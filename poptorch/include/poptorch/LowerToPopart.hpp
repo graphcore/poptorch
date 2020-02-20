@@ -11,7 +11,7 @@ namespace poptorch {
 /*
  * Take the transformed graph and create a poponnx graph from it.
  */
-at::IValue lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor>& inTensors);
+at::IValue lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor>& inTensors, std::vector<at::Tensor>& parameters);
 
 } // namespace Poptorch
 

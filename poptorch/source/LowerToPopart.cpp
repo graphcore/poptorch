@@ -20,8 +20,9 @@ namespace {
  */
 class LowerToPopart {
 public:
-  LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins)
-      : graph(g), inTensors(ins) {}
+  LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
+                std::vector<at::Tensor> &params)
+      : graph(g), inTensors(ins), parameters(params) {}
 
   void Lower();
 
@@ -32,12 +33,13 @@ private:
 
   std::vector<at::Tensor> &inTensors;
 
+  std::vector<at::Tensor> &parameters;
+
   // Mapping between the SSA values of torch jit with the ssa values of popart.
   std::unordered_map<torch::jit::Value *, poptorch::TensorId> valueMap;
   std::unordered_map<poptorch::TensorId, at::Tensor *> inputMap;
 
   std::list<poptorch::TensorId> outputs;
-
 
   poptorch::Compiler compiler;
 
@@ -87,6 +89,8 @@ at::IValue LowerToPopart::CompileAndRun() {
   // Set up the outputs.
   for (poptorch::TensorId id : outputs) {
     std::vector<std::int64_t> dims = compiler.GetSize(id);
+
+    std::cout << "Torch output dims: " << dims[0] << std::endl;
 
     // Create the torch tensor and use its memory for the popart tensor.
     torchOutputs[id] = at::empty({dims});
@@ -163,57 +167,38 @@ void LowerToPopart::LowerParameters() {
   }
 
   // Then lower the other params (I.E the weights.)
+
+  std::size_t paramIndex = 0;
   for (torch::jit::Value *value : graph.param_node()->outputs()) {
     // Skip the values already added (I.E)
     if (valueMap.find(value) != valueMap.end())
       continue;
 
-    // Get the underlaying type, only tensor for now.
-    c10::TensorTypePtr asTensor = value->type()->cast<c10::TensorType>();
-    c10::VaryingShape dims = asTensor->sizes();
-    at::ScalarType elem_type = *asTensor->scalarType();
+    at::Tensor &tensorAsParam = parameters[paramIndex];
 
-    // Random number generator with a normal distribution mean of 0 and variance
-    // of 1.
-    std::random_device random{};
-    std::normal_distribution<float> distribution{0, 1};
-
-    // Set the inital value to be random numbers.
-    std::vector<float> initalValue(*asTensor->numel());
-
-    std::cout << "Weight random init distribution: ";
-    std::transform(initalValue.begin(), initalValue.end(), initalValue.begin(),
-                   [&](float) {
-                     // Kaiming random initalization.
-                     float x = distribution(random) * std::sqrt(2.0f / (10.0f));
-                     std::cout << x << " ";
-                     return x;
-                   });
-    std::cout << std::endl;
-
-    // Convert the dimensions to popart supported type.
-    std::vector<std::int64_t> popartDims(*dims.size());
-    for (std::size_t i = 0; i < *dims.size(); ++i) {
-      popartDims[i] = static_cast<std::int64_t>(*dims[i]);
-    }
+    // Convert the tensor type to the correct vector size.
+    std::vector<int64_t> dims;
+    std::transform(tensorAsParam.sizes().begin(), tensorAsParam.sizes().end(),
+                   std::back_inserter(dims), [](std::int64_t i) { return i; });
 
     // Unpack the elem type into its Popart type.
-    std::string popartType = "FLOAT";
-    // When we actually support more types unpack them here
+    std::string popartType = typeToPopart(tensorAsParam.scalar_type());
 
     valueMap[value] = compiler.AddInitializedInputTensor(
-        "Weight", popartType.c_str(), popartDims,
-        static_cast<void *>(initalValue.data()));
+        "Weight", popartType.c_str(), dims, tensorAsParam.data_ptr());
+
+      paramIndex++;
   }
 }
 
 } // namespace
 
 at::IValue lowerToPopart(torch::jit::Graph &graph,
-                         std::vector<at::Tensor> &inTensors) {
+                         std::vector<at::Tensor> &inTensors,
+                         std::vector<at::Tensor> &parameters) {
   std::srand(std::time(nullptr));
 
-  LowerToPopart lower_impl{graph, inTensors};
+  LowerToPopart lower_impl{graph, inTensors, parameters};
   lower_impl.Lower();
 
   return lower_impl.CompileAndRun();

@@ -23,6 +23,8 @@ def make_tuple(example_inputs):
     return example_inputs
 
 
-def traceAndRun(path, tensors):
+def traceAndRun(network, tensors):
     in_tensors = make_tuple(tensors)
-    return poptorch_core.traceAndRun(path, in_tensors)
+
+    n = torch.jit.trace(network, in_tensors)
+    return poptorch_core.traceAndRun(n._c, in_tensors)

@@ -34,53 +34,42 @@ void popartMappingPass(std::shared_ptr<torch::jit::Graph> &graph) {
 }
 
 pybind11::object traceAndRun(
-    std::string model_path, pybind11::tuple inputs) {
-  std::cout << "Running transform pass on " << model_path << "\n";
-
-  torch::jit::script::Module module;
-  try {
-    module = torch::jit::load(model_path);
-  } catch (const c10::Error &e) {
-    std::cerr << "Error loading '" << model_path << "'\n";
-    return {};
-  }
+    torch::jit::script::Module& module, pybind11::tuple inputs) {
 
   auto forward = module.get_method("forward");
-  {
-    std::shared_ptr<torch::jit::Graph> graph = forward.graph();
-    std::cout << "Dumping graph:\n";
-    graph->dump();
+  auto graphAndTensors =
+      torch::jit::LowerGraph(*forward.graph(), module._ivalue());
+  auto graph = graphAndTensors.first;
+
+
+  torch::jit::RemoveInplaceOps(graph);
+
+  popartMappingPass(graph);
+
+  // Create a jit stack from the incoming pytorch tensors.
+  torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
+
+  // And turn convert them into at tensors which we can then resolve the address of.
+  std::vector<at::Tensor> inputTensors;
+  for (torch::jit::IValue value : inputStack) {
+    inputTensors.push_back(value.toTensor());
   }
 
-  {
-    auto graphAndTensors =
-        torch::jit::LowerGraph(*forward.graph(), module._ivalue());
-    std::cout << "Dumping lowered graph:\n";
-    auto graph = graphAndTensors.first;
-    graph->dump();
 
-    torch::jit::RemoveInplaceOps(graph);
+  // Find the parameter data from.
+  std::vector<at::Tensor> parameterData;
 
-    popartMappingPass(graph);
-
-    // Create a jit stack from the incoming pytorch tensors.
-    torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
-
-    // And turn convert them into at tensors which we can then resolve the address of.
-    std::vector<at::Tensor> inputTensors;
-
-    for (torch::jit::IValue value : inputStack) {
-      inputTensors.push_back(value.toTensor());
-    // .is_contiguous() << "  Data: " << value.toTensor().data_ptr() << std::endl;
-    }
-
-    at::IValue tensor = poptorch::lowerToPopart(*graph, inputTensors);
-    graph->dump();
-
-    return torch::jit::toPyObject(tensor);
+  for (at::Tensor param : module.parameters()) {
+    parameterData.push_back(param);
   }
 
-  std::cout << "exiting transformPass\n";
+
+  std::cout << "Graph right before popart" << std::endl;
+  graph->dump();
+
+  at::IValue tensor = poptorch::lowerToPopart(*graph, inputTensors, parameterData);
+
+  return torch::jit::toPyObject(tensor);
 }
 
 } // namespace poptorch

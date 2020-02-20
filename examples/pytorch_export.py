@@ -7,6 +7,7 @@ import torch.nn as nn
 import numpy as np
 
 import poptorch
+import torchvision.models as models
 
 
 class Layer(nn.Module):
@@ -27,7 +28,6 @@ class Net(nn.Module):
 
         self.layer1 = Layer(10, 10)
         self.layer2 = Layer(10, 5)
-        self.layer3 = Layer(5, 1)
 
     def forward(self, x):
         # poptorch.pipeline_stage(0)
@@ -36,24 +36,26 @@ class Net(nn.Module):
         # poptorch.pipeline_stage(1)
         # poptorch.virtual_graph(1)
         x = self.layer2(x)
-        x = self.layer3(x)
 
         return x
 
 
-net = Net()
-net.layer1.vgraph = 0
-net.layer2.vgraph = 1
-# Using trace to avoid dealing with if statements for now.
-# n = torch.jit.script(net)
-x = torch.ones(10)
-n = torch.jit.trace(net, x)
 
-n.save('foo.pt')
-out_tensor = poptorch.traceAndRun('foo.pt', x)
+#net = models.resnet18(pretrained=False)
+
+net = Net()
+
+# Using trace to avoid dealing with if statements for now.
+#n = torch.jit.script(net)
+#x = torch.ones((64, 3, 7, 7))
+x = torch.ones(10)
+
+out_tensor = poptorch.traceAndRun(net, x)
 print(out_tensor)
 
-print(net.forward(x))
+print(net(x))
+
+#print(net.forward(x))
 
 # print(type(n.graph))
 # poptorch.foo(n.graph)
