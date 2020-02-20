@@ -5,5 +5,16 @@ from poptorch_core import *
 pipeline_stage = torch.ops.poptorch.pipeline_stage
 virtual_graph = torch.ops.poptorch.virtual_graph
 
-def transformPass(path, tensor):
-    poptorch_core.transformPass(path, [[str(tensor.dtype), list(tensor.shape)]])
+# From pytorch/torch/jit/__init__.py
+def make_tuple(example_inputs):
+    if isinstance(example_inputs, (torch.Tensor, dict)):
+        return (example_inputs,)
+    # done primarily so that weird iterables fail here and not pybind11 code
+    if not isinstance(example_inputs, tuple):
+        return tuple(example_inputs)
+    return example_inputs
+
+
+def traceAndRun(path, tensors):
+    in_tensors = make_tuple(tensors)
+    return poptorch_core.traceAndRun(path, in_tensors)

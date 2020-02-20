@@ -1,11 +1,15 @@
 #include <iostream>
 
+
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
 #include <torch/csrc/jit/passes/lower_graph.h>
 #include <torch/script.h>
 
 #include <torch/csrc/jit/passes/remove_inplace_ops.h>
+#include <torch/csrc/jit/pybind_utils.h>
 
 #include "poptorch/LowerToPopart.hpp"
 
@@ -29,8 +33,8 @@ void popartMappingPass(std::shared_ptr<torch::jit::Graph> &graph) {
   }
 }
 
-void transformPass(
-    std::string model_path, InputTensorType& inputs) {
+pybind11::object traceAndRun(
+    std::string model_path, pybind11::tuple inputs) {
   std::cout << "Running transform pass on " << model_path << "\n";
 
   torch::jit::script::Module module;
@@ -38,7 +42,7 @@ void transformPass(
     module = torch::jit::load(model_path);
   } catch (const c10::Error &e) {
     std::cerr << "Error loading '" << model_path << "'\n";
-    return;
+    return {};
   }
 
   auto forward = module.get_method("forward");
@@ -59,8 +63,21 @@ void transformPass(
 
     popartMappingPass(graph);
 
-    poptorch::lowerToPopart(*graph, inputs);
+    // Create a jit stack from the incoming pytorch tensors.
+    torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
+
+    // And turn convert them into at tensors which we can then resolve the address of.
+    std::vector<at::Tensor> inputTensors;
+
+    for (torch::jit::IValue value : inputStack) {
+      inputTensors.push_back(value.toTensor());
+    // .is_contiguous() << "  Data: " << value.toTensor().data_ptr() << std::endl;
+    }
+
+    at::IValue tensor = poptorch::lowerToPopart(*graph, inputTensors);
     graph->dump();
+
+    return torch::jit::toPyObject(tensor);
   }
 
   std::cout << "exiting transformPass\n";
@@ -70,5 +87,5 @@ void transformPass(
 
 
 PYBIND11_MODULE(poptorch_core, m) {
-  m.def("transformPass", poptorch::transformPass);
+  m.def("traceAndRun", poptorch::traceAndRun);
 }

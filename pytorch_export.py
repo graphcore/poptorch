@@ -27,6 +27,7 @@ class Net(nn.Module):
 
         self.layer1 = Layer(10, 10)
         self.layer2 = Layer(10, 5)
+        self.layer3 = Layer(5, 1)
 
     def forward(self, x):
         # poptorch.pipeline_stage(0)
@@ -34,7 +35,9 @@ class Net(nn.Module):
         x = self.layer1(x)
         # poptorch.pipeline_stage(1)
         # poptorch.virtual_graph(1)
-        # x = self.layer2(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+
         return x
 
 
@@ -47,7 +50,10 @@ x = torch.ones(10)
 n = torch.jit.trace(net, x)
 
 n.save('foo.pt')
-poptorch.transformPass('foo.pt', x)
+out_tensor = poptorch.traceAndRun('foo.pt', x)
+print(out_tensor)
+
+print(net.forward(x))
 
 # print(type(n.graph))
 # poptorch.foo(n.graph)
