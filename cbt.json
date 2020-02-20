@@ -1,0 +1,7 @@
+{
+  "dependencies" : [
+    "popart",
+    "pybind11"
+  ],
+  "superproject_cmake_includes" : [ "SuperProjectConfig.cmake" ]
+}

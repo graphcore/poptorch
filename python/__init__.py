@@ -1,3 +1,11 @@
+import os
+import sys
+
+# Don't think we should keep this. It's done in popart, but we should just be able to add this path to LD_LIBRARY_PATH in build/activate.sh?
+lp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lib")
+lp = os.path.abspath(lp)
+sys.path.insert(0, lp)
+
 import torch
 import poptorch_core
 from poptorch_core import *

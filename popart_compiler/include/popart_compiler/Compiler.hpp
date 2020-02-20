@@ -2,6 +2,7 @@
 #define POPART_COMPILER_H
 
 #include <memory>
+#include <vector>
 
 namespace poptorch {
 
