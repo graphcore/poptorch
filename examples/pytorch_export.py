@@ -9,53 +9,38 @@ import numpy as np
 import poptorch
 import torchvision.models as models
 
+from PIL import Image
+from torchvision import transforms
 
-class Layer(nn.Module):
-    def __init__(self, in_size, out_size):
-        super(Layer, self).__init__()
-
-        self.net = nn.Linear(in_size, out_size)
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-        x = self.net(x)
-        return self.relu(x)
-
-
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-
-        self.layer1 = Layer(10, 10)
-        self.layer2 = Layer(10, 5)
-
-    def forward(self, x):
-        # poptorch.pipeline_stage(0)
-        # poptorch.virtual_graph(0)
-        x = self.layer1(x)
-        # poptorch.pipeline_stage(1)
-        # poptorch.virtual_graph(1)
-        x = self.layer2(x)
-
-        return x
+# Image loading from https://pytorch.org/hub/pytorch_vision_resnet/
+input_image = Image.open("zeus.jpg")
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+input_tensor = preprocess(input_image)
+input_batch = input_tensor.unsqueeze(0)
 
 
+supported_models = [
+    models.resnet18,
+    models.resnet50,
+    models.alexnet,
+    models.vgg16,
+    models.resnext50_32x4d,
+   ]
 
-#net = models.resnet18(pretrained=False)
 
-net = Net()
+for model in supported_models:
+    print("Loading model: " + str(model))
+    model = model(pretrained=True)
 
-# Using trace to avoid dealing with if statements for now.
-#n = torch.jit.script(net)
-#x = torch.ones((64, 3, 7, 7))
-x = torch.ones(10)
+    model.eval()
 
-out_tensor = poptorch.traceAndRun(net, x)
-print(out_tensor)
+    inference_model = poptorch.inferenceModel(model)
+    out_tensor = inference_model(input_batch)
 
-print(net(x))
-
-#print(net.forward(x))
-
-# print(type(n.graph))
-# poptorch.foo(n.graph)
+    print(torch.topk(torch.softmax(out_tensor, 1), 5))
+    print(torch.topk(torch.softmax(model(input_batch), 1), 5))

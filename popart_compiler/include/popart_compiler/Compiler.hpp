@@ -14,14 +14,36 @@ struct CompilerImpl;
 
 class Compiler {
 public:
-  Compiler();
+  Compiler(bool isTraining, std::uint64_t steps);
   ~Compiler();
+  Compiler(Compiler&& compiler);
 
   poptorch::TensorId AddInputTensor(const char *type,
                                     const std::vector<std::int64_t> &dims);
 
-  poptorch::TensorId BuildOp(const char *operation,
-                             const std::vector<poptorch::TensorId> &inputs);
+#define INT_VEC std::vector<std::int64_t>
+#define FLOAT float
+#define INT std::int64_t
+#define BOOL bool
+#define NONE
+#define ARG(Type, Name) , Type Name
+#define BODY_ARG(Name) NONE
+
+// Create a function decl with the given call and arguments.
+#define OP_DECL(StrFunc, function, OnnxImpl, Args, BodyArgs, VariadicIndex)    \
+  poptorch::TensorId function(                                                 \
+      const std::vector<poptorch::TensorId> &inputs Args);
+
+#include "SupportedOperations.inc.h"
+
+#undef BODY_ARG
+#undef OP_DECL
+#undef ARG
+#undef NONE
+#undef INT_VEC
+#undef FLOAT
+#undef INT
+#undef BOOL
 
   poptorch::TensorId
   AddInitializedInputTensor(const char *name, const char *type,
@@ -31,18 +53,25 @@ public:
 
   void AddOutput(poptorch::TensorId output);
 
-  void SetUpInputOp(poptorch::TensorId id, void *ptr,
+  void SetUpInputOp(poptorch::TensorId id, float* ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void SetUpOutputOp(poptorch::TensorId id, void *ptr,
+  void SetUpInputOp(poptorch::TensorId id, std::int32_t* ptr,
                     const std::vector<std::int64_t> &dims);
 
+  void SetUpInputOp(poptorch::TensorId id, std::int64_t* ptr,
+                    const std::vector<std::int64_t> &dims);
+
+
+  void SetUpOutputOp(poptorch::TensorId id, float *ptr,
+                     const std::vector<std::int64_t> &dims);
 
   void InitSession();
 
-
   void Run();
 
+
+  std::uint64_t BatchPerStep();
 
 private:
   std::unique_ptr<detail::CompilerImpl> impl;

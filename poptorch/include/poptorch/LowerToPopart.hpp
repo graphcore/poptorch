@@ -1,9 +1,9 @@
 #ifndef INCLUDE_POPTORCH_LOWER_TO_POPART_H
 #define INCLUDE_POPTORCH_LOWER_TO_POPART_H
 
-#include <torch/csrc/jit/ir.h>
-
+#include <poptorch/PoplarExecutable.hpp>
 #include <string>
+#include <torch/csrc/jit/ir.h>
 #include <vector>
 
 namespace poptorch {
@@ -11,8 +11,10 @@ namespace poptorch {
 /*
  * Take the transformed graph and create a poponnx graph from it.
  */
-at::IValue lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor>& inTensors, std::vector<at::Tensor>& parameters);
+std::shared_ptr<poptorch::PoplarExecutable>
+lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
+              std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training);
 
-} // namespace Poptorch
+} // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_LOWER_TO_POPART_H
