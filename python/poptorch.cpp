@@ -46,13 +46,23 @@ pybind11::object execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
   return torch::jit::toPyObject(value);
 }
 
+torch::jit::script::Module *as_module(py::handle h) {
+  return reinterpret_cast<torch::jit::script::Module *>(
+      pybind11::detail::values_and_holders(
+          reinterpret_cast<pybind11::detail::instance *>(h.ptr()))
+          .begin()
+          ->value_ptr());
+}
 
-std::shared_ptr<poptorch::PoplarExecutable> compile(
-    torch::jit::script::Module& module, pybind11::tuple inputs, std::uint64_t steps, bool training) {
+std::shared_ptr<poptorch::PoplarExecutable> compile(py::handle h,
+                                                    pybind11::tuple inputs,
+                                                    std::uint64_t steps,
+                                                    bool training) {
+  auto module = as_module(h);
 
-  auto forward = module.get_method("forward");
+  auto forward = module->get_method("forward");
   auto graphAndTensors =
-      torch::jit::LowerGraph(*forward.graph(), module._ivalue());
+      torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
   auto graph = graphAndTensors.first;
 
 

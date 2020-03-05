@@ -1,17 +1,15 @@
-from poptorch_core import *
-import poptorch_core
-import torch
 import os
 import sys
-
-
-import torch
-import torch.nn as nn
-
 # Don't think we should keep this. It's done in popart, but we should just be able to add this path to LD_LIBRARY_PATH in build/activate.sh?
 lp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lib")
 lp = os.path.abspath(lp)
 sys.path.insert(0, lp)
+
+import torch
+import torch.nn as nn
+
+from poptorch_core import *
+import poptorch_core
 
 
 pipeline_stage = torch.ops.poptorch.pipeline_stage
