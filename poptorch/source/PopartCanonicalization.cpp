@@ -101,11 +101,9 @@ CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
 }
 
 void CanonicalizeImpl::SearchAndPossiblyDestroy(torch::jit::Node *node) {
-  // We are assuming nodes only have 1 output. TODO: This may not be true.
-  // The input has more but it also has a lot (resnet 18 > 100) and is used by
-  // pretty much every op so would have a detramental impact on performance if
-  // we looped over its outputs everytime to see if they are still unused.
-  if (node->outputs().size() != 1 || node->output()->uses().size() != 0) {
+
+  // Skip parameters and nodes with any uses.
+  if (node->kind() == c10::prim::Param || node->hasUses()) {
     return;
   }
 
@@ -304,22 +302,37 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           *HandleConstant<float>(node->inputs()[1]->node());
 
       newNode = CreateDropout(graph, node->inputs()[0], rate);
+    } else if (kindAsStr == "poptorch::begin_ipu_block") {
+
+      // This could maybe be improved. Can we add attributes on the frontend?
+      // TODO.
+      newNode = graph.create(c10::Symbol::fromQualString("poptorch::begin_ipu_block"));
+
+      // Convert the prim::Constant into an attribute.
+      std::int64_t ipu_id =
+          *HandleConstant<std::int64_t>(node->input()->node());
+      newNode->i_(c10::Symbol::fromQualString("attr::ipu"), ipu_id);
     }
 
     // If we have a new node add it and replace the old use.
     if (newNode) {
       newNode->insertBefore(node);
 
-      torch::jit::Value *newVal = newNode->output();
-      torch::jit::Value *oldVal = node->output();
 
-      // Take the type of the old value.
-      newVal->setType(oldVal->type());
-
-      // Replace the old value with the new one.
-      oldVal->replaceAllUsesWith(newVal);
-
+      // Mark this node for deletion.
       toDelete.insert(node);
+
+      if (node->hasUses()) {
+        torch::jit::Value *newVal = newNode->output();
+        torch::jit::Value *oldVal = node->output();
+
+        // Take the type of the old value.
+        newVal->setType(oldVal->type());
+
+        // Replace the old value with the new one.
+        oldVal->replaceAllUsesWith(newVal);
+      }
+
     }
   }
 
@@ -332,8 +345,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 } // namespace
 
 void Canonicalize(torch::jit::Graph &graph) {
-
-  graph.dump();
   CanonicalizeImpl converter;
   converter.Run(graph);
 }

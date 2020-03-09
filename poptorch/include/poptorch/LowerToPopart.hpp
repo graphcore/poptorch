@@ -13,7 +13,8 @@ namespace poptorch {
  */
 std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
-              std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training);
+              std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training,
+	      std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation);
 
 } // namespace poptorch
 

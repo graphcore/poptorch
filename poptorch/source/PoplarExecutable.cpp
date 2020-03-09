@@ -32,7 +32,7 @@ at::IValue PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
   for (poptorch::TensorId id : popartOutputs) {
     std::vector<std::int64_t> dims = compiler.GetSize(id);
 
-    dims[0] *= compiler.BatchPerStep();
+    dims[0] *= compiler.PopartBatchDim();
 
     // Create the torch tensor and use its memory for the popart tensor.
     torchOutputs[id] = at::empty({dims});

@@ -14,17 +14,16 @@
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 
-void pipeline_stage(int64_t pstage) {}
-
-void virtual_graph(int64_t vgraph) {}
+void begin_ipu_block(int64_t ipu_id) {}
+void end_ipu_block() { }
 
 at::Tensor ipu_print_tensor(at::Tensor t) {
   return t;
 }
 
 static auto registry =
-    torch::RegisterOperators("poptorch::pipeline_stage", &pipeline_stage)
-        .op("poptorch::virtual_graph", &virtual_graph)
+    torch::RegisterOperators("poptorch::begin_ipu_block", &begin_ipu_block)
+        .op("poptorch::end_ipu_block", &end_ipu_block)
         .op("poptorch::ipu_print_tensor", &ipu_print_tensor);
         //.op("popart::convolution", convolution, torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));
 
@@ -54,10 +53,8 @@ torch::jit::script::Module *as_module(py::handle h) {
           ->value_ptr());
 }
 
-std::shared_ptr<poptorch::PoplarExecutable> compile(py::handle h,
-                                                    pybind11::tuple inputs,
-                                                    std::uint64_t steps,
-                                                    bool training) {
+std::shared_ptr<poptorch::PoplarExecutable> compile(
+  py::handle h, pybind11::tuple inputs, std::uint64_t steps, bool training, std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation) {
   auto module = as_module(h);
 
   auto forward = module->get_method("forward");
@@ -92,7 +89,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compile(py::handle h,
   std::cout << "Graph right before popart" << std::endl;
   graph->dump();
 
-  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps, training);
+  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps, training, replicationFactor, gradientAccumulation);
 }
 
 } // namespace poptorch

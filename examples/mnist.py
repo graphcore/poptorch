@@ -8,10 +8,14 @@ import poptorch
 
 # Load the MNIST data.
 
-training_batch_size = 20
+training_batch_size = 2
 training_ipu_step_size = 20
+training_gradient_accumulation = 4
 
-training_combined_batch_size = training_batch_size*training_ipu_step_size
+
+training_combined_batch_size = training_gradient_accumulation*training_batch_size*training_ipu_step_size
+
+
 training_data = torch.utils.data.DataLoader(
   torchvision.datasets.MNIST('mnist_data/', train=True, download=True,
                              transform=torchvision.transforms.Compose([
@@ -37,11 +41,13 @@ class Block(nn.Module):
     def __init__(self, in_channels, num_filters,kernel_size, pool_size):
         super(Block, self).__init__()
         self.conv = nn.Conv2d(in_channels, num_filters, kernel_size=kernel_size)
+        self.batch = nn.BatchNorm2d(num_filters)
         self.pool = nn.MaxPool2d(kernel_size=pool_size)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         x = self.conv(x)
+        x = self.batch(x)
         x = self.pool(x)
         x = self.relu(x)
         return x
@@ -59,15 +65,17 @@ class Network(nn.Module):
 
 
     def forward(self, x):
-        x = self.layer1(x)
+        with poptorch.IPU(0):
+          x = self.layer1(x)
+          x = self.layer2(x)
+          # -1 means deduce from the above layers, this is just batch size for most iterations.
+          x = x.view(-1, 320)
 
-        x = self.layer2(x)
-        # -1 means deduce from the above layers, this is just batch size for most iterations.
-        x = x.view(-1, 320)
-
-        x = self.layer3_act(self.layer3(x))
-        x = self.layer4(x)
-        return self.softmax(x)
+        with poptorch.IPU(1):
+          x = self.layer3_act(self.layer3(x))
+          x = self.layer4(x)
+          #x = poptorch.ipu_print_tensor(x)
+          return self.softmax(x)
 
 
 
@@ -80,11 +88,11 @@ loss_function = nn.CrossEntropyLoss()
 
 
 # Create model for training which will run on IPU.
-training_model = poptorch.trainingModel(model, training_ipu_step_size)
+training_model = poptorch.trainingModel(model, training_ipu_step_size, gradient_accumulation=training_gradient_accumulation)
 
 # Same model as above, they will share weights (in 'model') so while the above
 # trains the weights in the weights in this will automatically update.
-inference_model = poptorch.inferenceModel(model)
+inference_model = poptorch.inferenceModel(model, 4)
 
 def train():
   for batch_number, (data, labels) in enumerate(training_data):
@@ -135,5 +143,8 @@ def test():
       total += validation_batch_size
   print("Validation: of " + str(total) + " samples we got: " + str((correct/total)* 100.0) + "% correct")
 
-train()
-test()
+
+for i in range(0, 30):
+ print("Epoch " + str(i))
+ train()
+ test()

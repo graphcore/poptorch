@@ -14,7 +14,7 @@ struct CompilerImpl;
 
 class Compiler {
 public:
-  Compiler(bool isTraining, std::uint64_t steps);
+  Compiler(bool isTraining, std::uint64_t steps, std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation);
   ~Compiler();
   Compiler(Compiler&& compiler);
 
@@ -66,13 +66,16 @@ public:
   void SetUpOutputOp(poptorch::TensorId id, float *ptr,
                      const std::vector<std::int64_t> &dims);
 
+  void SetActiveIpu(std::uint64_t id);
+
   void InitSession();
 
   void Run();
 
+  std::uint64_t BatchPerStep() const;
 
-  std::uint64_t BatchPerStep();
 
+  std::uint64_t PopartBatchDim() const;
 private:
   std::unique_ptr<detail::CompilerImpl> impl;
 };
