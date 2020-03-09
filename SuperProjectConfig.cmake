@@ -1,5 +1,2 @@
-set(Torch_DIR "" CACHE STRING "The torch install dir")
-list(APPEND POPTORCH_CMAKE_ARGS -DTorch_DIR=${Torch_DIR})
-
 set(POPLAR_INSTALL_DIR "" CACHE STRING "The Poplar install directory")
 list(APPEND POPTORCH_CMAKE_ARGS -DPOPLAR_INSTALL_DIR=${POPLAR_INSTALL_DIR})
