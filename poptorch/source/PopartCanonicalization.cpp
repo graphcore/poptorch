@@ -130,7 +130,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     torch::jit::Symbol kind = node->kind();
     std::string kindAsStr = kind.toDisplayString();
 
-
     if (kindAsStr == "aten::_convolution") {
       /*
       aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[]
@@ -167,8 +166,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       if (transposed && *transposed == 0) {
 
         // Create a "normal" convolution.
-        newNode = poptorch::CreateConvolution(graph, inputs, dilation, groups,
-                                              padding, stride);
+        newNode = poptorch::Create_conv(graph, inputs, dilation, groups, {},
+                                        padding, stride);
 
       } else {
 
@@ -198,8 +197,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       float momentum = *HandleConstant<float>(node->inputs()[6]->node());
       float epsilon = *HandleConstant<float>(node->inputs()[7]->node());
 
-      newNode = poptorch::CreateBatchNorm(
-          graph, inputTensors, epsilon, momentum, static_cast<bool>(training));
+      newNode = poptorch::Create_batchnormalization(graph, inputTensors, 1,
+                                                    epsilon, momentum);
 
     } else if (kindAsStr == "aten::max_pool2d") {
       /*
@@ -219,17 +218,17 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       padding.push_back(padding[0]);
       padding.push_back(padding[1]);
 
-      newNode = poptorch::CreateMaxPool(graph, node->inputs()[0], kernel_size,
-                                        stride, padding, dilation);
+      newNode = poptorch::Create_maxpool(graph, {node->inputs()[0]}, 1,
+                                         kernel_size, 0, dilation, padding, 0, stride);
     } else if (kindAsStr == "aten::add") {
       // Drop the nonsense term in the add.
       // TODO: Figure out what the "alpha" is.
       newNode =
-          poptorch::CreateAdd(graph, node->inputs()[0], node->inputs()[1]);
+          poptorch::Create_add(graph, {node->inputs()[0], node->inputs()[1]});
     } else if (kindAsStr == "aten::flatten") {
 
-      newNode = poptorch::CreateFlatten(graph, node->inputs()[0]);
-    } else if (kindAsStr== "aten::addmm") {
+      newNode = poptorch::Create_flatten(graph, {node->inputs()[0]}, 1);
+    } else if (kindAsStr == "aten::addmm") {
 
       //"aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta,
       // Scalar alpha) -> Tensor")
@@ -240,14 +239,13 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       float beta = *HandleConstant<std::int64_t>(node->inputs()[3]->node());
       float alpha = *HandleConstant<std::int64_t>(node->inputs()[4]->node());
 
-      newNode = poptorch::CreateMatmul(graph, matB, matC);
+      newNode = poptorch::Create_matmul(graph, {matB, matC});
       newNode->insertBefore(node);
-      newNode = poptorch::CreateAdd(graph, newNode->output(), matA);
+      newNode = poptorch::Create_add(graph, {newNode->output(), matA});
       //  newNode = poptorch::CreateAdd(graph, matA, matB);
       //  newNode = poptorch::CreateGEMM(graph, matB, matC, matA, beta, alpha);
 
-    } else if (kindAsStr ==
-               "aten::adaptive_avg_pool2d") {
+    } else if (kindAsStr == "aten::adaptive_avg_pool2d") {
 
       std::vector<std::int64_t> outputShape =
           HandleListConstruct(node->inputs()[1]->node());
@@ -267,15 +265,15 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           inputShape[1] - (outputShape[1] - 1) * stride[1]};
       const std::vector<int64_t> &padding{0, 0, 0, 0};
 
-      newNode = CreateAveragePool(graph, node->inputs()[0], kernel_shape,
-                                  stride, padding);
+      newNode = Create_averagepool(graph, {node->inputs()[0]}, kernel_shape, 0, 0,
+                                   padding, stride);
     } else if (kindAsStr == "aten::softmax") {
       // "aten::softmax(Tensor self, int dim, int? dtype) -> Tensor"
 
       std::int64_t dim =
           *HandleConstant<std::int64_t>(node->inputs()[1]->node());
 
-      newNode = CreateSoftmax(graph, node->inputs()[0], dim);
+      newNode = Create_softmax(graph, {node->inputs()[0]}, dim);
 
     } else if (kindAsStr == "aten::view") {
       // aten::view(Tensor(a) self, int[] size) -> Tensor(a)
@@ -298,26 +296,29 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     } else if (kindAsStr == "aten::dropout") {
       // aten::dropout(Tensor input, float p, bool train) -> Tensor
 
-      float rate =
-          *HandleConstant<float>(node->inputs()[1]->node());
+      float rate = *HandleConstant<float>(node->inputs()[1]->node());
 
-      newNode = CreateDropout(graph, node->inputs()[0], rate);
+      newNode = Create_dropout(graph, {node->inputs()[0]}, 1, rate);
     } else if (kindAsStr == "poptorch::begin_ipu_block") {
 
       // This could maybe be improved. Can we add attributes on the frontend?
       // TODO.
-      newNode = graph.create(c10::Symbol::fromQualString("poptorch::begin_ipu_block"));
+      newNode = graph.create(
+          c10::Symbol::fromQualString("poptorch::begin_ipu_block"));
 
       // Convert the prim::Constant into an attribute.
       std::int64_t ipu_id =
           *HandleConstant<std::int64_t>(node->input()->node());
       newNode->i_(c10::Symbol::fromQualString("attr::ipu"), ipu_id);
+    } else if (kindAsStr == "aten::t") {
+      newNode = Create_transpose(graph, {node->inputs()[0]}, {});
+    } else if (kindAsStr == "aten::relu" || kindAsStr == "aten::relu_") {
+      newNode = Create_relu(graph, {node->inputs()[0]});
     }
 
     // If we have a new node add it and replace the old use.
     if (newNode) {
       newNode->insertBefore(node);
-
 
       // Mark this node for deletion.
       toDelete.insert(node);
@@ -332,7 +333,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         // Replace the old value with the new one.
         oldVal->replaceAllUsesWith(newVal);
       }
-
     }
   }
 

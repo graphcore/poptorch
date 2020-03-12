@@ -95,7 +95,12 @@ Compiler::AddInputTensor(const char *string,
 #define OP_DECL(name, function, onnxImpl, Args, BodyArgs, VariadicIndex)       \
   poptorch::TensorId Compiler::function(                                       \
       const std::vector<poptorch::TensorId> &inputs Args) {                    \
-    auto aiOnnx = impl->opBuilder->aiOnnxOpset9();                             \
+    auto AiOnnxOpset6 = impl->opBuilder->aiOnnxOpset6();                       \
+    auto AiOnnxOpset7 = impl->opBuilder->aiOnnxOpset7();                       \
+    auto AiOnnxOpset8 = impl->opBuilder->aiOnnxOpset8();                       \
+    auto AiOnnxOpset9 = impl->opBuilder->aiOnnxOpset9();                       \
+    auto AiOnnxOpset10 = impl->opBuilder->aiOnnxOpset10();                     \
+    auto AiOnnxOpset11 = impl->opBuilder->aiOnnxOpset11();                     \
     auto aiGraphcore = impl->opBuilder->aiGraphcoreOpset1();                   \
     std::vector<popart::TensorId> ins;                                         \
     std::transform(                                                            \
@@ -207,24 +212,21 @@ void Compiler::InitSession() {
     std::cout << "Acquired IPU device, running on device." << std::endl;
   }
 
-
   popart::SessionOptions options;
 
-    if (impl->usedIpus.size() > 1) {
-      options.enablePipelining = true;
-      options.enableVirtualGraphs = true;
-      options.virtualGraphMode =  popart::VirtualGraphMode::Manual;
-    }
+  if (impl->usedIpus.size() > 1) {
+    options.enablePipelining = true;
+    options.enableVirtualGraphs = true;
+    options.virtualGraphMode = popart::VirtualGraphMode::Manual;
+  }
 
-
-   if (impl->gradientAccumulation > 1) {
-      options.enableGradientAccumulation = true;
-      options.accumulationFactor= impl->gradientAccumulation;
-   }
+  if (impl->gradientAccumulation > 1) {
+    options.enableGradientAccumulation = true;
+    options.accumulationFactor = impl->gradientAccumulation;
+  }
 
   // Create the anchors, these are used to copy to the host.
   auto dataFlow = popart::DataFlow(impl->steps, impl->anchors);
-
 
   // Create the popart session object to actually run the graph.
   if (!impl->isTraining) {
@@ -246,7 +248,7 @@ void Compiler::InitSession() {
     popart::Loss *loss = new popart::NllLoss(networkOutput, inLabels, "loss",
                                              popart::ReductionType::SUM);
 
-loss->virtualGraph(impl->activeIpu);
+    loss->virtualGraph(impl->activeIpu);
     popart::GraphTransformer transformer{impl->opBuilder->getModelProto()};
 
     transformer.prepareNodesForTraining();
@@ -254,9 +256,8 @@ loss->virtualGraph(impl->activeIpu);
     // Create the training session.
     impl->session = popart::TrainingSession::createFromOnnxModel(
         transformer.getModelProto(), dataFlow, {loss}, optimizer, device, {},
-       options, popart::PatternsLevel::DEFAULT);
+        options, popart::PatternsLevel::DEFAULT);
   }
-
 
   // Poplar compilation.
   impl->session->prepareDevice();
@@ -300,13 +301,15 @@ void Compiler::SetActiveIpu(std::uint64_t id) { impl->activeIpu = id; }
 
 std::uint64_t Compiler::BatchPerStep() const { return impl->steps; }
 
-
-std::uint64_t Compiler::PopartBatchDim() const { return impl->replicationFactor * impl->steps * impl->gradientAccumulation; }
-
+std::uint64_t Compiler::PopartBatchDim() const {
+  return impl->replicationFactor * impl->steps * impl->gradientAccumulation;
+}
 
 Compiler::Compiler(Compiler &&other) { impl = std::move(other.impl); }
 
-Compiler::Compiler(bool isTraining, std::uint64_t steps, std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation) {
+Compiler::Compiler(bool isTraining, std::uint64_t steps,
+                   std::uint64_t replicationFactor,
+                   std::uint64_t gradientAccumulation) {
   impl = std::make_unique<detail::CompilerImpl>();
   impl->isTraining = isTraining;
   impl->steps = steps;
