@@ -11,6 +11,7 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/pybind_utils.h>
 
+#include "poptorch/ShapeInference.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 
@@ -47,6 +48,14 @@ pybind11::object execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
 
 torch::jit::script::Module *as_module(py::handle h) {
   return reinterpret_cast<torch::jit::script::Module *>(
+      pybind11::detail::values_and_holders(
+          reinterpret_cast<pybind11::detail::instance *>(h.ptr()))
+          .begin()
+          ->value_ptr());
+}
+
+torch::jit::Graph *as_graph(py::handle h) {
+  return reinterpret_cast<torch::jit::Graph *>(
       pybind11::detail::values_and_holders(
           reinterpret_cast<pybind11::detail::instance *>(h.ptr()))
           .begin()
@@ -92,6 +101,11 @@ std::shared_ptr<poptorch::PoplarExecutable> compile(
   return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps, training, replicationFactor, gradientAccumulation);
 }
 
+void pyPropagateInputShapes(py::handle h) {
+  auto graph = as_graph(h);
+  propagateInputShapes(graph);
+}
+
 } // namespace poptorch
 
 
@@ -100,4 +114,5 @@ PYBIND11_MODULE(poptorch_core, m) {
 
   m.def("compile", poptorch::compile);
   m.def("execute", poptorch::execute);
+  m.def("propagateInputShapes", poptorch::pyPropagateInputShapes);
 }

@@ -91,3 +91,7 @@ def trainingModel(model, device_iterations, gradient_accumulation=1):
 def inferenceModel(model, device_iterations=1):
     return PoplarExecutor(model, False, device_iterations)
 
+def propagateInputShapes(graph, dummyInputs):
+    for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
+        graphInput.inferTypeFrom(dummyInput)
+    poptorch_core.propagateInputShapes(graph)

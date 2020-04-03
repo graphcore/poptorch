@@ -9,6 +9,7 @@ pybind11_add_module(poptorch_core SHARED
   "${PROJECT_SOURCE_DIR}/poptorch/source/OpBuilder.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoplarExecutable.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   )
 
 target_link_libraries(poptorch_core PRIVATE
