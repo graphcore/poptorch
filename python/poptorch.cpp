@@ -14,6 +14,7 @@
 #include "poptorch/ShapeInference.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
+#include "poptorch/Peephole.hpp"
 
 void begin_ipu_block(int64_t ipu_id) {}
 void end_ipu_block() { }
@@ -106,6 +107,11 @@ void pyPropagateInputShapes(py::handle h) {
   propagateInputShapes(graph);
 }
 
+void pyPeepholeOptimizations(py::handle h, bool training) {
+  auto graph = as_graph(h);
+  peepholeOptimizations(*graph, training);
+}
+
 } // namespace poptorch
 
 
@@ -115,4 +121,5 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("compile", poptorch::compile);
   m.def("execute", poptorch::execute);
   m.def("propagateInputShapes", poptorch::pyPropagateInputShapes);
+  m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
 }

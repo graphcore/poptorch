@@ -1,4 +1,3 @@
-import pytest
 import torch
 import torch.nn as nn
 import numpy as np
@@ -51,7 +50,6 @@ def test_conv2d():
 
 
 def test_batchnorm():
-    pytest.skip()
     class X(nn.Module):
         def __init__(self, features):
             super(X, self).__init__()
@@ -70,7 +68,7 @@ def test_batchnorm():
     m = torch.jit.script(m)
     graph = m.graph
     torch._C._jit_pass_inline(graph)
-    poptorch.poptorch_core.cleanupAttrs(graph, True)
+    poptorch.poptorch_core.peepholeOptimizations(graph, False);
     graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
     torch._C._jit_pass_constant_propagation(graph)
     # Observe the graph doesn't already have a shape for the output.
