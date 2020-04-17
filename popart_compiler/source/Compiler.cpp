@@ -64,6 +64,15 @@ public:
   // Domain helpers
   popart::TensorId reshape(const std::vector<popart::TensorId> &inputs,
                            const std::vector<int64_t> &shape);
+
+  popart::TensorId intConstant(const std::vector<popart::TensorId> &inputs,
+                            const std::vector<int64_t> &data,
+                            const std::vector<int64_t> &shape);
+
+  popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
+                            const std::vector<double> &data,
+                            const std::vector<int64_t> &shape);
+
 };
 
 popart::TensorId
@@ -71,6 +80,72 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
                       const std::vector<int64_t> &shape) {
   auto aiOnnx = opBuilder->aiOnnxOpset9();
   return opBuilder->reshape_const(aiOnnx, inputs, shape);
+}
+
+popart::TensorId
+CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
+                       const std::vector<int64_t> &data,
+                       const std::vector<int64_t> &shape) {
+  // Create the tensor info for our new tensor.
+  popart::TensorInfo info{"INT", shape};
+
+  std::int64_t totalSize = std::accumulate(shape.begin(), shape.end(), 1,
+                                           std::multiplies<std::int64_t>());
+  std::vector<int64_t> broadcastedData(totalSize);
+
+  // Create the inital data for the variable.
+  popart::ConstVoidData theData;
+
+  if (data.size() == 1 && totalSize != 1) {
+
+    std::for_each(broadcastedData.begin(), broadcastedData.end(),
+                  [&data](std::int64_t &i) { i = data[0]; });
+
+    theData.data = broadcastedData.data();
+    theData.info = info;
+  } else {
+    theData.data = data.data();
+    theData.info = info;
+  }
+
+  auto aiOnnx = opBuilder->aiOnnxOpset9();
+  return aiOnnx.constant(theData);
+}
+
+
+
+popart::TensorId
+CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
+                       const std::vector<double> &data,
+                       const std::vector<int64_t> &shape) {
+  // Create the tensor info for our new tensor.
+  popart::TensorInfo info{"FLOAT", shape};
+
+  std::int64_t totalSize = std::accumulate(shape.begin(), shape.end(), 1,
+                                           std::multiplies<std::int64_t>());
+  std::vector<float> broadcastedData(totalSize);
+
+  // Create the inital data for the variable.
+  popart::ConstVoidData theData;
+
+  if (data.size() == 1 && totalSize != 1) {
+
+    std::for_each(broadcastedData.begin(), broadcastedData.end(),
+                  [&data](float &i) { i = data[0]; });
+
+    theData.data = broadcastedData.data();
+    theData.info = info;
+  } else {
+    int counter = 0;
+    std::for_each(broadcastedData.begin(), broadcastedData.end(),
+                  [&](float &i) { i = data[counter++]; });
+
+    theData.data = broadcastedData.data();
+    theData.info = info;
+  }
+
+  auto aiOnnx = opBuilder->aiOnnxOpset9();
+  return aiOnnx.constant(theData);
 }
 
 } // namespace detail
@@ -85,6 +160,7 @@ Compiler::AddInputTensor(const char *string,
 }
 
 #define INT_VEC std::vector<std::int64_t>
+#define FLOAT_VEC std::vector<double>
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
@@ -95,13 +171,8 @@ Compiler::AddInputTensor(const char *string,
 #define OP_DECL(name, function, onnxImpl, Args, BodyArgs, VariadicIndex)       \
   poptorch::TensorId Compiler::function(                                       \
       const std::vector<poptorch::TensorId> &inputs Args) {                    \
-    auto AiOnnxOpset6 = impl->opBuilder->aiOnnxOpset6();                       \
-    auto AiOnnxOpset7 = impl->opBuilder->aiOnnxOpset7();                       \
-    auto AiOnnxOpset8 = impl->opBuilder->aiOnnxOpset8();                       \
     auto AiOnnxOpset9 = impl->opBuilder->aiOnnxOpset9();                       \
-    auto AiOnnxOpset10 = impl->opBuilder->aiOnnxOpset10();                     \
-    auto AiOnnxOpset11 = impl->opBuilder->aiOnnxOpset11();                     \
-    auto aiGraphcore = impl->opBuilder->aiGraphcoreOpset1();                   \
+    auto AiGraphcoreOpset1 = impl->opBuilder->aiGraphcoreOpset1();             \
     std::vector<popart::TensorId> ins;                                         \
     std::transform(                                                            \
         inputs.begin(), inputs.end(), std::back_inserter(ins),                 \
@@ -119,6 +190,7 @@ Compiler::AddInputTensor(const char *string,
 #undef ARG
 #undef NONE
 #undef INT_VEC
+#undef FLOAT_VEC
 #undef FLOAT
 #undef INT
 #undef BOOL

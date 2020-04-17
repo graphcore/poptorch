@@ -22,6 +22,7 @@ public:
                                     const std::vector<std::int64_t> &dims);
 
 #define INT_VEC std::vector<std::int64_t>
+#define FLOAT_VEC std::vector<double>
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
@@ -41,6 +42,7 @@ public:
 #undef ARG
 #undef NONE
 #undef INT_VEC
+#undef FLOAT_VEC
 #undef FLOAT
 #undef INT
 #undef BOOL

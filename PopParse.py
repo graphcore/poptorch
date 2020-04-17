@@ -8,7 +8,7 @@ jsonOutput = {}
 
 files = [sys.argv[1] + "builder.hpp", sys.argv[1] + "builder.h.gen"]
 
-nodeBlacklist = {"DomainOpSet", "AiGraphcoreOpset1", "Builder", "getOpsetVersion"}
+nodeBlacklist = {"DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset10", "AiOnnxOpset11"}
 
 def find_children(node, argNum):
     argDict = {}
@@ -33,8 +33,6 @@ def find_functions(node, namespace):
 
     operation = {}
     if node.kind == clang.cindex.CursorKind.CXX_METHOD:
-
-
         returnType = str(node.type.spelling).split("(")[0]
 
         operation["type"] = returnType
@@ -80,7 +78,7 @@ find_functions(root_node,"")
 classes = []
 
 for n in jsonOutput:
-    if n.startswith("AiOnnxOpset"):
+    if n.startswith("Ai"):
         classes.append(n)
 
 classes.reverse()
@@ -153,8 +151,12 @@ for opset in classes:
         opDecl = "OP_DECL("
 
         opDecl += "\"popart::" + name + "\", " + name
-        # opDecl += ", " + opset + "." + name
-        opDecl += ", AiOnnxOpset11." + name
+
+        if opset.startswith("AiOnnxOpset"):
+            opDecl += ", AiOnnxOpset9." + name
+        else:
+            opDecl += ", " + opset + "." + name
+
 
         argVector = ""
         bodyArgVector = ""

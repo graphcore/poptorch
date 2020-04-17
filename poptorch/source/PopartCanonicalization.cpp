@@ -219,7 +219,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       padding.push_back(padding[1]);
 
       newNode = poptorch::Create_maxpool(graph, {node->inputs()[0]}, 1,
-                                         kernel_size, 0, dilation, padding, 0, stride);
+                                         kernel_size, padding, 0, stride);
     } else if (kindAsStr == "aten::add") {
       // Drop the nonsense term in the add.
       // TODO: Figure out what the "alpha" is.
@@ -265,7 +265,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           inputShape[1] - (outputShape[1] - 1) * stride[1]};
       const std::vector<int64_t> &padding{0, 0, 0, 0};
 
-      newNode = Create_averagepool(graph, {node->inputs()[0]}, kernel_shape, 0, 0,
+      newNode = Create_averagepool(graph, {node->inputs()[0]}, kernel_shape, 0,
                                    padding, stride);
     } else if (kindAsStr == "aten::softmax") {
       // "aten::softmax(Tensor self, int dim, int? dtype) -> Tensor"

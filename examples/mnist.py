@@ -65,17 +65,17 @@ class Network(nn.Module):
 
 
     def forward(self, x):
-        with poptorch.IPU(0):
-          x = self.layer1(x)
-          x = self.layer2(x)
-          # -1 means deduce from the above layers, this is just batch size for most iterations.
-          x = x.view(-1, 320)
+        # with poptorch.IPU(0):
+        x = self.layer1(x)
+        x = self.layer2(x)
+        # -1 means deduce from the above layers, this is just batch size for most iterations.
+        x = x.view(-1, 320)
 
-        with poptorch.IPU(1):
-          x = self.layer3_act(self.layer3(x))
-          x = self.layer4(x)
-          #x = poptorch.ipu_print_tensor(x)
-          return self.softmax(x)
+        # with poptorch.IPU(1):
+        x = self.layer3_act(self.layer3(x))
+        x = self.layer4(x)
+        #x = poptorch.ipu_print_tensor(x)
+        return self.softmax(x)
 
 
 

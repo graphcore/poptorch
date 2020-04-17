@@ -200,6 +200,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
 
 // Torch JIT api defines the attribute accessor as the following function names.
 #define INT_VEC is
+#define FLOAT_VEC fs
 #define FLOAT f
 #define INT i
 #define BOOL i
@@ -226,6 +227,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
 #undef ARG
 #undef NONE
 #undef INT_VEC
+#undef FLOAT_VEC
 #undef FLOAT
 #undef INT
 #undef BOOL
