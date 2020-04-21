@@ -113,6 +113,7 @@ def test_maxpool2d():
     assert _has_node(graph, 'aten::max_pool2d')
     assert inferedOutputShape == actualOutputShape
 
+
 def test_view():
     class X(nn.Module):
         def __init__(self, *args, **kwargs):
@@ -138,6 +139,7 @@ def test_view():
     assert _has_node(graph, 'aten::view')
     assert inferedOutputShape == actualOutputShape
 
+
 # "aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta, Scalar alpha) -> Tensor") ||
 def test_addmm():
     class X(nn.Module):
@@ -147,7 +149,7 @@ def test_addmm():
         def forward(self, x, y, z):
             return torch.addmm(x, y, z)
 
-    m =  X()
+    m = X()
     dummyInputs = (torch.zeros(2, 4), torch.zeros(2, 3), torch.zeros(3, 4))
     actualOutputShape = list(m(*dummyInputs).size())
 
@@ -163,3 +165,97 @@ def test_addmm():
     assert inferedOutputShape == actualOutputShape
 
 
+def test_add():
+    def run_test(shape_a, shape_b):
+        print(f'run_test({shape_a}, {shape_b})')
+
+        class X(nn.Module):
+            def __init__(self):
+                super(X, self).__init__()
+
+            def forward(self, a, b):
+                return a + b
+
+        m = X()
+        dummyInputs = [torch.zeros(*shape) for shape in (shape_a, shape_b)]
+        actualOutputShape = list(m(*dummyInputs).size())
+
+        m = torch.jit.script(m)
+        graph = m.graph
+        graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+        assert _getOutputShape(graph) is None
+
+        poptorch.propagateInputShapes(graph, dummyInputs)
+        inferedOutputShape = _getOutputShape(graph)
+        print(graph)
+
+        assert _has_node(graph, 'aten::add')
+        assert inferedOutputShape == actualOutputShape
+
+    run_test((1, 4), (5, 1))
+    run_test((1, 4), (1, 5, 1))
+    run_test((1, 4), (7, 5, 1))
+
+
+def test_adaptive_average_pool2d():
+    def run_test(input_shape):
+        class X(nn.Module):
+            def __init__(self):
+                super(X, self).__init__()
+                self.aap = nn.AdaptiveAvgPool2d((5, 7))
+
+            def forward(self, x):
+                return self.aap(x)
+
+        m = X()
+        dummyInputs = (torch.zeros(*input_shape), )
+        actualOutputShape = list(m(*dummyInputs).size())
+
+        m = torch.jit.script(m)
+        graph = m.graph
+        list(graph.inputs())[1].inferTypeFrom(dummyInputs[0])
+        graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+        torch._C._jit_pass_peephole(graph, True)
+        torch._C._jit_pass_constant_propagation(graph)
+        assert _getOutputShape(graph) is None
+
+        poptorch.propagateInputShapes(graph, dummyInputs)
+        inferedOutputShape = _getOutputShape(graph)
+        print(graph)
+
+        assert _has_node(graph, 'aten::adaptive_avg_pool2d')
+        assert inferedOutputShape == actualOutputShape
+
+    run_test((2, 3, 4))
+    run_test((2, 3, 4, 5))
+
+
+def test_flatten():
+    def run_test(input_shape):
+        class X(nn.Module):
+            def __init__(self):
+                super(X, self).__init__()
+
+            def forward(self, x):
+                return torch.flatten(x)
+
+        m = X()
+        dummyInputs = (torch.zeros(*input_shape), )
+        actualOutputShape = list(m(*dummyInputs).size())
+
+        m = torch.jit.script(m)
+        graph = m.graph
+        list(graph.inputs())[1].inferTypeFrom(dummyInputs[0])
+        graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+        torch._C._jit_pass_peephole(graph, True)
+        torch._C._jit_pass_constant_propagation(graph)
+        assert _getOutputShape(graph) is None
+
+        poptorch.propagateInputShapes(graph, dummyInputs)
+        inferedOutputShape = _getOutputShape(graph)
+        print(graph)
+
+        assert _has_node(graph, 'aten::flatten')
+        assert inferedOutputShape == actualOutputShape
+
+    run_test((2, 3, 4, 5))

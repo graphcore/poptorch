@@ -28,8 +28,9 @@ public:
       auto inferenceFunc = found->second;
       inferenceFunc(node);
     } else {
-      std::cerr << "Dont know how to infer shape for node of kind '" << kind
-                << "'\n";
+      std::stringstream ss;
+      ss << "Dont know how to infer shape for node of kind '" << kind << "'\n";
+      throw std::runtime_error(ss.str());
     }
   }
 
@@ -67,6 +68,154 @@ void outputTypeMatchesInputType(torch::jit::Node *node) {
   }
 
   node->output()->setType(inputType);
+}
+
+bool isInputACompleteTensor(torch::jit::Node *node, int index) {
+  if (!node->input(index)->type()->isSubtypeOf(torch::jit::TensorType::get())) {
+    return false;
+  }
+  auto i = node->input(index)->type()->cast<torch::jit::TensorType>();
+  if (!i->isComplete()) {
+    return false;
+  }
+  return true;
+}
+
+void inferShapeFlatten(torch::jit::Node *node) {
+  if (!isInputACompleteTensor(node, 0)) {
+    std::cerr << "Cannot infer shape, first input is either not a tensor or "
+                 "has an incomplete shape.\n";
+    return;
+  }
+  auto i0 = node->input(0)->type()->cast<torch::jit::TensorType>();
+  auto i0Shape = *i0->sizes().concrete_sizes();
+
+  if (node->input(1)->node()->kind() != c10::prim::Constant) {
+    std::cerr << "Cannot infer shape, unable to get data for shape input \n";
+    return;
+  }
+  auto start =
+      node->input(1)->node()->i(c10::Symbol::fromQualString("attr::value"));
+
+  if (node->input(1)->node()->kind() != c10::prim::Constant) {
+    std::cerr << "Cannot infer shape, unable to get data for shape input \n";
+    return;
+  }
+  auto end =
+      node->input(2)->node()->i(c10::Symbol::fromQualString("attr::value"));
+
+  if (end == -1) {
+    end = i0Shape.size() - 1;
+  }
+
+  std::vector<int64_t> resultShape;
+  for (int i = 0; i < start; i++) {
+    resultShape.push_back(i0Shape.at(i));
+  }
+
+  int64_t x = 1;
+  for (int i = start; i <= end; i++) {
+    x *= i0Shape.at(i);
+  }
+  resultShape.push_back(x);
+
+  for (int i = end + 1; i < i0Shape.size(); i++) {
+    resultShape.push_back(i0Shape.at(i));
+  }
+
+  auto outputType = i0->withSizes(resultShape);
+  node->output()->setType(outputType);
+}
+
+void inferShapeAdaptiveAvgPool2d(torch::jit::Node *node) {
+  if (!isInputACompleteTensor(node, 0)) {
+    std::cerr << "Cannot infer shape, first input is either not a tensor or "
+                 "has an incomplete shape.\n";
+    return;
+  }
+  auto i0 = node->input(0)->type()->cast<torch::jit::TensorType>();
+  auto i0Shape = *i0->sizes().concrete_sizes();
+
+  if (node->input(1)->node()->kind() != c10::prim::Constant) {
+    std::cerr << "Cannot infer shape, unable to get data for shape input\n";
+    return;
+  }
+  auto i1Data =
+      node->input(1)->node()->is(c10::Symbol::fromQualString("attr::value"));
+
+  std::vector<int64_t> resultShape{i0Shape.at(0)};
+  if (i0Shape.size() == 4) {
+    resultShape.push_back(i0Shape.at(1));
+  }
+  for (auto i : i1Data) {
+    resultShape.push_back(i);
+  }
+
+  auto outputType = i0->withSizes(resultShape);
+  node->output()->setType(outputType);
+}
+
+void inferShapeBroadcast(torch::jit::Node *node) {
+  if (!node->input(0)->type()->isSubtypeOf(torch::jit::TensorType::get())) {
+    std::cerr << "Cannot infer shape, first input is not a Tensor.\n";
+    return;
+  }
+  auto i0 = node->input(0)->type()->cast<torch::jit::TensorType>();
+  if (!i0->isComplete()) {
+    std::cerr << "Cannot infer shape, first input shape is not complete!\n";
+    return;
+  }
+
+  if (!node->input(1)->type()->isSubtypeOf(torch::jit::TensorType::get())) {
+    std::cerr << "Cannot infer shape, first input is not a Tensor.\n";
+    return;
+  }
+  auto i1 = node->input(1)->type()->cast<torch::jit::TensorType>();
+  if (!i1->isComplete()) {
+    std::cerr << "Cannot infer shape, second input shape is not complete!\n";
+    return;
+  }
+
+  std::vector<int64_t> i0Shape = *i0->sizes().concrete_sizes();
+  std::vector<int64_t> i1Shape = *i1->sizes().concrete_sizes();
+
+  int i0End = i0Shape.size() - 1;
+  int i1End = i1Shape.size() - 1;
+  std::vector<int64_t> resultShape;
+  while (i0End >= 0 && i1End >= 0) {
+    auto a = i0Shape.at(i0End);
+    i0End--;
+    auto b = i1Shape.at(i1End);
+    i1End--;
+
+    if (a == b) {
+      resultShape.push_back(a);
+    } else if (a == 1) {
+      resultShape.push_back(b);
+    } else if (b == 1) {
+      resultShape.push_back(a);
+    } else {
+      std::cerr << "Cannot broadcast shapes " << i0Shape << " and " << i1Shape
+                << ". Dimensions " << a << " and " << b << " conflict.\n";
+      return;
+    }
+  }
+  while (i0End >= 0 || i1End >= 0) {
+    if (i0End >= 0) {
+      auto a = i0Shape.at(i0End);
+      resultShape.push_back(a);
+    } else {
+      auto b = i1Shape.at(i1End);
+      resultShape.push_back(b);
+    }
+
+    i0End--;
+    i1End--;
+  }
+
+  std::reverse(resultShape.begin(), resultShape.end());
+  auto outputType = i0->withSizes(resultShape);
+  node->output()->setType(outputType);
 }
 
 // aten::conv2d(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[]
@@ -333,6 +482,20 @@ RegisterInferenceFunction maxpool2d("aten::max_pool2d", inferShapeMaxPool2d);
 RegisterInferenceFunction view("aten::view", inferShapeView);
 RegisterInferenceFunction addmm("aten::addmm", inferShapeAddmm);
 RegisterInferenceFunction transpose("aten::t", inferShapeTranspose);
+RegisterInferenceFunction broadcast({"aten::add", "aten::add_", "aten::sub",
+                                     "aten::sub_", "aten::mul", "aten::mul_"},
+                                    inferShapeBroadcast);
+RegisterInferenceFunction avgpool2d("aten::adaptive_avg_pool2d",
+                                    inferShapeAdaptiveAvgPool2d);
+RegisterInferenceFunction flatten("aten::flatten", inferShapeFlatten);
+
+// These nodes have a dummy function registered so they are ignored.
+RegisterInferenceFunction ignore(
+    {"prim::Constant", "aten::__getitem__", "aten::__is__", "aten::__isnot__",
+     "aten::eq", "aten::ne", "aten::dim", "aten::len", "aten::size"},
+    [](auto node) {
+      std::cerr << "Warning: Shape inference is ignoring node:\n  " << *node;
+    });
 } // namespace
 
 } // namespace poptorch
