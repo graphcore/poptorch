@@ -9,7 +9,7 @@
 
 #include <torch/csrc/jit/passes/remove_inplace_ops.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
-#include <torch/csrc/jit/pybind_utils.h>
+#include <torch/csrc/jit/python/pybind_utils.h>
 
 #include "poptorch/ShapeInference.hpp"
 #include "poptorch/LowerToPopart.hpp"

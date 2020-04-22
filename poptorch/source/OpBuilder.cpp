@@ -1,5 +1,5 @@
 #include <poptorch/OpBuilder.hpp>
-#include <torch/csrc/jit/ir.h>
+#include <torch/csrc/jit/ir/ir.h>
 
 namespace poptorch {
 

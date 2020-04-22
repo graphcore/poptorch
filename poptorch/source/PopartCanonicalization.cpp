@@ -1,7 +1,7 @@
 #include <poptorch/OpBuilder.hpp>
 #include <poptorch/PopartCanonicalization.hpp>
 
-#include <torch/csrc/jit/ir.h>
+#include <torch/csrc/jit/ir/ir.h>
 #include <unordered_set>
 
 namespace poptorch {

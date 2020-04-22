@@ -21,6 +21,7 @@ target_link_libraries(poptorch_core PRIVATE
 target_include_directories(poptorch_core PRIVATE
   "${PROJECT_SOURCE_DIR}/poptorch/include"
   "${PROJECT_SOURCE_DIR}/popart_compiler/include"
+  ${TORCH_INCLUDE_DIRS}
   ${POPART_INCLUDE_DIR})
 
 install(TARGETS poptorch_core

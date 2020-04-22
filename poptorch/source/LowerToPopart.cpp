@@ -1,7 +1,7 @@
 #include "poptorch/LowerToPopart.hpp"
 #include <iostream>
 
-#include <torch/csrc/jit/ir.h>
+#include <torch/csrc/jit/ir/ir.h>
 
 #include <cstdlib>
 #include <ctime>

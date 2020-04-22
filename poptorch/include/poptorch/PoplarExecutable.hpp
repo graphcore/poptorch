@@ -2,7 +2,7 @@
 #define INCLUDE_POPTORCH_POPLAR_EXECUTABLE_HPP
 
 #include <popart_compiler/Compiler.hpp>
-#include <torch/csrc/jit/ir.h>
+#include <torch/csrc/jit/ir/ir.h>
 
 namespace poptorch {
 

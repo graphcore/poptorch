@@ -3,7 +3,7 @@
 
 #include <poptorch/PoplarExecutable.hpp>
 #include <string>
-#include <torch/csrc/jit/ir.h>
+#include <torch/csrc/jit/ir/ir.h>
 #include <vector>
 
 namespace poptorch {
