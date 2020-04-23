@@ -1,3 +1,4 @@
+#include <shared/Logging.hpp>
 #include <poptorch/ShapeInference.hpp>
 
 namespace poptorch {
@@ -63,7 +64,7 @@ struct RegisterInferenceFunction {
 void outputTypeMatchesInputType(torch::jit::Node *node) {
   auto inputType = node->input(0)->type()->cast<torch::jit::TensorType>();
   if (!inputType->isComplete()) {
-    std::cerr << "Cannot infer shape, input shape is not complete!\n";
+    logging::err("Cannot infer shape, input shape is not complete!");
     return;
   }
 
@@ -83,22 +84,22 @@ bool isInputACompleteTensor(torch::jit::Node *node, int index) {
 
 void inferShapeFlatten(torch::jit::Node *node) {
   if (!isInputACompleteTensor(node, 0)) {
-    std::cerr << "Cannot infer shape, first input is either not a tensor or "
-                 "has an incomplete shape.\n";
+    logging::err("Cannot infer shape, first input is either not a tensor or "
+                 "has an incomplete shape.");
     return;
   }
   auto i0 = node->input(0)->type()->cast<torch::jit::TensorType>();
   auto i0Shape = *i0->sizes().concrete_sizes();
 
   if (node->input(1)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get data for shape input \n";
+    logging::err("Cannot infer shape, unable to get data for shape input ");
     return;
   }
   auto start =
       node->input(1)->node()->i(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(1)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get data for shape input \n";
+    logging::err("Cannot infer shape, unable to get data for shape input.");
     return;
   }
   auto end =
@@ -129,15 +130,15 @@ void inferShapeFlatten(torch::jit::Node *node) {
 
 void inferShapeAdaptiveAvgPool2d(torch::jit::Node *node) {
   if (!isInputACompleteTensor(node, 0)) {
-    std::cerr << "Cannot infer shape, first input is either not a tensor or "
-                 "has an incomplete shape.\n";
+    logging::err("Cannot infer shape, first input is either not a tensor or "
+                 "has an incomplete shape.");
     return;
   }
   auto i0 = node->input(0)->type()->cast<torch::jit::TensorType>();
   auto i0Shape = *i0->sizes().concrete_sizes();
 
   if (node->input(1)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get data for shape input\n";
+    logging::err("Cannot infer shape, unable to get data for shape input.");
     return;
   }
   auto i1Data =
@@ -157,22 +158,22 @@ void inferShapeAdaptiveAvgPool2d(torch::jit::Node *node) {
 
 void inferShapeBroadcast(torch::jit::Node *node) {
   if (!node->input(0)->type()->isSubtypeOf(torch::jit::TensorType::get())) {
-    std::cerr << "Cannot infer shape, first input is not a Tensor.\n";
+    logging::err("Cannot infer shape, first input is not a Tensor.");
     return;
   }
   auto i0 = node->input(0)->type()->cast<torch::jit::TensorType>();
   if (!i0->isComplete()) {
-    std::cerr << "Cannot infer shape, first input shape is not complete!\n";
+    logging::err("Cannot infer shape, first input shape is not complete!");
     return;
   }
 
   if (!node->input(1)->type()->isSubtypeOf(torch::jit::TensorType::get())) {
-    std::cerr << "Cannot infer shape, first input is not a Tensor.\n";
+    logging::err("Cannot infer shape, first input is not a Tensor.");
     return;
   }
   auto i1 = node->input(1)->type()->cast<torch::jit::TensorType>();
   if (!i1->isComplete()) {
-    std::cerr << "Cannot infer shape, second input shape is not complete!\n";
+    logging::err("Cannot infer shape, second input shape is not complete!");
     return;
   }
 
@@ -195,8 +196,9 @@ void inferShapeBroadcast(torch::jit::Node *node) {
     } else if (b == 1) {
       resultShape.push_back(a);
     } else {
-      std::cerr << "Cannot broadcast shapes " << i0Shape << " and " << i1Shape
-                << ". Dimensions " << a << " and " << b << " conflict.\n";
+      logging::err(
+          "Cannot broadcast shapes {} and {}. Dimensions {} and {} conflict.",
+          i0Shape, i1Shape, a, b);
       return;
     }
   }
@@ -223,13 +225,13 @@ void inferShapeBroadcast(torch::jit::Node *node) {
 void inferShapeConv2d(torch::jit::Node *node) {
   auto inputType = node->input(0)->type()->cast<torch::jit::TensorType>();
   if (!inputType->isComplete()) {
-    std::cerr << "Cannot infer shape, input shape is not complete!\n";
+    logging::err("Cannot infer shape, input shape is not complete!");
     return;
   }
 
   auto weightType = node->input(1)->type()->cast<torch::jit::TensorType>();
   if (!weightType->isComplete()) {
-    std::cerr << "Cannot infer shape, weight shape is not complete!\n";
+    logging::err("Cannot infer shape, weight shape is not complete!");
     return;
   }
 
@@ -238,7 +240,7 @@ void inferShapeConv2d(torch::jit::Node *node) {
   int dilationInputIndex = 5;
 
   if (node->input(strideInputIndex)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get stride\n";
+    logging::err("Cannot infer shape, unable to get stride");
     return;
   }
   auto strideData = node->input(strideInputIndex)
@@ -246,7 +248,7 @@ void inferShapeConv2d(torch::jit::Node *node) {
                         ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(paddingInputIndex)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get padding\n";
+    logging::err("Cannot infer shape, unable to get padding\n");
     return;
   }
   auto paddingData = node->input(paddingInputIndex)
@@ -254,7 +256,7 @@ void inferShapeConv2d(torch::jit::Node *node) {
                          ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(dilationInputIndex)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get dilation\n";
+    logging::err("Cannot infer shape, unable to get dilation\n");
     return;
   }
   auto dilationData = node->input(dilationInputIndex)
@@ -294,7 +296,7 @@ void inferShapeConv2d(torch::jit::Node *node) {
 void inferShapeMaxPool2d(torch::jit::Node *node) {
   auto inputType = node->input(0)->type()->cast<torch::jit::TensorType>();
   if (!inputType->isComplete()) {
-    std::cerr << "Cannot infer shape, input shape is not complete!\n";
+    logging::err("Cannot infer shape, input shape is not complete!\n");
     return;
   }
 
@@ -308,7 +310,7 @@ void inferShapeMaxPool2d(torch::jit::Node *node) {
   int dilationInputIndex = 4;
 
   if (node->input(kernelInputIndex)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get kernel\n";
+    logging::err("Cannot infer shape, unable to get kernel\n");
     return;
   }
   auto kernelData = node->input(kernelInputIndex)
@@ -316,7 +318,7 @@ void inferShapeMaxPool2d(torch::jit::Node *node) {
                         ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(strideInputIndex)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get stride\n";
+    logging::err("Cannot infer shape, unable to get stride\n");
     return;
   }
   auto strideData = node->input(strideInputIndex)
@@ -324,7 +326,7 @@ void inferShapeMaxPool2d(torch::jit::Node *node) {
                         ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(paddingInputIndex)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get padding\n";
+    logging::err("Cannot infer shape, unable to get padding\n");
     return;
   }
   auto paddingData = node->input(paddingInputIndex)
@@ -332,7 +334,7 @@ void inferShapeMaxPool2d(torch::jit::Node *node) {
                          ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(dilationInputIndex)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get dilation\n";
+    logging::err("Cannot infer shape, unable to get dilation\n");
     return;
   }
   auto dilationData = node->input(dilationInputIndex)
@@ -359,14 +361,14 @@ void inferShapeMaxPool2d(torch::jit::Node *node) {
 void inferShapeView(torch::jit::Node *node) {
   auto inputType = node->input(0)->type()->cast<torch::jit::TensorType>();
   if (!inputType->isComplete()) {
-    std::cerr << "Cannot infer shape, input shape is not complete!\n";
+    logging::err("Cannot infer shape, input shape is not complete!\n");
     return;
   }
 
   auto inputShape = *inputType->sizes().concrete_sizes();
 
   if (node->input(1)->node()->kind() != c10::prim::Constant) {
-    std::cerr << "Cannot infer shape, unable to get data for shape input\n";
+    logging::err("Cannot infer shape, unable to get data for shape input\n");
     return;
   }
   auto shapeData =
@@ -391,8 +393,8 @@ void inferShapeView(torch::jit::Node *node) {
 
   if (unknownDimensions == 0) {
     if (getNumberElements(shapeData) != getNumberElements(inputShape)) {
-      std::cerr << "Error: New shape has a different number of elements to old "
-                   "shape.\n";
+      logging::err("Error: New shape has a different number of elements to old "
+                   "shape.\n");
       return;
     }
     auto outputType = inputType->withSizes(shapeData);
@@ -411,15 +413,15 @@ void inferShapeView(torch::jit::Node *node) {
     auto outputType = inputType->withSizes(outputShape);
     node->output()->setType(outputType);
   } else {
-    std::cerr << "Too many unknown dimensions (" << unknownDimensions
-              << ") in shape data (" << shapeData << ")\n";
+    logging::err("Too many unknown dimensions ({}) in shape data ({})",
+                 unknownDimensions, shapeData);
   }
 }
 
 void inferShapeAddmm(torch::jit::Node *node) {
   auto mat1Type = node->input(1)->type()->cast<torch::jit::TensorType>();
   if (!mat1Type->isComplete()) {
-    std::cerr << "Cannot infer shape, mat1 shape is not complete!\n";
+    logging::err("Cannot infer shape, mat1 shape is not complete!");
     return;
   }
 
@@ -427,7 +429,7 @@ void inferShapeAddmm(torch::jit::Node *node) {
 
   auto mat2Type = node->input(2)->type()->cast<torch::jit::TensorType>();
   if (!mat2Type->isComplete()) {
-    std::cerr << "Cannot infer shape, mat2 shape is not complete!\n";
+    logging::err("Cannot infer shape, mat2 shape is not complete!");
     return;
   }
 
@@ -444,13 +446,13 @@ void inferShapeAddmm(torch::jit::Node *node) {
 void inferShapeTranspose(torch::jit::Node *node) {
   auto inputType = node->input(0)->type()->cast<torch::jit::TensorType>();
   if (!inputType->isComplete()) {
-    std::cerr << "Cannot infer shape, input shape is not complete!\n";
+    logging::err("Cannot infer shape, input shape is not complete!");
     return;
   }
 
   auto inputShape = *inputType->sizes().concrete_sizes();
   if (inputShape.size() != 2) {
-    std::cerr << "Transpose inference only handles inputs with rank 2.\n";
+    logging::err("Transpose inference only handles inputs with rank 2.\n");
   }
 
   std::vector<int64_t> outShape{inputShape[1], inputShape[0]};
@@ -494,7 +496,7 @@ RegisterInferenceFunction ignore(
     {"prim::Constant", "aten::__getitem__", "aten::__is__", "aten::__isnot__",
      "aten::eq", "aten::ne", "aten::dim", "aten::len", "aten::size"},
     [](auto node) {
-      std::cerr << "Warning: Shape inference is ignoring node:\n  " << *node;
+      logging::err("Warning: Shape inference is ignoring node:\n  {}", *node);
     });
 } // namespace
 

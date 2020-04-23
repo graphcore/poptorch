@@ -18,6 +18,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "shared/Logging.hpp"
+
 namespace poptorch {
 
 namespace detail {
@@ -211,8 +213,6 @@ Compiler::AddInitializedInputTensor(const char *name, const char *type,
 
   popart::TensorId id = impl->ids[impl->ids.size() - 1];
 
-  // std::cout << "Tensor ID: " << id << " has address: " << data << std::endl;
-
   popart::MutableVoidData mutableData;
   mutableData.data = data;
   mutableData.info = info;
@@ -277,11 +277,10 @@ void Compiler::InitSession() {
           impl->usedIpus.size());
 
   if (!device) {
-    std::cout << "No IPU device found, falling back to CPU emulator (IPU Model)"
-              << std::endl;
+    logging::debug("No IPU device found, falling back to CPU emulator (IPU Model)");
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
   } else {
-    std::cout << "Acquired IPU device, running on device." << std::endl;
+    logging::debug("Acquired IPU device, running on device.");
   }
 
   popart::SessionOptions options;

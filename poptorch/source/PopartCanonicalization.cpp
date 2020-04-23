@@ -1,3 +1,4 @@
+#include <shared/Logging.hpp>
 #include <poptorch/OpBuilder.hpp>
 #include <poptorch/PopartCanonicalization.hpp>
 
@@ -69,8 +70,8 @@ bool CanonicalizeImpl::IsNone(torch::jit::Node *node) const {
 template <typename T>
 std::optional<T> CanonicalizeImpl::HandleConstant(torch::jit::Node *node) {
   if (std::string(node->kind().toDisplayString()) != "prim::Constant") {
-    std::cerr << "Constant is expected to be prim::Constant but is "
-              << node->kind().toDisplayString() << std::endl;
+    logging::err("Constant is expected to be prim::Constant but is {}",
+                 node->kind().toDisplayString());
     assert(false && "Constant kind must be prim::Constant");
     return std::nullopt;
   }
@@ -171,8 +172,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       } else {
 
-        std::cerr << "CURRENTLY UNSUPPORTED CONVOLUTION!!!";
-        newNode->dump();
+        logging::err("CURRENTLY UNSUPPORTED CONVOLUTION!!!\n{}", *newNode);
       }
     } else if (kindAsStr == "aten::batch_norm") {
       /*

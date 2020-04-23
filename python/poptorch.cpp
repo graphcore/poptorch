@@ -11,10 +11,11 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
 
-#include "poptorch/ShapeInference.hpp"
+#include "shared/Logging.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Peephole.hpp"
+#include "poptorch/ShapeInference.hpp"
 
 void begin_ipu_block(int64_t ipu_id) {}
 void end_ipu_block() { }
@@ -96,8 +97,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compile(
     parameterData.push_back(param);
   }
 
-  std::cout << "Graph right before popart" << std::endl;
-  graph->dump();
+  logging::debug("Graph right before popart:\n{}", *graph);
 
   return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps, training, replicationFactor, gradientAccumulation);
 }

@@ -1,4 +1,6 @@
+#include "shared/Logging.hpp"
 #include "poptorch/LowerToPopart.hpp"
+
 #include <iostream>
 
 #include <torch/csrc/jit/ir/ir.h>
@@ -68,7 +70,7 @@ std::string typeToPopart(at::ScalarType type) {
     return "INT32";
   }
 
-  std::cerr << "UNIMPLEMENTED TYPE " << type << std::endl;
+  logging::err("Unimplemented type '{}'", type);
   return "UNIMPLEMENTED";
 }
 
@@ -127,9 +129,7 @@ void LowerToPopart::LowerBody() {
     } else if (bodyAsStr == "poptorch::end_ipu_block") {
       // NOP for now.
     } else {
-      std::cerr << "ERROR: couldn't find a registered operation for node "
-                << std::endl;
-      node->dump();
+      logging::err("Couldn't find a registered operation for node {}", *node);
     }
   }
 }
