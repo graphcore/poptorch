@@ -2,6 +2,7 @@ include(GNUInstallDirs)
 
 find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
+find_package(Spdlog REQUIRED)
 
 pybind11_add_module(poptorch_core SHARED
   "poptorch.cpp"
@@ -23,6 +24,7 @@ target_include_directories(poptorch_core PRIVATE
   "${PROJECT_SOURCE_DIR}/poptorch/include"
   "${PROJECT_SOURCE_DIR}/shared/include"
   "${PROJECT_SOURCE_DIR}/popart_compiler/include"
+  ${SPDLOG_INCLUDE_DIR}
   ${TORCH_INCLUDE_DIRS}
   ${POPART_INCLUDE_DIR})
 
