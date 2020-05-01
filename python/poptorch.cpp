@@ -12,10 +12,11 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 
 #include "shared/Logging.hpp"
+#include "poptorch/EliminateListConstructs.hpp"
+#include "poptorch/ShapeInference.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Peephole.hpp"
-#include "poptorch/ShapeInference.hpp"
 
 void begin_ipu_block(int64_t ipu_id) {}
 void end_ipu_block() { }
@@ -112,8 +113,12 @@ void pyPeepholeOptimizations(py::handle h, bool training) {
   peepholeOptimizations(*graph, training);
 }
 
-} // namespace poptorch
+void pyEliminateListConstructs(py::handle h) {
+  auto graph = as_graph(h);
+  eliminateListConstructs(graph);
+}
 
+} // namespace poptorch
 
 PYBIND11_MODULE(poptorch_core, m) {
   py::class_<poptorch::PoplarExecutable, std::shared_ptr<poptorch::PoplarExecutable> >(m, "InternalPoplarExecutable");
@@ -122,4 +127,5 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("execute", poptorch::execute);
   m.def("propagateInputShapes", poptorch::pyPropagateInputShapes);
   m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
+  m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);
 }

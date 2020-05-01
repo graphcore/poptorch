@@ -13,6 +13,7 @@ pybind11_add_module(poptorch_core SHARED
   "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Peephole.cpp"
   "${PROJECT_SOURCE_DIR}/shared/source/Logging.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/EliminateListConstructs.cpp"
   )
 
 target_link_libraries(poptorch_core PRIVATE

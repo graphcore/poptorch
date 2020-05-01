@@ -68,7 +68,7 @@ def test_batchnorm():
     m = torch.jit.script(m)
     graph = m.graph
     torch._C._jit_pass_inline(graph)
-    poptorch.poptorch_core.peepholeOptimizations(graph, False);
+    poptorch.poptorch_core.peepholeOptimizations(graph, False)
     graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
     torch._C._jit_pass_constant_propagation(graph)
     # Observe the graph doesn't already have a shape for the output.
@@ -217,6 +217,11 @@ def test_adaptive_average_pool2d():
         graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
         torch._C._jit_pass_peephole(graph, True)
         torch._C._jit_pass_constant_propagation(graph)
+
+        torch._C._jit_pass_loop_unrolling(graph)
+        torch._C._jit_pass_constant_propagation(graph)
+        poptorch.poptorch_core.eliminateListConstructs(graph)
+
         assert _getOutputShape(graph) is None
 
         poptorch.propagateInputShapes(graph, dummyInputs)
