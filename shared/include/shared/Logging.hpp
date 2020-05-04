@@ -81,6 +81,8 @@ MAKE_LOG_TEMPLATE(info, Info)
 MAKE_LOG_TEMPLATE(warn, Warn)
 MAKE_LOG_TEMPLATE(err, Err)
 
+#undef MAKE_LOG_TEMPLATE
+
 // Convenience macro to create a log entry prefixed with function name e.g.:
 //    void someFunc(int i) {
 //      FUNC_LOGGER(info, " with i := {}", i);
@@ -91,6 +93,8 @@ MAKE_LOG_TEMPLATE(err, Err)
 // least one parameter.
 #define FUNC_LOGGER(lvl, fmtStr, ...)                                          \
   logging::lvl("{}: " fmtStr, __PRETTY_FUNCTION__, __VA_ARGS__)
+
+#undef FUNC_LOGGER
 
 } // namespace logging
 

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
 include(GNUInstallDirs)
 project(poptorch)
+set(VERSION "0.0.0")
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -12,3 +13,5 @@ add_definitions(-DONNX_NAMESPACE=onnx)
 set(INSTALL_PYDIR python)
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
+
+add_subdirectory(docs)

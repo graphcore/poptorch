@@ -1,3 +1,5 @@
+#include <shared/Logging.hpp>
+
 #include <popart_compiler/Compiler.hpp>
 
 #include <fstream>
@@ -17,8 +19,6 @@
 #include <popart/tensors.hpp>
 #include <unordered_map>
 #include <vector>
-
-#include "shared/Logging.hpp"
 
 namespace poptorch {
 
