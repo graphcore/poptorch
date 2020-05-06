@@ -11,10 +11,11 @@ public:
   PoplarExecutable() = delete;
   PoplarExecutable(poptorch::Compiler &&c,
                    std::vector<poptorch::TensorId> &&inputs,
-                   std::vector<poptorch::TensorId> &&outputs)
-      : compiler(std::move(c)), popartInputs(inputs), popartOutputs(outputs) {}
+                   std::vector<poptorch::TensorId> &&outputs,
+                   bool p)
+      : compiler(std::move(c)), popartInputs(inputs), popartOutputs(outputs), profile(p) {}
 
-  at::IValue Run(std::vector<at::Tensor> &inTensors);
+  std::vector<at::IValue> Run(std::vector<at::Tensor> &inTensors);
 
 private:
   poptorch::Compiler compiler;
@@ -22,6 +23,8 @@ private:
   std::vector<poptorch::TensorId> popartInputs;
 
   std::vector<poptorch::TensorId> popartOutputs;
+
+  bool profile;
 };
 
 } // namespace poptorch

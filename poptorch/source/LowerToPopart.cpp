@@ -24,7 +24,8 @@ class LowerToPopart {
 public:
   LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
                 std::vector<at::Tensor> &params, std::uint64_t steps,
-                bool training, std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation);
+                bool training, std::uint64_t replicationFactor,
+                std::uint64_t gradientAccumulation, bool profile_);
 
   void Lower();
 
@@ -42,13 +43,16 @@ private:
   std::vector<poptorch::TensorId> outputTensorHooks;
 
   // Mapping between the SSA values of torch jit with the ssa values of popart.
-  std::unordered_map<torch::jit::Value *, poptorch::TensorId> valueMap;
+  std::unordered_map<torch::jit::Value *, std::vector<poptorch::TensorId>>
+      valueMap;
 
   using FunctionType = std::function<poptorch::TensorId(
       const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
   std::unordered_map<std::string, FunctionType> functionToImplementation;
 
   poptorch::Compiler compiler;
+
+  bool profile;
 
   void LowerParameters();
 
@@ -79,11 +83,11 @@ std::string typeToPopart(at::ScalarType type) {
  */
 std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::Compile() {
   // Init the session, this also involves compiling to poplar.
-  compiler.InitSession();
+  compiler.InitSession(profile);
 
   return std::make_shared<poptorch::PoplarExecutable>(
       std::move(compiler), std::move(inputTensorHooks),
-      std::move(outputTensorHooks));
+      std::move(outputTensorHooks), profile);
 }
 
 void LowerToPopart::Lower() {
@@ -98,8 +102,10 @@ void LowerToPopart::Lower() {
 
 void LowerToPopart::LowerReturn() {
   for (torch::jit::Value *value : graph.outputs()) {
-    compiler.AddOutput(valueMap[value]);
-    outputTensorHooks.push_back(valueMap[value]);
+    for (poptorch::TensorId id : valueMap[value]) {
+      compiler.AddOutput(id);
+      outputTensorHooks.push_back(id);
+    }
   }
 }
 
@@ -111,23 +117,39 @@ void LowerToPopart::LowerBody() {
 
     std::vector<poptorch::TensorId> inputs;
     std::transform(node->inputs().begin(), node->inputs().end(),
-                   std::back_inserter(inputs),
-                   [&](torch::jit::Value *val) { return valueMap[val]; });
+                   std::back_inserter(inputs), [&](torch::jit::Value *val) {
+                     // Tuples aren't supported here but we don't support any
+                     // operations which actually take in tuples.
+                     return valueMap[val][0];
+                   });
 
     auto itr = functionToImplementation.find(bodyAsStr);
 
     if (itr != functionToImplementation.end()) {
 
-
       // Get the torch jit SSA for the input/output values.
       torch::jit::Value *output = node->output();
       // Call the callback.
-      valueMap[output] = itr->second(inputs, node);
+      valueMap[output].push_back(itr->second(inputs, node));
     } else if (bodyAsStr == "poptorch::begin_ipu_block") {
       compiler.SetActiveIpu(node->i(c10::Symbol::fromQualString("attr::ipu")));
 
     } else if (bodyAsStr == "poptorch::end_ipu_block") {
       // NOP for now.
+    } else if (bodyAsStr == "prim::TupleConstruct") {
+
+      // Get the torch jit SSA for the input/output values.
+      torch::jit::Value *output = node->output();
+
+      // Unpack the inputs.
+      std::vector<poptorch::TensorId> unpackedInputs;
+
+      // Add the values to the value map.
+      for (torch::jit::Value *ids : node->inputs()) {
+        for (poptorch::TensorId values : valueMap[ids]) {
+          valueMap[output].push_back(values);
+        }
+      }
     } else {
       logging::err("Couldn't find a registered operation for node {}", *node);
     }
@@ -149,7 +171,7 @@ void LowerToPopart::LowerParameters() {
         typeToPopart(tensor.scalar_type()).c_str(), dims);
 
     // Record the id so we can map back to the pytorch tensor.
-    valueMap[graph.param_node()->outputs()[index]] = id;
+    valueMap[graph.param_node()->outputs()[index]].push_back(id);
     inputTensorHooks.push_back(id);
     ++index;
   }
@@ -171,8 +193,8 @@ void LowerToPopart::LowerParameters() {
     // Unpack the elem type into its Popart type.
     std::string popartType = typeToPopart(tensorAsParam.scalar_type());
 
-    valueMap[value] = compiler.AddInitializedInputTensor(
-        "Weight", popartType.c_str(), dims, tensorAsParam.data_ptr());
+    valueMap[value].push_back(compiler.AddInitializedInputTensor(
+        "Weight", popartType.c_str(), dims, tensorAsParam.data_ptr()));
 
     paramIndex++;
   }
@@ -180,9 +202,12 @@ void LowerToPopart::LowerParameters() {
 
 LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
                              std::vector<at::Tensor> &params,
-                             std::uint64_t steps, bool training, std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation)
+                             std::uint64_t steps, bool training,
+                             std::uint64_t replicationFactor,
+                             std::uint64_t gradientAccumulation, bool profile_)
     : graph(g), inTensors(ins), parameters(params),
-      compiler({training, steps, replicationFactor, gradientAccumulation}) {
+      compiler({training, steps, replicationFactor, gradientAccumulation}),
+      profile(profile_) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
   /* {"popart::Foo", [&](const std::vector<poptorch::TensorId> &inputs,
@@ -215,7 +240,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
   , node->Type(c10::Symbol::fromQualString("attr::" #Name))
 #define BODY_ARG(Name) NONE
 // Create a function decl with the given call and arguments.
-#define OP_DECL(name, function, unused, Args, unused2, VariadicIndex)          \
+#define OP_DECL(name, function, unused, Args, unused2)                         \
   {name,                                                                       \
    [&](const std::vector<poptorch::TensorId> &inputs,                          \
        torch::jit::Node *node) { return compiler.function(inputs Args); }},
@@ -239,10 +264,13 @@ LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
 std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
               std::vector<at::Tensor> &parameters, std::uint64_t steps,
-              bool training,std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation) {
+              bool training, std::uint64_t replicationFactor,
+              std::uint64_t gradientAccumulation, bool profile) {
   std::srand(std::time(nullptr));
 
-  LowerToPopart lower_impl{graph, inTensors, parameters, steps, training, replicationFactor, gradientAccumulation};
+  LowerToPopart lower_impl{
+      graph,    inTensors,         parameters,           steps,
+      training, replicationFactor, gradientAccumulation, profile};
   lower_impl.Lower();
 
   return lower_impl.Compile();

@@ -6,6 +6,8 @@ find_package(Popart REQUIRED)
 find_package(Poplar REQUIRED)
 find_package(Boost REQUIRED)
 
+add_definitions(-DONNX_NAMESPACE=onnx)
+
 add_library(popart_compiler SHARED
   "source/Compiler.cpp"
   "../shared/source/Logging.cpp"

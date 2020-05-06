@@ -2,7 +2,7 @@
 #include <iostream>
 namespace poptorch {
 
-at::IValue PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
+std::vector<at::IValue> PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
 
   // Set up the input tensors in the poplar graph to point to the incoming
   // pytorch tensors.
@@ -44,10 +44,14 @@ at::IValue PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
   // Execute the compiled poplar graph.
   compiler.Run();
 
+
+  std::vector<at::IValue> returnees;
   // Return the outputs as pytorch tensors to the user.
   for (auto &pair : torchOutputs) {
-    return pair.second;
+    returnees.push_back(pair.second);
   }
+
+  return returnees;
 }
 
 } // namespace poptorch

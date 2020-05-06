@@ -8,6 +8,9 @@ class Graph;
 } // namespace jit
 } // namespace torch
 
+#include <string>
+#include <unordered_map>
+
 
 namespace poptorch {
 

@@ -15,6 +15,7 @@
 #include <popart/op/matmul.hpp>
 #include <popart/op/nll.hpp>
 #include <popart/optimizer.hpp>
+#include <popart/popx/devicex.hpp>
 #include <popart/session.hpp>
 #include <popart/tensors.hpp>
 #include <unordered_map>
@@ -68,12 +69,12 @@ public:
                            const std::vector<int64_t> &shape);
 
   popart::TensorId intConstant(const std::vector<popart::TensorId> &inputs,
-                            const std::vector<int64_t> &data,
-                            const std::vector<int64_t> &shape);
+                               const std::vector<int64_t> &data,
+                               const std::vector<int64_t> &shape);
 
   popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
-                            const std::vector<double> &data,
-                            const std::vector<int64_t> &shape);
+                                 const std::vector<double> &data,
+                                 const std::vector<int64_t> &shape);
 
 };
 
@@ -86,10 +87,10 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
 
 popart::TensorId
 CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
-                       const std::vector<int64_t> &data,
-                       const std::vector<int64_t> &shape) {
+                          const std::vector<int64_t> &data,
+                          const std::vector<int64_t> &shape) {
   // Create the tensor info for our new tensor.
-  popart::TensorInfo info{"INT", shape};
+  popart::TensorInfo info{"INT32", shape};
 
   std::int64_t totalSize = std::accumulate(shape.begin(), shape.end(), 1,
                                            std::multiplies<std::int64_t>());
@@ -114,12 +115,10 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
   return aiOnnx.constant(theData);
 }
 
-
-
 popart::TensorId
 CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
-                       const std::vector<double> &data,
-                       const std::vector<int64_t> &shape) {
+                            const std::vector<double> &data,
+                            const std::vector<int64_t> &shape) {
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{"FLOAT", shape};
 
@@ -152,6 +151,39 @@ CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
 
 } // namespace detail
 
+// Variadic output case. For now we will add all outputs to the graph and
+// allocate them on the same IPU but we will only return one. This means only
+// one output can be used by user IR (but can still be used by the backed via
+// transformations).
+template <typename T> struct HandleOutput {
+  poptorch::TensorId operator()(T &in, detail::CompilerImpl *impl) {
+    std::set<popart::TensorId> ids;
+
+    for (popart::TensorId id : in) {
+      ids.insert(id);
+      impl->ids.push_back(id);
+    }
+
+    impl->opBuilder->virtualGraph(ids, impl->activeIpu);
+    impl->usedIpus.insert(impl->activeIpu);
+
+    // Return the first added tensor as the sole return of this IR op.
+    return impl->ids.size() - in.size();
+  }
+};
+
+// Single tensor output case
+template <> struct HandleOutput<popart::TensorId> {
+  poptorch::TensorId operator()(popart::TensorId in,
+                                detail::CompilerImpl *impl) {
+    impl->opBuilder->virtualGraph(in, impl->activeIpu);
+    impl->usedIpus.insert(impl->activeIpu);
+
+    impl->ids.push_back(in);
+    return impl->ids.size() - 1;
+  }
+};
+
 poptorch::TensorId
 Compiler::AddInputTensor(const char *string,
                          const std::vector<std::int64_t> &dims) {
@@ -170,7 +202,7 @@ Compiler::AddInputTensor(const char *string,
 #define ARG(Type, Name) , Type Name
 #define BODY_ARG(Name) , Name
 // Create a function decl with the given call and arguments.
-#define OP_DECL(name, function, onnxImpl, Args, BodyArgs, VariadicIndex)       \
+#define OP_DECL(name, function, onnxImpl, Args, BodyArgs)                      \
   poptorch::TensorId Compiler::function(                                       \
       const std::vector<poptorch::TensorId> &inputs Args) {                    \
     auto AiOnnxOpset9 = impl->opBuilder->aiOnnxOpset9();                       \
@@ -179,11 +211,8 @@ Compiler::AddInputTensor(const char *string,
     std::transform(                                                            \
         inputs.begin(), inputs.end(), std::back_inserter(ins),                 \
         [&](poptorch::TensorId index) { return impl->ids[index]; });           \
-    impl->ids.push_back(onnxImpl(ins BodyArgs) VariadicIndex);                 \
-    const poptorch::TensorId id = impl->ids.size() - 1;                        \
-    impl->opBuilder->virtualGraph(impl->ids[id], impl->activeIpu);             \
-    impl->usedIpus.insert(impl->activeIpu);                                    \
-    return id;                                                                 \
+    auto output = onnxImpl(ins BodyArgs);                                      \
+    return HandleOutput<decltype(output)>{}(output, impl.get());               \
   }
 
 #include "popart_compiler/SupportedOperations.inc.h"
@@ -269,7 +298,7 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, float *ptr,
       {impl->ids[id], *impl->memoryManager.back().get()});
 }
 
-void Compiler::InitSession() {
+void Compiler::InitSession(bool profile) {
   // Try and get a single IPU. If not avaliable, run on CPU.
   // TODO: Make an actual device selection mechanism.
   std::shared_ptr<popart::DeviceInfo> device =
@@ -284,6 +313,8 @@ void Compiler::InitSession() {
   }
 
   popart::SessionOptions options;
+
+  options.logDir = ".";
 
   if (impl->usedIpus.size() > 1) {
     options.enablePipelining = true;
@@ -330,8 +361,28 @@ void Compiler::InitSession() {
         options, popart::PatternsLevel::DEFAULT);
   }
 
+  logging::trace(
+      "Popart serialised IR:\n{}",
+      impl->session->serializeIr(popart::IrSerializationFormat::JSON));
+
   // Poplar compilation.
-  impl->session->prepareDevice();
+  try {
+    impl->session->prepareDevice();
+  } catch (popart::memory_allocation_err &e) {
+    std::ofstream stream;
+    stream.open("OOMReport.json");
+    stream << e.getGraphReport(true);
+    stream.close();
+
+    std::rethrow_exception(std::current_exception());
+  }
+
+  if (profile) {
+    std::ofstream stream;
+    stream.open("GraphReport.json");
+    stream << impl->session->getGraphReport();
+    stream.close();
+  }
 
   impl->session->weightsFromHost();
 }

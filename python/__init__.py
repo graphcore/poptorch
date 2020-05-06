@@ -26,10 +26,12 @@ def make_tuple(example_inputs):
     return example_inputs
 
 
+class IPU(nn.Module):
+    def __init__(self, ipu_id, layer_to_call=None):
+        super(IPU, self).__init__()
 
-class IPU:
-    def __init__(self, ipu_id):
         self.ipu_id = ipu_id
+        self.layer_to_call = layer_to_call
 
     def __enter__(self):
         begin_ipu_block(self.ipu_id)
@@ -37,14 +39,20 @@ class IPU:
     def __exit__(self ,type, value, traceback):
         end_ipu_block()
 
+    def __call__(self, x):
+        begin_ipu_block(self.ipu_id)
+        out = self.layer_to_call(x)
+        return out
+
 class PoplarExecutor:
-    def __init__(self, model, training, device_iterations, replication_factor=1, gradient_accumulation=1):
+    def __init__(self, model, training, device_iterations, replication_factor=1, gradient_accumulation=1, profile=False):
         self.executable = None
         self.model = model
         self.training = training
         self.device_iterations = device_iterations
         self.gradient_accumulation = gradient_accumulation
         self.replication_factor = replication_factor
+        self.profile = profile
 
     def __call__(self, tensors):
 
@@ -58,23 +66,29 @@ class PoplarExecutor:
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we should slice it up so we compile by the batch size alone.
             newTuple = []
 
-            extra_poplar_batch_dims = self.device_iterations * self.replication_factor * self.gradient_accumulation 
+            extra_poplar_batch_dims = self.device_iterations * self.replication_factor * self.gradient_accumulation
+
             for tensor in in_tensors:
                 newTuple.append(tensor.narrow(
                     0, 0, tensor.size()[0] // extra_poplar_batch_dims))
 
+
             # Compile the poplar executable based on the batchsize.
             newTuple = tuple(newTuple)
             n = torch.jit.trace(self.model, newTuple)
-            print(n._c)
+
             self.executable = poptorch_core.compile(
-                n._c, newTuple, self.device_iterations, self.training, self.replication_factor, self.gradient_accumulation)
+                n._c, newTuple, self.device_iterations, self.training, self.replication_factor, self.gradient_accumulation, self.profile)
 
         # Execute the poplar executable with the full size (batch * device interations)
-        return poptorch_core.execute(self.executable, in_tensors)
+        output = poptorch_core.execute(self.executable, in_tensors)
 
+        if len(output) > 1:
+            return tuple(output)
+        else:
+            return output[0]
 
-def trainingModel(model, device_iterations, gradient_accumulation=1):
+def trainingModel(model, device_iterations, gradient_accumulation=1, profile=False):
 
     class ModelTrainingWrapper(nn.Module):
         def __init__(self, model):
@@ -85,13 +99,9 @@ def trainingModel(model, device_iterations, gradient_accumulation=1):
             return self.model(args)
 
     wrappedModel = ModelTrainingWrapper(model)
-    return PoplarExecutor(wrappedModel, True, device_iterations, gradient_accumulation=gradient_accumulation)
+    return PoplarExecutor(wrappedModel, True, device_iterations, gradient_accumulation=gradient_accumulation, profile=profile)
 
 
-def inferenceModel(model, device_iterations=1):
-    return PoplarExecutor(model, False, device_iterations)
+def inferenceModel(model, device_iterations=1, profile=False):
+    return PoplarExecutor(model, False, device_iterations, profile=profile)
 
-def propagateInputShapes(graph, dummyInputs):
-    for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
-        graphInput.inferTypeFrom(dummyInput)
-    poptorch_core.propagateInputShapes(graph)
