@@ -337,7 +337,7 @@ void Compiler::InitSession(bool profile) {
     // Create an inference session.
     impl->session = popart::InferenceSession::createFromOnnxModel(
         impl->opBuilder->getModelProto(), dataFlow, device, {}, {}, options,
-        popart::PatternsLevel::DEFAULT);
+        popart::PatternsLevel::Default);
   } else {
     auto optimizer = popart::ConstSGD(0.01);
 
@@ -348,7 +348,7 @@ void Compiler::InitSession(bool profile) {
 
     // TODO: Plug the leak.
     popart::Loss *loss = new popart::NllLoss(networkOutput, inLabels, "loss",
-                                             popart::ReductionType::SUM);
+                                             popart::ReductionType::Sum);
 
     loss->virtualGraph(impl->activeIpu);
     popart::GraphTransformer transformer{impl->opBuilder->getModelProto()};
@@ -358,7 +358,7 @@ void Compiler::InitSession(bool profile) {
     // Create the training session.
     impl->session = popart::TrainingSession::createFromOnnxModel(
         transformer.getModelProto(), dataFlow, {loss}, optimizer, device, {},
-        options, popart::PatternsLevel::DEFAULT);
+        options, popart::PatternsLevel::Default);
   }
 
   logging::trace(
