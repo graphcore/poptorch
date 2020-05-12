@@ -318,7 +318,6 @@ void Compiler::InitSession(bool profile) {
 
   if (impl->usedIpus.size() > 1) {
     options.enablePipelining = true;
-    options.enableVirtualGraphs = true;
     options.virtualGraphMode = popart::VirtualGraphMode::Manual;
   }
 
