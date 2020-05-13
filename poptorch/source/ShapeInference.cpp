@@ -1,5 +1,5 @@
-#include <shared/Logging.hpp>
 #include <poptorch/ShapeInference.hpp>
+#include <shared/Logging.hpp>
 
 namespace poptorch {
 
@@ -29,9 +29,8 @@ public:
       auto inferenceFunc = found->second;
       inferenceFunc(node);
     } else {
-      std::stringstream ss;
-      ss << "Dont know how to infer shape for node of kind '" << kind << "'\n";
-      throw std::runtime_error(ss.str());
+      std::cerr << "Warning: Dont know how to infer shape for node of kind '"
+                << kind << "'\n";
     }
   }
 

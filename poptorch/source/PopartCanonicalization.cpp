@@ -1,11 +1,11 @@
-#include <shared/Logging.hpp>
 #include <poptorch/OpBuilder.hpp>
 #include <poptorch/PopartCanonicalization.hpp>
+#include <shared/Logging.hpp>
 
 #include <string>
 #include <torch/csrc/jit/ir/ir.h>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace poptorch {
 
@@ -20,8 +20,12 @@ private:
   // unused users afterwards.
   std::unordered_set<torch::jit::Node *> toDelete;
 
-  // Todo, template this later.
-  std::vector<std::int64_t> HandleListConstruct(torch::jit::Node *node);
+  // This handles the case of both `prim::ListConstruct`
+  // and 'prim::Constant[value=[x, y, z]]'.
+  template <typename T> std::vector<T> HandleList(torch::jit::Node *node);
+
+  template <typename T>
+  std::vector<T> HandleListConstruct(torch::jit::Node *node);
 
   template <typename T> std::optional<T> HandleConstant(torch::jit::Node *node);
 
@@ -148,14 +152,32 @@ std::optional<T> CanonicalizeImpl::HandleConstant(torch::jit::Node *node) {
   return Handle<T>{}(sym, node);
 }
 
-std::vector<std::int64_t>
-CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
-  std::vector<std::int64_t> result;
+template <typename T>
+std::vector<T> CanonicalizeImpl::HandleList(torch::jit::Node *node) {
+  if (node->kind() == c10::prim::ListConstruct) {
+    return HandleListConstruct<T>(node);
+  } else if (node->kind() == c10::prim::Constant) {
+    auto sym = c10::Symbol::fromQualString("attr::value");
+
+    assert(node->hasAttribute(sym) && "Node must have value attribute");
+
+    return *Handle<std::vector<T>>{}(sym, node);
+  } else {
+    std::cerr << "Unhandled list input node:\n";
+    node->dump();
+    assert(false && "List inputs must be of type prim::ListConstruct");
+  }
+}
+
+template <typename T>
+std::vector<T> CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
+  assert(node->kind() == c10::prim::ListConstruct);
+
+  std::vector<T> result;
 
   for (torch::jit::Value *value : node->inputs()) {
 
-    std::optional<std::int64_t> val =
-        HandleConstant<std::int64_t>(value->node());
+    std::optional<T> val = HandleConstant<T>(value->node());
     if (val) {
       result.push_back(*val);
     }
@@ -172,9 +194,10 @@ void CanonicalizeImpl::SearchAndPossiblyDestroy(torch::jit::Node *node) {
   }
 
   // Store the inputs used by this node.
-  std::vector<torch::jit::Value *> inputs;
+  // Ops may use the same input twice, so use a set to store only unique inputs.
+  std::unordered_set<torch::jit::Value *> inputs;
   for (torch::jit::Value *user : node->inputs()) {
-    inputs.push_back(user);
+    inputs.insert(user);
   }
 
   // Delete the node.
@@ -197,7 +220,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     // We have a dummy if statement so we can daisy chain the rest of the "else
     // if's" off of it.
     if (kindAsStr == "aten::view" || kindAsStr == "aten::unsqueeze" ||
-               kindAsStr == "aten::expand" || kindAsStr == "aten::flatten" || kindAsStr == "aten::reshape") {
+        kindAsStr == "aten::expand" || kindAsStr == "aten::flatten" ||
+        kindAsStr == "aten::reshape") {
       // clang-format off
 
       // aten::view(Tensor self, int[] size) -> Tensor
@@ -205,12 +229,10 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // aten::expand(Tensor self, int[] size, *, bool implicit) -> Tensor
       // clang-format on
 
-
       // Extract the type from the pytorch IR.
       c10::TensorTypePtr asTensor =
           node->output()->type()->cast<c10::TensorType>();
       c10::VaryingShape dims = asTensor->sizes();
-
 
       // Convert that IR type into a C++ vector of ints.
       std::vector<std::int64_t> newShape;
@@ -243,11 +265,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
 // We have a helper macro to insert the alpha value if needed.
 #define ALPHA_BODY(Type)                                                       \
-  Type alphaAsScalar = *HandleConstant<std::int64_t>(alphaValue->node());              \
-  std::cout << "Scalar as "#Type": " << alphaAsScalar << std::endl; \
+  Type alphaAsScalar = *HandleConstant<std::int64_t>(alphaValue->node());      \
+  std::cout << "Scalar as " #Type ": " << alphaAsScalar << std::endl;          \
   if (alphaAsScalar != 1) {                                                    \
     torch::jit::Node *alphaConst =                                             \
-        Create_Constant<Type>{}(graph, {alphaAsScalar}, {1});                    \
+        Create_Constant<Type>{}(graph, {alphaAsScalar}, {1});                  \
     alphaConst->insertAfter(alphaValue->node());                               \
     torch::jit::Node *alphaNode =                                              \
         Create_mul(graph, {alphaConst->output(), valueToMultiply});            \
@@ -260,8 +282,9 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 #define ALPHA(ValueToMultiply, AlphaParam)                                     \
   torch::jit::Value *alphaValue = AlphaParam;                                  \
   torch::jit::Value *valueToMultiply = ValueToMultiply;                        \
-  ANY_SCALAR_CONSTANT_HANDLER(valueToMultiply, ALPHA_BODY) \
-  if (alphaValue == AlphaParam) alphaValue = valueToMultiply; \
+  ANY_SCALAR_CONSTANT_HANDLER(valueToMultiply, ALPHA_BODY)                     \
+  if (alphaValue == AlphaParam)                                                \
+    alphaValue = valueToMultiply;
 
 // Create a function decl with the given call and arguments.
 #define OP_CONVERTOR(AtenID, PreBuildCalls, PopartBuilder, Params)             \
@@ -298,16 +321,16 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       }
 
       std::vector<std::int64_t> stride =
-          HandleListConstruct(node->inputs()[3]->node());
+          HandleList<int64_t>(node->inputs()[3]->node());
       std::vector<std::int64_t> padding =
-          HandleListConstruct(node->inputs()[4]->node());
+          HandleList<std::int64_t>(node->inputs()[4]->node());
 
       // Slight workaround for current padding mechanism here.
       padding.push_back(padding[0]);
       padding.push_back(padding[1]);
 
       std::vector<std::int64_t> dilation =
-          HandleListConstruct(node->inputs()[5]->node());
+          HandleList<std::int64_t>(node->inputs()[5]->node());
       // torch::jit::Value* output_padding = node->inputs()[8];
       std::int64_t groups =
           *HandleConstant<std::int64_t>(node->inputs()[8]->node());
@@ -322,6 +345,37 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
         logging::err("CURRENTLY UNSUPPORTED CONVOLUTION!!!\n{}", *newNode);
       }
+    } else if (kindAsStr == "aten::conv2d") {
+      /*
+      aten::conv2d(Tensor input, Tensor weight, Tensor? bias, int[] stride,
+      int[] padding, int[] dilation, int groups) -> Tensor
+      */
+      auto input = node->inputs()[0];
+      auto kernel = node->inputs()[1];
+
+      std::vector<torch::jit::Value *> inputs{input, kernel};
+
+      // Add bias if present.
+      if (!IsNone(node->inputs()[2]->node())) {
+        inputs.push_back(node->inputs()[2]);
+      }
+
+      std::vector<std::int64_t> stride =
+          HandleList<std::int64_t>(node->inputs()[3]->node());
+      std::vector<std::int64_t> padding =
+          HandleList<std::int64_t>(node->inputs()[4]->node());
+
+      // Slight workaround for current padding mechanism here.
+      padding.push_back(padding[0]);
+      padding.push_back(padding[1]);
+
+      std::vector<std::int64_t> dilation =
+          HandleList<std::int64_t>(node->inputs()[5]->node());
+      std::int64_t groups =
+          *HandleConstant<std::int64_t>(node->inputs()[6]->node());
+
+      newNode = poptorch::Create_conv(graph, inputs, dilation, groups, {},
+                                      padding, stride);
     } else if (kindAsStr == "aten::batch_norm") {
       // clang-format off
       /*
@@ -359,14 +413,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
      */
       // clang-format on
       std::vector<std::int64_t> kernel_size =
-          HandleListConstruct(node->inputs()[1]->node());
+          HandleList<std::int64_t>(node->inputs()[1]->node());
       std::vector<std::int64_t> stride =
-          HandleListConstruct(node->inputs()[2]->node());
+          HandleList<std::int64_t>(node->inputs()[2]->node());
       std::vector<std::int64_t> padding =
-          HandleListConstruct(node->inputs()[3]->node());
-
-      /*std::vector<std::int64_t> dilation =
-          HandleListConstruct(node->inputs()[4]->node());*/
+          HandleList<std::int64_t>(node->inputs()[3]->node());
 
       // Slight workaround for current padding mechanism here.
       padding.push_back(padding[0]);
@@ -377,7 +428,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     } else if (kindAsStr == "aten::adaptive_avg_pool2d") {
 
       std::vector<std::int64_t> outputShape =
-          HandleListConstruct(node->inputs()[1]->node());
+          HandleList<std::int64_t>(node->inputs()[1]->node());
 
       c10::TensorTypePtr asTensor =
           node->inputs()[0]->type()->cast<c10::TensorType>();
@@ -488,7 +539,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // clang-format on
 
       std::vector<std::int64_t> permutation =
-          HandleListConstruct(node->inputs()[1]->node());
+          HandleList<std::int64_t>(node->inputs()[1]->node());
 
       c10::TensorTypePtr asTensor =
           node->inputs()[0]->type()->cast<c10::TensorType>();
@@ -554,7 +605,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       }
 
       newNode = Create_div(graph, {node->inputs()[0], node->inputs()[1]});
-    }  else if (kindAsStr == "aten::embedding") {
+    } else if (kindAsStr == "aten::embedding") {
       // aten::embedding(Tensor weight, Tensor indices, int padding_idx, bool
       // scale_grad_by_freq, bool sparse) -> Tensor
 
@@ -610,7 +661,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // In BERT the cast is to the same type so ignore for now.
       node->output()->replaceAllUsesWith(node->inputs()[0]);
       toDelete.insert(node);
-      } else if (kindAsStr == "aten::rsub") {
+    } else if (kindAsStr == "aten::rsub") {
 
       // clang-format off
       // Tensor aten::rsub(const Tensor& self, const Tensor& other, Scalar alpha)
