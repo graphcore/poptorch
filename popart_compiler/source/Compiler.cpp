@@ -336,7 +336,7 @@ void Compiler::InitSession(bool profile) {
 
     // Create an inference session.
     impl->session = popart::InferenceSession::createFromOnnxModel(
-        impl->opBuilder->getModelProto(), dataFlow, device, {}, {}, options,
+        impl->opBuilder->getModelProto(), dataFlow, device, {}, options,
         popart::PatternsLevel::Default);
   } else {
     auto optimizer = popart::ConstSGD(0.01);
@@ -347,8 +347,8 @@ void Compiler::InitSession(bool profile) {
     auto inLabels = impl->ids[1];
 
     // TODO: Plug the leak.
-    popart::TensorId nllloss = impl->opBuilder->aiGraphcore.nllloss(
-        {networkOutput, inLabels}, ReductionType::Sum);
+    popart::TensorId nllloss = impl->opBuilder->aiGraphcore().nllloss(
+        {networkOutput, inLabels}, popart::ReductionType::Sum);
     popart::Loss *loss = new popart::IdentityLoss(
         nllloss, "loss", popart::ReductionType::Sum);
 
