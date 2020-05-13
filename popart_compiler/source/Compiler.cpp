@@ -347,7 +347,7 @@ void Compiler::InitSession(bool profile) {
     auto inLabels = impl->ids[1];
 
     // TODO: Plug the leak.
-    popart::TensorId nllloss = impl->opBuilder->aiGraphcore().nllloss(
+    popart::TensorId nllloss = impl->opBuilder->aiGraphcoreOpset1().nllloss(
         {networkOutput, inLabels}, popart::ReductionType::Sum);
     popart::Loss *loss = new popart::IdentityLoss(
         nllloss, "loss", popart::ReductionType::Sum);
