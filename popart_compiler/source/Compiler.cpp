@@ -12,6 +12,7 @@
 #include <popart/graphtransformer.hpp>
 #include <popart/ir.hpp>
 #include <popart/ndarraywrapper.hpp>
+#include <popart/op/identity.hpp>
 #include <popart/op/matmul.hpp>
 #include <popart/op/nll.hpp>
 #include <popart/optimizer.hpp>
@@ -346,8 +347,10 @@ void Compiler::InitSession(bool profile) {
     auto inLabels = impl->ids[1];
 
     // TODO: Plug the leak.
-    popart::Loss *loss = new popart::NllLoss(networkOutput, inLabels, "loss",
-                                             popart::ReductionType::Sum);
+    popart::TensorId nllloss = impl->opBuilder->aiGraphcore.nllloss(
+        {networkOutput, inLabels}, ReductionType::Sum);
+    popart::Loss *loss = new popart::IdentityLoss(
+        nllloss, "loss", popart::ReductionType::Sum);
 
     loss->virtualGraph(impl->activeIpu);
     popart::GraphTransformer transformer{impl->opBuilder->getModelProto()};
