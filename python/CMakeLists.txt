@@ -30,6 +30,6 @@ target_include_directories(poptorch_core PRIVATE
   ${POPART_INCLUDE_DIR})
 
 install(TARGETS poptorch_core
-  DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  DESTINATION ${INSTALL_PYDIR})
 
 install(FILES __init__.py DESTINATION "${INSTALL_PYDIR}/poptorch")
