@@ -103,7 +103,7 @@ set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
 
 include(CPack)
 
-set(PKG_UPLOAD_DIR ../../../pkg)
+set(PKG_UPLOAD_DIR ../../pkg)
 
 if(BUILD_DOCS)
 add_custom_target(package_and_move
