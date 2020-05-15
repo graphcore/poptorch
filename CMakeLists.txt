@@ -128,19 +128,19 @@ endif()
 
 #------ product info file
 if(BUILD_DOCS)
-  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime user guide (PDF)\n"
+  string(APPEND PKG_ELEMENTS "  - name: PopTorch user guide (PDF)\n"
                              "    file: ${USER_GUIDE_PDF_NAME}\n"
                              "    type: pdf\n")
 
-  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime user guide (HTML)\n"
+  string(APPEND PKG_ELEMENTS "  - name: PopTorch user guide (HTML)\n"
                              "    file: ${USER_GUIDE_HTML_NAME}\n"
                              "    type: html_zip\n")
 
-#  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime Python API (PDF)\n"
+#  string(APPEND PKG_ELEMENTS "  - name: PopTorch Python API (PDF)\n"
 #                             "    file: ${PYTHON_API_PDF_NAME}\n"
 #                             "    type: pdf\n")
 #
-#  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime Python API (HTML)\n"
+#  string(APPEND PKG_ELEMENTS "  - name: PopTorch Python API (HTML)\n"
 #                             "    file: ${PYTHON_API_HTML_NAME}\n"
 #                             "    type: html_zip\n")
 endif()

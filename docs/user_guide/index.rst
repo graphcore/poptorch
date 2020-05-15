@@ -1,5 +1,5 @@
-PopART User Guide
-=================
+PopTorch User Guide
+===================
 
 .. gcdoc::
     :verb-borders:
@@ -8,4 +8,4 @@ PopART User Guide
     :maxdepth: 2
 
     intro
-
+    example
