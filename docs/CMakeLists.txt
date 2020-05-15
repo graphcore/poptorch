@@ -41,7 +41,7 @@ if (BUILD_DOCS)
   )
 
   add_custom_target(pdf_copy ALL
-    COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/latex/poptorch_user_guide.pdf ${PROJECT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}
+    COMMAND mv ${CMAKE_CURRENT_BINARY_DIR}/latex/poptorch_user_guide.pdf ${PROJECT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/pdfgen
   )
 

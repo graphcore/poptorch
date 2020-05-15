@@ -71,6 +71,11 @@ add_subdirectory(python)
 #add_subdirectory(tests)
 #add_subdirectory(examples)
 
+set(USER_GUIDE_PDF_NAME poptorch-user-guide-${VERSION}-${SNAPSHOT}.pdf)
+set(USER_GUIDE_HTML_NAME poptorch-user-guide-html-${VERSION}-${SNAPSHOT}.zip)
+set(PYTHON_API_PDF_NAME poptorch-python-api-${VERSION}-${SNAPSHOT}.pdf)
+set(PYTHON_API_HTML_NAME poptorch-python-api-html-${VERSION}-${SNAPSHOT}.zip)
+
 add_subdirectory(docs)
 
 #------ packaging
@@ -94,11 +99,6 @@ endif()
 
 set(PACKAGE_FILE_NAME poptorch-${PACKAGE_OS_TYPE}-${VERSION}-${SNAPSHOT})
 set(CPACK_PACKAGE_FILE_NAME ${PACKAGE_FILE_NAME})
-
-set(USER_GUIDE_PDF_NAME poptorch-user-guide-${VERSION}-${SNAPSHOT}.pdf)
-set(USER_GUIDE_HTML_NAME poptorch-user-guide-html-${VERSION}-${SNAPSHOT}.zip)
-set(PYTHON_API_PDF_NAME poptorch-python-api-${VERSION}-${SNAPSHOT}.pdf)
-set(PYTHON_API_HTML_NAME poptorch-python-api-html-${VERSION}-${SNAPSHOT}.zip)
 set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
 
 include(CPack)
@@ -111,8 +111,8 @@ add_custom_target(package_and_move
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv ${PACKAGE_FILE_NAME}.tar.gz ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
-#  COMMAND bash -c "mv ${USER_GUIDE_PDF_NAME} ${PKG_UPLOAD_DIR}"
-#  COMMAND bash -c "mv ${USER_GUIDE_HTML_NAME} ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv ${USER_GUIDE_PDF_NAME} ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv ${USER_GUIDE_HTML_NAME} ${PKG_UPLOAD_DIR}"
 #  COMMAND bash -c "mv ${PYTHON_API_PDF_NAME} ${PKG_UPLOAD_DIR}"
 #  COMMAND bash -c "mv ${PYTHON_API_HTML_NAME} ${PKG_UPLOAD_DIR}"
 )
@@ -128,28 +128,20 @@ endif()
 
 #------ product info file
 if(BUILD_DOCS)
-#  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime user guide (PDF)\n"
-#                             "    file: ${USER_GUIDE_PDF_NAME}\n"
-#                             "    type: pdf\n")
-#
-#  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime user guide (HTML)\n"
-#                             "    file: ${USER_GUIDE_HTML_NAME}\n"
-#                             "    type: html_zip\n")
-#
+  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime user guide (PDF)\n"
+                             "    file: ${USER_GUIDE_PDF_NAME}\n"
+                             "    type: pdf\n")
+
+  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime user guide (HTML)\n"
+                             "    file: ${USER_GUIDE_HTML_NAME}\n"
+                             "    type: html_zip\n")
+
 #  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime Python API (PDF)\n"
 #                             "    file: ${PYTHON_API_PDF_NAME}\n"
 #                             "    type: pdf\n")
 #
 #  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime Python API (HTML)\n"
 #                             "    file: ${PYTHON_API_HTML_NAME}\n"
-#                             "    type: html_zip\n")
-#
-#  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime C++ API (PDF)\n"
-#                             "    file: ${CPP_API_PDF_NAME}\n"
-#                             "    type: pdf\n")
-#
-#  string(APPEND PKG_ELEMENTS "  - name: Poplar advanced runtime C++ API (HTML)\n"
-#                             "    file: ${CPP_API_HTML_NAME}\n"
 #                             "    type: html_zip\n")
 endif()
 
