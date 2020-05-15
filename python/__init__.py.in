@@ -8,6 +8,12 @@ sys.path.insert(0, lp)
 import torch
 import torch.nn as nn
 
+actual_ver = torch.version.__version__
+expected_ver = '@EXPECTED_TORCH_VERSION@'
+if actual_ver != expected_ver:
+    print("WARNING: poptorch was compiled against version " + expected_ver +
+          " of pytorch, but this version is " + actual_ver)
+
 from poptorch_core import *
 import poptorch_core
 

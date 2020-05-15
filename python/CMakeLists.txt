@@ -4,6 +4,8 @@ find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
 find_package(Spdlog REQUIRED)
 
+add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+
 pybind11_add_module(poptorch_core SHARED
   "poptorch.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/LowerToPopart.cpp"
@@ -32,4 +34,11 @@ target_include_directories(poptorch_core PRIVATE
 install(TARGETS poptorch_core
   DESTINATION ${INSTALL_PYDIR})
 
-install(FILES __init__.py DESTINATION "${INSTALL_PYDIR}/poptorch")
+execute_process(
+  COMMAND python -c "import torch ; print(torch.version.__version__)"
+  OUTPUT_VARIABLE EXPECTED_TORCH_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+configure_file(__init__.py.in ${CMAKE_CURRENT_BINARY_DIR}/__init__.py @ONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py
+        DESTINATION "${INSTALL_PYDIR}/poptorch")
