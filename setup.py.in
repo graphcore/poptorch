@@ -2,11 +2,8 @@ from setuptools import setup
 
 VERSION='@VERSION@-@SNAPSHOT@'
 
-DESCRIPTION="PopTorch"
-
-LONG_DESCRIPTION="""
-PopTorch
-"""
+with open("README.md", "r") as fh:
+    LONG_DESCRIPTION = fh.read()
 
 REQUIRES = [
     'torch==@EXPECTED_TORCH_VERSION@',
@@ -15,12 +12,13 @@ REQUIRES = [
 setup(
     name='poptorch',
     version=VERSION,
-    description=DESCRIPTION,
-    long_description=LONG_DESCRIPTION,
+    description=LONG_DESCRIPTION[0],
+    long_description=LONG_DESCRIPTION[3:],
+    long_description_content_type="text/markdown",
     url='http://graphcore.ai',
     author='GraphCore',
     author_email='contact@graphcore.ai',
-    license='Apache',
+    license='Apache 2.0',
     packages=['poptorch'],
     package_data={'poptorch': ['*.so']},
     platforms="linux_x86_64",

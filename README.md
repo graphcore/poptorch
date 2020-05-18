@@ -1,7 +1,6 @@
-POPTORCH OVERVIEW
------------------
+PopTorch. PyTorch integration for the GraphCore IPU
+---------------------------------------------------
 
-A backend for PyTorch interfacing with PopART and the Graphcore IPU
-
-
+PopTorch is a set of extensions for PyTorch enabling models
+to be training, evaluated and used on the GraphCore IPU.
 

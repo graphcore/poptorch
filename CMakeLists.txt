@@ -163,6 +163,9 @@ configure_file(poptorch.prodinfo.yml
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME}
         DESTINATION .)
 
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+        DESTINATION .)
+
 #------ end of product info file
 
 #------ enable script
