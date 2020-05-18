@@ -26,5 +26,5 @@ target_include_directories(popart_compiler PRIVATE
                                         ${Boost_INCLUDE_DIRS})
 
 install(TARGETS popart_compiler
-  DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  DESTINATION ${INSTALL_PYDIR})
 

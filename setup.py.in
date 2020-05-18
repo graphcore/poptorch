@@ -1,0 +1,43 @@
+from setuptools import setup
+
+VERSION='@VERSION@-@SNAPSHOT@'
+
+DESCRIPTION="PopTorch"
+
+LONG_DESCRIPTION="""
+PopTorch
+"""
+
+REQUIRES = [
+    'torch==@EXPECTED_TORCH_VERSION@',
+],
+
+setup(
+    name='poptorch',
+    version=VERSION,
+    description=DESCRIPTION,
+    long_description=LONG_DESCRIPTION,
+    url='http://graphcore.ai',
+    author='GraphCore',
+    author_email='contact@graphcore.ai',
+    license='Apache',
+    packages=['poptorch'],
+    package_data={'poptorch': ['*.so']},
+    platforms="linux_x86_64",
+    install_requires=REQUIRES,
+    zip_safe=False,
+    classifiers=[
+        'Intended Audience :: Developers',
+        'Intended Audience :: Education',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 3',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Mathematics',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        'Topic :: Software Development',
+        'Topic :: Software Development :: Libraries',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+    ],
+)
+

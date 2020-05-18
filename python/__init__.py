@@ -1,21 +1,10 @@
 import os
 import sys
-# Don't think we should keep this. It's done in popart, but we should just be able to add this path to LD_LIBRARY_PATH in build/activate.sh?
-lp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../lib")
-lp = os.path.abspath(lp)
-sys.path.insert(0, lp)
 
 import torch
 import torch.nn as nn
 
-actual_ver = torch.version.__version__
-expected_ver = '@EXPECTED_TORCH_VERSION@'
-if actual_ver != expected_ver:
-    print("WARNING: poptorch was compiled against version " + expected_ver +
-          " of pytorch, but this version is " + actual_ver)
-
-from poptorch_core import *
-import poptorch_core
+from poptorch.poptorch_core import *
 
 begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 end_ipu_block = torch.ops.poptorch.end_ipu_block
@@ -95,7 +84,7 @@ class PoplarExecutor:
                 print('Compiling the model using tracing')
                 n = torch.jit.trace(self.model, newTuple)
 
-                self.executable = poptorch_core.compileWithTrace(
+                self.executable = compileWithTrace(
                     n._c, n.graph, newTuple, self.device_iterations,
                     self.training, self.replication_factor,
                     self.gradient_accumulation, self.profile)
@@ -107,13 +96,13 @@ class PoplarExecutor:
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 
-                self.executable = poptorch_core.compileWithScript(
+                self.executable = compileWithScript(
                     n._c, n.graph, newTuple, self.device_iterations,
                     self.training, self.replication_factor,
                     self.gradient_accumulation, self.profile)
 
         # Execute the poplar executable with the full size (batch * device interations)
-        output = poptorch_core.execute(self.executable, in_tensors)
+        output = execute(self.executable, in_tensors)
 
         if len(output) > 1:
             return tuple(output)
@@ -157,4 +146,4 @@ def inferenceModel(model,
 def propagateInputShapes(graph, dummyInputs):
     for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
         graphInput.inferTypeFrom(dummyInput)
-    poptorch_core.propagateInputShapes(graph)
+    propagateInputShapes(graph)

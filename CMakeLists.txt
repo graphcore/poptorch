@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
-include(GNUInstallDirs)
 project(poptorch)
 
 #------ release version numnber
@@ -38,7 +37,7 @@ endif()
 #with cmake >= 3.12 this should be add_compile_definitions(ONNX_NAMESPACE=onnx)
 add_definitions(-DONNX_NAMESPACE=onnx)
 
-#------ cpack information
+#------ git information
 execute_process(
   COMMAND git rev-parse HEAD
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -53,17 +52,16 @@ message(STATUS "View hash is " ${VIEW_SHORT_HASH})
 
 set(SNAPSHOT ${VIEW_SHORT_HASH})
 
-set(CPACK_PACKAGE_VENDOR graphcore)
-set(CPACK_GENERATOR TGZ)
-
 execute_process(COMMAND
   git rev-parse --short=10 HEAD
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   OUTPUT_VARIABLE GIT_COMMIT_HASH
   OUTPUT_STRIP_TRAILING_WHITESPACE)
-#------ end of cpack information
+#------ end of git information
 
-set(INSTALL_PYDIR python)
+set(INSTALL_PYDIR poptorch)
+set(CMAKE_INSTALL_RPATH "$ORIGIN")
+
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
 
@@ -97,30 +95,37 @@ if (DEFINED SWDB_PACKAGE_NAME)
   message(STATUS "Overriding package type '${PACKAGE_OS_TYPE}'")
 endif()
 
-set(PACKAGE_FILE_NAME poptorch-${PACKAGE_OS_TYPE}-${VERSION}-${SNAPSHOT})
-set(CPACK_PACKAGE_FILE_NAME ${PACKAGE_FILE_NAME})
-set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
+execute_process(
+  COMMAND python -c "import torch ; print(torch.version.__version__.split('+')[0])"
+  OUTPUT_VARIABLE EXPECTED_TORCH_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-include(CPack)
+configure_file(setup.py.in
+  ${PROJECT_BINARY_DIR}/setup.py
+  @ONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/setup.py DESTINATION .)
+
+set(PACKAGE_FILE_NAME poptorch-${VERSION}_${SNAPSHOT}-py3-none-any.whl)
+set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
 
 set(PKG_UPLOAD_DIR ../../pkg)
 
 if(BUILD_DOCS)
 add_custom_target(package_and_move
-  COMMAND ${CMAKE_CPACK_COMMAND} --config ${CMAKE_BINARY_DIR}/CPackConfig.cmake
+  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+  COMMAND python3 setup.py sdist bdist_wheel
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv ${PACKAGE_FILE_NAME}.tar.gz ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv ${USER_GUIDE_PDF_NAME} ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv ${USER_GUIDE_HTML_NAME} ${PKG_UPLOAD_DIR}"
-#  COMMAND bash -c "mv ${PYTHON_API_PDF_NAME} ${PKG_UPLOAD_DIR}"
-#  COMMAND bash -c "mv ${PYTHON_API_HTML_NAME} ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME} ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME} ${PKG_UPLOAD_DIR}"
 )
 else()
 add_custom_target(package_and_move
-  COMMAND ${CMAKE_CPACK_COMMAND} --config ${CMAKE_BINARY_DIR}/CPackConfig.cmake
+  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+  COMMAND python3 setup.py sdist bdist_wheel
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv ${PACKAGE_FILE_NAME}.tar.gz ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv dist/*.whl ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
 )
 endif()
@@ -154,6 +159,10 @@ execute_process(
 configure_file(poptorch.prodinfo.yml
   ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME}
   @ONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME}
+        DESTINATION .)
+
 #------ end of product info file
 
 #------ enable script
@@ -172,3 +181,4 @@ configure_file(enable.sh.in
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/enable.sh
         DESTINATION .)
 #------ end of enable script
+

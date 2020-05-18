@@ -6,6 +6,6 @@ source_id: @SNAPSHOT@
 repo: git@phabricator.sourcevertex.net:diffusion/POPTORCH/poptorch.git
 elements:
   - name: PopTorch framework (@OS_TYPE@)
-    file: @PACKAGE_FILE_NAME@.tar.gz
+    file: @PACKAGE_FILE_NAME@
     type: poptorch_build_@OS_TYPE@
 @PKG_ELEMENTS@
