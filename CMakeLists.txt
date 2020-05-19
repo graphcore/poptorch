@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
 project(poptorch)
 
+enable_testing()
+
 #------ release version numnber
 file(READ ${PROJECT_SOURCE_DIR}/version.json VERSION_JSON)
 string(REGEX REPLACE
@@ -66,7 +68,7 @@ add_subdirectory(popart_compiler)
 add_subdirectory(python)
 
 # Examples and tests
-#add_subdirectory(tests)
+add_subdirectory(tests)
 #add_subdirectory(examples)
 
 set(USER_GUIDE_PDF_NAME poptorch-user-guide-${VERSION}-${SNAPSHOT}.pdf)
