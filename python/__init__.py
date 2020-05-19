@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from poptorch.poptorch_core import *
+import poptorch.poptorch_core as poptorch_core
 
 begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 end_ipu_block = torch.ops.poptorch.end_ipu_block
@@ -146,4 +147,4 @@ def inferenceModel(model,
 def propagateInputShapes(graph, dummyInputs):
     for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
         graphInput.inferTypeFrom(dummyInput)
-    propagateInputShapes(graph)
+    poptorch_core.propagateInputShapes(graph)
