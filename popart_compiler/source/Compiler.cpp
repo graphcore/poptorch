@@ -349,17 +349,14 @@ void Compiler::InitSession(bool profile) {
     // TODO: Plug the leak.
     popart::TensorId nllloss = impl->opBuilder->aiGraphcoreOpset1().nllloss(
         {networkOutput, inLabels}, popart::ReductionType::Sum);
-    popart::Loss *loss = new popart::IdentityLoss(
-        nllloss, "loss", popart::ReductionType::Sum);
 
-    loss->virtualGraph(impl->activeIpu);
     popart::GraphTransformer transformer{impl->opBuilder->getModelProto()};
 
     transformer.prepareNodesForTraining();
 
     // Create the training session.
     impl->session = popart::TrainingSession::createFromOnnxModel(
-        transformer.getModelProto(), dataFlow, {loss}, optimizer, device, {},
+        transformer.getModelProto(), dataFlow, nllloss, optimizer, device, {},
         options, popart::PatternsLevel::Default);
   }
 
