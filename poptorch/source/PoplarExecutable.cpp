@@ -1,8 +1,9 @@
-#include <poptorch/PoplarExecutable.hpp>
 #include <iostream>
+#include <poptorch/PoplarExecutable.hpp>
 namespace poptorch {
 
-std::vector<at::IValue> PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
+std::vector<at::IValue>
+PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
 
   // Set up the input tensors in the poplar graph to point to the incoming
   // pytorch tensors.
@@ -15,13 +16,14 @@ std::vector<at::IValue> PoplarExecutable::Run(std::vector<at::Tensor> &inTensors
     std::transform(pytorchTensor.sizes().begin(), pytorchTensor.sizes().end(),
                    popartDims.begin(), [](std::int64_t i) { return i; });
 
-
-    if (i == 0) {
-        compiler.SetUpInputOp(
-            popartId, static_cast<float *>(pytorchTensor.data_ptr()), popartDims);
+    at::ScalarType elemType = pytorchTensor.scalar_type();
+    if (elemType == at::ScalarType::Float) {
+      compiler.SetUpInputOp(
+          popartId, static_cast<float *>(pytorchTensor.data_ptr()), popartDims);
     } else {
-        compiler.SetUpInputOp(
-            popartId, static_cast<std::int32_t *>(pytorchTensor.data_ptr()), popartDims);
+      compiler.SetUpInputOp(
+          popartId, static_cast<std::int32_t *>(pytorchTensor.data_ptr()),
+          popartDims);
     }
   }
 
@@ -43,7 +45,6 @@ std::vector<at::IValue> PoplarExecutable::Run(std::vector<at::Tensor> &inTensors
 
   // Execute the compiled poplar graph.
   compiler.Run();
-
 
   std::vector<at::IValue> returnees;
   // Return the outputs as pytorch tensors to the user.
