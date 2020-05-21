@@ -23,6 +23,7 @@ target_include_directories(popart_compiler PRIVATE
                                         ${SPDLOG_INCLUDE_DIR}
                                         ${POPART_INCLUDE_DIR}
                                         ${POPLAR_INCLUDE_DIR}
+                                        ${POPLIBS_INCLUDE_DIR}
                                         ${Boost_INCLUDE_DIRS})
 
 install(TARGETS popart_compiler
