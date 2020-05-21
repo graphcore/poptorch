@@ -3,6 +3,7 @@
 #include <shared/Logging.hpp>
 
 #include <string>
+#include <optional>
 #include <torch/csrc/jit/ir/ir.h>
 #include <unordered_map>
 #include <unordered_set>
