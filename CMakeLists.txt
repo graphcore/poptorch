@@ -62,7 +62,12 @@ execute_process(COMMAND
 #------ end of git information
 
 set(INSTALL_PYDIR poptorch)
-set(CMAKE_INSTALL_RPATH "$ORIGIN")
+
+if(${OS_TYPE} STREQUAL osx)
+  set(CMAKE_INSTALL_RPATH "@loader_path")
+elseif(${OS_TYPE} STREQUAL linux)
+  set(CMAKE_INSTALL_RPATH "$ORIGIN")
+endif()
 
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
