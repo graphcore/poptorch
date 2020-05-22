@@ -74,7 +74,7 @@ add_subdirectory(python)
 
 # Examples and tests
 add_subdirectory(tests)
-#add_subdirectory(examples)
+add_subdirectory(examples)
 
 set(USER_GUIDE_PDF_NAME poptorch-user-guide-${VERSION}-${SNAPSHOT}.pdf)
 set(USER_GUIDE_HTML_NAME poptorch-user-guide-html-${VERSION}-${SNAPSHOT}.zip)
