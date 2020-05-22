@@ -8,4 +8,5 @@ PopTorch User Guide
     :maxdepth: 2
 
     intro
+    installation
     example
