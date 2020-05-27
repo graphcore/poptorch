@@ -14,7 +14,7 @@ def install_release(release_utils, release_id, snapshot_id, version_str):
     # Tag the view repository with the release.
     release_utils.tag_view_repo(
             'ssh://git@phabricator.sourcevertex.net/diffusion/' \
-            + 'POPTORCH/poptorch.git',
+            + 'POPONNXVIEW/poponnxview.git',
             snapshot_id,
             release_id,
             tag)
