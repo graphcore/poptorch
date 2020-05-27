@@ -3,7 +3,10 @@
 
 
 def install_release(release_utils, release_id, snapshot_id, version_str):
-    release_utils.log.info('Tagging poptorch release ' + version_str)
+    # Tag must contain the string 'poptorch' to keep it unique.
+    tag = "{}-poptorch".format(version_str)
+
+    release_utils.log.info('Tagging poptorch release ' + tag)
 
     # Create the release on the document server.
     release_utils.create_document_release(snapshot_id)
@@ -14,7 +17,7 @@ def install_release(release_utils, release_id, snapshot_id, version_str):
             + 'POPTORCH/poptorch.git',
             snapshot_id,
             release_id,
-            version_str)
+            tag)
 
     # Increment the point version number.
     release_utils.increment_version_point(
