@@ -69,6 +69,12 @@ elseif(${OS_TYPE} STREQUAL linux)
   set(CMAKE_INSTALL_RPATH "$ORIGIN")
 endif()
 
+
+# Common packages
+find_package(Spdlog REQUIRED)
+find_package(Popart REQUIRED)
+find_package(Poplar REQUIRED)
+
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
 

@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 project(popart_compiler)
 
-find_package(Spdlog REQUIRED)
-find_package(Popart REQUIRED)
-find_package(Poplar REQUIRED)
 find_package(Boost REQUIRED)
 
 add_definitions(-DONNX_NAMESPACE=onnx)

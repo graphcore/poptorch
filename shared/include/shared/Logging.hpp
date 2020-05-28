@@ -83,19 +83,6 @@ MAKE_LOG_TEMPLATE(err, Err)
 
 #undef MAKE_LOG_TEMPLATE
 
-// Convenience macro to create a log entry prefixed with function name e.g.:
-//    void someFunc(int i) {
-//      FUNC_LOGGER(info, " with i := {}", i);
-//    }
-// Then the log entry would be something like:
-// 14:30:31.00 [I] void someFunc(int): with i := 42
-// NOTE: Because of the limitations of __VA_ARGS__ this log entry must have at
-// least one parameter.
-#define FUNC_LOGGER(lvl, fmtStr, ...)                                          \
-  logging::lvl("{}: " fmtStr, __PRETTY_FUNCTION__, __VA_ARGS__)
-
-#undef FUNC_LOGGER
-
 } // namespace logging
 
 #endif // INCLUDE_POPTORCH_LOGGING_H
