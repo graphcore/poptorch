@@ -1,10 +1,10 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <iostream>
 #include <poptorch/PoplarExecutable.hpp>
 namespace poptorch {
 
 std::vector<at::IValue>
 PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
-
   // Set up the input tensors in the poplar graph to point to the incoming
   // pytorch tensors.
   for (std::size_t i = 0; i < popartInputs.size(); ++i) {
@@ -38,7 +38,8 @@ PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
 
     // Create the torch tensor and use its memory for the popart tensor.
     torchOutputs[id] = at::empty({dims});
-    float *dataPtr = (float *)torchOutputs[id].toTensor().data_ptr();
+    float *dataPtr =
+        static_cast<float *>(torchOutputs[id].toTensor().data_ptr());
 
     compiler.SetUpOutputOp(id, dataPtr, dims);
   }

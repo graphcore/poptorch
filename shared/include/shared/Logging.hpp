@@ -1,9 +1,11 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef INCLUDE_POPTORCH_LOGGING_H
 #define INCLUDE_POPTORCH_LOGGING_H
 
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/fmt/ostr.h>
 #include <string>
+#include <utility>
 
 /// This is a simple logging system for poptorch based on spdlog. The easiest
 /// way to use it is to simply call `logging::<level>()` where <level> is one
@@ -86,4 +88,3 @@ MAKE_LOG_TEMPLATE(err, Err)
 } // namespace logging
 
 #endif // INCLUDE_POPTORCH_LOGGING_H
-

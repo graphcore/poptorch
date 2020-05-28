@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "shared/Logging.hpp"
 
 #include <spdlog/fmt/fmt.h>
@@ -39,7 +40,6 @@ LoggingContext &context() {
 }
 
 Level logLevelFromString(const std::string &level) {
-
   if (level == "TRACE")
     return Level::Trace;
   if (level == "DEBUG")
@@ -55,8 +55,8 @@ Level logLevelFromString(const std::string &level) {
 
   throw std::runtime_error(
       fmt::format("Unknown POPTORCH_LOG_LEVEL '{}'. Valid values are TRACE, "
-                     "DEBUG, INFO, WARN, ERR and OFF.",
-                     level));
+                  "DEBUG, INFO, WARN, ERR and OFF.",
+                  level));
 }
 
 template <typename Mutex>

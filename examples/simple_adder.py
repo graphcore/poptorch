@@ -5,12 +5,14 @@ import poptorch
 # This simple example demoonstrates compiling a model to add
 # two tensors together using the IPU.
 
+
 class SimpleAdder(nn.Module):
     def __init__(self):
         super(SimpleAdder, self).__init__()
 
     def forward(self, x, y):
         return x + y
+
 
 model = SimpleAdder()
 inference_model = poptorch.inferenceModel(model)

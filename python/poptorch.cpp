@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/Peephole.hpp"
@@ -54,9 +55,7 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
   std::vector<at::IValue> value = executable->Run(inputTensors);
 
   std::vector<pybind11::object> returnee;
-  std::transform(value.begin(),
-                 value.end(),
-                 std::back_inserter(returnee),
+  std::transform(value.begin(), value.end(), std::back_inserter(returnee),
                  [](at::IValue &v) { return torch::jit::toPyObject(v); });
 
   return returnee;
@@ -89,14 +88,10 @@ void constantPropagation(torch::jit::Graph *graph) {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h,
-                 py::handle g,
-                 pybind11::tuple inputs,
-                 std::uint64_t steps,
-                 bool training,
+compileWithTrace(py::handle h, py::handle g, pybind11::tuple inputs,
+                 std::uint64_t steps, bool training,
                  std::uint64_t replicationFactor,
-                 std::uint64_t gradientAccumulation,
-                 bool profile) {
+                 std::uint64_t gradientAccumulation, bool profile) {
   auto module = as_module(h);
 
   auto forward = module->get_method("forward");
@@ -134,26 +129,17 @@ compileWithTrace(py::handle h,
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  return poptorch::lowerToPopart(*graph,
-                                 inputTensors,
-                                 parameterData,
-                                 steps,
-                                 training,
-                                 replicationFactor,
-                                 gradientAccumulation,
-                                 profile);
+  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps,
+                                 training, replicationFactor,
+                                 gradientAccumulation, profile);
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithScript(py::handle h,
-                  py::handle g,
-                  pybind11::tuple inputs,
-                  std::uint64_t steps,
-                  bool training,
+compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
+                  std::uint64_t steps, bool training,
                   std::uint64_t replicationFactor,
-                  std::uint64_t gradientAccumulation,
-                  bool profile) {
-  auto module   = as_module(h);
+                  std::uint64_t gradientAccumulation, bool profile) {
+  auto module = as_module(h);
   auto argGraph = as_graph(g);
 
   torch::jit::Inline(*argGraph);
@@ -161,7 +147,7 @@ compileWithScript(py::handle h,
   peepholeOptimizations(*argGraph, training);
 
   auto graphAndTensors = torch::jit::LowerGraph(*argGraph, module->_ivalue());
-  auto graph           = graphAndTensors.first;
+  auto graph = graphAndTensors.first;
   graph->dump();
 
   int loop_count = 0;
@@ -215,14 +201,9 @@ compileWithScript(py::handle h,
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  return poptorch::lowerToPopart(*graph,
-                                 inputTensors,
-                                 parameterData,
-                                 steps,
-                                 training,
-                                 replicationFactor,
-                                 gradientAccumulation,
-                                 profile);
+  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps,
+                                 training, replicationFactor,
+                                 gradientAccumulation, profile);
 }
 
 void pyPropagateInputShapes(py::handle h) {
@@ -270,8 +251,7 @@ PYBIND11_MODULE(poptorch_core, m) {
   static py::exception<popart::internal_error> ePopartInternal(
       m, "popart_internal_exception");
   static py::exception<poplar::poplar_error> ePoplar(m, "poplar_exception");
-  static py::exception<poputil::poplibs_error> ePoplibs(m,
-                                                        "poplibs_exception");
+  static py::exception<poputil::poplibs_error> ePoplibs(m, "poplibs_exception");
 
   py::register_exception_translator([](std::exception_ptr p) {
     try {
