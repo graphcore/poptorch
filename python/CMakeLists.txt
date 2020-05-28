@@ -3,8 +3,6 @@ include(GNUInstallDirs)
 find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
 
-add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
-
 pybind11_add_module(poptorch_core SHARED
   "poptorch.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/error.cpp"
@@ -18,14 +16,14 @@ pybind11_add_module(poptorch_core SHARED
   "${PROJECT_SOURCE_DIR}/poptorch/source/EliminateListConstructs.cpp"
   )
 
-target_link_libraries(poptorch_core PUBLIC
+target_link_libraries(poptorch_core PRIVATE
   ${TORCH_LIBRARIES}
   ${POPART_LIB}
   ${POPLAR_LIB}
   ${POPUTIL_LIB}
   popart_compiler)
 
-target_include_directories(poptorch_core PUBLIC
+target_include_directories(poptorch_core PRIVATE
   "${PROJECT_SOURCE_DIR}/poptorch/include"
   "${PROJECT_SOURCE_DIR}/shared/include"
   "${PROJECT_SOURCE_DIR}/popart_compiler/include"

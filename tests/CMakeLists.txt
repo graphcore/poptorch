@@ -90,9 +90,17 @@ function(add_test_executable name)
       PRIVATE
       ${Boost_INCLUDE_DIRS}
       ${CMAKE_CURRENT_SOURCE_DIR}
-      $<TARGET_PROPERTY:poptorch_core,INCLUDE_DIRECTORIES>)
+      "${PROJECT_SOURCE_DIR}/poptorch/include"
+      "${PROJECT_SOURCE_DIR}/shared/include"
+      "${PROJECT_SOURCE_DIR}/popart_compiler/include"
+      ${POPART_INCLUDE_DIR}
+      ${POPLAR_INCLUDE_DIR}
+      ${POPLIBS_INCLUDE_DIR}
+      ${SPDLOG_INCLUDE_DIR}
+  )
+
   target_link_libraries(${name}
-    poptorch_core
+    popart_compiler
     ${CMAKE_THREAD_LIBS_INIT}
     ${Boost_LIBRARIES}
   )
