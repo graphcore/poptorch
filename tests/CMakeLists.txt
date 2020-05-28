@@ -88,6 +88,7 @@ function(add_test_executable name)
     add_executable(${name} ${ARGN})
   target_include_directories(${name}
       PRIVATE
+      ${Boost_INCLUDE_DIRS}
       ${CMAKE_CURRENT_SOURCE_DIR}
       $<TARGET_PROPERTY:poptorch_core,INCLUDE_DIRECTORIES>)
   target_link_libraries(${name}
