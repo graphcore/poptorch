@@ -25,4 +25,4 @@ x = torch.ones(2)
 y = torch.zeros(2)
 
 print(inference_model((x, y)))
-print(model(x,y))
+print(model(x, y))

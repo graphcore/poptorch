@@ -1,8 +1,10 @@
-#include <iostream>
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+
+#include <iostream>
 
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/inliner.h>
@@ -38,7 +40,6 @@ namespace poptorch {
 std::vector<pybind11::object>
 execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
         pybind11::tuple inputs) {
-
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
 

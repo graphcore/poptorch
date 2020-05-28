@@ -4,38 +4,47 @@ import torchvision
 import numpy as np
 import poptorch
 
-
 # Load the MNIST data.
 
 training_batch_size = 20
 training_ipu_step_size = 20
 
-training_combined_batch_size = training_batch_size*training_ipu_step_size
+training_combined_batch_size = training_batch_size * training_ipu_step_size
 training_data = torch.utils.data.DataLoader(
-  torchvision.datasets.MNIST('mnist_data/', train=True, download=True,
-                             transform=torchvision.transforms.Compose([
-                               torchvision.transforms.ToTensor(),
-                               torchvision.transforms.Normalize(
-                                 (0.1307,), (0.3081,))
-                             ])), batch_size=training_combined_batch_size, shuffle=True, drop_last=True)
+    torchvision.datasets.MNIST('mnist_data/',
+                               train=True,
+                               download=True,
+                               transform=torchvision.transforms.Compose([
+                                   torchvision.transforms.ToTensor(),
+                                   torchvision.transforms.Normalize((0.1307, ),
+                                                                    (0.3081, ))
+                               ])),
+    batch_size=training_combined_batch_size,
+    shuffle=True,
+    drop_last=True)
 
 validation_batch_size = 100
 
-validation_data = torch.utils.data.DataLoader(
-  torchvision.datasets.MNIST('mnist_data/', train=True, download=True,
-                             transform=torchvision.transforms.Compose([
-                               torchvision.transforms.ToTensor(),
-                               torchvision.transforms.Normalize(
-                                 (0.1307,), (0.3081,))
-                             ])), batch_size=validation_batch_size, shuffle=True, drop_last=True)
-
+validation_data = torch.utils.data.DataLoader(torchvision.datasets.MNIST(
+    'mnist_data/',
+    train=True,
+    download=True,
+    transform=torchvision.transforms.Compose([
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize((0.1307, ), (0.3081, ))
+    ])),
+                                              batch_size=validation_batch_size,
+                                              shuffle=True,
+                                              drop_last=True)
 
 
 # Define the network.
 class Block(nn.Module):
-    def __init__(self, in_channels, num_filters,kernel_size, pool_size):
+    def __init__(self, in_channels, num_filters, kernel_size, pool_size):
         super(Block, self).__init__()
-        self.conv = nn.Conv2d(in_channels, num_filters, kernel_size=kernel_size)
+        self.conv = nn.Conv2d(in_channels,
+                              num_filters,
+                              kernel_size=kernel_size)
         self.pool = nn.MaxPool2d(kernel_size=pool_size)
         self.relu = nn.ReLU()
 
@@ -44,6 +53,7 @@ class Block(nn.Module):
         x = self.pool(x)
         x = self.relu(x)
         return x
+
 
 class Network(nn.Module):
     def __init__(self):
@@ -55,8 +65,6 @@ class Network(nn.Module):
         self.layer4 = nn.Linear(256, 10)
 
         self.softmax = nn.Softmax(1)
-
-
 
     def forward(self, x):
         # with poptorch.IPU(0):
@@ -72,14 +80,11 @@ class Network(nn.Module):
         return self.softmax(x)
 
 
-
 # Create our model.
 model = Network()
 
-
 # This isn't needed. It's just to print out the loss in python land.
 loss_function = nn.CrossEntropyLoss()
-
 
 # Create model for training which will run on IPU.
 training_model = poptorch.trainingModel(model, training_ipu_step_size)
@@ -88,54 +93,60 @@ training_model = poptorch.trainingModel(model, training_ipu_step_size)
 # trains the weights in the weights in this will automatically update.
 inference_model = poptorch.inferenceModel(model)
 
+
 def train():
-  for batch_number, (data, labels) in enumerate(training_data):
-    result = training_model((data, labels.int()))
-    popart_loss = loss_function(result, labels)
+    for batch_number, (data, labels) in enumerate(training_data):
+        result = training_model((data, labels.int()))
+        popart_loss = loss_function(result, labels)
 
-    if batch_number % 10 == 0:
-        print("PoptorchIPU loss at batch: " + str(batch_number) + " is " + str(popart_loss))
+        if batch_number % 10 == 0:
+            print("PoptorchIPU loss at batch: " + str(batch_number) + " is " +
+                  str(popart_loss))
 
-        # Pick the highest probability.
-        _, ind = torch.max(result, 1)
-        eq = torch.eq(ind, labels)
-        elms, counts = torch.unique(eq, sorted=False, return_counts=True)
+            # Pick the highest probability.
+            _, ind = torch.max(result, 1)
+            eq = torch.eq(ind, labels)
+            elms, counts = torch.unique(eq, sorted=False, return_counts=True)
 
-        acc = 0.0
-        if len(elms) == 2:
-          if elms[0] == True:
-            acc = (counts[0].item() / training_combined_batch_size) * 100.0
-          else:
-            acc = (counts[1].item()/ training_combined_batch_size) * 100.0
+            acc = 0.0
+            if len(elms) == 2:
+                if elms[0] == True:
+                    acc = (counts[0].item() /
+                           training_combined_batch_size) * 100.0
+                else:
+                    acc = (counts[1].item() /
+                           training_combined_batch_size) * 100.0
 
-        print ("Training accuracy:  " + str(acc) +"% from batch of size " + str(training_combined_batch_size))
-
+            print("Training accuracy:  " + str(acc) + "% from batch of size " +
+                  str(training_combined_batch_size))
 
 
 def test():
-  correct = 0
-  total = 0
-  with torch.no_grad():
-    for batch_number, (data, labels) in enumerate(validation_data):
-      output = inference_model(data)
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch_number, (data, labels) in enumerate(validation_data):
+            output = inference_model(data)
 
-      # Argmax the probabilities to get the highest.
-      _, ind = torch.max(output, 1)
+            # Argmax the probabilities to get the highest.
+            _, ind = torch.max(output, 1)
 
-      # Compare it against the ground truth for this batch.
-      eq = torch.eq(ind, labels)
+            # Compare it against the ground truth for this batch.
+            eq = torch.eq(ind, labels)
 
-      # Count the number which are True and the number which are False.
-      elms, counts = torch.unique(eq, sorted=False, return_counts=True)
+            # Count the number which are True and the number which are False.
+            elms, counts = torch.unique(eq, sorted=False, return_counts=True)
 
-      if len(elms) == 2 or elms[0] == True:
-        if elms[0] == True:
-          correct += counts[0].item()
-        else:
-          correct += counts[1].item()
+            if len(elms) == 2 or elms[0] == True:
+                if elms[0] == True:
+                    correct += counts[0].item()
+                else:
+                    correct += counts[1].item()
 
-      total += validation_batch_size
-  print("Validation: of " + str(total) + " samples we got: " + str((correct/total)* 100.0) + "% correct")
+            total += validation_batch_size
+    print("Validation: of " + str(total) + " samples we got: " +
+          str((correct / total) * 100.0) + "% correct")
+
 
 train()
 test()

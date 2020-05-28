@@ -1,10 +1,11 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <poptorch/Peephole.hpp>
 
 namespace poptorch {
 
 class PeepholeOptimizer {
 public:
-  PeepholeOptimizer(bool _training) : isTraining(_training) {}
+  explicit PeepholeOptimizer(bool _training) : isTraining(_training) {}
 
   void run(torch::jit::Graph &graph) {
     run(graph.block());

@@ -1,7 +1,9 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef POPART_COMPILER_H
 #define POPART_COMPILER_H
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace poptorch {
