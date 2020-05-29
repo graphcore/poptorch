@@ -12,13 +12,19 @@ add_poptorch_py_unit_test(shape_inference)
 # C++ tests #
 #############
 
-find_package(Boost REQUIRED unit_test_framework filesystem)
+find_package(Torch REQUIRED)
 
-# Workaround for this bug: https://github.com/boostorg/system/issues/26
-# on certain systems/compilers (e.g. compiling the host-runtime-view
-# on Centos 7.6 with GCC 7.3).
-# TODO: When CMake 3.12 is required use add_compile_definitions() instead.
+# Ensure ABI matches that of PyTorch
+add_definitions("-D_GLIBCXX_USE_CXX11_ABI=${Torch_USE_CXX11_ABI}")
+
+# Boost must be header only because the ABI must match PyTorch
+find_package(Boost REQUIRED)
 add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
+
+# We need to link against python as we are testing
+# a python module
+find_package(pybind11 REQUIRED)
+find_package(PythonLibsNew ${PYBIND11_PYTHON_VERSION} REQUIRED)
 
 set(DEFAULT_TEST_VARIANTS "Cpu" CACHE STRING
     "The device variants to run tests on when no variants are set explicitly")
@@ -85,7 +91,7 @@ function(extract_targets variants targets)
 endfunction()
 
 function(add_test_executable name)
-    add_executable(${name} ${ARGN})
+  add_executable(${name} ${ARGN})
   target_include_directories(${name}
       PRIVATE
       ${Boost_INCLUDE_DIRS}
@@ -97,17 +103,19 @@ function(add_test_executable name)
       ${POPLAR_INCLUDE_DIR}
       ${POPLIBS_INCLUDE_DIR}
       ${SPDLOG_INCLUDE_DIR}
-  )
+      ${TORCH_INCLUDE_DIRS})
 
   target_link_libraries(${name}
+    poptorch_core
+    ${TORCH_LIBRARIES}
+    ${POPART_LIB}
+    ${POPLAR_LIB}
+    ${POPUTIL_LIB}
     popart_compiler
+    ${PYTHON_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
-    ${Boost_LIBRARIES}
   )
-
-  if (NOT Boost_UNIT_TEST_FRAMEWORK_LIBRARY MATCHES "\\.a$")
-    target_compile_definitions(${name} PRIVATE -DBOOST_TEST_DYN_LINK)
-  endif()
+  # NB Boost must *not* be linked
 
   set_property(TARGET ${name}
               APPEND_STRING PROPERTY

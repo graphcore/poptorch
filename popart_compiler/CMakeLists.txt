@@ -4,6 +4,7 @@ project(popart_compiler)
 find_package(Boost REQUIRED)
 
 add_definitions(-DONNX_NAMESPACE=onnx)
+add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
 
 add_library(popart_compiler SHARED
   "source/Compiler.cpp"

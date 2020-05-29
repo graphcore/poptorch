@@ -22,18 +22,22 @@
 /// POPTORCH_LOG_LEVEL=ERR
 /// POPTORCH_LOG_DEST=Mylog.txt
 ///
-/// Formatting is done using the `fmt` library. It supports {}-style and %-style
-/// format specification strings. See https://github.com/fmtlib/fmt for details.
+/// Formatting is done using the `fmt` library. It supports {}-style and
+/// %-style format specification strings. See https://github.com/fmtlib/fmt
+/// for details.
+
+// This header is compatible with both the pre and post C++11 ABIs
 
 namespace logging {
 
 enum class Level {
   Trace = 0,
   Debug = 1,
-  Info = 2,
-  Warn = 3,
-  Err = 4,
-  // level 5 is "critical" in spglog, which we don't use so isn't exposed here.
+  Info  = 2,
+  Warn  = 3,
+  Err   = 4,
+  // level 5 is "critical" in spdlog, which we don't use so isn't exposed
+  // here.
   Off = 6,
 };
 
@@ -51,7 +55,8 @@ void flush();
 
 // Log a message. You should probably use the MAKE_LOG_TEMPLATE macros
 // instead, e.g. logging::debug("A debug message").
-void log(Level l, std::string &&msg);
+void log(Level l, const std::string &msg);
+void log(Level l, const char *msg);
 
 // Log a formatted message. This uses the `fmt` C++ library for formatting.
 // See https://github.com/fmtlib/fmt for details. You should probably use
@@ -67,14 +72,14 @@ void log(Level l, const char *s, const Args &... args) {
 
 // Create a bit of syntactic sugar which allows log statements
 // of the form logging::debug("Msg").
-#define MAKE_LOG_TEMPLATE(fnName, lvl)                                         \
-  template <typename... Args>                                                  \
-  inline void fnName(const char *s, const Args &... args) {                    \
-    log(Level::lvl, s, std::forward<const Args>(args)...);                     \
-  }                                                                            \
-  template <typename... Args>                                                  \
-  inline void fnName(const std::string &s, const Args &... args) {             \
-    log(Level::lvl, s.c_str(), std::forward<const Args>(args)...);             \
+#define MAKE_LOG_TEMPLATE(fnName, lvl)                                       \
+  template <typename... Args>                                                \
+  inline void fnName(const char *s, const Args &... args) {                  \
+    log(Level::lvl, s, std::forward<const Args>(args)...);                   \
+  }                                                                          \
+  template <typename... Args>                                                \
+  inline void fnName(const std::string &s, const Args &... args) {           \
+    log(Level::lvl, s.c_str(), std::forward<const Args>(args)...);           \
   }
 
 MAKE_LOG_TEMPLATE(trace, Trace)

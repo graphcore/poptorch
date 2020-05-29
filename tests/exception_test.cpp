@@ -3,9 +3,13 @@
 
 #include <poptorch/error.hpp>
 
-#include <boost/test/unit_test.hpp>
+// Use header only variant due to ABI issues
+#include <boost/test/included/unit_test.hpp>
 
-void test_function1() { throw poptorch::error("Test {} {} {}", 1, 2, 3); }
+void test_function1() {
+  logging::setLogLevel(logging::Level::Trace);
+  throw poptorch::error("Test {} {} {}", 1, 2, 3);
+}
 
 BOOST_AUTO_TEST_CASE(LoggingTest1) {
 
@@ -17,7 +21,10 @@ BOOST_AUTO_TEST_CASE(LoggingTest1) {
   }
 }
 
-void test_function2() { throw poptorch::error("Test {} {} {}", 1, 2); }
+void test_function2() {
+  logging::setLogLevel(logging::Level::Trace);
+  throw poptorch::error("Test {} {} {}", 1, 2);
+}
 
 BOOST_AUTO_TEST_CASE(LoggingTest2) {
 
