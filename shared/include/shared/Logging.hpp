@@ -33,9 +33,9 @@ namespace logging {
 enum class Level {
   Trace = 0,
   Debug = 1,
-  Info  = 2,
-  Warn  = 3,
-  Err   = 4,
+  Info = 2,
+  Warn = 3,
+  Err = 4,
   // level 5 is "critical" in spdlog, which we don't use so isn't exposed
   // here.
   Off = 6,
@@ -72,14 +72,14 @@ void log(Level l, const char *s, const Args &... args) {
 
 // Create a bit of syntactic sugar which allows log statements
 // of the form logging::debug("Msg").
-#define MAKE_LOG_TEMPLATE(fnName, lvl)                                       \
-  template <typename... Args>                                                \
-  inline void fnName(const char *s, const Args &... args) {                  \
-    log(Level::lvl, s, std::forward<const Args>(args)...);                   \
-  }                                                                          \
-  template <typename... Args>                                                \
-  inline void fnName(const std::string &s, const Args &... args) {           \
-    log(Level::lvl, s.c_str(), std::forward<const Args>(args)...);           \
+#define MAKE_LOG_TEMPLATE(fnName, lvl)                                         \
+  template <typename... Args>                                                  \
+  inline void fnName(const char *s, const Args &... args) {                    \
+    log(Level::lvl, s, std::forward<const Args>(args)...);                     \
+  }                                                                            \
+  template <typename... Args>                                                  \
+  inline void fnName(const std::string &s, const Args &... args) {             \
+    log(Level::lvl, s.c_str(), std::forward<const Args>(args)...);             \
   }
 
 MAKE_LOG_TEMPLATE(trace, Trace)

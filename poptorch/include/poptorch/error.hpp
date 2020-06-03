@@ -26,8 +26,7 @@ private:
     logging::err(what());
   }
 
-  explicit error(const _empty &, const std::string &s)
-      : std::runtime_error(s) {
+  explicit error(const _empty &, const std::string &s) : std::runtime_error(s) {
     logging::err(what());
   }
 
@@ -44,8 +43,8 @@ public:
   explicit error(const char *s, const Args &... args) try : std
     ::runtime_error(fmt::format(s, args...)) { logging::err(what()); }
   catch (const fmt::FormatError &e) {
-    std::string reason = std::string("Poptorch exception format error ") +
-                         std::string(e.what());
+    std::string reason =
+        std::string("Poptorch exception format error ") + std::string(e.what());
     error _e(_empty(), reason);
     throw _e;
   }
@@ -54,8 +53,8 @@ public:
   explicit error(const std::string &s, const Args &... args) try : std
     ::runtime_error(fmt::format(s, args...)) { logging::err(what()); }
   catch (const fmt::FormatError &e) {
-    std::string reason = std::string("Poptorch exception format error:") +
-                         std::string(e.what());
+    std::string reason =
+        std::string("Poptorch exception format error:") + std::string(e.what());
     throw error(_empty(), reason);
   }
 };
