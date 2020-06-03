@@ -342,9 +342,9 @@ void Compiler::InitSession(bool profile) {
     popart::TensorId networkOutput = *impl->outputs.begin();
     auto inLabels = impl->ids[1];
 
-    // TODO: Plug the leak.
     popart::TensorId nllloss = impl->opBuilder->aiGraphcoreOpset1().nllloss(
         {networkOutput, inLabels}, popart::ReductionType::Sum);
+    impl->opBuilder->virtualGraph(nllloss, impl->activeIpu);
 
     popart::GraphTransformer transformer{impl->opBuilder->getModelProto()};
 
