@@ -91,7 +91,7 @@ function(extract_targets variants targets)
 endfunction()
 
 function(add_test_executable name)
-  add_executable(${name} ${ARGN})
+  add_executable(${name} ${ARGN} "${PROJECT_SOURCE_DIR}/shared/source/Logging.cpp")
   target_include_directories(${name}
       PRIVATE
       ${Boost_INCLUDE_DIRS}
