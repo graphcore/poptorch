@@ -2,12 +2,14 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 project(popart_compiler)
 
 find_package(Boost REQUIRED)
+find_package(Popart REQUIRED)
+find_package(Poplar REQUIRED)
 
 add_definitions(-DONNX_NAMESPACE=onnx)
-add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
 
 add_library(popart_compiler SHARED
   "source/Compiler.cpp"
+  "source/Error.cpp"
   "../shared/source/Logging.cpp"
   )
 

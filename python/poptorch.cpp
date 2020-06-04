@@ -1,14 +1,13 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "popart_compiler/Error.hpp"
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/ShapeInference.hpp"
-#include "poptorch/error.hpp"
 #include "shared/Logging.hpp"
 
 #include <iostream>
-#include <poputil/exceptions.hpp>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -20,9 +19,6 @@
 #include <torch/csrc/jit/passes/remove_inplace_ops.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/script.h>
-
-#include <popart/error.hpp>
-#include <poplar/exceptions.hpp>
 
 void begin_ipu_block(int64_t ipu_id) {}
 void end_ipu_block() {}
@@ -241,44 +237,11 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);
   m.def("canonicalize", poptorch::pyCanonicalize);
 
-  // Exceptions are processed explicitly to allow the main dynamic library
-  // to do the type inference. This prevents some inter dynamic library type
-  // inference issues on OS/X
-  static py::exception<poptorch::error> ePoptorch(m, "poptorch_exception");
-  static py::exception<poptorch::internal_error> ePoptorchInternal(
-      m, "poptorch_internal_exception");
-  static py::exception<popart::error> ePopart(m, "popart_exception");
-  static py::exception<popart::internal_error> ePopartInternal(
-      m, "popart_internal_exception");
-  static py::exception<poplar::poplar_error> ePoplar(m, "poplar_exception");
-  static py::exception<poputil::poplibs_error> ePoplibs(m, "poplibs_exception");
-
   py::register_exception_translator([](std::exception_ptr p) {
     try {
       std::rethrow_exception(p);
     } catch (std::exception &e) {
-      switch (poptorch::getErrorSource(e)) {
-      case poptorch::ErrorSource::poptorch:
-        ePoptorch(e.what());
-        return;
-      case poptorch::ErrorSource::poptorch_internal:
-        ePoptorchInternal(e.what());
-        return;
-      case poptorch::ErrorSource::popart:
-        ePopart(e.what());
-        return;
-      case poptorch::ErrorSource::popart_internal:
-        ePopartInternal(e.what());
-        return;
-      case poptorch::ErrorSource::poplar:
-        ePoplar(e.what());
-        return;
-      case poptorch::ErrorSource::poplibs:
-        ePoplibs(e.what());
-        return;
-      case poptorch::ErrorSource::unknown:
-        throw;
-      }
+      poptorch::rethrowErrorAsPoplar(e);
     }
   });
 }

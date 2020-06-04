@@ -2,23 +2,15 @@
 #include <iostream>
 #include <memory>
 
-#ifndef _GLIBCXX_USE_CXX11_ABI
-#error _GLIBCXX_USE_CXX11_ABI not defined
-#endif
-
-#if _GLIBCXX_USE_CXX11_ABI
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/ostream_sink.h>
 #include <spdlog/spdlog.h>
-#endif //_GLIBCXX_USE_CXX11_ABI
 
 #include "shared/Logging.hpp"
 
 namespace logging {
 
-// Compile internal functions only with C++ 11 ABI
-#if _GLIBCXX_USE_CXX11_ABI
 namespace {
 
 // Check our enums match (incase spdlog changes under us)
@@ -118,28 +110,22 @@ LoggingContext::LoggingContext() {
 
 // Compile only with c++11 as these functions are compatible with both ABIs
 
-__attribute__((visibility("default"))) bool shouldLog(Level l) {
-  return context().logger->should_log(translate(l));
-}
+bool shouldLog(Level l) { return context().logger->should_log(translate(l)); }
 
-__attribute__((visibility("default"))) void setLogLevel(Level l) {
-  context().logger->set_level(translate(l));
-}
+void setLogLevel(Level l) { context().logger->set_level(translate(l)); }
 
-__attribute__((visibility("default"))) void flush() {
-  context().logger->flush();
-}
+void flush() { context().logger->flush(); }
 
-__attribute__((visibility("default"))) void log(Level l, const char *msg) {
+void log(Level l, const char *msg) {
   std::string str(msg);
   context().logger->log(translate(l), msg);
+
+  // As we use this library across translation units we always flush as
+  // otherwise the logger could become out of sync.
+  flush();
 }
-#endif // _GLIBCXX_USE_CXX11_ABI
 
 // Compile separably for both ABIs
-__attribute__((visibility("default"))) void log(Level l,
-                                                const std::string &msg) {
-  log(l, msg.c_str());
-}
+void log(Level l, const std::string &msg) { log(l, msg.c_str()); }
 
 } // namespace logging

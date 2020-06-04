@@ -1,7 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #define BOOST_TEST_MODULE ExceptionTest
 
-#include <poptorch/error.hpp>
+#include <popart_compiler/Error.hpp>
 
 // Use header only variant due to ABI issues
 #include <boost/test/included/unit_test.hpp>

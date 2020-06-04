@@ -1,6 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#ifndef INCLUDE_POPTORCH_ERROR_HPP
-#define INCLUDE_POPTORCH_ERROR_HPP
+#ifndef INCLUDE_POPART_COMPILER_ERROR_HPP
+#define INCLUDE_POPART_COMPILER_ERROR_HPP
 
 #include <memory>
 #include <shared/Logging.hpp>
@@ -69,18 +69,8 @@ public:
   using error::error;
 };
 
-enum class ErrorSource {
-  poptorch = 0,
-  poptorch_internal,
-  popart,
-  popart_internal,
-  poplar,
-  poplibs,
-  unknown,
-};
-
-ErrorSource getErrorSource(const std::exception &e);
+void rethrowErrorAsPoplar(const std::exception &e);
 
 } // namespace poptorch
 
-#endif // INCLUDE_POPTORCH_ERROR_HPP
+#endif // INCLUDE_POPART_COMPILER_ERROR_HPP

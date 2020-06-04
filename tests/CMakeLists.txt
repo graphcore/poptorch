@@ -99,18 +99,12 @@ function(add_test_executable name)
       "${PROJECT_SOURCE_DIR}/poptorch/include"
       "${PROJECT_SOURCE_DIR}/shared/include"
       "${PROJECT_SOURCE_DIR}/popart_compiler/include"
-      ${POPART_INCLUDE_DIR}
-      ${POPLAR_INCLUDE_DIR}
-      ${POPLIBS_INCLUDE_DIR}
       ${SPDLOG_INCLUDE_DIR}
       ${TORCH_INCLUDE_DIRS})
 
   target_link_libraries(${name}
     poptorch_core
     ${TORCH_LIBRARIES}
-    ${POPART_LIB}
-    ${POPLAR_LIB}
-    ${POPUTIL_LIB}
     popart_compiler
     ${PYTHON_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
