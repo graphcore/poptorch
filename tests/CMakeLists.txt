@@ -13,6 +13,7 @@ add_poptorch_py_unit_test(bert_small_ipu_model)
 # C++ tests #
 #############
 
+find_package(Threads REQUIRED)
 find_package(Torch REQUIRED)
 
 # Ensure ABI matches that of PyTorch
