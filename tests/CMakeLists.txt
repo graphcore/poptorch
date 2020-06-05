@@ -7,6 +7,7 @@ function(add_poptorch_py_unit_test name)
 endfunction()
 
 add_poptorch_py_unit_test(shape_inference)
+add_poptorch_py_unit_test(bert_small_ipu_model)
 
 #############
 # C++ tests #

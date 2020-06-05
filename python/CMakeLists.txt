@@ -11,6 +11,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/LowerToPopart.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/OpBuilder.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/PopartLateCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoplarExecutable.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Peephole.cpp"

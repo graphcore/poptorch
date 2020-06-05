@@ -266,7 +266,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 // We have a helper macro to insert the alpha value if needed.
 #define ALPHA_BODY(Type)                                                       \
   Type alphaAsScalar = *HandleConstant<std::int64_t>(alphaValue->node());      \
-  std::cout << "Scalar as " #Type ": " << alphaAsScalar << std::endl;          \
   if (alphaAsScalar != 1) {                                                    \
     torch::jit::Node *alphaConst =                                             \
         Create_Constant<Type>{}(graph, {alphaAsScalar}, {1});                  \
@@ -565,18 +564,31 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       std::int64_t dim1 =
           *HandleConstant<std::int64_t>(node->inputs()[2]->node());
 
-      std::vector<std::int64_t> permutation{dim0, dim1};
-
       c10::TensorTypePtr asTensor =
           node->inputs()[0]->type()->cast<c10::TensorType>();
       c10::VaryingShape dims = asTensor->sizes();
 
-      std::for_each(permutation.begin(), permutation.end(),
-                    [&](std::int64_t &val) {
-                      if (val < 0) {
-                        val = *dims.size() + val;
-                      }
-                    });
+      // Convert that IR type into a C++ vector of ints. In popart the
+      // permutation includes all elements (rotate last two elements with [0, 1,
+      // 3, 2]) whereas in pytorch you only need to specify the dimensions being
+      // moved (same operation, [3, 2]). So we need to make sure the IR reflects
+      // that.
+      std::vector<std::int64_t> permutation;
+      for (std::int64_t i = 0; i < *dims.size(); ++i) {
+        permutation.push_back(i);
+      }
+
+      // Allow for python array style access.
+      if (dim0 < 0) {
+        dim0 = *dims.size() + dim0;
+      }
+
+      if (dim1 < 0) {
+        dim1 = *dims.size() + dim1;
+      }
+
+      permutation[dim0] = dim1;
+      permutation[dim1] = dim0;
 
       newNode = Create_transpose(graph, {node->inputs()[0]}, permutation);
     } else if (kindAsStr == "aten::div") {

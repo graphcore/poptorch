@@ -9,8 +9,8 @@ namespace poptorch {
  */
 torch::jit::Node *CreateReshape(torch::jit::Graph &graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *newNode =
-      graph.create(c10::Symbol::fromQualString("popart::reshape"), {A});
+  torch::jit::Node *newNode = graph.create(
+      c10::Symbol::fromQualString("popart::reshape_static_shape"), {A});
   newNode->is_(c10::Symbol::fromQualString("attr::shape"), new_shape);
   return newNode;
 }

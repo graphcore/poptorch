@@ -107,6 +107,9 @@ compileWithTrace(py::handle h, py::handle g, pybind11::tuple inputs,
   // representation.
   poptorch::Canonicalize(*graph);
 
+  // Enforce any constraints that aren't enforced by popart.
+  poptorch::CanonicalizeLate(*graph);
+
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
 
@@ -169,8 +172,7 @@ compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
 
   torch::jit::RemoveInplaceOps(graph);
 
-  std::cout << "Graph before canonicalization\n";
-  graph->dump();
+  logging::debug("Graph right before canonicalization:\n{}", *graph);
 
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.

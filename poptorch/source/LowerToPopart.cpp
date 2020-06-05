@@ -67,9 +67,7 @@ private:
 std::string typeToPopart(at::ScalarType type) {
   if (type == at::ScalarType::Float) {
     return "FLOAT";
-  } else if (type == at::ScalarType::Long) {
-    return "INT64";
-  } else if (type == at::ScalarType::Int) {
+  } else if (type == at::ScalarType::Int || type == at::ScalarType::Long) {
     return "INT32";
   }
 
