@@ -181,4 +181,7 @@ function(add_poptorch_cpp_unit_test name)
   endforeach()
 endfunction()
 
-add_poptorch_cpp_unit_test(exception_test exception_test.cpp)
+# See T21802. C++ tests are disabled by default for now.
+if (${POPTORCH_ENABLE_CPP_TESTS})
+  add_poptorch_cpp_unit_test(exception_test exception_test.cpp)
+endif()
