@@ -8,7 +8,7 @@
 #include <unordered_set>
 
 #include <poptorch/OpBuilder.hpp>
-#include <shared/Logging.hpp>
+#include <poptorch_logging/Logging.hpp>
 
 namespace poptorch {
 

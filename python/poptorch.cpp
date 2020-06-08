@@ -5,7 +5,7 @@
 #include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/ShapeInference.hpp"
-#include "shared/Logging.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 #include <iostream>
 #include <pybind11/functional.h>

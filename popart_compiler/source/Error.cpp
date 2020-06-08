@@ -1,9 +1,11 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <popart_compiler/Error.hpp>
-#include <poputil/exceptions.hpp>
+#include <spdlog/fmt/fmt.h>
 
 #include <popart/error.hpp>
 #include <poplar/exceptions.hpp>
+#include <poptorch_logging/Logging.hpp>
+#include <poputil/exceptions.hpp>
 
 namespace poptorch {
 
@@ -40,5 +42,7 @@ void rethrowErrorAsPoplar(const std::exception &e) {
     throw std::runtime_error(err->what());
   }
 }
+
+error::error(const char *s) : std::runtime_error(s) { logging::err(what()); }
 
 } // namespace poptorch

@@ -1,13 +1,13 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include <iostream>
-#include <memory>
+#include "poptorch_logging/Logging.hpp"
 
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/ostream_sink.h>
 #include <spdlog/spdlog.h>
 
-#include "shared/Logging.hpp"
+#include <iostream>
+#include <string>
 
 namespace logging {
 
@@ -86,7 +86,7 @@ LoggingContext::LoggingContext() {
       logLevelFromString(POPTORCH_LOG_LEVEL ? POPTORCH_LOG_LEVEL : "OFF");
 
   if (logDest == "stdout") {
-    auto sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
+    auto sink = std::shared_ptr<spdlog::sinks::ansicolor_stdout_sink_mt>();
     setColours(*sink);
     logger = std::make_shared<spdlog::logger>("graphcore", sink);
   } else if (logDest == "stderr") {
@@ -108,24 +108,12 @@ LoggingContext::LoggingContext() {
 
 } // namespace
 
-// Compile only with c++11 as these functions are compatible with both ABIs
+void log(Level l, const char *msg) { context().logger->log(translate(l), msg); }
 
 bool shouldLog(Level l) { return context().logger->should_log(translate(l)); }
 
 void setLogLevel(Level l) { context().logger->set_level(translate(l)); }
 
 void flush() { context().logger->flush(); }
-
-void log(Level l, const char *msg) {
-  std::string str(msg);
-  context().logger->log(translate(l), msg);
-
-  // As we use this library across translation units we always flush as
-  // otherwise the logger could become out of sync.
-  flush();
-}
-
-// Compile separably for both ABIs
-void log(Level l, const std::string &msg) { log(l, msg.c_str()); }
 
 } // namespace logging

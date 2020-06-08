@@ -69,8 +69,7 @@ elseif(${OS_TYPE} STREQUAL linux)
   set(CMAKE_INSTALL_RPATH "$ORIGIN")
 endif()
 
-find_package(Spdlog REQUIRED)
-
+add_subdirectory(poptorch_logging)
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
 

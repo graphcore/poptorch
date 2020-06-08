@@ -20,7 +20,7 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/session.hpp>
 #include <popart/tensors.hpp>
-#include <shared/Logging.hpp>
+#include <poptorch_logging/Logging.hpp>
 
 namespace poptorch {
 

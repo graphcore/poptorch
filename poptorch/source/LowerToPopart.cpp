@@ -10,7 +10,7 @@
 #include <random>
 
 #include "popart_compiler/Compiler.hpp"
-#include "shared/Logging.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 

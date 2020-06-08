@@ -2,7 +2,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 
-#include <shared/Logging.hpp>
+#include <poptorch_logging/Logging.hpp>
 
 #include <poptorch/EliminateListConstructs.hpp>
 

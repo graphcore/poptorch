@@ -5,7 +5,6 @@
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/fmt/ostr.h>
 #include <string>
-#include <utility>
 
 /// This is a simple logging system for poptorch based on spdlog. The easiest
 /// way to use it is to simply call `logging::<level>()` where <level> is one
@@ -22,11 +21,8 @@
 /// POPTORCH_LOG_LEVEL=ERR
 /// POPTORCH_LOG_DEST=Mylog.txt
 ///
-/// Formatting is done using the `fmt` library. It supports {}-style and
-/// %-style format specification strings. See https://github.com/fmtlib/fmt
-/// for details.
-
-// This header is compatible with both the pre and post C++11 ABIs
+/// Formatting is done using the `fmt` library. It supports {}-style and %-style
+/// format specification strings. See https://github.com/fmtlib/fmt for details.
 
 namespace logging {
 
@@ -36,8 +32,7 @@ enum class Level {
   Info = 2,
   Warn = 3,
   Err = 4,
-  // level 5 is "critical" in spdlog, which we don't use so isn't exposed
-  // here.
+  // level 5 is "critical" in spdlog, which we don't use so isn't exposed here.
   Off = 6,
 };
 
@@ -55,7 +50,6 @@ void flush();
 
 // Log a message. You should probably use the MAKE_LOG_TEMPLATE macros
 // instead, e.g. logging::debug("A debug message").
-void log(Level l, const std::string &msg);
 void log(Level l, const char *msg);
 
 // Log a formatted message. This uses the `fmt` C++ library for formatting.
@@ -66,7 +60,8 @@ template <typename... Args>
 void log(Level l, const char *s, const Args &... args) {
   // Avoid formatting if the logging is disabled anyway.
   if (shouldLog(l)) {
-    log(l, fmt::format(s, args...));
+    const std::string str = fmt::format(s, args...);
+    log(l, str.c_str());
   }
 }
 
@@ -76,10 +71,6 @@ void log(Level l, const char *s, const Args &... args) {
   template <typename... Args>                                                  \
   inline void fnName(const char *s, const Args &... args) {                    \
     log(Level::lvl, s, std::forward<const Args>(args)...);                     \
-  }                                                                            \
-  template <typename... Args>                                                  \
-  inline void fnName(const std::string &s, const Args &... args) {             \
-    log(Level::lvl, s.c_str(), std::forward<const Args>(args)...);             \
   }
 
 MAKE_LOG_TEMPLATE(trace, Trace)
@@ -89,6 +80,19 @@ MAKE_LOG_TEMPLATE(warn, Warn)
 MAKE_LOG_TEMPLATE(err, Err)
 
 #undef MAKE_LOG_TEMPLATE
+
+// Convenience macro to create a log entry prefixed with function name e.g.:
+//    void someFunc(int i) {
+//      FUNC_LOGGER(info, " with i := {}", i);
+//    }
+// Then the log entry would be something like:
+// 14:30:31.00 [I] void someFunc(int): with i := 42
+// NOTE: Because of the limitations of __VA_ARGS__ this log entry must have at
+// least one parameter.
+#define FUNC_LOGGER(lvl, fmtStr, ...)                                          \
+  logging::lvl("{}: " fmtStr, __PRETTY_FUNCTION__, __VA_ARGS__)
+
+#undef FUNC_LOGGER
 
 } // namespace logging
 

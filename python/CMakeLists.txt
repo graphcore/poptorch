@@ -16,7 +16,6 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Peephole.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/EliminateListConstructs.cpp"
-  "${PROJECT_SOURCE_DIR}/shared/source/Logging.cpp"
   )
 
 pybind11_add_module(poptorch_core SHARED
@@ -25,11 +24,12 @@ pybind11_add_module(poptorch_core SHARED
 
 target_link_libraries(poptorch_core PRIVATE
   ${TORCH_LIBRARIES}
-  popart_compiler)
+  popart_compiler
+  poptorch_logging)
 
 target_include_directories(poptorch_core PRIVATE
   "${PROJECT_SOURCE_DIR}/poptorch/include"
-  "${PROJECT_SOURCE_DIR}/shared/include"
+  "${PROJECT_SOURCE_DIR}/poptorch_logging/include"
   "${PROJECT_SOURCE_DIR}/popart_compiler/include"
   ${SPDLOG_INCLUDE_DIR}
   ${TORCH_INCLUDE_DIRS})
