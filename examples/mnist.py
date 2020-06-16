@@ -104,7 +104,7 @@ training_model = poptorch.trainingModel(model, training_ipu_step_size, loss=lf)
 #training_model = poptorch.trainingModel(model, training_ipu_step_size, loss=nn.CrossEntropyLoss())
 
 # Same model as above, they will share weights (in 'model') so while the above
-# trains the weights in the weights in this will automatically update.
+# trains the weights, the weights in this will be automatically updated.
 inference_model = poptorch.inferenceModel(model)
 
 
