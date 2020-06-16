@@ -3,6 +3,12 @@
 set -e # Stop on error
 DIR=$(realpath $(dirname $0))
 
+# If some arguments were passed to the script assume this is coming from arc lint: print instructions and exit
+if [[ $# -gt 0 ]]
+then
+  echo "Linters not installed: run ${DIR}/install_linters.sh to install the linters then try again"
+  exit 1
+fi
 mkdir -p .linters
 
 VE=${DIR}/.linters/venv
