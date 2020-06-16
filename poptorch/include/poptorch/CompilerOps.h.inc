@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
 // Run `python3 PopParse.py to regenerate
 // clang-format off

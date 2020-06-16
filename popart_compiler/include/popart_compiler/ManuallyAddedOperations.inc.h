@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 OP_DECL("popart::reshape_static_shape", reshape, impl->reshape, ARG(INT_VEC, shape),
         BODY_ARG(shape))
 OP_DECL("poptorch::ipu_print_tensor", ipu_print_tensor,

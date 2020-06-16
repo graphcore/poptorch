@@ -1,3 +1,5 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+
 // aten::dropout(Tensor input, float p, bool train) -> Tensor
 OP_CONVERTOR("aten::dropout", NONE, Create_dropout,
              {PARAM(0)} COMMA 1 COMMA HANDLE(1, float))

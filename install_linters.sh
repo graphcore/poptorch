@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 set -e # Stop on error
 DIR=$(realpath $(dirname $0))

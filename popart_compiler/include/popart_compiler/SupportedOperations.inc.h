@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 /*
     OP_DECLS are in the following form:
     OP_DECL(string, function, onnx implementation, arguments, body argument)

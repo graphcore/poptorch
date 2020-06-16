@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+
 import readline
 import rlcompleter
 readline.parse_and_bind('tab: complete')
