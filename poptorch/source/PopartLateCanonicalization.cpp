@@ -10,6 +10,8 @@
 #include <poptorch/PopartCanonicalization.hpp> // NOLINT
 #include <torch/csrc/jit/ir/ir.h>              // NOLINT
 
+#include "PoptorchSymbols.h"
+
 namespace poptorch {
 
 using FunctionTy = std::function<void()>;
@@ -25,14 +27,13 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
   // Look for the nodes.
   for (torch::jit::Node *node : graph.nodes()) {
     const torch::jit::Symbol kind = node->kind();
-    const std::string kindAsStr = kind.toDisplayString();
 
     /*
      * Pytorch group normalization allows for the user to either select the C
      * dimension or the W dimension so this needs to be rearanged. (Assuming
      * dimensions are [B, C, H, W] pytorch also allows <4 unlike poplibs).
      */
-    if (kindAsStr == "popart::groupnormalization") {
+    if (kind == Symbols::popart::groupnormalization) {
       callbacks.push_back([node, &graph]() {
         torch::jit::Value *val = node->inputs()[0];
 
@@ -85,7 +86,7 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
         postTranspose->replaceInput(0, node->output());
       });
       //}
-    } else if (kindAsStr == "popart::slice") {
+    } else if (kind == Symbols::popart::slice) {
       /*
          Popart slice leaves in singleton dimensions whereas pytorch does not.
          So we must reshape the output to retain the pytorch form.
@@ -115,7 +116,7 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
         // Take the type of the old value.
         reshaped->output()->setType(node->output()->type());
       });
-    } else if (kindAsStr == "popart::nllloss") {
+    } else if (kind == Symbols::popart::nllloss) {
       callbacks.push_back([node, &graph]() {
         /*
          * NLLloss in popart performs the log operation whereas pytorch doesn't.

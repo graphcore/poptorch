@@ -9,19 +9,17 @@
 namespace poptorch {
 
 bool isAppendNode(torch::jit::Node *node) {
-  std::string kind = node->kind().toDisplayString();
-  return kind == "aten::append";
+  return node->kind() == c10::aten::append;
 }
 
 bool isConstantNode(torch::jit::Node *node) {
-  std::string kind = node->kind().toDisplayString();
-  return kind == "prim::Constant";
+  return node->kind() == c10::prim::Constant;
 }
 
 template <typename T> T getValue(torch::jit::Node *node);
 
 template <> int64_t getValue(torch::jit::Node *node) {
-  auto sym = c10::Symbol::fromQualString("attr::value");
+  auto sym = c10::attr::value;
   return node->i(sym);
 }
 
@@ -184,8 +182,7 @@ void eliminateListConstructs(torch::jit::Block *block) {
   std::vector<torch::jit::Node *> toDelete;
 
   for (auto node : block->nodes()) {
-    std::string kind = node->kind().toDisplayString();
-    if (kind == "prim::ListConstruct") {
+    if (node->kind() == c10::prim::ListConstruct) {
       if (tryCreateConstantNode(node)) {
         toDelete.push_back(node);
       }

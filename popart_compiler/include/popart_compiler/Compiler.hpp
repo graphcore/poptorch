@@ -34,7 +34,7 @@ public:
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
-#define OP_DECL(StrFunc, function, OnnxImpl, Args, BodyArgs)                   \
+#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
   poptorch::TensorId function(                                                 \
       const std::vector<poptorch::TensorId> &inputs Args);
 

@@ -9,13 +9,13 @@
 #include <list>
 #include <random>
 
+#include "PoptorchSymbols.h"
 #include "popart_compiler/Compiler.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
 namespace {
-
 /*
  * Implementation of the lowering operation.
  */
@@ -47,7 +47,7 @@ private:
 
   using FunctionType = std::function<poptorch::TensorId(
       const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
-  std::unordered_map<std::string, FunctionType> functionToImplementation;
+  std::unordered_map<c10::Symbol, FunctionType> functionToImplementation;
 
   poptorch::Compiler compiler;
 
@@ -110,7 +110,7 @@ void LowerToPopart::LowerReturn() {
 void LowerToPopart::LowerBody() {
   for (torch::jit::Node *node : graph.nodes()) {
     // Switch/lookup based on the actual int value.
-    const std::string &bodyAsStr = node->kind().toDisplayString();
+    const c10::Symbol kind = node->kind();
 
     std::vector<poptorch::TensorId> inputs;
     std::transform(node->inputs().begin(), node->inputs().end(),
@@ -120,20 +120,20 @@ void LowerToPopart::LowerBody() {
                      return valueMap[val][0];
                    });
 
-    auto itr = functionToImplementation.find(bodyAsStr);
+    auto itr = functionToImplementation.find(kind);
 
     if (itr != functionToImplementation.end()) {
       // Get the torch jit SSA for the input/output values.
       torch::jit::Value *output = node->output();
       // Call the callback.
       valueMap[output].push_back(itr->second(inputs, node));
-    } else if (bodyAsStr == "poptorch::begin_ipu_block") {
+    } else if (kind == Symbols::poptorch::begin_ipu_block) {
       compiler.SetActiveIpu(node->i(c10::Symbol::fromQualString("attr::ipu")));
 
-    } else if (bodyAsStr == "poptorch::end_ipu_block") {
+    } else if (kind == Symbols::poptorch::end_ipu_block) {
       // NOP for now.
-    } else if (bodyAsStr == "prim::TupleConstruct" ||
-               bodyAsStr == "prim::ListConstruct") {
+    } else if (kind == c10::prim::TupleConstruct ||
+               kind == c10::prim::ListConstruct) {
       // Get the torch jit SSA for the input/output values.
       torch::jit::Value *output = node->output();
 
@@ -143,8 +143,8 @@ void LowerToPopart::LowerBody() {
           valueMap[output].push_back(values);
         }
       }
-    } else if (bodyAsStr == "prim::TupleUnpack" ||
-               bodyAsStr == "prim::ListUnpack") {
+    } else if (kind == c10::prim::TupleUnpack ||
+               kind == c10::prim::ListUnpack) {
       // Get the torch jit SSA for the input/output values.
       at::ArrayRef<torch::jit::Value *> output = node->outputs();
 
@@ -242,9 +242,10 @@ LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
 #define ARG(Type, Name)                                                        \
   , node->Type(c10::Symbol::fromQualString("attr::" #Name))
 #define BODY_ARG(Name) NONE
+
 // Create a function decl with the given call and arguments.
-#define OP_DECL(name, function, unused, Args, unused2)                         \
-  {name,                                                                       \
+#define OP_DECL(ns, funcName, function, unused, Args, unused2)                 \
+  {Symbols::ns::funcName,                                                      \
    [&](const std::vector<poptorch::TensorId> &inputs,                          \
        torch::jit::Node *node) { return compiler.function(inputs Args); }},
 

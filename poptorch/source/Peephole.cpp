@@ -29,7 +29,7 @@ private:
 
   void handleGetAttrNode(torch::jit::Node *node) {
     assert(node->kind() == c10::prim::GetAttr);
-    if (node->s(c10::Symbol::fromQualString("attr::name")) == "training") {
+    if (node->s(c10::attr::name) == "training") {
       auto graph = node->owningGraph();
       graph->setInsertPoint(node);
       torch::jit::Value *newConst =

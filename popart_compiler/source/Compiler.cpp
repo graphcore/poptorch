@@ -224,12 +224,12 @@ static bool IsLoss(const std::string &operation) {
 #define ARG(Type, Name) , Type Name
 #define BODY_ARG(Name) , Name
 // Create a function decl with the given call and arguments.
-#define OP_DECL(name, function, onnxImpl, Args, BodyArgs)                      \
+#define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
   poptorch::TensorId Compiler::function(                                       \
       const std::vector<poptorch::TensorId> &inputs Args) {                    \
     auto AiOnnxOpset9 = impl->opBuilder->aiOnnxOpset9();                       \
     auto AiGraphcoreOpset1 = impl->opBuilder->aiGraphcoreOpset1();             \
-    const bool isLoss = IsLoss(name);                                          \
+    const bool isLoss = IsLoss(#ns "::" #funcName);                            \
     std::vector<popart::TensorId> ins;                                         \
     std::transform(                                                            \
         inputs.begin(), inputs.end(), std::back_inserter(ins),                 \

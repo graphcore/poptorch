@@ -1,8 +1,9 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 /*
     OP_DECLS are in the following form:
-    OP_DECL(string, function, onnx implementation, arguments, body argument)
-     - string is the string representation of the function
+    OP_DECL(namespace, funcName, function, onnx implementation, arguments, body argument)
+     - namespace is the op's namespace
+     - funcName is the op name
      - function is the actual op part of the <namespace>:<op> pair and will be
    used to name/call the given function.
      - Onnx implementation is the underlaying onnx function which will be
