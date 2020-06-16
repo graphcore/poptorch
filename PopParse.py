@@ -3,10 +3,14 @@
 import clang.cindex
 import sys
 import json
+import os
 
 jsonOutput = {}
 
-files = [sys.argv[1] + "builder.hpp", sys.argv[1] + "builder.h.gen"]
+current_dir = os.path.dirname(os.path.realpath(__file__))
+popart_dir = current_dir + "/../popart/popart/willow/include/popart"
+
+files = [popart_dir + "/builder.hpp", popart_dir + "/builder.h.gen"]
 
 nodeBlacklist = {
     "DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset10",
@@ -67,13 +71,13 @@ def find_functions(node, namespace):
 
 index = clang.cindex.Index.create()
 
-tu = index.parse(
-    sys.argv[1] + "builder.hpp",
-    args=[
-        "-std=c++14", "-I/Users/stephenm/Projects/popart_install/include/",
-        "-I/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1/",
-        "-I/Library/Developer/CommandLineTools/usr/lib/clang/10.0.1/include/"
-    ])
+tu = index.parse(popart_dir + "/builder.hpp",
+                 args=[
+                     "-std=c++14",
+                     "-I" + popart_dir,
+                     "-DONNX_NAMESPACE=onnx",
+                     "-I/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1/",
+                 ])
 
 for diag in tu.diagnostics:
     print(diag)
@@ -103,40 +107,71 @@ for opset in classes:
     for name in toRemove:
         jsonOutput[opset].pop(name)
 
+CXXTypeToTypeClass = {
+    # Scalar integers
+    "int64_t": "INT",
+    "int": "INT",
+    "bool": "INT",
+    "unsigned int": "INT",
+    "popart::ReductionType": "INT",
+    "boost::optional<int64_t>": "INT",
+    "boost::optional<int>": "INT",
+
+    # Floats
+    "float": "FLOAT",
+    "boost::optional<float>": "FLOAT",
+
+    # Non-scalar floats
+    "std::vector<float>": "FLOAT_VEC",
+
+    # Non-scalar integers.
+    "std::vector<int64_t>": "INT_VEC",
+    "boost::optional<std::vector<int64_t>>": "INT_VEC"
+}
+
 
 # Convert the raw C++ type parsed from the header into the macro type.
 def toType(cxxType):
 
-    if "boost::optional" in cxxType:
-        return "UNKNOWN"
+    cleaned = cxxType.replace("&", "").replace("const", "").replace(" ", "")
 
-    if cxxType == "int64_t":
-        return "INT"
+    if cleaned in CXXTypeToTypeClass:
+        return CXXTypeToTypeClass[cleaned]
 
-    if "int64_t" in cxxType:
-        return "INT_VEC"
-
-    if cxxType == "unsigned int":
-        return "INT"
-
-    if cxxType == "float":
-        return "FLOAT"
-
+    # Soft fail as it isn't unexpected for some popart functions to be unsupported right now.
     return "UNKNOWN"
 
 
-def attrTypeGetter(cxxType):
-    if cxxType == "int64_t":
+# Convert from the popart header types into normal C++ types that can be used by pytorch.
+def convertCxxConvert(cxxType):
+
+    if "boost::optional<int>" in cxxType or "boost::optional<int64_t>" in cxxType:
+        return "std::int32_t"
+
+    if "popart::ReductionType" in cxxType:
+        return "std::int32_t"
+
+    if "boost::optional<float>" in cxxType:
+        return "float"
+
+    if "boost::optional<std::vector<int64_t" in cxxType:
+        return "std::vector<int64_t>"
+
+    # Most types won't need processing
+    return cxxType
+
+
+def attrTypeGetter(ty):
+    if ty == "INT":
         return "i"
 
-    if "int64_t" in cxxType:
+    if ty == "INT_VEC":
         return "is"
 
-    if cxxType == "unsigned int":
-        return "i"
-
-    if cxxType == "float":
+    if ty == "FLOAT":
         return "f"
+
+    assert False, "Invalid type: " + ty
 
 
 macroFile = ""
@@ -161,11 +196,16 @@ for opset in classes:
         argVector = ""
         bodyArgVector = ""
 
-        earlyExit = False
+        earlyExit = True
         args = jsonOutput[opset][name]["args"]
         for arg in args:
             # Skip the first args and also the "name" arg.
-            if arg["name"] == "args" or arg["name"] == "name":
+            if arg["name"] == "args":
+                # Guarantee we are working with an op which takes in popart tensors as 0th argument.
+                earlyExit = False
+                continue
+
+            if arg["name"] == "name":
                 continue
 
             macroType = toType(arg["type"])
@@ -176,7 +216,11 @@ for opset in classes:
 
             argVector += "ARG(" + macroType + "," + arg["name"] + ") "
 
-            bodyArgVector += "BODY_ARG(" + arg["name"] + ") "
+            if "ReductionType" in arg["type"]:
+                bodyArgVector += "BODY_ARG(static_cast<popart::ReductionType>(" + arg[
+                    "name"] + ")) "
+            else:
+                bodyArgVector += "BODY_ARG(" + arg["name"] + ") "
 
         if earlyExit:
             continue
@@ -190,13 +234,7 @@ for opset in classes:
         opDecl += ", " + argVector
         opDecl += ", " + bodyArgVector
 
-        # Return type handler.
-        if "std::vector" in jsonOutput[opset][name]["type"]:
-            opDecl += ", [0])"
-        else:
-            opDecl += ", NONE)"
-
-        macroFile += opDecl + "\n"
+        macroFile += opDecl + ")\n"
 
         header = "torch::jit::Node* "
 
@@ -210,9 +248,9 @@ for opset in classes:
             if arg["name"] == "args" or arg["name"] == "name":
                 continue
 
-            header += "," + arg["type"] + " " + arg["name"]
+            header += "," + convertCxxConvert(arg["type"]) + " " + arg["name"]
 
-            attr = attrTypeGetter(arg["type"])
+            attr = attrTypeGetter(toType(arg["type"]))
 
             cppFile += "newNode->" + attr + "_(c10::Symbol::fromQualString(\"attr::" + arg[
                 "name"] + "\")," + arg["name"] + ");\n"
@@ -227,7 +265,7 @@ for opset in classes:
 
         cxxFile += cppFile + "\n"
 
-autogeneratedComment = "// Auto generated file, do not modify\n// Run `python3 PopParse.py to regenerate\n"
+autogeneratedComment = "// Auto generated file, do not modify\n// Run `python3 PopParse.py to regenerate\n// clang-format off\n"
 with open('CompilerOperationMacros.inc', 'w') as f:
     print(autogeneratedComment, file=f)
     print(macroFile, file=f)

@@ -115,6 +115,21 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
         // Take the type of the old value.
         reshaped->output()->setType(node->output()->type());
       });
+    } else if (kindAsStr == "popart::nllloss") {
+      callbacks.push_back([node, &graph]() {
+        /*
+         * NLLloss in popart performs the log operation whereas pytorch doesn't.
+         */
+
+        torch::jit::Node *log = node->inputs()[0]->node();
+        const std::string logAsStr = log->kind().toDisplayString();
+
+        // Make sure it is an log.
+        if (logAsStr == "popart::log") {
+          // Just use the softmax directly.
+          node->replaceInputWith(log->output(), log->input());
+        }
+      });
     }
   }
 

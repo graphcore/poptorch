@@ -6,8 +6,11 @@ function(add_poptorch_py_unit_test name)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BUILD_DIR})
 endfunction()
 
-add_poptorch_py_unit_test(shape_inference)
+
 add_poptorch_py_unit_test(bert_small_ipu_model)
+add_poptorch_py_unit_test(losses)
+add_poptorch_py_unit_test(custom_loss)
+add_poptorch_py_unit_test(shape_inference)
 
 #############
 # C++ tests #

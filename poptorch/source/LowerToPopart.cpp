@@ -132,18 +132,28 @@ void LowerToPopart::LowerBody() {
 
     } else if (bodyAsStr == "poptorch::end_ipu_block") {
       // NOP for now.
-    } else if (bodyAsStr == "prim::TupleConstruct") {
+    } else if (bodyAsStr == "prim::TupleConstruct" ||
+               bodyAsStr == "prim::ListConstruct") {
       // Get the torch jit SSA for the input/output values.
       torch::jit::Value *output = node->output();
-
-      // Unpack the inputs.
-      std::vector<poptorch::TensorId> unpackedInputs;
 
       // Add the values to the value map.
       for (torch::jit::Value *ids : node->inputs()) {
         for (poptorch::TensorId values : valueMap[ids]) {
           valueMap[output].push_back(values);
         }
+      }
+    } else if (bodyAsStr == "prim::TupleUnpack" ||
+               bodyAsStr == "prim::ListUnpack") {
+      // Get the torch jit SSA for the input/output values.
+      at::ArrayRef<torch::jit::Value *> output = node->outputs();
+
+      torch::jit::Value *input = node->input();
+      // Mapping from a single tuple input which we record each tuple element as
+      // being an output (not what is in the IR) to the actual unpack in the IR
+      // which is just a pass through of what we've already done.
+      for (std::int32_t i = 0; i < output.size(); ++i) {
+        valueMap[output[i]].push_back(valueMap[input][i]);
       }
     } else {
       logging::err("Couldn't find a registered operation for node {}", *node);

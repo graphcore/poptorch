@@ -67,27 +67,38 @@ class Network(nn.Module):
         self.softmax = nn.Softmax(1)
 
     def forward(self, x):
-        # with poptorch.IPU(0):
         x = self.layer1(x)
         x = self.layer2(x)
         # -1 means deduce from the above layers, this is just batch size for most iterations.
         x = x.view(-1, 320)
 
-        # with poptorch.IPU(1):
         x = self.layer3_act(self.layer3(x))
         x = self.layer4(x)
-        #x = poptorch.ipu_print_tensor(x)
-        return self.softmax(x)
+        x = self.softmax(x)
+        return x
 
 
 # Create our model.
 model = Network()
 
-# This isn't needed. It's just to print out the loss in python land.
-loss_function = nn.CrossEntropyLoss()
+
+# You can just provide nn.NLLLoss but this shows how you can have a custom loss function.
+class Loss(nn.Module):
+    def __init__(self):
+        super(Loss, self).__init__()
+        self.loss = nn.NLLLoss(reduction="mean")
+
+    def forward(self, x, y):
+        l = self.loss(x, y)
+        l = poptorch.ipu_print_tensor(l)
+        return l
+
+
+lf = Loss()
 
 # Create model for training which will run on IPU.
-training_model = poptorch.trainingModel(model, training_ipu_step_size)
+training_model = poptorch.trainingModel(model, training_ipu_step_size, loss=lf)
+#training_model = poptorch.trainingModel(model, training_ipu_step_size, loss=nn.CrossEntropyLoss())
 
 # Same model as above, they will share weights (in 'model') so while the above
 # trains the weights in the weights in this will automatically update.
@@ -95,16 +106,18 @@ inference_model = poptorch.inferenceModel(model)
 
 
 def train():
+    losses = []
+
     for batch_number, (data, labels) in enumerate(training_data):
-        result = training_model((data, labels.int()))
-        popart_loss = loss_function(result, labels)
+        result = training_model((data, labels))
+        losses.append(result[1][0].item())
 
         if batch_number % 10 == 0:
             print("PoptorchIPU loss at batch: " + str(batch_number) + " is " +
-                  str(popart_loss))
+                  str(result[1]))
 
             # Pick the highest probability.
-            _, ind = torch.max(result, 1)
+            _, ind = torch.max(result[0], 1)
             eq = torch.eq(ind, labels)
             elms, counts = torch.unique(eq, sorted=False, return_counts=True)
 

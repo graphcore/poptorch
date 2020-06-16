@@ -10,6 +10,8 @@
 #include <poptorch/OpBuilder.hpp>
 #include <poptorch_logging/Logging.hpp>
 
+#include <popart_compiler/Error.hpp>
+
 namespace poptorch {
 
 namespace {
@@ -29,6 +31,8 @@ private:
 
   template <typename T>
   std::vector<T> HandleListConstruct(torch::jit::Node *node);
+
+  std::vector<torch::jit::Value *> HandleTensorList(torch::jit::Node *node);
 
   template <typename T> std::optional<T> HandleConstant(torch::jit::Node *node);
 
@@ -95,6 +99,26 @@ template <> struct Handle<std::vector<double>> {
     }
   }
 };
+
+// Both pytorch and popart represent reduce as an enum but with different
+// values.
+static std::int32_t convertReduceToPopart(std::int32_t pytorchReduce) {
+  // Popart:
+  // Sum = 0, Mean =1, NoReduction = 2
+  // Pytorch
+  // Sum = 2, Mean =1, NoReduction = 0
+  if (pytorchReduce == 0) {
+    return 2;
+  }
+  if (pytorchReduce == 1) {
+    return 1;
+  }
+  if (pytorchReduce == 2) {
+    return 0;
+  }
+
+  throw poptorch::error("Unsupported pytorch reduce");
+}
 
 /*
  * ConvertAtenToPopart implementation.
@@ -458,6 +482,88 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       }
 
       newNode = Create_softmax(graph, {node->inputs()[0]}, dim);
+    } else if (kindAsStr == "aten::log_softmax") {
+      // "aten::log_softmax(Tensor self, int dim, int? dtype) -> Tensor"
+
+      std::int64_t dim =
+          *HandleConstant<std::int64_t>(node->inputs()[1]->node());
+
+      c10::TensorTypePtr asTensor =
+          node->inputs()[0]->type()->cast<c10::TensorType>();
+      c10::VaryingShape dims = asTensor->sizes();
+
+      if (dim < 0) {
+        dim = *dims.size() + dim;
+      }
+
+      newNode = Create_softmax(graph, {node->inputs()[0]}, dim);
+
+      newNode->insertBefore(node);
+      newNode = Create_log(graph, {newNode->output()});
+    } else if (kindAsStr == "aten::nll_loss") {
+      // This is derived by me (stephenm@graphcore.ai) not parsed from the
+      // pytorch headers like the others as I can't find it in them.
+
+      // "aten::nll_loss(Tensor input, Tensor label, Tensor? weight, int
+      // reduction, int ignore_index) -> Tensor"
+
+      std::int64_t reduction =
+          *HandleConstant<std::int64_t>(node->inputs()[3]->node());
+      std::int64_t ignore_index =
+          *HandleConstant<std::int64_t>(node->inputs()[4]->node());
+
+      // Convert to popart reduce values.
+      reduction = convertReduceToPopart(reduction);
+
+      newNode = Create_nllloss(graph, {node->inputs()[0], node->inputs()[1]},
+                               reduction, ignore_index);
+    } else if (kindAsStr == "aten::l1_loss") {
+      std::int64_t reduction =
+          *HandleConstant<std::int64_t>(node->inputs()[2]->node());
+
+      // Convert to popart reduce values.
+      reduction = convertReduceToPopart(reduction);
+
+      // Popart calculates the L1 loss as being the difference from an input to
+      // 0. So we have to manually subract the losses first.
+      torch::jit::Node *subtract =
+          Create_sub(graph, {node->inputs()[0], node->inputs()[1]});
+      subtract->insertBefore(node);
+
+      const float scale = 1.0f;
+      newNode = Create_l1loss(graph, {subtract->output()}, scale, reduction);
+
+    } else if (kindAsStr == "aten::mse_loss") {
+      std::int64_t reduction =
+          *HandleConstant<std::int64_t>(node->inputs()[2]->node());
+
+      // Convert to popart reduce values.
+      reduction = convertReduceToPopart(reduction);
+
+      // Subtract X - Y
+      torch::jit::Node *subtract =
+          Create_sub(graph, {node->inputs()[0], node->inputs()[1]});
+      subtract->insertBefore(node);
+
+      // Square it.
+      torch::jit::Node *square =
+          Create_mul(graph, {subtract->output(), subtract->output()});
+      square->insertAfter(subtract);
+
+      torch::jit::Node *finalNode = square;
+
+      if (reduction == 0) {
+        // Sum
+        finalNode = Create_sum(graph, {square->output()});
+        finalNode->insertAfter(square);
+      } else if (reduction == 1) {
+        // Mean
+        finalNode = Create_mean(graph, {square->output()});
+        finalNode->insertAfter(square);
+      }
+
+      newNode = Create_identityloss(graph, {finalNode->output()}, reduction);
+
     } else if (kindAsStr == "poptorch::begin_ipu_block") {
       // This could maybe be improved. Can we add attributes on the frontend?
       // TODO(tbd)
@@ -712,6 +818,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       newNode = Create_ConstantInt(graph, vals,
                                    {static_cast<std::int64_t>(vals.size())});
+    } else if (kindAsStr == "poptorch::identity_loss") {
+      std::int64_t reduction =
+          *HandleConstant<std::int64_t>(node->inputs()[1]->node());
+
+      newNode = Create_identityloss(graph, {node->inputs()[0]}, reduction);
     }
 
     // If we have a new node add it and replace the old use.

@@ -25,6 +25,8 @@ void Canonicalize(torch::jit::Graph &graph);
  */
 void CanonicalizeLate(torch::jit::Graph &graph);
 
+void CanonicalizeLists(torch::jit::Graph &graph);
+
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_TRANSFORM_ATEN_TO_POPART_HPP_

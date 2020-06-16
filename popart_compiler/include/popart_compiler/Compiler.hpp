@@ -74,6 +74,9 @@ public:
   void SetUpOutputOp(poptorch::TensorId id, float *ptr,
                      const std::vector<std::int64_t> &dims);
 
+  void SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
+                     const std::vector<std::int64_t> &dims);
+
   void SetActiveIpu(std::uint64_t id);
 
   void InitSession(bool profile);

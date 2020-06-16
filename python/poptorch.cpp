@@ -24,11 +24,13 @@ void begin_ipu_block(int64_t ipu_id) {}
 void end_ipu_block() {}
 
 at::Tensor ipu_print_tensor(at::Tensor t) { return t; }
+at::Tensor identity_loss(at::Tensor t, int64_t reduction) { return t; }
 
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &begin_ipu_block)
         .op("poptorch::end_ipu_block", &end_ipu_block)
-        .op("poptorch::ipu_print_tensor", &ipu_print_tensor);
+        .op("poptorch::ipu_print_tensor", &ipu_print_tensor)
+        .op("poptorch::identity_loss", &identity_loss);
 //.op("popart::convolution", convolution,
 // torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));
 
@@ -102,6 +104,8 @@ compileWithTrace(py::handle h, py::handle g, pybind11::tuple inputs,
   torch::jit::RemoveInplaceOps(graph);
 
   logging::debug("Graph right before canonicalization:\n{}", *graph);
+
+  poptorch::CanonicalizeLists(*graph);
 
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.
@@ -238,12 +242,4 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
   m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);
   m.def("canonicalize", poptorch::pyCanonicalize);
-
-  py::register_exception_translator([](std::exception_ptr p) {
-    try {
-      std::rethrow_exception(p);
-    } catch (std::exception &e) {
-      poptorch::rethrowErrorAsPoplar(e);
-    }
-  });
 }

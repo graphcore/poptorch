@@ -24,6 +24,20 @@ def make_tuple(example_inputs):
     return example_inputs
 
 
+def identity_loss(x, reduction="none"):
+    if (reduction == "sum"):
+        return torch.ops.poptorch.identity_loss(x, 0)
+
+    if (reduction == "mean"):
+        return torch.ops.poptorch.identity_loss(x, 1)
+
+    assert reduction == "none", "Unsupported reduction type!"
+    return torch.ops.poptorch.identity_loss(x, 2)
+
+
+identity_loss = identity_loss
+
+
 class IPU(nn.Module):
     def __init__(self, ipu_id, layer_to_call=None):
         super(IPU, self).__init__()
@@ -117,16 +131,25 @@ def trainingModel(model,
                   device_iterations,
                   gradient_accumulation=1,
                   profile=False,
-                  trace_model=True):
+                  trace_model=True,
+                  loss=None):
     class ModelTrainingWrapper(nn.Module):
-        def __init__(self, model):
+        def __init__(self, model, loss=None):
             super(ModelTrainingWrapper, self).__init__()
             self.model = model
+            self.loss = loss
 
-        def __call__(self, args, labels):
-            return self.model(args)
+        def __call__(self, args, loss_inputs):
+            output = self.model(args)
 
-    wrappedModel = ModelTrainingWrapper(model)
+            if self.loss:
+                loss = self.loss(output, loss_inputs)
+
+                return output, loss
+
+            return output
+
+    wrappedModel = ModelTrainingWrapper(model, loss)
     return PoplarExecutor(wrappedModel,
                           True,
                           device_iterations,
