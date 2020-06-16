@@ -1,40 +1,49 @@
 Installation
 ------------
 
-PopTorch is part of the Poplar SDK.  It is packaged inside a python pip wheel
-file.
+PopTorch is part of the Poplar SDK.  It is packaged as a Python wheel
+file that can be installed using ``pip``.
 
-The PopART and Poplar runtime libraries are required to use PopTorch, so the
-dynamic library search path must be set up accordingly.
+PopTorch requires Python 3.6 or later.
 
-Using a python virtual environment
+For more information about installing the Poplar SDK, see the Getting Started
+Guide for your IPU system.
+
+Using a Python virtual environment
 __________________________________
 
-It is common to isolate python environments from the system python environment
-using a tool such as python `virtualenv`.  A typical installation process would
-look like this.
+We recommend creating a virtual environment to isolate your PopTorch environment
+from the system Python environment You can use the Python tool ``virtualenv``
+for this. You can create a virtual environment and install PopTorch as shown below:
 
 .. code-block:: bash
 
-    virtualenv -p python3 poptorch_test
-    source poptorch_test/bin/activate
-    pip install <sdk_path>/poptorch_x.x.x.whl
+    $ virtualenv -p python3 poptorch_test
+    $ source poptorch_test/bin/activate
+    $ pip install <sdk_path>/poptorch_x.x.x.whl
 
-To set up the environment to run pytorch scripts, ensure that PopTorch is
-available in the python environment, and that Poplar and PopART are both
-in the runtime library search path.
+
+Setting the environment variables
+_________________________________
+
+The PopART and Poplar runtime libraries are required to use PopTorch, so you
+will need to set the library search paths, using the scripts provided in the SDK:
 
 .. code-block:: bash
 
-    # Enable the python environment containing PopTorch
-    source poptorch_test/bin/activate
+    # Enable the Python environment containing PopTorch (if not already enabled)
+    $ source poptorch_test/bin/activate
 
     # Add the Poplar and PopART runtime libraries to the search path
-    source <path to poplar installation>/enable.sh
-    source <path to popart installation>/enable.sh
+    $ source <path to poplar installation>/enable.sh
+    $ source <path to popart installation>/enable.sh
 
-This simple example can be used to verify that the system is working as
-expected.
+Validating the setup
+____________________
+
+You can run this simple example to verify that the system is working as
+expected. This example, and the others in this document can be found in
+the Poplar SDK installation.
 
 .. literalinclude:: ../../examples/simple_adder.py
   :language: python

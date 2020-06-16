@@ -9,4 +9,5 @@ PopTorch User Guide
 
     intro
     installation
+    overview
     example
