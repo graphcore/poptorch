@@ -7,6 +7,8 @@
 
 namespace logging {
 
+#define UNUSED(var) (void)(var)
+
 #define ERROR(msg)                                                             \
   do {                                                                         \
     std::stringstream __error_msg;                                             \

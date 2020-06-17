@@ -95,7 +95,6 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
         c10::TensorTypePtr asTensor =
             node->output()->type()->cast<c10::TensorType>();
         c10::VaryingShape dims = asTensor->sizes();
-        std::size_t dimensions = *dims.size();
 
         std::vector<std::int64_t> originalShape;
 
@@ -117,7 +116,7 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
         reshaped->output()->setType(node->output()->type());
       });
     } else if (kind == Symbols::popart::nllloss) {
-      callbacks.push_back([node, &graph]() {
+      callbacks.push_back([node]() {
         /*
          * NLLloss in popart performs the log operation whereas pytorch doesn't.
          */

@@ -3,6 +3,24 @@ project(poptorch)
 
 enable_testing()
 
+add_compile_options(
+  -Wall
+  -pedantic
+  -Wextra
+  -Wdisabled-optimization
+  -Wshadow
+  -Wswitch
+  -Wformat=2
+  -Wimplicit-fallthrough
+  -Winit-self
+  -Wcomment
+  -Wsequence-point
+  -Wundef
+  -Wuninitialized)
+
+if(${ENABLE_WERROR})
+  add_compile_options(-Werror)
+endif()
 #------ release version numnber
 file(READ ${PROJECT_SOURCE_DIR}/version.json VERSION_JSON)
 string(REGEX REPLACE

@@ -20,11 +20,14 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/script.h>
 
-void begin_ipu_block(int64_t ipu_id) {}
+void begin_ipu_block(int64_t ipu_id) { UNUSED(ipu_id); }
 void end_ipu_block() {}
 
 at::Tensor ipu_print_tensor(at::Tensor t) { return t; }
-at::Tensor identity_loss(at::Tensor t, int64_t reduction) { return t; }
+at::Tensor identity_loss(at::Tensor t, int64_t reduction) {
+  UNUSED(reduction);
+  return t;
+}
 
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &begin_ipu_block)
@@ -84,7 +87,7 @@ void constantPropagation(torch::jit::Graph *graph) {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, py::handle g, pybind11::tuple inputs,
+compileWithTrace(py::handle h, py::handle, pybind11::tuple inputs,
                  std::uint64_t steps, bool training,
                  std::uint64_t replicationFactor,
                  std::uint64_t gradientAccumulation, bool profile) {

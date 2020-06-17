@@ -21,6 +21,8 @@ public:
 
   std::vector<at::IValue> Run(std::vector<at::Tensor> &inTensors);
 
+  bool ProfilingEnabled() const { return profile; }
+
 private:
   poptorch::Compiler compiler;
 

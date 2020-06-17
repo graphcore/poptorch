@@ -119,7 +119,7 @@ void inferShapeFlatten(torch::jit::Node *node) {
   }
   resultShape.push_back(x);
 
-  for (int i = end + 1; i < i0Shape.size(); i++) {
+  for (uint i = end + 1; i < i0Shape.size(); i++) {
     resultShape.push_back(i0Shape.at(i));
   }
 

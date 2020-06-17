@@ -53,6 +53,7 @@ private:
       break;
     case c10::prim::GetAttr:
       handleGetAttrNode(node);
+      break;
     default:
       break;
     }

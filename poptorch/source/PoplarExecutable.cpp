@@ -17,7 +17,7 @@ PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
     // Convert to correct data type.
     std::vector<std::int64_t> popartDims(pytorchTensor.sizes().size());
     std::transform(pytorchTensor.sizes().begin(), pytorchTensor.sizes().end(),
-                   popartDims.begin(), [](std::int64_t i) { return i; });
+                   popartDims.begin(), [](std::int64_t j) { return j; });
 
     at::ScalarType elemType = pytorchTensor.scalar_type();
     if (elemType == at::ScalarType::Float) {

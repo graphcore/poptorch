@@ -419,8 +419,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       std::vector<torch::jit::Value *> inputTensors{input, weight, bias,
                                                     running_mean, running_var};
 
-      std::int64_t training =
-          0; //*HandleConstant<std::int64_t>(node->inputs()[5]->node());
       float momentum = *HandleConstant<float>(node->inputs()[6]->node());
       float epsilon = *HandleConstant<float>(node->inputs()[7]->node());
 
@@ -681,7 +679,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // moved (same operation, [3, 2]). So we need to make sure the IR reflects
       // that.
       std::vector<std::int64_t> permutation;
-      for (std::int64_t i = 0; i < *dims.size(); ++i) {
+      for (std::uint64_t i = 0; i < *dims.size(); ++i) {
         permutation.push_back(i);
       }
 

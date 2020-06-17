@@ -99,11 +99,14 @@ function(add_test_executable name)
   add_executable(${name} ${ARGN} "${PROJECT_SOURCE_DIR}/shared/source/Logging.cpp")
   target_include_directories(${name}
       PRIVATE
-      ${Boost_INCLUDE_DIRS}
       ${CMAKE_CURRENT_SOURCE_DIR}
       "${PROJECT_SOURCE_DIR}/poptorch/include"
       "${PROJECT_SOURCE_DIR}/shared/include"
-      "${PROJECT_SOURCE_DIR}/popart_compiler/include"
+      "${PROJECT_SOURCE_DIR}/popart_compiler/include")
+
+  target_include_directories(${name}
+      SYSTEM PRIVATE
+      ${Boost_INCLUDE_DIRS}
       ${SPDLOG_INCLUDE_DIR}
       ${TORCH_INCLUDE_DIRS})
 

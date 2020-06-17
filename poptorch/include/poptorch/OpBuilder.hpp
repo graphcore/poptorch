@@ -7,9 +7,9 @@
 
 namespace torch {
 namespace jit {
-class Graph;
-class Node;
-class Value;
+struct Graph;
+struct Node;
+struct Value;
 } // namespace jit
 } // namespace torch
 

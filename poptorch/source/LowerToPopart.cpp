@@ -152,7 +152,7 @@ void LowerToPopart::LowerBody() {
       // Mapping from a single tuple input which we record each tuple element as
       // being an output (not what is in the IR) to the actual unpack in the IR
       // which is just a pass through of what we've already done.
-      for (std::int32_t i = 0; i < output.size(); ++i) {
+      for (std::uint32_t i = 0; i < output.size(); ++i) {
         valueMap[output[i]].push_back(valueMap[input][i]);
       }
     } else {
@@ -245,9 +245,11 @@ LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
 
 // Create a function decl with the given call and arguments.
 #define OP_DECL(ns, funcName, function, unused, Args, unused2)                 \
-  {Symbols::ns::funcName,                                                      \
-   [&](const std::vector<poptorch::TensorId> &inputs,                          \
-       torch::jit::Node *node) { return compiler.function(inputs Args); }},
+  {Symbols::ns::funcName, [&](const std::vector<poptorch::TensorId> &inputs,   \
+                              torch::jit::Node *node) {                        \
+     (void)(node);                                                             \
+     return compiler.function(inputs Args);                                    \
+   }},
 
 #include "popart_compiler/SupportedOperations.inc.h"
 

@@ -64,16 +64,16 @@ bool tryCreateConstantNode(torch::jit::Node *node) {
 
   // Get the uses in the order they appear in the block.
   std::vector<torch::jit::Node *> uses;
-  for (auto node : node->owningBlock()->nodes()) {
-    if (unordered_uses.find(node) != unordered_uses.end()) {
-      uses.push_back(node);
+  for (auto n : node->owningBlock()->nodes()) {
+    if (unordered_uses.find(n) != unordered_uses.end()) {
+      uses.push_back(n);
     }
   }
 
   // There should be an initial block of appends at the start of uses, and then
   // no further appends after that.
   int index_of_last_initial_append = -1;
-  for (int i = 0; i < uses.size(); i++) {
+  for (uint i = 0; i < uses.size(); i++) {
     auto use = uses[i];
     if (isAppendNode(use)) {
       index_of_last_initial_append = i;
@@ -81,7 +81,7 @@ bool tryCreateConstantNode(torch::jit::Node *node) {
       break;
     }
   }
-  for (int i = index_of_last_initial_append + 1; i < uses.size(); i++) {
+  for (uint i = index_of_last_initial_append + 1; i < uses.size(); i++) {
     auto use = uses[i];
     if (isAppendNode(use)) {
       logging::err(

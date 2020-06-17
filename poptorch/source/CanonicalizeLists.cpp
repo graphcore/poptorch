@@ -45,7 +45,7 @@ void CanonicalizeLists(torch::jit::Graph &graph) {
         const std::string unpackAsStr = unpack->kind().toDisplayString();
         // Make sure it is an unpack.
         if (unpackAsStr == "prim::ListUnpack") {
-          for (std::int32_t i = 0; i < unpack->outputs().size(); ++i) {
+          for (std::uint32_t i = 0; i < unpack->outputs().size(); ++i) {
             // Replace each output of the unpack with the input of the original
             // list.
             unpack->outputs()[i]->replaceAllUsesWith(list->inputs()[i]);

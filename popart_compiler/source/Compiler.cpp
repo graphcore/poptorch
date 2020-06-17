@@ -20,6 +20,7 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/session.hpp>
 #include <popart/tensors.hpp>
+#include <poptorch_logging/Error.hpp>
 #include <poptorch_logging/Logging.hpp>
 
 namespace poptorch {
@@ -94,6 +95,7 @@ popart::TensorId
 CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
                           const std::vector<int64_t> &data,
                           const std::vector<int64_t> &shape) {
+  UNUSED(inputs);
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{"INT32", shape};
 
@@ -123,6 +125,7 @@ popart::TensorId
 CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
                             const std::vector<double> &data,
                             const std::vector<int64_t> &shape) {
+  UNUSED(inputs);
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{"FLOAT", shape};
 

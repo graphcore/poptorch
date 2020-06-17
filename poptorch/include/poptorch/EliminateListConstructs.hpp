@@ -20,7 +20,7 @@
 
 namespace torch {
 namespace jit {
-class Graph;
+struct Graph;
 } // namespace jit
 } // namespace torch
 
