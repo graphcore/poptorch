@@ -1,10 +1,12 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "poptorch_logging/Error.hpp"
 #include <poptorch/Peephole.hpp>
 
 namespace poptorch {
 
 class PeepholeOptimizer {
 public:
-  PeepholeOptimizer(bool _training) : isTraining(_training) {}
+  explicit PeepholeOptimizer(bool _training) : isTraining(_training) {}
 
   void run(torch::jit::Graph &graph) {
     run(graph.block());
@@ -16,19 +18,19 @@ public:
 
 private:
   void removeUncheckedCast(torch::jit::Node *node) {
-    assert(node->kind() == c10::prim::unchecked_cast);
+    ERROR_ON(node->kind() != c10::prim::unchecked_cast);
     node->output()->replaceAllUsesWith(node->input());
     markAsDelete(node);
   }
 
   void removeNodeWithoutOutput(torch::jit::Node *node) {
-    assert(node->outputs().size() == 0);
+    ERROR_ON(node->outputs().size() != 0);
     markAsDelete(node);
   }
 
   void handleGetAttrNode(torch::jit::Node *node) {
-    assert(node->kind() == c10::prim::GetAttr);
-    if (node->s(c10::Symbol::fromQualString("attr::name")) == "training") {
+    ERROR_ON(node->kind() != c10::prim::GetAttr);
+    if (node->s(c10::attr::name) == "training") {
       auto graph = node->owningGraph();
       graph->setInsertPoint(node);
       torch::jit::Value *newConst =
@@ -51,6 +53,7 @@ private:
       break;
     case c10::prim::GetAttr:
       handleGetAttrNode(node);
+      break;
     default:
       break;
     }

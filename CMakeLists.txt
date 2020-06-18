@@ -3,6 +3,24 @@ project(poptorch)
 
 enable_testing()
 
+add_compile_options(
+  -Wall
+  -pedantic
+  -Wextra
+  -Wdisabled-optimization
+  -Wshadow
+  -Wswitch
+  -Wformat=2
+  -Wimplicit-fallthrough
+  -Winit-self
+  -Wcomment
+  -Wsequence-point
+  -Wundef
+  -Wuninitialized)
+
+if(${ENABLE_WERROR})
+  add_compile_options(-Werror)
+endif()
 #------ release version numnber
 file(READ ${PROJECT_SOURCE_DIR}/version.json VERSION_JSON)
 string(REGEX REPLACE
@@ -21,6 +39,10 @@ string(REGEX REPLACE
 set(VERSION ${CPACK_PACKAGE_VERSION_MAJOR})
 set(VERSION ${VERSION}.${CPACK_PACKAGE_VERSION_MINOR})
 set(VERSION ${VERSION}.${CPACK_PACKAGE_VERSION_PATCH})
+
+if (DEFINED BUILD_NUMBER)
+  set(VERSION "${VERSION}+${BUILD_NUMBER}")
+endif()
 #------ end of release version numnber
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
@@ -69,6 +91,7 @@ elseif(${OS_TYPE} STREQUAL linux)
   set(CMAKE_INSTALL_RPATH "$ORIGIN")
 endif()
 
+add_subdirectory(poptorch_logging)
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
 
@@ -112,7 +135,7 @@ configure_file(setup.py.in
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/setup.py DESTINATION .)
 
-set(PACKAGE_FILE_NAME poptorch-${VERSION}_${SNAPSHOT}-py3-none-any.whl)
+set(PACKAGE_FILE_NAME poptorch-${VERSION}+${SNAPSHOT}+${PACKAGE_OS_TYPE}-py3-none-linux_x86_64.whl)
 set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
 
 set(PKG_UPLOAD_DIR ../../pkg)
@@ -122,7 +145,7 @@ add_custom_target(package_and_move
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND python3 setup.py sdist bdist_wheel
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
   COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME} ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME} ${PKG_UPLOAD_DIR}"
@@ -132,7 +155,7 @@ add_custom_target(package_and_move
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND python3 setup.py sdist bdist_wheel
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv dist/*.whl ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
   COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
 )
 endif()
@@ -147,14 +170,6 @@ if(BUILD_DOCS)
   string(APPEND PKG_ELEMENTS "  - name: PopTorch user guide (HTML)\n"
                              "    file: ${USER_GUIDE_HTML_NAME}\n"
                              "    type: html_zip\n")
-
-#  string(APPEND PKG_ELEMENTS "  - name: PopTorch Python API (PDF)\n"
-#                             "    file: ${PYTHON_API_PDF_NAME}\n"
-#                             "    type: pdf\n")
-#
-#  string(APPEND PKG_ELEMENTS "  - name: PopTorch Python API (HTML)\n"
-#                             "    file: ${PYTHON_API_HTML_NAME}\n"
-#                             "    type: html_zip\n")
 endif()
 
 execute_process(

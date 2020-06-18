@@ -1,0 +1,8 @@
+{
+  "phabricator.uri" : "https://phabricator.sourcevertex.net",
+  "load": [
+    "../arcanist_linters/clang-format-linter",
+    "../arcanist_linters/yapf_linter"
+  ],
+  "arc.land.onto.default": "develop"
+}

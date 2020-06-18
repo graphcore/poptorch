@@ -1,7 +1,9 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef POPART_COMPILER_H
 #define POPART_COMPILER_H
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace poptorch {
@@ -32,7 +34,7 @@ public:
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
-#define OP_DECL(StrFunc, function, OnnxImpl, Args, BodyArgs)                   \
+#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
   poptorch::TensorId function(                                                 \
       const std::vector<poptorch::TensorId> &inputs Args);
 
@@ -55,7 +57,7 @@ public:
   std::vector<std::int64_t> GetSize(poptorch::TensorId id);
 
   poptorch::TensorId
-  customOperation(const std::string &op,
+  customOperation(const char *op,
                   const std::vector<poptorch::TensorId> &inputs);
 
   void AddOutput(poptorch::TensorId output);
@@ -70,6 +72,9 @@ public:
                     const std::vector<std::int64_t> &dims);
 
   void SetUpOutputOp(poptorch::TensorId id, float *ptr,
+                     const std::vector<std::int64_t> &dims);
+
+  void SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
                      const std::vector<std::int64_t> &dims);
 
   void SetActiveIpu(std::uint64_t id);
