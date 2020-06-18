@@ -12,7 +12,6 @@ void test_function1() {
 }
 
 BOOST_AUTO_TEST_CASE(LoggingTest1) {
-
   try {
     test_function1();
     BOOST_TEST(false);
@@ -27,7 +26,6 @@ void test_function2() {
 }
 
 BOOST_AUTO_TEST_CASE(LoggingTest2) {
-
   try {
     test_function2();
     BOOST_TEST(false);
