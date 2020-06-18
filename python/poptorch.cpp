@@ -1,41 +1,35 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <iostream>
-
-#include "poptorch/EliminateListConstructs.hpp"
-#include "poptorch/LowerToPopart.hpp"
-#include "poptorch/Peephole.hpp"
-#include "poptorch/PopartCanonicalization.hpp"
-#include "poptorch/ShapeInference.hpp"
-#include "poptorch_logging/Error.hpp"
-#include "poptorch_logging/Logging.hpp"
 
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include <torch/csrc/jit/passes/constant_propagation.h>
-#include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/inliner.h>
 #include <torch/csrc/jit/passes/lower_graph.h>
 #include <torch/csrc/jit/passes/peephole.h>
-#include <torch/csrc/jit/passes/remove_inplace_ops.h>
-#include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/script.h>
 
-void begin_ipu_block(int64_t ipu_id) { UNUSED(ipu_id); }
+#include <torch/csrc/jit/passes/dead_code_elimination.h>
+#include <torch/csrc/jit/passes/remove_inplace_ops.h>
+#include <torch/csrc/jit/python/pybind_utils.h>
+
+#include "poptorch/EliminateListConstructs.hpp"
+#include "poptorch/LowerToPopart.hpp"
+#include "poptorch/Peephole.hpp"
+#include "poptorch/PopartCanonicalization.hpp"
+#include "poptorch/ShapeInference.hpp"
+#include "shared/Logging.hpp"
+
+void begin_ipu_block(int64_t ipu_id) {}
 void end_ipu_block() {}
 
 at::Tensor ipu_print_tensor(at::Tensor t) { return t; }
-at::Tensor identity_loss(at::Tensor t, int64_t reduction) {
-  UNUSED(reduction);
-  return t;
-}
 
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &begin_ipu_block)
         .op("poptorch::end_ipu_block", &end_ipu_block)
-        .op("poptorch::ipu_print_tensor", &ipu_print_tensor)
-        .op("poptorch::identity_loss", &identity_loss);
+        .op("poptorch::ipu_print_tensor", &ipu_print_tensor);
 //.op("popart::convolution", convolution,
 // torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));
 
@@ -48,8 +42,8 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
 
-  // And turn convert them into at tensors which we can then resolve the
-  // address of.
+  // And turn convert them into at tensors which we can then resolve the address
+  // of.
   std::vector<at::Tensor> inputTensors;
   for (torch::jit::IValue value : inputStack) {
     inputTensors.push_back(value.toTensor());
@@ -83,13 +77,15 @@ torch::jit::Graph *as_graph(py::handle h) {
 void constantPropagation(torch::jit::Graph *graph) {
   // Create a shared_ptr with a custom deleter that doesn't do anything.
   std::shared_ptr<torch::jit::Graph> x(graph, [](torch::jit::Graph *) {});
-  ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
+  // x should be the only handle to graph.
+  assert(x.use_count() == 1);
   torch::jit::ConstantPropagation(x);
-  ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
+  // x should be the only handle to graph.
+  assert(x.use_count() == 1);
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, py::handle, pybind11::tuple inputs,
+compileWithTrace(py::handle h, py::handle g, pybind11::tuple inputs,
                  std::uint64_t steps, bool training,
                  std::uint64_t replicationFactor,
                  std::uint64_t gradientAccumulation, bool profile) {
@@ -108,20 +104,14 @@ compileWithTrace(py::handle h, py::handle, pybind11::tuple inputs,
 
   logging::debug("Graph right before canonicalization:\n{}", *graph);
 
-  poptorch::CanonicalizeLists(*graph);
-
-  // Convert any unsupported ATEN nodes in the graph to a popart
-  // representation.
+  // Convert any unsupported ATEN nodes in the graph to a popart representation.
   poptorch::Canonicalize(*graph);
-
-  // Enforce any constraints that aren't enforced by popart.
-  poptorch::CanonicalizeLate(*graph);
 
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
 
-  // And turn convert them into at tensors which we can then resolve the
-  // address of.
+  // And turn convert them into at tensors which we can then resolve the address
+  // of.
   std::vector<at::Tensor> inputTensors;
   for (torch::jit::IValue value : inputStack) {
     inputTensors.push_back(value.toTensor());
@@ -179,22 +169,21 @@ compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
 
   torch::jit::RemoveInplaceOps(graph);
 
-  logging::debug("Graph right before canonicalization:\n{}", *graph);
+  std::cout << "Graph before canonicalization\n";
+  graph->dump();
 
-  // Convert any unsupported ATEN nodes in the graph to a popart
-  // representation.
+  // Convert any unsupported ATEN nodes in the graph to a popart representation.
   poptorch::Canonicalize(*graph);
 
-  // Clean up the module as we will likely have stopped using lots of
-  // constants.
+  // Clean up the module as we will likely have stopped using lots of constants.
   // TODO: Alias Analysis freaks out about this, so ignore for now.
   // torch::jit::EliminateDeadCode(graph);
 
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
 
-  // And turn convert them into at tensors which we can then resolve the
-  // address of.
+  // And turn convert them into at tensors which we can then resolve the address
+  // of.
   std::vector<at::Tensor> inputTensors;
   for (torch::jit::IValue value : inputStack) {
     inputTensors.push_back(value.toTensor());

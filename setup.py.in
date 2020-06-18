@@ -1,6 +1,6 @@
 from setuptools import setup
 
-VERSION='@VERSION@'
+VERSION='@VERSION@-@SNAPSHOT@'
 
 with open("README.md", "r") as fh:
     LONG_DESCRIPTION = fh.read()

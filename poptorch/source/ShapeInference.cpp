@@ -1,8 +1,5 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <poptorch/ShapeInference.hpp>
-#include <poptorch_logging/Logging.hpp>
-
-#include "PoptorchSymbols.h"
+#include <shared/Logging.hpp>
 
 namespace poptorch {
 
@@ -13,26 +10,27 @@ public:
   InferenceFunctions(const InferenceFunctions &) = delete;
   InferenceFunctions &operator=(const InferenceFunctions &) = delete;
 
-  static void registerFunction(const std::vector<c10::Symbol> &kinds,
+  static void registerFunction(const std::vector<std::string> &kinds,
                                InferenceFunction func) {
     for (auto &kind : kinds) {
       registerFunction(kind, func);
     }
   }
 
-  static void registerFunction(c10::Symbol kind, InferenceFunction func) {
+  static void registerFunction(const std::string &kind,
+                               InferenceFunction func) {
     instance().inferenceFunctions.insert({kind, func});
   }
 
   static void tryInferShapeFor(torch::jit::Node *node) {
-    c10::Symbol kind = node->kind();
+    std::string kind = node->kind().toDisplayString();
     auto found = instance().inferenceFunctions.find(kind);
     if (found != instance().inferenceFunctions.end()) {
       auto inferenceFunc = found->second;
       inferenceFunc(node);
     } else {
       std::cerr << "Warning: Dont know how to infer shape for node of kind '"
-                << kind.toDisplayString() << "'\n";
+                << kind << "'\n";
     }
   }
 
@@ -48,16 +46,16 @@ private:
     return instance;
   }
 
-  std::unordered_map<c10::Symbol, InferenceFunction> inferenceFunctions;
+  std::unordered_map<std::string, InferenceFunction> inferenceFunctions;
 };
 
 struct RegisterInferenceFunction {
-  RegisterInferenceFunction(const std::vector<c10::Symbol> &kinds,
+  RegisterInferenceFunction(const std::vector<std::string> &kinds,
                             InferenceFunction func) {
     InferenceFunctions::registerFunction(kinds, func);
   }
 
-  RegisterInferenceFunction(c10::Symbol kind, InferenceFunction func) {
+  RegisterInferenceFunction(const std::string &kind, InferenceFunction func) {
     InferenceFunctions::registerFunction(kind, func);
   }
 };
@@ -96,13 +94,15 @@ void inferShapeFlatten(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get data for shape input ");
     return;
   }
-  auto start = node->input(1)->node()->i(c10::attr::value);
+  auto start =
+      node->input(1)->node()->i(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(1)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get data for shape input.");
     return;
   }
-  auto end = node->input(2)->node()->i(c10::attr::value);
+  auto end =
+      node->input(2)->node()->i(c10::Symbol::fromQualString("attr::value"));
 
   if (end == -1) {
     end = i0Shape.size() - 1;
@@ -119,7 +119,7 @@ void inferShapeFlatten(torch::jit::Node *node) {
   }
   resultShape.push_back(x);
 
-  for (uint i = end + 1; i < i0Shape.size(); i++) {
+  for (int i = end + 1; i < i0Shape.size(); i++) {
     resultShape.push_back(i0Shape.at(i));
   }
 
@@ -140,7 +140,8 @@ void inferShapeAdaptiveAvgPool2d(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get data for shape input.");
     return;
   }
-  auto i1Data = node->input(1)->node()->is(c10::attr::value);
+  auto i1Data =
+      node->input(1)->node()->is(c10::Symbol::fromQualString("attr::value"));
 
   std::vector<int64_t> resultShape{i0Shape.at(0)};
   if (i0Shape.size() == 4) {
@@ -241,21 +242,25 @@ void inferShapeConv2d(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get stride");
     return;
   }
-  auto strideData = node->input(strideInputIndex)->node()->is(c10::attr::value);
+  auto strideData = node->input(strideInputIndex)
+                        ->node()
+                        ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(paddingInputIndex)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get padding\n");
     return;
   }
-  auto paddingData =
-      node->input(paddingInputIndex)->node()->is(c10::attr::value);
+  auto paddingData = node->input(paddingInputIndex)
+                         ->node()
+                         ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(dilationInputIndex)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get dilation\n");
     return;
   }
-  auto dilationData =
-      node->input(dilationInputIndex)->node()->is(c10::attr::value);
+  auto dilationData = node->input(dilationInputIndex)
+                          ->node()
+                          ->is(c10::Symbol::fromQualString("attr::value"));
 
   auto inputShape = *inputType->sizes().concrete_sizes();
   auto weightShape = *weightType->sizes().concrete_sizes();
@@ -307,27 +312,33 @@ void inferShapeMaxPool2d(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get kernel\n");
     return;
   }
-  auto kernelData = node->input(kernelInputIndex)->node()->is(c10::attr::value);
+  auto kernelData = node->input(kernelInputIndex)
+                        ->node()
+                        ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(strideInputIndex)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get stride\n");
     return;
   }
-  auto strideData = node->input(strideInputIndex)->node()->is(c10::attr::value);
+  auto strideData = node->input(strideInputIndex)
+                        ->node()
+                        ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(paddingInputIndex)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get padding\n");
     return;
   }
-  auto paddingData =
-      node->input(paddingInputIndex)->node()->is(c10::attr::value);
+  auto paddingData = node->input(paddingInputIndex)
+                         ->node()
+                         ->is(c10::Symbol::fromQualString("attr::value"));
 
   if (node->input(dilationInputIndex)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get dilation\n");
     return;
   }
-  auto dilationData =
-      node->input(dilationInputIndex)->node()->is(c10::attr::value);
+  auto dilationData = node->input(dilationInputIndex)
+                          ->node()
+                          ->is(c10::Symbol::fromQualString("attr::value"));
 
   std::vector<int64_t> outShape{N, C};
 
@@ -359,7 +370,8 @@ void inferShapeView(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get data for shape input\n");
     return;
   }
-  auto shapeData = node->input(1)->node()->is(c10::attr::value);
+  auto shapeData =
+      node->input(1)->node()->is(c10::Symbol::fromQualString("attr::value"));
 
   auto getNumberElements = [](auto shape) {
     int64_t numberElements = 1;
@@ -462,33 +474,29 @@ void propagateInputShapes(torch::jit::Graph *graph) {
 }
 
 namespace {
-RegisterInferenceFunction outputMatchesInput({c10::aten::batch_norm,
-                                              c10::aten::relu, c10::aten::relu_,
-                                              c10::aten::softmax,
-                                              c10::prim::unchecked_cast},
+RegisterInferenceFunction outputMatchesInput({"aten::batch_norm", "aten::relu",
+                                              "aten::relu_", "aten::softmax",
+                                              "aten::unchecked_cast"},
                                              outputTypeMatchesInputType);
-RegisterInferenceFunction conv2d(c10::aten::conv2d, inferShapeConv2d);
-RegisterInferenceFunction maxpool2d(c10::aten::max_pool2d, inferShapeMaxPool2d);
-RegisterInferenceFunction view(c10::aten::view, inferShapeView);
-RegisterInferenceFunction addmm(c10::aten::addmm, inferShapeAddmm);
-RegisterInferenceFunction transpose(c10::aten::t, inferShapeTranspose);
-RegisterInferenceFunction broadcast({c10::aten::add, c10::aten::add_,
-                                     c10::aten::sub, c10::aten::sub_,
-                                     c10::aten::mul, c10::aten::mul_},
+RegisterInferenceFunction conv2d("aten::conv2d", inferShapeConv2d);
+RegisterInferenceFunction maxpool2d("aten::max_pool2d", inferShapeMaxPool2d);
+RegisterInferenceFunction view("aten::view", inferShapeView);
+RegisterInferenceFunction addmm("aten::addmm", inferShapeAddmm);
+RegisterInferenceFunction transpose("aten::t", inferShapeTranspose);
+RegisterInferenceFunction broadcast({"aten::add", "aten::add_", "aten::sub",
+                                     "aten::sub_", "aten::mul", "aten::mul_"},
                                     inferShapeBroadcast);
-RegisterInferenceFunction avgpool2d(c10::aten::adaptive_avg_pool2d,
+RegisterInferenceFunction avgpool2d("aten::adaptive_avg_pool2d",
                                     inferShapeAdaptiveAvgPool2d);
-RegisterInferenceFunction flatten(c10::aten::flatten, inferShapeFlatten);
+RegisterInferenceFunction flatten("aten::flatten", inferShapeFlatten);
 
 // These nodes have a dummy function registered so they are ignored.
-RegisterInferenceFunction
-    ignore({c10::prim::Constant, c10::aten::__getitem__, c10::aten::__is__,
-            c10::aten::__isnot__, c10::aten::eq, c10::aten::ne, c10::aten::dim,
-            c10::aten::len, c10::aten::size},
-           [](auto node) {
-             logging::err("Warning: Shape inference is ignoring node:\n  {}",
-                          *node);
-           });
+RegisterInferenceFunction ignore(
+    {"prim::Constant", "aten::__getitem__", "aten::__is__", "aten::__isnot__",
+     "aten::eq", "aten::ne", "aten::dim", "aten::len", "aten::size"},
+    [](auto node) {
+      logging::err("Warning: Shape inference is ignoring node:\n  {}", *node);
+    });
 } // namespace
 
 } // namespace poptorch

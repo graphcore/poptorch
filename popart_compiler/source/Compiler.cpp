@@ -1,14 +1,13 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <shared/Logging.hpp>
+
 #include <popart_compiler/Compiler.hpp>
 
 #include <fstream>
+
 #include <iostream>
 #include <list>
 #include <map>
 #include <memory>
-#include <unordered_map>
-#include <vector>
-
 #include <popart/builder.hpp>
 #include <popart/graphtransformer.hpp>
 #include <popart/ir.hpp>
@@ -20,8 +19,8 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/session.hpp>
 #include <popart/tensors.hpp>
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include <unordered_map>
+#include <vector>
 
 namespace poptorch {
 
@@ -55,11 +54,6 @@ public:
   popart::WeightsIO weightCallback;
 
   bool isTraining;
-
-  // Record each loss as it is used so we can make them inputs of the global
-  // identity op.
-  std::vector<popart::TensorId> losses;
-
   std::uint64_t steps;
   std::uint64_t replicationFactor;
   std::uint64_t gradientAccumulation;
@@ -82,6 +76,7 @@ public:
   popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
                                  const std::vector<double> &data,
                                  const std::vector<int64_t> &shape);
+
 };
 
 popart::TensorId
@@ -95,7 +90,6 @@ popart::TensorId
 CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
                           const std::vector<int64_t> &data,
                           const std::vector<int64_t> &shape) {
-  UNUSED(inputs);
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{"INT32", shape};
 
@@ -107,6 +101,7 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
   popart::ConstVoidData theData;
 
   if (data.size() == 1 && totalSize != 1) {
+
     std::for_each(broadcastedData.begin(), broadcastedData.end(),
                   [&data](std::int64_t &i) { i = data[0]; });
 
@@ -125,7 +120,6 @@ popart::TensorId
 CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
                             const std::vector<double> &data,
                             const std::vector<int64_t> &shape) {
-  UNUSED(inputs);
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{"FLOAT", shape};
 
@@ -137,6 +131,7 @@ CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
   popart::ConstVoidData theData;
 
   if (data.size() == 1 && totalSize != 1) {
+
     std::for_each(broadcastedData.begin(), broadcastedData.end(),
                   [&data](float &i) { i = data[0]; });
 
@@ -162,16 +157,12 @@ CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
 // one output can be used by user IR (but can still be used by the backed via
 // transformations).
 template <typename T> struct HandleOutput {
-  poptorch::TensorId operator()(T &in, bool loss, detail::CompilerImpl *impl) {
+  poptorch::TensorId operator()(T &in, detail::CompilerImpl *impl) {
     std::set<popart::TensorId> ids;
 
     for (popart::TensorId id : in) {
       ids.insert(id);
       impl->ids.push_back(id);
-
-      if (loss) {
-        impl->losses.push_back(id);
-      }
     }
 
     impl->opBuilder->virtualGraph(ids, impl->activeIpu);
@@ -184,16 +175,12 @@ template <typename T> struct HandleOutput {
 
 // Single tensor output case
 template <> struct HandleOutput<popart::TensorId> {
-  poptorch::TensorId operator()(popart::TensorId in, bool loss,
+  poptorch::TensorId operator()(popart::TensorId in,
                                 detail::CompilerImpl *impl) {
     impl->opBuilder->virtualGraph(in, impl->activeIpu);
     impl->usedIpus.insert(impl->activeIpu);
+
     impl->ids.push_back(in);
-
-    if (loss) {
-      impl->losses.push_back(in);
-    }
-
     return impl->ids.size() - 1;
   }
 };
@@ -207,17 +194,6 @@ Compiler::AddInputTensor(const char *string,
   return impl->ids.size() - 1;
 }
 
-// A whitelist of supported loss operations. Popart needs to know which
-// operations are losses so they can be marked by the session.
-static bool IsLoss(const std::string &operation) {
-  if (operation == "popart::l1loss" || operation == "popart::nllloss" ||
-      operation == "popart::identityloss") {
-    return true;
-  }
-
-  return false;
-}
-
 #define INT_VEC std::vector<std::int64_t>
 #define FLOAT_VEC std::vector<double>
 #define FLOAT float
@@ -227,18 +203,17 @@ static bool IsLoss(const std::string &operation) {
 #define ARG(Type, Name) , Type Name
 #define BODY_ARG(Name) , Name
 // Create a function decl with the given call and arguments.
-#define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
+#define OP_DECL(name, function, onnxImpl, Args, BodyArgs)                      \
   poptorch::TensorId Compiler::function(                                       \
       const std::vector<poptorch::TensorId> &inputs Args) {                    \
     auto AiOnnxOpset9 = impl->opBuilder->aiOnnxOpset9();                       \
     auto AiGraphcoreOpset1 = impl->opBuilder->aiGraphcoreOpset1();             \
-    const bool isLoss = IsLoss(#ns "::" #funcName);                            \
     std::vector<popart::TensorId> ins;                                         \
     std::transform(                                                            \
         inputs.begin(), inputs.end(), std::back_inserter(ins),                 \
         [&](poptorch::TensorId index) { return impl->ids[index]; });           \
     auto output = onnxImpl(ins BodyArgs);                                      \
-    return HandleOutput<decltype(output)>{}(output, isLoss, impl.get());       \
+    return HandleOutput<decltype(output)>{}(output, impl.get());               \
   }
 
 #include "popart_compiler/SupportedOperations.inc.h"
@@ -278,6 +253,8 @@ Compiler::AddInitializedInputTensor(const char *name, const char *type,
 }
 
 void Compiler::AddOutput(poptorch::TensorId output) {
+  impl->opBuilder->addOutputTensor(impl->ids[output]);
+
   impl->outputs.push_back(impl->ids[output]);
 
   impl->anchors.insert({impl->ids[output], popart::AnchorReturnType("ALL")});
@@ -303,6 +280,7 @@ void Compiler::SetUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
 
 void Compiler::SetUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
                             const std::vector<std::int64_t> &dims) {
+
   // Popart wrapper around the tensor pointer.
   impl->memoryManager.push_back(
       std::make_unique<popart::NDArrayWrapper<std::int64_t>>(ptr, dims));
@@ -312,20 +290,10 @@ void Compiler::SetUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
 
 void Compiler::SetUpOutputOp(poptorch::TensorId id, float *ptr,
                              const std::vector<std::int64_t> &dims) {
+
   // Popart wrapper around the tensor pointer.
   impl->memoryManager.push_back(std::make_unique<popart::NDArrayWrapper<float>>(
       static_cast<float *>(ptr), dims));
-
-  impl->popartOutgoing.insert(
-      {impl->ids[id], *impl->memoryManager.back().get()});
-}
-
-void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
-                             const std::vector<std::int64_t> &dims) {
-  // Popart wrapper around the tensor pointer.
-  impl->memoryManager.push_back(
-      std::make_unique<popart::NDArrayWrapper<std::int32_t>>(
-          static_cast<std::int32_t *>(ptr), dims));
 
   impl->popartOutgoing.insert(
       {impl->ids[id], *impl->memoryManager.back().get()});
@@ -339,8 +307,7 @@ void Compiler::InitSession(bool profile) {
           impl->usedIpus.size());
 
   if (!device) {
-    logging::debug(
-        "No IPU device found, falling back to CPU emulator (IPU Model)");
+    logging::debug("No IPU device found, falling back to CPU emulator (IPU Model)");
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
   } else {
     logging::debug("Acquired IPU device, running on device.");
@@ -372,12 +339,16 @@ void Compiler::InitSession(bool profile) {
         impl->opBuilder->getModelProto(), dataFlow, device, {}, options,
         popart::PatternsLevel::Default);
   } else {
-    auto optimizer = popart::ConstSGD(0.001);
+    auto optimizer = popart::ConstSGD(0.01);
 
-    // Set a global identity loss that all other losses derive from.
-    popart::TensorId lossRoot =
-        impl->opBuilder->aiGraphcoreOpset1().identityloss(impl->losses);
-    impl->opBuilder->virtualGraph(lossRoot, impl->activeIpu);
+    // TODO: Some other mechanism of working out what the training label is and
+    // what the output it.
+    popart::TensorId networkOutput = *impl->outputs.begin();
+    auto inLabels = impl->ids[1];
+
+    // TODO: Plug the leak.
+    popart::TensorId nllloss = impl->opBuilder->aiGraphcoreOpset1().nllloss(
+        {networkOutput, inLabels}, popart::ReductionType::Sum);
 
     popart::GraphTransformer transformer{impl->opBuilder->getModelProto()};
 
@@ -385,7 +356,7 @@ void Compiler::InitSession(bool profile) {
 
     // Create the training session.
     impl->session = popart::TrainingSession::createFromOnnxModel(
-        transformer.getModelProto(), dataFlow, lossRoot, optimizer, device, {},
+        transformer.getModelProto(), dataFlow, nllloss, optimizer, device, {},
         options, popart::PatternsLevel::Default);
   }
 
@@ -395,9 +366,7 @@ void Compiler::InitSession(bool profile) {
 
   // Poplar compilation.
   try {
-    logging::trace("Begining Poplar compilation.");
     impl->session->prepareDevice();
-    logging::trace("Finished Poplar compilation.");
   } catch (popart::memory_allocation_err &e) {
     std::ofstream stream;
     stream.open("OOMReport.json");
@@ -418,6 +387,7 @@ void Compiler::InitSession(bool profile) {
 }
 
 void Compiler::Run() {
+
   // TODO don't do this everytime.
   if (!impl->isTraining) {
     impl->session->weightsFromHost();

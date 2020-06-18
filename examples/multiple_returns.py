@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-
 import torch
 import torch.nn as nn
 import numpy as np
@@ -28,4 +25,4 @@ x = torch.ones(2)
 y = torch.zeros(2)
 
 print(inference_model((x, y)))
-print(model(x, y))
+print(model(x,y))

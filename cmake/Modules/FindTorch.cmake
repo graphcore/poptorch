@@ -1,13 +1,8 @@
 set(WhatToDoString "Set Torch_DIR, \
 something like -DTorch_DIR=/path/to/directory/containing/TorchConfig.cmake/")
 
-execute_process(COMMAND python3 -c "import torch; from pathlib import Path; print(Path(torch.__file__).parent, end='')"
+execute_process(COMMAND python -c "import torch; from pathlib import Path; print(Path(torch.__file__).parent, end='')"
                 OUTPUT_VARIABLE TorchInit_PATH)
-
-# PyTorch may be compiled with _GLIBCXX_USE_CXX11_ABI=0
-execute_process(COMMAND
-python3 -c "import torch; print('1' if torch.compiled_with_cxx11_abi() else '0', end='')"
-                OUTPUT_VARIABLE Torch_USE_CXX11_ABI)
 
 find_library(LibTorch torch ${TorchInit_PATH}/lib)
 if (NOT LibTorch)

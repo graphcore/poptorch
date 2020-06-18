@@ -1,4 +1,3 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef INCLUDE_POPTORCH_LOGGING_H
 #define INCLUDE_POPTORCH_LOGGING_H
 
@@ -32,7 +31,7 @@ enum class Level {
   Info = 2,
   Warn = 3,
   Err = 4,
-  // level 5 is "critical" in spdlog, which we don't use so isn't exposed here.
+  // level 5 is "critical" in spglog, which we don't use so isn't exposed here.
   Off = 6,
 };
 
@@ -50,7 +49,7 @@ void flush();
 
 // Log a message. You should probably use the MAKE_LOG_TEMPLATE macros
 // instead, e.g. logging::debug("A debug message").
-void log(Level l, const char *msg);
+void log(Level l, std::string &&msg);
 
 // Log a formatted message. This uses the `fmt` C++ library for formatting.
 // See https://github.com/fmtlib/fmt for details. You should probably use
@@ -60,8 +59,7 @@ template <typename... Args>
 void log(Level l, const char *s, const Args &... args) {
   // Avoid formatting if the logging is disabled anyway.
   if (shouldLog(l)) {
-    const std::string str = fmt::format(s, args...);
-    log(l, str.c_str());
+    log(l, fmt::format(s, args...));
   }
 }
 
@@ -71,6 +69,10 @@ void log(Level l, const char *s, const Args &... args) {
   template <typename... Args>                                                  \
   inline void fnName(const char *s, const Args &... args) {                    \
     log(Level::lvl, s, std::forward<const Args>(args)...);                     \
+  }                                                                            \
+  template <typename... Args>                                                  \
+  inline void fnName(const std::string &s, const Args &... args) {             \
+    log(Level::lvl, s.c_str(), std::forward<const Args>(args)...);             \
   }
 
 MAKE_LOG_TEMPLATE(trace, Trace)
@@ -97,3 +99,4 @@ MAKE_LOG_TEMPLATE(err, Err)
 } // namespace logging
 
 #endif // INCLUDE_POPTORCH_LOGGING_H
+
