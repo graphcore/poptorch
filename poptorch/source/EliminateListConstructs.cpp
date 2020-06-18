@@ -1,26 +1,25 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 
-#include <shared/Logging.hpp>
+#include <poptorch_logging/Logging.hpp>
 
 #include <poptorch/EliminateListConstructs.hpp>
 
 namespace poptorch {
 
 bool isAppendNode(torch::jit::Node *node) {
-  std::string kind = node->kind().toDisplayString();
-  return kind == "aten::append";
+  return node->kind() == c10::aten::append;
 }
 
 bool isConstantNode(torch::jit::Node *node) {
-  std::string kind = node->kind().toDisplayString();
-  return kind == "prim::Constant";
+  return node->kind() == c10::prim::Constant;
 }
 
 template <typename T> T getValue(torch::jit::Node *node);
 
 template <> int64_t getValue(torch::jit::Node *node) {
-  auto sym = c10::Symbol::fromQualString("attr::value");
+  auto sym = c10::attr::value;
   return node->i(sym);
 }
 
@@ -65,16 +64,16 @@ bool tryCreateConstantNode(torch::jit::Node *node) {
 
   // Get the uses in the order they appear in the block.
   std::vector<torch::jit::Node *> uses;
-  for (auto node : node->owningBlock()->nodes()) {
-    if (unordered_uses.find(node) != unordered_uses.end()) {
-      uses.push_back(node);
+  for (auto n : node->owningBlock()->nodes()) {
+    if (unordered_uses.find(n) != unordered_uses.end()) {
+      uses.push_back(n);
     }
   }
 
   // There should be an initial block of appends at the start of uses, and then
   // no further appends after that.
   int index_of_last_initial_append = -1;
-  for (int i = 0; i < uses.size(); i++) {
+  for (uint i = 0; i < uses.size(); i++) {
     auto use = uses[i];
     if (isAppendNode(use)) {
       index_of_last_initial_append = i;
@@ -82,7 +81,7 @@ bool tryCreateConstantNode(torch::jit::Node *node) {
       break;
     }
   }
-  for (int i = index_of_last_initial_append + 1; i < uses.size(); i++) {
+  for (uint i = index_of_last_initial_append + 1; i < uses.size(); i++) {
     auto use = uses[i];
     if (isAppendNode(use)) {
       logging::err(
@@ -183,8 +182,7 @@ void eliminateListConstructs(torch::jit::Block *block) {
   std::vector<torch::jit::Node *> toDelete;
 
   for (auto node : block->nodes()) {
-    std::string kind = node->kind().toDisplayString();
-    if (kind == "prim::ListConstruct") {
+    if (node->kind() == c10::prim::ListConstruct) {
       if (tryCreateConstantNode(node)) {
         toDelete.push_back(node);
       }

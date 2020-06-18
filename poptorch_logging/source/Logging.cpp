@@ -1,4 +1,5 @@
-#include "shared/Logging.hpp"
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "poptorch_logging/Logging.hpp"
 
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/sinks/null_sink.h>
@@ -39,7 +40,6 @@ LoggingContext &context() {
 }
 
 Level logLevelFromString(const std::string &level) {
-
   if (level == "TRACE")
     return Level::Trace;
   if (level == "DEBUG")
@@ -55,8 +55,8 @@ Level logLevelFromString(const std::string &level) {
 
   throw std::runtime_error(
       fmt::format("Unknown POPTORCH_LOG_LEVEL '{}'. Valid values are TRACE, "
-                     "DEBUG, INFO, WARN, ERR and OFF.",
-                     level));
+                  "DEBUG, INFO, WARN, ERR and OFF.",
+                  level));
 }
 
 template <typename Mutex>
@@ -86,7 +86,7 @@ LoggingContext::LoggingContext() {
       logLevelFromString(POPTORCH_LOG_LEVEL ? POPTORCH_LOG_LEVEL : "OFF");
 
   if (logDest == "stdout") {
-    auto sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
+    auto sink = std::shared_ptr<spdlog::sinks::ansicolor_stdout_sink_mt>();
     setColours(*sink);
     logger = std::make_shared<spdlog::logger>("graphcore", sink);
   } else if (logDest == "stderr") {
@@ -108,9 +108,7 @@ LoggingContext::LoggingContext() {
 
 } // namespace
 
-void log(Level l, std::string &&msg) {
-  context().logger->log(translate(l), msg);
-}
+void log(Level l, const char *msg) { context().logger->log(translate(l), msg); }
 
 bool shouldLog(Level l) { return context().logger->should_log(translate(l)); }
 

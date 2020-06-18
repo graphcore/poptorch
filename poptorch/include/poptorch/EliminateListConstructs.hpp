@@ -1,3 +1,4 @@
+// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef INCLUDE_POPTORCH_ELIMINATE_LIST_CONSTRUCTS_H
 #define INCLUDE_POPTORCH_ELIMINATE_LIST_CONSTRUCTS_H
 
@@ -19,7 +20,7 @@
 
 namespace torch {
 namespace jit {
-class Graph;
+struct Graph;
 } // namespace jit
 } // namespace torch
 

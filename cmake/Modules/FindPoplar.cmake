@@ -1,8 +1,8 @@
 set(WhatToDoString "Set POPLAR_INSTALL_DIR, \
 something like -DPOPLAR_INSTALL_DIR=/path/to/build/install/")
-FIND_PATH(POPLAR_INCLUDE_DIR 
+FIND_PATH(POPLAR_INCLUDE_DIR
   NAMES poplar/Engine.hpp
-  HINTS ${POPLAR_INSTALL_DIR} ${POPLAR_INSTALL_DIR}/poplar/include ${POPLAR_INSTALL_DIR}/include 
+  HINTS ${POPLAR_INSTALL_DIR} ${POPLAR_INSTALL_DIR}/poplar/include ${POPLAR_INSTALL_DIR}/include
   PATH_SUFFIXES poplar poplar/include
   DOC "directory with poplar include files (poplar/Engine.hpp etc.)")
 IF(NOT POPLAR_INCLUDE_DIR)
@@ -12,7 +12,7 @@ MESSAGE(STATUS "Found POPLAR_INCLUDE_DIR ${POPLAR_INCLUDE_DIR}")
 MARK_AS_ADVANCED(POPLAR_INCLUDE_DIR)
 
 FIND_PATH(POPLIBS_INCLUDE_DIR
-  NAMES poplin/MatMul.hpp 
+  NAMES poplin/MatMul.hpp
   HINTS ${POPLAR_INSTALL_DIR}/poplibs/include ${POPLAR_INSTALL_DIR}/include ${POPLAR_INSTALL_DIR}
   PATH_SUFFIXES poplibs poplibs/include
   DOC "directory with poplibs include files (poplin/MatMult.hpp etc.)")
