@@ -1,4 +1,3 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <poptorch/ShapeInference.hpp>
 #include <shared/Logging.hpp>
 

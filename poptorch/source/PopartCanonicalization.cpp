@@ -1,14 +1,12 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <poptorch/OpBuilder.hpp>
 #include <poptorch/PopartCanonicalization.hpp>
+#include <shared/Logging.hpp>
 
-#include <optional>
 #include <string>
+#include <optional>
 #include <torch/csrc/jit/ir/ir.h>
 #include <unordered_map>
 #include <unordered_set>
-
-#include <poptorch/OpBuilder.hpp>
-#include <shared/Logging.hpp>
 
 namespace poptorch {
 
@@ -106,6 +104,7 @@ bool CanonicalizeImpl::CanBeConstFolded(torch::jit::Node *node) {
 }
 
 template <typename T> T CanonicalizeImpl::FoldConstant(torch::jit::Node *node) {
+
   // The index of aten::size must be constant.
   std::size_t index = *HandleConstant<std::size_t>(node->inputs()[1]->node());
 
@@ -178,6 +177,7 @@ std::vector<T> CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
   std::vector<T> result;
 
   for (torch::jit::Value *value : node->inputs()) {
+
     std::optional<T> val = HandleConstant<T>(value->node());
     if (val) {
       result.push_back(*val);
@@ -188,6 +188,7 @@ std::vector<T> CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
 }
 
 void CanonicalizeImpl::SearchAndPossiblyDestroy(torch::jit::Node *node) {
+
   // Skip parameters and nodes with any uses.
   if (node->kind() == c10::prim::Param || node->hasUses()) {
     return;
@@ -342,6 +343,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
                                         padding, stride);
 
       } else {
+
         logging::err("CURRENTLY UNSUPPORTED CONVOLUTION!!!\n{}", *newNode);
       }
     } else if (kindAsStr == "aten::conv2d") {
@@ -404,6 +406,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
                                                     epsilon, momentum);
 
     } else if (kindAsStr == "aten::max_pool2d") {
+
       // clang-format off
       /*
         aten::max_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
@@ -424,6 +427,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode = poptorch::Create_maxpool(graph, {node->inputs()[0]}, 1,
                                          kernel_size, padding, 0, stride);
     } else if (kindAsStr == "aten::adaptive_avg_pool2d") {
+
       std::vector<std::int64_t> outputShape =
           HandleList<std::int64_t>(node->inputs()[1]->node());
 
@@ -433,7 +437,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       std::vector<std::int64_t> inputShape{*dims[2], *dims[3]};
 
       // Need to clean this code up.
-      // TODO(tbd)
+      // TODO.
       const std::vector<int64_t> &stride{inputShape[0] / outputShape[0],
                                          inputShape[1] / outputShape[1]};
 
@@ -460,8 +464,9 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       newNode = Create_softmax(graph, {node->inputs()[0]}, dim);
     } else if (kindAsStr == "poptorch::begin_ipu_block") {
+
       // This could maybe be improved. Can we add attributes on the frontend?
-      // TODO(tbd)
+      // TODO.
       newNode = graph.create(
           c10::Symbol::fromQualString("poptorch::begin_ipu_block"));
 
@@ -470,6 +475,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           *HandleConstant<std::int64_t>(node->input()->node());
       newNode->i_(c10::Symbol::fromQualString("attr::ipu"), ipu_id);
     } else if (kindAsStr == "aten::mul") {
+
       torch::jit::Value *other = node->inputs()[1];
 
       std::optional<float> asScalar = HandleConstant<float>(other->node());
@@ -506,8 +512,9 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode =
           Create_slice(graph, {node->inputs()[0]}, {index + 1}, {index}, {dim});
     } else if (kindAsStr == "aten::slice") {
+
       // clang-format off
-      // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor // NOLINT
+      // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor
       // clang-format on
 
       std::int64_t dim =
@@ -549,7 +556,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode = Create_transpose(graph, {node->inputs()[0]}, permutation);
     } else if (kindAsStr == "aten::contiguous") {
       // clang-format off
-      // aten::contiguous(Tensor self, *, MemoryFormat memory_format=contiguous_format) -> Tensor // NOLINT
+      // aten::contiguous(Tensor self, *, MemoryFormat memory_format=contiguous_format) -> Tensor
       // Returns a copy of the tensor but in contiguous memory.
       // clang-format on
 
@@ -580,6 +587,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       newNode = Create_transpose(graph, {node->inputs()[0]}, permutation);
     } else if (kindAsStr == "aten::div") {
+
       torch::jit::Value *other = node->inputs()[1];
       std::optional<float> asScalar = HandleConstant<float>(other->node());
 
@@ -615,7 +623,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode = Create_gather(graph, {node->inputs()[0], node->inputs()[1]}, 0);
     } else if (kindAsStr == "aten::ones") {
       // clang-format off
-      // aten::ones(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor // NOLINT
+      // aten::ones(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor
       // TODO: Handle type.
       // clang-format on
       c10::TensorTypePtr asTensor =
@@ -630,7 +638,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode = Create_ConstantFloat(graph, {1.0f}, operationShape);
     } else if (kindAsStr == "aten::zeros") {
       // clang-format off
-      // aten::zeros(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor // NOLINT
+      // aten::zeros(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor
       // TODO: Handle type.
       // clang-format on
       c10::TensorTypePtr asTensor =
@@ -644,18 +652,20 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       newNode = Create_ConstantInt(graph, {0}, operationShape);
     } else if (kindAsStr == "aten::to") {
+
       // clang-format off
-      // aten::to(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
-      // aten::to(Tensor(a) self, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
-      // aten::to(Tensor(a) self, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
+      // aten::to(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)"
+      // aten::to(Tensor(a) self, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)"
+      // aten::to(Tensor(a) self, bool non_blocking=False, bool copy=False) -> Tensor(a|b)"
       // clang-format on
 
       // In BERT the cast is to the same type so ignore for now.
       node->output()->replaceAllUsesWith(node->inputs()[0]);
       toDelete.insert(node);
     } else if (kindAsStr == "aten::rsub") {
+
       // clang-format off
-      // Tensor aten::rsub(const Tensor& self, const Tensor& other, Scalar alpha) // NOLINT
+      // Tensor aten::rsub(const Tensor& self, const Tensor& other, Scalar alpha)
       // clang-format on
       // We are ignoring alpha here.
 
@@ -682,8 +692,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode = Create_sub(graph, {other, node->inputs()[0]});
     } else if (kindAsStr == "aten::arange") {
       // clang-format off
-      // aten::arange(Scalar end, ScalarType dtype, Layout, Device, bool pin_memory) // NOLINT
-      // aten::arange(Scalar start, Scalar end, Scalar step, ScalarType dtype, Layout, Device, bool pin_memory) // NOLINT
+      // aten::arange(Scalar end, ScalarType dtype, Layout, Device, bool pin_memory)
+      // aten::arange(Scalar start, Scalar end, Scalar step, ScalarType dtype, Layout, Device, bool pin_memory)
       // clang-format on
 
       if (node->inputs().size() != 5) {

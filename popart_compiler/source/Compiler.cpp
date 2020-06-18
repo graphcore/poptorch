@@ -1,14 +1,13 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <shared/Logging.hpp>
+
 #include <popart_compiler/Compiler.hpp>
 
 #include <fstream>
+
 #include <iostream>
 #include <list>
 #include <map>
 #include <memory>
-#include <unordered_map>
-#include <vector>
-
 #include <popart/builder.hpp>
 #include <popart/graphtransformer.hpp>
 #include <popart/ir.hpp>
@@ -20,7 +19,8 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/session.hpp>
 #include <popart/tensors.hpp>
-#include <shared/Logging.hpp>
+#include <unordered_map>
+#include <vector>
 
 namespace poptorch {
 
@@ -76,6 +76,7 @@ public:
   popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
                                  const std::vector<double> &data,
                                  const std::vector<int64_t> &shape);
+
 };
 
 popart::TensorId
@@ -100,6 +101,7 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
   popart::ConstVoidData theData;
 
   if (data.size() == 1 && totalSize != 1) {
+
     std::for_each(broadcastedData.begin(), broadcastedData.end(),
                   [&data](std::int64_t &i) { i = data[0]; });
 
@@ -129,6 +131,7 @@ CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
   popart::ConstVoidData theData;
 
   if (data.size() == 1 && totalSize != 1) {
+
     std::for_each(broadcastedData.begin(), broadcastedData.end(),
                   [&data](float &i) { i = data[0]; });
 
@@ -277,6 +280,7 @@ void Compiler::SetUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
 
 void Compiler::SetUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
                             const std::vector<std::int64_t> &dims) {
+
   // Popart wrapper around the tensor pointer.
   impl->memoryManager.push_back(
       std::make_unique<popart::NDArrayWrapper<std::int64_t>>(ptr, dims));
@@ -286,6 +290,7 @@ void Compiler::SetUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
 
 void Compiler::SetUpOutputOp(poptorch::TensorId id, float *ptr,
                              const std::vector<std::int64_t> &dims) {
+
   // Popart wrapper around the tensor pointer.
   impl->memoryManager.push_back(std::make_unique<popart::NDArrayWrapper<float>>(
       static_cast<float *>(ptr), dims));
@@ -302,8 +307,7 @@ void Compiler::InitSession(bool profile) {
           impl->usedIpus.size());
 
   if (!device) {
-    logging::debug(
-        "No IPU device found, falling back to CPU emulator (IPU Model)");
+    logging::debug("No IPU device found, falling back to CPU emulator (IPU Model)");
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
   } else {
     logging::debug("Acquired IPU device, running on device.");
@@ -383,6 +387,7 @@ void Compiler::InitSession(bool profile) {
 }
 
 void Compiler::Run() {
+
   // TODO don't do this everytime.
   if (!impl->isTraining) {
     impl->session->weightsFromHost();

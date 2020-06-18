@@ -10,8 +10,7 @@
    macros depending on which file this is in.
      - Body arguments are just the names of the arguments so they can be used in
    the cpp file.
-     - Indexing (TODO REMOVE) this is to allow us to index into the output. We
-   will have to change this in the future.
+     - Indexing (TODO REMOVE) this is to allow us to index into the output. We will have to change this in the future.
 */
-#include "CompilerOperationMacros.inc"
 #include "ManuallyAddedOperations.inc.h"
+#include "CompilerOperationMacros.inc"

@@ -1,4 +1,3 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <poptorch/OpBuilder.hpp>
 #include <torch/csrc/jit/ir/ir.h>
 

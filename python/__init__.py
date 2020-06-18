@@ -135,7 +135,9 @@ def trainingModel(model,
                           trace_model=trace_model)
 
 
-def inferenceModel(model, device_iterations=1, profile=False,
+def inferenceModel(model,
+                   device_iterations=1,
+                   profile=False,
                    trace_model=True):
     return PoplarExecutor(model,
                           False,

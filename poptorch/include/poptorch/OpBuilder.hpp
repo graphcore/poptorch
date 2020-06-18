@@ -1,4 +1,3 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef INCLUDE_POPTORCH_OP_BUILDER_HPP
 #define INCLUDE_POPTORCH_OP_BUILDER_HPP
 

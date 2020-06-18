@@ -1,13 +1,10 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef INCLUDE_POPTORCH_LOWER_TO_POPART_H
 #define INCLUDE_POPTORCH_LOWER_TO_POPART_H
 
-#include <memory>
+#include <poptorch/PoplarExecutable.hpp>
 #include <string>
 #include <torch/csrc/jit/ir/ir.h>
 #include <vector>
-
-#include <poptorch/PoplarExecutable.hpp>
 
 namespace poptorch {
 
@@ -16,9 +13,8 @@ namespace poptorch {
  */
 std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
-              std::vector<at::Tensor> &parameters, std::uint64_t steps,
-              bool training, std::uint64_t replicationFactor,
-              std::uint64_t gradientAccumulation, bool profile);
+              std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training,
+	      std::uint64_t replicationFactor,  std::uint64_t gradientAccumulation, bool profile);
 
 } // namespace poptorch
 
