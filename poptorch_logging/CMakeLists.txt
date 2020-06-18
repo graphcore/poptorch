@@ -10,5 +10,7 @@ add_library(poptorch_logging STATIC
 set_property(TARGET poptorch_logging PROPERTY CXX_STANDARD 14)
 
 target_include_directories(poptorch_logging PRIVATE
-                                        "include"
+                                        "include")
+
+target_include_directories(poptorch_logging SYSTEM PRIVATE
                                         ${SPDLOG_INCLUDE_DIR})
