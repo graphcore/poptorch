@@ -1,10 +1,10 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include "popart_compiler/Error.hpp"
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/ShapeInference.hpp"
+#include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 #include <iostream>
@@ -78,11 +78,9 @@ torch::jit::Graph *as_graph(py::handle h) {
 void constantPropagation(torch::jit::Graph *graph) {
   // Create a shared_ptr with a custom deleter that doesn't do anything.
   std::shared_ptr<torch::jit::Graph> x(graph, [](torch::jit::Graph *) {});
-  // x should be the only handle to graph.
-  assert(x.use_count() == 1);
+  ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
   torch::jit::ConstantPropagation(x);
-  // x should be the only handle to graph.
-  assert(x.use_count() == 1);
+  ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>

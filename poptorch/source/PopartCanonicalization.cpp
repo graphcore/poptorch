@@ -8,10 +8,10 @@
 #include <unordered_set>
 
 #include <poptorch/OpBuilder.hpp>
+#include <poptorch_logging/Error.hpp>
 #include <poptorch_logging/Logging.hpp>
 
 #include "PoptorchSymbols.h"
-#include <popart_compiler/Error.hpp>
 
 namespace poptorch {
 
@@ -118,7 +118,7 @@ static std::int32_t convertReduceToPopart(std::int32_t pytorchReduce) {
     return 0;
   }
 
-  throw poptorch::error("Unsupported pytorch reduce");
+  ERROR("Unsupported pytorch reduce");
 }
 
 /*
@@ -186,19 +186,18 @@ std::vector<T> CanonicalizeImpl::HandleList(torch::jit::Node *node) {
   } else if (node->kind() == c10::prim::Constant) {
     auto sym = c10::attr::value;
 
-    assert(node->hasAttribute(sym) && "Node must have value attribute");
+    ERROR_ON_MSG(!node->hasAttribute(sym), "Node must have value attribute");
 
     return *Handle<std::vector<T>>{}(sym, node);
-  } else {
-    std::cerr << "Unhandled list input node:\n";
-    node->dump();
-    assert(false && "List inputs must be of type prim::ListConstruct");
   }
+  std::cerr << "Unhandled list input node:\n";
+  node->dump();
+  ERROR("List inputs must be of type prim::ListConstruct");
 }
 
 template <typename T>
 std::vector<T> CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
-  assert(node->kind() == c10::prim::ListConstruct);
+  ERROR_ON(node->kind() != c10::prim::ListConstruct);
 
   std::vector<T> result;
 

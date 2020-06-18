@@ -4,6 +4,7 @@ project(poptorch_logging)
 find_package(Spdlog REQUIRED)
 
 add_library(poptorch_logging STATIC
+  "source/Error.cpp"
   "source/Logging.cpp")
 
 set_property(TARGET poptorch_logging PROPERTY CXX_STANDARD 14)
