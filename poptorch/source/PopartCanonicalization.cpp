@@ -1,9 +1,10 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <poptorch/PopartCanonicalization.hpp>
 
+#include <torch/csrc/jit/ir/ir.h>
+
 #include <optional>
 #include <string>
-#include <torch/csrc/jit/ir/ir.h>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -321,8 +322,9 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 #define ANY_SCALAR_CONSTANT_HANDLER(Body)                                      \
   at::IntTypePtr type = alphaValue->type()->cast<at::IntType>();               \
   if (type) {                                                                  \
-    Body(int)                                                                  \
-  }                                                                            \
+    Body(int) /* NOLINT */                                                     \
+  }
+
 // Many binary element wise operations contained a fused "Alpha" component. The
 // form of this is A (+, -) B * alpha. Most of the time this will be zero so can
 // be skipped but it could be non-zero and must be handled.
@@ -401,7 +403,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           *HandleConstant<std::int64_t>(node->inputs()[8]->node());
 
       if (transposed && *transposed == 0) {
-
         // Create a "normal" convolution.
         newNode = poptorch::Create_conv(graph, inputs, dilation, groups, {},
                                         padding, stride);
@@ -455,8 +456,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       torch::jit::Value *running_mean = node->inputs()[3];
       torch::jit::Value *running_var = node->inputs()[4];
 
-      // TODO: These will have to be checked if they are actual tensors in the
-      // future.
+      // TODO(T22645): These will have to be checked if they are actual tensors
+      // in the future.
       std::vector<torch::jit::Value *> inputTensors{input, weight, bias,
                                                     running_mean, running_var};
 

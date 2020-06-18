@@ -5,6 +5,7 @@
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/fmt/ostr.h>
 #include <string>
+#include <utility>
 
 /// This is a simple logging system for poptorch based on spdlog. The easiest
 /// way to use it is to simply call `logging::<level>()` where <level> is one
