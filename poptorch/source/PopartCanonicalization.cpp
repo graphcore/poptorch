@@ -822,6 +822,57 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           *HandleConstant<std::int64_t>(node->inputs()[1]->node());
 
       newNode = Create_identityloss(graph, {node->inputs()[0]}, reduction);
+    } else if (kind == c10::aten::layer_norm) {
+      // clang-format off
+      // aten::layer_norm(Tensor input,int[] normalized_shape, Tensor? weight,
+      //                Tensor? bias, float eps, bool cudnn_enable) -> Tensor
+      // clang-format on
+
+      // Tensor to normalise.
+      torch::jit::Value *X = node->inputs()[0];
+
+      // Bias to add
+      torch::jit::Value *gamma = node->inputs()[2];
+
+      // Weight to multiply.
+      torch::jit::Value *beta = node->inputs()[3];
+
+      const float epsilon = *HandleConstant<float>(node->inputs()[4]->node());
+
+      // Pytorch normalizes across arbitrary number of dimensions from the end.
+      // We flatten into a [M, N] array and normalize the N.
+      std::vector<std::int64_t> normalizedShape =
+          HandleList<int64_t>(node->inputs()[1]->node());
+      const std::int64_t axis = -normalizedShape.size();
+
+      // Flatten into [M, N]
+      torch::jit::Node *flatten = Create_flatten(graph, {X}, axis);
+      flatten->insertBefore(node);
+
+      // Normalize.
+      torch::jit::Node *normalize = Create_groupnormalization(
+          graph, {flatten->output(), gamma, beta}, 1, epsilon);
+      normalize->insertAfter(flatten);
+
+      // Reshape back into the expected shape.
+      c10::TensorTypePtr convertedToTensor =
+          node->output()->type()->cast<c10::TensorType>();
+      c10::VaryingShape dims = convertedToTensor->sizes();
+
+      std::vector<std::int64_t> originalShape;
+
+      for (auto optionalInt : *dims.sizes()) {
+        originalShape.push_back(*optionalInt);
+      }
+
+      // Perform the reshape.
+      newNode = CreateReshape(graph, normalize->output(), originalShape);
+
+    } else if (kind == Symbols::poptorch::identity_loss) {
+      std::int64_t reduction =
+          *HandleConstant<std::int64_t>(node->inputs()[1]->node());
+
+      newNode = Create_identityloss(graph, {node->inputs()[0]}, reduction);
     }
 
     // If we have a new node add it and replace the old use.

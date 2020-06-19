@@ -10,6 +10,7 @@ endfunction()
 add_poptorch_py_unit_test(bert_small_ipu_model)
 add_poptorch_py_unit_test(losses)
 add_poptorch_py_unit_test(custom_loss)
+add_poptorch_py_unit_test(norms)
 add_poptorch_py_unit_test(optimizers)
 add_poptorch_py_unit_test(shape_inference)
 
