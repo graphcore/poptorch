@@ -5,6 +5,7 @@ import sys
 
 import torch
 import torch.nn as nn
+import torch.optim as optim
 
 from poptorch.poptorch_core import *
 import poptorch.poptorch_core as poptorch_core
@@ -33,6 +34,21 @@ def identity_loss(x, reduction="none"):
 
     assert reduction == "none", "Unsupported reduction type!"
     return torch.ops.poptorch.identity_loss(x, 2)
+
+
+def convertOptimizerToDict(optimizer):
+    if len(optimizer.param_groups) != 1:
+        print(
+            "Error: Poptorch currently only supports one parameter group! (all parameters)"
+        )
+        exit()
+
+    return {
+        "lr": (optimizer.param_groups[0]["lr"], False),
+        "momentum": (optimizer.param_groups[0]["momentum"], False),
+        "weight_decay": (optimizer.param_groups[0]["weight_decay"], False),
+        "dampening": (optimizer.param_groups[0]["dampening"], False)
+    }
 
 
 identity_loss = identity_loss
@@ -65,7 +81,8 @@ class PoplarExecutor:
                  trace_model,
                  replication_factor=1,
                  gradient_accumulation=1,
-                 profile=False):
+                 profile=False,
+                 optimizer={}):
         self.executable = None
         self.model = model
         self.training = training
@@ -74,9 +91,9 @@ class PoplarExecutor:
         self.replication_factor = replication_factor
         self.profile = profile
         self.trace_model = trace_model
+        self.optimizer = optimizer
 
-    def __call__(self, tensors):
-
+    def __call__(self, tensors, optimizer=None):
         # Convert single tensor to tuple.
         in_tensors = make_tuple(tensors)
 
@@ -102,9 +119,9 @@ class PoplarExecutor:
                 n = torch.jit.trace(self.model, newTuple)
 
                 self.executable = compileWithTrace(
-                    n._c, n.graph, newTuple, self.device_iterations,
-                    self.training, self.replication_factor,
-                    self.gradient_accumulation, self.profile)
+                    n._c, newTuple, self.device_iterations, self.training,
+                    self.replication_factor, self.gradient_accumulation,
+                    self.optimizer, self.profile)
             else:
                 print('Compiling the model using scripting')
                 n = torch.jit.script(self.model)
@@ -119,7 +136,12 @@ class PoplarExecutor:
                     self.gradient_accumulation, self.profile)
 
         # Execute the poplar executable with the full size (batch * device interations)
-        output = execute(self.executable, in_tensors)
+        if optimizer:
+            self.optimizer = optimizer
+            output = execute(self.executable, in_tensors,
+                             convertOptimizerToDict(self.optimizer))
+        else:
+            output = execute(self.executable, in_tensors, {})
 
         if len(output) > 1:
             return tuple(output)
@@ -132,7 +154,13 @@ def trainingModel(model,
                   gradient_accumulation=1,
                   profile=False,
                   trace_model=True,
-                  loss=None):
+                  loss=None,
+                  optimizer=None):
+    if optimizer == None:
+        optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+    optimizer = convertOptimizerToDict(optimizer)
+
     class ModelTrainingWrapper(nn.Module):
         def __init__(self, model, loss=None):
             super(ModelTrainingWrapper, self).__init__()
@@ -144,7 +172,6 @@ def trainingModel(model,
 
             if self.loss:
                 loss = self.loss(output, loss_inputs)
-
                 return output, loss
 
             return output
@@ -155,7 +182,8 @@ def trainingModel(model,
                           device_iterations,
                           gradient_accumulation=gradient_accumulation,
                           profile=profile,
-                          trace_model=trace_model)
+                          trace_model=trace_model,
+                          optimizer=optimizer)
 
 
 def inferenceModel(model, device_iterations=1, profile=False,

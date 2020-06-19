@@ -2,6 +2,8 @@
 #ifndef INCLUDE_POPTORCH_POPLAR_EXECUTABLE_HPP
 #define INCLUDE_POPTORCH_POPLAR_EXECUTABLE_HPP
 
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -19,7 +21,13 @@ public:
       : compiler(std::move(c)), popartInputs(inputs), popartOutputs(outputs),
         profile(p) {}
 
-  std::vector<at::IValue> Run(std::vector<at::Tensor> &inTensors);
+  /*
+   * Execute the compiled graph stored in field "compiler" with the given
+   * |inTensors| and return to the user the resulting tensors if any.
+   */
+  std::vector<at::IValue>
+  Run(std::vector<at::Tensor> &inTensors,
+      const std::unordered_map<std::string, std::pair<float, bool>> &optimizer);
 
   bool ProfilingEnabled() const { return profile; }
 

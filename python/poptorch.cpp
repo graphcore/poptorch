@@ -1,5 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+
 #include <iostream>
+#include <unordered_map>
 
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/LowerToPopart.hpp"
@@ -12,7 +14,7 @@
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-
+#include <pybind11/stl_bind.h> // NOLINT
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/inliner.h>
@@ -41,9 +43,24 @@ static auto registry =
 
 namespace poptorch {
 
+// Process the user provided dictionary and extract the relevant optimizer
+// information.
+std::unordered_map<std::string, std::pair<float, bool>>
+processDict(const py::dict &opt) {
+  std::unordered_map<std::string, std::pair<float, bool>> optimizer;
+
+  for (auto element : opt) {
+    std::pair<float, bool> p = element.second.cast<std::pair<float, bool>>();
+
+    optimizer[element.first.cast<std::string>()] = p;
+  }
+
+  return optimizer;
+}
+
 std::vector<pybind11::object>
 execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
-        pybind11::tuple inputs) {
+        pybind11::tuple inputs, py::dict *optimizerDict) {
 
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
@@ -55,7 +72,13 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
     inputTensors.push_back(value.toTensor());
   }
 
-  std::vector<at::IValue> value = executable->Run(inputTensors);
+  std::unordered_map<std::string, std::pair<float, bool>> optimizer{};
+
+  if (optimizerDict) {
+    optimizer = processDict(*optimizerDict);
+  }
+
+  std::vector<at::IValue> value = executable->Run(inputTensors, optimizer);
 
   std::vector<pybind11::object> returnee;
   std::transform(value.begin(), value.end(), std::back_inserter(returnee),
@@ -89,16 +112,19 @@ void constantPropagation(torch::jit::Graph *graph) {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, py::handle, pybind11::tuple inputs,
-                 std::uint64_t steps, bool training,
-                 std::uint64_t replicationFactor,
-                 std::uint64_t gradientAccumulation, bool profile) {
+compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
+                 bool training, std::uint64_t replicationFactor,
+                 std::uint64_t gradientAccumulation, py::dict optimizerDict,
+                 bool profile) {
   auto module = as_module(h);
 
   auto forward = module->get_method("forward");
   auto graphAndTensors =
       torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
   auto graph = graphAndTensors.first;
+
+  std::unordered_map<std::string, std::pair<float, bool>> optimizer =
+      processDict(optimizerDict);
 
   torch::jit::EliminateDeadCode(graph);
   torch::jit::PeepholeOptimize(graph);
@@ -137,7 +163,7 @@ compileWithTrace(py::handle h, py::handle, pybind11::tuple inputs,
 
   return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps,
                                  training, replicationFactor,
-                                 gradientAccumulation, profile);
+                                 gradientAccumulation, optimizer, profile);
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
@@ -208,7 +234,7 @@ compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
 
   return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps,
                                  training, replicationFactor,
-                                 gradientAccumulation, profile);
+                                 gradientAccumulation, {}, profile);
 }
 
 void pyPropagateInputShapes(py::handle h) {

@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <popart/builder.hpp>
@@ -331,7 +332,7 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
       {impl->ids[id], *impl->memoryManager.back().get()});
 }
 
-void Compiler::InitSession(bool profile) {
+void Compiler::InitSession(bool profile, const Optimizer &opt) {
   // Try and get a single IPU. If not avaliable, run on CPU.
   // TODO: Make an actual device selection mechanism.
   std::shared_ptr<popart::DeviceInfo> device =
@@ -372,15 +373,25 @@ void Compiler::InitSession(bool profile) {
         impl->opBuilder->getModelProto(), dataFlow, device, {}, options,
         popart::PatternsLevel::Default);
   } else {
-    auto optimizer = popart::ConstSGD(0.001);
+    logging::debug(
+        "Adding inital graph optimizer SGD with parameters:: Learning rate "
+        "{}, weight decay {}, Momentum {}, Dampening {}",
+        opt.learningRate.first, opt.weightDecay.first, opt.momentum.first,
+        opt.dampening.first);
+
+    // Create the optimizer from user provided parameters.
+    auto optimizer =
+        popart::SGD(opt.learningRate, opt.weightDecay, opt.momentum,
+                    opt.dampening, {1.0f, true}, // Velocity scaling, off.
+                    {1.0f, true});               // Loss scaling, off.
 
     // Set a global identity loss that all other losses derive from.
     popart::TensorId lossRoot =
         impl->opBuilder->aiGraphcoreOpset1().identityloss(impl->losses);
     impl->opBuilder->virtualGraph(lossRoot, impl->activeIpu);
 
+    // Transform nodes which have training/inference variants. I.E BatchNorm.
     popart::GraphTransformer transformer{impl->opBuilder->getModelProto()};
-
     transformer.prepareNodesForTraining();
 
     // Create the training session.
@@ -417,11 +428,31 @@ void Compiler::InitSession(bool profile) {
   impl->session->weightsFromHost();
 }
 
-void Compiler::Run() {
+void Compiler::Run(const Optimizer &optimizer) {
   // TODO don't do this everytime.
   if (!impl->isTraining) {
     impl->session->weightsFromHost();
     impl->session->writeWeights(impl->weightCallback);
+  }
+
+  if (optimizer.type != OptimizerType::NONE && impl->isTraining) {
+    // Convert the map from the user into a popart SGD class.
+    auto newOptimizer = popart::SGD(
+        optimizer.learningRate, optimizer.weightDecay, optimizer.momentum,
+        optimizer.dampening, {1.0f, true}, // Velocity scaling, off.
+        {1.0f, true});                     // Loss scaling, off.
+
+    // Print to debug the new optimizer.
+    logging::debug(
+        "Updating graph optimizer SGD with parameters: Learning rate "
+        "{}, weight decay {}, Momentum {}, Dampening {}",
+        optimizer.learningRate.first, optimizer.weightDecay.first,
+        optimizer.momentum.first, optimizer.dampening.first);
+
+    // Update the popart graph/poplar executable with the new optimizer.
+    popart::TrainingSession &session =
+        dynamic_cast<popart::TrainingSession &>(*impl->session.get());
+    session.updateOptimizerFromHost(&newOptimizer);
   }
 
   // Execute the model on IPU.

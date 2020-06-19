@@ -1,11 +1,15 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "poptorch/PoplarExecutable.hpp"
 #include <iostream>
-#include <poptorch/PoplarExecutable.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include <string>
+#include <unordered_map>
+
 namespace poptorch {
 
-std::vector<at::IValue>
-PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
+std::vector<at::IValue> PoplarExecutable::Run(
+    std::vector<at::Tensor> &inTensors,
+    const std::unordered_map<std::string, std::pair<float, bool>>
+        &optimizerParameters) {
   std::vector<at::Tensor> tensor_views;
 
   // Set up the input tensors in the poplar graph to point to the incoming
@@ -56,7 +60,7 @@ PoplarExecutable::Run(std::vector<at::Tensor> &inTensors) {
   }
 
   // Execute the compiled poplar graph.
-  compiler.Run();
+  compiler.Run(optimizerParameters);
 
   std::vector<at::IValue> returnees;
   // Return the outputs as pytorch tensors to the user.

@@ -4,7 +4,12 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
+
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
@@ -13,6 +18,54 @@ using TensorId = std::size_t;
 namespace detail {
 struct CompilerImpl;
 }
+
+enum OptimizerType : std::uint8_t { NONE, SGD };
+
+// Extract the value from the map or return zero.
+static std::pair<float, bool> FindInMapOrZero(
+    const std::unordered_map<std::string, std::pair<float, bool>> &opts,
+    const std::string &name) {
+
+  // Lookup map.
+  auto itr = opts.find(name);
+  if (itr != opts.end()) {
+    return itr->second;
+  }
+
+  logging::info("Optimizer map didn't have field for {}, defaulting to zero {}",
+                name);
+  return {0.0f, false};
+}
+
+struct Optimizer {
+  Optimizer(
+      const std::unordered_map<std::string, std::pair<float, bool>> &opts) {
+    // It is valid to not pass in a optimizer.
+    if (opts.empty()) {
+      type = OptimizerType::NONE;
+      return;
+    }
+
+    // Until popart supports more optimizers we only support SGD.
+    type = OptimizerType::SGD;
+
+    auto itr = opts.find("lr");
+    ERROR_ON_MSG(itr == opts.end(),
+                 "Learning rate was not provided in optimizer dictionary!");
+
+    learningRate = itr->second;
+    momentum = FindInMapOrZero(opts, "momentum");
+    weightDecay = FindInMapOrZero(opts, "weight_decay");
+    dampening = FindInMapOrZero(opts, "dampening");
+  }
+
+  OptimizerType type;
+
+  std::pair<float, bool> learningRate;
+  std::pair<float, bool> momentum;
+  std::pair<float, bool> weightDecay;
+  std::pair<float, bool> dampening;
+};
 
 class Compiler {
 public:
@@ -79,9 +132,15 @@ public:
 
   void SetActiveIpu(std::uint64_t id);
 
-  void InitSession(bool profile);
+  void InitSession(bool profile, const Optimizer &opt);
 
-  void Run();
+  /*
+   * Execute the compiled popart graph using poplar. An optimizer can be
+   * provided to update the optimizer currently being run by the graph. If there
+   * is nothing to update the optimizer will be set to OptimizerType::None
+   * otherwise the new optimizer will be written to device.
+   */
+  void Run(const Optimizer &optimizationToUpdate);
 
   std::uint64_t BatchPerStep() const;
 

@@ -1,13 +1,12 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "poptorch/LowerToPopart.hpp"
 
-#include <torch/csrc/jit/ir/ir.h>
-
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
 #include <list>
 #include <random>
+#include <utility>
 
 #include "PoptorchSymbols.h"
 #include "popart_compiler/Compiler.hpp"
@@ -21,10 +20,12 @@ namespace {
  */
 class LowerToPopart {
 public:
-  LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
-                std::vector<at::Tensor> &params, std::uint64_t steps,
-                bool training, std::uint64_t replicationFactor,
-                std::uint64_t gradientAccumulation, bool profile_);
+  LowerToPopart(
+      torch::jit::Graph &g, std::vector<at::Tensor> &ins,
+      std::vector<at::Tensor> &params, std::uint64_t steps, bool training,
+      std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
+      const std::unordered_map<std::string, std::pair<float, bool>> &opt,
+      bool profile_);
 
   void Lower();
 
@@ -44,6 +45,9 @@ private:
   // Mapping between the SSA values of torch jit with the ssa values of popart.
   std::unordered_map<torch::jit::Value *, std::vector<poptorch::TensorId>>
       valueMap;
+
+  // Optimizer from the user.
+  const std::unordered_map<std::string, std::pair<float, bool>> &optimizer;
 
   using FunctionType = std::function<poptorch::TensorId(
       const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
@@ -80,7 +84,7 @@ std::string typeToPopart(at::ScalarType type) {
  */
 std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::Compile() {
   // Init the session, this also involves compiling to poplar.
-  compiler.InitSession(profile);
+  compiler.InitSession(profile, optimizer);
 
   return std::make_shared<poptorch::PoplarExecutable>(
       std::move(compiler), std::move(inputTensorHooks),
@@ -204,12 +208,13 @@ void LowerToPopart::LowerParameters() {
   }
 }
 
-LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
-                             std::vector<at::Tensor> &params,
-                             std::uint64_t steps, bool training,
-                             std::uint64_t replicationFactor,
-                             std::uint64_t gradientAccumulation, bool profile_)
-    : graph(g), inTensors(ins), parameters(params),
+LowerToPopart::LowerToPopart(
+    torch::jit::Graph &g, std::vector<at::Tensor> &ins,
+    std::vector<at::Tensor> &params, std::uint64_t steps, bool training,
+    std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
+    const std::unordered_map<std::string, std::pair<float, bool>> &opt,
+    bool profile_)
+    : graph(g), inTensors(ins), parameters(params), optimizer(opt),
       compiler({training, steps, replicationFactor, gradientAccumulation}),
       profile(profile_) {
   // Init the function implementation map. This map will be populated by
@@ -267,16 +272,18 @@ LowerToPopart::LowerToPopart(torch::jit::Graph &g, std::vector<at::Tensor> &ins,
 
 } // namespace
 
-std::shared_ptr<poptorch::PoplarExecutable>
-lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
-              std::vector<at::Tensor> &parameters, std::uint64_t steps,
-              bool training, std::uint64_t replicationFactor,
-              std::uint64_t gradientAccumulation, bool profile) {
+std::shared_ptr<poptorch::PoplarExecutable> lowerToPopart(
+    torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
+    std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training,
+    std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
+    const std::unordered_map<std::string, std::pair<float, bool>> &opt,
+    bool profile) {
   std::srand(std::time(nullptr));
 
   LowerToPopart lower_impl{
       graph,    inTensors,         parameters,           steps,
-      training, replicationFactor, gradientAccumulation, profile};
+      training, replicationFactor, gradientAccumulation, opt,
+      profile};
   lower_impl.Lower();
 
   return lower_impl.Compile();

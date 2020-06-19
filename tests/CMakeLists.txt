@@ -10,6 +10,7 @@ endfunction()
 add_poptorch_py_unit_test(bert_small_ipu_model)
 add_poptorch_py_unit_test(losses)
 add_poptorch_py_unit_test(custom_loss)
+add_poptorch_py_unit_test(optimizers)
 add_poptorch_py_unit_test(shape_inference)
 
 #############
@@ -99,14 +100,11 @@ function(add_test_executable name)
   add_executable(${name} ${ARGN} "${PROJECT_SOURCE_DIR}/shared/source/Logging.cpp")
   target_include_directories(${name}
       PRIVATE
+      ${Boost_INCLUDE_DIRS}
       ${CMAKE_CURRENT_SOURCE_DIR}
       "${PROJECT_SOURCE_DIR}/poptorch/include"
       "${PROJECT_SOURCE_DIR}/shared/include"
-      "${PROJECT_SOURCE_DIR}/popart_compiler/include")
-
-  target_include_directories(${name}
-      SYSTEM PRIVATE
-      ${Boost_INCLUDE_DIRS}
+      "${PROJECT_SOURCE_DIR}/popart_compiler/include"
       ${SPDLOG_INCLUDE_DIR}
       ${TORCH_INCLUDE_DIRS})
 
