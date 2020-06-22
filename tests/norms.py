@@ -74,7 +74,7 @@ def test_layerNormPretrainedWeights():
     model.train()
     for i in range(0, 10):
         outputs = model(input)
-        otimizer.zero_grad()
+        optimizer.zero_grad()
         loss = criterion(outputs, torch.ones([3, 5, 3, 10]))
         loss.backward()
         optimizer.step()

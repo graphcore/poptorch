@@ -21,7 +21,7 @@ def test_L1Loss_direct():
             input = torch.randn(10)
 
             groundTruth = model(target, input)
-            poptorch_out = poptorch_model((target, input))
+            poptorch_out = poptorch_model(target, input)
 
             assert torch.allclose(groundTruth, poptorch_out)
 
@@ -47,18 +47,19 @@ def test_L1Loss_training():
         input = torch.randn(10)
 
         # Make sure the first run doesn't already pass the test.
-        original, original_loss = poptorch_model((input, target))
+        original, original_loss = poptorch_model(input, target)
         assert original_loss > 0.1
         assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
         optimizer = None
         for i in range(0, 2000):
-            out, loss = poptorch_model((input, target), optimizer=optimizer)
+            out, loss = poptorch_model(input, target)
 
             # Model needs to adjust the LR in the middle to converge
             optimizer = None
             if i == 1000:
-                optimizer = optim.SGD(model.parameters(), lr=0.001)
+                poptorch_model.setOptimizer(
+                    optim.SGD(model.parameters(), lr=0.001))
 
         # Check we have trained the "model"
         assert loss < original_loss
@@ -88,7 +89,7 @@ def test_MSELoss_direct():
             input = torch.randn(10)
 
             groundTruth = model(target, input)
-            poptorch_out = poptorch_model((target, input))
+            poptorch_out = poptorch_model(target, input)
 
             assert torch.allclose(groundTruth, poptorch_out)
 
@@ -107,12 +108,12 @@ def test_MSELoss_training():
     input = torch.randn(10)
 
     # Make sure the first run doesn't already pass the test.s
-    original, original_loss = poptorch_model((input, target))
+    original, original_loss = poptorch_model(input, target)
     assert original_loss > 0.1
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
     for i in range(0, 2500):
-        out, loss = poptorch_model((input, target))
+        out, loss = poptorch_model(input, target)
 
     # Check we have trained the "model"
     assert loss < 0.001
@@ -134,7 +135,7 @@ def test_CrossEntropy_direct():
             input = torch.randn(1, 10)
 
             groundTruth = model(input, label)
-            poptorch_out = poptorch_model((input, label))
+            poptorch_out = poptorch_model(input, label)
             assert torch.allclose(groundTruth, poptorch_out)
 
 
@@ -163,7 +164,7 @@ def test_LogSoftmax():
 
         # Works as we copy the weights back every time this may need to change that interface.
         groundTruth = model(input)
-        poptorch_out, loss = poptorch_model((input, label))
+        poptorch_out, loss = poptorch_model(input, label)
 
         assert torch.allclose(groundTruth, poptorch_out)
 
@@ -196,10 +197,10 @@ def test_NLLLoss_training():
         label = torch.randint(0, 10, [1])
 
         # Make sure the first run doesn't already pass the test.
-        original, original_loss = poptorch_model((input, label))
+        original, original_loss = poptorch_model(input, label)
 
         for i in range(0, 1000):
-            out, loss = poptorch_model((input, label))
+            out, loss = poptorch_model(input, label)
 
         # # Check we have trained the "model"
         assert loss < original_loss
@@ -224,10 +225,10 @@ def test_CrossEntropyLoss_training():
         label = torch.randint(0, 10, [1])
 
         # Make sure the first run doesn't already pass the test.
-        original, original_loss = poptorch_model((input, label))
+        original, original_loss = poptorch_model(input, label)
 
         for i in range(0, 1000):
-            out, loss = poptorch_model((input, label))
+            out, loss = poptorch_model(input, label)
 
         # # Check we have trained the "model"
         assert loss < original_loss

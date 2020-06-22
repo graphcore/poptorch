@@ -13,6 +13,7 @@ add_poptorch_py_unit_test(custom_loss)
 add_poptorch_py_unit_test(norms)
 add_poptorch_py_unit_test(optimizers)
 add_poptorch_py_unit_test(shape_inference)
+add_poptorch_py_unit_test(inputs)
 
 #############
 # C++ tests #

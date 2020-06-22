@@ -733,7 +733,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     } else if (kind == c10::aten::ones) {
       // clang-format off
       // aten::ones(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor // NOLINT
-      // TODO: Handle type.
       // clang-format on
       c10::TensorTypePtr asTensor =
           node->outputs()[0]->type()->cast<c10::TensorType>();
@@ -744,11 +743,23 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         operationShape.push_back(*optionalInt);
       }
 
-      newNode = Create_ConstantFloat(graph, {1.0f}, operationShape);
+      switch (*asTensor->scalarType()) {
+      case c10::ScalarType::Int:
+      case c10::ScalarType::Long: {
+        newNode = Create_ConstantInt(graph, {1}, operationShape);
+        break;
+      }
+      case c10::ScalarType::Float: {
+        newNode = Create_ConstantFloat(graph, {1.0}, operationShape);
+        break;
+      }
+      default:
+        ERROR("aten::ones of type " << c10::toString(*asTensor->scalarType())
+                                    << " not supported");
+      }
     } else if (kind == c10::aten::zeros) {
       // clang-format off
       // aten::zeros(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor // NOLINT
-      // TODO: Handle type.
       // clang-format on
       c10::TensorTypePtr asTensor =
           node->outputs()[0]->type()->cast<c10::TensorType>();
@@ -759,7 +770,20 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         operationShape.push_back(*optionalInt);
       }
 
-      newNode = Create_ConstantInt(graph, {0}, operationShape);
+      switch (*asTensor->scalarType()) {
+      case c10::ScalarType::Int:
+      case c10::ScalarType::Long: {
+        newNode = Create_ConstantInt(graph, {0}, operationShape);
+        break;
+      }
+      case c10::ScalarType::Float: {
+        newNode = Create_ConstantFloat(graph, {0.0}, operationShape);
+        break;
+      }
+      default:
+        ERROR("aten::zeros of type " << c10::toString(*asTensor->scalarType())
+                                     << " not supported");
+      }
     } else if (kind == c10::aten::to) {
       // clang-format off
       // aten::to(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT

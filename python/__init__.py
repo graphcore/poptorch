@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import logging
 import os
 import sys
 
@@ -13,6 +14,15 @@ import poptorch.poptorch_core as poptorch_core
 begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 end_ipu_block = torch.ops.poptorch.end_ipu_block
 ipu_print_tensor = torch.ops.poptorch.ipu_print_tensor
+
+# Create a poptorch logger which outputs to the console INFO messages and above
+logger = logging.getLogger("poptorch")
+logger.setLevel(logging.INFO)
+console = logging.StreamHandler()
+formatter = logging.Formatter('%(name)s:%(levelname)s: %(message)s')
+console.setFormatter(formatter)
+console.setLevel(logging.DEBUG)
+logger.addHandler(console)
 
 
 # From pytorch/torch/jit/__init__.py
@@ -73,6 +83,60 @@ class IPU(nn.Module):
         return out
 
 
+class _Args:
+    def __init__(self, model, args, kwargs, training):
+        # Combine args and kwargs:
+        self._args = []
+        fn = model.__call__ if training else model.forward
+        varnames = fn.__code__.co_varnames
+        # Remove 'self'
+        assert varnames[0] == 'self'
+        argcount = fn.__code__.co_argcount
+        varnames = varnames[1:argcount]
+        argcount -= 1
+        assert len(args) + len(
+            kwargs
+        ) <= argcount, "Too many arguments provided: expected %s (%d) but got %d" % (
+            varnames, len(varnames), len(args) + len(kwargs))
+        defaults = fn.__defaults__ or []
+        first_optional = len(varnames) - len(defaults)
+        none_passed = []
+        for i, name in enumerate(varnames):
+            if i < len(args):
+                self._args.append(args[i])
+                assert name not in kwargs, "Parameter %s was passed more than once" % name
+            elif name in kwargs:
+                assert not none_passed, "Torch doesn't support passing tensors after the following parameters have defaulted to None. %s" % ", ".join(
+                    none_passed)
+                self._args.append(kwargs[name])
+            else:
+                assert i >= first_optional, "Mandatory parameter %s missing" % name
+                value = defaults[i - first_optional]
+                if value == None:
+                    none_passed.append("%s (%d)" % (name, i))
+                if not none_passed:
+                    self._args.append(value)
+
+        self._varnames = varnames
+
+    def _forEach(self, data, fn):
+        if isinstance(data, (tuple, list)):
+            return type(data)(self._forEach(d, fn) for d in data)
+        elif isinstance(data, dict):
+            return {
+                key: self._forEach(value, fn)
+                for key, value in data.items()
+            }
+        else:
+            return fn(data)
+
+    def forEach(self, fn):
+        self._args = self._forEach(self._args, fn)
+
+    def asTuple(self):
+        return tuple(self._args)
+
+
 class PoplarExecutor:
     def __init__(self,
                  model,
@@ -92,59 +156,62 @@ class PoplarExecutor:
         self.profile = profile
         self.trace_model = trace_model
         self.optimizer = optimizer
+        self.new_optimizer = optimizer
 
-    def __call__(self, tensors, optimizer=None):
+    def setOptimizer(self, optimizer):
+        self.new_optimizer = optimizer
+
+    def __call__(self, *args, **kwargs):
         # Convert single tensor to tuple.
-        in_tensors = make_tuple(tensors)
+        in_tensors = _Args(self.model, args, kwargs, self.training)
 
         if self.executable == None:
-            print("First time call to model will invoke poplar compilation. " +
-                  str(self.device_iterations) + " " + str(self.training))
+            logger.info(
+                "First time call to model will invoke poplar compilation. " +
+                str(self.device_iterations) + " " + str(self.training))
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we should slice it up so we compile by the batch size alone.
-            newTuple = []
-
             extra_poplar_batch_dims = self.device_iterations * self.replication_factor * self.gradient_accumulation
 
-            for tensor in in_tensors:
-                newTuple.append(
-                    tensor.narrow(0, 0,
-                                  tensor.size()[0] // extra_poplar_batch_dims))
+            in_tensors.forEach(lambda t: t.narrow(
+                0, 0,
+                t.size()[0] // extra_poplar_batch_dims) if isinstance(
+                    t, torch.Tensor) else t)
 
             # Compile the poplar executable based on the batchsize.
-            newTuple = tuple(newTuple)
-
             if self.trace_model:
-                print('Compiling the model using tracing')
-                n = torch.jit.trace(self.model, newTuple)
+                logger.info('Compiling the model using tracing')
+                n = torch.jit.trace(self.model, in_tensors.asTuple())
 
                 self.executable = compileWithTrace(
-                    n._c, newTuple, self.device_iterations, self.training,
-                    self.replication_factor, self.gradient_accumulation,
-                    self.optimizer, self.profile)
+                    n._c, in_tensors.asTuple(), self.device_iterations,
+                    self.training, self.replication_factor,
+                    self.gradient_accumulation, self.optimizer, self.profile)
             else:
-                print('Compiling the model using scripting')
+                logger.info('Compiling the model using scripting')
                 n = torch.jit.script(self.model)
                 graphInputs = list(n.graph.inputs())
-                for graphInput, argIn in zip(graphInputs[1:], newTuple):
+                for graphInput, argIn in zip(graphInputs[1:],
+                                             in_tensors.asTuple()):
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 
                 self.executable = compileWithScript(
-                    n._c, n.graph, newTuple, self.device_iterations,
-                    self.training, self.replication_factor,
-                    self.gradient_accumulation, self.profile)
+                    n._c, n.graph, in_tensors.asTuple(),
+                    self.device_iterations, self.training,
+                    self.replication_factor, self.gradient_accumulation,
+                    self.profile)
 
         # Execute the poplar executable with the full size (batch * device interations)
-        if optimizer:
-            self.optimizer = optimizer
-            output = execute(self.executable, in_tensors,
+        if self.new_optimizer and self.new_optimizer != self.optimizer:
+            self.optimizer = self.new_optimizer
+            output = execute(self.executable, in_tensors.asTuple(),
                              convertOptimizerToDict(self.optimizer))
         else:
-            output = execute(self.executable, in_tensors, {})
+            output = execute(self.executable, in_tensors.asTuple(), {})
 
         if len(output) > 1:
-            return tuple(output)
+            return output
         else:
             return output[0]
 
@@ -156,7 +223,7 @@ def trainingModel(model,
                   trace_model=True,
                   loss=None,
                   optimizer=None):
-    if optimizer == None:
+    if not optimizer:
         optimizer = optim.SGD(model.parameters(), lr=0.01)
 
     optimizer = convertOptimizerToDict(optimizer)

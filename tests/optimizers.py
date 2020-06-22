@@ -25,11 +25,11 @@ def test_SGD():
     label = torch.randint(0, 10, [1])
 
     # Make sure the first run doesn't already pass the test.
-    original, original_loss = poptorch_model((input, label))
+    original, original_loss = poptorch_model(input, label)
 
     # Loss shouldn't change.
     for i in range(0, 50):
-        out, loss = poptorch_model((input, label))
+        out, loss = poptorch_model(input, label)
         assert loss == original_loss
 
     # We shouldn't get the right result.
@@ -37,10 +37,11 @@ def test_SGD():
 
     # Update the optimizer and check the loss now begins to decrease.
     optimizer = optim.SGD(model.parameters(), lr=0.01)
-    poptorch_model((input, label), optimizer=optimizer)
+    poptorch_model.setOptimizer(optimizer)
+    poptorch_model(input, label)
 
     for i in range(0, 1000):
-        out, loss = poptorch_model((input, label))
+        out, loss = poptorch_model(input, label)
 
     # Check we have trained the "model"
     assert loss < original_loss

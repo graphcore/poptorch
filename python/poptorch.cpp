@@ -43,6 +43,8 @@ static auto registry =
 
 namespace poptorch {
 
+namespace {
+
 // Process the user provided dictionary and extract the relevant optimizer
 // information.
 std::unordered_map<std::string, std::pair<float, bool>>
@@ -58,6 +60,25 @@ processDict(const py::dict &opt) {
   return optimizer;
 }
 
+void buildTensorList(const torch::jit::IValue &value,
+                     std::vector<at::Tensor> &tensors) {
+  if (value.isTuple()) {
+    for (auto &element : value.toTuple()->elements()) {
+      buildTensorList(element, tensors);
+    }
+  } else if (value.isList()) {
+    for (auto element : value.toList()) {
+      buildTensorList(element, tensors);
+    }
+  } else if (value.isTensor()) {
+    tensors.push_back(value.toTensor());
+  } else {
+    ERROR("Unsupported value " << value.tagKind());
+  }
+}
+
+} // namespace
+
 std::vector<pybind11::object>
 execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
         pybind11::tuple inputs, py::dict *optimizerDict) {
@@ -69,7 +90,7 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
   // address of.
   std::vector<at::Tensor> inputTensors;
   for (torch::jit::IValue value : inputStack) {
-    inputTensors.push_back(value.toTensor());
+    buildTensorList(value, inputTensors);
   }
 
   std::unordered_map<std::string, std::pair<float, bool>> optimizer{};
@@ -150,7 +171,7 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
   // address of.
   std::vector<at::Tensor> inputTensors;
   for (torch::jit::IValue value : inputStack) {
-    inputTensors.push_back(value.toTensor());
+    buildTensorList(value, inputTensors);
   }
 
   // Find the parameter data from.
