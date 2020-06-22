@@ -77,9 +77,9 @@ class IPU(nn.Module):
     def __exit__(self, type, value, traceback):
         end_ipu_block()
 
-    def __call__(self, x):
+    def __call__(self, *input, **kwargs):
         begin_ipu_block(self.ipu_id)
-        out = self.layer_to_call(x)
+        out = self.layer_to_call(*input, **kwargs)
         return out
 
 

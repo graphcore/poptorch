@@ -37,3 +37,9 @@ OP_CONVERTOR(aten::matmul, NONE, Create_matmul, {PARAM(0) COMMA PARAM(1)})
 
 // "aten::mean(Tensor self, *, int? dtype) -> Tensor"
 OP_CONVERTOR(aten::mean, NONE, Create_mean, {PARAM(0)})
+
+// aten::sigmoid(Tensor t) -> Tensor
+OP_CONVERTOR(aten::sigmoid, NONE, Create_sigmoid, {PARAM(0)})
+
+// aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> Tensor
+OP_CONVERTOR(aten::constant_pad_nd, NONE, Create_ConstantPad, PARAM(0) COMMA HANDLE_LIST(1, std::int64_t) COMMA HANDLE(2, float))

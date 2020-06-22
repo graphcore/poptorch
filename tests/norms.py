@@ -69,7 +69,6 @@ def test_layerNormPretrainedWeights():
     # We aren't training to any real target we just want to update the beta/gamma parameters and check they still work in popart.
     criterion = torch.nn.MSELoss()
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-    print(list(model.norm.parameters()))
 
     model.train()
     for i in range(0, 10):

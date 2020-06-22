@@ -350,6 +350,35 @@ void LowerToPopart::LowerParameters() {
   }
 }
 
+// Helper to let us filter string arguments into const char*s. This is to catch
+// the std::string produced by some attributes before they cross the ABI
+// boundary.
+namespace {
+
+// Default template conversion, just return the type.
+template <typename T> struct StringConvertorHelper {
+  explicit StringConvertorHelper(T x) : value(x) {}
+  T value;
+
+  operator T() { return value; }
+};
+
+// String, return const char*.
+template <> struct StringConvertorHelper<std::string> {
+  explicit StringConvertorHelper(std::string &x) : value(x) {}
+  std::string &value;
+
+  operator const char *() { return value.c_str(); }
+};
+
+// Function to create the conversion helper. To allow template type deduction
+// and template specialization at the same time.
+template <typename T> StringConvertorHelper<T> convertString(T t) {
+  return StringConvertorHelper<T>{t};
+}
+
+} // namespace
+
 LowerToPopart::LowerToPopart(
     torch::jit::Graph &g, std::vector<at::Tensor> &ins,
     std::vector<at::Tensor> &params, std::uint64_t steps, bool training,
@@ -379,6 +408,7 @@ LowerToPopart::LowerToPopart(
 #define FLOAT f
 #define INT i
 #define BOOL i
+#define STRING s
 
 // Useful NOP macro
 #define NONE
@@ -387,7 +417,7 @@ LowerToPopart::LowerToPopart(
 // accessors, the name is converted into "attr::NAME" which is what pytorch JIT
 // expects for attribute accessing.
 #define ARG(Type, Name)                                                        \
-  , node->Type(c10::Symbol::fromQualString("attr::" #Name))
+  , convertString(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
@@ -409,6 +439,7 @@ LowerToPopart::LowerToPopart(
 #undef FLOAT
 #undef INT
 #undef BOOL
+#undef STRING
   }; // End map initalizer.
 }
 

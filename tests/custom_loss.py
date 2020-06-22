@@ -48,5 +48,3 @@ def test_custom_loss():
     out = model(input)
     assert torch.allclose(out, target, rtol=1e-02, atol=1e-02)
 
-
-test_custom_loss()

@@ -82,6 +82,7 @@ public:
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
+#define STRING const char *
 #define NONE
 #define ARG(Type, Name) , Type Name
 #define BODY_ARG(Name) NONE
@@ -102,6 +103,7 @@ public:
 #undef FLOAT
 #undef INT
 #undef BOOL
+#undef STRING
 
   poptorch::TensorId
   AddInitializedInputTensor(const char *name, const char *type,

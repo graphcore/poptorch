@@ -77,12 +77,15 @@ public:
                            const std::vector<int64_t> &shape);
 
   popart::TensorId intConstant(const std::vector<popart::TensorId> &inputs,
-                               const std::vector<int64_t> &data,
+                               const std::vector<int32_t> &data,
                                const std::vector<int64_t> &shape);
 
   popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
                                  const std::vector<double> &data,
                                  const std::vector<int64_t> &shape);
+
+  popart::TensorId cast(const std::vector<popart::TensorId> &inputs,
+                        const std::string &type);
 };
 
 popart::TensorId
@@ -94,7 +97,7 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
 
 popart::TensorId
 CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
-                          const std::vector<int64_t> &data,
+                          const std::vector<int32_t> &data,
                           const std::vector<int64_t> &shape) {
   UNUSED(inputs);
   // Create the tensor info for our new tensor.
@@ -102,14 +105,14 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
 
   std::int64_t totalSize = std::accumulate(shape.begin(), shape.end(), 1,
                                            std::multiplies<std::int64_t>());
-  std::vector<int64_t> broadcastedData(totalSize);
+  std::vector<int32_t> broadcastedData(totalSize);
 
   // Create the inital data for the variable.
   popart::ConstVoidData theData;
 
   if (data.size() == 1 && totalSize != 1) {
     std::for_each(broadcastedData.begin(), broadcastedData.end(),
-                  [&data](std::int64_t &i) { i = data[0]; });
+                  [&data](std::int32_t &i) { i = data[0]; });
 
     theData.data = broadcastedData.data();
     theData.info = info;
@@ -120,6 +123,12 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
 
   auto aiOnnx = opBuilder->aiOnnxOpset9();
   return aiOnnx.constant(theData);
+}
+
+popart::TensorId CompilerImpl::cast(const std::vector<popart::TensorId> &inputs,
+                                    const std::string &type) {
+  auto aiOnnx = opBuilder->aiOnnxOpset9();
+  return aiOnnx.cast(inputs, type);
 }
 
 popart::TensorId
@@ -208,6 +217,24 @@ Compiler::AddInputTensor(const char *string,
   return impl->ids.size() - 1;
 }
 
+std::vector<std::int32_t> int64ToInt32(const std::vector<std::int64_t> &in) {
+  std::vector<std::int32_t> x;
+
+  for (std::int64_t i : in) {
+    // If i is less than the int32 smallest value or greater than its biggest,
+    // throw overflow error.
+    bool overflow =
+        i > static_cast<std::int64_t>(
+                std::numeric_limits<std::int32_t>::max()) ||
+        i < static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::min());
+
+    ERROR_ON_MSG(overflow, "Int 64 overflowed during poptorch compilation.");
+    x.push_back(i);
+  }
+
+  return x;
+}
+
 // A whitelist of supported loss operations. Popart needs to know which
 // operations are losses so they can be marked by the session.
 static bool IsLoss(const std::string &operation) {
@@ -224,6 +251,7 @@ static bool IsLoss(const std::string &operation) {
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
+#define STRING const char *
 #define NONE
 #define ARG(Type, Name) , Type Name
 #define BODY_ARG(Name) , Name
@@ -252,6 +280,7 @@ static bool IsLoss(const std::string &operation) {
 #undef FLOAT
 #undef INT
 #undef BOOL
+#undef STRING
 
 poptorch::TensorId
 Compiler::AddInitializedInputTensor(const char *name, const char *type,
@@ -259,6 +288,7 @@ Compiler::AddInitializedInputTensor(const char *name, const char *type,
                                     void *data) {
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{type, dims};
+
   // Create the inital data for the variable.
   popart::ConstVoidData theData;
   theData.data = data;

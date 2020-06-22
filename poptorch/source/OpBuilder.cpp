@@ -1,7 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PoptorchSymbols.h"
 #include <poptorch/OpBuilder.hpp>
-#include <torch/csrc/jit/ir/ir.h>
 
 namespace poptorch {
 
@@ -31,6 +30,43 @@ torch::jit::Node *Create_ConstantFloat(torch::jit::Graph &graph,
   torch::jit::Node *newNode = graph.create(Symbols::poptorch::float_constant);
   newNode->fs_(c10::attr::data, data);
   newNode->is_(c10::attr::shape, new_shape);
+  return newNode;
+}
+
+torch::jit::Node *Create_Cast(torch::jit::Graph &graph, torch::jit::Value *A,
+                              c10::ScalarType scalar) {
+  torch::jit::Node *newNode = graph.create(Symbols::poptorch::cast, {A});
+
+  std::string newType = "";
+
+  if (scalar == c10::kFloat) {
+    newType = "FLOAT";
+  } else if (scalar == c10::kInt) {
+    newType = "INT32";
+  } else if (scalar == c10::kLong) {
+    newType = "INT64";
+  }
+
+  newNode->s_(c10::Symbol::fromQualString("attr::type"), newType);
+
+  return newNode;
+}
+
+torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
+                                     torch::jit::Value *A,
+                                     const std::vector<int64_t> &pad_shape,
+                                     float constant) {
+  std::vector<int64_t> tmp = pad_shape;
+
+  tmp.insert(tmp.begin(), 0);
+  tmp.insert(tmp.begin(), 0);
+  tmp.insert(tmp.begin() + 4, 0);
+  tmp.insert(tmp.begin() + 4, 0);
+
+  torch::jit::Node *newNode =
+      graph.create(Symbols::poptorch::constant_pad, {A});
+  newNode->is_(c10::Symbol::fromQualString("attr::pads"), tmp);
+  newNode->f_(c10::Symbol::fromQualString("attr::value"), constant);
   return newNode;
 }
 

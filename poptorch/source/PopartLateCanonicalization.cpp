@@ -36,7 +36,11 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
       callbacks.push_back([node, &graph]() {
         c10::TensorTypePtr asTensor =
             node->output()->type()->cast<c10::TensorType>();
+
         c10::VaryingShape dims = asTensor->sizes();
+
+        if (!dims.size())
+          return;
 
         std::vector<std::int64_t> originalShape;
 

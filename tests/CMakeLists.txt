@@ -7,7 +7,7 @@ function(add_poptorch_py_unit_test name)
 endfunction()
 
 
-add_poptorch_py_unit_test(bert_small_ipu_model)
+add_poptorch_py_unit_test(bert_small_and_medium)
 add_poptorch_py_unit_test(losses)
 add_poptorch_py_unit_test(custom_loss)
 add_poptorch_py_unit_test(norms)

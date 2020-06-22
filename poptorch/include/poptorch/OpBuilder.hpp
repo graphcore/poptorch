@@ -1,17 +1,10 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef INCLUDE_POPTORCH_OP_BUILDER_HPP
 #define INCLUDE_POPTORCH_OP_BUILDER_HPP
+#include <torch/csrc/jit/ir/ir.h>
 
 #include <string>
 #include <vector>
-
-namespace torch {
-namespace jit {
-struct Graph;
-struct Node;
-struct Value;
-} // namespace jit
-} // namespace torch
 
 namespace poptorch {
 
@@ -26,6 +19,14 @@ torch::jit::Node *Create_ConstantInt(torch::jit::Graph &graph,
 torch::jit::Node *Create_ConstantFloat(torch::jit::Graph &graph,
                                        const std::vector<double> &data,
                                        const std::vector<int64_t> &new_shape);
+
+torch::jit::Node *Create_Cast(torch::jit::Graph &graph, torch::jit::Value *A,
+                              c10::ScalarType scalar);
+
+torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
+                                     torch::jit::Value *A,
+                                     const std::vector<int64_t> &pad_shape,
+                                     float constant);
 
 // Default to int in the helper.
 template <typename T> struct Create_Constant {

@@ -177,6 +177,10 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
   // Find the parameter data from.
   std::vector<at::Tensor> parameterData;
   for (at::Tensor param : graphAndTensors.second) {
+    if (!param.is_contiguous()) {
+      logging::debug("Tensor is NOT continguous!");
+    }
+
     parameterData.push_back(param);
   }
 
