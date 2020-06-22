@@ -28,7 +28,7 @@ def test_custom_loss():
     input = torch.randn(10)
 
     # Make sure the first run doesn't already pass the test.
-    original, original_loss = poptorch_model((input, target))
+    original, original_loss = poptorch_model(input, target)
 
     assert original_loss > 0.1
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
@@ -38,7 +38,7 @@ def test_custom_loss():
     assert not torch.allclose(out, target, rtol=1e-02, atol=1e-02)
 
     for i in range(0, 2500):
-        out, loss = poptorch_model((input, target))
+        out, loss = poptorch_model(input, target)
 
     # Check we have trained the "model"
     assert loss < 0.001
@@ -48,5 +48,3 @@ def test_custom_loss():
     out = model(input)
     assert torch.allclose(out, target, rtol=1e-02, atol=1e-02)
 
-
-test_custom_loss()

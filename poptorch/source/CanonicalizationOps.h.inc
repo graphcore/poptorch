@@ -35,8 +35,11 @@ OP_CONVERTOR(aten::gelu, NONE, Create_gelu, {PARAM(0)})
 // aten::matmul(Tensor self, Tensor other) -> Tensor
 OP_CONVERTOR(aten::matmul, NONE, Create_matmul, {PARAM(0) COMMA PARAM(1)})
 
-// aten::layer_norm(Tensor input, int[] normalized_shape, Tensor? weight, Tensor? bias, float eps, bool cudnn_enable) -> Tensor
-OP_CONVERTOR(aten::layer_norm, NONE, Create_groupnormalization, {PARAM(0) COMMA PARAM(2) COMMA PARAM(3)} COMMA 1 COMMA HANDLE(4, float))
-
 // "aten::mean(Tensor self, *, int? dtype) -> Tensor"
 OP_CONVERTOR(aten::mean, NONE, Create_mean, {PARAM(0)})
+
+// aten::sigmoid(Tensor t) -> Tensor
+OP_CONVERTOR(aten::sigmoid, NONE, Create_sigmoid, {PARAM(0)})
+
+// aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> Tensor
+OP_CONVERTOR(aten::constant_pad_nd, NONE, Create_ConstantPad, PARAM(0) COMMA HANDLE_LIST(1, std::int64_t) COMMA HANDLE(2, float))

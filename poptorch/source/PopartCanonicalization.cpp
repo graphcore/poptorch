@@ -244,7 +244,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     // if's" off of it.
     if (kind == c10::aten::view || kind == c10::aten::unsqueeze ||
         kind == c10::aten::expand || kind == c10::aten::flatten ||
-        kind == c10::aten::reshape) {
+        kind == c10::aten::reshape || kind == c10::aten::squeeze) {
       // clang-format off
 
       // aten::view(Tensor self, int[] size) -> Tensor
@@ -265,21 +265,62 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Reshape the tensor into that shape.
       newNode = CreateReshape(graph, node->inputs()[0], newShape);
+    } else if (kind == c10::aten::expand_as) {
+      // clang-format off
+      // aten::expand(Tensor self, int[] size, *, bool implicit) -> Tensor
+      // aten::expand_as(Tensor self, Tensor other) -> Tensor
+      // clang-format on
+
+      // Extract the type from the pytorch IR.
+      c10::TensorTypePtr selfTensor =
+          node->inputs()[0]->type()->expect<c10::TensorType>();
+      c10::VaryingShape selfDims = selfTensor->sizes();
+
+      std::int64_t oldElemCount = 0;
+      for (auto optionalInt : *selfDims.sizes()) {
+        oldElemCount += *optionalInt;
+      }
+
+      // Extract the type from the pytorch IR.
+      c10::TensorTypePtr asTensor =
+          node->inputs()[1]->type()->expect<c10::TensorType>();
+      c10::VaryingShape dims = asTensor->sizes();
+
+      // Convert that IR type into a C++ vector of ints.
+      std::vector<std::int64_t> newShape;
+      std::int64_t newElemCount = 0;
+
+      for (auto optionalInt : *dims.sizes()) {
+        newShape.push_back(*optionalInt);
+        newElemCount += *optionalInt;
+      }
+
+      // Elements don't change so just a reshape.
+      if (newElemCount == oldElemCount) {
+        newNode = CreateReshape(graph, node->inputs()[0], newShape);
+      } else {
+        newNode = Create_ConstantInt(graph, newShape,
+                                     {static_cast<int64_t>(newShape.size())});
+        newNode->insertBefore(node);
+
+        newNode = Create_Cast(graph, newNode->output(), c10::kLong);
+        newNode->insertBefore(node);
+
+        newNode = Create_expand(graph, {node->inputs()[0], newNode->output()});
+      }
     }
 #define HANDLE(Index, Type) *HandleConstant<Type>(node->inputs()[Index]->node())
+#define HANDLE_LIST(Index, Type)                                               \
+  HandleListConstruct<Type>(node->inputs()[Index]->node())
 #define PARAM(Index) node->inputs()[Index]
 #define COMMA ,
 #define NONE
 
 // Handle all supported scalar values and pass the correct C++ type to the given
 // body.
-#define ANY_SCALAR_CONSTANT_HANDLER(Value, Body)                               \
-  c10::TensorTypePtr asTensor = Value->type()->cast<c10::TensorType>();        \
-  at::ScalarType type = *asTensor->scalarType();                               \
-  if (type == at::ScalarType::Float || type == at::ScalarType::Double) {       \
-    Body(float)                                                                \
-  } else if (type == at::ScalarType::Int || type == at::ScalarType::Long ||    \
-             type == at::ScalarType::Bool) {                                   \
+#define ANY_SCALAR_CONSTANT_HANDLER(Body)                                      \
+  at::IntTypePtr type = alphaValue->type()->cast<at::IntType>();               \
+  if (type) {                                                                  \
     Body(int)                                                                  \
   }                                                                            \
 // Many binary element wise operations contained a fused "Alpha" component. The
@@ -288,7 +329,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
 // We have a helper macro to insert the alpha value if needed.
 #define ALPHA_BODY(Type)                                                       \
-  Type alphaAsScalar = *HandleConstant<std::int64_t>(alphaValue->node());      \
+  Type alphaAsScalar = *HandleConstant<Type>(alphaValue->node());              \
   if (alphaAsScalar != 1) {                                                    \
     torch::jit::Node *alphaConst =                                             \
         Create_Constant<Type>{}(graph, {alphaAsScalar}, {1});                  \
@@ -304,7 +345,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 #define ALPHA(ValueToMultiply, AlphaParam)                                     \
   torch::jit::Value *alphaValue = AlphaParam;                                  \
   torch::jit::Value *valueToMultiply = ValueToMultiply;                        \
-  ANY_SCALAR_CONSTANT_HANDLER(valueToMultiply, ALPHA_BODY)                     \
+  ANY_SCALAR_CONSTANT_HANDLER(ALPHA_BODY)                                      \
   if (alphaValue == AlphaParam)                                                \
     alphaValue = valueToMultiply;
 
@@ -733,7 +774,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     } else if (kind == c10::aten::ones) {
       // clang-format off
       // aten::ones(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor // NOLINT
-      // TODO: Handle type.
       // clang-format on
       c10::TensorTypePtr asTensor =
           node->outputs()[0]->type()->cast<c10::TensorType>();
@@ -744,11 +784,23 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         operationShape.push_back(*optionalInt);
       }
 
-      newNode = Create_ConstantFloat(graph, {1.0f}, operationShape);
+      switch (*asTensor->scalarType()) {
+      case c10::ScalarType::Int:
+      case c10::ScalarType::Long: {
+        newNode = Create_ConstantInt(graph, {1}, operationShape);
+        break;
+      }
+      case c10::ScalarType::Float: {
+        newNode = Create_ConstantFloat(graph, {1.0}, operationShape);
+        break;
+      }
+      default:
+        ERROR("aten::ones of type " << c10::toString(*asTensor->scalarType())
+                                    << " not supported");
+      }
     } else if (kind == c10::aten::zeros) {
       // clang-format off
       // aten::zeros(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor // NOLINT
-      // TODO: Handle type.
       // clang-format on
       c10::TensorTypePtr asTensor =
           node->outputs()[0]->type()->cast<c10::TensorType>();
@@ -759,7 +811,20 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         operationShape.push_back(*optionalInt);
       }
 
-      newNode = Create_ConstantInt(graph, {0}, operationShape);
+      switch (*asTensor->scalarType()) {
+      case c10::ScalarType::Int:
+      case c10::ScalarType::Long: {
+        newNode = Create_ConstantInt(graph, {0}, operationShape);
+        break;
+      }
+      case c10::ScalarType::Float: {
+        newNode = Create_ConstantFloat(graph, {0.0}, operationShape);
+        break;
+      }
+      default:
+        ERROR("aten::zeros of type " << c10::toString(*asTensor->scalarType())
+                                     << " not supported");
+      }
     } else if (kind == c10::aten::to) {
       // clang-format off
       // aten::to(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
@@ -767,9 +832,25 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // aten::to(Tensor(a) self, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
       // clang-format on
 
-      // In BERT the cast is to the same type so ignore for now.
-      node->output()->replaceAllUsesWith(node->inputs()[0]);
-      toDelete.insert(node);
+      c10::TensorTypePtr outputType =
+          node->outputs()[0]->type()->expect<c10::TensorType>();
+
+      c10::TensorTypePtr inputType =
+          node->inputs()[0]->type()->expect<c10::TensorType>();
+
+      c10::ScalarType outAsScalar = *outputType->scalarType();
+      c10::ScalarType inAsScalar = *inputType->scalarType();
+
+      // Remove the node if casting to the same type.
+      if (outAsScalar == inAsScalar) {
+        node->output()->replaceAllUsesWith(node->inputs()[0]);
+        toDelete.insert(node);
+        continue;
+      }
+
+      // Otherwise cast as normal.
+      newNode = Create_Cast(graph, node->inputs()[0], outAsScalar);
+
     } else if (kind == c10::aten::rsub) {
       // clang-format off
       // Tensor aten::rsub(const Tensor& self, const Tensor& other, Scalar alpha) // NOLINT
@@ -822,6 +903,152 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           *HandleConstant<std::int64_t>(node->inputs()[1]->node());
 
       newNode = Create_identityloss(graph, {node->inputs()[0]}, reduction);
+    } else if (kind == c10::aten::layer_norm) {
+      // clang-format off
+      // aten::layer_norm(Tensor input,int[] normalized_shape, Tensor? weight,
+      //                Tensor? bias, float eps, bool cudnn_enable) -> Tensor
+      // clang-format on
+
+      // Tensor to normalise.
+      torch::jit::Value *X = node->inputs()[0];
+
+      // Bias to add
+      torch::jit::Value *gamma = node->inputs()[2];
+
+      // Weight to multiply.
+      torch::jit::Value *beta = node->inputs()[3];
+
+      const float epsilon = *HandleConstant<float>(node->inputs()[4]->node());
+
+      // Pytorch normalizes across arbitrary number of dimensions from the end.
+      // We flatten into a [M, N] array and normalize the N.
+      std::vector<std::int64_t> normalizedShape =
+          HandleList<int64_t>(node->inputs()[1]->node());
+      const std::int64_t axis = -normalizedShape.size();
+
+      // Flatten into [M, N]
+      torch::jit::Node *flatten = Create_flatten(graph, {X}, axis);
+      flatten->insertBefore(node);
+
+      // Normalize.
+      torch::jit::Node *normalize = Create_groupnormalization(
+          graph, {flatten->output(), gamma, beta}, 1, epsilon);
+      normalize->insertAfter(flatten);
+
+      // Reshape back into the expected shape.
+      c10::TensorTypePtr convertedToTensor =
+          node->output()->type()->cast<c10::TensorType>();
+      c10::VaryingShape dims = convertedToTensor->sizes();
+
+      std::vector<std::int64_t> originalShape;
+
+      for (auto optionalInt : *dims.sizes()) {
+        originalShape.push_back(*optionalInt);
+      }
+
+      // Perform the reshape.
+      newNode = CreateReshape(graph, normalize->output(), originalShape);
+
+    } else if (kind == Symbols::poptorch::identity_loss) {
+      std::int64_t reduction =
+          *HandleConstant<std::int64_t>(node->inputs()[1]->node());
+
+      newNode = Create_identityloss(graph, {node->inputs()[0]}, reduction);
+    } else if (kind == c10::aten::split) {
+      // clang-format off
+      // aten::split(Tensor self, int[] split_sizes, int dim=0) -> Tensor[]"
+      // clang-format on
+
+      // Get the shape of the input.
+      c10::TensorTypePtr asTensor =
+          node->inputs()[0]->type()->expect<c10::TensorType>();
+      c10::VaryingShape dims = asTensor->sizes();
+
+      const std::int64_t splitSize =
+          *HandleConstant<std::int64_t>(node->inputs()[1]->node());
+      const std::int64_t dim =
+          *HandleConstant<std::int64_t>(node->inputs()[2]->node());
+
+      const std::int64_t axis = dim >= 0 ? dim : *dims.size() + dim;
+
+      std::vector<torch::jit::Value *> slices;
+
+      for (std::int32_t index = 0; index < *dims[axis]; index += splitSize) {
+        newNode = Create_slice(graph, {node->inputs()[0]}, {index + splitSize},
+                               {index}, {axis});
+        newNode->insertBefore(node);
+        slices.push_back(newNode->output());
+      }
+
+      newNode = graph.create(at::prim::ListConstruct, slices);
+
+    } else if (kind == c10::aten::eq) {
+      // clang-format off
+      // "aten::eq(Tensor self, Tensor other) -> Tensor"
+      // "aten::eq(Tensor self, Scalar other) -> Tensor"
+      // clang-format on
+
+      torch::jit::Value *other = node->inputs()[1];
+
+      std::optional<std::int64_t> isInt =
+          HandleConstant<std::int64_t>(other->node());
+
+      if (isInt) {
+        // Add int as tensor.
+        torch::jit::Node *c = Create_ConstantInt(graph, {*isInt}, {1});
+        c->insertBefore(node);
+        other = c->output();
+      }
+
+      newNode = Create_equal(graph, {node->inputs()[0], other});
+
+    } else if (kind == c10::aten::masked_fill) {
+      // clang-format off
+      // Derived from documentation
+      // aten::masked_fill(Tensor self, Tensor mask, Tensor other) -> Tensor
+      // clang-format on
+
+      // Apply by performing the following operation
+      // inverseMask = -(mask - 1)
+      // self * inverseMask + mask * other
+
+      // Cast the mask to int32.
+      torch::jit::Node *mask = Create_Cast(graph, node->inputs()[1], c10::kInt);
+      mask->insertBefore(node);
+
+      // Create an inverse mask via -(mask - 1)
+      torch::jit::Node *negativeOne = Create_ConstantInt(graph, {-1}, {1});
+      negativeOne->insertBefore(node);
+
+      torch::jit::Node *inverseMask =
+          Create_add(graph, {mask->output(), negativeOne->output()});
+      inverseMask->insertBefore(node);
+
+      inverseMask = Create_neg(graph, {inverseMask->output()});
+      inverseMask->insertBefore(node);
+
+      // Prepare input and update
+      mask = Create_Cast(graph, node->inputs()[1], c10::kFloat);
+      mask->insertBefore(node);
+
+      float otherAsConst = *HandleConstant<float>(node->inputs()[2]->node());
+      torch::jit::Node *other =
+          Create_ConstantFloat(graph, {otherAsConst}, {1});
+      other->insertBefore(node);
+
+      torch::jit::Node *update =
+          Create_mul(graph, {mask->output(), other->output()});
+      update->insertBefore(node);
+
+      // Create holes in the original so we can add into it.
+      inverseMask = Create_Cast(graph, inverseMask->output(), c10::kFloat);
+      inverseMask->insertBefore(node);
+
+      torch::jit::Node *self =
+          Create_mul(graph, {node->inputs()[0], inverseMask->output()});
+      self->insertBefore(node);
+
+      newNode = Create_add(graph, {self->output(), update->output()});
     }
 
     // If we have a new node add it and replace the old use.

@@ -23,5 +23,5 @@ inference_model = poptorch.inferenceModel(model)
 t1 = torch.tensor([1.])
 t2 = torch.tensor([2.])
 
-assert inference_model((t1, t2)) == 3.0
+assert inference_model(t1, t2) == 3.0
 print("Success")
