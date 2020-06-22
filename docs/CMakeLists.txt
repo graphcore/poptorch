@@ -20,7 +20,7 @@ if (BUILD_DOCS)
 
   add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pdfgen
-    COMMAND ${GCDOC} -v -r ${VERSION} --onesided -b pdf ${CMAKE_CURRENT_SOURCE_DIR}/user_guide ${CMAKE_CURRENT_BINARY_DIR}/latex/poptorch_user_guide.pdf
+    COMMAND ${GCDOC} -v -r ${DOCS_VERSION} --onesided -b pdf ${CMAKE_CURRENT_SOURCE_DIR}/user_guide ${CMAKE_CURRENT_BINARY_DIR}/latex/poptorch_user_guide.pdf
     COMMENT "Building PDF documentation"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/latex
@@ -28,7 +28,7 @@ if (BUILD_DOCS)
 
   add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/html/poptorch_user_guide
-    COMMAND ${GCDOC} -v -r ${VERSION} -b singlehtml ${CMAKE_CURRENT_SOURCE_DIR}/user_guide ${CMAKE_CURRENT_BINARY_DIR}/html/poptorch_user_guide
+    COMMAND ${GCDOC} -v -r ${DOCS_VERSION} -b singlehtml ${CMAKE_CURRENT_SOURCE_DIR}/user_guide ${CMAKE_CURRENT_BINARY_DIR}/html/poptorch_user_guide
     COMMENT "Building html user guide documentation"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
