@@ -171,9 +171,16 @@ class PoplarExecutor:
                 str(self.device_iterations) + " " + str(self.training))
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we should slice it up so we compile by the batch size alone.
-            extra_poplar_batch_dims = self.device_iterations * self.replication_factor * self.gradient_accumulation
+            extra_poplar_batch_dims = self.device_iterations * \
+                self.replication_factor * self.gradient_accumulation
 
-            in_tensors.forEach(lambda t: t.narrow(
+            # There are two concepts of batch size. First is the "model" batch size then there is the
+            # concept of batching at the popart level. Here we divide by the popart batch size so the
+            # trace "sees" the model batch size but when we call execute we pass the full batch and popart
+            # will partition it up.
+            in_tensors_trace_view = _Args(self.model, args, kwargs,
+                                          self.training)
+            in_tensors_trace_view.forEach(lambda t: t.narrow(
                 0, 0,
                 t.size()[0] // extra_poplar_batch_dims) if isinstance(
                     t, torch.Tensor) else t)
@@ -181,23 +188,25 @@ class PoplarExecutor:
             # Compile the poplar executable based on the batchsize.
             if self.trace_model:
                 logger.info('Compiling the model using tracing')
-                n = torch.jit.trace(self.model, in_tensors.asTuple())
+                n = torch.jit.trace(self.model,
+                                    in_tensors_trace_view.asTuple())
 
                 self.executable = compileWithTrace(
-                    n._c, in_tensors.asTuple(), self.device_iterations,
-                    self.training, self.replication_factor,
-                    self.gradient_accumulation, self.optimizer, self.profile)
+                    n._c, in_tensors_trace_view.asTuple(),
+                    self.device_iterations, self.training,
+                    self.replication_factor, self.gradient_accumulation,
+                    self.optimizer, self.profile)
             else:
                 logger.info('Compiling the model using scripting')
                 n = torch.jit.script(self.model)
                 graphInputs = list(n.graph.inputs())
                 for graphInput, argIn in zip(graphInputs[1:],
-                                             in_tensors.asTuple()):
+                                             in_tensors_trace_view):
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 
                 self.executable = compileWithScript(
-                    n._c, n.graph, in_tensors.asTuple(),
+                    n._c, n.graph, in_tensors_trace_view.asTuple(),
                     self.device_iterations, self.training,
                     self.replication_factor, self.gradient_accumulation,
                     self.profile)
