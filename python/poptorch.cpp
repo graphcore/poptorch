@@ -1,5 +1,18 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+#include <pybind11/functional.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
+#include <torch/csrc/jit/passes/constant_propagation.h>
+#include <torch/csrc/jit/passes/dead_code_elimination.h>
+#include <torch/csrc/jit/passes/inliner.h>
+#include <torch/csrc/jit/passes/lower_graph.h>
+#include <torch/csrc/jit/passes/peephole.h>
+#include <torch/csrc/jit/passes/remove_inplace_ops.h>
+#include <torch/csrc/jit/python/pybind_utils.h>
+#include <torch/script.h>
+
 #include <iostream>
 #include <unordered_map>
 
@@ -10,19 +23,6 @@
 #include "poptorch/ShapeInference.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
-
-#include <pybind11/functional.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/stl_bind.h> // NOLINT
-#include <torch/csrc/jit/passes/constant_propagation.h>
-#include <torch/csrc/jit/passes/dead_code_elimination.h>
-#include <torch/csrc/jit/passes/inliner.h>
-#include <torch/csrc/jit/passes/lower_graph.h>
-#include <torch/csrc/jit/passes/peephole.h>
-#include <torch/csrc/jit/passes/remove_inplace_ops.h>
-#include <torch/csrc/jit/python/pybind_utils.h>
-#include <torch/script.h>
 
 void begin_ipu_block(int64_t ipu_id) { UNUSED(ipu_id); }
 void end_ipu_block() {}
@@ -82,7 +82,6 @@ void buildTensorList(const torch::jit::IValue &value,
 std::vector<pybind11::object>
 execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
         pybind11::tuple inputs, py::dict *optimizerDict) {
-
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
 
@@ -238,8 +237,6 @@ compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
 
   // Clean up the module as we will likely have stopped using lots of
   // constants.
-  // TODO: Alias Analysis freaks out about this, so ignore for now.
-  // torch::jit::EliminateDeadCode(graph);
 
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);

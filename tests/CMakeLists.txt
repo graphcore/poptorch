@@ -6,7 +6,7 @@ function(add_poptorch_py_unit_test name)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BUILD_DIR})
 endfunction()
 
-
+add_poptorch_py_unit_test(batching)
 add_poptorch_py_unit_test(bert_small_and_medium)
 add_poptorch_py_unit_test(losses)
 add_poptorch_py_unit_test(custom_loss)

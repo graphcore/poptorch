@@ -364,7 +364,7 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
 
 void Compiler::InitSession(bool profile, const Optimizer &opt) {
   // Try and get a single IPU. If not avaliable, run on CPU.
-  // TODO: Make an actual device selection mechanism.
+  // TODO(T22642): Make an actual device selection mechanism.
   std::shared_ptr<popart::DeviceInfo> device =
       popart::DeviceManager::createDeviceManager().acquireAvailableDevice(
           impl->usedIpus.size());
@@ -459,7 +459,7 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
 }
 
 void Compiler::Run(const Optimizer &optimizer) {
-  // TODO don't do this everytime.
+  // TODO(T22644) don't do this everytime.
   if (!impl->isTraining) {
     impl->session->weightsFromHost();
     impl->session->writeWeights(impl->weightCallback);
@@ -489,7 +489,7 @@ void Compiler::Run(const Optimizer &optimizer) {
   popart::StepIO stepio(impl->popartIncoming, impl->popartOutgoing);
   impl->session->run(stepio);
 
-  // TODO don't do this everytime.
+  // TODO(T22644) don't do this everytime.
   if (impl->isTraining) {
     impl->session->weightsToHost();
     impl->session->readWeights(impl->weightCallback);
@@ -497,7 +497,6 @@ void Compiler::Run(const Optimizer &optimizer) {
 
   // The buffers handle the communication between pytorch and popart, we set
   // them up each run.
-  // TODO: This might be annoying for performance.
   impl->popartIncoming.clear();
   impl->popartOutgoing.clear();
   impl->memoryManager.clear();

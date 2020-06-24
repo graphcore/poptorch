@@ -2,9 +2,10 @@
 #ifndef INCLUDE_POPTORCH_LOWER_TO_POPART_H
 #define INCLUDE_POPTORCH_LOWER_TO_POPART_H
 
+#include <torch/csrc/jit/ir/ir.h>
+
 #include <memory>
 #include <string>
-#include <torch/csrc/jit/ir/ir.h>
 #include <unordered_map>
 #include <utility>
 #include <vector>
