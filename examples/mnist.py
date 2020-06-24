@@ -9,10 +9,15 @@ import poptorch
 
 # Load the MNIST data.
 
+# Normal pytorch batch size
 training_batch_size = 20
+
+# Device "step"
 training_ipu_step_size = 20
 
-training_combined_batch_size = training_batch_size * training_ipu_step_size
+replication_factor = 4
+
+training_combined_batch_size = training_batch_size * training_ipu_step_size * replication_factor
 training_data = torch.utils.data.DataLoader(
     torchvision.datasets.MNIST('mnist_data/',
                                train=True,
@@ -67,7 +72,7 @@ class Network(nn.Module):
         self.layer3_act = nn.ReLU()
         self.layer4 = nn.Linear(256, 10)
 
-        self.softmax = nn.Softmax(1)
+        self.softmax = nn.LogSoftmax(1)
 
     def forward(self, x):
         x = self.layer1(x)
@@ -97,11 +102,11 @@ class Loss(nn.Module):
         return l
 
 
-lf = Loss()
-
 # Create model for training which will run on IPU.
-training_model = poptorch.trainingModel(model, training_ipu_step_size, loss=lf)
-#training_model = poptorch.trainingModel(model, training_ipu_step_size, loss=nn.CrossEntropyLoss())
+training_model = poptorch.trainingModel(model,
+                                        training_ipu_step_size,
+                                        replication_factor=replication_factor,
+                                        loss=Loss())
 
 # Same model as above, they will share weights (in 'model') so while the above
 # trains the weights, the weights in this will be automatically updated.
@@ -112,7 +117,7 @@ def train():
     losses = []
 
     for batch_number, (data, labels) in enumerate(training_data):
-        result = training_model((data, labels))
+        result = training_model(data, labels)
         losses.append(result[1][0].item())
 
         if batch_number % 10 == 0:

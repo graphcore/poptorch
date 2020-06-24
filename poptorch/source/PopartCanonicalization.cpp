@@ -38,6 +38,10 @@ private:
 
   template <typename T> std::optional<T> HandleConstant(torch::jit::Node *node);
 
+  // Turn a parameter constant into an IR constant.
+  torch::jit::Node *CreateIRConstant(torch::jit::Graph &graph,
+                                     torch::jit::Value *node);
+
   // Delete a node and also its users if they are also unused.
   void SearchAndPossiblyDestroy(torch::jit::Node *node);
 
@@ -196,6 +200,18 @@ std::vector<T> CanonicalizeImpl::HandleList(torch::jit::Node *node) {
   ERROR("List inputs must be of type prim::ListConstruct");
 }
 
+std::vector<torch::jit::Value *>
+CanonicalizeImpl::HandleTensorList(torch::jit::Node *node) {
+  std::vector<torch::jit::Value *> result;
+
+  // Just convert the node->inputs array ref to vector and return it.
+  for (torch::jit::Value *value : node->inputs()) {
+    result.push_back(value);
+  }
+
+  return result;
+}
+
 template <typename T>
 std::vector<T> CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
   ERROR_ON(node->kind() != c10::prim::ListConstruct);
@@ -210,6 +226,25 @@ std::vector<T> CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
   }
 
   return result;
+}
+
+// Turn a prim::Constant scalar input into a popart graph level scalar constant.
+torch::jit::Node *CanonicalizeImpl::CreateIRConstant(torch::jit::Graph &graph,
+                                                     torch::jit::Value *value) {
+  // Get the scalar type of the result.
+  c10::FloatTypePtr asFloat = value->type()->cast<c10::FloatType>();
+  c10::IntTypePtr asInt = value->type()->cast<c10::IntType>();
+
+  if (asInt) {
+    return Create_ConstantInt(
+        graph, {*HandleConstant<std::int64_t>(value->node())}, {1});
+  } else if (asFloat) {
+    return Create_ConstantFloat(graph, {*HandleConstant<float>(value->node())},
+                                {1});
+  }
+
+  ERROR("Unsupported type in CreateIRConstant");
+  return nullptr;
 }
 
 void CanonicalizeImpl::SearchAndPossiblyDestroy(torch::jit::Node *node) {
@@ -313,6 +348,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 #define HANDLE(Index, Type) *HandleConstant<Type>(node->inputs()[Index]->node())
 #define HANDLE_LIST(Index, Type)                                               \
   HandleListConstruct<Type>(node->inputs()[Index]->node())
+#define HANDLE_TENSOR_LIST(Index)                                              \
+  HandleTensorList(node->inputs()[Index]->node())
 #define PARAM(Index) node->inputs()[Index]
 #define COMMA ,
 #define NONE
@@ -467,11 +504,15 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode = poptorch::Create_batchnormalization(graph, inputTensors, 1,
                                                     epsilon, momentum);
 
-    } else if (kind == c10::aten::max_pool2d) {
+    } else if (kind == c10::aten::max_pool2d || kind == c10::aten::avg_pool2d) {
       // clang-format off
       /*
         aten::max_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
         padding, int[] dilation, bool ceil_mode) -> Tensor
+
+        aten::avg_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
+                         padding, bool ceil_mode, bool count_include_pad,
+                         int? divisor_override) -> Tensor
      */
       // clang-format on
       std::vector<std::int64_t> kernel_size =
@@ -485,9 +526,19 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       padding.push_back(padding[0]);
       padding.push_back(padding[1]);
 
-      newNode = poptorch::Create_maxpool(graph, {node->inputs()[0]}, 1,
-                                         kernel_size, padding, 0, stride);
+      if (kind == c10::aten::max_pool2d) {
+        newNode = poptorch::Create_maxpool(graph, {node->inputs()[0]}, 1,
+                                           kernel_size, padding, 0, stride);
+      } else {
+        // ceil_mode, countIncludePad, divisor_override are ignored for now due
+        // to not being supported directly in popart.
+        newNode = poptorch::Create_averagepool(graph, {node->input(0)},
+                                               kernel_size, 0, padding, stride);
+      }
     } else if (kind == c10::aten::adaptive_avg_pool2d) {
+      // clang-format off
+      // aten::adaptive_avg_pool2d(Tensor self, int[] output_size) -> Tensor
+      // clang-format on
       std::vector<std::int64_t> outputShape =
           HandleList<std::int64_t>(node->inputs()[1]->node());
 
@@ -955,9 +1006,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           *HandleConstant<std::int64_t>(node->inputs()[1]->node());
 
       newNode = Create_identityloss(graph, {node->inputs()[0]}, reduction);
-    } else if (kind == c10::aten::split) {
+    } else if (kind == c10::aten::split || kind == c10::aten::chunk) {
       // clang-format off
       // aten::split(Tensor self, int[] split_sizes, int dim=0) -> Tensor[]"
+      // aten::split(Tensor self, int split_sizes, int dim=0) -> Tensor[]"
+      // aten::chunk(Tensor self, int chunks, int dim) -> Tensor[]
       // clang-format on
 
       // Get the shape of the input.
@@ -965,20 +1018,67 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           node->inputs()[0]->type()->expect<c10::TensorType>();
       c10::VaryingShape dims = asTensor->sizes();
 
-      const std::int64_t splitSize =
-          *HandleConstant<std::int64_t>(node->inputs()[1]->node());
+      // Pythonic axis translation.
       const std::int64_t dim =
           *HandleConstant<std::int64_t>(node->inputs()[2]->node());
-
       const std::int64_t axis = dim >= 0 ? dim : *dims.size() + dim;
 
+      // Size of each split ignoring the remainder at the end.
+      std::vector<std::int64_t> sizeOfEachSplit;
+
+      // Split size can either be the number of splits or the size of the
+      // splits.
+      std::optional<std::int64_t> splitSize =
+          HandleConstant<std::int64_t>(node->input(0)->node());
+
+      if (kind == c10::aten::chunk) {
+        // Chunk takes in the *number of chunks*. Canonicalise it to *size of
+        // chunks*.
+        ERROR_ON_MSG(
+            !splitSize,
+            "Aten chunk node does not have a integer number of chunks!");
+        std::int64_t sliceSize = *dims[axis] / *splitSize;
+        for (int i = 0; i < *splitSize; ++i) {
+          sizeOfEachSplit.push_back(sliceSize);
+        }
+
+        // Add an extra slice for the remainder.
+        if (*dims[axis] % *splitSize != 0) {
+          sizeOfEachSplit.push_back(*dims[axis] % *splitSize);
+        }
+      } else if (splitSize) {
+        // Split takes in the size of each chunk.
+        std::int64_t sliceSize = *splitSize;
+        for (int i = 0; i < *dims[axis] / sliceSize; ++i) {
+          sizeOfEachSplit.push_back(sliceSize);
+        }
+
+        // Add an extra slice for the remainder.
+        if (*dims[axis] % *splitSize != 0) {
+          sizeOfEachSplit.push_back(*dims[axis] % *splitSize);
+        }
+      } else {
+        sizeOfEachSplit = HandleList<std::int64_t>(node->input(0)->node());
+      }
+
+      // Rolling index to track where we are in the tensor.
+      std::int64_t index = 0;
+
+      // The result of each slice.
       std::vector<torch::jit::Value *> slices;
 
-      for (std::int32_t index = 0; index < *dims[axis]; index += splitSize) {
-        newNode = Create_slice(graph, {node->inputs()[0]}, {index + splitSize},
+      // Slice up according to the canonicalised split vector.
+      for (std::int64_t sliceSize : sizeOfEachSplit) {
+        // Create a slice.
+        newNode = Create_slice(graph, {node->inputs()[0]}, {index + sliceSize},
                                {index}, {axis});
+
+        // Add the slice to the graph.
         newNode->insertBefore(node);
         slices.push_back(newNode->output());
+
+        // Move along in the vector dimension.
+        index += sliceSize;
       }
 
       newNode = graph.create(at::prim::ListConstruct, slices);

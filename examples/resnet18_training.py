@@ -36,38 +36,29 @@ training_data = torch.utils.data.DataLoader(
     shuffle=True,
     drop_last=True)
 
-model = models.resnet18(pretrained=False)
+
+class NormWrapper(torch.nn.Module):
+    def __init__(self, C):
+        super(NormWrapper, self).__init__()
+        self.layer = torch.nn.GroupNorm(1, C)
+
+    def forward(self, *input, **kwargs):
+        return self.layer(*input, **kwargs)
+
+
+model = models.resnet18(pretrained=False, norm_layer=NormWrapper)
 model.train()
 
-
-class printafterlayer(nn.Module):
-    def __init__(self, layer):
-        super(printafterlayer, self).__init__()
-        self.layer = layer
-
-    def __call__(self, x):
-        print(self.layer)
-        print("Input: " + str(x.size()))
-
-        o = self.layer(x)
-
-        print("Output: " + str(o.size()))
-        return o
-
-
-model.conv1 = printafterlayer(model.conv1)
-model.bn1 = printafterlayer(model.bn1)
-model.relu = printafterlayer(model.relu)
-
-#model.layer3 = poptorch.IPU(1, model.layer3)
-
 training_model = poptorch.trainingModel(
-    model, training_ipu_step_size, gradient_accumulation=gradient_accumulation)
+    model,
+    training_ipu_step_size,
+    gradient_accumulation=gradient_accumulation,
+    loss=torch.nn.NLLLoss())
 
 
 def train():
     for batch_number, (data, labels) in enumerate(training_data):
-        result = training_model((data, labels.int()))
+        result = training_model(data, labels)
 
         if batch_number % 10 == 0:
             # Pick the highest probability.

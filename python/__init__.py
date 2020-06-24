@@ -228,6 +228,7 @@ class PoplarExecutor:
 def trainingModel(model,
                   device_iterations,
                   gradient_accumulation=1,
+                  replication_factor=1,
                   profile=False,
                   trace_model=True,
                   loss=None,
@@ -253,20 +254,25 @@ def trainingModel(model,
             return output
 
     wrappedModel = ModelTrainingWrapper(model, loss)
-    return PoplarExecutor(wrappedModel,
-                          True,
-                          device_iterations,
+    return PoplarExecutor(model=wrappedModel,
+                          training=True,
+                          device_iterations=device_iterations,
                           gradient_accumulation=gradient_accumulation,
+                          replication_factor=replication_factor,
                           profile=profile,
                           trace_model=trace_model,
                           optimizer=optimizer)
 
 
-def inferenceModel(model, device_iterations=1, profile=False,
+def inferenceModel(model,
+                   device_iterations=1,
+                   replication_factor=1,
+                   profile=False,
                    trace_model=True):
-    return PoplarExecutor(model,
-                          False,
-                          device_iterations,
+    return PoplarExecutor(model=model,
+                          training=False,
+                          replication_factor=replication_factor,
+                          device_iterations=device_iterations,
                           profile=profile,
                           trace_model=trace_model)
 
