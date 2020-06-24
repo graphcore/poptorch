@@ -49,7 +49,6 @@ for i in range(0, batches):
                                         context,
                                         max_length=110,
                                         pad_to_max_length='right')
-    print(len(encoding[i]["input_ids"]))
     input_ids[i], attention_mask[i] = encoding[i]["input_ids"], encoding[i][
         "attention_mask"]
     batch_list.append(input_ids[i])
@@ -58,9 +57,11 @@ for i in range(0, batches):
 input_batch = torch.tensor(batch_list)
 attention_batch = torch.tensor(atten_list)
 
+print(input_batch.size())
 # Execute on IPU.
 start_score_pop, end_scores_pop = inference_model(input_batch, attention_batch)
 
+print("Context: " + context)
 index = 0
 for start_score, end_score in zip(start_score_pop, end_scores_pop):
     answer_ids = input_ids[index][torch.argmax(start_score

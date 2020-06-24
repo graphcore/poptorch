@@ -367,10 +367,10 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
   // TODO(T22642): Make an actual device selection mechanism.
   std::shared_ptr<popart::DeviceInfo> device =
       popart::DeviceManager::createDeviceManager().acquireAvailableDevice(
-          impl->usedIpus.size());
+          impl->usedIpus.size() * impl->replicationFactor);
 
   if (!device) {
-    logging::debug(
+    logging::warn(
         "No IPU device found, falling back to CPU emulator (IPU Model)");
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
   } else {
@@ -380,6 +380,12 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
   popart::SessionOptions options;
 
   options.logDir = ".";
+
+  options.enableReplicatedGraphs = impl->replicationFactor != 1;
+  options.replicatedGraphCount = impl->replicationFactor;
+
+  logging::info("Popart replication enabled: {} with factor set to {}",
+                options.enableReplicatedGraphs, options.replicatedGraphCount);
 
   if (impl->usedIpus.size() > 1) {
     options.enablePipelining = true;

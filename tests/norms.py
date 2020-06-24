@@ -87,3 +87,23 @@ def test_layerNormPretrainedWeights():
     outputs = model(input)
 
     assert torch.allclose(poptorchOut, outputs, rtol=1e-4, atol=1e-6)
+
+
+def test_groupNorm():
+    torch.manual_seed(42)
+
+    for i in range(1, 4):
+        input = torch.randn([3, 10, 5, 2])
+
+        groupNorm = torch.nn.GroupNorm(5, 10)
+
+        # Run pytorch native on CPU.
+        nativeOutput = groupNorm(input)
+
+        # Run on IPU.
+        ipuModel = poptorch.inferenceModel(groupNorm)
+        poptorchOut = ipuModel(input)
+
+        # Group norm is pending correctness changes in popart/poplar so we will just test the shape/type for now.
+        assert poptorchOut.size() == nativeOutput.size()
+        assert poptorchOut.type() == nativeOutput.type()

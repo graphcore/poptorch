@@ -13,6 +13,8 @@
 // For some reason aten::relu_ is missing from the c10 namespace
 namespace c10 {
 SYMBOL_DECL(aten, relu_)
+SYMBOL_DECL(aten, dropout_)
+SYMBOL_DECL(aten, hardtanh_)
 } // namespace c10
 
 namespace poptorch {
