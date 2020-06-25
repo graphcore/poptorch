@@ -51,12 +51,23 @@ std::vector<at::IValue> PoplarExecutable::Run(
     }
     dims[0] *= compiler.PopartBatchDim();
 
-    // Create the torch tensor and use its memory for the popart tensor.
-    torchOutputs[id] = at::empty({dims});
-    float *dataPtr =
-        static_cast<float *>(torchOutputs[id].toTensor().data_ptr());
+    poptorch::PopartTypes type = compiler.GetPopartType(id);
 
-    compiler.SetUpOutputOp(id, dataPtr, dims);
+    // Create the torch tensor and use its memory for the popart tensor.
+    if (type == poptorch::PopartTypes::FLOAT) {
+      torchOutputs[id] = at::empty({dims}, at::ScalarType::Float);
+      float *dataPtr =
+          static_cast<float *>(torchOutputs[id].toTensor().data_ptr());
+
+      compiler.SetUpOutputOp(id, dataPtr, dims);
+    } else if (type == poptorch::PopartTypes::INT32 ||
+               type == poptorch::PopartTypes::UINT32) {
+      torchOutputs[id] = at::empty({dims}, at::ScalarType::Int);
+      std::int32_t *dataPtr =
+          static_cast<std::int32_t *>(torchOutputs[id].toTensor().data_ptr());
+
+      compiler.SetUpOutputOp(id, dataPtr, dims);
+    }
   }
 
   // Execute the compiled poplar graph.
