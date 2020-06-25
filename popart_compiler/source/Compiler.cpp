@@ -508,6 +508,19 @@ void Compiler::Run(const Optimizer &optimizer) {
   impl->memoryManager.clear();
 }
 
+poptorch::PopartTypes Compiler::GetPopartType(poptorch::TensorId tensor) const {
+  popart::TensorInfo info = impl->session->getInfo(impl->ids[tensor]);
+
+  if (info.dataType() == popart::DataType::FLOAT) {
+    return poptorch::PopartTypes::FLOAT;
+  } else if (info.dataType() == popart::DataType::INT32 ||
+             info.dataType() == popart::DataType::UINT32) {
+    return poptorch::PopartTypes::INT32;
+  }
+
+  ERROR("Unsupported popart type in return: " << info.data_type());
+}
+
 std::vector<std::int64_t> Compiler::GetSize(poptorch::TensorId id) {
   popart::TensorInfo info = impl->session->getInfo(impl->ids[id]);
 

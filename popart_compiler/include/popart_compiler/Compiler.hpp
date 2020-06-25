@@ -21,6 +21,30 @@ struct CompilerImpl;
 
 enum OptimizerType : std::uint8_t { NONE, SGD };
 
+// Taken directly from popart.
+enum PopartTypes {
+  // fixed point types
+  UINT8 = 0,
+  INT8,
+  UINT16,
+  INT16,
+  INT32,
+  INT64,
+  UINT32,
+  UINT64,
+  BOOL,
+  // floating point types
+  FLOAT,
+  FLOAT16,
+  BFLOAT16,
+  DOUBLE,
+  COMPLEX64,
+  COMPLEX128,
+  // other types
+  STRING,
+  UNDEFINED,
+};
+
 // Extract the value from the map or return zero.
 static std::pair<float, bool> FindInMapOrZero(
     const std::unordered_map<std::string, std::pair<float, bool>> &opts,
@@ -135,6 +159,9 @@ public:
   void SetActiveIpu(std::uint64_t id);
 
   void InitSession(bool profile, const Optimizer &opt);
+
+  // Return the type of the given tensor.
+  PopartTypes GetPopartType(poptorch::TensorId tensor) const;
 
   /*
    * Execute the compiled popart graph using poplar. An optimizer can be

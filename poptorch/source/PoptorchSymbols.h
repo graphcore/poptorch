@@ -15,6 +15,9 @@ namespace c10 {
 SYMBOL_DECL(aten, relu_)
 SYMBOL_DECL(aten, dropout_)
 SYMBOL_DECL(aten, hardtanh_)
+SYMBOL_DECL(aten, logical_not)
+SYMBOL_DECL(aten, floor_divide)
+SYMBOL_DECL(aten, true_divide)
 } // namespace c10
 
 namespace poptorch {

@@ -38,6 +38,10 @@ private:
 
   template <typename T> std::optional<T> HandleConstant(torch::jit::Node *node);
 
+  template <typename T>
+  torch::jit::Value *HandleParamOrConstant(torch::jit::Graph &graph,
+                                           torch::jit::Value *operand);
+
   // Turn a parameter constant into an IR constant.
   torch::jit::Node *CreateIRConstant(torch::jit::Graph &graph,
                                      torch::jit::Value *node);
@@ -165,6 +169,11 @@ bool CanonicalizeImpl::IsNone(torch::jit::Node *node) const {
 
 template <typename T>
 std::optional<T> CanonicalizeImpl::HandleConstant(torch::jit::Node *node) {
+  // Lists should be explicitly handled in handle list construct.
+  if (node->kind() == c10::prim::ListConstruct) {
+    return std::nullopt;
+  }
+
   if (node->kind() != c10::prim::Constant && CanBeConstFolded(node)) {
     if constexpr (std::is_integral<T>::value) {
       return FoldConstant<T>(node);
@@ -182,6 +191,24 @@ std::optional<T> CanonicalizeImpl::HandleConstant(torch::jit::Node *node) {
   }
 
   return Handle<T>{}(sym, node);
+}
+
+template <typename T>
+torch::jit::Value *
+CanonicalizeImpl::HandleParamOrConstant(torch::jit::Graph &graph,
+                                        torch::jit::Value *operand) {
+  torch::jit::Value *valueToReturn = operand;
+  torch::jit::Node *constant = CreateIRConstant(graph, operand);
+
+  if (constant) {
+    constant->insertBefore(operand->node());
+
+    torch::jit::Node *cast = CastToType<T>(graph, constant->output());
+    cast->insertAfter(constant);
+    valueToReturn = cast->output();
+  }
+
+  return valueToReturn;
 }
 
 template <typename T>
@@ -243,7 +270,7 @@ torch::jit::Node *CanonicalizeImpl::CreateIRConstant(torch::jit::Graph &graph,
                                 {1});
   }
 
-  ERROR("Unsupported type in CreateIRConstant");
+  // Legal to return null means |value| was not a constant.
   return nullptr;
 }
 
@@ -354,6 +381,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 #define COMMA ,
 #define NONE
 
+#define PARAM_OR_CONSTANT(Index, Type)                                         \
+  HandleParamOrConstant<Type>(graph, node->inputs()[Index])
 // Handle all supported scalar values and pass the correct C++ type to the given
 // body.
 #define ANY_SCALAR_CONSTANT_HANDLER(Body)                                      \
@@ -574,6 +603,50 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       }
 
       newNode = Create_softmax(graph, {node->inputs()[0]}, dim);
+    } else if (kind == c10::aten::log10) {
+      // Log10(X) = Log(X) / Log(10)
+
+      // Add log(x)
+      torch::jit::Node *logx = Create_log(graph, {node->inputs()[0]});
+      logx->insertBefore(node);
+
+      // Add log10
+      const double log10Const =
+          2.302585092994045684017991454684364207601101488628772976033;
+      torch::jit::Node *log10 = Create_ConstantFloat(graph, {log10Const}, {});
+      log10->insertBefore(node);
+
+      // Add the divide.
+      newNode = Create_div(graph, {logx->output(), log10->output()});
+    } else if (kind == c10::aten::log1p) {
+      // Log1p(x) = log(x + 1)
+
+      // Add the one constant
+      torch::jit::Node *one = Create_ConstantFloat(graph, {1.0}, {});
+      one->insertBefore(node);
+
+      // Add x + 1
+      torch::jit::Node *add =
+          Create_add(graph, {node->inputs()[0], one->output()});
+      add->insertBefore(node);
+
+      // Add the log
+      newNode = Create_log(graph, {add->output()});
+    } else if (kind == c10::aten::log2) {
+      // Log2(X) = Log(X) / Log(2)
+
+      // Add log(x)
+      torch::jit::Node *logx = Create_log(graph, {node->inputs()[0]});
+      logx->insertBefore(node);
+
+      // Add log2
+      const double log2Const =
+          0.693147180559945309417232121458176568075500134360255254120;
+      torch::jit::Node *log2 = Create_ConstantFloat(graph, {log2Const}, {});
+      log2->insertBefore(node);
+
+      // Add the divide.
+      newNode = Create_div(graph, {logx->output(), log2->output()});
     } else if (kind == c10::aten::log_softmax) {
       // "aten::log_softmax(Tensor self, int dim, int? dtype) -> Tensor"
 
@@ -1029,7 +1102,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // Split size can either be the number of splits or the size of the
       // splits.
       std::optional<std::int64_t> splitSize =
-          HandleConstant<std::int64_t>(node->input(0)->node());
+          HandleConstant<std::int64_t>(node->input(1)->node());
 
       if (kind == c10::aten::chunk) {
         // Chunk takes in the *number of chunks*. Canonicalise it to *size of
@@ -1058,7 +1131,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           sizeOfEachSplit.push_back(*dims[axis] % *splitSize);
         }
       } else {
-        sizeOfEachSplit = HandleList<std::int64_t>(node->input(0)->node());
+        sizeOfEachSplit = HandleList<std::int64_t>(node->input(1)->node());
       }
 
       // Rolling index to track where we are in the tensor.
@@ -1150,6 +1223,175 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       self->insertBefore(node);
 
       newNode = Create_add(graph, {self->output(), update->output()});
+    } else if (kind == c10::aten::rsqrt) {
+      // rsqrt =  1 / sqrt(x)
+      torch::jit::Node *sqrt = Create_sqrt(graph, {node->input()});
+      sqrt->insertBefore(node);
+
+      newNode = Create_reciprocal(graph, {sqrt->output()});
+    } else if (kind == c10::aten::expm1) {
+      // expm1 = exp(x) - 1
+
+      // exp(x)
+      torch::jit::Node *exp = Create_exp(graph, {node->input()});
+      exp->insertBefore(node);
+
+      // Add the one constant
+      torch::jit::Node *one = Create_ConstantFloat(graph, {1.0}, {});
+      one->insertBefore(node);
+
+      newNode = Create_sub(graph, {exp->output(), one->output()});
+    } else if (kind == c10::aten::trunc) {
+      // Drop the exponent by casting to int and back.
+      torch::jit::Node *toInt = Create_Cast(graph, node->input(), c10::kInt);
+      toInt->insertBefore(node);
+
+      newNode = Create_Cast(graph, toInt->output(), c10::kFloat);
+
+    } else if (kind == c10::aten::frac) {
+      // Frac(x) = x - trunc(x)
+
+      // Drop the exponent by casting to int and back.
+      torch::jit::Node *toInt = Create_Cast(graph, node->input(), c10::kInt);
+      toInt->insertBefore(node);
+
+      torch::jit::Node *trunc =
+          Create_Cast(graph, toInt->output(), c10::kFloat);
+      trunc->insertBefore(node);
+
+      newNode = Create_sub(graph, {node->input(), trunc->output()});
+    } else if (kind == c10::aten::round) {
+      // round(x) = trunc(x + sign(x)*0.5)
+
+      // Add 0.5 as constant.
+      torch::jit::Node *zeroPointFive = Create_ConstantFloat(graph, {0.5}, {});
+      zeroPointFive->insertBefore(node);
+
+      torch::jit::Node *sign = Create_sign(graph, {node->input()});
+      sign->insertBefore(node);
+
+      torch::jit::Node *broadcastBySign =
+          Create_mul(graph, {sign->output(), zeroPointFive->output()});
+      broadcastBySign->insertBefore(node);
+
+      torch::jit::Node *addition =
+          Create_add(graph, {node->input(), broadcastBySign->output()});
+      addition->insertBefore(node);
+
+      // Drop the exponent by casting to int and back.
+      torch::jit::Node *toInt =
+          Create_Cast(graph, addition->output(), c10::kInt);
+      toInt->insertBefore(node);
+
+      newNode = Create_Cast(graph, toInt->output(), c10::kFloat);
+    } else if (kind == c10::aten::floor_divide) {
+      // aten::floor_divide(Tensor x, Tensor y) -> Tensor
+      // floor_divide(x, y) = floor(x)/floor(y)
+
+      torch::jit::Node *x = Create_floor(graph, {node->inputs()[0]});
+      torch::jit::Node *y = Create_floor(graph, {node->inputs()[1]});
+      x->insertBefore(node);
+      y->insertBefore(node);
+
+      newNode = Create_div(graph, {x->output(), y->output()});
+
+    } else if (kind == c10::aten::true_divide) {
+      // aten::true_divide(Tensor x, Tensor y) -> Tensor
+      // true_divide(x, y) = (float)x / (float)y
+
+      torch::jit::Node *x = Create_Cast(graph, node->inputs()[0], c10::kFloat);
+      x->insertBefore(node);
+
+      torch::jit::Node *y = Create_Cast(graph, node->inputs()[1], c10::kFloat);
+      y->insertBefore(node);
+
+      newNode = Create_div(graph, {x->output(), y->output()});
+    } else if (kind == c10::aten::argmax || kind == c10::aten::argmin) {
+      // clang-format off
+      //  aten::argmin(Tensor in, int? dim, int keep_dims) -> Tensor
+      //  aten::argmax(Tensor in, int? dim, int keep_dims) -> Tensor
+      // dim (int) – the dimension to reduce. If None, the argmax
+      //             of the flattened input is returned.
+      // clang-format on
+
+      torch::jit::Value *input = node->input(0);
+      std::optional<std::int64_t> dim =
+          HandleConstant<std::int64_t>(node->inputs()[1]->node());
+      std::int64_t keepDim =
+          *HandleConstant<std::int64_t>(node->inputs()[2]->node());
+
+      // If dim is not provided we will flatten input so just use 0 in that
+      // case.
+      std::int64_t dimToUse = 1;
+
+      // Check if dim is NONE.
+      if (!dim) {
+        torch::jit::Node *flatten =
+            Create_flatten(graph, {node->inputs()[0]}, 0);
+        flatten->insertBefore(node);
+        input = flatten->output();
+      } else {
+        dimToUse = *dim;
+      }
+
+      // Create the actual argmax/argmin.
+      if (kind == c10::aten::argmax) {
+        newNode = Create_argmax(graph, {input}, dimToUse, keepDim);
+      } else {
+        newNode = Create_argmin(graph, {input}, dimToUse, keepDim);
+      }
+
+    } else if (kind == c10::aten::prod || kind == c10::aten::mean ||
+               kind == c10::aten::sum || kind == c10::aten::logsumexp) {
+      // clang-format off
+
+      // Reductions have two overloads. The first is:
+      // aten::mean(Tensor self, int[] dim, int keepdim, Tensor? out)) -> tensor
+
+      // The second is:
+      // aten::mean(Tensor self, int? dtype)) -> tensor
+
+      // clang-format on
+
+      torch::jit::Value *input = node->input(0);
+
+      std::vector<std::int64_t> axes{};
+      std::int64_t keepdim = 0;
+
+      // Case 2.
+      if (node->inputs().size() == 2) {
+        torch::jit::Node *flatten =
+            Create_flatten(graph, {node->inputs()[0]}, 0);
+        flatten->insertBefore(node);
+        input = flatten->output();
+        axes = {1};
+      } else {
+        // Case 1.
+        // Sometimes the dimensions are just one int.
+        std::optional<std::int64_t> asInt =
+            HandleConstant<std::int64_t>(node->inputs()[1]->node());
+
+        if (asInt) {
+          axes.push_back(*asInt);
+        } else {
+          axes = HandleListConstruct<std::int64_t>(node->inputs()[1]->node());
+        }
+
+        keepdim = *HandleConstant<std::int64_t>(node->inputs()[2]->node());
+      }
+
+      // Output the correct reduction.
+      if (kind == c10::aten::prod) {
+        newNode = Create_reduceprod(graph, {input}, axes, keepdim);
+      } else if (kind == c10::aten::mean) {
+        newNode = Create_reducemean(graph, {input}, axes, keepdim);
+      } else if (kind == c10::aten::sum) {
+        newNode = Create_reducesum(graph, {input}, axes, keepdim);
+      } else if (kind == c10::aten::logsumexp) {
+        newNode = Create_reducelogsumexp(graph, {input}, axes, keepdim);
+      } else {
+        ERROR("Popart Canonicalisation: UNREACHABLE reached in reductions.");
+      }
     }
 
     // If we have a new node add it and replace the old use.
