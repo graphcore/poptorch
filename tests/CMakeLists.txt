@@ -17,6 +17,7 @@ add_poptorch_py_unit_test(optimizers)
 add_poptorch_py_unit_test(resnets_inference)
 add_poptorch_py_unit_test(shape_inference)
 add_poptorch_py_unit_test(inputs)
+add_poptorch_py_unit_test(weights_writing)
 
 #############
 # C++ tests #

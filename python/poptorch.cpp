@@ -79,6 +79,30 @@ void buildTensorList(const torch::jit::IValue &value,
 
 } // namespace
 
+void copyWeightsToHost_impl(
+    std::shared_ptr<poptorch::PoplarExecutable> executable) {
+  // Copy the weights or warn if this is before first time compilation.
+  if (!executable) {
+    logging::warn(
+        "Call to copyWeightsToHost ignored as model has not been compiled "
+        "(Poptorch will compile models on first invocation).");
+  } else {
+    executable->CopyWeightsToHost();
+  }
+}
+
+void copyWeightsToDevice_impl(
+    std::shared_ptr<poptorch::PoplarExecutable> executable) {
+  // Copy the weights or warn if this is before first time compilation.
+  if (!executable) {
+    logging::warn(
+        "Call to copyWeightsToDevice ignored as model has not been compiled "
+        "(Poptorch will compile models on first invocation).");
+  } else {
+    executable->CopyWeightsToDevice();
+  }
+}
+
 std::vector<pybind11::object>
 execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
         pybind11::tuple inputs, py::dict *optimizerDict) {
@@ -296,4 +320,6 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
   m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);
   m.def("canonicalize", poptorch::pyCanonicalize);
+  m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDevice_impl);
+  m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHost_impl);
 }

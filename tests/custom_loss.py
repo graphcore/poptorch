@@ -44,6 +44,9 @@ def test_custom_loss():
     assert loss < 0.001
     assert torch.allclose(out, target, rtol=1e-02, atol=1e-02)
 
+    # Copy weights back to host.
+    poptorch_model.copyWeightsToHost()
+
     # Check that the pytorch native model is also returning the trained
     # value that was trained on IPU.
     out = model(input)

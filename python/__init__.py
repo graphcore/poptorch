@@ -158,6 +158,14 @@ class PoplarExecutor:
         self.optimizer = optimizer
         self.new_optimizer = optimizer
 
+    # Copy weights from the device into the memory of the model given on wrapper creation.
+    def copyWeightsToHost(self):
+        copyWeightsToHost_impl(self.executable)
+
+    # Write from host memory to IPU memory. This is done automatically on compilation so should be rarely used.
+    def copyWeightsToDevice(self):
+        copyWeightsToDevice_impl(self.executable)
+
     def setOptimizer(self, optimizer):
         self.new_optimizer = optimizer
 

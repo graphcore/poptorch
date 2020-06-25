@@ -462,16 +462,26 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
     stream.close();
   }
 
+  // Write the weights immediately after compilation to the IPU.
+  CopyWeightsToDevice();
+}
+
+// Write the weights into IPU memory from the pytorch tensor buffers in the
+// model.
+void Compiler::CopyWeightsToDevice() {
+  logging::info("Writing weights from host to IPU memory.");
   impl->session->weightsFromHost();
+  impl->session->writeWeights(impl->weightCallback);
+}
+
+// Read the weights from IPU memory into the pytorch tensor buffers.
+void Compiler::CopyWeightsToHost() {
+  logging::info("Writing weights from IPU to host.");
+  impl->session->weightsToHost();
+  impl->session->readWeights(impl->weightCallback);
 }
 
 void Compiler::Run(const Optimizer &optimizer) {
-  // TODO(T22644) don't do this everytime.
-  if (!impl->isTraining) {
-    impl->session->weightsFromHost();
-    impl->session->writeWeights(impl->weightCallback);
-  }
-
   if (optimizer.type != OptimizerType::NONE && impl->isTraining) {
     // Convert the map from the user into a popart SGD class.
     auto newOptimizer = popart::SGD(
@@ -495,12 +505,6 @@ void Compiler::Run(const Optimizer &optimizer) {
   // Execute the model on IPU.
   popart::StepIO stepio(impl->popartIncoming, impl->popartOutgoing);
   impl->session->run(stepio);
-
-  // TODO(T22644) don't do this everytime.
-  if (impl->isTraining) {
-    impl->session->weightsToHost();
-    impl->session->readWeights(impl->weightCallback);
-  }
 
   // The buffers handle the communication between pytorch and popart, we set
   // them up each run.

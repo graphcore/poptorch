@@ -82,4 +82,10 @@ std::vector<at::IValue> PoplarExecutable::Run(
   return returnees;
 }
 
+// Tell popart to copy weights off the IPU and write into host memory.
+void PoplarExecutable::CopyWeightsToHost() { compiler.CopyWeightsToHost(); }
+
+// Tell popart to copy weights from host into IPU memory.
+void PoplarExecutable::CopyWeightsToDevice() { compiler.CopyWeightsToDevice(); }
+
 } // namespace poptorch

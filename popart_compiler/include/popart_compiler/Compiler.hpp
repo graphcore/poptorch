@@ -160,6 +160,13 @@ public:
 
   void InitSession(bool profile, const Optimizer &opt);
 
+  // Write the weights into IPU memory from the pytorch tensor buffers in the
+  // model.
+  void CopyWeightsToDevice();
+
+  // Read the weights from IPU memory into the pytorch tensor buffers.
+  void CopyWeightsToHost();
+
   // Return the type of the given tensor.
   PopartTypes GetPopartType(poptorch::TensorId tensor) const;
 
