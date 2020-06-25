@@ -17,6 +17,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Peephole.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/EliminateListConstructs.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/WarnOnUnsupportedAten.cpp"
   )
 
 pybind11_add_module(poptorch_core SHARED SYSTEM

@@ -370,8 +370,9 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
           impl->usedIpus.size() * impl->replicationFactor);
 
   if (!device) {
-    logging::warn(
-        "No IPU device found, falling back to CPU emulator (IPU Model)");
+    logging::warn("No IPU device found, falling back to CPU emulator (IPU "
+                  "Model) number of IPUs requested {}",
+                  impl->usedIpus.size() * impl->replicationFactor);
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
   } else {
     logging::debug("Acquired IPU device, running on device.");

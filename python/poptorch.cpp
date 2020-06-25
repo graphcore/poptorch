@@ -163,6 +163,9 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
   // Enforce any constraints that aren't enforced by popart.
   poptorch::CanonicalizeLate(*graph);
 
+  // Warn the user if any operations couldn't be canonicalised.
+  poptorch::WarnOnUnsupportedAten(*graph);
+
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
 

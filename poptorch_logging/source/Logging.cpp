@@ -83,7 +83,7 @@ LoggingContext::LoggingContext() {
 
   // Get logging level from OS ENV. The default level is off.
   Level defaultLevel =
-      logLevelFromString(POPTORCH_LOG_LEVEL ? POPTORCH_LOG_LEVEL : "OFF");
+      logLevelFromString(POPTORCH_LOG_LEVEL ? POPTORCH_LOG_LEVEL : "WARN");
 
   if (logDest == "stdout") {
     auto sink = std::shared_ptr<spdlog::sinks::ansicolor_stdout_sink_mt>();

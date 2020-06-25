@@ -300,7 +300,6 @@ void CanonicalizeImpl::SearchAndPossiblyDestroy(torch::jit::Node *node) {
 void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
   for (torch::jit::Node *node : graph.nodes()) {
     torch::jit::Node *newNode = nullptr;
-
     torch::jit::Symbol kind = node->kind();
 
     // We have a dummy if statement so we can daisy chain the rest of the "else
