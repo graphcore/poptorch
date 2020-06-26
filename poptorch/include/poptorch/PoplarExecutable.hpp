@@ -38,6 +38,8 @@ public:
   // Tell popart to copy weights from host into IPU memory.
   void CopyWeightsToDevice();
 
+  const std::vector<OutputType> &OutputTypes() const;
+
 private:
   poptorch::Compiler compiler;
 

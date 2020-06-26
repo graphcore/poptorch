@@ -45,8 +45,11 @@ public:
 
   // Output tensors for the session.
   std::map<popart::TensorId, popart::IArray &> popartOutgoing;
+  std::map<popart::TensorId, std::vector<void *>> outgoingDuplicates;
 
   std::list<popart::TensorId> outputs;
+  // Flat representation of the output shapes
+  std::vector<OutputType> outputTypes;
 
   // A list to allocate our buffers in so they get released.
   std::list<std::unique_ptr<popart::IArray>> memoryManager;
@@ -308,7 +311,7 @@ Compiler::AddInitializedInputTensor(const char *name, const char *type,
   return impl->ids.size() - 1;
 }
 
-void Compiler::AddOutput(poptorch::TensorId output) {
+void Compiler::AddOutputTensor(poptorch::TensorId output) {
   impl->outputs.push_back(impl->ids[output]);
 
   impl->anchors.insert({impl->ids[output], popart::AnchorReturnType("ALL")});
@@ -347,8 +350,14 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, float *ptr,
   impl->memoryManager.push_back(std::make_unique<popart::NDArrayWrapper<float>>(
       static_cast<float *>(ptr), dims));
 
-  impl->popartOutgoing.insert(
-      {impl->ids[id], *impl->memoryManager.back().get()});
+  popart::TensorId popartId = impl->ids[id];
+  if (!impl->popartOutgoing
+           .insert({popartId, *impl->memoryManager.back().get()})
+           .second) {
+    // Insertion in the map failed because there is already a pointer associated
+    // with that id.
+    impl->outgoingDuplicates[popartId].push_back(ptr);
+  }
 }
 
 void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
@@ -358,8 +367,14 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
       std::make_unique<popart::NDArrayWrapper<std::int32_t>>(
           static_cast<std::int32_t *>(ptr), dims));
 
-  impl->popartOutgoing.insert(
-      {impl->ids[id], *impl->memoryManager.back().get()});
+  popart::TensorId popartId = impl->ids[id];
+  if (!impl->popartOutgoing
+           .insert({popartId, *impl->memoryManager.back().get()})
+           .second) {
+    // Insertion in the map failed because there is already a pointer associated
+    // with that id.
+    impl->outgoingDuplicates[popartId].push_back(ptr);
+  }
 }
 
 void Compiler::InitSession(bool profile, const Optimizer &opt) {
@@ -506,10 +521,20 @@ void Compiler::Run(const Optimizer &optimizer) {
   popart::StepIO stepio(impl->popartIncoming, impl->popartOutgoing);
   impl->session->run(stepio);
 
+  // In case several outputs point at the same tensor: duplicate the data
+  for (auto out : impl->outgoingDuplicates) {
+    auto &src = impl->popartOutgoing.at(out.first);
+    for (auto ptr : out.second) {
+      std::memcpy(ptr, src.data(),
+                  src.nelms() *
+                      popart::getDataTypeInfoMap().at(src.dataType()).nbytes());
+    }
+  }
   // The buffers handle the communication between pytorch and popart, we set
   // them up each run.
   impl->popartIncoming.clear();
   impl->popartOutgoing.clear();
+  impl->outgoingDuplicates.clear();
   impl->memoryManager.clear();
 }
 
@@ -524,6 +549,10 @@ poptorch::PopartTypes Compiler::GetPopartType(poptorch::TensorId tensor) const {
   }
 
   ERROR("Unsupported popart type in return: " << info.data_type());
+}
+
+bool Compiler::TensorIdIsValid(poptorch::TensorId id) const {
+  return id < impl->ids.size();
 }
 
 std::vector<std::int64_t> Compiler::GetSize(poptorch::TensorId id) {
@@ -553,5 +582,13 @@ Compiler::Compiler(bool isTraining, std::uint64_t steps,
 }
 
 Compiler::~Compiler() {}
+
+void Compiler::AddOutputType(OutputType type) {
+  impl->outputTypes.emplace_back(type);
+}
+
+const std::vector<OutputType> &Compiler::OutputTypes() const {
+  return impl->outputTypes;
+}
 
 } // namespace poptorch

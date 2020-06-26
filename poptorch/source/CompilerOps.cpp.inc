@@ -25,7 +25,7 @@ newNode->f_(c10::Symbol::fromQualString("attr::scale"),scale);
 return newNode;
 }
 torch::jit::Node* Create_lstm(torch::jit::Graph &graph,  const std::vector<torch::jit::Value *>& args,int64_t outputFullSequence) {
- torch::jit::Node *newNode = graph.create(Symbols::popart::lstm, args);
+ torch::jit::Node *newNode = graph.create(Symbols::popart::lstm, args, 2);
 newNode->i_(c10::Symbol::fromQualString("attr::outputFullSequence"),outputFullSequence);
 return newNode;
 }
@@ -573,7 +573,7 @@ newNode->i_(c10::Symbol::fromQualString("attr::blocksize"),blocksize);
 return newNode;
 }
 torch::jit::Node* Create_split(torch::jit::Graph &graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,int64_t axis,const std::vector<int64_t> & split) {
- torch::jit::Node *newNode = graph.create(Symbols::popart::split, args);
+ torch::jit::Node *newNode = graph.create(Symbols::popart::split, args, num_outputs);
 newNode->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
 newNode->i_(c10::Symbol::fromQualString("attr::axis"),axis);
 newNode->is_(c10::Symbol::fromQualString("attr::split"),split);
