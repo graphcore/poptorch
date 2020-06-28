@@ -1,13 +1,14 @@
-PopTorch User Guide
-===================
+PyTorch for the IPU: User Guide
+===============================
 
 .. gcdoc::
     :verb-borders:
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 4
 
     intro
     installation
     overview
+    batching
     example

@@ -4,8 +4,6 @@ Installation
 PopTorch is part of the Poplar SDK.  It is packaged as a Python wheel
 file that can be installed using ``pip``.
 
-PopTorch requires Python 3.6 or later.
-
 For more information about installing the Poplar SDK, see the Getting Started
 Guide for your IPU system.
 
@@ -42,8 +40,9 @@ Validating the setup
 ____________________
 
 You can run this simple example to verify that the system is working as
-expected. This example, and the others in this document can be found in
-the Poplar SDK installation.
+expected. This example can be found in the Poplar SDK installation.
 
 .. literalinclude:: ../../examples/simple_adder.py
+  :caption: Simple adder example
   :language: python
+  :linenos:
