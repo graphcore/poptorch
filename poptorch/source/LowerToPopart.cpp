@@ -26,7 +26,9 @@ public:
 
   poptorch::TensorId Tensor(torch::jit::Value *value) const;
   const TensorList &Tuple(torch::jit::Value *value) const;
-  bool IsTuple(torch::jit::Value *value) const;
+  // Return the list of tensors without checking if it's a tuple or a single
+  // tensor.
+  const TensorList &Tensors(torch::jit::Value *value) const;
 
   void SetTensor(torch::jit::Value *value, poptorch::TensorId id);
   void SetTuple(torch::jit::Value *value, const TensorList &tuple);
@@ -43,12 +45,6 @@ private:
   std::unordered_map<torch::jit::Value *, Data> map;
 };
 
-bool ValueMap::IsTuple(torch::jit::Value *value) const {
-  auto it = map.find(value);
-  ERROR_ON_MSG(it == map.end(), value->debugName() << " not found in ValueMap");
-  return it->second.isTuple;
-}
-
 poptorch::TensorId ValueMap::Tensor(torch::jit::Value *value) const {
   auto it = map.find(value);
   ERROR_ON_MSG(it == map.end(), value->debugName() << " not found in ValueMap");
@@ -61,6 +57,12 @@ const ValueMap::TensorList &ValueMap::Tuple(torch::jit::Value *value) const {
   auto it = map.find(value);
   ERROR_ON_MSG(it == map.end(), value->debugName() << " not found in ValueMap");
   ERROR_ON_MSG(!it->second.isTuple, value->debugName() << " is not a tuple");
+  return it->second.tensors;
+}
+
+const ValueMap::TensorList &ValueMap::Tensors(torch::jit::Value *value) const {
+  auto it = map.find(value);
+  ERROR_ON_MSG(it == map.end(), value->debugName() << " not found in ValueMap");
   return it->second.tensors;
 }
 
@@ -167,15 +169,53 @@ void LowerToPopart::Lower() {
 }
 
 void LowerToPopart::LowerReturn() {
+  compiler.AddOutputType({OutputType::Type::Tuple,
+                          static_cast<std::int64_t>(graph.outputs().size())});
+  // Recursively go through the output's type to
+  // flatten its structure.
+  // In the flat representation each 0 represent a
+  // tensor, and each non zero value represent a
+  // tuple of that size.
+  // e.g: (T0, T1, (T2, T3), T4)
+  // [ 4, 0, 0, 2, 0, 0, 0 ]
+  std::function<void(c10::TypePtr)> processType;
+  processType = [&](c10::TypePtr type) {
+    switch (type->kind()) {
+    case c10::TypeKind::TensorType: {
+      compiler.AddOutputType({OutputType::Type::Tensor});
+      break;
+    }
+    case c10::TypeKind::TupleType: {
+      auto tuple = type->expect<c10::TupleType>();
+      compiler.AddOutputType(
+          {OutputType::Type::Tuple,
+           static_cast<std::int64_t>(tuple->elements().size())});
+      for (auto eltType : tuple->elements()) {
+        processType(eltType);
+      }
+      break;
+    }
+    default:
+      ERROR("Unsupported output type '" << c10::typeKindToString(type->kind()));
+    }
+  };
   for (torch::jit::Value *value : graph.outputs()) {
-    if (valueMap.IsTuple(value)) {
-      for (auto id : valueMap.Tuple(value)) {
-        compiler.AddOutput(id);
-        outputTensorHooks.push_back(id);
+    if (value->type()->kind() == c10::TypeKind::ListType) {
+      c10::TypeKind eltKind =
+          value->type()->expect<c10::ListType>()->getElementType()->kind();
+      ERROR_ON_MSG(eltKind != c10::TypeKind::TensorType,
+                   "Unsupported list type " << c10::typeKindToString(eltKind));
+      std::int64_t numTensors =
+          static_cast<std::int64_t>(valueMap.Tensors(value).size());
+      compiler.AddOutputType({OutputType::Type::List, numTensors});
+      for (std::int64_t i = 0; i < numTensors; ++i) {
+        compiler.AddOutputType({OutputType::Type::Tensor});
       }
     } else {
-      auto id = valueMap.Tensor(value);
-      compiler.AddOutput(id);
+      processType(value->type());
+    }
+    for (auto id : valueMap.Tensors(value)) {
+      compiler.AddOutputTensor(id);
       outputTensorHooks.push_back(id);
     }
   }
@@ -199,9 +239,18 @@ void LowerToPopart::LowerBody() {
                        return valueMap.Tensor(val);
                      });
 
-      torch::jit::Value *output = node->output();
       // Call the callback.
-      valueMap.SetTensor(output, itr->second(inputs, node));
+      poptorch::TensorId firstOutputTensor = itr->second(inputs, node);
+      // The callback only returns the ID of the first tensor, but we know
+      // the generated tensors have contiguous IDs, so we can infer the other
+      // IDs.
+      for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
+        torch::jit::Value *output = node->output(i);
+        poptorch::TensorId outputTensor = firstOutputTensor + i;
+        ERROR_ON_MSG(!compiler.TensorIdIsValid(outputTensor),
+                     "Output " << i << " doesn't exist of Node " << *node);
+        valueMap.SetTensor(output, outputTensor);
+      }
     } else if (kind == Symbols::poptorch::begin_ipu_block) {
       compiler.SetActiveIpu(node->i(c10::Symbol::fromQualString("attr::ipu")));
     } else if (kind == Symbols::poptorch::end_ipu_block) {
@@ -214,7 +263,9 @@ void LowerToPopart::LowerBody() {
       // Add the values to the value map.
       ValueMap::TensorList tuple;
       for (torch::jit::Value *ids : node->inputs()) {
-        tuple.push_back(valueMap.Tensor(ids));
+        for (auto tensor : valueMap.Tensors(ids)) {
+          tuple.push_back(tensor);
+        }
       }
       valueMap.SetTuple(output, tuple);
     } else if (kind == c10::prim::TupleUnpack ||

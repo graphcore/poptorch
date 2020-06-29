@@ -12,3 +12,4 @@ OP_DECL(poptorch, cast, cast, impl->cast, ARG(STRING, type), BODY_ARG(type))
 OP_DECL(poptorch, constant_pad, constant_pad, AiOnnxOpset9.pad,
         ARG(INT_VEC, pads) ARG(FLOAT, value),
         BODY_ARG(pads) BODY_ARG("constant") BODY_ARG(value))
+OP_DECL(poptorch, addNotInPlace, addNotInPlace, impl->addNotInPlace, NONE, NONE)

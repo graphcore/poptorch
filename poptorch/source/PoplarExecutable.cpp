@@ -40,7 +40,8 @@ std::vector<at::IValue> PoplarExecutable::Run(
   }
 
   // Temp buffers for the output state.
-  std::map<poptorch::TensorId, at::IValue> torchOutputs;
+  std::vector<at::IValue> returnees;
+  returnees.reserve(popartOutputs.size());
 
   // Set up the outputs.
   for (poptorch::TensorId id : popartOutputs) {
@@ -55,17 +56,16 @@ std::vector<at::IValue> PoplarExecutable::Run(
 
     // Create the torch tensor and use its memory for the popart tensor.
     if (type == poptorch::PopartTypes::FLOAT) {
-      torchOutputs[id] = at::empty({dims}, at::ScalarType::Float);
+      returnees.emplace_back(at::empty({dims}, at::ScalarType::Float));
       float *dataPtr =
-          static_cast<float *>(torchOutputs[id].toTensor().data_ptr());
+          static_cast<float *>(returnees.back().toTensor().data_ptr());
 
       compiler.SetUpOutputOp(id, dataPtr, dims);
     } else if (type == poptorch::PopartTypes::INT32 ||
                type == poptorch::PopartTypes::UINT32) {
-      torchOutputs[id] = at::empty({dims}, at::ScalarType::Int);
+      returnees.emplace_back(at::empty({dims}, at::ScalarType::Int));
       std::int32_t *dataPtr =
-          static_cast<std::int32_t *>(torchOutputs[id].toTensor().data_ptr());
-
+          static_cast<std::int32_t *>(returnees.back().toTensor().data_ptr());
       compiler.SetUpOutputOp(id, dataPtr, dims);
     }
   }
@@ -73,13 +73,16 @@ std::vector<at::IValue> PoplarExecutable::Run(
   // Execute the compiled poplar graph.
   compiler.Run(optimizerParameters);
 
-  std::vector<at::IValue> returnees;
-  // Return the outputs as pytorch tensors to the user.
-  for (auto &pair : torchOutputs) {
-    returnees.push_back(pair.second);
-  }
-
   return returnees;
 }
 
+// Tell popart to copy weights off the IPU and write into host memory.
+void PoplarExecutable::CopyWeightsToHost() { compiler.CopyWeightsToHost(); }
+
+// Tell popart to copy weights from host into IPU memory.
+void PoplarExecutable::CopyWeightsToDevice() { compiler.CopyWeightsToDevice(); }
+
+const std::vector<OutputType> &PoplarExecutable::OutputTypes() const {
+  return compiler.OutputTypes();
+}
 } // namespace poptorch

@@ -135,6 +135,8 @@ for opset in classes:
         jsonOutput[opset].pop(name)
 logger.debug("addedFunctions: %s" % addedFunctions)
 
+MultipleOutputsOps = {"lstm": "2", "split": "num_outputs"}
+
 CXXTypeToTypeClass = {
     # Scalar integers
     "int64_t": "INT",
@@ -270,7 +272,10 @@ for opset in classes:
 
         header += "Create_" + name + "(torch::jit::Graph &graph,  const std::vector<torch::jit::Value *>& args"
 
-        cppFile = " torch::jit::Node *newNode = graph.create(Symbols::popart::" + name + ", args);\n"
+        cppFile = " torch::jit::Node *newNode = graph.create(Symbols::popart::" + name + ", args"
+        if name in MultipleOutputsOps:
+            cppFile += ", %s" % MultipleOutputsOps[name]
+        cppFile += ");\n"
 
         args = jsonOutput[opset][name]["args"]
         for arg in args:

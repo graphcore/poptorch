@@ -32,6 +32,14 @@ public:
 
   bool ProfilingEnabled() const { return profile; }
 
+  // Tell popart to copy weights off the IPU and write into host memory.
+  void CopyWeightsToHost();
+
+  // Tell popart to copy weights from host into IPU memory.
+  void CopyWeightsToDevice();
+
+  const std::vector<OutputType> &OutputTypes() const;
+
 private:
   poptorch::Compiler compiler;
 

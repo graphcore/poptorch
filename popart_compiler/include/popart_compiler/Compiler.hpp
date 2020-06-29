@@ -45,6 +45,12 @@ enum PopartTypes {
   UNDEFINED,
 };
 
+struct OutputType {
+  enum class Type { Tensor, Tuple, List };
+  Type type;
+  int64_t numElements{0};
+};
+
 // Extract the value from the map or return zero.
 static std::pair<float, bool> FindInMapOrZero(
     const std::unordered_map<std::string, std::pair<float, bool>> &opts,
@@ -133,13 +139,17 @@ public:
   AddInitializedInputTensor(const char *name, const char *type,
                             const std::vector<std::int64_t> &dims, void *data);
 
+  bool TensorIdIsValid(poptorch::TensorId id) const;
+
   std::vector<std::int64_t> GetSize(poptorch::TensorId id);
 
   poptorch::TensorId
   customOperation(const char *op,
                   const std::vector<poptorch::TensorId> &inputs);
 
-  void AddOutput(poptorch::TensorId output);
+  void AddOutputType(OutputType type);
+
+  void AddOutputTensor(poptorch::TensorId output);
 
   void SetUpInputOp(poptorch::TensorId id, float *ptr,
                     const std::vector<std::int64_t> &dims);
@@ -160,6 +170,13 @@ public:
 
   void InitSession(bool profile, const Optimizer &opt);
 
+  // Write the weights into IPU memory from the pytorch tensor buffers in the
+  // model.
+  void CopyWeightsToDevice();
+
+  // Read the weights from IPU memory into the pytorch tensor buffers.
+  void CopyWeightsToHost();
+
   // Return the type of the given tensor.
   PopartTypes GetPopartType(poptorch::TensorId tensor) const;
 
@@ -174,6 +191,11 @@ public:
   std::uint64_t BatchPerStep() const;
 
   std::uint64_t PopartBatchDim() const;
+
+  // Return a flat representation of the output types
+  // For example: ( T0, T2, (T3, T4)) is represented as:
+  // [ Tuple3, Tensor, Tensor, Tuple2, Tensor, Tensor ]
+  const std::vector<OutputType> &OutputTypes() const;
 
 private:
   std::unique_ptr<detail::CompilerImpl> impl;

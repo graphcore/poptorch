@@ -8,6 +8,7 @@ readline.parse_and_bind('tab: complete')
 import torch
 import torch.nn as nn
 import numpy as np
+import os
 
 import poptorch
 import torchvision.models as models
@@ -16,7 +17,8 @@ from PIL import Image
 from torchvision import transforms
 
 # Image loading from https://pytorch.org/hub/pytorch_vision_resnet/
-input_image = Image.open("zeus.jpg")
+this_dir = os.path.dirname(os.path.realpath(__file__))
+input_image = Image.open(os.path.join(this_dir, "zeus.jpg"))
 preprocess = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),

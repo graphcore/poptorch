@@ -79,6 +79,30 @@ void buildTensorList(const torch::jit::IValue &value,
 
 } // namespace
 
+void copyWeightsToHost_impl(
+    std::shared_ptr<poptorch::PoplarExecutable> executable) {
+  // Copy the weights or warn if this is before first time compilation.
+  if (!executable) {
+    logging::warn(
+        "Call to copyWeightsToHost ignored as model has not been compiled "
+        "(Poptorch will compile models on first invocation).");
+  } else {
+    executable->CopyWeightsToHost();
+  }
+}
+
+void copyWeightsToDevice_impl(
+    std::shared_ptr<poptorch::PoplarExecutable> executable) {
+  // Copy the weights or warn if this is before first time compilation.
+  if (!executable) {
+    logging::warn(
+        "Call to copyWeightsToDevice ignored as model has not been compiled "
+        "(Poptorch will compile models on first invocation).");
+  } else {
+    executable->CopyWeightsToDevice();
+  }
+}
+
 std::vector<pybind11::object>
 execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
         pybind11::tuple inputs, py::dict *optimizerDict) {
@@ -98,11 +122,57 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
     optimizer = processDict(*optimizerDict);
   }
 
-  std::vector<at::IValue> value = executable->Run(inputTensors, optimizer);
+  std::vector<at::IValue> outputTensors =
+      executable->Run(inputTensors, optimizer);
 
   std::vector<pybind11::object> returnee;
-  std::transform(value.begin(), value.end(), std::back_inserter(returnee),
-                 [](at::IValue &v) { return torch::jit::toPyObject(v); });
+
+  // Reshape the output tensors in the structure expected by the user
+  auto tensorIt = outputTensors.begin();
+  auto &outputTypes = executable->OutputTypes();
+  auto typeIt = outputTypes.begin();
+  ERROR_ON(typeIt == outputTypes.end());
+  std::uint64_t numOutputs = typeIt->numElements;
+  std::function<pybind11::object()> processOutput;
+  processOutput = [&]() -> pybind11::object {
+    ERROR_ON_MSG(typeIt == outputTypes.end(), "Invalid OutputTypes object");
+    switch (typeIt->type) {
+    case OutputType::Type::Tensor: {
+      ERROR_ON_MSG(tensorIt == outputTensors.end(),
+                   "Not enough tensors to unpack");
+      auto object = torch::jit::toPyObject(*tensorIt);
+      tensorIt++;
+      return object;
+    }
+    case OutputType::Type::Tuple: {
+      std::int64_t numElements = typeIt->numElements;
+      pybind11::tuple pytuple(numElements);
+      for (std::int64_t i = 0; i < numElements; ++i) {
+        typeIt++;
+        pytuple[i] = processOutput();
+      }
+      return std::move(pytuple);
+    }
+    case OutputType::Type::List: {
+      std::int64_t numElements = typeIt->numElements;
+      pybind11::list pylist(numElements);
+      for (std::int64_t i = 0; i < numElements; ++i) {
+        typeIt++;
+        pylist[i] = processOutput();
+      }
+      return std::move(pylist);
+    }
+    default:
+      ERROR("Unsupported OutputType");
+    }
+  };
+
+  for (std::uint64_t i = 0; i < numOutputs; ++i) {
+    typeIt++;
+    returnee.push_back(processOutput());
+  }
+  ERROR_ON_MSG(tensorIt != outputTensors.end(),
+               "Not all the output tensors were unpacked");
 
   return returnee;
 }
@@ -162,6 +232,9 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
 
   // Enforce any constraints that aren't enforced by popart.
   poptorch::CanonicalizeLate(*graph);
+
+  // Warn the user if any operations couldn't be canonicalised.
+  poptorch::WarnOnUnsupportedAten(*graph);
 
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
@@ -293,4 +366,6 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
   m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);
   m.def("canonicalize", poptorch::pyCanonicalize);
+  m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDevice_impl);
+  m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHost_impl);
 }

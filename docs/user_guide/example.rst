@@ -6,6 +6,7 @@ _____________
 
 
 .. literalinclude:: ../../examples/mnist.py
+  :caption: MNIST example
   :language: python
   :linenos:
 

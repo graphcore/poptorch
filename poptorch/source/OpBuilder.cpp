@@ -70,6 +70,14 @@ torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
   return newNode;
 }
 
+torch::jit::Node *Create_addNotInPlace(torch::jit::Graph &graph,
+                                       torch::jit::Value *A,
+                                       torch::jit::Value *B) {
+  torch::jit::Node *newNode =
+      graph.create(Symbols::poptorch::addNotInPlace, {A, B});
+  return newNode;
+}
+
 /*
  * Auto generated operation.
  */

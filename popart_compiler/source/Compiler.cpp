@@ -45,8 +45,11 @@ public:
 
   // Output tensors for the session.
   std::map<popart::TensorId, popart::IArray &> popartOutgoing;
+  std::map<popart::TensorId, std::vector<void *>> outgoingDuplicates;
 
   std::list<popart::TensorId> outputs;
+  // Flat representation of the output shapes
+  std::vector<OutputType> outputTypes;
 
   // A list to allocate our buffers in so they get released.
   std::list<std::unique_ptr<popart::IArray>> memoryManager;
@@ -86,6 +89,8 @@ public:
 
   popart::TensorId cast(const std::vector<popart::TensorId> &inputs,
                         const std::string &type);
+
+  popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 };
 
 popart::TensorId
@@ -208,6 +213,19 @@ template <> struct HandleOutput<popart::TensorId> {
   }
 };
 
+namespace detail {
+
+popart::TensorId
+CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
+  auto AiOnnxOpset9 = opBuilder->aiOnnxOpset9();
+  popart::TensorId output = AiOnnxOpset9.add(in);
+  opBuilder->setInplacePreferences(
+      output, {{"AddLhsInplace", -1}, {"AddRhsInplace", -1}});
+  return output;
+}
+
+} // namespace detail
+
 poptorch::TensorId
 Compiler::AddInputTensor(const char *string,
                          const std::vector<std::int64_t> &dims) {
@@ -308,7 +326,7 @@ Compiler::AddInitializedInputTensor(const char *name, const char *type,
   return impl->ids.size() - 1;
 }
 
-void Compiler::AddOutput(poptorch::TensorId output) {
+void Compiler::AddOutputTensor(poptorch::TensorId output) {
   impl->outputs.push_back(impl->ids[output]);
 
   impl->anchors.insert({impl->ids[output], popart::AnchorReturnType("ALL")});
@@ -347,8 +365,14 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, float *ptr,
   impl->memoryManager.push_back(std::make_unique<popart::NDArrayWrapper<float>>(
       static_cast<float *>(ptr), dims));
 
-  impl->popartOutgoing.insert(
-      {impl->ids[id], *impl->memoryManager.back().get()});
+  popart::TensorId popartId = impl->ids[id];
+  if (!impl->popartOutgoing
+           .insert({popartId, *impl->memoryManager.back().get()})
+           .second) {
+    // Insertion in the map failed because there is already a pointer associated
+    // with that id.
+    impl->outgoingDuplicates[popartId].push_back(ptr);
+  }
 }
 
 void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
@@ -358,8 +382,14 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
       std::make_unique<popart::NDArrayWrapper<std::int32_t>>(
           static_cast<std::int32_t *>(ptr), dims));
 
-  impl->popartOutgoing.insert(
-      {impl->ids[id], *impl->memoryManager.back().get()});
+  popart::TensorId popartId = impl->ids[id];
+  if (!impl->popartOutgoing
+           .insert({popartId, *impl->memoryManager.back().get()})
+           .second) {
+    // Insertion in the map failed because there is already a pointer associated
+    // with that id.
+    impl->outgoingDuplicates[popartId].push_back(ptr);
+  }
 }
 
 void Compiler::InitSession(bool profile, const Optimizer &opt) {
@@ -370,8 +400,9 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
           impl->usedIpus.size() * impl->replicationFactor);
 
   if (!device) {
-    logging::warn(
-        "No IPU device found, falling back to CPU emulator (IPU Model)");
+    logging::warn("No IPU device found, falling back to CPU emulator (IPU "
+                  "Model) number of IPUs requested {}",
+                  impl->usedIpus.size() * impl->replicationFactor);
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
   } else {
     logging::debug("Acquired IPU device, running on device.");
@@ -461,16 +492,26 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
     stream.close();
   }
 
+  // Write the weights immediately after compilation to the IPU.
+  CopyWeightsToDevice();
+}
+
+// Write the weights into IPU memory from the pytorch tensor buffers in the
+// model.
+void Compiler::CopyWeightsToDevice() {
+  logging::info("Writing weights from host to IPU memory.");
   impl->session->weightsFromHost();
+  impl->session->writeWeights(impl->weightCallback);
+}
+
+// Read the weights from IPU memory into the pytorch tensor buffers.
+void Compiler::CopyWeightsToHost() {
+  logging::info("Writing weights from IPU to host.");
+  impl->session->weightsToHost();
+  impl->session->readWeights(impl->weightCallback);
 }
 
 void Compiler::Run(const Optimizer &optimizer) {
-  // TODO(T22644) don't do this everytime.
-  if (!impl->isTraining) {
-    impl->session->weightsFromHost();
-    impl->session->writeWeights(impl->weightCallback);
-  }
-
   if (optimizer.type != OptimizerType::NONE && impl->isTraining) {
     // Convert the map from the user into a popart SGD class.
     auto newOptimizer = popart::SGD(
@@ -495,16 +536,20 @@ void Compiler::Run(const Optimizer &optimizer) {
   popart::StepIO stepio(impl->popartIncoming, impl->popartOutgoing);
   impl->session->run(stepio);
 
-  // TODO(T22644) don't do this everytime.
-  if (impl->isTraining) {
-    impl->session->weightsToHost();
-    impl->session->readWeights(impl->weightCallback);
+  // In case several outputs point at the same tensor: duplicate the data
+  for (auto out : impl->outgoingDuplicates) {
+    auto &src = impl->popartOutgoing.at(out.first);
+    for (auto ptr : out.second) {
+      std::memcpy(ptr, src.data(),
+                  src.nelms() *
+                      popart::getDataTypeInfoMap().at(src.dataType()).nbytes());
+    }
   }
-
   // The buffers handle the communication between pytorch and popart, we set
   // them up each run.
   impl->popartIncoming.clear();
   impl->popartOutgoing.clear();
+  impl->outgoingDuplicates.clear();
   impl->memoryManager.clear();
 }
 
@@ -519,6 +564,10 @@ poptorch::PopartTypes Compiler::GetPopartType(poptorch::TensorId tensor) const {
   }
 
   ERROR("Unsupported popart type in return: " << info.data_type());
+}
+
+bool Compiler::TensorIdIsValid(poptorch::TensorId id) const {
+  return id < impl->ids.size();
 }
 
 std::vector<std::int64_t> Compiler::GetSize(poptorch::TensorId id) {
@@ -548,5 +597,13 @@ Compiler::Compiler(bool isTraining, std::uint64_t steps,
 }
 
 Compiler::~Compiler() {}
+
+void Compiler::AddOutputType(OutputType type) {
+  impl->outputTypes.emplace_back(type);
+}
+
+const std::vector<OutputType> &Compiler::OutputTypes() const {
+  return impl->outputTypes;
+}
 
 } // namespace poptorch

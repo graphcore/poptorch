@@ -1,11 +1,45 @@
 Introduction
 ------------
 
-PopTorch is a set of extensions for PyTorch to enable it to run on the Graphcore
-IPU hardware.
+PopTorch is a set of extensions for PyTorch to enable PyTorch models to run directly
+on Graphcore IPU hardware.
 
-By wrapping a PyTorch model in a PopTorch wrapper, the model
-can be trained on the IPU, and then saved or inspected as a PyTorch
-model. It can also be used for making predictions on IPU hardware.
+PopTorch supports both inference and training. To run a model on the IPU you wrap your
+existing PyTorch model in either a PopTorch inference wrapper or a PopTorch training
+wrapper. You can provide further annotations to split the model across multiple IPUs.
 
+You can wrap individual layers in an IPU helper to designate which IPU they
+should go on. Using the user-provided annotations, PopTorch will use PopART to parallelise
+the model over the given number of IPUs. Additional parallelism can be expressed via
+a replication factor which enables you to data-parallelise the model over more
+IPUs.
 
+PopTorch has been designed to require fewer manual alterations to your models in order to run them
+on IPU. However, it does have some differences from native PyTorch execution.
+
+* In training mode, PopTorch has its own autograd and will take the model, optimizer, and
+  user-provided loss function and will perform the full forward and backward pass under the
+  hood.
+
+  .. literalinclude:: poptorch_training_simple.py
+    :caption: A simple example of training using PyTorch on the CPU
+    :linenos:
+    :lines: 17-33
+
+  .. literalinclude:: poptorch_training_simple.py
+    :caption: Equivalent code using PopTorch to train on the IPU
+    :linenos:
+    :lines: 0-16
+
+* Under the hood PopTorch uses the ``torch.jit.trace`` API. That means it inherits some of the constraints of
+  that API. These include:
+    * Keyword arguments to a model forward operator are not supported. Inputs must be torch tensors or
+      tuples/lists containing torch tensors.
+    * ``torch.jit.trace`` cannot handle control flow or shape variations within the model.
+      That is, the inputs passed at run-time cannot vary the control flow of the model or the shapes/sizes of results.
+    * Half type is no supported.
+    * Not all PyTorch operations have been implemented by the backend yet.
+
+* PopTorch follows PopART's data batching semantics. By default this means you will just pass in data
+  of the normal batch size. However, there are a number of options provided in PopTorch which will enable
+  more efficient data loading. See :ref:`efficient_data_batching` for more information.
