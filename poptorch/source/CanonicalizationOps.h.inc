@@ -16,12 +16,20 @@ OP_CONVERTOR(aten::relu, NONE, Create_relu, {PARAM(0)})
 OP_CONVERTOR(aten::relu_, NONE, Create_relu, {PARAM(0)})
 
 // aten::sub(Tensor self, Tensor other, *, Scalar alpha) -> Tensor
-OP_CONVERTOR(aten::sub, ALPHA(PARAM(1), PARAM(2)), Create_sub,
-             {PARAM(0) COMMA alphaValue})
+OP_CONVERTOR(aten::sub, ALPHA(PARAM_OR_CONSTANT_ANY_TYPE(1), PARAM(2)), Create_sub,
+             {PARAM_OR_CONSTANT_ANY_TYPE(0) COMMA alphaValue})
+
+// aten::mul(Tensor self, Tensor other)
+OP_CONVERTOR(aten::mul, NONE, Create_mul,
+             {PARAM_OR_CONSTANT_ANY_TYPE(0) COMMA PARAM_OR_CONSTANT_ANY_TYPE(1)})
+
+// aten::div(Tensor self, Tensor other)
+OP_CONVERTOR(aten::div, NONE, Create_div,
+             {PARAM_OR_CONSTANT_ANY_TYPE(0) COMMA PARAM_OR_CONSTANT_ANY_TYPE(1)})
 
 // aten::add(Tensor self, Tensor other, *, Scalar alpha) -> Tensor
-OP_CONVERTOR(aten::add, ALPHA(PARAM(1), PARAM(2)), Create_add,
-             {PARAM(0) COMMA alphaValue})
+OP_CONVERTOR(aten::add, ALPHA(PARAM_OR_CONSTANT_ANY_TYPE(1), PARAM(2)), Create_add,
+             {PARAM_OR_CONSTANT_ANY_TYPE(0) COMMA alphaValue})
 
 // aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta, Scalar
 // alpha) -> Tensor
@@ -42,9 +50,26 @@ OP_CONVERTOR(aten::matmul, NONE, Create_matmul, {PARAM(0) COMMA PARAM(1)})
 // aten::sigmoid(Tensor t) -> Tensor
 OP_CONVERTOR(aten::sigmoid, NONE, Create_sigmoid, {PARAM(0)})
 
+
+// Pads are all in the form of:
 // aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> Tensor
+// Only constant has the |value| the multiple dimension of inputs vary by the length of pads.
+
 OP_CONVERTOR(aten::constant_pad_nd, NONE, Create_ConstantPad,
              PARAM(0) COMMA HANDLE_LIST(1, std::int64_t) COMMA HANDLE(2, float))
+
+OP_CONVERTOR(aten::reflection_pad1d, NONE, Create_ReflectionPad,
+             PARAM(0) COMMA HANDLE_LIST(1, std::int64_t))
+OP_CONVERTOR(aten::reflection_pad2d, NONE, Create_ReflectionPad,
+             PARAM(0) COMMA HANDLE_LIST(1, std::int64_t))
+
+
+OP_CONVERTOR(aten::replication_pad1d, NONE, Create_EdgePad,
+             PARAM(0) COMMA HANDLE_LIST(1, std::int64_t))
+OP_CONVERTOR(aten::replication_pad2d, NONE, Create_EdgePad,
+             PARAM(0) COMMA HANDLE_LIST(1, std::int64_t))
+OP_CONVERTOR(aten::replication_pad3d, NONE, Create_EdgePad,
+             PARAM(0) COMMA HANDLE_LIST(1, std::int64_t))
 
 // aten::group_norm(Tensor input, int num_groups, Tensor? weight, Tensor? bias,
 // float eps, bool cudnn_enabled) -> Tensor
@@ -82,3 +107,14 @@ OP_CONVERTOR(aten::square, NONE, Create_mul, {PARAM(0) COMMA PARAM(0)})
 OP_CONVERTOR(aten::tan, NONE, Create_tan, {PARAM(0)})
 OP_CONVERTOR(aten::tanh, NONE, Create_tanh, {PARAM(0)})
 OP_CONVERTOR(aten::logical_not, NONE, Create_logical_not, {PARAM(0)})
+
+
+// Activations
+OP_CONVERTOR(aten::selu, NONE, Create_selu, {PARAM(0)} COMMA 1.6732632423543772848170429916717f COMMA 1.0507009873554804934193349852946f)
+OP_CONVERTOR(aten::selu_, NONE, Create_selu, {PARAM(0)} COMMA 1.6732632423543772848170429916717f COMMA 1.0507009873554804934193349852946f)
+// Re-enable after release (in popart master)
+// OP_CONVERTOR(aten::prelu, NONE, Create_prelu, {PARAM(0) COMMA PARAM(1)})
+OP_CONVERTOR(aten::elu, NONE, Create_elu, {PARAM(0)} COMMA HANDLE(1, float))
+OP_CONVERTOR(aten::elu_, NONE, Create_elu, {PARAM(0)} COMMA HANDLE(1, float))
+OP_CONVERTOR(aten::leaky_relu, NONE, Create_leakyrelu, {PARAM(0)} COMMA HANDLE(1, float))
+OP_CONVERTOR(aten::leaky_relu_, NONE, Create_leakyrelu, {PARAM(0)} COMMA HANDLE(1, float))

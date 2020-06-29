@@ -6,18 +6,22 @@ function(add_poptorch_py_unit_test name)
            WORKING_DIRECTORY ${CMAKE_CURRENT_BUILD_DIR})
 endfunction()
 
-
+add_poptorch_py_unit_test(activations)
 add_poptorch_py_unit_test(batching)
 add_poptorch_py_unit_test(bert_small_and_medium)
+add_poptorch_py_unit_test(convs)
 add_poptorch_py_unit_test(custom_loss)
 add_poptorch_py_unit_test(inputs)
 add_poptorch_py_unit_test(losses)
 add_poptorch_py_unit_test(lstm)
 add_poptorch_py_unit_test(math_ops)
+add_poptorch_py_unit_test(misc_nn_layers)
 add_poptorch_py_unit_test(norms)
 add_poptorch_py_unit_test(optimizers)
+add_poptorch_py_unit_test(pooling_and_padding)
 add_poptorch_py_unit_test(resnets_inference)
 add_poptorch_py_unit_test(shape_inference)
+add_poptorch_py_unit_test(tensor_ops)
 add_poptorch_py_unit_test(weights_writing)
 
 #############

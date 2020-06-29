@@ -28,6 +28,13 @@ torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
                                      const std::vector<int64_t> &pad_shape,
                                      float constant);
 
+torch::jit::Node *Create_ReflectionPad(torch::jit::Graph &graph,
+                                       torch::jit::Value *A,
+                                       const std::vector<int64_t> &pad_shape);
+
+torch::jit::Node *Create_EdgePad(torch::jit::Graph &graph, torch::jit::Value *A,
+                                 const std::vector<int64_t> &pad_shape);
+
 torch::jit::Node *Create_addNotInPlace(torch::jit::Graph &graph,
                                        torch::jit::Value *A,
                                        torch::jit::Value *B);

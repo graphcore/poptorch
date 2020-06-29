@@ -236,3 +236,80 @@ def test_CrossEntropyLoss_training():
         # # Check we have trained the "model"
         assert loss < original_loss
         assert torch.argmax(out, dim=1) == label
+
+
+# This also servees as the NLL loss test as it uses NLL under the hood.
+def test_BCE_direct():
+    reductions = ["mean", "sum"]
+    torch.manual_seed(42)
+
+    for reduction in reductions:
+        model = torch.nn.BCELoss(reduction=reduction)
+
+        poptorch_model = poptorch.inferenceModel(model)
+
+        for i in range(0, 10):
+            target = torch.empty(10).random_(2)
+            input = torch.empty(10).uniform_()
+
+            groundTruth = model(input, target)
+            poptorch_out = poptorch_model(input, target)
+            assert torch.allclose(groundTruth, poptorch_out)
+
+
+# TODO(T22975)
+# This also servees as the NLL loss test as it uses NLL under the hood.
+# Re-enable once pytorch fixes https://github.com/pytorch/pytorch/issues/40679
+# def test_BCE_direct_with_weight():
+#     reductions = ["mean", "sum"]
+#     torch.manual_seed(42)
+
+#     for reduction in reductions:
+
+#         weight = torch.randn(10)
+#         model = torch.nn.BCELoss(weight=weight, reduction=reduction)
+
+#         poptorch_model = poptorch.inferenceModel(model)
+
+#         for i in range(0, 10):
+#             target = torch.empty(10, 10).random_(2)
+#             input = torch.empty(10, 10).uniform_()
+
+#             groundTruth = model(input, target)
+#             poptorch_out = poptorch_model(input, target)
+#             assert torch.allclose(groundTruth, poptorch_out)
+
+
+def test_BCE_training():
+    torch.manual_seed(42)
+
+    reductions = ["mean", "sum"]
+    torch.manual_seed(42)
+
+    for reduction in reductions:
+        model = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                    torch.nn.Sigmoid())
+
+        poptorch_model = poptorch.trainingModel(
+            model,
+            device_iterations=1,
+            loss=torch.nn.BCELoss(reduction=reduction),
+            optimizer=optim.SGD(model.parameters(), lr=0.1))
+
+        target = torch.empty(10).uniform_()
+        input = torch.randn(10)
+
+        # Make sure the first run doesn't already pass the test.
+        original, original_loss = poptorch_model(input, target)
+
+        for i in range(0, 1000):
+            out, loss = poptorch_model(input, target)
+
+        print(out)
+        print(target)
+        print(loss)
+        print("\n")
+
+        # # Check we have trained the "model"
+        assert loss < original_loss
+        torch.testing.assert_allclose(target, out, rtol=1e-03, atol=1e-03)

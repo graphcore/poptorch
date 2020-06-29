@@ -71,6 +71,12 @@ private:
   torch::jit::Value *HandleParamOrConstant(torch::jit::Graph &graph,
                                            torch::jit::Value *operand);
 
+  // Just returns operand if it is a tensor otherwise adds it as a constant and
+  // casts it to the right type.
+  torch::jit::Value *HandleParamOrConstantDeduceType(torch::jit::Graph &graph,
+                                                     torch::jit::Value *operand,
+                                                     torch::jit::Node *user);
+
   // Turn a parameter constant into an IR constant.
   torch::jit::Node *CreateIRConstant(torch::jit::Graph &graph,
                                      torch::jit::Value *node);
@@ -98,9 +104,19 @@ template <typename T> struct Handle {
   std::optional<T> operator()(c10::Symbol &sym, torch::jit::Node *node) {
     if (node->kindOf(sym) == torch::jit::AttributeKind::i) {
       return node->i(sym);
-    } else {
-      return std::nullopt;
+
+    } else if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
+      // Sometimes a single long constant is encoded as an at::Tensor.
+      at::Tensor tensor = node->t(sym);
+
+      if (tensor.sizes().size() == 0) {
+        // Cast tensor to correct value.
+        T value = *static_cast<T *>(tensor.data_ptr());
+        return value;
+      }
     }
+
+    return std::nullopt;
   }
 };
 
@@ -221,6 +237,35 @@ std::optional<T> CanonicalizeImpl::HandleConstant(torch::jit::Node *node) {
   return Handle<T>{}(sym, node);
 }
 
+torch::jit::Value *
+CanonicalizeImpl::HandleParamOrConstantDeduceType(torch::jit::Graph &graph,
+                                                  torch::jit::Value *operand,
+                                                  torch::jit::Node *user) {
+  // The returned value must be a tensor.
+  c10::TensorTypePtr returnTensor =
+      user->output()->type()->expect<c10::TensorType>();
+
+  // Deduce the type from the scalar type on the return.
+  auto optionalScalarType = returnTensor->scalarType();
+
+  // Means something in the JIT has failed.
+  ERROR_ON_MSG(!optionalScalarType,
+               "Internal error: Tensor doesn't have a scalar type.");
+
+  switch (*optionalScalarType) {
+  case c10::ScalarType::Int:
+  case c10::ScalarType::Long: {
+    return HandleParamOrConstant<std::int32_t>(graph, operand);
+  }
+  case c10::ScalarType::Float: {
+    return HandleParamOrConstant<float>(graph, operand);
+  }
+  default: {
+    ERROR("Internal error: Tensor scalar type is unsupported");
+  }
+  }
+}
+
 template <typename T>
 torch::jit::Value *
 CanonicalizeImpl::HandleParamOrConstant(torch::jit::Graph &graph,
@@ -289,13 +334,33 @@ torch::jit::Node *CanonicalizeImpl::CreateIRConstant(torch::jit::Graph &graph,
   // Get the scalar type of the result.
   c10::FloatTypePtr asFloat = value->type()->cast<c10::FloatType>();
   c10::IntTypePtr asInt = value->type()->cast<c10::IntType>();
-
   if (asInt) {
     return Create_ConstantInt(
         graph, {*HandleConstant<std::int64_t>(value->node())}, {1});
   } else if (asFloat) {
     return Create_ConstantFloat(graph, {*HandleConstant<float>(value->node())},
                                 {1});
+  }
+
+  // If this is still a constant.
+  if (value->node()->kind() == c10::prim::Constant) {
+    // Scalar doubles and longs are tensors somehow.
+    c10::TensorTypePtr asTensor = value->type()->expect<c10::TensorType>();
+
+    auto sizes = asTensor->sizes();
+    auto type = asTensor->scalarType();
+
+    if (sizes.size() && *sizes.size() == 0 && type) {
+      if (*type == at::kDouble) {
+        return Create_ConstantFloat(
+            graph, {*HandleConstant<float>(value->node())}, {1});
+      } else if (*type == at::kLong) {
+        return Create_ConstantInt(
+            graph, {*HandleConstant<std::int64_t>(value->node())}, {1});
+      }
+    }
+
+    ERROR("Internal error: Constant type is unsupported");
   }
 
   // Legal to return null means |value| was not a constant.
@@ -333,19 +398,56 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     // We have a dummy if statement so we can daisy chain the rest of the "else
     // if's" off of it.
     if (kind == c10::aten::view || kind == c10::aten::unsqueeze ||
-        kind == c10::aten::expand || kind == c10::aten::flatten ||
-        kind == c10::aten::reshape || kind == c10::aten::squeeze) {
+        kind == c10::aten::flatten || kind == c10::aten::reshape ||
+        kind == c10::aten::squeeze) {
       // clang-format off
-
       // aten::view(Tensor self, int[] size) -> Tensor
       // aten::unsqueeze(Tensor self, int dim) -> Tensor
-      // aten::expand(Tensor self, int[] size, *, bool implicit) -> Tensor
       // clang-format on
 
       std::vector<std::int64_t> newShape = ShapeFromTensor(node->output());
 
       // Reshape the tensor into that shape.
-      newNode = CreateReshape(graph, node->input(0), newShape);
+      newNode = CreateReshape(graph, node->inputs()[0], newShape);
+    } else if (kind == c10::aten::expand) {
+      // clang-format off
+      // aten::expand(Tensor self, int[] size)  -> Tensor
+      // clang-format on
+
+      // Extract the type from the pytorch IR.
+      c10::TensorTypePtr selfTensor =
+          node->inputs()[0]->type()->expect<c10::TensorType>();
+      c10::VaryingShape selfDims = selfTensor->sizes();
+
+      // Old shape
+      std::vector<std::int64_t> oldShape = ShapeFromTensor(node->input(0));
+
+      // Count the elems in the old shape.
+      std::int64_t oldElemCount = std::accumulate(
+          oldShape.begin(), oldShape.end(), 1, std::multiplies<std::int64_t>());
+
+      // Get the target size for the expand.
+      std::vector<std::int64_t> newShape =
+          HandleList<int64_t>(node->input(1)->node());
+
+      // Count the number of elements in the target shape.
+      std::int64_t newElemCount = std::accumulate(
+          newShape.begin(), newShape.end(), 1, std::multiplies<std::int64_t>());
+
+      // Elements don't change so just a reshape.
+      if (newElemCount == oldElemCount) {
+        newNode = CreateReshape(graph, node->input(0), newShape);
+      } else {
+        // Otherwise we are expanding the original tensor.
+        newNode = Create_ConstantInt(graph, newShape,
+                                     {static_cast<int64_t>(newShape.size())});
+        newNode->insertBefore(node);
+
+        newNode = Create_Cast(graph, newNode->output(), c10::kLong);
+        newNode->insertBefore(node);
+
+        newNode = Create_expand(graph, {node->input(0), newNode->output()});
+      }
     } else if (kind == c10::aten::expand_as) {
       // clang-format off
       // aten::expand(Tensor self, int[] size, *, bool implicit) -> Tensor
@@ -397,6 +499,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 #define PARAM(Index) node->inputs()[Index]
 #define COMMA ,
 #define NONE
+
+// Only to be used on operations which return a tensor and which this operand
+// should be of the same scalar type as the return.
+#define PARAM_OR_CONSTANT_ANY_TYPE(Index)                                      \
+  HandleParamOrConstantDeduceType(graph, node->inputs()[Index], node)
 
 #define PARAM_OR_CONSTANT(Index, Type)                                         \
   HandleParamOrConstant<Type>(graph, node->inputs()[Index])
@@ -475,9 +582,15 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       std::vector<std::int64_t> padding =
           HandleList<std::int64_t>(node->input(4)->node());
 
-      // Slight workaround for current padding mechanism here.
-      padding.push_back(padding[0]);
-      padding.push_back(padding[1]);
+      // Pytorch gives the padding as being the amount to pad in both
+      // directions. Popart two arguments for each axis, the amount to pad in
+      // each direction along that axis. In the form (Axis0Left, AxisNLeft...,
+      // Axis0Right, AxisNRight) where left and right refer to the direction
+      // along the axis to add zeros to.
+      const std::size_t num_pads = padding.size();
+      for (std::size_t padIndex = 0; padIndex < num_pads; ++padIndex) {
+        padding.push_back(padding[padIndex]);
+      }
 
       std::vector<std::int64_t> dilation =
           HandleList<std::int64_t>(node->input(5)->node());
@@ -491,7 +604,16 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
                                         padding, stride);
 
       } else {
-        logging::err("CURRENTLY UNSUPPORTED CONVOLUTION!!!\n{}", *newNode);
+        logging::err("Transposed convolutions are not currently supported.");
+
+        /* TODO(T22979) Re-enable once PopART supports transposed convolutions.
+        // Output shape.
+        // Give popart the shape of the output so it can autogenerate pads.
+        std::vector<std::int64_t> outputShape = ShapeFromTensor(node->output())
+
+        newNode = poptorch::Create_convtranspose(graph, inputs, dilation,
+        groups, {}, {}, outputShape, padding, stride);
+        */
       }
     } else if (kind == c10::aten::conv2d) {
       /*
@@ -513,9 +635,15 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       std::vector<std::int64_t> padding =
           HandleList<std::int64_t>(node->input(4)->node());
 
-      // Slight workaround for current padding mechanism here.
-      padding.push_back(padding[0]);
-      padding.push_back(padding[1]);
+      // Pytorch gives the padding as being the amount to pad in both
+      // directions. Popart two arguments for each axis, the amount to pad in
+      // each direction along that axis. In the form (Axis0Left, AxisNLeft...,
+      // Axis0Right, AxisNRight) where left and right refer to the direction
+      // along the axis to add zeros to.
+      const std::size_t num_pads = padding.size();
+      for (std::size_t padIndex = 0; padIndex < num_pads; ++padIndex) {
+        padding.push_back(padding[padIndex]);
+      }
 
       std::vector<std::int64_t> dilation =
           HandleList<std::int64_t>(node->input(5)->node());
@@ -533,7 +661,40 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       */
       // clang-format on
 
+      // Pytorch supports BatchNorm1D/2D/3D. PopART only supports 2D so we need
+      // to reshape input into a 4D tensor.
+
+      // Keep track of the original shape so we can convert back if we are
+      // running BatchNorm1D or 3D.
+      std::vector<std::int64_t> originalShape = ShapeFromTensor(node->input(0));
+
+      // New 4D shape to perform the operation with.
+      std::vector<std::int64_t> newShape = originalShape;
+
+      // Turn the shape into a 4D tensor.
+      if (originalShape.size() == 2) {
+        // Add two singletons to pad to 4D.
+        newShape.push_back(1);
+        newShape.push_back(1);
+      } else if (originalShape.size() == 3) {
+        // Add one singleton to get to 4D.
+        newShape.push_back(1);
+      } else if (originalShape.size() == 5) {
+        // Flatten last two dimensions to reduce to 4.
+        newShape[3] *= newShape[4];
+        newShape.pop_back();
+      }
+
+      // Input is value at 0th position.
       torch::jit::Value *input = node->input(0);
+
+      // Reshape to 4D if needed.
+      if (originalShape.size() != 4) {
+        torch::jit::Node *reshape_in = CreateReshape(graph, input, newShape);
+        reshape_in->insertBefore(node);
+        input = reshape_in->output();
+      }
+
       torch::jit::Value *weight = node->input(1);
       torch::jit::Value *bias = node->input(2);
       torch::jit::Value *running_mean = node->input(3);
@@ -550,7 +711,18 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode = poptorch::Create_batchnormalization(graph, inputTensors, 1,
                                                     epsilon, momentum);
 
-    } else if (kind == c10::aten::max_pool2d || kind == c10::aten::avg_pool2d) {
+      // If we reshaped, reshape back.
+      if (originalShape.size() != 4) {
+        // Add the batch norm.
+        newNode->insertBefore(node);
+
+        // This is now the new node.
+        newNode = CreateReshape(graph, newNode->output(), originalShape);
+      }
+
+    } else if (kind == c10::aten::max_pool1d || kind == c10::aten::avg_pool1d ||
+               kind == c10::aten::max_pool2d || kind == c10::aten::avg_pool2d ||
+               kind == c10::aten::max_pool3d || kind == c10::aten::avg_pool3d) {
       // clang-format off
       /*
         aten::max_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
@@ -568,11 +740,18 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       std::vector<std::int64_t> padding =
           HandleList<std::int64_t>(node->input(3)->node());
 
-      // Slight workaround for current padding mechanism here.
-      padding.push_back(padding[0]);
-      padding.push_back(padding[1]);
+      // Pytorch gives the padding as being the amount to pad in both
+      // directions. Popart two arguments for each axis, the amount to pad in
+      // each direction along that axis. In the form (Axis0Left, AxisNLeft...,
+      // Axis0Right, AxisNRight) where left and right refer to the direction
+      // along the axis to add zeros to.
+      const std::size_t num_pads = padding.size();
+      for (std::size_t padIndex = 0; padIndex < num_pads; ++padIndex) {
+        padding.push_back(padding[padIndex]);
+      }
 
-      if (kind == c10::aten::max_pool2d) {
+      if (kind == c10::aten::max_pool1d || kind == c10::aten::max_pool2d ||
+          kind == c10::aten::max_pool3d) {
         newNode = poptorch::Create_maxpool(graph, {node->input(0)}, 1,
                                            kernel_size, padding, 0, stride);
       } else {
@@ -581,9 +760,10 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         newNode = poptorch::Create_averagepool(graph, {node->input(0)},
                                                kernel_size, 0, padding, stride);
       }
-    } else if (kind == c10::aten::adaptive_avg_pool2d) {
-      // clang-format off
+    } else if (kind == c10::aten::adaptive_avg_pool2d ||
+               kind == c10::aten::adaptive_max_pool2d) { // clang-format off
       // aten::adaptive_avg_pool2d(Tensor self, int[] output_size) -> Tensor
+      // aten::adaptive_max_pool2d(Tensor self, int[] output_size) -> Tensor
       // clang-format on
       std::vector<std::int64_t> outputShape =
           HandleList<std::int64_t>(node->input(1)->node());
@@ -603,8 +783,18 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           inputShape[1] - (outputShape[1] - 1) * stride[1]};
       const std::vector<int64_t> &padding{0, 0, 0, 0};
 
-      newNode = Create_averagepool(graph, {node->input(0)}, kernel_shape, 0,
-                                   padding, stride);
+      if (kind == c10::aten::adaptive_avg_pool2d) {
+        newNode = Create_averagepool(graph, {node->input(0)}, kernel_shape, 0,
+                                     padding, stride);
+      } else {
+        logging::err("Adaptive max pooling isn't currently supported.");
+        /* // TODO(T22978) Fix the number of inputs in PopParse so this can
+           return 2.
+           // Supported by Onnx.
+
+            newNode = poptorch::Create_maxpool(graph,
+           {node->input(0)}, 2, kernel_shape, padding, 0, stride);*/
+      }
     } else if (kind == c10::aten::softmax) {
       // "aten::softmax(Tensor self, int dim, int? dtype) -> Tensor"
 
@@ -747,33 +937,14 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
     } else if (kind == Symbols::poptorch::begin_ipu_block) {
       // This could maybe be improved. Can we add attributes on the frontend?
       // TODO(tbd)
-      newNode = graph.create(
-          c10::Symbol::fromQualString("poptorch::begin_ipu_block"));
+      newNode =
+          graph.create(c10::Symbol::fromQualString("poptorch::begin_ipu_block"),
+                       {}, node->outputs().size());
 
       // Convert the prim::Constant into an attribute.
       std::int64_t ipu_id =
           *HandleConstant<std::int64_t>(node->input()->node());
       newNode->i_(c10::Symbol::fromQualString("attr::ipu"), ipu_id);
-    } else if (kind == c10::aten::mul) {
-      torch::jit::Value *other = node->input(1);
-
-      std::optional<float> asScalar = HandleConstant<float>(other->node());
-
-      if (asScalar) {
-        torch::jit::Node *asConstant =
-            Create_ConstantFloat(graph, {*asScalar}, {1});
-        asConstant->insertBefore(node);
-
-        other->replaceAllUsesWith(asConstant->output());
-
-        // Mark it for deletion.
-        toDelete.insert(other->node());
-
-        // Use the popart constant instead.
-        other = asConstant->output();
-      }
-
-      newNode = Create_mul(graph, {node->input(0), other});
     } else if (kind == c10::aten::select) {
       // clang-format off
       // aten::select(Tensor self, int dim, int index) -> Tensor
@@ -872,25 +1043,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       permutation[dim1] = dim0;
 
       newNode = Create_transpose(graph, {node->input(0)}, permutation);
-    } else if (kind == c10::aten::div) {
-      torch::jit::Value *other = node->input(1);
-      std::optional<float> asScalar = HandleConstant<float>(other->node());
-
-      if (asScalar) {
-        torch::jit::Node *asConstant =
-            Create_ConstantFloat(graph, {*asScalar}, {1});
-        asConstant->insertBefore(node);
-
-        other->replaceAllUsesWith(asConstant->output());
-
-        // Mark it for deletion.
-        toDelete.insert(other->node());
-
-        // Use the popart constant instead.
-        other = asConstant->output();
-      }
-
-      newNode = Create_div(graph, {node->input(0), node->input(1)});
     } else if (kind == c10::aten::embedding) {
       // aten::embedding(Tensor weight, Tensor indices, int padding_idx, bool
       // scale_grad_by_freq, bool sparse) -> Tensor
@@ -1400,6 +1552,82 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       } else {
         ERROR("Popart Canonicalisation: UNREACHABLE reached in reductions.");
       }
+    } else if (kind == c10::aten::binary_cross_entropy) {
+      // clang-format off
+      // aten::binary_cross_entropy(Tensor input, Tensor target,
+      //                            Tensor? weight, int reduction)
+      // clang-format on
+
+      // L = loss, w = weight, y= target, x = input.
+      // Algorithm is: L = - w * (y *log(x) + (1 - y)*log(1 - x))
+
+      // The input.
+      torch::jit::Value *x = node->input(0);
+
+      // The target.
+      torch::jit::Value *y = node->input(1);
+
+      // Optional weight term.
+      torch::jit::Value *weight = node->input(2);
+
+      // Loss reduction.
+      std::int64_t reduction =
+          *HandleConstant<std::int64_t>(node->input(3)->node());
+
+      // Convert to popart reduce values.
+      reduction = convertReduceToPopart(reduction);
+
+      // Add the one constant
+      torch::jit::Node *one = Create_ConstantFloat(graph, {1.0}, {});
+      one->insertBefore(node);
+
+      torch::jit::Node *logX = Create_log(graph, {x});
+      logX->insertBefore(node);
+
+      // Log(x)*y
+      torch::jit::Node *logXMulY = Create_mul(graph, {y, logX->output()});
+      logXMulY->insertBefore(node);
+
+      // Do (1 - y) and (1 - x)
+      torch::jit::Node *xMinusOne = Create_sub(graph, {one->output(), x});
+      torch::jit::Node *yMinusOne = Create_sub(graph, {one->output(), y});
+      xMinusOne->insertBefore(node);
+      yMinusOne->insertBefore(node);
+
+      // Log(1 - x)
+      torch::jit::Node *logXMinusOne = Create_log(graph, {xMinusOne->output()});
+      logXMinusOne->insertBefore(node);
+
+      // (1 -y)*Log(1 - x)
+      torch::jit::Node *subsMultiplied =
+          Create_mul(graph, {yMinusOne->output(), logXMinusOne->output()});
+      subsMultiplied->insertBefore(node);
+
+      // Log(x)*y + (1 -y)*Log(1 - x)
+      torch::jit::Node *addTerms =
+          Create_add(graph, {logXMulY->output(), subsMultiplied->output()});
+      addTerms->insertBefore(node);
+
+      torch::jit::Node *finalNode = addTerms;
+
+      if (weight->node()->kind() != c10::prim::Constant) {
+        finalNode = Create_mul(graph, {addTerms->output(), weight});
+        finalNode->insertBefore(node);
+      }
+
+      finalNode = Create_neg(graph, {addTerms->output()});
+      finalNode->insertBefore(node);
+      if (reduction == 0) {
+        // Sum
+        finalNode = Create_sum(graph, {finalNode->output()});
+        finalNode->insertBefore(node);
+      } else if (reduction == 1) {
+        // Mean
+        finalNode = Create_mean(graph, {finalNode->output()});
+        finalNode->insertBefore(node);
+      }
+
+      newNode = Create_identityloss(graph, {finalNode->output()}, reduction);
 
     } else if (kind == c10::aten::lstm) {
       // clang-format off

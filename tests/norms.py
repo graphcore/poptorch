@@ -5,6 +5,71 @@ import torch
 import poptorch
 import torch.optim as optim
 
+# Norms
+#'torch.nn.BatchNorm1d', 'torch.nn.BatchNorm2d', 'torch.nn.BatchNorm3d', 'torch.nn.GroupNorm', 'torch.nn.SyncBatchNorm', 'torch.nn.SyncBatchNorm.convert_sync_batchnorm',
+# 'torch.nn.InstanceNorm1d', 'torch.nn.InstanceNorm2d', 'torch.nn.InstanceNorm3d', 'torch.nn.LayerNorm', 'torch.nn.LocalResponseNorm',
+
+batch_norms = [
+    torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d
+]
+
+
+def test_batchNorm1D():
+    torch.manual_seed(42)
+
+    input = torch.randn([2, 10, 1000])
+    norm = torch.nn.BatchNorm1d(10)
+
+    # Run pytorch native on CPU.
+    nativeOutput = norm(input)
+
+    # Run on IPU.
+    ipuModel = poptorch.inferenceModel(norm)
+    poptorchOut = ipuModel(input)
+
+    torch.testing.assert_allclose(poptorchOut,
+                                  nativeOutput,
+                                  atol=1e-1,
+                                  rtol=0.1)
+
+
+def test_batchNorm2D():
+    torch.manual_seed(42)
+
+    input = torch.randn([20, 10, 35, 45])
+    norm = torch.nn.BatchNorm2d(10)
+
+    # Run pytorch native on CPU.
+    nativeOutput = norm(input)
+
+    # Run on IPU.
+    ipuModel = poptorch.inferenceModel(norm)
+    poptorchOut = ipuModel(input)
+
+    torch.testing.assert_allclose(poptorchOut,
+                                  nativeOutput,
+                                  atol=1e-1,
+                                  rtol=0.1)
+
+
+def test_batchNorm3D():
+    torch.manual_seed(42)
+
+    input = torch.randn([20, 10, 35, 45, 10])
+    norm = torch.nn.BatchNorm3d(10)
+
+    # Run pytorch native on CPU.
+    nativeOutput = norm(input)
+
+    # Run on IPU.
+    ipuModel = poptorch.inferenceModel(norm)
+    poptorchOut = ipuModel(input)
+
+    torch.testing.assert_allclose(poptorchOut,
+                                  nativeOutput,
+                                  atol=1e-1,
+                                  rtol=0.1)
+
 
 def test_layerNorm():
     torch.manual_seed(42)
