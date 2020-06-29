@@ -11,4 +11,5 @@ PyTorch for the IPU: User Guide
     installation
     overview
     batching
+    supported_ops
     example

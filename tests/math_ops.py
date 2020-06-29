@@ -33,17 +33,7 @@ def unary_op_harness(op, input, eq):
     assert eq(nativeOut, poptorch_out)
 
 
-def binary_op_harness(op, input1, input2, eq):
-    class Model(torch.nn.Module):
-        def __init__(self, op):
-            super(Model, self).__init__()
-            self.op = op
-
-        def forward(self, x, y):
-            return self.op(x, y)
-
-    model = Model(op)
-
+def binary_op_harness(model, input1, input2, eq):
     # Run on CPU.
     nativeOut = model(input1, input2)
 
@@ -148,6 +138,7 @@ binary_ops_float = [
     torch.add,
     # torch.atan2,
     torch.div,
+    torch.sub,
     # torch.fmod,
     # torch.floor_divide,
     torch.mul,
@@ -165,10 +156,80 @@ def test_binary_ops_float(op):
     def compare(x, y):
         return torch.allclose(x, y, atol=1e-05, equal_nan=True)
 
-    binary_op_harness(op, input1, input2, compare)
+    class Model(torch.nn.Module):
+        def __init__(self, op):
+            super(Model, self).__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            return self.op(x, y)
+
+    binary_op_harness(Model(op), input1, input2, compare)
 
 
-binary_op_itn = [
+binary_ops_basic_element_wise_float = [
+    torch.add,
+    torch.div,
+    torch.sub,
+    torch.mul,
+]
+
+
+@pytest.mark.parametrize("op", binary_ops_basic_element_wise_float)
+def test_binary_ops_elementwise_edgecases(op):
+    torch.manual_seed(42)
+    input1 = torch.randn([1, 2, 10, 200])
+    input2 = torch.randn([1])
+
+    def compare(x, y):
+        return torch.allclose(x, y, atol=1e-05, equal_nan=True)
+
+    # Constant on LHS
+    class ConstOnLHS(torch.nn.Module):
+        def __init__(self, op):
+            super(ConstOnLHS, self).__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            return self.op(x, 4.0)
+
+    binary_op_harness(ConstOnLHS(op), input1, input2, compare)
+
+    # Constant on RHS
+    class ConstOnRHS(torch.nn.Module):
+        def __init__(self, op):
+            super(ConstOnRHS, self).__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            return self.op(2.5, x)
+
+    binary_op_harness(ConstOnRHS(op), input1, input2, compare)
+
+    # Constant on LHS wrong type.
+    class ConstOnLHSInt(torch.nn.Module):
+        def __init__(self, op):
+            super(ConstOnLHSInt, self).__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            return self.op(x, 4)
+
+    binary_op_harness(ConstOnLHSInt(op), input1, input2, compare)
+
+    # Constant on RHS wrong type
+    class ConstOnRHSInt(torch.nn.Module):
+        def __init__(self, op):
+            super(ConstOnRHSInt, self).__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            return self.op(134, x)
+
+    binary_op_harness(ConstOnRHSInt(op), input1, input2, compare)
+
+
+binary_op_int = [
     # torch.logical_or, torch.logical_xor, , torch.bitwise_and, torch.bitwise_or, torch.bitwise_xor, torch.logical_and,
 ]
 
