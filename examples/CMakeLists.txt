@@ -7,3 +7,4 @@ function(add_poptorch_py_example name)
 endfunction()
 
 add_poptorch_py_example(simple_adder)
+add_poptorch_py_example(lstm)

@@ -1400,6 +1400,121 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       } else {
         ERROR("Popart Canonicalisation: UNREACHABLE reached in reductions.");
       }
+
+    } else if (kind == c10::aten::lstm) {
+      // clang-format off
+      // aten::lstm(Tensor self, Tensor[] hx, Tensor[] weights, bool bias,
+      // int num_layers, float dropout, bool training, bool bidirectional,
+      // bool batch_first) -> Tensor, (Tensor, Tensor)
+      // clang-format on
+
+      torch::jit::Value *input = node->input(0);
+
+      torch::jit::ArrayRef<torch::jit::Value *> hiddenLayers =
+          node->input(1)->node()->inputs();
+      torch::jit::ArrayRef<torch::jit::Value *> weightsList =
+          node->input(2)->node()->inputs();
+
+      bool useBias = *HandleConstant<bool>(node->input(3)->node());
+      ERROR_ON_MSG(!useBias, "LSTM without biases not supported");
+      std::int64_t numLayers =
+          *HandleConstant<std::int64_t>(node->input(4)->node());
+      ERROR_ON_MSG(numLayers != 1, "Only LSTM with 1 layer supported");
+
+      float dropout = *HandleConstant<float>(node->input(5)->node());
+      ERROR_ON_MSG(dropout != 0.0f, "LSTM only supports dropout = 0.0");
+
+      bool bidirectional = *HandleConstant<bool>(node->input(7)->node());
+      ERROR_ON_MSG(bidirectional, "bidirectional LSTM not supported");
+
+      bool batchFirst = *HandleConstant<bool>(node->input(8)->node());
+      ERROR_ON_MSG(batchFirst, "LSTM with batch first not supported");
+
+      // An LSTM state is made of 4 values
+      constexpr std::uint64_t stateSize = 4;
+      const std::int64_t numWeights =
+          *weightsList[0]->type()->cast<c10::TensorType>()->sizes()[0];
+      ERROR_ON(numWeights % stateSize != 0);
+      const std::int64_t numHiddenLayers = numWeights / stateSize;
+
+      // def reshape_weights(onnx_weights):
+      //    ws = builder.aiOnnx.split([w], 4, 1, [hidden_size] * 4)
+      //    ws = [builder.aiOnnx.transpose([i], [0, 2, 1]) for i in ws]
+      //    ws = builder.aiOnnx.concat([ws[i] for i in (2, 0, 3, 1)], 0)
+      //    return ws
+      //
+      // Note: onnx weights are in IOFC order while Torch uses IFCO
+      //
+      // Biases don't need to be transposed
+      auto reshapeTensor = [&](torch::jit::Value *values, bool areWeights) {
+        const std::uint64_t numDimsWithoutBatch = areWeights ? 2 : 1;
+        std::vector<std::int64_t> shape = ShapeFromTensor(values);
+        if (shape.size() == numDimsWithoutBatch) {
+          // Add a batch dimension
+          shape.insert(shape.begin(), 1);
+          torch::jit::Node *reshape = CreateReshape(graph, values, shape);
+          reshape->insertBefore(node);
+          values = reshape->output();
+        }
+        torch::jit::Node *states =
+            Create_split(graph, {values}, stateSize, 1,
+                         {numHiddenLayers, numHiddenLayers, numHiddenLayers,
+                          numHiddenLayers});
+        states->insertBefore(node);
+        std::vector<torch::jit::Value *> slices;
+        for (std::uint64_t i = 0; i < stateSize; ++i) {
+          if (areWeights) {
+            // Weights also need to be transposed
+            torch::jit::Node *transposed =
+                Create_transpose(graph, {states->output(i)}, {0, 2, 1});
+            transposed->insertBefore(node);
+            slices.push_back(transposed->output());
+          } else {
+            slices.push_back(states->output(i));
+          }
+        }
+        torch::jit::Node *concat = Create_concat(
+            graph, {slices[1], slices[0], slices[2], slices[3]}, 0);
+        concat->insertBefore(node);
+        return concat->output();
+      };
+
+      torch::jit::Node *concatWeights =
+          Create_concat(graph,
+                        {reshapeTensor(weightsList[0], true),
+                         reshapeTensor(weightsList[1], true)},
+                        1);
+      concatWeights->insertBefore(node);
+      torch::jit::Node *combineBiases =
+          Create_addNotInPlace(graph, reshapeTensor(weightsList[2], false),
+                               reshapeTensor(weightsList[3], false));
+      combineBiases->insertBefore(node);
+
+      torch::jit::Node *concatStates =
+          Create_concat(graph, {hiddenLayers[0], hiddenLayers[1]}, 0);
+      concatStates->insertBefore(node);
+
+      std::vector<torch::jit::Value *> args;
+      args.push_back(input);
+      args.push_back(concatWeights->output()); // input weights + output_weights
+      args.push_back(combineBiases->output()); // biases
+      args.push_back(concatStates->output());  // init_states
+
+      torch::jit::Node *lstm = Create_lstm(graph, args, 1);
+      lstm->insertBefore(node);
+
+      // Keep the last slice from Y
+      torch::jit::Node *Y_h =
+          Create_slice(graph, {lstm->output(0)}, {INT_MAX}, {-1}, {0});
+      Y_h->insertBefore(node);
+
+      ERROR_ON(node->outputs().size() != 3);
+      if (node->hasUses()) {
+        ReplaceOutputUse(node, lstm, 0);
+        ReplaceOutputUse(node->output(1), Y_h->output());
+        ReplaceOutputUse(node->output(2), lstm->output(1));
+      }
+      toDelete.insert(node);
     }
 
     // If we have a new node add it and replace the old use.

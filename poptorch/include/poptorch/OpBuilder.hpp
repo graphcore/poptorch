@@ -28,6 +28,10 @@ torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
                                      const std::vector<int64_t> &pad_shape,
                                      float constant);
 
+torch::jit::Node *Create_addNotInPlace(torch::jit::Graph &graph,
+                                       torch::jit::Value *A,
+                                       torch::jit::Value *B);
+
 // Default to int in the helper.
 template <typename T> struct Create_Constant {
   torch::jit::Node *operator()(torch::jit::Graph &graph,

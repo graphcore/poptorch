@@ -5,20 +5,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import poptorch
-
-
-def outputsMatch(ref, other):
-    if isinstance(ref, torch.Tensor):
-        return torch.allclose(other, ref)
-    if isinstance(ref, tuple):
-        if not isinstance(other, tuple) or len(ref) != len(other):
-            return False
-    elif isinstance(ref, list):
-        if not isinstance(other, list) or len(ref) != len(other):
-            return False
-    else:
-        assert "%s not supported" % type(ref)
-    return all([outputsMatch(r, other[i]) for i, r in enumerate(ref)])
+import poptorch.testing
 
 
 def test_multiple_tensors():
@@ -42,7 +29,7 @@ def test_multiple_tensors():
 
     ipu = inference_model(x, y)
     ref = model(x, y)
-    assert outputsMatch(
+    assert poptorch.testing.allclose(
         ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
 
 
@@ -67,7 +54,7 @@ def test_simple_list():
 
     ipu = inference_model(x, y)
     ref = model(x, y)
-    assert outputsMatch(
+    assert poptorch.testing.allclose(
         ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
 
 
@@ -92,7 +79,7 @@ def test_simple_tuple():
 
     ipu = inference_model(x, y)
     ref = model(x, y)
-    assert outputsMatch(
+    assert poptorch.testing.allclose(
         ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
 
 
@@ -118,7 +105,7 @@ def test_nested_tuples():
     ipu = inference_model(x, y)
     ref = model(x, y)
 
-    assert outputsMatch(
+    assert poptorch.testing.allclose(
         ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
 
 
@@ -144,5 +131,5 @@ def test_same_tensor():
     ipu = inference_model(x, y)
     ref = model(x, y)
 
-    assert outputsMatch(
+    assert poptorch.testing.allclose(
         ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)

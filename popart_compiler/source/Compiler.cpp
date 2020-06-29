@@ -89,6 +89,8 @@ public:
 
   popart::TensorId cast(const std::vector<popart::TensorId> &inputs,
                         const std::string &type);
+
+  popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 };
 
 popart::TensorId
@@ -210,6 +212,19 @@ template <> struct HandleOutput<popart::TensorId> {
     return impl->ids.size() - 1;
   }
 };
+
+namespace detail {
+
+popart::TensorId
+CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
+  auto AiOnnxOpset9 = opBuilder->aiOnnxOpset9();
+  popart::TensorId output = AiOnnxOpset9.add(in);
+  opBuilder->setInplacePreferences(
+      output, {{"AddLhsInplace", -1}, {"AddRhsInplace", -1}});
+  return output;
+}
+
+} // namespace detail
 
 poptorch::TensorId
 Compiler::AddInputTensor(const char *string,

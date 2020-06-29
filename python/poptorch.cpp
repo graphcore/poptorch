@@ -151,7 +151,7 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
         typeIt++;
         pytuple[i] = processOutput();
       }
-      return pytuple;
+      return std::move(pytuple);
     }
     case OutputType::Type::List: {
       std::int64_t numElements = typeIt->numElements;
@@ -160,7 +160,7 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
         typeIt++;
         pylist[i] = processOutput();
       }
-      return pylist;
+      return std::move(pylist);
     }
     default:
       ERROR("Unsupported OutputType");
