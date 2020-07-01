@@ -18,7 +18,8 @@ using TensorId = std::size_t;
 
 namespace detail {
 struct CompilerImpl;
-}
+struct SessionOptionsImpl;
+} // namespace detail
 
 struct OutputType {
   enum class Type { Tensor, Tuple, List };
@@ -72,10 +73,29 @@ struct Optimizer {
   std::pair<float, bool> dampening;
 };
 
+class Compiler;
+class SessionOptions {
+public:
+  SessionOptions();
+  SessionOptions(SessionOptions &&);
+  ~SessionOptions();
+  // Disable copy: Move only
+  SessionOptions(const SessionOptions &) = delete;
+  SessionOptions &operator=(const SessionOptions &) = delete;
+
+  void AddStringOption(const char *option, const char *value);
+  void AddUInt64Option(const char *option, std::uint64_t value);
+  void AddBoolOption(const char *option, bool value);
+  void AddDoubleOption(const char *option, double value);
+
+private:
+  std::unique_ptr<detail::SessionOptionsImpl> impl;
+  friend Compiler;
+};
+
 class Compiler {
 public:
-  Compiler(bool isTraining, std::uint64_t steps,
-           std::uint64_t replicationFactor, std::uint64_t gradientAccumulation);
+  Compiler(bool isTraining, const SessionOptions &options);
   ~Compiler();
   Compiler(Compiler &&compiler);
 
@@ -132,8 +152,7 @@ public:
   // "EVERYN": Will return every N batch
   // "FINAL": Will return the last batch only
   // clang-format on
-  void AddOutputTensor(poptorch::TensorId output, PopartAnchorTypes anchorMode,
-                       std::uint64_t anchorReturnPeriod);
+  void AddOutputTensor(poptorch::TensorId output);
 
   void SetUpInputOp(poptorch::TensorId id, float *ptr,
                     const std::vector<std::int64_t> &dims);
@@ -152,7 +171,7 @@ public:
 
   void SetActiveIpu(std::uint64_t id);
 
-  void InitSession(bool profile, const Optimizer &opt);
+  void InitSession(const Optimizer &opt);
 
   // Write the weights into IPU memory from the pytorch tensor buffers in the
   // model.

@@ -41,12 +41,8 @@ enum PopartTypes {
 };
 
 // See popart DataFlow.hpp for a full description of each.
-enum PopartAnchorTypes : std::uint8_t {
-  Final = 0,
-  EveryN,
-  All,
-  Sum,
-};
+// Must be kept in sync with AnchorMode in python/__init__.py
+enum PopartAnchorTypes : std::uint8_t { Final = 0, EveryN, All, Sum, N };
 
 // Must be static so each library gets its own copy,  __attribute__((unused)) is
 // to silence the warning if it is unused in any of them.

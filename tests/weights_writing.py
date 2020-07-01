@@ -11,7 +11,6 @@ def test_weight_write_to_host():
     model = torch.nn.Linear(10, 10)
 
     poptorch_model = poptorch.trainingModel(model,
-                                            device_iterations=1,
                                             loss=torch.nn.MSELoss())
     target = torch.randn(10)
     input = torch.randn(10)
@@ -135,7 +134,6 @@ def test_weight_overwrite_trained_weight():
     model = torch.nn.Linear(10, 10)
 
     poptorch_model = poptorch.trainingModel(model,
-                                            device_iterations=1,
                                             loss=torch.nn.MSELoss())
     target = torch.randn(10)
     input = torch.randn(10)

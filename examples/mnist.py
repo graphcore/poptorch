@@ -94,8 +94,9 @@ class Network(nn.Module):
 model = Network()
 
 # Create model for training which will run on IPU.
+opts = poptorch.Options().deviceIterations(training_ipu_step_size)
 training_model = poptorch.trainingModel(model,
-                                        training_ipu_step_size,
+                                        opts,
                                         replication_factor=replication_factor,
                                         loss=nn.NLLLoss(reduction="mean"))
 

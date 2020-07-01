@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import enum
 import logging
 import os
 import sys
@@ -25,16 +26,6 @@ console.setLevel(logging.DEBUG)
 logger.addHandler(console)
 
 
-# From pytorch/torch/jit/__init__.py
-def make_tuple(example_inputs):
-    if isinstance(example_inputs, (torch.Tensor, dict)):
-        return (example_inputs, )
-    # done primarily so that weird iterables fail here and not pybind11 code
-    if not isinstance(example_inputs, tuple):
-        return tuple(example_inputs)
-    return example_inputs
-
-
 def identity_loss(x, reduction="none"):
     if (reduction == "sum"):
         return torch.ops.poptorch.identity_loss(x, 0)
@@ -46,7 +37,7 @@ def identity_loss(x, reduction="none"):
     return torch.ops.poptorch.identity_loss(x, 2)
 
 
-def convertOptimizerToDict(optimizer):
+def _convertOptimizerToDict(optimizer):
     if len(optimizer.param_groups) != 1:
         print(
             "Error: Poptorch currently only supports one parameter group! (all parameters)"
@@ -61,12 +52,193 @@ def convertOptimizerToDict(optimizer):
     }
 
 
-identity_loss = identity_loss
+class _OptionsDict:
+    """Safe dictionary to store options: only keys which have been passed to the constructor can later be updated.
+    """
+
+    def __init__(self, **default_values):
+        self._values = default_values
+
+    def Set(self, **kwargs):
+        for option, value in kwargs.items():
+            assert option in self._values, "Invalid option %s, valid options are %s" % (
+                option, self._values.keys())
+            assert type(value) == type(
+                self._values[option]
+            ), "Unexpected type %s for option %s. Expected %s" % (
+                type(value), option, type(self._values[option]))
+            self._values[option] = value
+
+    def __getattr__(self, option):
+        assert option in self._values, "Invalid option %s, valid options are %s" % (
+            option, self._values.keys())
+        return self._values[option]
+
+    def Update(self, other):
+        assert not set(self._values.keys()).intersection(
+            other), "Can't merge dictionaries, they have some keys in common"
+        other.update(self._values)
+        return other
+
+    def __call__(self, key):
+        assert key in self._values, "Invalid option %s, valid options are %s" % (
+            key, self._values.keys())
+        return self._values[key]
+
+
+class _JitOptions(_OptionsDict):
+    """Options related to Pytorch's JIT
+    """
+
+    def __init__(self):
+        super().__init__(trace_model=True)
+
+    def traceModel(self, trace_model):
+        """
+        If True: use torch.jit.trace
+        If False: use torch.jit.script
+
+        Trace model is enabled by default.
+        """
+        self.Set(trace_model=trace_model)
+        return self
+
+
+class _TrainingOptions(_OptionsDict):
+    """Options specific to model training.
+    """
+
+    def __init__(self):
+        super().__init__(gradient_accumulation=1)
+
+    def gradientAccumulation(self, gradient_accumulation):
+        self.Set(gradient_accumulation=gradient_accumulation)
+        return self
+
+
+class _PopartOptions:
+    """Options specific to the Popart backend.
+    Only for advanced users.
+    """
+
+    def __init__(self):
+        self.options = {}
+
+    def Set(self, key, value):
+        self.options[key] = value
+        return self
+
+
+class AnchorMode(enum.IntEnum):
+    """
+    All: Return a result for each batch.
+    Sum: Return the sum of all the batches
+    Final: Return the last batch.
+    EveryN: Return every N batches. N is passed in as |anchor_return_period|
+    Default: "All" for inference, "Final" for training.
+    """
+    Final = 0
+    EveryN = 1
+    All = 2
+    Sum = 3
+    Default = 4
+
+
+class Options(_OptionsDict):
+    def __init__(self):
+        self._jit = _JitOptions()
+        self._training = _TrainingOptions()
+        self._popart = _PopartOptions()
+
+        super().__init__(
+            enable_pipelining=False,
+            replication_factor=1,
+            device_iterations=1,
+            log_dir=".",
+            profile=False,
+            anchor_mode=AnchorMode.Default.value,
+            anchor_return_period=1,
+        )
+
+    @property
+    def Jit(self):
+        return self._jit
+
+    @property
+    def Training(self):
+        return self._training
+
+    @property
+    def Popart(self):
+        return self._popart
+
+    def deviceIterations(self, device_iterations):
+        self.Set(device_iterations=device_iterations)
+        return self
+
+    def enablePipelining(self, enable_pipelining):
+        self.Set(enable_pipelining=enable_pipelining)
+        return self
+
+    def replicationFactor(self, replication_factor):
+        self.Set(replication_factor=replication_factor)
+        return self
+
+    def logDir(self, log_dir):
+        """Where to save log files (Default: Current directory)"""
+        self.Set(log_dir=log_dir)
+        return self
+
+    def profile(self, profile):
+        """Enable profiling (Default: False)"""
+        self.Set(profile=profile)
+        return self
+
+    def anchorMode(self, anchor_mode, anchor_return_period=None):
+        """ How much data to return from a model
+
+        Args:
+            anchor_mode:
+                All: Return a result for each batch.
+                Sum: Return the sum of all the batches
+                Final: Return the last batch.
+                EveryN: Return every N batches. N is passed in as |anchor_return_period|
+                Default: "All" for inference, "Final" for training.
+        """
+        assert isinstance(anchor_mode, AnchorMode)
+
+        # Check the anchor return period makes sense.
+        if anchor_mode == AnchorMode.EveryN:
+            assert anchor_return_period and anchor_return_period > 0, "EveryN anchor must have anchor_return_period set to valid positive integer"
+        elif anchor_return_period:
+            logging.info(
+                "Anchor return period argument ignored with anchor_mode set to %s"
+                % anchor_mode)
+
+        self.Set(anchor_mode=anchor_mode.value,
+                 anchor_return_period=anchor_return_period or 1)
+        return self
+
+    def defaultAnchorMode(self):
+        return self.anchor_mode == AnchorMode.Default
+
+    def toDict(self):
+        """ Merge all the options, except for the Jit ones, into a single dictionary to be serialised and passed to the cpp side."""
+        if self.defaultAnchorMode():
+            import pdb
+            pdb.set_trace()
+        assert not self.defaultAnchorMode(
+        ), "An anchor mode must be picked before serialisation"
+        out = {}
+        out.update(self._popart.options)
+        out = self.Update(out)
+        out = self._training.Update(out)
+        return out
 
 
 class IPU(nn.Module):
     def __init__(self, ipu_id, layer_to_call=None):
-        super(IPU, self).__init__()
+        super().__init__()
 
         self.ipu_id = ipu_id
         self.layer_to_call = layer_to_call
@@ -171,28 +343,12 @@ class _Args:
         return tuple(self._args)
 
 
-class PoplarExecutor:
-    def __init__(self,
-                 model,
-                 training,
-                 device_iterations,
-                 trace_model,
-                 anchor_mode,
-                 anchor_return_period,
-                 replication_factor=1,
-                 gradient_accumulation=1,
-                 profile=False,
-                 optimizer={}):
-        self.anchor_mode = anchor_mode
-        self.anchor_return_period = anchor_return_period
+class _PoplarExecutor:
+    def __init__(self, model, options, training, optimizer={}):
         self.executable = None
+        self.options = options
         self.model = model
         self.training = training
-        self.device_iterations = device_iterations
-        self.gradient_accumulation = gradient_accumulation
-        self.replication_factor = replication_factor
-        self.profile = profile
-        self.trace_model = trace_model
         self.optimizer = optimizer
         self.new_optimizer = optimizer
         self.warned_not_contiguous_input = False
@@ -224,11 +380,11 @@ class PoplarExecutor:
         if self.executable == None:
             logger.info(
                 "First time call to model will invoke poplar compilation. " +
-                str(self.device_iterations) + " " + str(self.training))
+                str(self.options.device_iterations) + " " + str(self.training))
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we should slice it up so we compile by the batch size alone.
-            extra_poplar_batch_dims = self.device_iterations * \
-                self.replication_factor * self.gradient_accumulation
+            extra_poplar_batch_dims = self.options.device_iterations * \
+                self.options.replication_factor * self.options.Training.gradient_accumulation
 
             # There are two concepts of batch size. First is the "model" batch size then there is the
             # concept of batching at the popart level. Here we divide by the popart batch size so the
@@ -242,17 +398,14 @@ class PoplarExecutor:
                     t, torch.Tensor) else t)
 
             # Compile the poplar executable based on the batchsize.
-            if self.trace_model:
+            if self.options.Jit.trace_model:
                 logger.info('Compiling the model using tracing')
                 n = torch.jit.trace(self.model,
                                     in_tensors_trace_view.asTuple())
 
                 self.executable = compileWithTrace(
                     n._c, in_tensors_trace_view.asTuple(),
-                    self.device_iterations, self.training,
-                    self.replication_factor, self.gradient_accumulation,
-                    self.optimizer, self.anchor_mode,
-                    self.anchor_return_period, self.profile)
+                    self.options.toDict(), self.training, self.optimizer)
             else:
                 logger.info('Compiling the model using scripting')
                 n = torch.jit.script(self.model)
@@ -264,15 +417,13 @@ class PoplarExecutor:
 
                 self.executable = compileWithScript(
                     n._c, n.graph, in_tensors_trace_view.asTuple(),
-                    self.device_iterations, self.training,
-                    self.replication_factor, self.gradient_accumulation,
-                    self.anchor_mode, self.anchor_return_period, self.profile)
+                    self.options.toDict(), self.training)
 
         # Execute the poplar executable with the full size (batch * device interations)
         if self.new_optimizer and self.new_optimizer != self.optimizer:
             self.optimizer = self.new_optimizer
             output = execute(self.executable, in_tensors.asTuple(),
-                             convertOptimizerToDict(self.optimizer))
+                             _convertOptimizerToDict(self.optimizer))
         else:
             output = execute(self.executable, in_tensors.asTuple(), {})
 
@@ -282,49 +433,19 @@ class PoplarExecutor:
             return output[0]
 
 
-def isValidAnchorMode(anchor_mode, anchor_return_period):
-
-    # Check this is a supported anchor type.
-    supported_anchor_modes = ["FINAL", "ALL", "SUM", "EVERYN"]
-    assert anchor_mode in supported_anchor_modes, "Unsupported anchor mode %s, must be one of: %s" % (
-        anchor_mode, str(supported_anchor_modes))
-
-    # Check the anchor return period makes sense.
-    if anchor_mode == "EVERYN":
-        validEveryN = anchor_return_period != None and anchor_return_period > 0
-        assert validEveryN, "EveryN anchor must have anchor_return_period set to valid positive integer"
-    elif anchor_mode != "EVERYN" and anchor_return_period != None:
-        logging.info(
-            "Anchor return period argument ignored with anchor_mode set to %s"
-            % anchor_mode)
-
-
-def trainingModel(
-        model,
-        device_iterations,
-        gradient_accumulation=1,
-        replication_factor=1,
-        profile=False,
-        trace_model=True,
-        loss=None,
-        optimizer=None,
+def trainingModel(model, options=None, loss=None, optimizer=None):
+    options = options or Options()
+    if options.defaultAnchorMode():
         # In training it makes sense to see only the last result, by default.
-        anchor_mode="FINAL",
-        anchor_return_period=None,  # Only applies if anchor_mode is "EVERY_N"
-):
-
-    isValidAnchorMode(anchor_mode, anchor_return_period)
-    if anchor_return_period == None:
-        anchor_return_period = 1
-
+        options.anchorMode(AnchorMode.Final)
     if not optimizer:
         optimizer = optim.SGD(model.parameters(), lr=0.01)
 
-    optimizer = convertOptimizerToDict(optimizer)
+    optimizer = _convertOptimizerToDict(optimizer)
 
     class ModelTrainingWrapper(nn.Module):
         def __init__(self, model, loss=None):
-            super(ModelTrainingWrapper, self).__init__()
+            super().__init__()
             self.model = model
             self.loss = loss
 
@@ -338,40 +459,18 @@ def trainingModel(
             return output
 
     wrappedModel = ModelTrainingWrapper(model, loss)
-    return PoplarExecutor(model=wrappedModel,
-                          training=True,
-                          device_iterations=device_iterations,
-                          gradient_accumulation=gradient_accumulation,
-                          replication_factor=replication_factor,
-                          profile=profile,
-                          trace_model=trace_model,
-                          optimizer=optimizer,
-                          anchor_mode=anchor_mode,
-                          anchor_return_period=anchor_return_period)
+    return _PoplarExecutor(model=wrappedModel,
+                           options=options,
+                           training=True,
+                           optimizer=optimizer)
 
 
-def inferenceModel(
-        model,
-        device_iterations=1,
-        replication_factor=1,
-        profile=False,
-        trace_model=True,
-        # In inference it makes sense to see the result of every batch, by default.
-        anchor_mode="ALL",
-        anchor_return_period=None,  # Only applies if anchor_mode is "EVERY_N"
-):
-    isValidAnchorMode(anchor_mode, anchor_return_period)
-    if anchor_return_period == None:
-        anchor_return_period = 1
-
-    return PoplarExecutor(model=model,
-                          training=False,
-                          replication_factor=replication_factor,
-                          device_iterations=device_iterations,
-                          profile=profile,
-                          trace_model=trace_model,
-                          anchor_mode=anchor_mode,
-                          anchor_return_period=anchor_return_period)
+def inferenceModel(model, options=None):
+    options = options or Options()
+    if options.defaultAnchorMode():
+        # In inference it makes sense to see all the results, by default.
+        options.anchorMode(AnchorMode.All)
+    return _PoplarExecutor(model=model, options=options, training=False)
 
 
 def propagateInputShapes(graph, dummyInputs):

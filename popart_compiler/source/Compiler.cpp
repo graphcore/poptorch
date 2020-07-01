@@ -64,9 +64,18 @@ public:
   // identity op.
   std::vector<popart::TensorId> losses;
 
-  std::uint64_t steps;
-  std::uint64_t replicationFactor;
-  std::uint64_t gradientAccumulation;
+  popart::SessionOptions popartOptions;
+  struct Options {
+    bool profile;
+    std::uint64_t steps;
+    PopartAnchorTypes anchorMode;
+    std::uint64_t anchorReturnPeriod;
+  };
+
+  // List of options which have been explicitely set by the user.
+  std::set<std::string> optionsSet;
+
+  Options options;
 
   // We add operations using a state based system so the user would set the
   // active IPU and all subsequent operations will be added to that IPU until
@@ -92,6 +101,159 @@ public:
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 };
+
+struct SessionOptionsImpl {
+  SessionOptionsImpl();
+
+  std::map<std::string, std::function<void(bool)>> boolOptions;
+  std::map<std::string, std::function<void(std::uint64_t)>> uint64Options;
+  std::map<std::string, std::function<void(std::string)>> stringOptions;
+  std::map<std::string, std::function<void(double)>> doubleOptions;
+  std::set<std::string> optionsSet;
+
+  popart::SessionOptions popartOptions;
+  CompilerImpl::Options poptorchOptions;
+
+  template <typename ValueType>
+  void Set(const std::string &key, ValueType value,
+           std::map<std::string, std::function<void(ValueType)>> &options,
+           const std::string &typeStr) {
+    auto it = options.find(key);
+    ERROR_ON_MSG(it == options.end(),
+                 "Unknown " << typeStr << " option " << key);
+    it->second(value);
+    optionsSet.insert(key);
+  }
+};
+
+SessionOptionsImpl::SessionOptionsImpl() : popartOptions(), poptorchOptions() {
+  // The keys must match the name and type of the attributes of SessionOptions
+  // in python/__init__.py
+  boolOptions["profile"] = [&](bool value) { poptorchOptions.profile = value; };
+  boolOptions["constant_weights"] = [&](bool value) {
+    popartOptions.constantWeights = value;
+  };
+  boolOptions["enable_pipelining"] = [&](bool value) {
+    popartOptions.enablePipelining = value;
+  };
+
+  uint64Options["device_iterations"] = [&](std::uint64_t value) {
+    poptorchOptions.steps = value;
+  };
+  uint64Options["gradient_accumulation"] = [&](std::uint64_t value) {
+    popartOptions.accumulationFactor = value;
+  };
+  uint64Options["anchor_return_period"] = [&](std::uint64_t value) {
+    poptorchOptions.anchorReturnPeriod = value;
+  };
+  uint64Options["replication_factor"] = [&](std::uint64_t value) {
+    popartOptions.replicatedGraphCount = value;
+  };
+
+  uint64Options["anchor_mode"] = [&](std::uint64_t value) {
+    ERROR_ON_MSG(value >= static_cast<std::uint64_t>(PopartAnchorTypes::N),
+                 "Value for PopartAnchorTypes out of range");
+    poptorchOptions.anchorMode = static_cast<PopartAnchorTypes>(value);
+  };
+
+  stringOptions["log_dir"] = [&](std::string value) {
+    popartOptions.logDir = value;
+  };
+
+  stringOptions["logDir"] = [&](std::string) {
+    logging::warn(
+        "Ignoring call to poptorch.Options.Popart.Set(\"logDir\",...): use "
+        "poptorch.Options.logDir() instead");
+  };
+
+#define ADD_POPART_ENUM_OPTION(name, EnumType)                                 \
+  uint64Options[#name] = [&](std::uint64_t value) {                            \
+    ERROR_ON_MSG(value >= static_cast<std::uint64_t>(popart::EnumType::N),     \
+                 "Value for " << #EnumType << " out of range");                \
+    popartOptions.name = static_cast<popart::EnumType>(value);                 \
+  }
+
+#define ADD_POPART_BOOL_OPTION(name)                                           \
+  boolOptions[#name] = [&](bool value) { popartOptions.name = value; }
+#define ADD_POPART_UINT64_OPTION(name)                                         \
+  uint64Options[#name] = [&](std::uint64_t value) {                            \
+    popartOptions.name = value;                                                \
+  }
+
+#define ADD_POPART_DOUBLE_OPTION(name)                                         \
+  doubleOptions[#name] = [&](double value) { popartOptions.name = value; }
+
+#define ADD_POPART_STRING_OPTION(name)                                         \
+  stringOptions[#name] = [&](std::string value) { popartOptions.name = value; }
+
+  ADD_POPART_ENUM_OPTION(autoRecomputation, RecomputationType);
+  ADD_POPART_ENUM_OPTION(mergeVarUpdate, MergeVarUpdateType);
+  ADD_POPART_ENUM_OPTION(virtualGraphMode, VirtualGraphMode);
+  ADD_POPART_ENUM_OPTION(syntheticDataMode, SyntheticDataMode);
+
+  ADD_POPART_STRING_OPTION(cachePath);
+  ADD_POPART_STRING_OPTION(partialsTypeMatMuls);
+  ADD_POPART_STRING_OPTION(customCodeletCompileFlags);
+  ADD_POPART_STRING_OPTION(serializedPoprithmsAnnealGraphsDir);
+  ADD_POPART_STRING_OPTION(kahnTieBreaker);
+  ADD_POPART_STRING_OPTION(ipuSystemType);
+
+  ADD_POPART_UINT64_OPTION(firstDotOp);
+  ADD_POPART_UINT64_OPTION(finalDotOp);
+  ADD_POPART_UINT64_OPTION(pingPongPhases);
+  ADD_POPART_UINT64_OPTION(numIOTiles);
+  ADD_POPART_UINT64_OPTION(batchSerializationFactor);
+  ADD_POPART_UINT64_OPTION(mergeVarUpdateMemThreshold);
+  ADD_POPART_UINT64_OPTION(looseThresholdAtPeak);
+  ADD_POPART_UINT64_OPTION(accumulationFactor);
+  ADD_POPART_UINT64_OPTION(swapLimitScheduler);
+  ADD_POPART_UINT64_OPTION(globalReplicationFactor);
+  ADD_POPART_UINT64_OPTION(globalReplicaOffset);
+  ADD_POPART_UINT64_OPTION(replicatedWeightShardingMinNumElements);
+
+  ADD_POPART_BOOL_OPTION(dotOpNames);
+  ADD_POPART_BOOL_OPTION(exportPoplarComputationGraph);
+  ADD_POPART_BOOL_OPTION(exportPoplarVertexGraph);
+  ADD_POPART_BOOL_OPTION(separateCallOpPdfs);
+  ADD_POPART_BOOL_OPTION(enableOutlining);
+  ADD_POPART_BOOL_OPTION(enableOutliningCopyCostPruning);
+  ADD_POPART_BOOL_OPTION(rearrangeAnchorsOnHost);
+  ADD_POPART_BOOL_OPTION(enablePrefetchDatastreams);
+  ADD_POPART_BOOL_OPTION(enableNonStableSoftmax);
+  ADD_POPART_BOOL_OPTION(enableReplicatedGraphs);
+  ADD_POPART_BOOL_OPTION(enableGradientAccumulation);
+  ADD_POPART_BOOL_OPTION(instrumentWithHardwareCycleCounter);
+  ADD_POPART_BOOL_OPTION(enablePipelining);
+  ADD_POPART_BOOL_OPTION(disableGradAccumulationTensorStreams);
+  ADD_POPART_BOOL_OPTION(compileEngine);
+  ADD_POPART_BOOL_OPTION(constantWeights);
+  ADD_POPART_BOOL_OPTION(enableEngineCaching);
+  ADD_POPART_BOOL_OPTION(enableFloatingPointChecks);
+  ADD_POPART_BOOL_OPTION(enableStochasticRounding);
+  ADD_POPART_BOOL_OPTION(explicitRecomputation);
+  ADD_POPART_BOOL_OPTION(replicatedWeightSharding);
+  ADD_POPART_BOOL_OPTION(aliasZeroCopy);
+  ADD_POPART_BOOL_OPTION(delayVarUpdates);
+  ADD_POPART_BOOL_OPTION(enableFullyConnectedPass);
+  ADD_POPART_BOOL_OPTION(enableGroupedMatmuls);
+  ADD_POPART_BOOL_OPTION(enableSerializedMatmuls);
+  ADD_POPART_BOOL_OPTION(enableStableNorm);
+  ADD_POPART_BOOL_OPTION(hostAllReduce);
+  ADD_POPART_BOOL_OPTION(hostWeightUpdate);
+  ADD_POPART_BOOL_OPTION(hostAllReduceRemoteBuffer);
+  ADD_POPART_BOOL_OPTION(decomposeGradSum);
+  ADD_POPART_BOOL_OPTION(enableDistributedReplicatedGraphs);
+  ADD_POPART_BOOL_OPTION(groupHostSync);
+
+  ADD_POPART_DOUBLE_OPTION(outlineThreshold);
+  ADD_POPART_DOUBLE_OPTION(timeLimitScheduler);
+
+#undef ADD_POPART_STRING_OPTION
+#undef ADD_POPART_UINT64_OPTION
+#undef ADD_POPART_BOOL_OPTION
+#undef ADD_POPART_DOUBLE_OPTION
+#undef ADD_POPART_ENUM_OPTION
+}
 
 popart::TensorId
 CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
@@ -326,16 +488,15 @@ Compiler::AddInitializedInputTensor(const char *name, const char *type,
   return impl->ids.size() - 1;
 }
 
-void Compiler::AddOutputTensor(poptorch::TensorId output,
-                               PopartAnchorTypes anchorMode,
-                               std::uint64_t anchorReturnPeriod) {
+void Compiler::AddOutputTensor(poptorch::TensorId output) {
   impl->outputs.push_back(impl->ids[output]);
-  const char *asStr = anchorTypeToString(anchorMode);
+  const char *asStr = anchorTypeToString(impl->options.anchorMode);
 
   // If we are returning EveryN we need to pass in the return period.
-  if (anchorMode == PopartAnchorTypes::EveryN) {
-    impl->anchors.insert({impl->ids[output],
-                          popart::AnchorReturnType(asStr, anchorReturnPeriod)});
+  if (impl->options.anchorMode == PopartAnchorTypes::EveryN) {
+    impl->anchors.insert(
+        {impl->ids[output],
+         popart::AnchorReturnType(asStr, impl->options.anchorReturnPeriod)});
   } else {
     impl->anchors.insert({impl->ids[output], popart::AnchorReturnType(asStr)});
   }
@@ -401,56 +562,82 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
   }
 }
 
-void Compiler::InitSession(bool profile, const Optimizer &opt) {
+void Compiler::InitSession(const Optimizer &opt) {
   // Try and get a single IPU. If not avaliable, run on CPU.
   // TODO(T22642): Make an actual device selection mechanism.
   std::shared_ptr<popart::DeviceInfo> device =
       popart::DeviceManager::createDeviceManager().acquireAvailableDevice(
-          impl->usedIpus.size() * impl->replicationFactor);
+          impl->usedIpus.size() * impl->popartOptions.replicatedGraphCount);
 
   if (!device) {
     logging::warn("No IPU device found, falling back to CPU emulator (IPU "
                   "Model) number of IPUs requested {}",
-                  impl->usedIpus.size() * impl->replicationFactor);
+                  impl->usedIpus.size() *
+                      impl->popartOptions.replicatedGraphCount);
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
   } else {
     logging::debug("Acquired IPU device, running on device.");
   }
 
-  popart::SessionOptions options;
-
-  options.logDir = ".";
-
-  options.enableReplicatedGraphs = impl->replicationFactor != 1;
-  options.replicatedGraphCount = impl->replicationFactor;
+  popart::SessionOptions &options = impl->popartOptions;
+  bool enableReplicatedGraphs = impl->popartOptions.replicatedGraphCount != 1;
+  if (impl->optionsSet.count("enableReplicatedGraphs") &&
+      options.enableReplicatedGraphs != enableReplicatedGraphs) {
+    logging::warn("enableReplicatedGraphs forced by the user to {}",
+                  options.enableReplicatedGraphs);
+  } else {
+    options.enableReplicatedGraphs = enableReplicatedGraphs;
+  }
 
   logging::info("Popart replication enabled: {} with factor set to {}",
                 options.enableReplicatedGraphs, options.replicatedGraphCount);
 
-  if (impl->usedIpus.size() > 1) {
-    options.enablePipelining = true;
-    options.virtualGraphMode = popart::VirtualGraphMode::Manual;
+  // Causes problems with Popart
+  const bool constantWeights = false;
+  if (impl->optionsSet.count("constantWeights") &&
+      options.constantWeights != constantWeights) {
+    logging::warn("constantWeights forced by the user to {}",
+                  options.constantWeights);
+  } else {
+    options.constantWeights = constantWeights;
   }
 
-  if (impl->gradientAccumulation > 1) {
-    options.enableGradientAccumulation = true;
-    options.accumulationFactor = impl->gradientAccumulation;
+  if (impl->usedIpus.size() > 1) {
+    if (!options.enablePipelining) {
+      logging::warn("Using {} IPUs but "
+                    "poptorch.Options.enablePipelining() is False",
+                    impl->usedIpus.size());
+    }
+    if (impl->optionsSet.count("virtualGraphMode") &&
+        options.virtualGraphMode != popart::VirtualGraphMode::Manual) {
+      logging::warn("virtualGraphMode forced by the user to {} ",
+                    popart::toString(options.virtualGraphMode));
+    } else {
+      options.virtualGraphMode = popart::VirtualGraphMode::Manual;
+    }
+  }
+
+  bool enableGradientAccumulation = options.accumulationFactor > 1;
+  if (impl->optionsSet.count("enableGradientAccumulation") &&
+      !options.enableGradientAccumulation) {
+    logging::warn("enableGradientAccumulation forced by the user to {}",
+                  options.enableGradientAccumulation);
+  } else {
+    options.enableGradientAccumulation = enableGradientAccumulation;
   }
 
   // Create the anchors, these are used to copy to the host.
-  auto dataFlow = popart::DataFlow(impl->steps, impl->anchors);
+  auto dataFlow = popart::DataFlow(impl->options.steps, impl->anchors);
 
   // Create the popart session object to actually run the graph.
   if (!impl->isTraining) {
-    options.constantWeights = false;
-
     // Create an inference session.
     impl->session = popart::InferenceSession::createFromOnnxModel(
         impl->opBuilder->getModelProto(), dataFlow, device, {}, options,
         popart::PatternsLevel::Default);
   } else {
     logging::debug(
-        "Adding inital graph optimizer SGD with parameters:: Learning rate "
+        "Adding initial graph optimizer SGD with parameters:: Learning rate "
         "{}, weight decay {}, Momentum {}, Dampening {}",
         opt.learningRate.first, opt.weightDecay.first, opt.momentum.first,
         opt.dampening.first);
@@ -494,7 +681,7 @@ void Compiler::InitSession(bool profile, const Optimizer &opt) {
     std::rethrow_exception(std::current_exception());
   }
 
-  if (profile) {
+  if (impl->options.profile) {
     std::ofstream stream;
     stream.open("GraphReport.json");
     stream << impl->session->getGraphReport();
@@ -587,10 +774,11 @@ std::vector<std::int64_t> Compiler::GetSize(poptorch::TensorId id) {
 
 void Compiler::SetActiveIpu(std::uint64_t id) { impl->activeIpu = id; }
 
-std::uint64_t Compiler::BatchPerStep() const { return impl->steps; }
+std::uint64_t Compiler::BatchPerStep() const { return impl->options.steps; }
 
 std::uint64_t Compiler::PopartBatchDim() const {
-  return impl->replicationFactor * impl->steps * impl->gradientAccumulation;
+  return impl->popartOptions.replicatedGraphCount * impl->options.steps *
+         impl->popartOptions.accumulationFactor;
 }
 
 std::uint64_t Compiler::PopartBatchDimForAnchor(poptorch::TensorId id) const {
@@ -615,19 +803,17 @@ std::uint64_t Compiler::PopartBatchDimForAnchor(poptorch::TensorId id) const {
   }
 
   // Return an element for each replica.
-  return impl->replicationFactor;
+  return impl->popartOptions.replicatedGraphCount;
 }
 
 Compiler::Compiler(Compiler &&other) { impl = std::move(other.impl); }
 
-Compiler::Compiler(bool isTraining, std::uint64_t steps,
-                   std::uint64_t replicationFactor,
-                   std::uint64_t gradientAccumulation) {
+Compiler::Compiler(bool isTraining, const SessionOptions &options) {
   impl = std::make_unique<detail::CompilerImpl>();
   impl->isTraining = isTraining;
-  impl->steps = steps;
-  impl->replicationFactor = replicationFactor;
-  impl->gradientAccumulation = gradientAccumulation;
+  impl->popartOptions = options.impl->popartOptions;
+  impl->options = options.impl->poptorchOptions;
+  impl->optionsSet = options.impl->optionsSet;
 }
 
 Compiler::~Compiler() {}
@@ -640,4 +826,27 @@ const std::vector<OutputType> &Compiler::OutputTypes() const {
   return impl->outputTypes;
 }
 
+SessionOptions::SessionOptions()
+    : impl(std::make_unique<detail::SessionOptionsImpl>()) {}
+
+SessionOptions::SessionOptions(SessionOptions &&src)
+    : impl(std::move(src.impl)) {}
+
+void SessionOptions::AddStringOption(const char *option, const char *value) {
+  impl->Set<std::string>(option, value, impl->stringOptions, "string");
+}
+
+void SessionOptions::AddUInt64Option(const char *option, std::uint64_t value) {
+  impl->Set(option, value, impl->uint64Options, "uint64");
+}
+
+void SessionOptions::AddBoolOption(const char *option, bool value) {
+  impl->Set(option, value, impl->boolOptions, "bool");
+}
+
+void SessionOptions::AddDoubleOption(const char *option, double value) {
+  impl->Set(option, value, impl->doubleOptions, "floating point");
+}
+
+SessionOptions::~SessionOptions() {}
 } // namespace poptorch

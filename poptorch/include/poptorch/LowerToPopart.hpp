@@ -14,17 +14,15 @@
 #include "poptorch/PoplarExecutable.hpp"
 
 namespace poptorch {
+class SessionOptions;
 
 /*
  * Take the transformed graph and create a poponnx graph from it.
  */
-std::shared_ptr<poptorch::PoplarExecutable> lowerToPopart(
-    torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
-    std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training,
-    std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
-    const std::unordered_map<std::string, std::pair<float, bool>> &opt,
-    PopartAnchorTypes anchor_mode, std::uint64_t anchorReturnPeriod,
-    bool profile);
+std::shared_ptr<poptorch::PoplarExecutable>
+lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
+              std::vector<at::Tensor> &parameters, bool training,
+              const Optimizer &opt, const SessionOptions &options);
 
 } // namespace poptorch
 

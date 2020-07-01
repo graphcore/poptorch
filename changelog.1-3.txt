@@ -1,7 +1,9 @@
-D28569: PopTorch now exposes PopART anchor options to choose how much data to return from a model. These
-are passed into the model wrapper via |anchor_mode| options are "SUM", "ALL", "FINAL" and "EVERYN".
-    "ALL" : Return a result for each batch.
-    "SUM" : Return the sum of all the batches
-    "FINAL" : Return the last batch.
-    "EVERYN" : Return every N batches. N is passed in as |anchor_return_period|
+New features:
+- PopTorch now exposes PopART anchor options to choose how much data to return from a model. These
+are passed into the model wrapper via |anchor_mode| options are Sum, All, Final and EveryN.
+    All: Return a result for each batch.
+    Sum: Return the sum of all the batches
+    Final: Return the last batch.
+    EveryN: Return every N batches. N is passed in as |anchor_return_period|
 - Add support for batched LSTM and batch first
+- An Options object can now be passed to poptorch.trainingModel / poptorch.inferenceModel to configure the session.

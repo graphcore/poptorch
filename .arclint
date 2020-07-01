@@ -4,14 +4,20 @@
             "type": "clang-format",
             "bin": ["./.linters/clang-format", "./install_linters.sh"],
             "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
-            "exclude": "(\\.inc.h$)"
+            "exclude": [
+              "(\\.inc.h$)",
+              "(^docs/.*)"
+            ]
         },
         "cpplint": {
             "type": "cpplint",
             "bin": ["./.linters/cpplint", "./install_linters.sh"],
             "flags": ["--root=include"],
             "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
-            "exclude": "(\\.inc.h$)",
+            "exclude": [
+              "(\\.inc.h$)",
+              "(^docs/.*)"
+            ],
             "severity": {
               "runtime/references": "disabled",
               "build/c++11": "disabled",
@@ -23,7 +29,8 @@
         "yapf": {
             "type": "yapf",
             "bin": ["./.linters/yapf", "./install_linters.sh"],
-            "include": "(\\.py$)"
+            "include": "(\\.py$)",
+            "exclude": "(^docs/.*)"
         },
         "copyright":{
           "type": "script-and-regex",

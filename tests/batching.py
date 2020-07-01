@@ -20,10 +20,11 @@ def test_inferenceBatching():
     nativeOutput = model(input)
 
     # Run on IPU batch size 1 * 10 popart batches.
-    ipuModel = poptorch.inferenceModel(model, device_iterations=10)
+    opts = poptorch.Options().deviceIterations(10)
+    ipuModel = poptorch.inferenceModel(model, opts)
     poptorchOut = ipuModel(input)
 
-    # Check that inference wrapper has defaulted to "FINAL".
+    # Check that inference wrapper has defaulted to "All".
     assert len(poptorchOut.size()) == 4
     assert poptorchOut.size()[0] == 10
     torch.testing.assert_allclose(poptorchOut, nativeOutput)
@@ -41,8 +42,9 @@ def test_trainingBatching():
     model = torch.nn.Linear(10, 10)
 
     # Run on IPU batch size 1 * 10 popart batches.
+    opts = poptorch.Options().deviceIterations(10)
     poptorch_model = poptorch.trainingModel(model,
-                                            device_iterations=10,
+                                            opts,
                                             loss=torch.nn.CrossEntropyLoss())
 
     # Run all 10 batches as batchsize 10.
@@ -54,7 +56,7 @@ def test_trainingBatching():
     for i in range(0, 1000):
         poptorchOut, loss = poptorch_model(input, label)
 
-        # Each batch should NOT report its own loss. As by default training model should have a "FINAL" anchor.
+        # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
         assert len(loss.size()) == 1
         assert loss.size()[0] == 1
 
@@ -68,10 +70,7 @@ def test_trainingBatching():
     assert torch.equal(torch.argmax(out, dim=1), label)
 
 
-anchor_mode = ["ALL", "FINAL", "SUM", "EVERYN"]
-
-
-@pytest.mark.parametrize("anchor", anchor_mode)
+@pytest.mark.parametrize("anchor", list(poptorch.AnchorMode))
 def test_inferenceAnchors(anchor):
     torch.manual_seed(42)
 
@@ -84,18 +83,17 @@ def test_inferenceAnchors(anchor):
     nativeOutput = model(input)
 
     # Run on IPU batch size 1 * 10 popart batches. anchor_return_period ignored if not EVERYN
-    ipuModel = poptorch.inferenceModel(model,
-                                       device_iterations=10,
-                                       anchor_mode=anchor,
-                                       anchor_return_period=5)
+    opts = poptorch.Options().deviceIterations(10)
+    opts.anchorMode(anchor, anchor_return_period=5)
+    ipuModel = poptorch.inferenceModel(model, opts)
     poptorchOut = ipuModel(input)
 
-    if anchor == "ALL":
+    if anchor in [poptorch.AnchorMode.All, poptorch.AnchorMode.Default]:
         # Expect the full batch.
         assert len(poptorchOut.size()) == 4
         assert poptorchOut.size()[0] == 10
         torch.testing.assert_allclose(poptorchOut, nativeOutput)
-    elif anchor == "EVERYN":
+    elif anchor == poptorch.AnchorMode.EveryN:
         # Otherwise we are expecting device_iterations / N
         assert len(poptorchOut.size()) == 4
         assert poptorchOut.size()[0] == 2
@@ -109,10 +107,10 @@ def test_inferenceAnchors(anchor):
         assert len(poptorchOut.size()) == 4
         assert poptorchOut.size()[0] == 1
 
-        if anchor == "FINAL":
+        if anchor == poptorch.AnchorMode.Final:
             # Check we are the same as the last output.
             torch.testing.assert_allclose(poptorchOut, nativeOutput[-1])
-        elif anchor == "SUM":
+        elif anchor == poptorch.AnchorMode.Sum:
             # Check we are close to the sum of the batch dim.
             sum = torch.sum(nativeOutput, dim=0, keepdim=True)
             torch.testing.assert_allclose(poptorchOut, sum)
@@ -120,7 +118,7 @@ def test_inferenceAnchors(anchor):
             assert False, "Unexpected anchor type %s" % anchor
 
 
-@pytest.mark.parametrize("anchor", anchor_mode)
+@pytest.mark.parametrize("anchor", list(poptorch.AnchorMode))
 def test_trainingAnchors(anchor):
     torch.manual_seed(42)
 
@@ -138,15 +136,15 @@ def test_trainingAnchors(anchor):
     nativeOutput = model(input)
 
     # Run on IPU batch size 1 * 1000 popart batches.
+    opts = poptorch.Options().deviceIterations(1000)
+    opts.anchorMode(anchor, anchor_return_period=20)
     poptorch_model = poptorch.trainingModel(model,
-                                            device_iterations=1000,
-                                            loss=torch.nn.CrossEntropyLoss(),
-                                            anchor_mode=anchor,
-                                            anchor_return_period=20)
+                                            opts,
+                                            loss=torch.nn.CrossEntropyLoss())
 
     poptorchOut, loss = poptorch_model(input, label)
 
-    if anchor == "ALL":
+    if anchor == poptorch.AnchorMode.All:
         # Expect the full batch.
         assert len(poptorchOut.size()) == 2
         assert poptorchOut.size()[0] == 1000
@@ -166,7 +164,7 @@ def test_trainingAnchors(anchor):
 
             previous_average = new_average
 
-    elif anchor == "EVERYN":
+    elif anchor == poptorch.AnchorMode.EveryN:
         # Otherwise we are expecting device_iterations / N
         assert len(poptorchOut.size()) == 2
         assert poptorchOut.size()[0] == 50
@@ -182,12 +180,12 @@ def test_trainingAnchors(anchor):
         assert len(loss.size()) == 1
         assert loss.size()[0] == 1
 
-        if anchor == "FINAL":
+        if anchor in [poptorch.AnchorMode.Final, poptorch.AnchorMode.Default]:
             # We just have to check the loss is small.
             # This is just relative to the previously observed loss values on this test with this seed.
             assert loss < 0.2
 
-        elif anchor == "SUM":
+        elif anchor == poptorch.AnchorMode.Sum:
             # We just have to check that the loss is huge.
             assert loss > 500.0
         else:

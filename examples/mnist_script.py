@@ -74,7 +74,9 @@ d0, _ = next(iter(validation_data))
 model = Network()
 model.eval()
 
-inference_model = poptorch.inferenceModel(model, 4, trace_model=False)
+opts = poptorch.Options().deviceIterations(4)
+opts.Jit.traceModel(False)
+inference_model = poptorch.inferenceModel(model, opts)
 result = inference_model(d0)
 result = result.numpy()
 

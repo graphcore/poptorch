@@ -39,7 +39,6 @@ def test_L1Loss_training():
 
         poptorch_model = poptorch.trainingModel(
             model,
-            device_iterations=1,
             loss=torch.nn.L1Loss(reduction=reduction),
             optimizer=optim.SGD(model.parameters(), lr=0.01))
 
@@ -100,9 +99,7 @@ def test_MSELoss_training():
 
     model = torch.nn.Linear(10, 10)
 
-    poptorch_model = poptorch.trainingModel(model,
-                                            device_iterations=1,
-                                            loss=torch.nn.MSELoss())
+    poptorch_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
 
     target = torch.randn(10)
     input = torch.randn(10)
@@ -156,7 +153,7 @@ def test_LogSoftmax():
     model = Net()
 
     poptorch_model = poptorch.trainingModel(
-        model, device_iterations=1, loss=torch.nn.NLLLoss(reduction="mean"))
+        model, loss=torch.nn.NLLLoss(reduction="mean"))
 
     for i in range(0, 10):
         label = torch.randint(0, 10, [1])
@@ -193,9 +190,7 @@ def test_NLLLoss_training():
         model = Net()
 
         poptorch_model = poptorch.trainingModel(
-            model,
-            device_iterations=1,
-            loss=torch.nn.NLLLoss(reduction=reduction))
+            model, loss=torch.nn.NLLLoss(reduction=reduction))
         input = torch.randn(1, 10)
         label = torch.randint(0, 10, [1])
 
@@ -221,9 +216,7 @@ def test_CrossEntropyLoss_training():
         model = torch.nn.Linear(10, 10)
 
         poptorch_model = poptorch.trainingModel(
-            model,
-            device_iterations=1,
-            loss=torch.nn.CrossEntropyLoss(reduction=reduction))
+            model, loss=torch.nn.CrossEntropyLoss(reduction=reduction))
         input = torch.randn(1, 10)
         label = torch.randint(0, 10, [1])
 
@@ -292,7 +285,6 @@ def test_BCE_training():
 
         poptorch_model = poptorch.trainingModel(
             model,
-            device_iterations=1,
             loss=torch.nn.BCELoss(reduction=reduction),
             optimizer=optim.SGD(model.parameters(), lr=0.1))
 

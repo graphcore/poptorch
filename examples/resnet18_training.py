@@ -49,11 +49,9 @@ class NormWrapper(torch.nn.Module):
 model = models.resnet18(pretrained=False, norm_layer=NormWrapper)
 model.train()
 
-training_model = poptorch.trainingModel(
-    model,
-    training_ipu_step_size,
-    gradient_accumulation=gradient_accumulation,
-    loss=torch.nn.NLLLoss())
+opts = poptorch.Options().deviceIterations(training_ipu_step_size)
+opts.Training.gradientAccumulation(gradient_accumulation)
+training_model = poptorch.trainingModel(model, opts, loss=torch.nn.NLLLoss())
 
 
 def train():

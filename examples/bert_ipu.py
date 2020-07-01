@@ -33,7 +33,8 @@ if running_on_hardware:
         1, model.bert.embeddings.position_embeddings)
 
 # Mark model for inference.
-inference_model = poptorch.inferenceModel(model, device_iterations=batches)
+opts = poptorch.Options().deviceIterations(batches)
+inference_model = poptorch.inferenceModel(model, opts)
 
 # Batch by the number of iterations so we fill the pipeline.
 encoding, input_ids, attention_mask = [None] * batches, [None] * batches, [

@@ -15,9 +15,10 @@ def test_SGD():
     # "Train" with learning rate of zero and check the loss remains the same.
     optimizer = optim.SGD(model.parameters(), lr=0.00)
 
+    opts = poptorch.Options().deviceIterations(1)
     poptorch_model = poptorch.trainingModel(
         model,
-        device_iterations=1,
+        opts,
         loss=torch.nn.CrossEntropyLoss(reduction="mean"),
         optimizer=optimizer)
 

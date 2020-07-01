@@ -2,14 +2,12 @@
 #include "poptorch/PoplarExecutable.hpp"
 #include <iostream>
 #include <string>
-#include <unordered_map>
 
 namespace poptorch {
 
-std::vector<at::IValue> PoplarExecutable::Run(
-    std::vector<at::Tensor> &inTensors,
-    const std::unordered_map<std::string, std::pair<float, bool>>
-        &optimizerParameters) {
+std::vector<at::IValue>
+PoplarExecutable::Run(std::vector<at::Tensor> &inTensors,
+                      const Optimizer &optimizer) {
   std::vector<at::Tensor> tensor_views;
 
   // Set up the input tensors in the poplar graph to point to the incoming
@@ -75,7 +73,7 @@ std::vector<at::IValue> PoplarExecutable::Run(
   }
 
   // Execute the compiled poplar graph.
-  compiler.Run(optimizerParameters);
+  compiler.Run(optimizer);
 
   return returnees;
 }

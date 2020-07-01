@@ -16,6 +16,7 @@
 #include <iostream>
 #include <unordered_map>
 
+#include "popart_compiler/Compiler.hpp"
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/Peephole.hpp"
@@ -50,8 +51,7 @@ namespace {
 
 // Process the user provided dictionary and extract the relevant optimizer
 // information.
-std::unordered_map<std::string, std::pair<float, bool>>
-processDict(const py::dict &opt) {
+Optimizer parseOptimizer(const py::dict &opt) {
   std::unordered_map<std::string, std::pair<float, bool>> optimizer;
 
   for (auto element : opt) {
@@ -60,7 +60,35 @@ processDict(const py::dict &opt) {
     optimizer[element.first.cast<std::string>()] = p;
   }
 
-  return optimizer;
+  return {optimizer};
+}
+
+SessionOptions parseSessionOptions(const py::dict &opt) {
+  // steps, replicationFactor, profile
+  SessionOptions options;
+
+  for (auto element : opt) {
+    // Exception _trace_model is only used by Python
+    if (element.first.cast<std::string>() == "_trace_model") {
+      continue;
+    }
+    if (py::isinstance<py::bool_>(element.second)) {
+      options.AddBoolOption(element.first.cast<std::string>().c_str(),
+                            element.second.cast<bool>());
+    } else if (py::isinstance<py::float_>(element.second)) {
+      options.AddDoubleOption(element.first.cast<std::string>().c_str(),
+                              element.second.cast<double>());
+    } else if (py::isinstance<py::int_>(element.second)) {
+      options.AddUInt64Option(element.first.cast<std::string>().c_str(),
+                              element.second.cast<std::uint64_t>());
+    } else if (py::isinstance<py::str>(element.second)) {
+      options.AddStringOption(element.first.cast<std::string>().c_str(),
+                              element.second.cast<std::string>().c_str());
+    } else {
+      ERROR("Unknown option type " << element.second.get_type());
+    }
+  }
+  return std::move(options);
 }
 
 void buildTensorList(const torch::jit::IValue &value,
@@ -119,10 +147,10 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
     buildTensorList(value, inputTensors);
   }
 
-  std::unordered_map<std::string, std::pair<float, bool>> optimizer{};
+  Optimizer optimizer{{}};
 
   if (optimizerDict) {
-    optimizer = processDict(*optimizerDict);
+    optimizer = parseOptimizer(*optimizerDict);
   }
 
   std::vector<at::IValue> outputTensors =
@@ -205,11 +233,8 @@ void constantPropagation(torch::jit::Graph *graph) {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
-                 bool training, std::uint64_t replicationFactor,
-                 std::uint64_t gradientAccumulation, py::dict optimizerDict,
-                 const std::string &anchorMode,
-                 std::uint64_t anchorReturnPeriod, bool profile) {
+compileWithTrace(py::handle h, pybind11::tuple inputs, pybind11::dict options,
+                 bool training, py::dict optimizerDict) {
   auto module = as_module(h);
 
   auto forward = module->get_method("forward");
@@ -217,8 +242,7 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
       torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
   auto graph = graphAndTensors.first;
 
-  std::unordered_map<std::string, std::pair<float, bool>> optimizer =
-      processDict(optimizerDict);
+  Optimizer optimizer = parseOptimizer(optimizerDict);
 
   torch::jit::EliminateDeadCode(graph);
   torch::jit::PeepholeOptimize(graph);
@@ -262,17 +286,13 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  return poptorch::lowerToPopart(
-      *graph, inputTensors, parameterData, steps, training, replicationFactor,
-      gradientAccumulation, optimizer, anchorTypeFromString(anchorMode),
-      anchorReturnPeriod, profile);
+  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, training,
+                                 optimizer, parseSessionOptions(options));
 }
 
-std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
-    py::handle h, py::handle g, pybind11::tuple inputs, std::uint64_t steps,
-    bool training, std::uint64_t replicationFactor,
-    std::uint64_t gradientAccumulation, const std::string &anchorMode,
-    std::uint64_t anchorReturnPeriod, bool profile) {
+std::shared_ptr<poptorch::PoplarExecutable>
+compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
+                  pybind11::dict options, bool training) {
   auto module = as_module(h);
   auto argGraph = as_graph(g);
 
@@ -332,10 +352,9 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  return poptorch::lowerToPopart(
-      *graph, inputTensors, parameterData, steps, training, replicationFactor,
-      gradientAccumulation, {}, anchorTypeFromString(anchorMode),
-      anchorReturnPeriod, profile);
+  Optimizer optimizer{{}};
+  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, training,
+                                 optimizer, parseSessionOptions(options));
 }
 
 void pyPropagateInputShapes(py::handle h) {
