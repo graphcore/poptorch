@@ -1,5 +1,5 @@
-PyTorch for the IPU: User Guide
-===============================
+PyTorch for the IPU (Preview): User Guide
+=========================================
 
 .. gcdoc::
     :verb-borders:
@@ -13,3 +13,4 @@ PyTorch for the IPU: User Guide
     batching
     supported_ops
     example
+    legal
