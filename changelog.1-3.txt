@@ -1,0 +1,6 @@
+D28569: PopTorch now exposes PopART anchor options to choose how much data to return from a model. These
+are passed into the model wrapper via |anchor_mode| options are "SUM", "ALL", "FINAL" and "EVERYN".
+    "ALL" : Return a result for each batch.
+    "SUM" : Return the sum of all the batches
+    "FINAL" : Return the last batch.
+    "EVERYN" : Return every N batches. N is passed in as |anchor_return_period|

@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "popart_compiler/PopartEnums.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -18,32 +19,6 @@ using TensorId = std::size_t;
 namespace detail {
 struct CompilerImpl;
 }
-
-enum OptimizerType : std::uint8_t { NONE, SGD };
-
-// Taken directly from popart.
-enum PopartTypes {
-  // fixed point types
-  UINT8 = 0,
-  INT8,
-  UINT16,
-  INT16,
-  INT32,
-  INT64,
-  UINT32,
-  UINT64,
-  BOOL,
-  // floating point types
-  FLOAT,
-  FLOAT16,
-  BFLOAT16,
-  DOUBLE,
-  COMPLEX64,
-  COMPLEX128,
-  // other types
-  STRING,
-  UNDEFINED,
-};
 
 struct OutputType {
   enum class Type { Tensor, Tuple, List };
@@ -149,7 +124,16 @@ public:
 
   void AddOutputType(OutputType type);
 
-  void AddOutputTensor(poptorch::TensorId output);
+  // This function marks |output| as being read back from the device by the
+  // host. |anchor_mode| determines how frequently that should happen.
+  // clang-format off
+  // "ALL":  Will return all popart batches.
+  // "SUM": Will return the sum of all popart batches (I.E device iterations)
+  // "EVERYN": Will return every N batch
+  // "FINAL": Will return the last batch only
+  // clang-format on
+  void AddOutputTensor(poptorch::TensorId output, PopartAnchorTypes anchorMode,
+                       std::uint64_t anchorReturnPeriod);
 
   void SetUpInputOp(poptorch::TensorId id, float *ptr,
                     const std::vector<std::int64_t> &dims);
@@ -190,7 +174,14 @@ public:
 
   std::uint64_t BatchPerStep() const;
 
+  // Return the PopART batch dimensions [DeviceIterations * ReplicationFactor *
+  // GradientAccumulation]
   std::uint64_t PopartBatchDim() const;
+
+  // Take the above and work out how much of it is being returned. ID must anbe
+  // an anchor d the batch dim will be mutated depending on what the anchor is
+  // returning.
+  std::uint64_t PopartBatchDimForAnchor(poptorch::TensorId id) const;
 
   // Return a flat representation of the output types
   // For example: ( T0, T2, (T3, T4)) is represented as:

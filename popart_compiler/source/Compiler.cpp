@@ -326,10 +326,19 @@ Compiler::AddInitializedInputTensor(const char *name, const char *type,
   return impl->ids.size() - 1;
 }
 
-void Compiler::AddOutputTensor(poptorch::TensorId output) {
+void Compiler::AddOutputTensor(poptorch::TensorId output,
+                               PopartAnchorTypes anchorMode,
+                               std::uint64_t anchorReturnPeriod) {
   impl->outputs.push_back(impl->ids[output]);
+  const char *asStr = anchorTypeToString(anchorMode);
 
-  impl->anchors.insert({impl->ids[output], popart::AnchorReturnType("ALL")});
+  // If we are returning EveryN we need to pass in the return period.
+  if (anchorMode == PopartAnchorTypes::EveryN) {
+    impl->anchors.insert({impl->ids[output],
+                          popart::AnchorReturnType(asStr, anchorReturnPeriod)});
+  } else {
+    impl->anchors.insert({impl->ids[output], popart::AnchorReturnType(asStr)});
+  }
 }
 
 void Compiler::SetUpInputOp(poptorch::TensorId id, float *ptr,
@@ -582,6 +591,31 @@ std::uint64_t Compiler::BatchPerStep() const { return impl->steps; }
 
 std::uint64_t Compiler::PopartBatchDim() const {
   return impl->replicationFactor * impl->steps * impl->gradientAccumulation;
+}
+
+std::uint64_t Compiler::PopartBatchDimForAnchor(poptorch::TensorId id) const {
+  // Get the PopART tensor from our wrapper.
+  popart::TensorId popartId = impl->ids[id];
+
+  // Check what the anchor is supposed to return.
+  auto iterator = impl->anchors.find(popartId);
+  ERROR_ON_MSG(iterator == impl->anchors.end(),
+               "Internal Error: Output op doesn't have an anchor.");
+
+  const popart::AnchorReturnType &returnType = iterator->second;
+
+  // If we are returning ALL then we are returning a full batch.
+  if (returnType.id() == popart::AnchorReturnTypeId::All) {
+    return PopartBatchDim();
+  }
+
+  // If we are copying EveryN then we will be returning N.
+  if (returnType.id() == popart::AnchorReturnTypeId::EveryN) {
+    return PopartBatchDim() / returnType.rp();
+  }
+
+  // Return an element for each replica.
+  return impl->replicationFactor;
 }
 
 Compiler::Compiler(Compiler &&other) { impl = std::move(other.impl); }

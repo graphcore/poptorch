@@ -143,10 +143,14 @@ class PoplarExecutor:
                  training,
                  device_iterations,
                  trace_model,
+                 anchor_mode,
+                 anchor_return_period,
                  replication_factor=1,
                  gradient_accumulation=1,
                  profile=False,
                  optimizer={}):
+        self.anchor_mode = anchor_mode
+        self.anchor_return_period = anchor_return_period
         self.executable = None
         self.model = model
         self.training = training
@@ -203,7 +207,8 @@ class PoplarExecutor:
                     n._c, in_tensors_trace_view.asTuple(),
                     self.device_iterations, self.training,
                     self.replication_factor, self.gradient_accumulation,
-                    self.optimizer, self.profile)
+                    self.optimizer, self.anchor_mode,
+                    self.anchor_return_period, self.profile)
             else:
                 logger.info('Compiling the model using scripting')
                 n = torch.jit.script(self.model)
@@ -217,7 +222,7 @@ class PoplarExecutor:
                     n._c, n.graph, in_tensors_trace_view.asTuple(),
                     self.device_iterations, self.training,
                     self.replication_factor, self.gradient_accumulation,
-                    self.profile)
+                    self.anchor_mode, self.anchor_return_period, self.profile)
 
         # Execute the poplar executable with the full size (batch * device interations)
         if self.new_optimizer and self.new_optimizer != self.optimizer:
@@ -233,14 +238,41 @@ class PoplarExecutor:
             return output[0]
 
 
-def trainingModel(model,
-                  device_iterations,
-                  gradient_accumulation=1,
-                  replication_factor=1,
-                  profile=False,
-                  trace_model=True,
-                  loss=None,
-                  optimizer=None):
+def isValidAnchorMode(anchor_mode, anchor_return_period):
+
+    # Check this is a supported anchor type.
+    supported_anchor_modes = ["FINAL", "ALL", "SUM", "EVERYN"]
+    assert anchor_mode in supported_anchor_modes, "Unsupported anchor mode %s, must be one of: %s" % (
+        anchor_mode, str(supported_anchor_modes))
+
+    # Check the anchor return period makes sense.
+    if anchor_mode == "EVERYN":
+        validEveryN = anchor_return_period != None and anchor_return_period > 0
+        assert validEveryN, "EveryN anchor must have anchor_return_period set to valid positive integer"
+    elif anchor_mode != "EVERYN" and anchor_return_period != None:
+        logging.info(
+            "Anchor return period argument ignored with anchor_mode set to %s"
+            % anchor_mode)
+
+
+def trainingModel(
+        model,
+        device_iterations,
+        gradient_accumulation=1,
+        replication_factor=1,
+        profile=False,
+        trace_model=True,
+        loss=None,
+        optimizer=None,
+        # In training it makes sense to see only the last result, by default.
+        anchor_mode="FINAL",
+        anchor_return_period=None,  # Only applies if anchor_mode is "EVERY_N"
+):
+
+    isValidAnchorMode(anchor_mode, anchor_return_period)
+    if anchor_return_period == None:
+        anchor_return_period = 1
+
     if not optimizer:
         optimizer = optim.SGD(model.parameters(), lr=0.01)
 
@@ -269,20 +301,33 @@ def trainingModel(model,
                           replication_factor=replication_factor,
                           profile=profile,
                           trace_model=trace_model,
-                          optimizer=optimizer)
+                          optimizer=optimizer,
+                          anchor_mode=anchor_mode,
+                          anchor_return_period=anchor_return_period)
 
 
-def inferenceModel(model,
-                   device_iterations=1,
-                   replication_factor=1,
-                   profile=False,
-                   trace_model=True):
+def inferenceModel(
+        model,
+        device_iterations=1,
+        replication_factor=1,
+        profile=False,
+        trace_model=True,
+        # In inference it makes sense to see the result of every batch, by default.
+        anchor_mode="ALL",
+        anchor_return_period=None,  # Only applies if anchor_mode is "EVERY_N"
+):
+    isValidAnchorMode(anchor_mode, anchor_return_period)
+    if anchor_return_period == None:
+        anchor_return_period = 1
+
     return PoplarExecutor(model=model,
                           training=False,
                           replication_factor=replication_factor,
                           device_iterations=device_iterations,
                           profile=profile,
-                          trace_model=trace_model)
+                          trace_model=trace_model,
+                          anchor_mode=anchor_mode,
+                          anchor_return_period=anchor_return_period)
 
 
 def propagateInputShapes(graph, dummyInputs):

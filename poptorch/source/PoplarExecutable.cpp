@@ -50,7 +50,9 @@ std::vector<at::IValue> PoplarExecutable::Run(
     if (dims.size() == 0) {
       dims.push_back(1);
     }
-    dims[0] *= compiler.PopartBatchDim();
+
+    // Adjust by the popart batch dim, accounting for the anchor.
+    dims[0] *= compiler.PopartBatchDimForAnchor(id);
 
     poptorch::PopartTypes type = compiler.GetPopartType(id);
 
