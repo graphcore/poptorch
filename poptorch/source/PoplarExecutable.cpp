@@ -18,6 +18,8 @@ std::vector<at::IValue> PoplarExecutable::Run(
     poptorch::TensorId popartId = popartInputs[i];
     at::Tensor &pytorchTensor = inTensors[i];
 
+    ERROR_ON(!pytorchTensor.is_contiguous());
+
     // Convert to correct data type.
     std::vector<std::int64_t> popartDims(pytorchTensor.sizes().size());
     std::transform(pytorchTensor.sizes().begin(), pytorchTensor.sizes().end(),

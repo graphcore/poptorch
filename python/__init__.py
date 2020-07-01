@@ -130,6 +130,40 @@ class _Args:
         else:
             return fn(data)
 
+    def _forEachMatched(self, data, condition, doOnTrue, conditionMatches):
+        if isinstance(data, (tuple, list)):
+            return type(data)(
+                self._forEachMatched(d, condition, doOnTrue, conditionMatches)
+                for d in data)
+        elif isinstance(data, dict):
+            return {
+                key: self._forEachMatched(value, condition, doOnTrue,
+                                          conditionMatches)
+                for key, value in data.items()
+            }
+        else:
+            if condition(data):
+                conditionMatches.setTrue()
+                return doOnTrue(data)
+            else:
+                return data
+
+    def forEachMatchedAtLeastOnce(self, condition, doOnTrue=None):
+        class ConditionMatches(object):
+            def __init__(self):
+                self._matches = False
+
+            def __bool__(self):
+                return self._matches
+
+            def setTrue(self):
+                self._matches = True
+
+        matches = ConditionMatches()
+        self._args = self._forEachMatched(self._args, condition, doOnTrue,
+                                          matches)
+        return bool(matches)
+
     def forEach(self, fn):
         self._args = self._forEach(self._args, fn)
 
@@ -161,6 +195,7 @@ class PoplarExecutor:
         self.trace_model = trace_model
         self.optimizer = optimizer
         self.new_optimizer = optimizer
+        self.warned_not_contiguous_input = False
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
@@ -176,6 +211,15 @@ class PoplarExecutor:
     def __call__(self, *args, **kwargs):
         # Convert single tensor to tuple.
         in_tensors = _Args(self.model, args, kwargs, self.training)
+
+        if in_tensors.forEachMatchedAtLeastOnce(
+                condition=lambda t: not t.is_contiguous(),
+                doOnTrue=lambda t: t.contiguous()):
+            if not self.warned_not_contiguous_input:
+                logger.warning(
+                    "At least one input tensor is not contiguous: " +
+                    "non-contiguous tensors will be converted.")
+                self.warned_not_contiguous_input = True
 
         if self.executable == None:
             logger.info(
