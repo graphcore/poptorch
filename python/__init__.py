@@ -130,6 +130,40 @@ class _Args:
         else:
             return fn(data)
 
+    def _forEachMatched(self, data, condition, doOnTrue, conditionMatches):
+        if isinstance(data, (tuple, list)):
+            return type(data)(
+                self._forEachMatched(d, condition, doOnTrue, conditionMatches)
+                for d in data)
+        elif isinstance(data, dict):
+            return {
+                key: self._forEachMatched(value, condition, doOnTrue,
+                                          conditionMatches)
+                for key, value in data.items()
+            }
+        else:
+            if condition(data):
+                conditionMatches.setTrue()
+                return doOnTrue(data)
+            else:
+                return data
+
+    def forEachMatchedAtLeastOnce(self, condition, doOnTrue=None):
+        class ConditionMatches(object):
+            def __init__(self):
+                self._matches = False
+
+            def __bool__(self):
+                return self._matches
+
+            def setTrue(self):
+                self._matches = True
+
+        matches = ConditionMatches()
+        self._args = self._forEachMatched(self._args, condition, doOnTrue,
+                                          matches)
+        return bool(matches)
+
     def forEach(self, fn):
         self._args = self._forEach(self._args, fn)
 
@@ -143,10 +177,14 @@ class PoplarExecutor:
                  training,
                  device_iterations,
                  trace_model,
+                 anchor_mode,
+                 anchor_return_period,
                  replication_factor=1,
                  gradient_accumulation=1,
                  profile=False,
                  optimizer={}):
+        self.anchor_mode = anchor_mode
+        self.anchor_return_period = anchor_return_period
         self.executable = None
         self.model = model
         self.training = training
@@ -157,6 +195,7 @@ class PoplarExecutor:
         self.trace_model = trace_model
         self.optimizer = optimizer
         self.new_optimizer = optimizer
+        self.warned_not_contiguous_input = False
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
@@ -172,6 +211,15 @@ class PoplarExecutor:
     def __call__(self, *args, **kwargs):
         # Convert single tensor to tuple.
         in_tensors = _Args(self.model, args, kwargs, self.training)
+
+        if in_tensors.forEachMatchedAtLeastOnce(
+                condition=lambda t: not t.is_contiguous(),
+                doOnTrue=lambda t: t.contiguous()):
+            if not self.warned_not_contiguous_input:
+                logger.warning(
+                    "At least one input tensor is not contiguous: " +
+                    "non-contiguous tensors will be converted.")
+                self.warned_not_contiguous_input = True
 
         if self.executable == None:
             logger.info(
@@ -203,7 +251,8 @@ class PoplarExecutor:
                     n._c, in_tensors_trace_view.asTuple(),
                     self.device_iterations, self.training,
                     self.replication_factor, self.gradient_accumulation,
-                    self.optimizer, self.profile)
+                    self.optimizer, self.anchor_mode,
+                    self.anchor_return_period, self.profile)
             else:
                 logger.info('Compiling the model using scripting')
                 n = torch.jit.script(self.model)
@@ -217,7 +266,7 @@ class PoplarExecutor:
                     n._c, n.graph, in_tensors_trace_view.asTuple(),
                     self.device_iterations, self.training,
                     self.replication_factor, self.gradient_accumulation,
-                    self.profile)
+                    self.anchor_mode, self.anchor_return_period, self.profile)
 
         # Execute the poplar executable with the full size (batch * device interations)
         if self.new_optimizer and self.new_optimizer != self.optimizer:
@@ -233,14 +282,41 @@ class PoplarExecutor:
             return output[0]
 
 
-def trainingModel(model,
-                  device_iterations,
-                  gradient_accumulation=1,
-                  replication_factor=1,
-                  profile=False,
-                  trace_model=True,
-                  loss=None,
-                  optimizer=None):
+def isValidAnchorMode(anchor_mode, anchor_return_period):
+
+    # Check this is a supported anchor type.
+    supported_anchor_modes = ["FINAL", "ALL", "SUM", "EVERYN"]
+    assert anchor_mode in supported_anchor_modes, "Unsupported anchor mode %s, must be one of: %s" % (
+        anchor_mode, str(supported_anchor_modes))
+
+    # Check the anchor return period makes sense.
+    if anchor_mode == "EVERYN":
+        validEveryN = anchor_return_period != None and anchor_return_period > 0
+        assert validEveryN, "EveryN anchor must have anchor_return_period set to valid positive integer"
+    elif anchor_mode != "EVERYN" and anchor_return_period != None:
+        logging.info(
+            "Anchor return period argument ignored with anchor_mode set to %s"
+            % anchor_mode)
+
+
+def trainingModel(
+        model,
+        device_iterations,
+        gradient_accumulation=1,
+        replication_factor=1,
+        profile=False,
+        trace_model=True,
+        loss=None,
+        optimizer=None,
+        # In training it makes sense to see only the last result, by default.
+        anchor_mode="FINAL",
+        anchor_return_period=None,  # Only applies if anchor_mode is "EVERY_N"
+):
+
+    isValidAnchorMode(anchor_mode, anchor_return_period)
+    if anchor_return_period == None:
+        anchor_return_period = 1
+
     if not optimizer:
         optimizer = optim.SGD(model.parameters(), lr=0.01)
 
@@ -269,20 +345,33 @@ def trainingModel(model,
                           replication_factor=replication_factor,
                           profile=profile,
                           trace_model=trace_model,
-                          optimizer=optimizer)
+                          optimizer=optimizer,
+                          anchor_mode=anchor_mode,
+                          anchor_return_period=anchor_return_period)
 
 
-def inferenceModel(model,
-                   device_iterations=1,
-                   replication_factor=1,
-                   profile=False,
-                   trace_model=True):
+def inferenceModel(
+        model,
+        device_iterations=1,
+        replication_factor=1,
+        profile=False,
+        trace_model=True,
+        # In inference it makes sense to see the result of every batch, by default.
+        anchor_mode="ALL",
+        anchor_return_period=None,  # Only applies if anchor_mode is "EVERY_N"
+):
+    isValidAnchorMode(anchor_mode, anchor_return_period)
+    if anchor_return_period == None:
+        anchor_return_period = 1
+
     return PoplarExecutor(model=model,
                           training=False,
                           replication_factor=replication_factor,
                           device_iterations=device_iterations,
                           profile=profile,
-                          trace_model=trace_model)
+                          trace_model=trace_model,
+                          anchor_mode=anchor_mode,
+                          anchor_return_period=anchor_return_period)
 
 
 def propagateInputShapes(graph, dummyInputs):

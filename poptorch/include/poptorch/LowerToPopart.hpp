@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "popart_compiler/PopartEnums.hpp"
 #include "poptorch/PoplarExecutable.hpp"
 
 namespace poptorch {
@@ -22,6 +23,7 @@ std::shared_ptr<poptorch::PoplarExecutable> lowerToPopart(
     std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training,
     std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
     const std::unordered_map<std::string, std::pair<float, bool>> &opt,
+    PopartAnchorTypes anchor_mode, std::uint64_t anchorReturnPeriod,
     bool profile);
 
 } // namespace poptorch

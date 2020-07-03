@@ -87,6 +87,7 @@ public:
       std::vector<at::Tensor> &params, std::uint64_t steps, bool training,
       std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
       const std::unordered_map<std::string, std::pair<float, bool>> &opt,
+      PopartAnchorTypes anchor_mode, std::uint64_t anchorReturnPeriod,
       bool profile_);
 
   void Lower();
@@ -114,6 +115,12 @@ private:
   std::unordered_map<c10::Symbol, FunctionType> functionToImplementation;
 
   poptorch::Compiler compiler;
+
+  // What mode should the PopART anchors operate in.
+  PopartAnchorTypes anchorMode;
+
+  // If the mode is EveryN this is N.
+  std::uint64_t anchorReturnPeriod;
 
   bool profile;
 
@@ -215,7 +222,7 @@ void LowerToPopart::LowerReturn() {
       processType(value->type());
     }
     for (auto id : valueMap.Tensors(value)) {
-      compiler.AddOutputTensor(id);
+      compiler.AddOutputTensor(id, anchorMode, anchorReturnPeriod);
       outputTensorHooks.push_back(id);
     }
   }
@@ -435,9 +442,11 @@ LowerToPopart::LowerToPopart(
     std::vector<at::Tensor> &params, std::uint64_t steps, bool training,
     std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
     const std::unordered_map<std::string, std::pair<float, bool>> &opt,
+    PopartAnchorTypes anchorMode_, std::uint64_t anchorReturnPeriod_,
     bool profile_)
     : graph(g), inTensors(ins), parameters(params), optimizer(opt),
       compiler({training, steps, replicationFactor, gradientAccumulation}),
+      anchorMode(anchorMode_), anchorReturnPeriod(anchorReturnPeriod_),
       profile(profile_) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
@@ -501,13 +510,19 @@ std::shared_ptr<poptorch::PoplarExecutable> lowerToPopart(
     std::vector<at::Tensor> &parameters, std::uint64_t steps, bool training,
     std::uint64_t replicationFactor, std::uint64_t gradientAccumulation,
     const std::unordered_map<std::string, std::pair<float, bool>> &opt,
+    PopartAnchorTypes anchorMode, std::uint64_t anchorReturnPeriod,
     bool profile) {
-  std::srand(std::time(nullptr));
-
-  LowerToPopart lower_impl{
-      graph,    inTensors,         parameters,           steps,
-      training, replicationFactor, gradientAccumulation, opt,
-      profile};
+  LowerToPopart lower_impl{graph,
+                           inTensors,
+                           parameters,
+                           steps,
+                           training,
+                           replicationFactor,
+                           gradientAccumulation,
+                           opt,
+                           anchorMode,
+                           anchorReturnPeriod,
+                           profile};
   lower_impl.Lower();
 
   return lower_impl.Compile();

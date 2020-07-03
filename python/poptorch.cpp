@@ -24,6 +24,9 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+// Shared enums across the ABI boundary.
+#include "popart_compiler/PopartEnums.hpp"
+
 void begin_ipu_block(int64_t ipu_id) { UNUSED(ipu_id); }
 void end_ipu_block() {}
 
@@ -205,7 +208,8 @@ std::shared_ptr<poptorch::PoplarExecutable>
 compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
                  bool training, std::uint64_t replicationFactor,
                  std::uint64_t gradientAccumulation, py::dict optimizerDict,
-                 bool profile) {
+                 const std::string &anchorMode,
+                 std::uint64_t anchorReturnPeriod, bool profile) {
   auto module = as_module(h);
 
   auto forward = module->get_method("forward");
@@ -258,16 +262,17 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, std::uint64_t steps,
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps,
-                                 training, replicationFactor,
-                                 gradientAccumulation, optimizer, profile);
+  return poptorch::lowerToPopart(
+      *graph, inputTensors, parameterData, steps, training, replicationFactor,
+      gradientAccumulation, optimizer, anchorTypeFromString(anchorMode),
+      anchorReturnPeriod, profile);
 }
 
-std::shared_ptr<poptorch::PoplarExecutable>
-compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
-                  std::uint64_t steps, bool training,
-                  std::uint64_t replicationFactor,
-                  std::uint64_t gradientAccumulation, bool profile) {
+std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
+    py::handle h, py::handle g, pybind11::tuple inputs, std::uint64_t steps,
+    bool training, std::uint64_t replicationFactor,
+    std::uint64_t gradientAccumulation, const std::string &anchorMode,
+    std::uint64_t anchorReturnPeriod, bool profile) {
   auto module = as_module(h);
   auto argGraph = as_graph(g);
 
@@ -327,9 +332,10 @@ compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, steps,
-                                 training, replicationFactor,
-                                 gradientAccumulation, {}, profile);
+  return poptorch::lowerToPopart(
+      *graph, inputTensors, parameterData, steps, training, replicationFactor,
+      gradientAccumulation, {}, anchorTypeFromString(anchorMode),
+      anchorReturnPeriod, profile);
 }
 
 void pyPropagateInputShapes(py::handle h) {

@@ -7,17 +7,21 @@ import torchvision
 import numpy as np
 import poptorch
 
-# Load the MNIST data.
-
 # Normal pytorch batch size
 training_batch_size = 20
 
 # Device "step"
 training_ipu_step_size = 20
 
+# How many IPUs to replicate over.
 replication_factor = 4
 
+# This is the amount of data we will pull out of the data loader at each step. This is not
+# how much will be running on the IPU in a single model batch however. We just give the IPUs
+# this much data to allow for more efficient data loading.
 training_combined_batch_size = training_batch_size * training_ipu_step_size * replication_factor
+
+# Load MNIST normally.
 training_data = torch.utils.data.DataLoader(
     torchvision.datasets.MNIST('mnist_data/',
                                train=True,
@@ -31,8 +35,8 @@ training_data = torch.utils.data.DataLoader(
     shuffle=True,
     drop_last=True)
 
+# Load MNIST normally. 100 is actually just the model batchsize this time.
 validation_batch_size = 100
-
 validation_data = torch.utils.data.DataLoader(torchvision.datasets.MNIST(
     'mnist_data/',
     train=True,
@@ -46,7 +50,7 @@ validation_data = torch.utils.data.DataLoader(torchvision.datasets.MNIST(
                                               drop_last=True)
 
 
-# Define the network.
+# A helper block to build convolution-pool-relu blocks.
 class Block(nn.Module):
     def __init__(self, in_channels, num_filters, kernel_size, pool_size):
         super(Block, self).__init__()
@@ -63,6 +67,7 @@ class Block(nn.Module):
         return x
 
 
+# Define the network using the above blocks.
 class Network(nn.Module):
     def __init__(self):
         super(Network, self).__init__()
@@ -77,7 +82,6 @@ class Network(nn.Module):
     def forward(self, x):
         x = self.layer1(x)
         x = self.layer2(x)
-        # -1 means deduce from the above layers, this is just batch size for most iterations.
         x = x.view(-1, 320)
 
         x = self.layer3_act(self.layer3(x))
@@ -89,36 +93,19 @@ class Network(nn.Module):
 # Create our model.
 model = Network()
 
-
-# You can just provide nn.NLLLoss but this shows how you can have a custom loss function.
-class Loss(nn.Module):
-    def __init__(self):
-        super(Loss, self).__init__()
-        self.loss = nn.NLLLoss(reduction="mean")
-
-    def forward(self, x, y):
-        l = self.loss(x, y)
-        l = poptorch.ipu_print_tensor(l)
-        return l
-
-
 # Create model for training which will run on IPU.
 training_model = poptorch.trainingModel(model,
                                         training_ipu_step_size,
                                         replication_factor=replication_factor,
-                                        loss=Loss())
+                                        loss=nn.NLLLoss(reduction="mean"))
 
-# Same model as above, they will share weights (in 'model') so while the above
-# trains the weights, the weights in this will be automatically updated.
+# Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
 inference_model = poptorch.inferenceModel(model)
 
 
 def train():
-    losses = []
-
     for batch_number, (data, labels) in enumerate(training_data):
         result = training_model(data, labels)
-        losses.append(result[1][0].item())
 
         if batch_number % 10 == 0:
             print("PoptorchIPU loss at batch: " + str(batch_number) + " is " +
@@ -169,5 +156,13 @@ def test():
           str((correct / total) * 100.0) + "% correct")
 
 
+# Train on IPU.
 train()
+
+# Update the weights in model by copying from the training IPU. This updates (model.parameters())
+training_model.copyWeightsToHost()
+
+# Check validation loss on IPU once trained. Because PopTorch will be compiled on first call the
+# weights in model.parameters() will be copied implicitly. Subsequent calls will need to call
+# inference_model.copyWeightsToDevice()
 test()
