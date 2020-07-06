@@ -63,6 +63,18 @@ Optimizer parseOptimizer(const py::dict &opt) {
   return {optimizer};
 }
 
+std::string castToString(py::handle obj) {
+  if (py::isinstance<py::str>(obj)) {
+    return obj.cast<std::string>();
+  }
+  if (py::isinstance<py::int_>(obj)) {
+    std::stringstream ss;
+    ss << obj.cast<std::uint64_t>();
+    return ss.str();
+  }
+  ERROR("Don't know how to convert type " << obj.get_type() << " to string");
+}
+
 SessionOptions parseSessionOptions(const py::dict &opt) {
   // steps, replicationFactor, profile
   SessionOptions options;
@@ -84,6 +96,19 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
     } else if (py::isinstance<py::str>(element.second)) {
       options.AddStringOption(element.first.cast<std::string>().c_str(),
                               element.second.cast<std::string>().c_str());
+    } else if (py::isinstance<py::set>(element.second) ||
+               py::isinstance<py::list>(element.second)) {
+      for (auto option : element.second.cast<py::list>()) {
+        options.InsertStringOption(element.first.cast<std::string>().c_str(),
+                                   castToString(option).c_str());
+      }
+    } else if (py::isinstance<py::dict>(element.second)) {
+      for (auto option : element.second.cast<py::dict>()) {
+        options.InsertStringPairOption(
+            element.first.cast<std::string>().c_str(),
+            option.first.cast<std::string>().c_str(),
+            castToString(option.second).c_str());
+      }
     } else {
       ERROR("Unknown option type " << element.second.get_type());
     }

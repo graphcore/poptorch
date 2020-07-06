@@ -87,6 +87,11 @@ public:
   void AddUInt64Option(const char *option, std::uint64_t value);
   void AddBoolOption(const char *option, bool value);
   void AddDoubleOption(const char *option, double value);
+  // Insert a string option in an option container (set / list / vector)
+  void InsertStringOption(const char *option, const char *value);
+  // Insert a key / value pair in an option map
+  void InsertStringPairOption(const char *option, const char *key,
+                              const char *value);
 
 private:
   std::unique_ptr<detail::SessionOptionsImpl> impl;

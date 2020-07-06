@@ -411,7 +411,7 @@ class _PoplarExecutor:
                 n = torch.jit.script(self.model)
                 graphInputs = list(n.graph.inputs())
                 for graphInput, argIn in zip(graphInputs[1:],
-                                             in_tensors_trace_view):
+                                             in_tensors_trace_view.asTuple()):
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 

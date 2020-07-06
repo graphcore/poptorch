@@ -127,6 +127,9 @@ struct SessionOptionsImpl {
   std::map<std::string, std::function<void(std::uint64_t)>> uint64Options;
   std::map<std::string, std::function<void(std::string)>> stringOptions;
   std::map<std::string, std::function<void(double)>> doubleOptions;
+  std::map<std::string,
+           std::function<void(std::pair<std::string, std::string>)>>
+      containerOptions;
   std::set<std::string> optionsSet;
 
   popart::SessionOptions popartOptions;
@@ -183,6 +186,43 @@ SessionOptionsImpl::SessionOptionsImpl() : popartOptions(), poptorchOptions() {
         "Ignoring call to poptorch.Options.Popart.Set(\"logDir\",...): use "
         "poptorch.Options.logDir() instead");
   };
+
+  containerOptions["dotChecks"] = [&](std::pair<std::string, std::string> p) {
+    std::uint64_t value = std::stoul(p.first);
+    ERROR_ON_MSG(value >= static_cast<std::uint64_t>(popart::DotCheck::N),
+                 "Value for DotCheck out of range");
+    popartOptions.dotChecks.insert(static_cast<popart::DotCheck>(value));
+  };
+
+  containerOptions["hardwareInstrumentations"] =
+      [&](std::pair<std::string, std::string> p) {
+        std::uint64_t value = std::stoul(p.first);
+        ERROR_ON_MSG(value >=
+                         static_cast<std::uint64_t>(popart::Instrumentation::N),
+                     "Value for Instrumentation out of range");
+        popartOptions.hardwareInstrumentations.insert(
+            static_cast<popart::Instrumentation>(value));
+      };
+
+  containerOptions["customCodelets"] =
+      [&](std::pair<std::string, std::string> p) {
+        popartOptions.customCodelets.push_back(p.first);
+      };
+
+  containerOptions["engineOptions"] =
+      [&](std::pair<std::string, std::string> p) {
+        popartOptions.engineOptions.emplace(p);
+      };
+
+  containerOptions["reportOptions"] =
+      [&](std::pair<std::string, std::string> p) {
+        popartOptions.reportOptions.emplace(p);
+      };
+
+  containerOptions["convolutionOptions"] =
+      [&](std::pair<std::string, std::string> p) {
+        popartOptions.convolutionOptions.emplace(p);
+      };
 
 #define ADD_POPART_ENUM_OPTION(name, EnumType)                                 \
   uint64Options[#name] = [&](std::uint64_t value) {                            \
@@ -860,6 +900,17 @@ void SessionOptions::AddBoolOption(const char *option, bool value) {
 
 void SessionOptions::AddDoubleOption(const char *option, double value) {
   impl->Set(option, value, impl->doubleOptions, "floating point");
+}
+
+void SessionOptions::InsertStringOption(const char *option, const char *value) {
+  impl->Set(option, std::pair<std::string, std::string>(value, ""),
+            impl->containerOptions, "set / vector");
+}
+
+void SessionOptions::InsertStringPairOption(const char *option, const char *key,
+                                            const char *value) {
+  impl->Set(option, std::pair<std::string, std::string>(key, value),
+            impl->containerOptions, "map");
 }
 
 SessionOptions::~SessionOptions() {}
