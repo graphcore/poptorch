@@ -57,3 +57,68 @@ def test_lstm_twice():
     ipuOut2 = ipuLstm(inputs, hidden)
     assert poptorch.testing.allclose(out, ipuOut2)
     assert poptorch.testing.allclose(ipuOut, ipuOut2)
+
+
+def test_lstm_batch_first():
+    torch.manual_seed(42)
+    numHidden = 5
+    inputSize = 3
+    lstm = nn.LSTM(3, numHidden, batch_first=True)
+    ipuLstm = poptorch.inferenceModel(lstm)
+    inputs = [torch.randn(1, inputSize) for _ in range(5)]
+    # Add the extra 2nd dimension
+    inputs = torch.cat(inputs).view(1, len(inputs), -1)
+    hidden = (torch.randn(1, 1, numHidden), torch.randn(1, 1, numHidden))
+    out = lstm(inputs, hidden)
+    ipuOut = ipuLstm(inputs, hidden)
+    assert poptorch.testing.allclose(out, ipuOut)
+
+
+def test_lstm_no_bias():
+    torch.manual_seed(42)
+    numHidden = 5
+    inputSize = 3
+    lstm = nn.LSTM(3, numHidden, bias=False)
+    ipuLstm = poptorch.inferenceModel(lstm)
+    inputs = [torch.randn(1, inputSize) for _ in range(5)]
+    # Add the extra 2nd dimension
+    inputs = torch.cat(inputs).view(len(inputs), 1, -1)
+    hidden = (torch.randn(1, 1, numHidden), torch.randn(1, 1, numHidden))
+    out = lstm(inputs, hidden)
+    ipuOut = ipuLstm(inputs, hidden)
+    assert poptorch.testing.allclose(out, ipuOut)
+
+
+def test_lstm_batched():
+    torch.manual_seed(42)
+    numHidden = 5
+    inputSize = 3
+    batch = 4
+    lstm = nn.LSTM(3, numHidden)
+    ipuLstm = poptorch.inferenceModel(lstm)
+    inputs = [torch.randn(batch, inputSize) for _ in range(5)]
+    # Add the extra 2nd dimension
+    inputs = torch.cat(inputs).view(len(inputs), batch, -1)
+    print(inputs.shape)
+    hidden = (torch.randn(1, batch, numHidden), torch.randn(
+        1, batch, numHidden))
+    out = lstm(inputs, hidden)
+    ipuOut = ipuLstm(inputs, hidden)
+    assert poptorch.testing.allclose(out, ipuOut)
+
+
+def test_lstm_batched_batch_first():
+    torch.manual_seed(42)
+    numHidden = 5
+    inputSize = 3
+    batch = 4
+    lstm = nn.LSTM(3, numHidden, batch_first=True)
+    ipuLstm = poptorch.inferenceModel(lstm)
+    inputs = [torch.randn(batch, inputSize) for _ in range(5)]
+    # Add the extra 2nd dimension
+    inputs = torch.cat(inputs).view(batch, len(inputs), -1)
+    hidden = (torch.randn(1, batch, numHidden), torch.randn(
+        1, batch, numHidden))
+    out = lstm(inputs, hidden)
+    ipuOut = ipuLstm(inputs, hidden)
+    assert poptorch.testing.allclose(out, ipuOut)

@@ -4,3 +4,4 @@ are passed into the model wrapper via |anchor_mode| options are "SUM", "ALL", "F
     "SUM" : Return the sum of all the batches
     "FINAL" : Return the last batch.
     "EVERYN" : Return every N batches. N is passed in as |anchor_return_period|
+- Add support for batched LSTM and batch first

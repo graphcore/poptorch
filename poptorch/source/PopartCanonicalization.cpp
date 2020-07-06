@@ -1656,7 +1656,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       ERROR_ON_MSG(bidirectional, "bidirectional LSTM not supported");
 
       bool batchFirst = *HandleConstant<bool>(node->input(8)->node());
-      ERROR_ON_MSG(batchFirst, "LSTM with batch first not supported");
 
       // An LSTM state is made of 4 values
       constexpr std::uint64_t stateSize = 4;
@@ -1722,6 +1721,13 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           Create_concat(graph, {hiddenLayers[0], hiddenLayers[1]}, 0);
       concatStates->insertBefore(node);
 
+      // Transpose output BSF -> SBF
+      if (batchFirst) {
+        torch::jit::Node *transpose =
+            Create_transpose(graph, {input}, {1, 0, 2});
+        transpose->insertBefore(node);
+        input = transpose->output();
+      }
       std::vector<torch::jit::Value *> args;
       args.push_back(input);
       args.push_back(concatWeights->output()); // input weights + output_weights
@@ -1736,12 +1742,22 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           Create_slice(graph, {lstm->output(0)}, {INT_MAX}, {-1}, {0});
       Y_h->insertBefore(node);
 
+      torch::jit::Value *output = lstm->output(0);
+      // Transpose output SBF -> BSF
+      if (batchFirst) {
+        torch::jit::Node *transpose =
+            Create_transpose(graph, {output}, {1, 0, 2});
+        transpose->insertBefore(node);
+        output = transpose->output();
+      }
+
       ERROR_ON(node->outputs().size() != 3);
       if (node->hasUses()) {
-        ReplaceOutputUse(node, lstm, 0);
+        ReplaceOutputUse(node->output(0), output);
         ReplaceOutputUse(node->output(1), Y_h->output());
         ReplaceOutputUse(node->output(2), lstm->output(1));
       }
+
       toDelete.insert(node);
     }
 
