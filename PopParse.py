@@ -33,7 +33,10 @@ else:
 jsonOutput = {}
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
-popart_dir = current_dir + "/../popart/popart/willow/include/popart"
+
+# Popart uses both relative includes and full "popart/XXX.hpp" includes so we need point clang to both paths.
+popart_include_dir_partial = current_dir + "/../popart/popart/willow/include/"
+popart_dir = popart_include_dir_partial + "popart"
 
 files = [popart_dir + "/builder.hpp", popart_dir + "/builder.h.gen"]
 
@@ -61,7 +64,6 @@ def find_functions(node, namespace):
         return
 
     if node.kind == clang.cindex.CursorKind.CLASS_DECL:
-
         namespace = node.spelling
 
     operation = {}
@@ -100,6 +102,7 @@ tu = index.parse(popart_dir + "/builder.hpp",
                  args=[
                      "-std=c++14",
                      "-I" + popart_dir,
+                     "-I" + popart_include_dir_partial,
                      "-DONNX_NAMESPACE=onnx",
                      "-I/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1/",
                  ])
@@ -135,7 +138,7 @@ for opset in classes:
         jsonOutput[opset].pop(name)
 logger.debug("addedFunctions: %s" % addedFunctions)
 
-MultipleOutputsOps = {"lstm": "2", "split": "num_outputs"}
+MultipleOutputsOps = {"lstm": "2", "split": "num_outputs", "topk": "2"}
 
 CXXTypeToTypeClass = {
     # Scalar integers
@@ -243,6 +246,8 @@ for opset in classes:
             macroType = toType(arg["type"])
 
             if macroType == "UNKNOWN":
+                logger.debug("Skipping OP: " + name +
+                             " due to parse failure on " + str(arg))
                 earlyExit = True
                 break
 

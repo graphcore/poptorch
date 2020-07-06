@@ -597,7 +597,7 @@ torch::jit::Node* Create_tile(torch::jit::Graph &graph,  const std::vector<torch
 return newNode;
 }
 torch::jit::Node* Create_topk(torch::jit::Graph &graph,  const std::vector<torch::jit::Value *>& args,int64_t k,int64_t axis) {
- torch::jit::Node *newNode = graph.create(Symbols::popart::topk, args);
+ torch::jit::Node *newNode = graph.create(Symbols::popart::topk, args, 2);
 newNode->i_(c10::Symbol::fromQualString("attr::k"),k);
 newNode->i_(c10::Symbol::fromQualString("attr::axis"),axis);
 return newNode;

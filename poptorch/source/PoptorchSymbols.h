@@ -21,6 +21,8 @@ SYMBOL_DECL(aten, true_divide)
 SYMBOL_DECL(aten, leaky_relu_)
 SYMBOL_DECL(aten, elu_)
 SYMBOL_DECL(aten, selu_)
+SYMBOL_DECL(aten, isnan)
+SYMBOL_DECL(aten, isinf)
 } // namespace c10
 
 namespace poptorch {

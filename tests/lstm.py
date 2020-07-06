@@ -74,21 +74,6 @@ def test_lstm_batch_first():
     assert poptorch.testing.allclose(out, ipuOut)
 
 
-def test_lstm_no_bias():
-    torch.manual_seed(42)
-    numHidden = 5
-    inputSize = 3
-    lstm = nn.LSTM(3, numHidden, bias=False)
-    ipuLstm = poptorch.inferenceModel(lstm)
-    inputs = [torch.randn(1, inputSize) for _ in range(5)]
-    # Add the extra 2nd dimension
-    inputs = torch.cat(inputs).view(len(inputs), 1, -1)
-    hidden = (torch.randn(1, 1, numHidden), torch.randn(1, 1, numHidden))
-    out = lstm(inputs, hidden)
-    ipuOut = ipuLstm(inputs, hidden)
-    assert poptorch.testing.allclose(out, ipuOut)
-
-
 def test_lstm_batched():
     torch.manual_seed(42)
     numHidden = 5

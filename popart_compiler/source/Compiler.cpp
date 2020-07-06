@@ -84,6 +84,12 @@ public:
 
   std::unordered_set<std::uint64_t> usedIpus;
 
+  // General helpers.
+
+  // Inserts memory into the list of tensors being output by the model.
+  void AddMemoryToOutput(poptorch::TensorId id, void *ptr,
+                         std::unique_ptr<popart::IArray> &&memory);
+
   // Domain helpers
   popart::TensorId reshape(const std::vector<popart::TensorId> &inputs,
                            const std::vector<int64_t> &shape);
@@ -101,6 +107,18 @@ public:
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 };
+
+void CompilerImpl::AddMemoryToOutput(poptorch::TensorId id, void *ptr,
+                                     std::unique_ptr<popart::IArray> &&memory) {
+  memoryManager.push_back(std::move(memory));
+
+  popart::TensorId popartId = ids[id];
+  if (!popartOutgoing.insert({popartId, *memoryManager.back().get()}).second) {
+    // Insertion in the map failed because there is already a pointer associated
+    // with that id.
+    outgoingDuplicates[popartId].push_back(ptr);
+  }
+}
 
 struct SessionOptionsImpl {
   SessionOptionsImpl();
@@ -532,34 +550,28 @@ void Compiler::SetUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
 void Compiler::SetUpOutputOp(poptorch::TensorId id, float *ptr,
                              const std::vector<std::int64_t> &dims) {
   // Popart wrapper around the tensor pointer.
-  impl->memoryManager.push_back(std::make_unique<popart::NDArrayWrapper<float>>(
-      static_cast<float *>(ptr), dims));
+  auto memory = std::make_unique<popart::NDArrayWrapper<float>>(
+      static_cast<float *>(ptr), dims);
 
-  popart::TensorId popartId = impl->ids[id];
-  if (!impl->popartOutgoing
-           .insert({popartId, *impl->memoryManager.back().get()})
-           .second) {
-    // Insertion in the map failed because there is already a pointer associated
-    // with that id.
-    impl->outgoingDuplicates[popartId].push_back(ptr);
-  }
+  impl->AddMemoryToOutput(id, ptr, std::move(memory));
 }
 
 void Compiler::SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
                              const std::vector<std::int64_t> &dims) {
   // Popart wrapper around the tensor pointer.
-  impl->memoryManager.push_back(
-      std::make_unique<popart::NDArrayWrapper<std::int32_t>>(
-          static_cast<std::int32_t *>(ptr), dims));
+  auto memory = std::make_unique<popart::NDArrayWrapper<std::int32_t>>(
+      static_cast<std::int32_t *>(ptr), dims);
 
-  popart::TensorId popartId = impl->ids[id];
-  if (!impl->popartOutgoing
-           .insert({popartId, *impl->memoryManager.back().get()})
-           .second) {
-    // Insertion in the map failed because there is already a pointer associated
-    // with that id.
-    impl->outgoingDuplicates[popartId].push_back(ptr);
-  }
+  impl->AddMemoryToOutput(id, ptr, std::move(memory));
+}
+
+void Compiler::SetUpOutputOp(poptorch::TensorId id, bool *ptr,
+                             const std::vector<std::int64_t> &dims) {
+  // Popart wrapper around the tensor pointer.
+  auto memory = std::make_unique<popart::NDArrayWrapper<bool>>(
+      static_cast<bool *>(ptr), dims);
+
+  impl->AddMemoryToOutput(id, ptr, std::move(memory));
 }
 
 void Compiler::InitSession(const Optimizer &opt) {
@@ -757,6 +769,8 @@ poptorch::PopartTypes Compiler::GetPopartType(poptorch::TensorId tensor) const {
   } else if (info.dataType() == popart::DataType::INT32 ||
              info.dataType() == popart::DataType::UINT32) {
     return poptorch::PopartTypes::INT32;
+  } else if (info.dataType() == popart::DataType::BOOL) {
+    return poptorch::PopartTypes::BOOL;
   }
 
   ERROR("Unsupported popart type in return: " << info.data_type());

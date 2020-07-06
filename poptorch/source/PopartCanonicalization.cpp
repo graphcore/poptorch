@@ -21,13 +21,31 @@ namespace {
 // Convert that IR type into a C++ vector of ints.
 std::vector<std::int64_t> ShapeFromTensor(torch::jit::Value *value) {
   // Extract the type from the pytorch IR.
-  c10::TensorTypePtr asTensor = value->type()->cast<c10::TensorType>();
+  c10::TensorTypePtr asTensor = value->type()->expect<c10::TensorType>();
   c10::VaryingShape dims = asTensor->sizes();
 
   // Convert that IR type into a C++ vector of ints.
   std::vector<std::int64_t> shape;
   for (auto optionalInt : *dims.sizes()) {
     shape.push_back(*optionalInt);
+  }
+  return shape;
+}
+
+// An odd function which returns each tensor dimension as an array, a helper for
+// torch.max(tensor) and torch.min(tensor). I.E a 4D tensor will return (0, 1,
+// 2, 3).
+std::vector<std::int64_t>
+ReduceHelperDimensionCreator(torch::jit::Value *value) {
+  // Extract the type from the pytorch IR.
+  c10::TensorTypePtr asTensor = value->type()->expect<c10::TensorType>();
+  c10::VaryingShape dims = asTensor->sizes();
+
+  std::int64_t index = 0;
+  // Convert that IR type into a C++ vector of ints.
+  std::vector<std::int64_t> shape;
+  for (auto optionalInt : *dims.sizes()) {
+    shape.push_back(index++);
   }
   return shape;
 }
@@ -67,9 +85,14 @@ private:
 
   template <typename T> std::optional<T> HandleConstant(torch::jit::Node *node);
 
+  // Cast the operand to type T.
   template <typename T>
   torch::jit::Value *HandleParamOrConstant(torch::jit::Graph &graph,
                                            torch::jit::Value *operand);
+
+  // Do not cast the operand.
+  torch::jit::Value *HandleParamOrConstantNoCast(torch::jit::Graph &graph,
+                                                 torch::jit::Value *operand);
 
   // Just returns operand if it is a tensor otherwise adds it as a constant and
   // casts it to the right type.
@@ -80,6 +103,8 @@ private:
   // Turn a parameter constant into an IR constant.
   torch::jit::Node *CreateIRConstant(torch::jit::Graph &graph,
                                      torch::jit::Value *node);
+
+  std::int64_t HandleDimensionParam(torch::jit::Node *node, int index);
 
   // Delete a node and also its users if they are also unused.
   void SearchAndPossiblyDestroy(torch::jit::Node *node);
@@ -253,6 +278,7 @@ CanonicalizeImpl::HandleParamOrConstantDeduceType(torch::jit::Graph &graph,
                "Internal error: Tensor doesn't have a scalar type.");
 
   switch (*optionalScalarType) {
+  case c10::ScalarType::Bool:
   case c10::ScalarType::Int:
   case c10::ScalarType::Long: {
     return HandleParamOrConstant<std::int32_t>(graph, operand);
@@ -264,6 +290,20 @@ CanonicalizeImpl::HandleParamOrConstantDeduceType(torch::jit::Graph &graph,
     ERROR("Internal error: Tensor scalar type is unsupported");
   }
   }
+}
+
+torch::jit::Value *
+CanonicalizeImpl::HandleParamOrConstantNoCast(torch::jit::Graph &graph,
+                                              torch::jit::Value *operand) {
+  torch::jit::Value *valueToReturn = operand;
+  torch::jit::Node *constant = CreateIRConstant(graph, operand);
+
+  if (constant) {
+    constant->insertBefore(operand->node());
+    valueToReturn = constant->output();
+  }
+
+  return valueToReturn;
 }
 
 template <typename T>
@@ -326,6 +366,24 @@ std::vector<T> CanonicalizeImpl::HandleListConstruct(torch::jit::Node *node) {
   }
 
   return result;
+}
+
+std::int64_t CanonicalizeImpl::HandleDimensionParam(torch::jit::Node *node,
+                                                    int index) {
+  // Extract the dim.
+  std::int64_t dim = *HandleConstant<std::int64_t>(node->input(index)->node());
+
+  // Get the tensor type. Deduce on the first parameter.
+  c10::TensorTypePtr asTensor = node->input(0)->type()->cast<c10::TensorType>();
+  c10::VaryingShape dims = asTensor->sizes();
+
+  // If dim is less than zero subtract it to get the actual dimension.
+  if (dim < 0) {
+    dim = *dims.size() + dim;
+  }
+
+  // Return the dim.
+  return dim;
 }
 
 // Turn a prim::Constant scalar input into a popart graph level scalar constant.
@@ -492,7 +550,14 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         newNode = Create_expand(graph, {node->input(0), newNode->output()});
       }
     }
+
+// Handle a constant input.
 #define HANDLE(Index, Type) *HandleConstant<Type>(node->input(Index)->node())
+
+// Handle an integer dimension attribute (this can be negative hence the special
+// case)
+#define HANDLE_DIM(Index) HandleDimensionParam(node, Index)
+
 #define HANDLE_LIST(Index, Type)                                               \
   HandleListConstruct<Type>(node->input(Index)->node())
 #define HANDLE_TENSOR_LIST(Index) HandleTensorList(node->input(Index)->node())
@@ -504,6 +569,20 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 // should be of the same scalar type as the return.
 #define PARAM_OR_CONSTANT_ANY_TYPE(Index)                                      \
   HandleParamOrConstantDeduceType(graph, node->inputs()[Index], node)
+
+// Add the constant as is but don't try and deduce it to the "right" type as
+// that may be ambigous. I.E if an operation takes in an int and a float and
+// returns a bool.
+#define PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(Index)                              \
+  HandleParamOrConstantNoCast(graph, node->inputs()[Index])
+
+// Returns an integer list of dimension that a tensor has. For reduce functions.
+// A 5D tensor would return (0, 1, 2, 3, 4)
+#define DIMENISON_LENGTH_LIST(Index)                                           \
+  ReduceHelperDimensionCreator(node->inputs()[Index])
+
+// Check if the number of inputs is |num|. Used for overload resolution.
+#define NUM_INPUTS_EQUALS(Num) node->inputs().size() == Num
 
 #define PARAM_OR_CONSTANT(Index, Type)                                         \
   HandleParamOrConstant<Type>(graph, node->inputs()[Index])
@@ -1316,26 +1395,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       newNode = graph.create(at::prim::ListConstruct, slices);
 
-    } else if (kind == c10::aten::eq) {
-      // clang-format off
-      // "aten::eq(Tensor self, Tensor other) -> Tensor"
-      // "aten::eq(Tensor self, Scalar other) -> Tensor"
-      // clang-format on
-
-      torch::jit::Value *other = node->input(1);
-
-      std::optional<std::int64_t> isInt =
-          HandleConstant<std::int64_t>(other->node());
-
-      if (isInt) {
-        // Add int as tensor.
-        torch::jit::Node *c = Create_ConstantInt(graph, {*isInt}, {1});
-        c->insertBefore(node);
-        other = c->output();
-      }
-
-      newNode = Create_equal(graph, {node->input(0), other});
-
     } else if (kind == c10::aten::masked_fill) {
       // clang-format off
       // Derived from documentation
@@ -1759,6 +1818,39 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       }
 
       toDelete.insert(node);
+    } else if (kind == c10::aten::ge || kind == c10::aten::le) {
+      torch::jit::Node *comparison = nullptr;
+      torch::jit::Value *lhs =
+          HandleParamOrConstantNoCast(graph, node->input(0));
+      torch::jit::Value *rhs =
+          HandleParamOrConstantNoCast(graph, node->input(1));
+
+      // Node will either be < or >.
+      if (kind == c10::aten::ge) {
+        comparison = Create_greater(graph, {lhs, rhs});
+        comparison->insertBefore(node);
+      } else {
+        comparison = Create_less(graph, {lhs, rhs});
+        comparison->insertBefore(node);
+      }
+
+      // We do a check for ==
+      torch::jit::Node *equal = Create_equal(graph, {lhs, rhs});
+      equal->insertBefore(node);
+
+      // The final node will be a combination of equals and less or greater.
+      newNode =
+          Create_logical_or(graph, {equal->output(), comparison->output()});
+    } else if (kind == c10::aten::ne) {
+      torch::jit::Value *lhs =
+          HandleParamOrConstantNoCast(graph, node->input(0));
+      torch::jit::Value *rhs =
+          HandleParamOrConstantNoCast(graph, node->input(1));
+
+      // Not(equal(lhs, rhs))
+      torch::jit::Node *equal = Create_equal(graph, {lhs, rhs});
+      equal->insertBefore(node);
+      newNode = Create_logical_not(graph, {equal->output()});
     }
 
     // If we have a new node add it and replace the old use.

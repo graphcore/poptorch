@@ -58,6 +58,7 @@ PoplarExecutable::Run(std::vector<at::Tensor> &inTensors,
 
     // Create the torch tensor and use its memory for the popart tensor.
     if (type == poptorch::PopartTypes::FLOAT) {
+      // Returned tensor is a tensor of floats.
       returnees.emplace_back(at::empty({dims}, at::ScalarType::Float));
       float *dataPtr =
           static_cast<float *>(returnees.back().toTensor().data_ptr());
@@ -65,9 +66,16 @@ PoplarExecutable::Run(std::vector<at::Tensor> &inTensors,
       compiler.SetUpOutputOp(id, dataPtr, dims);
     } else if (type == poptorch::PopartTypes::INT32 ||
                type == poptorch::PopartTypes::UINT32) {
+      // Return tensor is a tensor of ints.
       returnees.emplace_back(at::empty({dims}, at::ScalarType::Int));
       std::int32_t *dataPtr =
           static_cast<std::int32_t *>(returnees.back().toTensor().data_ptr());
+      compiler.SetUpOutputOp(id, dataPtr, dims);
+    } else if (type == poptorch::PopartTypes::BOOL) {
+      // Return tensor is a tensor of bools.
+      returnees.emplace_back(at::empty({dims}, at::ScalarType::Bool));
+      bool *dataPtr =
+          static_cast<bool *>(returnees.back().toTensor().data_ptr());
       compiler.SetUpOutputOp(id, dataPtr, dims);
     }
   }

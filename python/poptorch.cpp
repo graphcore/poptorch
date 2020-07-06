@@ -88,7 +88,7 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
       ERROR("Unknown option type " << element.second.get_type());
     }
   }
-  return std::move(options);
+  return options;
 }
 
 void buildTensorList(const torch::jit::IValue &value,

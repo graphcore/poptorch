@@ -33,7 +33,17 @@ def unary_op_harness(op, input, eq):
     assert eq(nativeOut, poptorch_out)
 
 
-def binary_op_harness(model, input1, input2, eq):
+def binary_op_harness(op, input1, input2, eq):
+    class Model(torch.nn.Module):
+        def __init__(self, op):
+            super(Model, self).__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            return self.op(x, y)
+
+    model = Model(op)
+
     # Run on CPU.
     nativeOut = model(input1, input2)
 
@@ -301,7 +311,93 @@ def test_reduction_ops_float_api2(op):
 
 
 comparison_ops = [
-    torch.allclose, torch.argsort, torch.eq, torch.equal, torch.ge, torch.gt,
-    torch.isfinite, torch.isinf, torch.isnan, torch.kthvalue, torch.le,
-    torch.lt, torch.max, torch.min, torch.ne, torch.sort, torch.topk
+    # torch.allclose,     # Not supported in trace, seems to get optimized out.
+    # torch.argsort,     # Not in Onnx. TODO(T23319)
+    torch.eq,
+    # torch.equal,       # Not supported as the return of trace in JIT.
+    torch.ge,
+    torch.gt,
+    # torch.kthvalue,     # Not in Onnx.
+    torch.le,
+    torch.lt,
+    torch.max,
+    torch.min,
+    torch.ne,
+    # torch.sort,         # Not in Onnx (could be added via TopK if onnx supported TODO(T23319))
 ]
+
+
+@pytest.mark.parametrize("op", comparison_ops)
+def test_compare_operations(op):
+    torch.manual_seed(42)
+
+    lhs = torch.randn([1, 2, 10, 200])
+    rhs = torch.randn([1, 2, 10, 200])
+
+    indices = torch.randint(0, 200, [30])
+
+    # Make a few of the indices equal.
+    for i in indices:
+        lhs[0][0][0][i] = rhs[0][0][0][i]
+
+    binary_op_harness(op, lhs, rhs, torch.equal)
+
+    if op != torch.min and op != torch.max:
+
+        def constant_rhs(x):
+            return op(x, 0.34)
+
+        unary_op_harness(constant_rhs, lhs, torch.equal)
+
+
+comparison_unity_nan_inf_ops = [
+    # torch.isfinite, torch.isinf,  # Not in Onnx
+    torch.isnan,
+]
+
+
+@pytest.mark.parametrize("op", comparison_unity_nan_inf_ops)
+def test_compare_unity_nan_inf_ops(op):
+    torch.manual_seed(42)
+
+    input = torch.tensor([
+        1.0,
+        float('inf'), 2.0,
+        float('-inf'),
+        float('nan'),
+        float('-nan'), 13.0
+    ])
+
+    unary_op_harness(op, input, torch.equal)
+
+
+comparison_unity = [torch.max, torch.min]
+
+
+@pytest.mark.parametrize("op", comparison_unity)
+def test_compare_unity_operations(op):
+    torch.manual_seed(42)
+    input = torch.randn([1, 2, 10, 200])
+
+    def operation(x):
+        return op(x)
+
+    unary_op_harness(operation, input, torch.eq)
+
+
+# Support other arguments. TODO(T23319)
+def test_topk():
+    torch.manual_seed(42)
+
+    input = torch.randn([1, 2, 10, 200])
+
+    def operation(x):
+        return torch.topk(x, k=10, dim=-1)
+
+    def compare(x, y):
+        values_equal = torch.equal(x.values, y[0])  # Compare values.
+        # Compare indices.
+        indices_equal = torch.equal(x.indices, y[1].to(torch.int64))
+        return values_equal and indices_equal
+
+    unary_op_harness(operation, input, compare)

@@ -5,5 +5,15 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
     Sum: Return the sum of all the batches
     Final: Return the last batch.
     EveryN: Return every N batches. N is passed in as |anchor_return_period|
+
 - Add support for batched LSTM and batch first
+
 - An Options object can now be passed to poptorch.trainingModel / poptorch.inferenceModel to configure the session.
+
+- Adds support for the torch comparisons operations:
+    torch.eq, torch.ge, torch.gt,
+    torch.le, torch.lt, torch.max,
+    torch.min, torch.ne, torch.isnan
+
+    torch.min and torch.max only support (tensor, tensor) and (tensor) overloads. They do
+    not support the (tensor, dim=, keepdim=) overload.

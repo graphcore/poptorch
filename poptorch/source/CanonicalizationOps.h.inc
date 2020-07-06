@@ -118,3 +118,28 @@ OP_CONVERTOR(aten::elu, NONE, Create_elu, {PARAM(0)} COMMA HANDLE(1, float))
 OP_CONVERTOR(aten::elu_, NONE, Create_elu, {PARAM(0)} COMMA HANDLE(1, float))
 OP_CONVERTOR(aten::leaky_relu, NONE, Create_leakyrelu, {PARAM(0)} COMMA HANDLE(1, float))
 OP_CONVERTOR(aten::leaky_relu_, NONE, Create_leakyrelu, {PARAM(0)} COMMA HANDLE(1, float))
+
+
+// Comparison ops.
+OP_CONVERTOR(aten::eq, NONE, Create_equal, {PARAM(0) COMMA PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(1)})
+OP_CONVERTOR(aten::gt, NONE, Create_greater, {PARAM(0) COMMA PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(1)})
+OP_CONVERTOR(aten::lt, NONE, Create_less, {PARAM(0) COMMA PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(1)})
+
+
+// Max/min between two tensors.
+OP_CONVERTOR(aten::max and NUM_INPUTS_EQUALS(2), NONE, Create_max, {PARAM(0) COMMA PARAM(1)})
+OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(2), NONE, Create_min, {PARAM(0) COMMA PARAM(1)})
+
+// Max/Min reduce. Takes one tensor and reduces it.
+OP_CONVERTOR(aten::max and NUM_INPUTS_EQUALS(1), NONE, Create_reducemax, {PARAM(0)} COMMA DIMENISON_LENGTH_LIST(0) COMMA 0)
+OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(1), NONE, Create_reducemin, {PARAM(0)} COMMA DIMENISON_LENGTH_LIST(0) COMMA 0)
+
+// Same as above with dim and keepdim args.
+// Unsupported due to PopART/Onnx not returning the indices as well. TODO(T23333)
+//OP_CONVERTOR(aten::max and NUM_INPUTS_EQUALS(3), NONE, Create_reducemax, {PARAM(0)} COMMA {HANDLE_DIM(1)} COMMA HANDLE(2, int64_t))
+//OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(3), NONE, Create_reducemin, {PARAM(0)} COMMA {HANDLE_DIM(1)} COMMA HANDLE(2, int64_t))
+OP_CONVERTOR(aten::topk, NONE, Create_topk, {PARAM(0)} COMMA HANDLE(1, int64_t) COMMA  HANDLE_DIM(2))
+
+// Opset 10
+//OP_CONVERTOR(aten::isinf, NONE, Create_isinf, {PARAM(0)} COMMA 1 COMMA 1)
+OP_CONVERTOR(aten::isnan, NONE, Create_isnan, {PARAM(0)})
