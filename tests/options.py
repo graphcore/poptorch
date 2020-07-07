@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import pytest
 import torch
 import torch.nn as nn
 import numpy as np
@@ -55,16 +56,50 @@ def test_set_popart_options():
     # Create our model.
     model = Network()
     opts = poptorch.Options()
-    opts.Popart.Set("hardwareInstrumentations", set([0, 1]))
-    opts.Popart.Set("dotChecks", [0, 1])
-    opts.Popart.Set("engineOptions", {
+    opts.Popart.set("hardwareInstrumentations", set([0, 1]))
+    opts.Popart.set("dotChecks", [0, 1])
+    opts.Popart.set("engineOptions", {
         "debug.allowOutOfMemory": "true",
         "exchange.streamBufferOverlap": "any"
     })
-    opts.Popart.Set("customCodelets", [])
-    opts.Popart.Set("autoRecomputation", 1)
-    opts.Popart.Set("cachePath", "/tmp")
-    opts.Popart.Set("enableOutlining", True)
+    opts.Popart.set("customCodelets", [])
+    opts.Popart.set("autoRecomputation", 1)
+    opts.Popart.set("cachePath", "/tmp")
+    opts.Popart.set("enableOutlining", True)
+    inference_model = poptorch.inferenceModel(model, opts)
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    ipu = inference_model(x, y)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_real_ipu_selection():
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = Network()
+    # Force-disable the IPU model
+    opts = poptorch.Options().useIpuModel(False)
+    inference_model = poptorch.inferenceModel(model, opts)
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    ipu = inference_model(x, y)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_ipu_id_selection():
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = Network()
+    # Force-disable the IPU model
+    opts = poptorch.Options().useIpuId(0)
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
     y = torch.zeros(2)

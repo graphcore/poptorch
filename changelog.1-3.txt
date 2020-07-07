@@ -8,7 +8,7 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 
 - Add support for batched LSTM and batch first
 
-- An Options object can now be passed to poptorch.trainingModel / poptorch.inferenceModel to configure the session.
+- An Options object can now be passed to poptorch.trainingModel / poptorch.inferenceModel to configure the session and select IPUs
 
 - Adds support for the torch comparisons operations:
     torch.eq, torch.ge, torch.gt,

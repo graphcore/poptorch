@@ -43,6 +43,8 @@ static std::pair<float, bool> FindInMapOrZero(
   return {0.0f, false};
 }
 
+bool ipuHardwareIsAvailable();
+
 struct Optimizer {
   Optimizer(
       const std::unordered_map<std::string, std::pair<float, bool>> &opts) {

@@ -70,6 +70,11 @@ public:
     std::uint64_t steps;
     PopartAnchorTypes anchorMode;
     std::uint64_t anchorReturnPeriod;
+    bool ipuModel;
+    std::uint64_t ipuVersion;
+    std::uint64_t ipuId;
+    popart::DeviceConnectionType connectionType;
+    popart::SyncPattern syncPattern;
   };
 
   // List of options which have been explicitely set by the user.
@@ -106,7 +111,46 @@ public:
                         const std::string &type);
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
+
+  void updateUseModelConfig();
+  std::string checkSystemConfig();
 };
+
+std::string CompilerImpl::checkSystemConfig() {
+  auto dm = popart::DeviceManager::createDeviceManager();
+  if (dm.enumerateDevices().empty()) {
+    return "\nNo IPU detected in the system: are you sure the gc-driver is "
+           "enabled ?";
+  }
+  if (optionsSet.count("ipu_id")) {
+    return "";
+  }
+  std::uint64_t numIpus = usedIpus.size() * popartOptions.replicatedGraphCount;
+  if (dm.enumerateDevices(options.syncPattern, numIpus).empty()) {
+    std::stringstream ss;
+    ss << "\nNo device found on the system with " << numIpus
+       << " IPUs: the configuration needs changing";
+    return ss.str();
+  }
+  return "";
+}
+
+void CompilerImpl::updateUseModelConfig() {
+  // The configuration set by the application takes precedence over everything
+  // else.
+  if (optionsSet.count("ipuModel")) {
+    logging::info("From the user configuration: Ipu model: {}",
+                  options.ipuModel ? "Enabled" : "Disabled");
+  } else if (const char *envUseModel = std::getenv("POPTORCH_IPU_MODEL")) {
+    // As a fallback the model can be enabled by the POPTORCH_IPU_MODEL
+    // environment variable.
+    options.ipuModel = std::stoi(envUseModel) != 0;
+    logging::info("From POPTORCH_IPU_MODEL environment variable: Ipu model: {}",
+                  options.ipuModel ? "Enabled" : "Disabled");
+  } else {
+    options.ipuModel = false;
+  }
+}
 
 void CompilerImpl::AddMemoryToOutput(poptorch::TensorId id, void *ptr,
                                      std::unique_ptr<popart::IArray> &&memory) {
@@ -151,6 +195,9 @@ SessionOptionsImpl::SessionOptionsImpl() : popartOptions(), poptorchOptions() {
   // The keys must match the name and type of the attributes of SessionOptions
   // in python/__init__.py
   boolOptions["profile"] = [&](bool value) { poptorchOptions.profile = value; };
+  boolOptions["use_model"] = [&](bool value) {
+    poptorchOptions.ipuModel = value;
+  };
   boolOptions["constant_weights"] = [&](bool value) {
     popartOptions.constantWeights = value;
   };
@@ -160,6 +207,12 @@ SessionOptionsImpl::SessionOptionsImpl() : popartOptions(), poptorchOptions() {
 
   uint64Options["device_iterations"] = [&](std::uint64_t value) {
     poptorchOptions.steps = value;
+  };
+  uint64Options["ipu_version"] = [&](std::uint64_t value) {
+    poptorchOptions.ipuVersion = value;
+  };
+  uint64Options["ipu_id"] = [&](std::uint64_t value) {
+    poptorchOptions.ipuId = value;
   };
   uint64Options["gradient_accumulation"] = [&](std::uint64_t value) {
     popartOptions.accumulationFactor = value;
@@ -175,6 +228,21 @@ SessionOptionsImpl::SessionOptionsImpl() : popartOptions(), poptorchOptions() {
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(PopartAnchorTypes::N),
                  "Value for PopartAnchorTypes out of range");
     poptorchOptions.anchorMode = static_cast<PopartAnchorTypes>(value);
+  };
+
+  uint64Options["connection_type"] = [&](std::uint64_t value) {
+    ERROR_ON_MSG(
+        value > static_cast<std::uint64_t>(popart::DeviceConnectionType::Never),
+        "Value for DeviceConnectionType out of range");
+    poptorchOptions.connectionType =
+        static_cast<popart::DeviceConnectionType>(value);
+  };
+
+  uint64Options["sync_pattern"] = [&](std::uint64_t value) {
+    ERROR_ON_MSG(value >
+                     static_cast<std::uint64_t>(popart::SyncPattern::PingPong),
+                 "Value for SyncPattern out of range");
+    poptorchOptions.syncPattern = static_cast<popart::SyncPattern>(value);
   };
 
   stringOptions["log_dir"] = [&](std::string value) {
@@ -391,6 +459,12 @@ CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
 }
 
 } // namespace detail
+
+bool ipuHardwareIsAvailable() {
+  return !popart::DeviceManager::createDeviceManager()
+              .enumerateDevices()
+              .empty();
+}
 
 // Variadic output case. For now we will add all outputs to the graph and
 // allocate them on the same IPU but we will only return one. This means only
@@ -615,24 +689,49 @@ void Compiler::SetUpOutputOp(poptorch::TensorId id, bool *ptr,
 }
 
 void Compiler::InitSession(const Optimizer &opt) {
-  // Try and get a single IPU. If not avaliable, run on CPU.
-  // TODO(T22642): Make an actual device selection mechanism.
-  std::shared_ptr<popart::DeviceInfo> device =
-      popart::DeviceManager::createDeviceManager().acquireAvailableDevice(
-          impl->usedIpus.size() * impl->popartOptions.replicatedGraphCount);
+  popart::SessionOptions &options = impl->popartOptions;
+  impl->updateUseModelConfig();
 
-  if (!device) {
-    logging::warn("No IPU device found, falling back to CPU emulator (IPU "
-                  "Model) number of IPUs requested {}",
-                  impl->usedIpus.size() *
-                      impl->popartOptions.replicatedGraphCount);
+  std::shared_ptr<popart::DeviceInfo> device;
+  if (impl->options.ipuModel) {
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
+    logging::debug("Instantiated Cpu device, running on IPU model.");
   } else {
-    logging::debug("Acquired IPU device, running on device.");
+    if (!impl->optionsSet.count("ipu_id")) {
+      device =
+          popart::DeviceManager::createDeviceManager().acquireAvailableDevice(
+              impl->usedIpus.size() * options.replicatedGraphCount, 0,
+              impl->options.syncPattern, impl->options.connectionType);
+      ERROR_ON_MSG(!device,
+                   "Failed to acquire "
+                       << impl->usedIpus.size() * options.replicatedGraphCount
+                       << " IPU(s)" << impl->checkSystemConfig());
+      logging::debug("Acquired IPU device, running on device.");
+    } else {
+      device = popart::DeviceManager::createDeviceManager().acquireDeviceById(
+          impl->options.ipuId, impl->options.syncPattern,
+          impl->options.connectionType);
+      ERROR_ON_MSG(!device, "Failed to acquire device Id "
+                                << impl->options.ipuId
+                                << impl->checkSystemConfig());
+      ERROR_ON_MSG(
+          static_cast<std::uint64_t>(device->getNumIpus()) !=
+              impl->usedIpus.size() * options.replicatedGraphCount,
+          "Expected replication factor * used IPUs = "
+              << impl->usedIpus.size() << " * " << options.replicatedGraphCount
+              << " = " << impl->usedIpus.size() * options.replicatedGraphCount
+              << " device Ids but the user provided " << device->getNumIpus());
+      logging::debug("Acquired IPU device with id {}, running on device.",
+                     impl->options.ipuId);
+    }
   }
 
-  popart::SessionOptions &options = impl->popartOptions;
-  bool enableReplicatedGraphs = impl->popartOptions.replicatedGraphCount != 1;
+  // If Pipelining wasn't set: enable it if more than 1 IPU is used.
+  if (!impl->optionsSet.count("enablePipelining")) {
+    options.enablePipelining = impl->usedIpus.size() > 1;
+  }
+
+  bool enableReplicatedGraphs = options.replicatedGraphCount != 1;
   if (impl->optionsSet.count("enableReplicatedGraphs") &&
       options.enableReplicatedGraphs != enableReplicatedGraphs) {
     logging::warn("enableReplicatedGraphs forced by the user to {}",
@@ -644,7 +743,7 @@ void Compiler::InitSession(const Optimizer &opt) {
   logging::info("Popart replication enabled: {} with factor set to {}",
                 options.enableReplicatedGraphs, options.replicatedGraphCount);
 
-  // Causes problems with Popart
+  // Disable constantWeights by default: causes problems with Popart
   const bool constantWeights = false;
   if (impl->optionsSet.count("constantWeights") &&
       options.constantWeights != constantWeights) {

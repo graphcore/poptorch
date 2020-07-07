@@ -59,7 +59,7 @@ class _OptionsDict:
     def __init__(self, **default_values):
         self._values = default_values
 
-    def Set(self, **kwargs):
+    def set(self, **kwargs):
         for option, value in kwargs.items():
             assert option in self._values, "Invalid option %s, valid options are %s" % (
                 option, self._values.keys())
@@ -69,21 +69,28 @@ class _OptionsDict:
                 type(value), option, type(self._values[option]))
             self._values[option] = value
 
+    def createOrSet(self, **kwargs):
+        for option, value in kwargs.items():
+            if option in self._values:
+                self.set(option=value)
+            else:
+                self._values[option] = value
+
     def __getattr__(self, option):
         assert option in self._values, "Invalid option %s, valid options are %s" % (
             option, self._values.keys())
         return self._values[option]
 
-    def Update(self, other):
+    def update(self, other):
         assert not set(self._values.keys()).intersection(
             other), "Can't merge dictionaries, they have some keys in common"
         other.update(self._values)
         return other
 
-    def __call__(self, key):
-        assert key in self._values, "Invalid option %s, valid options are %s" % (
-            key, self._values.keys())
-        return self._values[key]
+    def __call__(self, option):
+        assert option in self._values, "Invalid option %s, valid options are %s" % (
+            option, self._values.keys())
+        return self._values[option]
 
 
 class _JitOptions(_OptionsDict):
@@ -100,7 +107,7 @@ class _JitOptions(_OptionsDict):
 
         Trace model is enabled by default.
         """
-        self.Set(trace_model=trace_model)
+        self.set(trace_model=trace_model)
         return self
 
 
@@ -112,7 +119,7 @@ class _TrainingOptions(_OptionsDict):
         super().__init__(gradient_accumulation=1)
 
     def gradientAccumulation(self, gradient_accumulation):
-        self.Set(gradient_accumulation=gradient_accumulation)
+        self.set(gradient_accumulation=gradient_accumulation)
         return self
 
 
@@ -124,7 +131,7 @@ class _PopartOptions:
     def __init__(self):
         self.options = {}
 
-    def Set(self, key, value):
+    def set(self, key, value):
         self.options[key] = value
         return self
 
@@ -144,6 +151,23 @@ class AnchorMode(enum.IntEnum):
     Default = 4
 
 
+class ConnectionType(enum.IntEnum):
+    """
+    - Always: Attach to the IPU from the start (Default).
+    - OnDemand: Wait until the compilation is complete and the executable is ready to be run to attach to the IPU.
+    - Never: Never try to attach to an IPU. (Useful for offline compilation, but trying to run an executable will raise an exception).
+    """
+    Always = 0
+    OnDemand = 1
+    Never = 2
+
+
+class SyncPattern(enum.IntEnum):
+    Full = 0
+    SinglePipeline = 1
+    PingPong = 2
+
+
 class Options(_OptionsDict):
     def __init__(self):
         self._jit = _JitOptions()
@@ -151,47 +175,112 @@ class Options(_OptionsDict):
         self._popart = _PopartOptions()
 
         super().__init__(
-            enable_pipelining=False,
             replication_factor=1,
             device_iterations=1,
             log_dir=".",
             profile=False,
             anchor_mode=AnchorMode.Default.value,
             anchor_return_period=1,
+            use_model=False,
+            connection_type=ConnectionType.Always.value,
+            sync_pattern=SyncPattern.Full.value,
         )
 
     @property
     def Jit(self):
+        """Options specific to PyTorch's JIT."""
         return self._jit
 
     @property
     def Training(self):
+        """Options specific to training."""
         return self._training
 
     @property
     def Popart(self):
+        """Options specific to the Popart backend.
+        (Advanced users only).
+        """
         return self._popart
 
     def deviceIterations(self, device_iterations):
-        self.Set(device_iterations=device_iterations)
+        """Number of iterations run on the device per execution (Default: 1)"""
+        self.set(device_iterations=device_iterations)
         return self
 
     def enablePipelining(self, enable_pipelining):
-        self.Set(enable_pipelining=enable_pipelining)
+        """Enable pipelining of virtual graphs (Default: False if 1 IPU used, True otherwise)"""
+        self.createOrSet(enable_pipelining=enable_pipelining)
         return self
 
     def replicationFactor(self, replication_factor):
-        self.Set(replication_factor=replication_factor)
+        """Number of model replications (Default: 1).
+
+        E.g. if your model uses 1 IPU, a
+        replication factor of 2 will use 2 IPUs. If your model is
+        pipelined across 4 IPUs, a replication factor of 4 will use 16 IPUs
+        total.
+        """
+        self.set(replication_factor=replication_factor)
         return self
 
     def logDir(self, log_dir):
         """Where to save log files (Default: Current directory)"""
-        self.Set(log_dir=log_dir)
+        self.set(log_dir=log_dir)
         return self
 
     def profile(self, profile):
         """Enable profiling (Default: False)"""
-        self.Set(profile=profile)
+        self.set(profile=profile)
+        return self
+
+    def useIpuModel(self, use_model):
+        """Use the IPU model or physical hardware.
+
+        Default: False (Real Hardware)
+        This setting takes precedence over the POPTORCH_IPU_MODEL environment variable.
+        """
+        self.set(use_model=use_model)
+        return self
+
+    def connectionType(self, connection_type):
+        """set the IPU connection type to one of:
+        - Always: Attach to the IPU from the start (Default).
+        - OnDemand: Wait until the compilation is complete and the executable is ready to be run to attach to the IPU.
+        - Never: Never try to attach to an IPU. (Useful for offline compilation, but trying to run an executable will raise an exception).
+        """
+        assert isinstance(connection_type, ConnectionType)
+        self.set(connection_type=connection_type.value)
+        return self
+
+    def syncPattern(self, sync_pattern):
+        """set the IPU SyncPatter to one of:
+        - Full
+        - SinglePipeline
+        - PingPong
+        """
+        assert isinstance(sync_patter, SyncPattern)
+        self.set(sync_pattern=sync_pattern.value)
+        return self
+
+    def useIpuId(self, ipu_id):
+        """ Use the specified IPU id as provided by gc-info.
+
+        The number of IPUs associated with the id must be equal to the number of IPUs used by your grpah multiplied by the replication factor.
+
+        E.g. if your model uses 1 IPU and the replication factor is 2 you will need to provide an id with 2 IPUs.
+        If your model is pipelined across 4 IPUs, the replication factor is 4, you will need to provide an id containing 16 IPUs.
+        total.
+        """
+        assert isinstance(ipu_id, int)
+        self.createOrSet(ipu_id=ipu_id)
+        return self
+
+    def setOfflineIpuTarget(self, ipu_version=1):
+        """Create an offline IPU target that can only be used for offline compilation.
+        """
+        self.connectionType(ConnectionType.Never)
+        self.createOrSet(ipu_version=ipu_version)
         return self
 
     def anchorMode(self, anchor_mode, anchor_return_period=None):
@@ -215,11 +304,12 @@ class Options(_OptionsDict):
                 "Anchor return period argument ignored with anchor_mode set to %s"
                 % anchor_mode)
 
-        self.Set(anchor_mode=anchor_mode.value,
+        self.set(anchor_mode=anchor_mode.value,
                  anchor_return_period=anchor_return_period or 1)
         return self
 
     def defaultAnchorMode(self):
+        """Return True if the anchor_mode is currently set to Default, False otherwise."""
         return self.anchor_mode == AnchorMode.Default
 
     def toDict(self):
@@ -231,8 +321,8 @@ class Options(_OptionsDict):
         ), "An anchor mode must be picked before serialisation"
         out = {}
         out.update(self._popart.options)
-        out = self.Update(out)
-        out = self._training.Update(out)
+        out = self.update(out)
+        out = self._training.update(out)
         return out
 
 
