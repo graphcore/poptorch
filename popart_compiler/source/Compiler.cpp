@@ -460,9 +460,9 @@ CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
 
 } // namespace detail
 
-bool ipuHardwareIsAvailable() {
+bool ipuHardwareIsAvailable(std::uint64_t numIpus) {
   return !popart::DeviceManager::createDeviceManager()
-              .enumerateDevices()
+              .enumerateDevices(popart::SyncPattern::Full, numIpus)
               .empty();
 }
 
@@ -694,35 +694,58 @@ void Compiler::InitSession(const Optimizer &opt) {
 
   std::shared_ptr<popart::DeviceInfo> device;
   if (impl->options.ipuModel) {
+    ERROR_ON_MSG(impl->options.connectionType ==
+                     popart::DeviceConnectionType::Never,
+                 "ConnectionType.Never / poptorch.Options.useOfflineIpuTarget "
+                 "not supported for the IPU model");
     device = popart::DeviceManager::createDeviceManager().createCpuDevice();
     logging::debug("Instantiated Cpu device, running on IPU model.");
   } else {
-    if (!impl->optionsSet.count("ipu_id")) {
+    const std::uint64_t numIpus =
+        impl->usedIpus.size() * options.replicatedGraphCount;
+    if (impl->options.connectionType == popart::DeviceConnectionType::Never) {
+      // Offline compilation path: create an offline device regardless of what's
+      // present on the system.
+      ERROR_ON_MSG(impl->optionsSet.count("ipu_id"),
+                   "Offline compilation targeting a specific id not supported");
+      std::map<std::string, std::string> deviceOptions;
+      deviceOptions["numIPUs"] = std::to_string(numIpus);
+      deviceOptions["ipuVersion"] =
+          "ipu" + std::to_string(impl->options.ipuVersion);
+      deviceOptions["syncPattern"] =
+          popart::syncPatternToString(impl->options.syncPattern);
       device =
-          popart::DeviceManager::createDeviceManager().acquireAvailableDevice(
-              impl->usedIpus.size() * options.replicatedGraphCount, 0,
-              impl->options.syncPattern, impl->options.connectionType);
-      ERROR_ON_MSG(!device,
-                   "Failed to acquire "
-                       << impl->usedIpus.size() * options.replicatedGraphCount
-                       << " IPU(s)" << impl->checkSystemConfig());
-      logging::debug("Acquired IPU device, running on device.");
+          popart::DeviceManager::createDeviceManager().createOfflineIPUDevice(
+              deviceOptions);
+      ERROR_ON_MSG(!device, "Failed to create offline IPU device");
     } else {
-      device = popart::DeviceManager::createDeviceManager().acquireDeviceById(
-          impl->options.ipuId, impl->options.syncPattern,
-          impl->options.connectionType);
-      ERROR_ON_MSG(!device, "Failed to acquire device Id "
-                                << impl->options.ipuId
-                                << impl->checkSystemConfig());
-      ERROR_ON_MSG(
-          static_cast<std::uint64_t>(device->getNumIpus()) !=
-              impl->usedIpus.size() * options.replicatedGraphCount,
-          "Expected replication factor * used IPUs = "
-              << impl->usedIpus.size() << " * " << options.replicatedGraphCount
-              << " = " << impl->usedIpus.size() * options.replicatedGraphCount
-              << " device Ids but the user provided " << device->getNumIpus());
-      logging::debug("Acquired IPU device with id {}, running on device.",
-                     impl->options.ipuId);
+      // Regular IPU hardware target
+      if (!impl->optionsSet.count("ipu_id")) {
+        device =
+            popart::DeviceManager::createDeviceManager().acquireAvailableDevice(
+                numIpus, 0, impl->options.syncPattern,
+                impl->options.connectionType);
+        ERROR_ON_MSG(!device, "Failed to acquire "
+                                  << numIpus << " IPU(s)"
+                                  << impl->checkSystemConfig());
+        logging::debug("Acquired IPU device, running on device.");
+      } else {
+        device = popart::DeviceManager::createDeviceManager().acquireDeviceById(
+            impl->options.ipuId, impl->options.syncPattern,
+            impl->options.connectionType);
+        ERROR_ON_MSG(!device, "Failed to acquire device Id "
+                                  << impl->options.ipuId
+                                  << impl->checkSystemConfig());
+        ERROR_ON_MSG(static_cast<std::uint64_t>(device->getNumIpus()) !=
+                         numIpus,
+                     "Expected replication factor * used IPUs = "
+                         << impl->usedIpus.size() << " * "
+                         << options.replicatedGraphCount << " = " << numIpus
+                         << " device Ids but the user provided "
+                         << device->getNumIpus());
+        logging::debug("Acquired IPU device with id {}, running on device.",
+                       impl->options.ipuId);
+      }
     }
   }
 

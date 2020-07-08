@@ -43,7 +43,10 @@ static std::pair<float, bool> FindInMapOrZero(
   return {0.0f, false};
 }
 
-bool ipuHardwareIsAvailable();
+/* Returns true if the system contains a device with numIpus
+ * Note: This function doesn't check if the devices are currently in use.
+ */
+bool ipuHardwareIsAvailable(std::uint64_t numIpus = 1);
 
 struct Optimizer {
   Optimizer(

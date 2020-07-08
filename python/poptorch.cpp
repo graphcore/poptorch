@@ -418,5 +418,6 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("canonicalize", poptorch::pyCanonicalize);
   m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDevice_impl);
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHost_impl);
-  m.def("ipuHardwareIsAvailable", poptorch::ipuHardwareIsAvailable);
+  m.def("ipuHardwareIsAvailable", poptorch::ipuHardwareIsAvailable,
+        py::arg("numIpus") = 1);
 }

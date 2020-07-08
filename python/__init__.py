@@ -276,8 +276,10 @@ class Options(_OptionsDict):
         self.createOrSet(ipu_id=ipu_id)
         return self
 
-    def setOfflineIpuTarget(self, ipu_version=1):
+    def useOfflineIpuTarget(self, ipu_version=1):
         """Create an offline IPU target that can only be used for offline compilation.
+
+        Note: the offline IPU target cannot be used if the IPU model is enabled.
         """
         self.connectionType(ConnectionType.Never)
         self.createOrSet(ipu_version=ipu_version)
@@ -508,6 +510,12 @@ class _PoplarExecutor:
                 self.executable = compileWithScript(
                     n._c, n.graph, in_tensors_trace_view.asTuple(),
                     self.options.toDict(), self.training)
+
+        if self.options.connectionType == ConnectionType.Never:
+            logger.info(
+                "Compilation complete and ConnectionType.Never selected: returning"
+            )
+            return
 
         # Execute the poplar executable with the full size (batch * device interations)
         if self.new_optimizer and self.new_optimizer != self.optimizer:
