@@ -36,7 +36,6 @@ def test_lstm2():
     hidden = (torch.randn(1, 1, numHidden), torch.randn(1, 1, numHidden))
     out = lstm(inputs, hidden)
     ipuOut = ipuLstm(inputs, hidden)
-    ipuLstm.copyWeightsToHost()
     assert poptorch.testing.allclose(out, ipuOut)
 
 

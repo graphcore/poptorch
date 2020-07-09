@@ -870,8 +870,8 @@ void Compiler::InitSession(const Optimizer &opt) {
 // model.
 void Compiler::CopyWeightsToDevice() {
   logging::info("Writing weights from host to IPU memory.");
-  impl->session->weightsFromHost();
   impl->session->writeWeights(impl->weightCallback);
+  impl->session->weightsFromHost();
 }
 
 // Read the weights from IPU memory into the pytorch tensor buffers.

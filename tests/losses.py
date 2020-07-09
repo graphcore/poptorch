@@ -159,9 +159,6 @@ def test_LogSoftmax():
         label = torch.randint(0, 10, [1])
         input = torch.randn(1, 10)
 
-        # Copy weights to host.
-        poptorch_model.copyWeightsToHost()
-
         # Run on host.
         groundTruth = model(input)
         poptorch_out, loss = poptorch_model(input, label)

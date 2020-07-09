@@ -160,9 +160,6 @@ def test():
 # Train on IPU.
 train()
 
-# Update the weights in model by copying from the training IPU. This updates (model.parameters())
-training_model.copyWeightsToHost()
-
 # Check validation loss on IPU once trained. Because PopTorch will be compiled on first call the
 # weights in model.parameters() will be copied implicitly. Subsequent calls will need to call
 # inference_model.copyWeightsToDevice()

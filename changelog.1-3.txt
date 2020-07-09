@@ -17,3 +17,4 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 
     torch.min and torch.max only support (tensor, tensor) and (tensor) overloads. They do
     not support the (tensor, dim=, keepdim=) overload.
+- Automatically synchronise the weights back to the Host after using the IPU for training. (i.e no need to explicitly call copyWeightsToHost() anymore)

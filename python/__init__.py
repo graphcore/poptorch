@@ -18,7 +18,10 @@ ipu_print_tensor = torch.ops.poptorch.ipu_print_tensor
 
 # Create a poptorch logger which outputs to the console INFO messages and above
 logger = logging.getLogger("poptorch")
-logger.setLevel(logging.INFO)
+if os.environ.get("POPTORCH_LOG_LEVEL") in ["DEBUG", "TRACE"]:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
 console = logging.StreamHandler()
 formatter = logging.Formatter('%(name)s:%(levelname)s: %(message)s')
 console.setFormatter(formatter)
@@ -316,9 +319,6 @@ class Options(_OptionsDict):
 
     def toDict(self):
         """ Merge all the options, except for the Jit ones, into a single dictionary to be serialised and passed to the cpp side."""
-        if self.defaultAnchorMode():
-            import pdb
-            pdb.set_trace()
         assert not self.defaultAnchorMode(
         ), "An anchor mode must be picked before serialisation"
         out = {}
@@ -444,6 +444,34 @@ class _PoplarExecutor:
         self.optimizer = optimizer
         self.new_optimizer = optimizer
         self.warned_not_contiguous_input = False
+        self.dirty_host_weights = False
+        if self.training:
+            m = self.model.model
+
+            class WrappedModel(type(m)):
+                def copyWeightsToHostIfNeeded(self_model):
+                    """ Return True if the weights on the host were dirty and have been updated.
+                    Return False if the weights were already up to date.
+                    """
+                    if self.dirty_host_weights:
+                        logger.debug("Implicit copyWeightsToHost()")
+                        self.copyWeightsToHost()
+                        self.dirty_host_weights = False
+                        return True
+                    return False
+
+                def __call__(self_model, *args, **kwargs):
+                    # If the model has been trained on the IPU: update the host side weights
+                    self_model.copyWeightsToHostIfNeeded()
+                    return self.model.real_model_call(*args, **kwargs)
+
+                def named_parameters(self_model, *args, **kwargs):
+                    self_model.copyWeightsToHostIfNeeded()
+                    return super().named_parameters(*args, **kwargs)
+
+            # __call__ is an attribute, not a method, unfortunately we cannot just
+            # replace it in the model object: we have to create a wrapper class and change the object's class.
+            m.__class__ = WrappedModel
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
@@ -517,6 +545,17 @@ class _PoplarExecutor:
             )
             return
 
+        # If this is an inference model: check if the same model is not being trained on a different IPU.
+        # If it is: make sure the weights are updated.
+        if not self.training:
+            copyWeightsToHostIfNeeded = getattr(
+                self.model, "copyWeightsToHostIfNeeded", None)
+            if callable(copyWeightsToHostIfNeeded):
+                if copyWeightsToHostIfNeeded():
+                    # Weights have now been updated on the Host: copy them to the second IPU.
+                    logger.debug("Implicit copyWeightsToDevice()")
+                    self.copyWeightsToDevice()
+
         # Execute the poplar executable with the full size (batch * device interations)
         if self.new_optimizer and self.new_optimizer != self.optimizer:
             self.optimizer = self.new_optimizer
@@ -524,6 +563,9 @@ class _PoplarExecutor:
                              _convertOptimizerToDict(self.optimizer))
         else:
             output = execute(self.executable, in_tensors.asTuple(), {})
+
+        if self.training:
+            self.dirty_host_weights = True
 
         if len(output) > 1:
             return output
@@ -546,9 +588,11 @@ def trainingModel(model, options=None, loss=None, optimizer=None):
             super().__init__()
             self.model = model
             self.loss = loss
+            # Store the real __call__ method before _PoplarExecutor wraps it
+            self.real_model_call = model.__call__
 
         def __call__(self, args, loss_inputs):
-            output = self.model(args)
+            output = self.real_model_call(args)
 
             if self.loss:
                 loss = self.loss(output, loss_inputs)

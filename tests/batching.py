@@ -60,9 +60,6 @@ def test_trainingBatching():
         assert len(loss.size()) == 1
         assert loss.size()[0] == 1
 
-    # Copy weights back to host model.
-    poptorch_model.copyWeightsToHost()
-
     # Run with trained weights.
     out = model(input)
 

@@ -2,40 +2,149 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
+import types
 import poptorch
 import torch.optim as optim
 
 
-def test_weight_write_to_host():
+def test_weights_sharing_ipu_cpu():
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
-    poptorch_model = poptorch.trainingModel(model,
-                                            loss=torch.nn.MSELoss())
+    training_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
+    training_model.deviceToHostCounter = 0
+    realMethod = training_model.copyWeightsToHost
+
+    original_parameters = str([p for p in model.parameters()])
+
+    def deviceToHostWrapper(model):
+        model.deviceToHostCounter += 1
+        realMethod()
+
+    training_model.copyWeightsToHost = types.MethodType(
+        deviceToHostWrapper, training_model)
+
+    # Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
     target = torch.randn(10)
     input = torch.randn(10)
 
     # Make sure the first run doesn't already pass the test.
-    original, loss = poptorch_model(input, target)
+    original, loss = training_model(input, target)
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
     # Train on IPU.
-    for i in range(0, 2500):
-        out, loss = poptorch_model(input, target)
+    for i in range(0, 1000):
+        out, loss = training_model(input, target)
 
-    # Run without copying the weights.
-    nativeOut = model(input)
-    assert not torch.allclose(nativeOut, out)
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed to train the model"
 
-    # Copy weights
-    poptorch_model.copyWeightsToHost()
-
-    # Run again with the now trained weights.
+    # Run without copying the weights and check they've been automatically updated.
     nativeOut = model(input)
     assert torch.allclose(nativeOut, out)
+    assert training_model.deviceToHostCounter == 1, "1 implicit copy after having trained the model"
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    current_parameters = str([p for p in model.parameters()])
+    assert original_parameters != current_parameters
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed to access the parameters after inference"
+    last_parameters = current_parameters
+
+    nativeOut = model(input)
+    assert torch.allclose(nativeOut, out)
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed after inference"
+
+    current_parameters = str([p for p in model.parameters()])
+    assert last_parameters == current_parameters
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed to access the parameters after inference"
+
+    # Train on IPU.
+    for i in range(0, 1000):
+        out, loss = training_model(input, target)
+
+    current_parameters = str([p for p in model.parameters()])
+    assert training_model.deviceToHostCounter == 1, "1 implicit copy after having trained the model"
+    assert original_parameters != current_parameters
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    for i in range(0, 500):
+        out, loss = training_model(input, target)
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed to train the model"
+
+    # Run without copying the weights and check they've been automatically updated.
+    nativeOut = model(input)
+    assert torch.allclose(nativeOut, out)
+    assert training_model.deviceToHostCounter == 1, "1 implicit copy after having trained the model"
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    nativeOut = model(input)
+    assert torch.allclose(nativeOut, out)
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed after inference"
 
     # Check we have trained the "model"
     assert torch.allclose(nativeOut, target, rtol=1e-02, atol=1e-02)
+
+
+def test_weights_sharing_ipus():
+    torch.manual_seed(42)
+    model = torch.nn.Linear(10, 10)
+
+    training_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
+    training_model.deviceToHostCounter = 0
+    realMethod = training_model.copyWeightsToHost
+
+    def deviceToHostWrapper(model):
+        model.deviceToHostCounter += 1
+        realMethod()
+
+    training_model.copyWeightsToHost = types.MethodType(
+        deviceToHostWrapper, training_model)
+
+    # Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
+    inference_model = poptorch.inferenceModel(model)
+    target = torch.randn(10)
+    input = torch.randn(10)
+
+    out_inference = inference_model(input)
+    assert not torch.allclose(out_inference, target, rtol=1e-02, atol=1e-02)
+
+    # Make sure the first run doesn't already pass the test.
+    original, loss = training_model(input, target)
+    assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
+
+    # Train on IPU.
+    for i in range(0, 1000):
+        out, loss = training_model(input, target)
+
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed to train the model"
+
+    # Run without copying the weights and check they've been automatically updated.
+    out_inference = inference_model(input)
+    assert torch.allclose(out_inference, out)
+    assert training_model.deviceToHostCounter == 1, "1 implicit copy after having trained the model"
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    out_inference = inference_model(input)
+    assert torch.allclose(out_inference, out)
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed after inference"
+
+    # Train on IPU.
+    for i in range(0, 1500):
+        out, loss = training_model(input, target)
+
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed to train the model"
+
+    # Run without copying the weights and check they've been automatically updated.
+    out_inference = inference_model(input)
+    assert torch.allclose(out_inference, out)
+    assert training_model.deviceToHostCounter == 1, "1 implicit copy after having trained the model"
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    out_inference = inference_model(input)
+    assert torch.allclose(out_inference, out)
+    assert training_model.deviceToHostCounter == 0, "No implicit copy needed after inference"
+
+    # Check we have trained the "model"
+    assert torch.allclose(out_inference, target, rtol=1e-02, atol=1e-02)
 
 
 def test_implicit_first_time_copy():
@@ -133,8 +242,7 @@ def test_weight_overwrite_trained_weight():
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
-    poptorch_model = poptorch.trainingModel(model,
-                                            loss=torch.nn.MSELoss())
+    poptorch_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
     target = torch.randn(10)
     input = torch.randn(10)
 
