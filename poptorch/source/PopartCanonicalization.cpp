@@ -299,7 +299,6 @@ CanonicalizeImpl::HandleParamOrConstantNoCast(torch::jit::Graph &graph,
   torch::jit::Node *constant = CreateIRConstant(graph, operand);
 
   if (constant) {
-    constant->insertBefore(operand->node());
     valueToReturn = constant->output();
   }
 
@@ -314,10 +313,7 @@ CanonicalizeImpl::HandleParamOrConstant(torch::jit::Graph &graph,
   torch::jit::Node *constant = CreateIRConstant(graph, operand);
 
   if (constant) {
-    constant->insertBefore(operand->node());
-
     torch::jit::Node *cast = CastToType<T>(graph, constant->output());
-    cast->insertAfter(constant);
     valueToReturn = cast->output();
   }
 
@@ -450,6 +446,7 @@ void CanonicalizeImpl::SearchAndPossiblyDestroy(torch::jit::Node *node) {
 
 void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
   for (torch::jit::Node *node : graph.nodes()) {
+    torch::jit::WithInsertPoint insertPoint(node);
     torch::jit::Node *newNode = nullptr;
     torch::jit::Symbol kind = node->kind();
 
@@ -499,11 +496,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         // Otherwise we are expanding the original tensor.
         newNode = Create_ConstantInt(graph, newShape,
                                      {static_cast<int64_t>(newShape.size())});
-        newNode->insertBefore(node);
 
         newNode = Create_Cast(graph, newNode->output(), c10::kLong);
-        newNode->insertBefore(node);
-
         newNode = Create_expand(graph, {node->input(0), newNode->output()});
       }
     } else if (kind == c10::aten::expand_as) {
@@ -542,10 +536,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       } else {
         newNode = Create_ConstantInt(graph, newShape,
                                      {static_cast<int64_t>(newShape.size())});
-        newNode->insertBefore(node);
 
         newNode = Create_Cast(graph, newNode->output(), c10::kLong);
-        newNode->insertBefore(node);
 
         newNode = Create_expand(graph, {node->input(0), newNode->output()});
       }
@@ -604,10 +596,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
   if (alphaAsScalar != 1) {                                                    \
     torch::jit::Node *alphaConst =                                             \
         Create_Constant<Type>{}(graph, {alphaAsScalar}, {1});                  \
-    alphaConst->insertAfter(alphaValue->node());                               \
     torch::jit::Node *alphaNode =                                              \
         Create_mul(graph, {alphaConst->output(), valueToMultiply});            \
-    alphaNode->insertAfter(alphaConst);                                        \
     alphaValue = alphaNode->output();                                          \
   }
 
@@ -770,7 +760,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // Reshape to 4D if needed.
       if (originalShape.size() != 4) {
         torch::jit::Node *reshape_in = CreateReshape(graph, input, newShape);
-        reshape_in->insertBefore(node);
         input = reshape_in->output();
       }
 
@@ -793,7 +782,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // If we reshaped, reshape back.
       if (originalShape.size() != 4) {
         // Add the batch norm.
-        newNode->insertBefore(node);
 
         // This is now the new node.
         newNode = CreateReshape(graph, newNode->output(), originalShape);
@@ -893,13 +881,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Add log(x)
       torch::jit::Node *logx = Create_log(graph, {node->inputs()[0]});
-      logx->insertBefore(node);
 
       // Add log10
       const double log10Const =
           2.302585092994045684017991454684364207601101488628772976033;
       torch::jit::Node *log10 = Create_ConstantFloat(graph, {log10Const}, {});
-      log10->insertBefore(node);
 
       // Add the divide.
       newNode = Create_div(graph, {logx->output(), log10->output()});
@@ -908,12 +894,10 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Add the one constant
       torch::jit::Node *one = Create_ConstantFloat(graph, {1.0}, {});
-      one->insertBefore(node);
 
       // Add x + 1
       torch::jit::Node *add =
           Create_add(graph, {node->inputs()[0], one->output()});
-      add->insertBefore(node);
 
       // Add the log
       newNode = Create_log(graph, {add->output()});
@@ -922,13 +906,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Add log(x)
       torch::jit::Node *logx = Create_log(graph, {node->inputs()[0]});
-      logx->insertBefore(node);
 
       // Add log2
       const double log2Const =
           0.693147180559945309417232121458176568075500134360255254120;
       torch::jit::Node *log2 = Create_ConstantFloat(graph, {log2Const}, {});
-      log2->insertBefore(node);
 
       // Add the divide.
       newNode = Create_div(graph, {logx->output(), log2->output()});
@@ -947,7 +929,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       newNode = Create_softmax(graph, {node->input(0)}, dim);
 
-      newNode->insertBefore(node);
       newNode = Create_log(graph, {newNode->output()});
     } else if (kind == c10::aten::nll_loss) {
       // This is derived by me (stephenm@graphcore.ai) not parsed from the
@@ -977,7 +958,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // 0. So we have to manually subract the losses first.
       torch::jit::Node *subtract =
           Create_sub(graph, {node->input(0), node->input(1)});
-      subtract->insertBefore(node);
 
       const float scale = 1.0f;
       newNode = Create_l1loss(graph, {subtract->output()}, scale, reduction);
@@ -992,23 +972,19 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // Subtract X - Y
       torch::jit::Node *subtract =
           Create_sub(graph, {node->input(0), node->input(1)});
-      subtract->insertBefore(node);
 
       // Square it.
       torch::jit::Node *square =
           Create_mul(graph, {subtract->output(), subtract->output()});
-      square->insertAfter(subtract);
 
       torch::jit::Node *finalNode = square;
 
       if (reduction == 0) {
         // Sum
         finalNode = Create_sum(graph, {square->output()});
-        finalNode->insertAfter(square);
       } else if (reduction == 1) {
         // Mean
         finalNode = Create_mean(graph, {square->output()});
-        finalNode->insertAfter(square);
       }
 
       newNode = Create_identityloss(graph, {finalNode->output()}, reduction);
@@ -1019,6 +995,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       newNode =
           graph.create(c10::Symbol::fromQualString("poptorch::begin_ipu_block"),
                        {}, node->outputs().size());
+      graph.insertNode(newNode);
 
       // Convert the prim::Constant into an attribute.
       std::int64_t ipu_id =
@@ -1231,7 +1208,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       if (asScalar) {
         torch::jit::Node *asConstant =
             Create_ConstantFloat(graph, {*asScalar}, {1});
-        asConstant->insertBefore(node);
 
         other->replaceAllUsesWith(asConstant->output());
 
@@ -1292,12 +1268,10 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Flatten into [M, N]
       torch::jit::Node *flatten = Create_flatten(graph, {X}, axis);
-      flatten->insertBefore(node);
 
       // Normalize.
       torch::jit::Node *normalize = Create_groupnormalization(
           graph, {flatten->output(), gamma, beta}, 1, epsilon);
-      normalize->insertAfter(flatten);
 
       // Reshape back into the expected shape.
       c10::TensorTypePtr convertedToTensor =
@@ -1386,7 +1360,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
                                {index}, {axis});
 
         // Add the slice to the graph.
-        newNode->insertBefore(node);
         slices.push_back(newNode->output());
 
         // Move along in the vector dimension.
@@ -1394,7 +1367,7 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       }
 
       newNode = graph.create(at::prim::ListConstruct, slices);
-
+      graph.insertNode(newNode);
     } else if (kind == c10::aten::masked_fill) {
       // clang-format off
       // Derived from documentation
@@ -1407,45 +1380,35 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Cast the mask to int32.
       torch::jit::Node *mask = Create_Cast(graph, node->input(1), c10::kInt);
-      mask->insertBefore(node);
 
       // Create an inverse mask via -(mask - 1)
       torch::jit::Node *negativeOne = Create_ConstantInt(graph, {-1}, {1});
-      negativeOne->insertBefore(node);
 
       torch::jit::Node *inverseMask =
           Create_add(graph, {mask->output(), negativeOne->output()});
-      inverseMask->insertBefore(node);
 
       inverseMask = Create_neg(graph, {inverseMask->output()});
-      inverseMask->insertBefore(node);
 
       // Prepare input and update
       mask = Create_Cast(graph, node->input(1), c10::kFloat);
-      mask->insertBefore(node);
 
       float otherAsConst = *HandleConstant<float>(node->input(2)->node());
       torch::jit::Node *other =
           Create_ConstantFloat(graph, {otherAsConst}, {1});
-      other->insertBefore(node);
 
       torch::jit::Node *update =
           Create_mul(graph, {mask->output(), other->output()});
-      update->insertBefore(node);
 
       // Create holes in the original so we can add into it.
       inverseMask = Create_Cast(graph, inverseMask->output(), c10::kFloat);
-      inverseMask->insertBefore(node);
 
       torch::jit::Node *self =
           Create_mul(graph, {node->input(0), inverseMask->output()});
-      self->insertBefore(node);
 
       newNode = Create_add(graph, {self->output(), update->output()});
     } else if (kind == c10::aten::rsqrt) {
       // rsqrt =  1 / sqrt(x)
       torch::jit::Node *sqrt = Create_sqrt(graph, {node->input()});
-      sqrt->insertBefore(node);
 
       newNode = Create_reciprocal(graph, {sqrt->output()});
     } else if (kind == c10::aten::expm1) {
@@ -1453,17 +1416,14 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // exp(x)
       torch::jit::Node *exp = Create_exp(graph, {node->input()});
-      exp->insertBefore(node);
 
       // Add the one constant
       torch::jit::Node *one = Create_ConstantFloat(graph, {1.0}, {});
-      one->insertBefore(node);
 
       newNode = Create_sub(graph, {exp->output(), one->output()});
     } else if (kind == c10::aten::trunc) {
       // Drop the exponent by casting to int and back.
       torch::jit::Node *toInt = Create_Cast(graph, node->input(), c10::kInt);
-      toInt->insertBefore(node);
 
       newNode = Create_Cast(graph, toInt->output(), c10::kFloat);
 
@@ -1472,11 +1432,9 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Drop the exponent by casting to int and back.
       torch::jit::Node *toInt = Create_Cast(graph, node->input(), c10::kInt);
-      toInt->insertBefore(node);
 
       torch::jit::Node *trunc =
           Create_Cast(graph, toInt->output(), c10::kFloat);
-      trunc->insertBefore(node);
 
       newNode = Create_sub(graph, {node->input(), trunc->output()});
     } else if (kind == c10::aten::round) {
@@ -1484,23 +1442,18 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Add 0.5 as constant.
       torch::jit::Node *zeroPointFive = Create_ConstantFloat(graph, {0.5}, {});
-      zeroPointFive->insertBefore(node);
 
       torch::jit::Node *sign = Create_sign(graph, {node->input()});
-      sign->insertBefore(node);
 
       torch::jit::Node *broadcastBySign =
           Create_mul(graph, {sign->output(), zeroPointFive->output()});
-      broadcastBySign->insertBefore(node);
 
       torch::jit::Node *addition =
           Create_add(graph, {node->input(), broadcastBySign->output()});
-      addition->insertBefore(node);
 
       // Drop the exponent by casting to int and back.
       torch::jit::Node *toInt =
           Create_Cast(graph, addition->output(), c10::kInt);
-      toInt->insertBefore(node);
 
       newNode = Create_Cast(graph, toInt->output(), c10::kFloat);
     } else if (kind == c10::aten::floor_divide) {
@@ -1509,8 +1462,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       torch::jit::Node *x = Create_floor(graph, {node->inputs()[0]});
       torch::jit::Node *y = Create_floor(graph, {node->inputs()[1]});
-      x->insertBefore(node);
-      y->insertBefore(node);
 
       newNode = Create_div(graph, {x->output(), y->output()});
 
@@ -1519,10 +1470,8 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // true_divide(x, y) = (float)x / (float)y
 
       torch::jit::Node *x = Create_Cast(graph, node->inputs()[0], c10::kFloat);
-      x->insertBefore(node);
 
       torch::jit::Node *y = Create_Cast(graph, node->inputs()[1], c10::kFloat);
-      y->insertBefore(node);
 
       newNode = Create_div(graph, {x->output(), y->output()});
     } else if (kind == c10::aten::argmax || kind == c10::aten::argmin) {
@@ -1547,7 +1496,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       if (!dim) {
         torch::jit::Node *flatten =
             Create_flatten(graph, {node->inputs()[0]}, 0);
-        flatten->insertBefore(node);
         input = flatten->output();
       } else {
         dimToUse = *dim;
@@ -1581,7 +1529,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       if (node->inputs().size() == 2) {
         torch::jit::Node *flatten =
             Create_flatten(graph, {node->inputs()[0]}, 0);
-        flatten->insertBefore(node);
         input = flatten->output();
         axes = {1};
       } else {
@@ -1638,52 +1585,40 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Add the one constant
       torch::jit::Node *one = Create_ConstantFloat(graph, {1.0}, {});
-      one->insertBefore(node);
 
       torch::jit::Node *logX = Create_log(graph, {x});
-      logX->insertBefore(node);
 
       // Log(x)*y
       torch::jit::Node *logXMulY = Create_mul(graph, {y, logX->output()});
-      logXMulY->insertBefore(node);
 
       // Do (1 - y) and (1 - x)
       torch::jit::Node *xMinusOne = Create_sub(graph, {one->output(), x});
       torch::jit::Node *yMinusOne = Create_sub(graph, {one->output(), y});
-      xMinusOne->insertBefore(node);
-      yMinusOne->insertBefore(node);
 
       // Log(1 - x)
       torch::jit::Node *logXMinusOne = Create_log(graph, {xMinusOne->output()});
-      logXMinusOne->insertBefore(node);
 
       // (1 -y)*Log(1 - x)
       torch::jit::Node *subsMultiplied =
           Create_mul(graph, {yMinusOne->output(), logXMinusOne->output()});
-      subsMultiplied->insertBefore(node);
 
       // Log(x)*y + (1 -y)*Log(1 - x)
       torch::jit::Node *addTerms =
           Create_add(graph, {logXMulY->output(), subsMultiplied->output()});
-      addTerms->insertBefore(node);
 
       torch::jit::Node *finalNode = addTerms;
 
       if (weight->node()->kind() != c10::prim::Constant) {
         finalNode = Create_mul(graph, {addTerms->output(), weight});
-        finalNode->insertBefore(node);
       }
 
       finalNode = Create_neg(graph, {addTerms->output()});
-      finalNode->insertBefore(node);
       if (reduction == 0) {
         // Sum
         finalNode = Create_sum(graph, {finalNode->output()});
-        finalNode->insertBefore(node);
       } else if (reduction == 1) {
         // Mean
         finalNode = Create_mean(graph, {finalNode->output()});
-        finalNode->insertBefore(node);
       }
 
       newNode = Create_identityloss(graph, {finalNode->output()}, reduction);
@@ -1739,21 +1674,18 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
           // Add a batch dimension
           shape.insert(shape.begin(), 1);
           torch::jit::Node *reshape = CreateReshape(graph, values, shape);
-          reshape->insertBefore(node);
           values = reshape->output();
         }
         torch::jit::Node *states =
             Create_split(graph, {values}, stateSize, 1,
                          {numHiddenLayers, numHiddenLayers, numHiddenLayers,
                           numHiddenLayers});
-        states->insertBefore(node);
         std::vector<torch::jit::Value *> slices;
         for (std::uint64_t i = 0; i < stateSize; ++i) {
           if (areWeights) {
             // Weights also need to be transposed
             torch::jit::Node *transposed =
                 Create_transpose(graph, {states->output(i)}, {0, 2, 1});
-            transposed->insertBefore(node);
             slices.push_back(transposed->output());
           } else {
             slices.push_back(states->output(i));
@@ -1761,7 +1693,6 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
         }
         torch::jit::Node *concat = Create_concat(
             graph, {slices[1], slices[0], slices[2], slices[3]}, 0);
-        concat->insertBefore(node);
         return concat->output();
       };
 
@@ -1770,21 +1701,17 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
                         {reshapeTensor(weightsList[0], true),
                          reshapeTensor(weightsList[1], true)},
                         1);
-      concatWeights->insertBefore(node);
       torch::jit::Node *combineBiases =
           Create_addNotInPlace(graph, reshapeTensor(weightsList[2], false),
                                reshapeTensor(weightsList[3], false));
-      combineBiases->insertBefore(node);
 
       torch::jit::Node *concatStates =
           Create_concat(graph, {hiddenLayers[0], hiddenLayers[1]}, 0);
-      concatStates->insertBefore(node);
 
       // Transpose output BSF -> SBF
       if (batchFirst) {
         torch::jit::Node *transpose =
             Create_transpose(graph, {input}, {1, 0, 2});
-        transpose->insertBefore(node);
         input = transpose->output();
       }
       std::vector<torch::jit::Value *> args;
@@ -1794,19 +1721,16 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       args.push_back(concatStates->output());  // init_states
 
       torch::jit::Node *lstm = Create_lstm(graph, args, 1);
-      lstm->insertBefore(node);
 
       // Keep the last slice from Y
       torch::jit::Node *Y_h =
           Create_slice(graph, {lstm->output(0)}, {INT_MAX}, {-1}, {0});
-      Y_h->insertBefore(node);
 
       torch::jit::Value *output = lstm->output(0);
       // Transpose output SBF -> BSF
       if (batchFirst) {
         torch::jit::Node *transpose =
             Create_transpose(graph, {output}, {1, 0, 2});
-        transpose->insertBefore(node);
         output = transpose->output();
       }
 
@@ -1828,15 +1752,12 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
       // Node will either be < or >.
       if (kind == c10::aten::ge) {
         comparison = Create_greater(graph, {lhs, rhs});
-        comparison->insertBefore(node);
       } else {
         comparison = Create_less(graph, {lhs, rhs});
-        comparison->insertBefore(node);
       }
 
       // We do a check for ==
       torch::jit::Node *equal = Create_equal(graph, {lhs, rhs});
-      equal->insertBefore(node);
 
       // The final node will be a combination of equals and less or greater.
       newNode =
@@ -1849,14 +1770,11 @@ void CanonicalizeImpl::Run(torch::jit::Graph &graph) {
 
       // Not(equal(lhs, rhs))
       torch::jit::Node *equal = Create_equal(graph, {lhs, rhs});
-      equal->insertBefore(node);
       newNode = Create_logical_not(graph, {equal->output()});
     }
 
     // If we have a new node add it and replace the old use.
     if (newNode) {
-      newNode->insertBefore(node);
-
       // Mark this node for deletion.
       toDelete.insert(node);
       ERROR_ON(node->outputs().size() != newNode->outputs().size());

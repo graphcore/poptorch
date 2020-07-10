@@ -12,6 +12,7 @@ torch::jit::Node *CreateReshape(torch::jit::Graph &graph, torch::jit::Value *A,
   torch::jit::Node *newNode =
       graph.create(Symbols::popart::reshape_static_shape, {A});
   newNode->is_(c10::attr::shape, new_shape);
+  graph.insertNode(newNode);
   return newNode;
 }
 
@@ -21,6 +22,7 @@ torch::jit::Node *Create_ConstantInt(torch::jit::Graph &graph,
   torch::jit::Node *newNode = graph.create(Symbols::poptorch::int_constant);
   newNode->is_(c10::attr::data, data);
   newNode->is_(c10::attr::shape, new_shape);
+  graph.insertNode(newNode);
   return newNode;
 }
 
@@ -30,12 +32,14 @@ torch::jit::Node *Create_ConstantFloat(torch::jit::Graph &graph,
   torch::jit::Node *newNode = graph.create(Symbols::poptorch::float_constant);
   newNode->fs_(c10::attr::data, data);
   newNode->is_(c10::attr::shape, new_shape);
+  graph.insertNode(newNode);
   return newNode;
 }
 
 torch::jit::Node *Create_Cast(torch::jit::Graph &graph, torch::jit::Value *A,
                               c10::ScalarType scalar) {
   torch::jit::Node *newNode = graph.create(Symbols::poptorch::cast, {A});
+  graph.insertNode(newNode);
 
   std::string newType = "";
 
@@ -107,6 +111,7 @@ torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
                                      float constant) {
   torch::jit::Node *newNode =
       graph.create(Symbols::poptorch::constant_pad, {A});
+  graph.insertNode(newNode);
   newNode->is_(c10::Symbol::fromQualString("attr::pads"),
                convertPytorchPads(pad_shape));
   newNode->f_(c10::Symbol::fromQualString("attr::value"), constant);
@@ -116,6 +121,7 @@ torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
 torch::jit::Node *Create_EdgePad(torch::jit::Graph &graph, torch::jit::Value *A,
                                  const std::vector<int64_t> &pad_shape) {
   torch::jit::Node *newNode = graph.create(Symbols::poptorch::edge_pad, {A});
+  graph.insertNode(newNode);
   newNode->is_(c10::Symbol::fromQualString("attr::pads"),
                convertPytorchPads(pad_shape));
   return newNode;
@@ -126,6 +132,7 @@ torch::jit::Node *Create_ReflectionPad(torch::jit::Graph &graph,
                                        const std::vector<int64_t> &pad_shape) {
   torch::jit::Node *newNode =
       graph.create(Symbols::poptorch::reflection_pad, {A});
+  graph.insertNode(newNode);
   newNode->is_(c10::Symbol::fromQualString("attr::pads"),
                convertPytorchPads(pad_shape));
 
@@ -137,6 +144,7 @@ torch::jit::Node *Create_addNotInPlace(torch::jit::Graph &graph,
                                        torch::jit::Value *B) {
   torch::jit::Node *newNode =
       graph.create(Symbols::poptorch::addNotInPlace, {A, B});
+  graph.insertNode(newNode);
   return newNode;
 }
 

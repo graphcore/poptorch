@@ -50,8 +50,8 @@ void CanonicalizeLate(torch::jit::Graph &graph) {
 
         torch::jit::Node *reshaped =
             CreateReshape(graph, node->output(), originalShape);
+        reshaped->moveAfter(node);
 
-        reshaped->insertAfter(node);
         node->replaceAllUsesWith(reshaped);
 
         // Replace all uses doesn't check that the use isn't in the instruction

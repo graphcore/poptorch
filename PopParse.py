@@ -295,6 +295,7 @@ for opset in classes:
             cppFile += "newNode->" + attr + "_(c10::Symbol::fromQualString(\"attr::" + arg[
                 "name"] + "\")," + arg["name"] + ");\n"
 
+        cppFile += "graph.insertNode(newNode);\n"
         cppFile += "return newNode;\n"
 
         cppFile = header + ") {\n" + cppFile + "}"
