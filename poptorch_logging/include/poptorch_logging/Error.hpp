@@ -12,8 +12,9 @@ namespace logging {
 #define ERROR(msg)                                                             \
   do {                                                                         \
     std::stringstream __error_msg;                                             \
-    __error_msg << "ERROR in " << __FILE__ << ":" << __LINE__ << ": " << msg;  \
-    throw logging::internal_error(__error_msg.str().c_str());                  \
+    __error_msg << "ERROR in " << __FILE__ << ":" << __LINE__ << ": "          \
+                << msg; /* NOLINT */                                           \
+    throw logging::InternalError(__error_msg.str().c_str());                   \
   } while (0)
 
 #define ERROR_ON_MSG(condition, msg)                                           \
@@ -28,9 +29,9 @@ namespace logging {
 /**
  * Exception class for poptorch
  */
-class error : public std::runtime_error {
+class Error : public std::runtime_error {
 public:
-  explicit error(const char *s);
+  explicit Error(const char *s);
 };
 
 /**
@@ -38,9 +39,9 @@ public:
  * This should be used as an assert; for states where the user should not have
  * been able to create.
  */
-class internal_error : public error {
+class InternalError : public Error {
 public:
-  using error::error;
+  using Error::Error;
 };
 } // namespace logging
 

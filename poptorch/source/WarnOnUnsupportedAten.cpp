@@ -8,10 +8,10 @@
 
 namespace poptorch {
 
-void WarnOnUnsupportedAten(torch::jit::Graph &graph) {
+void warnOnUnsupportedAten(torch::jit::Graph *graph) {
   // Check that all of the "aten::" ops have been eliminated.
-  bool hasUnsupportedOp = false;
-  for (torch::jit::Node *node : graph.nodes()) {
+  bool has_unsupported_op = false;
+  for (torch::jit::Node *node : graph->nodes()) {
     const torch::jit::Symbol kind = node->kind();
 
     if (kind.is_aten()) {
@@ -23,12 +23,12 @@ void WarnOnUnsupportedAten(torch::jit::Graph &graph) {
           "If you believe this one should be, please report this message to "
           "support@graphcore.ai.",
           domain);
-      hasUnsupportedOp = true;
+      has_unsupported_op = true;
     }
   }
 
   // Terminate compilation via error.
-  if (hasUnsupportedOp) {
+  if (has_unsupported_op) {
     ERROR("Unsupported ops found in compiled model (see warning log).");
   }
 }

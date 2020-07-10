@@ -221,6 +221,7 @@ for opset in classes:
         # Generate the macro
         opDecl = "OP_DECL("
 
+        funcName = name.capitalize()
         opDecl += "popart, " + name + ", " + name
 
         if opset.startswith("AiOnnxOpset"):
@@ -275,9 +276,9 @@ for opset in classes:
 
         header = "torch::jit::Node* "
 
-        header += "Create_" + name + "(torch::jit::Graph &graph,  const std::vector<torch::jit::Value *>& args"
+        header += "create" + funcName + "(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args"
 
-        cppFile = " torch::jit::Node *newNode = graph.create(Symbols::popart::" + name + ", args"
+        cppFile = " torch::jit::Node *new_node = graph->create(symbols::popart::" + name + ", args"
         if name in MultipleOutputsOps:
             cppFile += ", %s" % MultipleOutputsOps[name]
         cppFile += ");\n"
@@ -292,11 +293,11 @@ for opset in classes:
 
             attr = attrTypeGetter(toType(arg["type"]))
 
-            cppFile += "newNode->" + attr + "_(c10::Symbol::fromQualString(\"attr::" + arg[
+            cppFile += "new_node->" + attr + "_(c10::Symbol::fromQualString(\"attr::" + arg[
                 "name"] + "\")," + arg["name"] + ");\n"
 
-        cppFile += "graph.insertNode(newNode);\n"
-        cppFile += "return newNode;\n"
+        cppFile += "graph->insertNode(new_node);\n"
+        cppFile += "return new_node;\n"
 
         cppFile = header + ") {\n" + cppFile + "}"
 

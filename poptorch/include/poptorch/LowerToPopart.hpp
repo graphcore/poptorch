@@ -20,8 +20,8 @@ class SessionOptions;
  * Take the transformed graph and create a poponnx graph from it.
  */
 std::shared_ptr<poptorch::PoplarExecutable>
-lowerToPopart(torch::jit::Graph &graph, std::vector<at::Tensor> &inTensors,
-              std::vector<at::Tensor> &parameters, bool training,
+lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
+              std::vector<at::Tensor> *parameters, bool training,
               const Optimizer &opt, const SessionOptions &options);
 
 } // namespace poptorch

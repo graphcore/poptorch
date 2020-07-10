@@ -8,6 +8,6 @@ namespace poptorch {
 
 void propagateInputShapes(torch::jit::Graph *graph);
 
-}
+} // namespace poptorch
 
 #endif

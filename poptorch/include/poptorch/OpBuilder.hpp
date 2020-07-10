@@ -9,78 +9,78 @@
 namespace poptorch {
 
 // Manually added.
-torch::jit::Node *CreateReshape(torch::jit::Graph &graph, torch::jit::Value *A,
+torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape);
 
-torch::jit::Node *Create_ConstantInt(torch::jit::Graph &graph,
-                                     const std::vector<int64_t> &data,
-                                     const std::vector<int64_t> &new_shape);
+torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
+                                    const std::vector<int64_t> &data,
+                                    const std::vector<int64_t> &new_shape);
 
-torch::jit::Node *Create_ConstantFloat(torch::jit::Graph &graph,
-                                       const std::vector<double> &data,
-                                       const std::vector<int64_t> &new_shape);
+torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
+                                      const std::vector<double> &data,
+                                      const std::vector<int64_t> &new_shape);
 
-torch::jit::Node *Create_Cast(torch::jit::Graph &graph, torch::jit::Value *A,
-                              c10::ScalarType scalar);
+torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
+                             c10::ScalarType scalar);
 
-torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
-                                     torch::jit::Value *A,
-                                     const std::vector<int64_t> &pad_shape,
-                                     float constant);
+torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
+                                    torch::jit::Value *A,
+                                    const std::vector<int64_t> &pad_shape,
+                                    float constant);
 
-torch::jit::Node *Create_ReflectionPad(torch::jit::Graph &graph,
-                                       torch::jit::Value *A,
-                                       const std::vector<int64_t> &pad_shape);
+torch::jit::Node *createReflectionPad(torch::jit::Graph *graph,
+                                      torch::jit::Value *A,
+                                      const std::vector<int64_t> &pad_shape);
 
-torch::jit::Node *Create_EdgePad(torch::jit::Graph &graph, torch::jit::Value *A,
-                                 const std::vector<int64_t> &pad_shape);
+torch::jit::Node *createEdgePad(torch::jit::Graph *graph, torch::jit::Value *A,
+                                const std::vector<int64_t> &pad_shape);
 
-torch::jit::Node *Create_addNotInPlace(torch::jit::Graph &graph,
-                                       torch::jit::Value *A,
-                                       torch::jit::Value *B);
+torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,
+                                      torch::jit::Value *A,
+                                      torch::jit::Value *B);
 
 // Default to int in the helper.
-template <typename T> struct Create_Constant {
-  torch::jit::Node *operator()(torch::jit::Graph &graph,
+template <typename T> struct CreateConstant {
+  torch::jit::Node *operator()(torch::jit::Graph *graph,
                                const std::vector<int64_t> &data,
                                const std::vector<int64_t> &new_shape) {
-    return Create_ConstantInt(graph, data, new_shape);
+    return createConstantInt(graph, data, new_shape);
   }
 };
 
-template <> struct Create_Constant<float> {
-  torch::jit::Node *operator()(torch::jit::Graph &graph,
+template <> struct CreateConstant<float> {
+  torch::jit::Node *operator()(torch::jit::Graph *graph,
                                const std::vector<double> &data,
                                const std::vector<int64_t> &new_shape) {
-    return Create_ConstantFloat(graph, data, new_shape);
+    return createConstantFloat(graph, data, new_shape);
   }
 };
 
 template <typename T> struct CreateCast {};
 
 template <> struct CreateCast<float> {
-  torch::jit::Node *operator()(torch::jit::Graph &graph,
+  torch::jit::Node *operator()(torch::jit::Graph *graph,
                                torch::jit::Value *value) {
-    return Create_Cast(graph, value, c10::kFloat);
+    return createCast(graph, value, c10::kFloat);
   }
 };
 
 template <> struct CreateCast<std::int32_t> {
-  torch::jit::Node *operator()(torch::jit::Graph &graph,
+  torch::jit::Node *operator()(torch::jit::Graph *graph,
                                torch::jit::Value *value) {
-    return Create_Cast(graph, value, c10::kInt);
+    return createCast(graph, value, c10::kInt);
   }
 };
 
 template <> struct CreateCast<std::int64_t> {
-  torch::jit::Node *operator()(torch::jit::Graph &graph,
+  torch::jit::Node *operator()(torch::jit::Graph *graph,
                                torch::jit::Value *value) {
-    return Create_Cast(graph, value, c10::kLong);
+    return createCast(graph, value, c10::kLong);
   }
 };
 
 template <typename T>
-torch::jit::Node *CastToType(torch::jit::Graph &graph,
+torch::jit::Node *castToType(torch::jit::Graph *graph,
                              torch::jit::Value *value) {
   return CreateCast<T>{}(graph, value);
 }

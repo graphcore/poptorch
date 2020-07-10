@@ -35,23 +35,29 @@ struct LoggingContext {
 LoggingContext &context() {
   // This avoids the static initialisation order fiasco, but doesn't solve the
   // deinitialisation order. Who logs in destructors anyway?
-  static LoggingContext loggingContext;
-  return loggingContext;
+  static LoggingContext logging_context;
+  return logging_context;
 }
 
 Level logLevelFromString(const std::string &level) {
-  if (level == "TRACE")
+  if (level == "TRACE") {
     return Level::Trace;
-  if (level == "DEBUG")
+  }
+  if (level == "DEBUG") {
     return Level::Debug;
-  if (level == "INFO")
+  }
+  if (level == "INFO") {
     return Level::Info;
-  if (level == "WARN")
+  }
+  if (level == "WARN") {
     return Level::Warn;
-  if (level == "ERR")
+  }
+  if (level == "ERR") {
     return Level::Err;
-  if (level == "OFF" || level == "")
+  }
+  if (level == "OFF" || level.empty()) {
     return Level::Off;
+  }
 
   throw std::runtime_error(
       fmt::format("Unknown POPTORCH_LOG_LEVEL '{}'. Valid values are TRACE, "
@@ -63,9 +69,9 @@ template <typename Mutex>
 void setColours(spdlog::sinks::ansicolor_sink<Mutex> &sink) {
   // See https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
   // Ansi colours make zero sense.
-  static const std::string brightBlack = "\033[90m";
+  static const std::string bright_black = "\033[90m";
 
-  sink.set_color(spdlog::level::trace, brightBlack);
+  sink.set_color(spdlog::level::trace, bright_black);
   sink.set_color(spdlog::level::debug, sink.cyan);
   sink.set_color(spdlog::level::info, sink.white);
   sink.set_color(spdlog::level::warn, sink.yellow + sink.bold);
@@ -73,29 +79,29 @@ void setColours(spdlog::sinks::ansicolor_sink<Mutex> &sink) {
 }
 
 LoggingContext::LoggingContext() {
-  auto POPTORCH_LOG_DEST = std::getenv("POPTORCH_LOG_DEST");
-  auto POPTORCH_LOG_LEVEL = std::getenv("POPTORCH_LOG_LEVEL");
+  auto poptorch_log_dest = std::getenv("POPTORCH_LOG_DEST");
+  auto poptorch_log_level = std::getenv("POPTORCH_LOG_LEVEL");
 
   // Get logging output from the POPTORCH_LOG_DEST environment variable.
   // The valid options are "stdout", "stderr", or if it is neither
   // of those it is treated as a filename. The default is stderr.
-  std::string logDest = POPTORCH_LOG_DEST ? POPTORCH_LOG_DEST : "stderr";
+  std::string log_dest = poptorch_log_dest ? poptorch_log_dest : "stderr";
 
   // Get logging level from OS ENV. The default level is off.
-  Level defaultLevel =
-      logLevelFromString(POPTORCH_LOG_LEVEL ? POPTORCH_LOG_LEVEL : "WARN");
+  Level default_level =
+      logLevelFromString(poptorch_log_level ? poptorch_log_level : "WARN");
 
-  if (logDest == "stdout") {
+  if (log_dest == "stdout") {
     auto sink = std::shared_ptr<spdlog::sinks::ansicolor_stdout_sink_mt>();
     setColours(*sink);
     logger = std::make_shared<spdlog::logger>("graphcore", sink);
-  } else if (logDest == "stderr") {
+  } else if (log_dest == "stderr") {
     auto sink = std::make_shared<spdlog::sinks::ansicolor_stderr_sink_mt>();
     setColours(*sink);
     logger = std::make_shared<spdlog::logger>("graphcore", sink);
   } else {
     try {
-      logger = spdlog::basic_logger_mt("graphcore", logDest, true);
+      logger = spdlog::basic_logger_mt("graphcore", log_dest, true);
     } catch (const spdlog::spdlog_ex &e) {
       std::cerr << "Error opening log file: " << e.what() << std::endl;
       throw;
@@ -103,7 +109,7 @@ LoggingContext::LoggingContext() {
   }
 
   logger->set_pattern("[%T.%e] [%l] %v");
-  logger->set_level(translate(defaultLevel));
+  logger->set_level(translate(default_level));
 }
 
 } // namespace

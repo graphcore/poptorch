@@ -28,20 +28,20 @@
 // Shared enums across the ABI boundary.
 #include "popart_compiler/PopartEnums.hpp"
 
-void begin_ipu_block(int64_t ipu_id) { UNUSED(ipu_id); }
-void end_ipu_block() {}
+void beginIpuBlock(int64_t ipu_id) { UNUSED(ipu_id); }
+void endIpuBlock() {}
 
-at::Tensor ipu_print_tensor(at::Tensor t) { return t; }
-at::Tensor identity_loss(at::Tensor t, int64_t reduction) {
+at::Tensor ipuPrintTensor(at::Tensor t) { return t; }
+at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   UNUSED(reduction);
   return t;
 }
 
 static auto registry =
-    torch::RegisterOperators("poptorch::begin_ipu_block", &begin_ipu_block)
-        .op("poptorch::end_ipu_block", &end_ipu_block)
-        .op("poptorch::ipu_print_tensor", &ipu_print_tensor)
-        .op("poptorch::identity_loss", &identity_loss);
+    torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
+        .op("poptorch::end_ipu_block", &endIpuBlock)
+        .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
+        .op("poptorch::identity_loss", &identityLoss);
 //.op("popart::convolution", convolution,
 // torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));
 
@@ -60,7 +60,7 @@ Optimizer parseOptimizer(const py::dict &opt) {
     optimizer[element.first.cast<std::string>()] = p;
   }
 
-  return {optimizer};
+  return Optimizer{optimizer};
 }
 
 std::string castToString(py::handle obj) {
@@ -85,26 +85,26 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
       continue;
     }
     if (py::isinstance<py::bool_>(element.second)) {
-      options.AddBoolOption(element.first.cast<std::string>().c_str(),
+      options.addBoolOption(element.first.cast<std::string>().c_str(),
                             element.second.cast<bool>());
     } else if (py::isinstance<py::float_>(element.second)) {
-      options.AddDoubleOption(element.first.cast<std::string>().c_str(),
+      options.addDoubleOption(element.first.cast<std::string>().c_str(),
                               element.second.cast<double>());
     } else if (py::isinstance<py::int_>(element.second)) {
-      options.AddUInt64Option(element.first.cast<std::string>().c_str(),
+      options.addUint64Option(element.first.cast<std::string>().c_str(),
                               element.second.cast<std::uint64_t>());
     } else if (py::isinstance<py::str>(element.second)) {
-      options.AddStringOption(element.first.cast<std::string>().c_str(),
+      options.addStringOption(element.first.cast<std::string>().c_str(),
                               element.second.cast<std::string>().c_str());
     } else if (py::isinstance<py::set>(element.second) ||
                py::isinstance<py::list>(element.second)) {
       for (auto option : element.second.cast<py::list>()) {
-        options.InsertStringOption(element.first.cast<std::string>().c_str(),
+        options.insertStringOption(element.first.cast<std::string>().c_str(),
                                    castToString(option).c_str());
       }
     } else if (py::isinstance<py::dict>(element.second)) {
       for (auto option : element.second.cast<py::dict>()) {
-        options.InsertStringPairOption(
+        options.insertStringPairOption(
             element.first.cast<std::string>().c_str(),
             option.first.cast<std::string>().c_str(),
             castToString(option.second).c_str());
@@ -117,17 +117,17 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
 }
 
 void buildTensorList(const torch::jit::IValue &value,
-                     std::vector<at::Tensor> &tensors) {
+                     std::vector<at::Tensor> *tensors) {
   if (value.isTuple()) {
     for (auto &element : value.toTuple()->elements()) {
       buildTensorList(element, tensors);
     }
   } else if (value.isList()) {
-    for (auto element : value.toList()) {
+    for (const auto &element : value.toList()) {
       buildTensorList(element, tensors);
     }
   } else if (value.isTensor()) {
-    tensors.push_back(value.toTensor());
+    tensors->push_back(value.toTensor());
   } else {
     ERROR("Unsupported value " << value.tagKind());
   }
@@ -135,41 +135,41 @@ void buildTensorList(const torch::jit::IValue &value,
 
 } // namespace
 
-void copyWeightsToHost_impl(
-    std::shared_ptr<poptorch::PoplarExecutable> executable) {
+void copyWeightsToHostImpl(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   // Copy the weights or warn if this is before first time compilation.
   if (!executable) {
     logging::warn(
         "Call to copyWeightsToHost ignored as model has not been compiled "
         "(Poptorch will compile models on first invocation).");
   } else {
-    executable->CopyWeightsToHost();
+    executable->copyWeightsToHost();
   }
 }
 
-void copyWeightsToDevice_impl(
-    std::shared_ptr<poptorch::PoplarExecutable> executable) {
+void copyWeightsToDeviceImpl(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   // Copy the weights or warn if this is before first time compilation.
   if (!executable) {
     logging::warn(
         "Call to copyWeightsToDevice ignored as model has not been compiled "
         "(Poptorch will compile models on first invocation).");
   } else {
-    executable->CopyWeightsToDevice();
+    executable->copyWeightsToDevice();
   }
 }
 
 std::vector<pybind11::object>
-execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
-        pybind11::tuple inputs, py::dict *optimizerDict) {
+execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
+        const pybind11::tuple &inputs, py::dict *optimizerDict) {
   // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
+  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
 
   // And turn convert them into at tensors which we can then resolve the
   // address of.
-  std::vector<at::Tensor> inputTensors;
-  for (torch::jit::IValue value : inputStack) {
-    buildTensorList(value, inputTensors);
+  std::vector<at::Tensor> input_tensors;
+  for (const torch::jit::IValue &value : input_stack) {
+    buildTensorList(value, &input_tensors);
   }
 
   Optimizer optimizer{{}};
@@ -178,43 +178,43 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
     optimizer = parseOptimizer(*optimizerDict);
   }
 
-  std::vector<at::IValue> outputTensors =
-      executable->Run(inputTensors, optimizer);
+  std::vector<at::IValue> output_tensors =
+      executable->run(&input_tensors, optimizer);
 
   std::vector<pybind11::object> returnee;
 
   // Reshape the output tensors in the structure expected by the user
-  auto tensorIt = outputTensors.begin();
-  auto &outputTypes = executable->OutputTypes();
-  auto typeIt = outputTypes.begin();
-  ERROR_ON(typeIt == outputTypes.end());
-  std::uint64_t numOutputs = typeIt->numElements;
-  std::function<pybind11::object()> processOutput;
-  processOutput = [&]() -> pybind11::object {
-    ERROR_ON_MSG(typeIt == outputTypes.end(), "Invalid OutputTypes object");
-    switch (typeIt->type) {
+  auto tensor_it = output_tensors.begin();
+  auto &output_types = executable->outputTypes();
+  auto type_it = output_types.begin();
+  ERROR_ON(type_it == output_types.end());
+  std::uint64_t num_outputs = type_it->num_elements;
+  std::function<pybind11::object()> process_output;
+  process_output = [&]() -> pybind11::object {
+    ERROR_ON_MSG(type_it == output_types.end(), "Invalid OutputTypes object");
+    switch (type_it->type) {
     case OutputType::Type::Tensor: {
-      ERROR_ON_MSG(tensorIt == outputTensors.end(),
+      ERROR_ON_MSG(tensor_it == output_tensors.end(),
                    "Not enough tensors to unpack");
-      auto object = torch::jit::toPyObject(*tensorIt);
-      tensorIt++;
+      auto object = torch::jit::toPyObject(*tensor_it);
+      tensor_it++;
       return object;
     }
     case OutputType::Type::Tuple: {
-      std::int64_t numElements = typeIt->numElements;
-      pybind11::tuple pytuple(numElements);
-      for (std::int64_t i = 0; i < numElements; ++i) {
-        typeIt++;
-        pytuple[i] = processOutput();
+      std::int64_t num_elements = type_it->num_elements;
+      pybind11::tuple pytuple(num_elements);
+      for (std::int64_t i = 0; i < num_elements; ++i) {
+        type_it++;
+        pytuple[i] = process_output();
       }
       return std::move(pytuple);
     }
     case OutputType::Type::List: {
-      std::int64_t numElements = typeIt->numElements;
-      pybind11::list pylist(numElements);
-      for (std::int64_t i = 0; i < numElements; ++i) {
-        typeIt++;
-        pylist[i] = processOutput();
+      std::int64_t num_elements = type_it->num_elements;
+      pybind11::list pylist(num_elements);
+      for (std::int64_t i = 0; i < num_elements; ++i) {
+        type_it++;
+        pylist[i] = process_output();
       }
       return std::move(pylist);
     }
@@ -223,17 +223,17 @@ execute(std::shared_ptr<poptorch::PoplarExecutable> executable,
     }
   };
 
-  for (std::uint64_t i = 0; i < numOutputs; ++i) {
-    typeIt++;
-    returnee.push_back(processOutput());
+  for (std::uint64_t i = 0; i < num_outputs; ++i) {
+    type_it++;
+    returnee.push_back(process_output());
   }
-  ERROR_ON_MSG(tensorIt != outputTensors.end(),
+  ERROR_ON_MSG(tensor_it != output_tensors.end(),
                "Not all the output tensors were unpacked");
 
   return returnee;
 }
 
-torch::jit::script::Module *as_module(py::handle h) {
+torch::jit::script::Module *asModule(py::handle h) {
   return reinterpret_cast<torch::jit::script::Module *>(
       pybind11::detail::values_and_holders(
           reinterpret_cast<pybind11::detail::instance *>(h.ptr()))
@@ -241,7 +241,7 @@ torch::jit::script::Module *as_module(py::handle h) {
           ->value_ptr());
 }
 
-torch::jit::Graph *as_graph(py::handle h) {
+torch::jit::Graph *asGraph(py::handle h) {
   return reinterpret_cast<torch::jit::Graph *>(
       pybind11::detail::values_and_holders(
           reinterpret_cast<pybind11::detail::instance *>(h.ptr()))
@@ -251,21 +251,23 @@ torch::jit::Graph *as_graph(py::handle h) {
 
 void constantPropagation(torch::jit::Graph *graph) {
   // Create a shared_ptr with a custom deleter that doesn't do anything.
-  std::shared_ptr<torch::jit::Graph> x(graph, [](torch::jit::Graph *) {});
+  std::shared_ptr<torch::jit::Graph> x(graph,
+                                       [](torch::jit::Graph * /*unused*/) {});
   ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
   torch::jit::ConstantPropagation(x);
   ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, pybind11::tuple inputs, pybind11::dict options,
-                 bool training, py::dict optimizerDict) {
-  auto module = as_module(h);
+compileWithTrace(py::handle h, const pybind11::tuple &inputs,
+                 const pybind11::dict &options, bool training,
+                 const py::dict &optimizerDict) {
+  auto module = asModule(h);
 
   auto forward = module->get_method("forward");
-  auto graphAndTensors =
+  auto graph_and_tensors =
       torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
-  auto graph = graphAndTensors.first;
+  auto graph = graph_and_tensors.first;
 
   Optimizer optimizer = parseOptimizer(optimizerDict);
 
@@ -277,75 +279,76 @@ compileWithTrace(py::handle h, pybind11::tuple inputs, pybind11::dict options,
 
   logging::debug("Graph right before canonicalization:\n{}", *graph);
 
-  poptorch::CanonicalizeLists(*graph);
+  poptorch::canonicalizeLists(graph.get());
 
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.
-  poptorch::Canonicalize(*graph);
+  poptorch::canonicalize(graph.get());
 
   // Enforce any constraints that aren't enforced by popart.
-  poptorch::CanonicalizeLate(*graph);
+  poptorch::canonicalizeLate(graph.get());
 
   // Warn the user if any operations couldn't be canonicalised.
-  poptorch::WarnOnUnsupportedAten(*graph);
+  poptorch::warnOnUnsupportedAten(graph.get());
 
   // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
+  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
 
   // And turn convert them into at tensors which we can then resolve the
   // address of.
-  std::vector<at::Tensor> inputTensors;
-  for (torch::jit::IValue value : inputStack) {
-    buildTensorList(value, inputTensors);
+  std::vector<at::Tensor> input_tensors;
+  for (const torch::jit::IValue &value : input_stack) {
+    buildTensorList(value, &input_tensors);
   }
 
   // Find the parameter data from.
-  std::vector<at::Tensor> parameterData;
-  for (at::Tensor param : graphAndTensors.second) {
+  std::vector<at::Tensor> parameter_data;
+  for (const at::Tensor &param : graph_and_tensors.second) {
     if (!param.is_contiguous()) {
       logging::debug("Tensor is NOT continguous!");
     }
 
-    parameterData.push_back(param);
+    parameter_data.push_back(param);
   }
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, training,
-                                 optimizer, parseSessionOptions(options));
+  return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
+                                 training, optimizer,
+                                 parseSessionOptions(options));
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
-                  pybind11::dict options, bool training) {
-  auto module = as_module(h);
-  auto argGraph = as_graph(g);
+compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
+                  const pybind11::dict &options, bool training) {
+  auto module = asModule(h);
+  auto arg_graph = asGraph(g);
 
-  torch::jit::Inline(*argGraph);
-  constantPropagation(argGraph);
-  peepholeOptimizations(*argGraph, training);
+  torch::jit::Inline(*arg_graph);
+  constantPropagation(arg_graph);
+  peepholeOptimizations(arg_graph, training);
 
-  auto graphAndTensors = torch::jit::LowerGraph(*argGraph, module->_ivalue());
-  auto graph = graphAndTensors.first;
+  auto graph_and_tensors =
+      torch::jit::LowerGraph(*arg_graph, module->_ivalue());
+  auto graph = graph_and_tensors.first;
   graph->dump();
 
   int loop_count = 0;
-  std::string graphString;
+  std::string graph_string;
   while (true) {
     propagateInputShapes(graph.get());
     torch::jit::PeepholeOptimize(graph, true);
     torch::jit::ConstantPropagation(graph);
     torch::jit::EliminateDeadCode(graph);
-    peepholeOptimizations(*graph, training);
+    peepholeOptimizations(graph.get(), training);
 
-    std::string postPassesGraph = graph->toString(false);
-    if (graphString == postPassesGraph) {
+    std::string post_passes_graph = graph->toString(false);
+    if (graph_string == post_passes_graph) {
       std::cout << "Breaking from const folding after " << loop_count
                 << " iterations.\n";
       break;
-    } else {
-      graphString = std::move(postPassesGraph);
     }
+    graph_string = std::move(post_passes_graph);
 
     loop_count++;
   }
@@ -356,58 +359,59 @@ compileWithScript(py::handle h, py::handle g, pybind11::tuple inputs,
 
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.
-  poptorch::Canonicalize(*graph);
+  poptorch::canonicalize(graph.get());
 
   // Clean up the module as we will likely have stopped using lots of
   // constants.
 
   // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack inputStack = torch::jit::toTraceableStack(inputs);
+  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
 
   // And turn convert them into at tensors which we can then resolve the
   // address of.
-  std::vector<at::Tensor> inputTensors;
-  for (torch::jit::IValue value : inputStack) {
-    inputTensors.push_back(value.toTensor());
+  std::vector<at::Tensor> input_tensors;
+  for (const torch::jit::IValue &value : input_stack) {
+    input_tensors.push_back(value.toTensor());
   }
 
   // Find the parameter data from.
-  std::vector<at::Tensor> parameterData = graphAndTensors.second;
-  std::cout << "There should be " << parameterData.size() << " parameters.\n";
+  std::vector<at::Tensor> parameter_data = graph_and_tensors.second;
+  std::cout << "There should be " << parameter_data.size() << " parameters.\n";
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
   Optimizer optimizer{{}};
-  return poptorch::lowerToPopart(*graph, inputTensors, parameterData, training,
-                                 optimizer, parseSessionOptions(options));
+  return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
+                                 training, optimizer,
+                                 parseSessionOptions(options));
 }
 
 void pyPropagateInputShapes(py::handle h) {
-  auto graph = as_graph(h);
+  auto graph = asGraph(h);
   propagateInputShapes(graph);
 }
 
 void pyPeepholeOptimizations(py::handle h, bool training) {
-  auto graph = as_graph(h);
-  peepholeOptimizations(*graph, training);
+  auto graph = asGraph(h);
+  peepholeOptimizations(graph, training);
 }
 
 void pyEliminateListConstructs(py::handle h) {
-  auto graph = as_graph(h);
+  auto graph = asGraph(h);
   eliminateListConstructs(graph);
 }
 
 void pyCanonicalize(py::handle h) {
-  auto graph = as_graph(h);
-  Canonicalize(*graph);
+  auto graph = asGraph(h);
+  canonicalize(graph);
 }
 
 } // namespace poptorch
 
-PYBIND11_MODULE(poptorch_core, m) {
+PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   py::class_<poptorch::PoplarExecutable,
-             std::shared_ptr<poptorch::PoplarExecutable>>(
-      m, "InternalPoplarExecutable");
+             std::shared_ptr<poptorch::PoplarExecutable>>
+      give_me_a_name(m, "InternalPoplarExecutable");
 
   m.def("compileWithTrace", poptorch::compileWithTrace);
   m.def("compileWithScript", poptorch::compileWithScript);
@@ -416,8 +420,8 @@ PYBIND11_MODULE(poptorch_core, m) {
   m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
   m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);
   m.def("canonicalize", poptorch::pyCanonicalize);
-  m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDevice_impl);
-  m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHost_impl);
+  m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDeviceImpl);
+  m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);
   m.def("ipuHardwareIsAvailable", poptorch::ipuHardwareIsAvailable,
         py::arg("numIpus") = 1);
 }

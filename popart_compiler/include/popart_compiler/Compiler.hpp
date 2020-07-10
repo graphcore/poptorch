@@ -1,6 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#ifndef POPART_COMPILER_H
-#define POPART_COMPILER_H
+#pragma once
 
 #include <memory>
 #include <string>
@@ -24,11 +23,11 @@ struct SessionOptionsImpl;
 struct OutputType {
   enum class Type { Tensor, Tuple, List };
   Type type;
-  int64_t numElements{0};
+  int64_t num_elements{0};
 };
 
 // Extract the value from the map or return zero.
-static std::pair<float, bool> FindInMapOrZero(
+static std::pair<float, bool> findInMapOrZero(
     const std::unordered_map<std::string, std::pair<float, bool>> &opts,
     const std::string &name) {
 
@@ -46,10 +45,10 @@ static std::pair<float, bool> FindInMapOrZero(
 /* Returns true if the system contains a device with numIpus
  * Note: This function doesn't check if the devices are currently in use.
  */
-bool ipuHardwareIsAvailable(std::uint64_t numIpus = 1);
+bool ipuHardwareIsAvailable(std::uint64_t num_ipus = 1);
 
 struct Optimizer {
-  Optimizer(
+  explicit Optimizer(
       const std::unordered_map<std::string, std::pair<float, bool>> &opts) {
     // It is valid to not pass in a optimizer.
     if (opts.empty()) {
@@ -64,17 +63,17 @@ struct Optimizer {
     ERROR_ON_MSG(itr == opts.end(),
                  "Learning rate was not provided in optimizer dictionary!");
 
-    learningRate = itr->second;
-    momentum = FindInMapOrZero(opts, "momentum");
-    weightDecay = FindInMapOrZero(opts, "weight_decay");
-    dampening = FindInMapOrZero(opts, "dampening");
+    learning_rate = itr->second;
+    momentum = findInMapOrZero(opts, "momentum");
+    weight_decay = findInMapOrZero(opts, "weight_decay");
+    dampening = findInMapOrZero(opts, "dampening");
   }
 
   OptimizerType type;
 
-  std::pair<float, bool> learningRate;
+  std::pair<float, bool> learning_rate;
   std::pair<float, bool> momentum;
-  std::pair<float, bool> weightDecay;
+  std::pair<float, bool> weight_decay;
   std::pair<float, bool> dampening;
 };
 
@@ -88,28 +87,28 @@ public:
   SessionOptions(const SessionOptions &) = delete;
   SessionOptions &operator=(const SessionOptions &) = delete;
 
-  void AddStringOption(const char *option, const char *value);
-  void AddUInt64Option(const char *option, std::uint64_t value);
-  void AddBoolOption(const char *option, bool value);
-  void AddDoubleOption(const char *option, double value);
+  void addStringOption(const char *option, const char *value);
+  void addUint64Option(const char *option, std::uint64_t value);
+  void addBoolOption(const char *option, bool value);
+  void addDoubleOption(const char *option, double value);
   // Insert a string option in an option container (set / list / vector)
-  void InsertStringOption(const char *option, const char *value);
+  void insertStringOption(const char *option, const char *value);
   // Insert a key / value pair in an option map
-  void InsertStringPairOption(const char *option, const char *key,
+  void insertStringPairOption(const char *option, const char *key,
                               const char *value);
 
 private:
-  std::unique_ptr<detail::SessionOptionsImpl> impl;
+  std::unique_ptr<detail::SessionOptionsImpl> _impl;
   friend Compiler;
 };
 
 class Compiler {
 public:
-  Compiler(bool isTraining, const SessionOptions &options);
+  Compiler(bool is_training, const SessionOptions &options);
   ~Compiler();
   Compiler(Compiler &&compiler);
 
-  poptorch::TensorId AddInputTensor(const char *type,
+  poptorch::TensorId addInputTensor(const char *type,
                                     const std::vector<std::int64_t> &dims);
 
 #define INT_VEC std::vector<std::int64_t>
@@ -141,18 +140,18 @@ public:
 #undef STRING
 
   poptorch::TensorId
-  AddInitializedInputTensor(const char *name, const char *type,
+  addInitializedInputTensor(const char *name, const char *type,
                             const std::vector<std::int64_t> &dims, void *data);
 
-  bool TensorIdIsValid(poptorch::TensorId id) const;
+  bool tensorIdIsValid(poptorch::TensorId id) const;
 
-  std::vector<std::int64_t> GetSize(poptorch::TensorId id);
+  std::vector<std::int64_t> getSize(poptorch::TensorId id);
 
   poptorch::TensorId
   customOperation(const char *op,
                   const std::vector<poptorch::TensorId> &inputs);
 
-  void AddOutputType(OutputType type);
+  void addOutputType(OutputType type);
 
   // This function marks |output| as being read back from the device by the
   // host. |anchor_mode| determines how frequently that should happen.
@@ -162,38 +161,38 @@ public:
   // "EVERYN": Will return every N batch
   // "FINAL": Will return the last batch only
   // clang-format on
-  void AddOutputTensor(poptorch::TensorId output);
+  void addOutputTensor(poptorch::TensorId output);
 
-  void SetUpInputOp(poptorch::TensorId id, float *ptr,
+  void setUpInputOp(poptorch::TensorId id, float *ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void SetUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
+  void setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void SetUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
+  void setUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void SetUpOutputOp(poptorch::TensorId id, float *ptr,
+  void setUpOutputOp(poptorch::TensorId id, float *ptr,
                      const std::vector<std::int64_t> &dims);
 
-  void SetUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
+  void setUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
                      const std::vector<std::int64_t> &dims);
 
-  void SetUpOutputOp(poptorch::TensorId id, bool *ptr,
+  void setUpOutputOp(poptorch::TensorId id, bool *ptr,
                      const std::vector<std::int64_t> &dims);
-  void SetActiveIpu(std::uint64_t id);
+  void setActiveIpu(std::uint64_t id);
 
-  void InitSession(const Optimizer &opt);
+  void initSession(const Optimizer &opt);
 
   // Write the weights into IPU memory from the pytorch tensor buffers in the
   // model.
-  void CopyWeightsToDevice();
+  void copyWeightsToDevice();
 
   // Read the weights from IPU memory into the pytorch tensor buffers.
-  void CopyWeightsToHost();
+  void copyWeightsToHost();
 
   // Return the type of the given tensor.
-  PopartTypes GetPopartType(poptorch::TensorId tensor) const;
+  PopartTypes getPopartType(poptorch::TensorId tensor) const;
 
   /*
    * Execute the compiled popart graph using poplar. An optimizer can be
@@ -201,28 +200,26 @@ public:
    * is nothing to update the optimizer will be set to OptimizerType::None
    * otherwise the new optimizer will be written to device.
    */
-  void Run(const Optimizer &optimizationToUpdate);
+  void run(const Optimizer &optimizer);
 
-  std::uint64_t BatchPerStep() const;
+  std::uint64_t batchPerStep() const;
 
   // Return the PopART batch dimensions [DeviceIterations * ReplicationFactor *
   // GradientAccumulation]
-  std::uint64_t PopartBatchDim() const;
+  std::uint64_t popartBatchDim() const;
 
   // Take the above and work out how much of it is being returned. ID must anbe
   // an anchor d the batch dim will be mutated depending on what the anchor is
   // returning.
-  std::uint64_t PopartBatchDimForAnchor(poptorch::TensorId id) const;
+  std::uint64_t popartBatchDimForAnchor(poptorch::TensorId id) const;
 
   // Return a flat representation of the output types
   // For example: ( T0, T2, (T3, T4)) is represented as:
   // [ Tuple3, Tensor, Tensor, Tuple2, Tensor, Tensor ]
-  const std::vector<OutputType> &OutputTypes() const;
+  const std::vector<OutputType> &outputTypes() const;
 
 private:
-  std::unique_ptr<detail::CompilerImpl> impl;
+  std::unique_ptr<detail::CompilerImpl> _impl;
 };
 
 } // namespace poptorch
-
-#endif // POPART_COMPILER_H

@@ -6,12 +6,12 @@ namespace poptorch {
 
 class PeepholeOptimizer {
 public:
-  explicit PeepholeOptimizer(bool _training) : isTraining(_training) {}
+  explicit PeepholeOptimizer(bool _training) : _is_training(_training) {}
 
-  void run(torch::jit::Graph &graph) {
-    run(graph.block());
+  void run(torch::jit::Graph *graph) {
+    run(graph->block());
 
-    for (auto node : toDelete) {
+    for (auto node : _to_delete) {
       node->destroy();
     }
   }
@@ -24,7 +24,7 @@ private:
   }
 
   void removeNodeWithoutOutput(torch::jit::Node *node) {
-    ERROR_ON(node->outputs().size() != 0);
+    ERROR_ON(!node->outputs().empty());
     markAsDelete(node);
   }
 
@@ -33,9 +33,9 @@ private:
     if (node->s(c10::attr::name) == "training") {
       auto graph = node->owningGraph();
       graph->setInsertPoint(node);
-      torch::jit::Value *newConst =
-          graph->insertConstant(isTraining, node->sourceRange(), node->scope());
-      node->output()->replaceAllUsesWith(newConst);
+      torch::jit::Value *new_const = graph->insertConstant(
+          _is_training, node->sourceRange(), node->scope());
+      node->output()->replaceAllUsesWith(new_const);
       markAsDelete(node);
     }
   }
@@ -69,13 +69,13 @@ private:
     }
   }
 
-  void markAsDelete(torch::jit::Node *node) { toDelete.insert(node); }
+  void markAsDelete(torch::jit::Node *node) { _to_delete.insert(node); }
 
-  bool isTraining;
-  std::unordered_set<torch::jit::Node *> toDelete;
+  bool _is_training;
+  std::unordered_set<torch::jit::Node *> _to_delete;
 };
 
-void peepholeOptimizations(torch::jit::Graph &graph, bool training) {
+void peepholeOptimizations(torch::jit::Graph *graph, bool training) {
   PeepholeOptimizer(training).run(graph);
 }
 

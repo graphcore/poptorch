@@ -7,53 +7,53 @@ namespace poptorch {
 /*
  * Manually added operation.
  */
-torch::jit::Node *CreateReshape(torch::jit::Graph &graph, torch::jit::Value *A,
+torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *newNode =
-      graph.create(Symbols::popart::reshape_static_shape, {A});
-  newNode->is_(c10::attr::shape, new_shape);
-  graph.insertNode(newNode);
-  return newNode;
+  torch::jit::Node *new_node =
+      graph->create(symbols::popart::reshape_static_shape, {A});
+  new_node->is_(c10::attr::shape, new_shape);
+  graph->insertNode(new_node);
+  return new_node;
 }
 
-torch::jit::Node *Create_ConstantInt(torch::jit::Graph &graph,
-                                     const std::vector<int64_t> &data,
-                                     const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *newNode = graph.create(Symbols::poptorch::int_constant);
-  newNode->is_(c10::attr::data, data);
-  newNode->is_(c10::attr::shape, new_shape);
-  graph.insertNode(newNode);
-  return newNode;
+torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
+                                    const std::vector<int64_t> &data,
+                                    const std::vector<int64_t> &new_shape) {
+  torch::jit::Node *new_node = graph->create(symbols::poptorch::int_constant);
+  new_node->is_(c10::attr::data, data);
+  new_node->is_(c10::attr::shape, new_shape);
+  graph->insertNode(new_node);
+  return new_node;
 }
 
-torch::jit::Node *Create_ConstantFloat(torch::jit::Graph &graph,
-                                       const std::vector<double> &data,
-                                       const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *newNode = graph.create(Symbols::poptorch::float_constant);
-  newNode->fs_(c10::attr::data, data);
-  newNode->is_(c10::attr::shape, new_shape);
-  graph.insertNode(newNode);
-  return newNode;
+torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
+                                      const std::vector<double> &data,
+                                      const std::vector<int64_t> &new_shape) {
+  torch::jit::Node *new_node = graph->create(symbols::poptorch::float_constant);
+  new_node->fs_(c10::attr::data, data);
+  new_node->is_(c10::attr::shape, new_shape);
+  graph->insertNode(new_node);
+  return new_node;
 }
 
-torch::jit::Node *Create_Cast(torch::jit::Graph &graph, torch::jit::Value *A,
-                              c10::ScalarType scalar) {
-  torch::jit::Node *newNode = graph.create(Symbols::poptorch::cast, {A});
-  graph.insertNode(newNode);
+torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
+                             c10::ScalarType scalar) {
+  torch::jit::Node *new_node = graph->create(symbols::poptorch::cast, {A});
+  graph->insertNode(new_node);
 
-  std::string newType = "";
+  std::string new_type;
 
   if (scalar == c10::kFloat) {
-    newType = "FLOAT";
+    new_type = "FLOAT";
   } else if (scalar == c10::kInt) {
-    newType = "INT32";
+    new_type = "INT32";
   } else if (scalar == c10::kLong) {
-    newType = "INT64";
+    new_type = "INT64";
   }
 
-  newNode->s_(c10::Symbol::fromQualString("attr::type"), newType);
+  new_node->s_(c10::Symbol::fromQualString("attr::type"), new_type);
 
-  return newNode;
+  return new_node;
 }
 
 static std::vector<std::int64_t>
@@ -105,47 +105,47 @@ convertPytorchPads(const std::vector<int64_t> &pad_shape) {
   return tmp;
 }
 
-torch::jit::Node *Create_ConstantPad(torch::jit::Graph &graph,
-                                     torch::jit::Value *A,
-                                     const std::vector<int64_t> &pad_shape,
-                                     float constant) {
-  torch::jit::Node *newNode =
-      graph.create(Symbols::poptorch::constant_pad, {A});
-  graph.insertNode(newNode);
-  newNode->is_(c10::Symbol::fromQualString("attr::pads"),
-               convertPytorchPads(pad_shape));
-  newNode->f_(c10::Symbol::fromQualString("attr::value"), constant);
-  return newNode;
+torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
+                                    torch::jit::Value *A,
+                                    const std::vector<int64_t> &pad_shape,
+                                    float constant) {
+  torch::jit::Node *new_node =
+      graph->create(symbols::poptorch::constant_pad, {A});
+  graph->insertNode(new_node);
+  new_node->is_(c10::Symbol::fromQualString("attr::pads"),
+                convertPytorchPads(pad_shape));
+  new_node->f_(c10::Symbol::fromQualString("attr::value"), constant);
+  return new_node;
 }
 
-torch::jit::Node *Create_EdgePad(torch::jit::Graph &graph, torch::jit::Value *A,
-                                 const std::vector<int64_t> &pad_shape) {
-  torch::jit::Node *newNode = graph.create(Symbols::poptorch::edge_pad, {A});
-  graph.insertNode(newNode);
-  newNode->is_(c10::Symbol::fromQualString("attr::pads"),
-               convertPytorchPads(pad_shape));
-  return newNode;
+torch::jit::Node *createEdgePad(torch::jit::Graph *graph, torch::jit::Value *A,
+                                const std::vector<int64_t> &pad_shape) {
+  torch::jit::Node *new_node = graph->create(symbols::poptorch::edge_pad, {A});
+  graph->insertNode(new_node);
+  new_node->is_(c10::Symbol::fromQualString("attr::pads"),
+                convertPytorchPads(pad_shape));
+  return new_node;
 }
 
-torch::jit::Node *Create_ReflectionPad(torch::jit::Graph &graph,
-                                       torch::jit::Value *A,
-                                       const std::vector<int64_t> &pad_shape) {
-  torch::jit::Node *newNode =
-      graph.create(Symbols::poptorch::reflection_pad, {A});
-  graph.insertNode(newNode);
-  newNode->is_(c10::Symbol::fromQualString("attr::pads"),
-               convertPytorchPads(pad_shape));
+torch::jit::Node *createReflectionPad(torch::jit::Graph *graph,
+                                      torch::jit::Value *A,
+                                      const std::vector<int64_t> &pad_shape) {
+  torch::jit::Node *new_node =
+      graph->create(symbols::poptorch::reflection_pad, {A});
+  graph->insertNode(new_node);
+  new_node->is_(c10::Symbol::fromQualString("attr::pads"),
+                convertPytorchPads(pad_shape));
 
-  return newNode;
+  return new_node;
 }
 
-torch::jit::Node *Create_addNotInPlace(torch::jit::Graph &graph,
-                                       torch::jit::Value *A,
-                                       torch::jit::Value *B) {
-  torch::jit::Node *newNode =
-      graph.create(Symbols::poptorch::addNotInPlace, {A, B});
-  graph.insertNode(newNode);
-  return newNode;
+torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,
+                                      torch::jit::Value *A,
+                                      torch::jit::Value *B) {
+  torch::jit::Node *new_node =
+      graph->create(symbols::poptorch::add_not_in_place, {A, B});
+  graph->insertNode(new_node);
+  return new_node;
 }
 
 /*

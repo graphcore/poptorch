@@ -3,7 +3,7 @@
 #define SOURCE_POPTORCH_SYMBOLS_H
 #include <torch/csrc/jit/ir/ir.h>
 
-// Create all the C10 Symbols.
+// Create all the C10 symbols.
 #define SYMBOL_DECL(Namespace, FuncName)                                       \
   namespace Namespace {                                                        \
   const c10::Symbol FuncName(c10::Symbol::fromQualString(#Namespace            \
@@ -27,7 +27,7 @@ SYMBOL_DECL(aten, isinf)
 
 namespace poptorch {
 
-namespace Symbols {
+namespace symbols {
 #define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
   SYMBOL_DECL(Namespace, FuncName)
 
@@ -37,7 +37,7 @@ SYMBOL_DECL(poptorch, end_ipu_block)
 SYMBOL_DECL(poptorch, identity_loss)
 #undef OP_DECL
 #undef SYMBOL_DECL
-} // namespace Symbols
+} // namespace symbols
 
 } // namespace poptorch
 

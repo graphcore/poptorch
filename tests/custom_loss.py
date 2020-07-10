@@ -20,8 +20,7 @@ def test_custom_loss():
 
     loss = CustomLoss()
 
-    poptorch_model = poptorch.trainingModel(model,
-                                            loss=loss)
+    poptorch_model = poptorch.trainingModel(model, loss=loss)
 
     target = torch.randn(10)
     input = torch.randn(10)

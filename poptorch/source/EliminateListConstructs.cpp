@@ -34,9 +34,9 @@ createConstantFromList(const std::vector<torch::jit::Node *> &appendNodes) {
 
   auto x = appendNodes.at(0);
   auto graph = x->owningGraph();
-  torch::jit::Value *constNodeOutput =
+  torch::jit::Value *const_node_output =
       graph->insertConstant(values, x->sourceRange(), x->scope());
-  return constNodeOutput->node();
+  return const_node_output->node();
 }
 
 bool tryCreateConstantNode(torch::jit::Node *node) {
@@ -49,7 +49,7 @@ bool tryCreateConstantNode(torch::jit::Node *node) {
   }
 
   // If the list construct is never used, do nothing.
-  if (unordered_uses.size() == 0) {
+  if (unordered_uses.empty()) {
     return false;
   }
 
@@ -92,15 +92,15 @@ bool tryCreateConstantNode(torch::jit::Node *node) {
   }
 
   // Collect all the append nodes
-  std::vector<torch::jit::Node *> appendNodes;
+  std::vector<torch::jit::Node *> append_nodes;
   for (auto use : uses) {
     if (isAppendNode(use)) {
-      appendNodes.push_back(use);
+      append_nodes.push_back(use);
     }
   }
 
   // All append nodes should take an output of a constant node as an input.
-  for (auto n : appendNodes) {
+  for (auto n : append_nodes) {
     auto x = n->input(1);
     if (!isConstantNode(x->node())) {
       logging::err(
@@ -110,86 +110,86 @@ bool tryCreateConstantNode(torch::jit::Node *node) {
   }
 
   auto type = output->type();
-  torch::jit::Node *constantNode;
+  torch::jit::Node *constant_node;
   if (type->isSubtypeOf(torch::jit::ListType::ofInts())) {
-    constantNode = createConstantFromList<int64_t>(appendNodes);
+    constant_node = createConstantFromList<int64_t>(append_nodes);
   } else {
     logging::err("Unhandled output type {}", *type);
     return false;
   }
-  constantNode->moveAfter(node);
-  output->replaceAllUsesAfterNodeWith(appendNodes.back(),
-                                      constantNode->output());
+  constant_node->moveAfter(node);
+  output->replaceAllUsesAfterNodeWith(append_nodes.back(),
+                                      constant_node->output());
   return true;
 }
 
 void tryDeleteListConstructNode(torch::jit::Node *listConstruct) {
-  auto errorMessage = [&](std::string msg) {
+  auto error_message = [&](const std::string &msg) {
     logging::err("Unable to remove prim::ListConstruct node: {}  {}",
                  *listConstruct, msg);
   };
 
   // Collect all the nodes that append values to the ListConstruct.
-  std::vector<torch::jit::Node *> appendNodes;
+  std::vector<torch::jit::Node *> append_nodes;
   for (auto use : listConstruct->output()->uses()) {
     auto x = use.user;
     if (!isAppendNode(x)) {
       std::stringstream ss;
       ss << "Node is still used by something other than an aten::append node("
          << *x << ")";
-      errorMessage(ss.str());
+      error_message(ss.str());
       return;
     }
 
-    if (x->output()->uses().size() > 0) {
+    if (!x->output()->uses().empty()) {
       std::stringstream ss;
       ss << "Output of append node(" << *x << ") still has a use.";
-      errorMessage(ss.str());
+      error_message(ss.str());
       return;
     }
 
-    appendNodes.push_back(x);
+    append_nodes.push_back(x);
   }
 
   // Collect all the prim::Constant nodes that are inputs into the append nodes.
-  std::vector<torch::jit::Node *> constantInputs;
-  for (auto a : appendNodes) {
+  std::vector<torch::jit::Node *> constant_inputs;
+  for (auto a : append_nodes) {
     auto x = a->input(1)->node();
     if (!isConstantNode(x)) {
-      errorMessage("Input to aten::append node is not a prim::Constant.");
+      error_message("Input to aten::append node is not a prim::Constant.");
       return;
     }
 
     if (x->output()->uses().size() > 1) {
-      errorMessage("Output of prim::Constant is used by more than the "
-                   "aten::append node.");
+      error_message("Output of prim::Constant is used by more than the "
+                    "aten::append node.");
       return;
     }
 
-    constantInputs.push_back(x);
+    constant_inputs.push_back(x);
   }
 
-  for (auto x : appendNodes) {
+  for (auto x : append_nodes) {
     x->destroy();
   }
-  for (auto x : constantInputs) {
+  for (auto x : constant_inputs) {
     x->destroy();
   }
   listConstruct->destroy();
 }
 
 void eliminateListConstructs(torch::jit::Block *block) {
-  std::vector<torch::jit::Node *> toDelete;
+  std::vector<torch::jit::Node *> to_delete;
 
   for (auto node : block->nodes()) {
     if (node->kind() == c10::prim::ListConstruct) {
       if (tryCreateConstantNode(node)) {
-        toDelete.push_back(node);
+        to_delete.push_back(node);
       }
     }
   }
 
-  for (auto node : toDelete) {
+  for (auto node : to_delete) {
     tryDeleteListConstructNode(node);
   }
 }

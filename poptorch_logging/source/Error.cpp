@@ -4,6 +4,6 @@
 
 namespace logging {
 
-error::error(const char *s) : std::runtime_error(s) { logging::err(what()); }
+Error::Error(const char *s) : std::runtime_error(s) { logging::err(what()); }
 
 } // namespace logging

@@ -19,29 +19,30 @@ public:
   PoplarExecutable(poptorch::Compiler &&c,
                    std::vector<poptorch::TensorId> &&inputs,
                    std::vector<poptorch::TensorId> &&outputs)
-      : compiler(std::move(c)), popartInputs(inputs), popartOutputs(outputs) {}
+      : _compiler(std::move(c)), _popartInputs(inputs),
+        _popartOutputs(outputs) {}
 
   /*
    * Execute the compiled graph stored in field "compiler" with the given
    * |inTensors| and return to the user the resulting tensors if any.
    */
-  std::vector<at::IValue> Run(std::vector<at::Tensor> &inTensors,
+  std::vector<at::IValue> run(std::vector<at::Tensor> *inTensors,
                               const Optimizer &optimizer);
 
   // Tell popart to copy weights off the IPU and write into host memory.
-  void CopyWeightsToHost();
+  void copyWeightsToHost();
 
   // Tell popart to copy weights from host into IPU memory.
-  void CopyWeightsToDevice();
+  void copyWeightsToDevice();
 
-  const std::vector<OutputType> &OutputTypes() const;
+  const std::vector<OutputType> &outputTypes() const;
 
 private:
-  poptorch::Compiler compiler;
+  poptorch::Compiler _compiler;
 
-  std::vector<poptorch::TensorId> popartInputs;
+  std::vector<poptorch::TensorId> _popartInputs;
 
-  std::vector<poptorch::TensorId> popartOutputs;
+  std::vector<poptorch::TensorId> _popartOutputs;
 };
 
 } // namespace poptorch

@@ -52,14 +52,18 @@ static const char *anchorTypeToString(PopartAnchorTypes type)
     __attribute__((unused));
 
 static PopartAnchorTypes anchorTypeFromString(const std::string &str) {
-  if (str == "FINAL")
+  if (str == "FINAL") {
     return PopartAnchorTypes::Final;
-  if (str == "EVERYN")
+  }
+  if (str == "EVERYN") {
     return PopartAnchorTypes::EveryN;
-  if (str == "ALL")
+  }
+  if (str == "ALL") {
     return PopartAnchorTypes::All;
-  if (str == "SUM")
+  }
+  if (str == "SUM") {
     return PopartAnchorTypes::Sum;
+  }
 
   ERROR("Internal error: unsupported anchor type :" << str);
 }

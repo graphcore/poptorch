@@ -17,17 +17,17 @@ namespace poptorch {
    specific operations and will remove all others. Constants will be folded into
    the attributes of the ops themselves.
 */
-void Canonicalize(torch::jit::Graph &graph);
+void canonicalize(torch::jit::Graph *graph);
 
 /*
  * The second late canonicalization pass will take the popart code and will
  * enforce any constraints that aren't fixed by popart itself.
  */
-void CanonicalizeLate(torch::jit::Graph &graph);
+void canonicalizeLate(torch::jit::Graph *graph);
 
-void CanonicalizeLists(torch::jit::Graph &graph);
+void canonicalizeLists(torch::jit::Graph *graph);
 
-void WarnOnUnsupportedAten(torch::jit::Graph &graph);
+void warnOnUnsupportedAten(torch::jit::Graph *graph);
 
 } // namespace poptorch
 

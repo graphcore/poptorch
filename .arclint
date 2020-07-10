@@ -6,6 +6,7 @@
             "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
             "exclude": [
               "(\\.inc.h$)",
+              "(\\.inc.hpp$)",
               "(^docs/.*)"
             ]
         },
@@ -16,6 +17,7 @@
             "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
             "exclude": [
               "(\\.inc.h$)",
+              "(\\.inc.hpp$)",
               "(^docs/.*)"
             ],
             "severity": {
@@ -31,6 +33,17 @@
             "bin": ["./.linters/yapf", "./install_linters.sh"],
             "include": "(\\.py$)",
             "exclude": "(^docs/.*)"
+        },
+        "clang-tidy":{
+          "type": "script-and-regex",
+          "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
+          "exclude": [
+            "(\\.inc.h$)",
+            "(\\.inc.hpp$)",
+            "(^docs/.*)"
+          ],
+          "script-and-regex.script": "sh -c '{ .linters/clang-tidy --fix $0 -- -I.linters/include/ -I.linters/clang_include/ -Ipopart_compiler/include -Ipoptorch/shared/include -Ipoptorch/include -Ipoptorch_logging/include -I../spdlog/spdlog/include/ -DONNX_NAMESPACE=onnx -I.linters/torch/include -I../popart/popart/willow/include/ -I.linters/poplar_includes/ `cat .linters/python_includes` -std=c++17; } || true'",
+          "script-and-regex.regex": "/^(?P<file>[^ :]*):(?P<line>[^:]+):(?P<char>[^:]+): (?P<severity>[^:]+): (?P<message>.*)\\[(?P<name>.+)\\]$/m"
         },
         "copyright":{
           "type": "script-and-regex",

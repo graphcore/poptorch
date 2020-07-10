@@ -5,8 +5,8 @@
 
 namespace poptorch {
 
-void peepholeOptimizations(torch::jit::Graph &graph, bool training);
+void peepholeOptimizations(torch::jit::Graph *graph, bool training);
 
-}
+} // namespace poptorch
 
 #endif
