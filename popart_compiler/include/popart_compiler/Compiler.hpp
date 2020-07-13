@@ -11,6 +11,10 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+namespace popart {
+enum class DataType;
+}
+
 namespace poptorch {
 
 using TensorId = std::size_t;
@@ -128,16 +132,16 @@ public:
 
 #include "SupportedOperations.inc.hpp"
 
-#undef BODY_ARG
 #undef OP_DECL
+#undef BODY_ARG
 #undef ARG
-#undef NONE
-#undef INT_VEC
-#undef FLOAT_VEC
-#undef FLOAT
-#undef INT
-#undef BOOL
 #undef STRING
+#undef NONE
+#undef BOOL
+#undef INT
+#undef FLOAT
+#undef FLOAT_VEC
+#undef INT_VEC
 
   poptorch::TensorId
   addInitializedInputTensor(const char *name, const char *type,
@@ -145,7 +149,7 @@ public:
 
   bool tensorIdIsValid(poptorch::TensorId id) const;
 
-  std::vector<std::int64_t> getSize(poptorch::TensorId id);
+  std::vector<std::int64_t> getSize(poptorch::TensorId id) const;
 
   poptorch::TensorId
   customOperation(const char *op,
@@ -169,8 +173,9 @@ public:
   void setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
-  void setUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
-                    const std::vector<std::int64_t> &dims);
+  void setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
+                    const std::vector<std::int64_t> &dims,
+                    bool float16 = false);
 
   void setUpOutputOp(poptorch::TensorId id, float *ptr,
                      const std::vector<std::int64_t> &dims);
@@ -180,6 +185,10 @@ public:
 
   void setUpOutputOp(poptorch::TensorId id, bool *ptr,
                      const std::vector<std::int64_t> &dims);
+
+  void setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
+                     const std::vector<std::int64_t> &dims);
+
   void setActiveIpu(std::uint64_t id);
 
   void initSession(const Optimizer &opt);
@@ -219,6 +228,9 @@ public:
   const std::vector<OutputType> &outputTypes() const;
 
 private:
+  void assertTensorIs(const PopartTypes dataType, const poptorch::TensorId &id,
+                      const char *caller) const;
+
   std::unique_ptr<detail::CompilerImpl> _impl;
 };
 

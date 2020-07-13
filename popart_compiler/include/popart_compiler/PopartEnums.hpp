@@ -17,7 +17,7 @@ namespace poptorch {
 enum OptimizerType : std::uint8_t { NONE, SGD };
 
 // The types supported by popart.
-enum PopartTypes {
+enum class PopartTypes {
   // fixed point types
   UINT8 = 0,
   INT8,

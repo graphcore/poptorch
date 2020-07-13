@@ -1,6 +1,4 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include "poptorch/LowerToPopart.hpp"
-
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
@@ -8,10 +6,18 @@
 #include <random>
 #include <utility>
 
-#include "PoptorchSymbols.hpp"
+#include "torch/csrc/jit/ir/ir.h"
+
 #include "popart_compiler/Compiler.hpp"
+#include "popart_compiler/PopartEnums.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+
+#include "poptorch/LowerToPopart.hpp"
+#include "poptorch/ToString.hpp"
+
+#include "PoptorchSymbols.hpp"
 
 namespace poptorch {
 
@@ -127,12 +133,15 @@ private:
  * Static helper functions.
  */
 
-std::string typeToPopart(at::ScalarType type) {
-  if (type == at::ScalarType::Float) {
+std::string typeToPopartStr(at::ScalarType type) {
+  if (type == at::ScalarType::Float || type == at::ScalarType::Double) {
     return "FLOAT";
-  }
-  if (type == at::ScalarType::Int || type == at::ScalarType::Long) {
+  } else if (type == at::ScalarType::Half) {
+    return "FLOAT16";
+  } else if (type == at::ScalarType::Int || type == at::ScalarType::Long) {
     return "INT32";
+  } else if (type == at::ScalarType::Bool) {
+    return "BOOL";
   }
 
   logging::err("Unimplemented type '{}'", type);
@@ -146,6 +155,49 @@ std::vector<int64_t> getTensorDimensions(const at::Tensor &tensor) {
   return dims;
 }
 
+at::ScalarType fromPopartType(const poptorch::PopartTypes type) {
+  switch (type) {
+  case poptorch::PopartTypes::UINT8: {
+    return at::ScalarType::Byte;
+  }
+  case poptorch::PopartTypes::INT8: {
+    return at::ScalarType::Char;
+  }
+  case poptorch::PopartTypes::INT16: {
+    return at::ScalarType::Short;
+  }
+  case poptorch::PopartTypes::INT32: {
+    return at::ScalarType::Int;
+  }
+  case poptorch::PopartTypes::INT64: {
+    return at::ScalarType::Long;
+  }
+  case poptorch::PopartTypes::BOOL: {
+    return at::ScalarType::Bool;
+  }
+  case poptorch::PopartTypes::FLOAT: {
+    return at::ScalarType::Float;
+  }
+  case poptorch::PopartTypes::FLOAT16: {
+    return at::ScalarType::Half;
+  }
+  case poptorch::PopartTypes::BFLOAT16: {
+    return at::ScalarType::BFloat16;
+  }
+  case poptorch::PopartTypes::DOUBLE: {
+    return at::ScalarType::Double;
+  }
+  case poptorch::PopartTypes::COMPLEX64: {
+    return at::ScalarType::ComplexFloat;
+  }
+  case poptorch::PopartTypes::COMPLEX128: {
+    return at::ScalarType::ComplexDouble;
+  }
+  default:
+    ERROR("Unsupported PopART data type");
+  }
+}
+
 /*
  * Lower to popart impl.
  */
@@ -153,9 +205,14 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizer);
 
+  std::vector<at::ScalarType> dataTypes;
+  for (auto id : _outputTensorHooks) {
+    dataTypes.emplace_back(fromPopartType(_compiler.getPopartType(id)));
+  }
+
   return std::make_shared<poptorch::PoplarExecutable>(
       std::move(_compiler), std::move(_inputTensorHooks),
-      std::move(_outputTensorHooks));
+      std::move(_outputTensorHooks), std::move(dataTypes));
 }
 
 void LowerToPopart::lower() {
@@ -342,7 +399,7 @@ void LowerToPopart::lowerParameters() {
 
       // Return the input tensor id for input tensor of given type and dims.
       poptorch::TensorId id = _compiler.addInputTensor(
-          typeToPopart(tensor.scalar_type()).c_str(), dims);
+          typeToPopartStr(tensor.scalar_type()).c_str(), dims);
 
       // Record the id so we can map back to the pytorch tensor.
       tensorList.push_back(id);
@@ -362,7 +419,7 @@ void LowerToPopart::lowerParameters() {
     }
   };
 
-  for (torch::jit::Value *value : _graph.param_node()->outputs()) {
+  for (torch::jit::Value *value : _graph.inputs()) {
     if (index < num_inputs) {
       // Lower user provided input
       ERROR_ON(value->node()->kind() != c10::prim::Param);
@@ -393,8 +450,8 @@ void LowerToPopart::lowerParameters() {
       std::vector<int64_t> dims = getTensorDimensions(tensor_as_param);
 
       // Unpack the elem type into its Popart type.
-      std::string popart_type = typeToPopart(tensor_as_param.scalar_type());
 
+      std::string popart_type = typeToPopartStr(tensor_as_param.scalar_type());
       _valueMap.setTensor(value, _compiler.addInitializedInputTensor(
                                      "Weight", popart_type.c_str(), dims,
                                      tensor_as_param.data_ptr()));
@@ -480,16 +537,17 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 
 #include "popart_compiler/SupportedOperations.inc.hpp"
 
+#undef BODY_STR_ARG
+#undef STR_ARG
 #undef BODY_ARG
 #undef OP_DECL
 #undef ARG
 #undef NONE
-#undef INT_VEC
-#undef FLOAT_VEC
-#undef FLOAT
-#undef INT
 #undef BOOL
-#undef STRING
+#undef INT
+#undef FLOAT
+#undef FLOAT_VEC
+#undef INT_VEC
   }; // End map initalizer.
 }
 } // namespace

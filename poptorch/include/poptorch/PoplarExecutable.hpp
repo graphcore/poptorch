@@ -2,14 +2,14 @@
 #ifndef INCLUDE_POPTORCH_POPLAR_EXECUTABLE_HPP
 #define INCLUDE_POPTORCH_POPLAR_EXECUTABLE_HPP
 
-#include <torch/csrc/jit/ir/ir.h>
-
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include <popart_compiler/Compiler.hpp>
+#include "torch/csrc/jit/ir/ir.h"
+
+#include "popart_compiler/Compiler.hpp"
 
 namespace poptorch {
 
@@ -18,9 +18,14 @@ public:
   PoplarExecutable() = delete;
   PoplarExecutable(poptorch::Compiler &&c,
                    std::vector<poptorch::TensorId> &&inputs,
-                   std::vector<poptorch::TensorId> &&outputs)
-      : _compiler(std::move(c)), _popartInputs(inputs),
-        _popartOutputs(outputs) {}
+                   std::vector<poptorch::TensorId> &&outputs,
+                   std::vector<at::ScalarType> &&outputTypes)
+      : _compiler(std::move(c)), _popartInputs(inputs), _popartOutputs(outputs),
+        _popartOutputTypes(outputTypes) {
+    for (size_t i = 0; i < inputs.size(); i++) {
+      _convertedInputs.emplace_back();
+    }
+  }
 
   /*
    * Execute the compiled graph stored in field "compiler" with the given
@@ -42,7 +47,11 @@ private:
 
   std::vector<poptorch::TensorId> _popartInputs;
 
+  // Used for types which need conversion to maintain the ref count
+  std::vector<at::Tensor> _convertedInputs;
+
   std::vector<poptorch::TensorId> _popartOutputs;
+  std::vector<at::ScalarType> _popartOutputTypes;
 };
 
 } // namespace poptorch

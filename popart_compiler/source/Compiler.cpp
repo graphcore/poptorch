@@ -1,11 +1,10 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include <popart_compiler/Compiler.hpp>
-
 #include <fstream>
 #include <iostream>
 #include <list>
 #include <map>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -23,6 +22,9 @@
 #include <popart/tensors.hpp>
 #include <poptorch_logging/Error.hpp>
 #include <poptorch_logging/Logging.hpp>
+
+#include <popart_compiler/Compiler.hpp>
+#include <popart_compiler/PopartEnums.hpp>
 
 namespace poptorch {
 
@@ -99,6 +101,9 @@ public:
   popart::TensorId reshape(const std::vector<popart::TensorId> &inputs,
                            const std::vector<int64_t> &shape);
 
+  popart::TensorId cast(const std::vector<popart::TensorId> &inputs,
+                        const std::string &type);
+
   popart::TensorId intConstant(const std::vector<popart::TensorId> &inputs,
                                const std::vector<int32_t> &data,
                                const std::vector<int64_t> &shape);
@@ -106,9 +111,6 @@ public:
   popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
                                  const std::vector<double> &data,
                                  const std::vector<int64_t> &shape);
-
-  popart::TensorId cast(const std::vector<popart::TensorId> &inputs,
-                        const std::string &type);
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
@@ -396,6 +398,12 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
   return op_builder->reshape_const(ai_onnx, inputs, shape);
 }
 
+popart::TensorId CompilerImpl::cast(const std::vector<popart::TensorId> &inputs,
+                                    const std::string &type) {
+  auto aiOnnx = op_builder->aiOnnxOpset9();
+  return aiOnnx.cast(inputs, type);
+}
+
 popart::TensorId
 CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
                           const std::vector<int32_t> &data,
@@ -424,12 +432,6 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
 
   auto ai_onnx = op_builder->aiOnnxOpset9();
   return ai_onnx.constant(the_data);
-}
-
-popart::TensorId CompilerImpl::cast(const std::vector<popart::TensorId> &inputs,
-                                    const std::string &type) {
-  auto ai_onnx = op_builder->aiOnnxOpset9();
-  return ai_onnx.cast(inputs, type);
 }
 
 popart::TensorId
@@ -571,6 +573,7 @@ static bool IsLoss(const std::string &operation) {
 #define NONE
 #define ARG(Type, Name) , Type Name
 #define BODY_ARG(Name) , Name
+
 // Create a function decl with the given call and arguments.
 #define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
   poptorch::TensorId Compiler::function(                                       \
@@ -587,16 +590,17 @@ static bool IsLoss(const std::string &operation) {
   }
 
 #include "popart_compiler/SupportedOperations.inc.hpp"
-#undef BODY_ARG
+
 #undef OP_DECL
+#undef BODY_ARG
 #undef ARG
 #undef NONE
-#undef INT_VEC
-#undef FLOAT_VEC
-#undef FLOAT
-#undef INT
-#undef BOOL
 #undef STRING
+#undef BOOL
+#undef INT
+#undef FLOAT
+#undef FLOAT_VEC
+#undef INT_VEC
 
 poptorch::TensorId
 Compiler::addInitializedInputTensor(const char *name, const char *type,
@@ -641,6 +645,8 @@ void Compiler::addOutputTensor(poptorch::TensorId output) {
 
 void Compiler::setUpInputOp(poptorch::TensorId id, float *ptr,
                             const std::vector<std::int64_t> &dims) {
+  assertTensorIs(PopartTypes::FLOAT, id, __PRETTY_FUNCTION__);
+
   // Popart wrapper around the tensor pointer.
   _impl->memory_manager.push_back(
       std::make_unique<popart::NDArrayWrapper<float>>(static_cast<float *>(ptr),
@@ -651,6 +657,8 @@ void Compiler::setUpInputOp(poptorch::TensorId id, float *ptr,
 
 void Compiler::setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
                             const std::vector<std::int64_t> &dims) {
+  assertTensorIs(PopartTypes::INT32, id, __PRETTY_FUNCTION__);
+
   // Popart wrapper around the tensor pointer.
   _impl->memory_manager.push_back(
       std::make_unique<popart::NDArrayWrapper<std::int32_t>>(ptr, dims));
@@ -658,11 +666,21 @@ void Compiler::setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
       {_impl->ids[id], *_impl->memory_manager.back().get()});
 }
 
-void Compiler::setUpInputOp(poptorch::TensorId id, std::int64_t *ptr,
-                            const std::vector<std::int64_t> &dims) {
+void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
+                            const std::vector<std::int64_t> &dims,
+                            bool float16) {
+  if (float16) {
+    assertTensorIs(PopartTypes::FLOAT16, id, __PRETTY_FUNCTION__);
+  } else {
+    assertTensorIs(PopartTypes::INT16, id, __PRETTY_FUNCTION__);
+  }
+
   // Popart wrapper around the tensor pointer.
   _impl->memory_manager.push_back(
-      std::make_unique<popart::NDArrayWrapper<std::int64_t>>(ptr, dims));
+      std::make_unique<popart::NDArrayWrapper<std::int16_t>>(
+          ptr, popart::TensorInfo(float16 ? popart::DataType::FLOAT16
+                                          : popart::DataType::INT16,
+                                  dims)));
   _impl->popart_incoming.insert(
       {_impl->ids[id], *_impl->memory_manager.back().get()});
 }
@@ -690,6 +708,15 @@ void Compiler::setUpOutputOp(poptorch::TensorId id, bool *ptr,
   // Popart wrapper around the tensor pointer.
   auto memory = std::make_unique<popart::NDArrayWrapper<bool>>(
       static_cast<bool *>(ptr), dims);
+
+  _impl->addMemoryToOutput(id, ptr, std::move(memory));
+}
+
+void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
+                             const std::vector<std::int64_t> &dims) {
+  // Popart wrapper around the tensor pointer.
+  auto memory = std::make_unique<popart::NDArrayWrapper<std::int16_t>>(
+      static_cast<std::int16_t *>(ptr), dims);
 
   _impl->addMemoryToOutput(id, ptr, std::move(memory));
 }
@@ -932,15 +959,58 @@ void Compiler::run(const Optimizer &optimizer) {
 poptorch::PopartTypes Compiler::getPopartType(poptorch::TensorId tensor) const {
   popart::TensorInfo info = _impl->session->getInfo(_impl->ids[tensor]);
 
-  if (info.dataType() == popart::DataType::FLOAT) {
-    return poptorch::PopartTypes::FLOAT;
+  switch (info.dataType()) {
+  case popart::DataType::UINT8: {
+    return PopartTypes::UINT8;
   }
-  if (info.dataType() == popart::DataType::INT32 ||
-      info.dataType() == popart::DataType::UINT32) {
-    return poptorch::PopartTypes::INT32;
+  case popart::DataType::INT8: {
+    return PopartTypes::INT8;
   }
-  if (info.dataType() == popart::DataType::BOOL) {
-    return poptorch::PopartTypes::BOOL;
+  case popart::DataType::UINT16: {
+    return PopartTypes::UINT16;
+  }
+  case popart::DataType::INT16: {
+    return PopartTypes::INT16;
+  }
+  case popart::DataType::INT32: {
+    return PopartTypes::INT32;
+  }
+  case popart::DataType::INT64: {
+    return PopartTypes::INT64;
+  }
+  case popart::DataType::UINT32: {
+    return PopartTypes::UINT32;
+  }
+  case popart::DataType::UINT64: {
+    return PopartTypes::UINT64;
+  }
+  case popart::DataType::BOOL: {
+    return PopartTypes::BOOL;
+  }
+  case popart::DataType::FLOAT: {
+    return PopartTypes::FLOAT;
+  }
+  case popart::DataType::FLOAT16: {
+    return PopartTypes::FLOAT16;
+  }
+  case popart::DataType::BFLOAT16: {
+    return PopartTypes::BFLOAT16;
+  }
+  case popart::DataType::DOUBLE: {
+    return PopartTypes::DOUBLE;
+  }
+  case popart::DataType::COMPLEX64: {
+    return PopartTypes::COMPLEX64;
+  }
+  case popart::DataType::COMPLEX128: {
+    return PopartTypes::COMPLEX128;
+  }
+  case popart::DataType::STRING: {
+    return PopartTypes::STRING;
+  }
+  case popart::DataType::UNDEFINED: {
+    return PopartTypes::UNDEFINED;
+  }
   }
 
   ERROR("Unsupported popart type in return: " << info.data_type());
@@ -950,7 +1020,7 @@ bool Compiler::tensorIdIsValid(poptorch::TensorId id) const {
   return id < _impl->ids.size();
 }
 
-std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) {
+std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
   popart::TensorInfo info = _impl->session->getInfo(_impl->ids[id]);
 
   return info.shape();
@@ -1008,6 +1078,21 @@ void Compiler::addOutputType(OutputType type) {
 
 const std::vector<OutputType> &Compiler::outputTypes() const {
   return _impl->output_types;
+}
+
+void Compiler::assertTensorIs(const PopartTypes dataType,
+                              const poptorch::TensorId &id,
+                              const char *caller) const {
+  PopartTypes actualType;
+  try {
+    actualType = getPopartType(id);
+  } catch (const popart::error &) {
+    // Rare case of input tensor never used, so not in IR
+    return;
+  }
+
+  ERROR_ON_MSG(actualType != dataType,
+               "Incorrect type for tensor, " << id << " used in " << caller);
 }
 
 SessionOptions::SessionOptions()

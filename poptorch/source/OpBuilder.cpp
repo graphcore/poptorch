@@ -1,7 +1,12 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+
+#include "poptorch_logging/Error.hpp"
+
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch/ToString.hpp"
+
 #include "PoptorchSymbols.hpp"
-#include <poptorch/OpBuilder.hpp>
-#include <poptorch_logging/Error.hpp>
+
 namespace poptorch {
 
 torch::jit::Node *
@@ -49,16 +54,7 @@ torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::cast, {A});
 
-  std::string new_type;
-
-  if (scalar == c10::kFloat) {
-    new_type = "FLOAT";
-  } else if (scalar == c10::kInt) {
-    new_type = "INT32";
-  } else if (scalar == c10::kLong) {
-    new_type = "INT64";
-  }
-
+  std::string new_type = scalarTypeToOnnxString(scalar);
   new_node->s_(c10::Symbol::fromQualString("attr::type"), new_type);
 
   return new_node;

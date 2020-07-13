@@ -1,16 +1,18 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include <poptorch/PopartCanonicalization.hpp>
-
-#include <torch/csrc/jit/ir/ir.h>
 
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
-#include <poptorch/OpBuilder.hpp>
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include "torch/csrc/jit/ir/ir.h"
+
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
+
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch/PopartCanonicalization.hpp"
+#include "poptorch/ToString.hpp"
 
 #include "PoptorchSymbols.hpp"
 
@@ -275,7 +277,8 @@ CanonicalizeImpl::handleParamOrConstantDeduceType(torch::jit::Graph *graph,
   case c10::ScalarType::Long: {
     return handleParamOrConstant<std::int32_t>(graph, operand);
   }
-  case c10::ScalarType::Float: {
+  case c10::ScalarType::Float:
+  case c10::ScalarType::Double: {
     return handleParamOrConstant<float>(graph, operand);
   }
   default: {
@@ -600,7 +603,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   }
 
 // If the alpha is 1 we just ignore it otherwise we perform the alpha
-// multiplication and use that. This is the macro which should be used
+// multiplication and use that. This is the macro which should be used.
 #define ALPHA(ValueToMultiply, AlphaParam)                                     \
   torch::jit::Value *alphaValue = AlphaParam;                                  \
   torch::jit::Value *valueToMultiply = ValueToMultiply;                        \
@@ -1166,31 +1169,42 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
                                      << " not supported");
       }
     } else if (kind == c10::aten::to) {
+      auto tensorType = node->input(0)->type()->cast<c10::TensorType>();
+      ERROR_ON_MSG(
+          !tensorType,
+          "Casting from a non-tensor type not supported, in an aten::to.");
+
       // clang-format off
       // aten::to(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
       // aten::to(Tensor(a) self, int? dtype=None, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
-      // aten::to(Tensor(a) self, bool non_blocking=False, bool copy=False) -> Tensor(a|b)" // NOLINT
+      // aten::to(Tensor(a) self, [args without dtype])
       // clang-format on
 
-      c10::TensorTypePtr output_type =
-          node->outputs()[0]->type()->expect<c10::TensorType>();
-
-      c10::TensorTypePtr input_type =
-          node->input(0)->type()->expect<c10::TensorType>();
-
-      c10::ScalarType out_as_scalar = *output_type->scalarType();
-      c10::ScalarType in_as_scalar = *input_type->scalarType();
-
-      // Remove the node if casting to the same type.
-      if (out_as_scalar == in_as_scalar) {
-        node->output()->replaceAllUsesWith(node->input(0));
-        _to_delete.insert(node);
-        continue;
+      std::optional<c10::ScalarType> castTo;
+      if (node->input(1)->type()->cast<c10::DeviceObjType>() ||
+          node->input(1)->type()->cast<c10::IntType>()) {
+        auto outputType = node->output(0)->type()->expect<c10::TensorType>();
+        castTo = *outputType->scalarType();
       }
 
-      // Otherwise cast as normal.
-      new_node = createCast(graph, node->input(0), out_as_scalar);
+      if (castTo.has_value()) {
+        // Avoid promoting to an unsupported type
+        if (*castTo == at::ScalarType::Double) {
+          castTo = at::ScalarType::Float;
+        } else if (*castTo == at::ScalarType::Long) {
+          castTo = at::ScalarType::Int;
+        }
+      }
 
+      if (!castTo.has_value() || castTo == *tensorType->scalarType()) {
+        // NOOP
+        logging::trace("Ignoring type cast to same type, {}, {}", *castTo,
+                       *tensorType->scalarType());
+        node->output()->replaceAllUsesWith(node->input(0));
+        _to_delete.insert(node);
+      } else {
+        new_node = createCast(graph, node->input(0), *castTo);
+      }
     } else if (kind == c10::aten::rsub) {
       // clang-format off
       // Tensor aten::rsub(const Tensor& self, const Tensor& other, Scalar alpha) // NOLINT
@@ -1260,9 +1274,13 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 
       // Pytorch normalizes across arbitrary number of dimensions from the end.
       // We flatten into a [M, N] array and normalize the N.
-      std::vector<std::int64_t> normalized_shape =
+
+      std::vector<std::int64_t> normalizedShape =
           handleList<int64_t>(node->input(1)->node());
-      const std::int64_t axis = -normalized_shape.size();
+
+      // Opset 9 Flatten does not handle negative axis
+      auto tensorType = x->type()->expect<c10::TensorType>();
+      const std::int64_t axis = *tensorType->dim() - normalizedShape.size();
 
       // Flatten into [M, N]
       torch::jit::Node *flatten = createFlatten(graph, {x}, axis);
