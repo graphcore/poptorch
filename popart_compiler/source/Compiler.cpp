@@ -458,6 +458,7 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &inputs,
                              const PopartConstant &constant) {
   UNUSED(inputs);
   auto ai_onnx = op_builder->aiOnnxOpset10();
+
   return ai_onnx.constant(*constant.getPopartData());
 }
 

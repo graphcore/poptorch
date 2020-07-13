@@ -307,6 +307,26 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
         torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
     auto graph = graph_and_tensors.first;
 
+    // Create a jit stack from the incoming pytorch tensors.
+    torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
+
+    // And turn convert them into at tensors which we can then resolve the
+    // address of.
+    std::vector<at::Tensor> input_tensors;
+    for (const torch::jit::IValue &value : input_stack) {
+      buildTensorList(value, &input_tensors);
+    }
+
+    // Find the parameter data from.
+    std::vector<at::Tensor> parameter_data;
+    for (const at::Tensor &param : graph_and_tensors.second) {
+      if (!param.is_contiguous()) {
+        logging::debug("Tensor is NOT continguous!");
+      }
+
+      parameter_data.push_back(param);
+    }
+
     Optimizer optimizer = parseOptimizer(optimizerDict);
 
     logging::trace("Lowered graph:\n{}", *graph);
@@ -334,6 +354,10 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
     poptorch::type_and_constant_canonicalization::canonicaliseConstants(
         graph.get());
 
+    // Convert the IR to half to match the inputs/actual usage.
+    logging::debug("Graph before canonicalising half:\n{}", *graph);
+    poptorch::canonicaliseHalf(graph.get(), input_tensors, parameter_data);
+
     logging::debug("Graph right before canonicalization:\n{}", *graph);
 
     poptorch::canonicalizeLists(graph.get());
@@ -349,29 +373,6 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
 
     // Warn the user if any operations couldn't be canonicalised.
     poptorch::warnOnUnsupportedAten(graph.get());
-
-    // Create a jit stack from the incoming pytorch tensors.
-    torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
-
-    // And turn convert them into at tensors which we can then resolve the
-    // address of.
-    std::vector<at::Tensor> input_tensors;
-    for (const torch::jit::IValue &value : input_stack) {
-      buildTensorList(value, &input_tensors);
-    }
-
-    // Find the parameter data from.
-    std::vector<at::Tensor> parameter_data;
-    for (const at::Tensor &param : graph_and_tensors.second) {
-      if (!param.is_contiguous()) {
-        logging::debug("Tensor is NOT continguous!");
-      }
-
-      parameter_data.push_back(param);
-    }
-
-    // Convert the IR to half to match the inputs/actual usage.
-    poptorch::canonicaliseHalf(graph.get(), input_tensors, parameter_data);
 
     logging::debug("Graph right before popart:\n{}", *graph);
 

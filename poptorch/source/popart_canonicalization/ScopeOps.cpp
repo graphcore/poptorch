@@ -18,7 +18,7 @@ torch::jit::Node *beginIpuBlockHandler(torch::jit::Graph *graph,
   // TODO(T24134)
   new_node = createAndInsertNode(
       graph, c10::Symbol::fromQualString("poptorch::begin_ipu_block"), {},
-      node->outputs().size());
+      ImplicitCast::None, ImplicitCastOutput::None, node->outputs().size());
 
   // Convert the prim::Constant into an attribute.
   std::int64_t ipu_id = constantToLong(node->input()->node());

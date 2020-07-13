@@ -8,11 +8,15 @@
 #include <utility>
 #include <vector>
 
+#include "poptorch/ImplicitCasting.hpp"
+
 namespace poptorch {
-torch::jit::Node *
-createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
-                    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
-                    size_t num_outputs = 1);
+torch::jit::Node *createAndInsertNode(
+    torch::jit::Graph *graph, torch::jit::NodeKind kind,
+    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
+    ImplicitCast implicit_cast = ImplicitCast::None,
+    ImplicitCastOutput implicit_cast_output = ImplicitCastOutput::None,
+    size_t num_outputs = 1);
 
 // Create a poptorch::tensor_constant node from the given tensors, setting the
 // output type accordingly
@@ -30,6 +34,10 @@ torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
 torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
                                       const std::vector<double> &data,
                                       const std::vector<int64_t> &new_shape);
+
+torch::jit::Node *createConstantFloat16(torch::jit::Graph *graph,
+                                        const std::vector<double> &data,
+                                        const std::vector<int64_t> &new_shape);
 
 torch::jit::Node *
 createCustomOperation(torch::jit::Graph *graph,
@@ -78,6 +86,38 @@ torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph,
                              {static_cast<std::int64_t>(data.size())})
       ->output();
 }
+
+// Ops which will return the correct ScalarType
+
+torch::jit::Node *createCastTypedOutput(torch::jit::Graph *graph,
+                                        torch::jit::Value *A,
+                                        c10::ScalarType scalar);
+
+torch::jit::Node *
+createConcatTypedOutput(torch::jit::Graph *graph,
+                        const std::vector<torch::jit::Value *> &args,
+                        int64_t axis);
+
+torch::jit::Node *
+createFlattenTypedOutput(torch::jit::Graph *graph,
+                         const std::vector<torch::jit::Value *> &args,
+                         int64_t axis);
+
+torch::jit::Node *createSplitTypedOutput(
+    torch::jit::Graph *graph, const std::vector<torch::jit::Value *> &args,
+    unsigned int num_outputs, int64_t axis, const std::vector<int64_t> &split);
+
+torch::jit::Node *
+createTransposeTypedOutput(torch::jit::Graph *graph,
+                           const std::vector<torch::jit::Value *> &args,
+                           const std::vector<int64_t> &perm);
+
+// Used to add to the output the same type as in input to a unary create
+// function
+torch::jit::Node *createUnarySameTypedOutput(
+    torch::jit::Node *(*create_fn)(torch::jit::Graph *,
+                                   const std::vector<torch::jit::Value *> &),
+    torch::jit::Graph *graph, const std::vector<torch::jit::Value *> &args);
 
 // Default to int in the helper.
 template <typename T> struct CreateConstant {

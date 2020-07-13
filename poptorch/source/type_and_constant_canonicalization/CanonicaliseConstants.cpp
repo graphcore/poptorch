@@ -120,10 +120,13 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
 
     if (node->output()->type()->isSubtypeOf(c10::NumberType::get()) ||
         node->output()->type()->isSubtypeOf(c10::BoolType::get())) {
+      logging::LogContext ctx2("handling as number constant");
       handleNumberConstant(graph, node);
     } else if (node->output()->type()->isSubtypeOf(c10::TensorType::get())) {
+      logging::LogContext ctx2("handling as tensor constant");
       handleTensorConstant(graph, node);
     } else if (node->output()->type()->isSubtypeOf(c10::StringType::get())) {
+      logging::LogContext ctx2("handling as string constant");
       handleStringConstant(graph, node);
     }
 

@@ -155,7 +155,6 @@ OP_CONVERTOR(aten::isnan, NONE, createIsnan, {PARAM(0)})
 OP_CONVERTOR(aten::full_like, NONE, createExpand, {PARAM(1) COMMA TENSOR_SHAPE_AS_IR(0)})
 
 // full(int[] size, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-
 OP_CONVERTOR_WITH_CAST(aten::full, NONE, createExpand, {PARAM(1) COMMA HANDLE_LIST_AS_IR_CONSTANT(0)}, GET_RETURN_TYPE)
 
 // Random Sampling ops

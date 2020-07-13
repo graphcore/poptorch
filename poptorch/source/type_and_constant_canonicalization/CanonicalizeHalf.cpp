@@ -63,6 +63,12 @@ c10::TypePtr ConvertHalfImpl::convertValueIfNeeded(
     auto tuple = value->type()->expect<c10::TupleType>();
     std::vector<c10::TypePtr> new_types;
     bool type_changed = false;
+
+    // Unused tuple
+    if (!value->hasUses()) {
+      break;
+    }
+
     // Until we encounter something else we only support TupleUnpack
     ERROR_ON(value->uses().size() != 1);
     auto user = value->uses()[0].user;

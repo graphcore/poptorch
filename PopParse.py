@@ -136,6 +136,40 @@ for opset in classes:
         jsonOutput[opset].pop(name)
 logger.debug("addedFunctions: %s", sorted(addedFunctions))
 
+## Implicit cast support
+# Casting on all args
+CastingOps = [
+    "add", "batchnormalization", "bitshift", "clip", "conv", "convtranspose",
+    "div", "equal", "gru", "gemm", "greater", "instancenormalization", "less",
+    "lstm", "logical_and", "logical_or", "logical_xor", "logical_not",
+    "matmul", "max", "maxroipool", "mean", "min", "mod", "mul", "pow", "prelu",
+    "range", "rnn", "scan", "sequenceconstruct", "sub", "sum",
+    "groupnormalization", "call", "dynamicadd", "dynamicupdate",
+    "dynamicslice", "dynamiczero"
+]
+# Also Einsum, GreaterOrEqual, LessOrEqual
+
+CastingExceptFirstArgsOps = ["where"]
+CastingExceptSecondArgsOps = [
+    "dequantizelinear", "scatterelements", "scatternd"
+]
+# Also Pad but only after >= 11
+CastingExceptThirdArgsOps = ["roialign"]
+
+# Implicit casting ops not in these catagories: ConvInteger MatMulInteger,
+# QLinearConv, QLinearMatMul
+
+# All implicitly casting ops produce an output the same as the promoted type
+# except those which always return bools, floats (in onc case) and the following
+CastingDifferentOutput = ["sequenceconstruct", "call"]
+
+CastingAlwaysBoolOutput = [
+    "equal", "greater", "less", "logical_and", "logical_not", "logical_or",
+    "logical_xor"
+]
+
+CastingAlwaysFloatOutput = ["dequantizelinear"]
+
 MultipleOutputsOps = {"lstm": "2", "split": "num_outputs", "topk": "2"}
 
 CXXTypeToTypeClass = {
@@ -288,6 +322,30 @@ for opset in classes:
 
         cppFile = " torch::jit::Node *new_node = createAndInsertNode(graph, " \
                "symbols::popart::" + name + ", args"
+        if name in CastingOps:
+            cppFile += ", ImplicitCast::All"
+        elif name in CastingExceptFirstArgsOps:
+            cppFile += ", ImplicitCast::ExceptFirst"
+        elif name in CastingExceptSecondArgsOps:
+            cppFile += ", ImplicitCast::ExceptSecond"
+        elif name in CastingExceptThirdArgsOps:
+            cppFile += ", ImplicitCast::ExceptThird"
+        else:
+            cppFile += ", ImplicitCast::None"
+
+        if name in CastingAlwaysBoolOutput:
+            cppFile += ", ImplicitCastOutput::AlwaysBool"
+        elif name in CastingAlwaysFloatOutput:
+            cppFile += ", ImplicitCastOutput::AlwaysFloat"
+        elif any([
+                name in n for n in (CastingOps, CastingExceptFirstArgsOps,
+                                    CastingExceptSecondArgsOps,
+                                    CastingExceptThirdArgsOps)
+        ]):
+            cppFile += ", ImplicitCastOutput::AsPromoted"
+        else:
+            cppFile += ", ImplicitCastOutput::None"
+
         if name in MultipleOutputsOps:
             cppFile += ", %s" % MultipleOutputsOps[name]
         cppFile += ");\n"

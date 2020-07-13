@@ -14,6 +14,7 @@ endif()
 
 set(POPTORCH_CORE_SOURCES
   "poptorch.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/ImplicitCasting.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/LowerToPopart.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/OpBuilder.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ArithmeticOps.cpp"

@@ -23,8 +23,8 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
 
   bool use_bias = constantToBool(node->input(3)->node());
   ERROR_ON_MSG(!use_bias, "LSTM without biases not supported");
-  std::int64_t num_layers = constantToLong(node->input(4)->node());
 
+  std::int64_t num_layers = constantToLong(node->input(4)->node());
   ERROR_ON_MSG(num_layers != 1, "Only LSTM with 1 layer supported");
 
   float dropout = constantToFloat(node->input(5)->node());
@@ -61,42 +61,44 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
       values = reshape->output();
     }
     torch::jit::Node *states =
-        createSplit(graph, {values}, state_size, 1,
-                    {num_hidden_layers, num_hidden_layers, num_hidden_layers,
-                     num_hidden_layers});
+        createSplitTypedOutput(graph, {values}, state_size, 1,
+                               {num_hidden_layers, num_hidden_layers,
+                                num_hidden_layers, num_hidden_layers});
     std::vector<torch::jit::Value *> slices;
     for (std::uint64_t i = 0; i < state_size; ++i) {
       if (areWeights) {
         // Weights also need to be transposed
         torch::jit::Node *transposed =
-            createTranspose(graph, {states->output(i)}, {0, 2, 1});
+            createTransposeTypedOutput(graph, {states->output(i)}, {0, 2, 1});
         slices.push_back(transposed->output());
       } else {
         slices.push_back(states->output(i));
       }
     }
-    torch::jit::Node *concat =
-        createConcat(graph, {slices[1], slices[0], slices[2], slices[3]}, 0);
+    torch::jit::Node *concat = createConcatTypedOutput(
+        graph, {slices[1], slices[0], slices[2], slices[3]}, 0);
     return concat->output();
   };
 
   torch::jit::Node *concat_weights =
-      createConcat(graph,
-                   {reshape_tensor(weights_list[0], true),
-                    reshape_tensor(weights_list[1], true)},
-                   1);
+      createConcatTypedOutput(graph,
+                              {reshape_tensor(weights_list[0], true),
+                               reshape_tensor(weights_list[1], true)},
+                              1);
+
   torch::jit::Node *combine_biases =
       createAddNotInPlace(graph, reshape_tensor(weights_list[2], false),
                           reshape_tensor(weights_list[3], false));
 
   torch::jit::Node *concat_states =
-      createConcat(graph, {hidden_layers[0], hidden_layers[1]}, 0);
+      createConcatTypedOutput(graph, {hidden_layers[0], hidden_layers[1]}, 0);
 
   std::vector<std::int64_t> input_shape = shapeFromTensor(input);
   std::int64_t batch_dim = 0;
   // Transpose output BSF -> SBF
   if (batch_first) {
-    torch::jit::Node *transpose = createTranspose(graph, {input}, {1, 0, 2});
+    torch::jit::Node *transpose =
+        createTransposeTypedOutput(graph, {input}, {1, 0, 2});
     input = transpose->output();
     batch_dim = 1;
   }

@@ -128,3 +128,16 @@ def test_list_inputs(use_half):
     expected = [torch.tensor([1.0]), torch.tensor([5.0])]
 
     assert [t.float() for t in inference_model(t1, t2, t3)] == expected
+
+
+def test_unused_tuple():
+    class SimpleAdder(nn.Module):
+        def forward(self, x, y, z):  # pylint: disable=unused-argument
+            return x + y
+
+    model = SimpleAdder()
+    inference_model = poptorch.inferenceModel(model)
+    t1 = torch.tensor([1.])
+    t2 = torch.tensor([2.])
+    z = (torch.tensor([1.]), torch.tensor([1.]))
+    inference_model(t1, t2, z)

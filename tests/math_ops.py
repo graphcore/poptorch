@@ -106,7 +106,6 @@ unary_ops_int = [  # torch.bitwise_not,
 ]
 
 
-@pytest.mark.skip(reason="TODO(T21014)")
 def test_binary_pow():
     torch.manual_seed(42)
     input1 = torch.randn([1, 2, 10, 200])
@@ -207,7 +206,6 @@ binary_ops_basic_element_wise_float = [
 
 
 @pytest.mark.parametrize("op", binary_ops_basic_element_wise_float)
-@pytest.mark.skip(reason="TODO(T21014)")
 def test_binary_ops_elementwise_edgecases(op):
     torch.manual_seed(42)
     input1 = torch.randn([1, 2, 10, 200])
@@ -426,7 +424,6 @@ types = [torch.float32, torch.int32]
 
 
 @pytest.mark.parametrize("ty", types)
-@pytest.mark.skip(reason="TODO(T21014)")
 def test_constant_arrays(ty):
     torch.manual_seed(42)
 
@@ -441,7 +438,6 @@ def test_constant_arrays(ty):
 
 
 @pytest.mark.parametrize("ty", types)
-@pytest.mark.skip(reason="TODO(T21014)")
 def test_big_constant_arrays_sliced(ty):
     torch.manual_seed(42)
 

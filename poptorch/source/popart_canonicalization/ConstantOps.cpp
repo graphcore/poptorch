@@ -37,6 +37,10 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
     return createConstantFloat(graph, {is_ones ? 1.0 : 0.0}, operation_shape);
     break;
   }
+  case c10::ScalarType::Half: {
+    return createConstantFloat16(graph, {is_ones ? 1.0 : 0.0}, operation_shape);
+    break;
+  }
   default: {
     ERROR((is_ones ? "aten::ones" : "aten::zeros")
           << " of type " << c10::toString(*as_tensor->scalarType())

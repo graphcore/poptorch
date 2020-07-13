@@ -1,15 +1,18 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include "PopartCanonicalizationUtils.hpp"
 
 #include <functional>
 #include <numeric>
 #include <unordered_map>
 
-#include "../PoptorchSymbols.hpp"
-#include "poptorch/OpBuilder.hpp"
-#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
+
+#include "../PoptorchSymbols.hpp"
+
+#include "PopartCanonicalizationUtils.hpp"
 
 namespace poptorch {
 
@@ -154,7 +157,7 @@ std::int32_t constantToInt(torch::jit::Node *node) {
 
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
   auto s = torch::jit::constant_as<at::Scalar>(node->output());
-  return s->toLong();
+  return s->toInt();
 }
 
 std::int64_t constantToLong(torch::jit::Node *node) {
@@ -166,10 +169,15 @@ std::int64_t constantToLong(torch::jit::Node *node) {
         .to(at::ScalarType::Long)
         .item<std::int64_t>();
   }
-
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
   auto s = torch::jit::constant_as<at::Scalar>(node->output());
-  return s->toLong();
+  std::int64_t val = s->toLong();
+
+  if (val == INT_MAX) {
+    return LONG_MAX;
+  }
+
+  return val;
 }
 
 std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node) {
@@ -195,6 +203,8 @@ std::string constantToString(torch::jit::Node *node) {
                "Cannot force a non-constant node to a string");
 
   auto &&t = node->t(c10::attr::value);
+  ERROR_ON(!t.is_contiguous());
+
   auto length = t.sizes().at(0);
   std::string s(reinterpret_cast<char *>(t.data_ptr()), length);
   return s;

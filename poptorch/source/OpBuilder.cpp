@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 #include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
@@ -8,11 +9,76 @@
 #include "PoptorchSymbols.hpp"
 
 namespace poptorch {
+namespace {
+
+// Sets the scalar types of every output of an implicitly casted op
+// This is needed in the case where an op is
+// 1. created as part of canonicalising an op
+// 2. not the final op to be created as part of (1)
+// 3. followed by another op requiring the types for implicit casting
+void setNodeOutputsTypes(torch::jit::Node *node,
+                         const ImplicitCast implicit_cast,
+                         const ImplicitCastOutput implicit_cast_output) {
+  at::ScalarType output_type;
+
+  switch (implicit_cast_output) {
+  case ImplicitCastOutput::AsPromoted: {
+    size_t input_idx = (implicit_cast == ImplicitCast::ExceptFirst) ? 1 : 0;
+    output_type = *node->input(input_idx)
+                       ->type()
+                       ->expect<c10::TensorType>()
+                       ->scalarType();
+
+    break;
+  }
+
+  case ImplicitCastOutput::AlwaysBool: {
+    output_type = at::ScalarType::Bool;
+    break;
+  }
+
+  case ImplicitCastOutput::AlwaysFloat: {
+    output_type = at::ScalarType::Float;
+    break;
+  }
+
+  case ImplicitCastOutput::None: {
+    ERROR("Called on app which does not support implict casting");
+  }
+  }
+
+  for (auto output : node->outputs()) {
+    output->setType(c10::TensorType::create(output_type, c10::nullopt,
+                                            c10::nullopt, c10::nullopt));
+  }
+}
+} // namespace
+
 torch::jit::Node *
 createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
                     torch::jit::ArrayRef<torch::jit::Value *> inputs,
+                    const ImplicitCast implicit_cast,
+                    const ImplicitCastOutput implicit_cast_output,
                     size_t num_outputs) {
-  torch::jit::Node *new_node = graph->create(kind, inputs, num_outputs);
+  torch::jit::Node *new_node;
+
+  if (implicit_cast != ImplicitCast::None) {
+    logging::LogContext ctx(std::string("implicitically casting inputs of ") +
+                            kind.toQualString());
+    auto possibly_casted_inputs = implicitCastInputs(&inputs, implicit_cast);
+    ctx.clear();
+
+    new_node = graph->create(kind, num_outputs);
+    for (auto input : possibly_casted_inputs) {
+      new_node->addInput(input);
+    }
+
+    setNodeOutputsTypes(new_node, implicit_cast, implicit_cast_output);
+
+  } else {
+    ERROR_ON(implicit_cast_output != ImplicitCastOutput::None);
+    new_node = graph->create(kind, inputs, num_outputs);
+  }
 
   graph->insertNode(new_node);
   return new_node;
@@ -36,6 +102,8 @@ torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::popart::reshape_static_shape, {A});
   new_node->is_(c10::attr::shape, new_shape);
+  new_node->output()->setType(
+      A->type()->expect<c10::TensorType>()->withSizes(new_shape));
   return new_node;
 }
 
@@ -70,8 +138,11 @@ torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
                                       const std::vector<double> &data,
                                       const std::vector<int64_t> &new_shape) {
   auto total_size = static_cast<size_t>(std::accumulate(
-      new_shape.begin(), new_shape.end(), 1, std::multiplies<std::int64_t>()));
+      new_shape.begin(), new_shape.end(), 1, std::multiplies<size_t>()));
+  ERROR_ON(total_size == 0);
+
   size_t stride = 0;
+
   if (data.size() != 1) {
     ERROR_ON(total_size != data.size());
     stride = 1;
@@ -90,6 +161,16 @@ torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
   data.at((total_size - 1) * stride);
 
   return tensorToConstant(graph, t);
+}
+
+torch::jit::Node *createConstantFloat16(torch::jit::Graph *graph,
+                                        const std::vector<double> &data,
+                                        const std::vector<int64_t> &new_shape) {
+  torch::jit::Node *new_node = createConstantFloat(graph, data, new_shape);
+  new_node->t_(c10::attr::value,
+               new_node->t(c10::attr::value).to(at::ScalarType::Half));
+
+  return new_node;
 }
 
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
@@ -183,7 +264,71 @@ torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,
                                       torch::jit::Value *A,
                                       torch::jit::Value *B) {
   torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::add_not_in_place, {A, B});
+      createAndInsertNode(graph, symbols::poptorch::add_not_in_place, {A, B},
+                          ImplicitCast::All, ImplicitCastOutput::AsPromoted);
+  return new_node;
+}
+
+torch::jit::Node *createCastTypedOutput(torch::jit::Graph *graph,
+                                        torch::jit::Value *A,
+                                        c10::ScalarType scalar) {
+  torch::jit::Node *new_node = createCast(graph, A, scalar);
+  new_node->output()->setType(
+      A->type()->expect<c10::TensorType>()->withScalarType(scalar));
+  return new_node;
+}
+
+torch::jit::Node *
+createConcatTypedOutput(torch::jit::Graph *graph,
+                        const std::vector<torch::jit::Value *> &args,
+                        int64_t axis) {
+  torch::jit::Node *new_node = createConcat(graph, args, axis);
+  new_node->output()->setType(
+      args[0]->type()->expect<c10::TensorType>()->dimensionedOnly());
+  return new_node;
+}
+
+torch::jit::Node *
+createFlattenTypedOutput(torch::jit::Graph *graph,
+                         const std::vector<torch::jit::Value *> &args,
+                         int64_t axis) {
+  torch::jit::Node *new_node = createFlatten(graph, args, axis);
+  ERROR_ON(axis < 0); // Can be supported if needed
+  new_node->output()->setType(
+      args[0]->type()->expect<c10::TensorType>()->withDim(2));
+
+  return new_node;
+}
+
+torch::jit::Node *createSplitTypedOutput(
+    torch::jit::Graph *graph, const std::vector<torch::jit::Value *> &args,
+    unsigned int num_outputs, int64_t axis, const std::vector<int64_t> &split) {
+  torch::jit::Node *new_node =
+      createSplit(graph, args, num_outputs, axis, split);
+
+  for (unsigned int i = 0; i < num_outputs; i++) {
+    new_node->output(i)->setType(
+        args[0]->type()->expect<c10::TensorType>()->dimensionedOnly());
+  }
+  return new_node;
+}
+
+torch::jit::Node *
+createTransposeTypedOutput(torch::jit::Graph *graph,
+                           const std::vector<torch::jit::Value *> &args,
+                           const std::vector<int64_t> &perm) {
+  torch::jit::Node *new_node = createTranspose(graph, args, perm);
+  new_node->output()->setType(
+      args[0]->type()->expect<c10::TensorType>()->dimensionedOnly());
+  return new_node;
+}
+
+torch::jit::Node *createUnarySameTypedOutput(
+    torch::jit::Node *(*create_fn)(torch::jit::Graph *,
+                                   const std::vector<torch::jit::Value *> &),
+    torch::jit::Graph *graph, const std::vector<torch::jit::Value *> &args) {
+  torch::jit::Node *new_node = create_fn(graph, args);
+  new_node->output()->setType(args[0]->type());
   return new_node;
 }
 
@@ -193,7 +338,8 @@ createCustomOperation(torch::jit::Graph *graph,
                       const std::string &name, const std::string &domain,
                       std::int64_t domainVersion, std::int64_t numOutputs) {
   torch::jit::Node *new_node = createAndInsertNode(
-      graph, symbols::poptorch::custom_operation, inputs, numOutputs);
+      graph, symbols::poptorch::custom_operation, inputs, ImplicitCast::None,
+      ImplicitCastOutput::None, numOutputs);
 
   new_node->s_(c10::Symbol::fromQualString("attr::name"), name);
   new_node->s_(c10::Symbol::fromQualString("attr::domain"), domain);

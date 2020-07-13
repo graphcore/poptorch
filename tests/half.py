@@ -2,7 +2,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import poptorch
-import pytest
 import torch
 import torchvision.models as models
 import helpers
@@ -47,7 +46,6 @@ def test_model_with_weights():
                                   atol=1e-04)
 
 
-@pytest.mark.skip(reason="TODO(T21014)")
 def test_simple_model():
     class SimpleAdder(torch.nn.Module):
         def forward(self, x, y, z, w):

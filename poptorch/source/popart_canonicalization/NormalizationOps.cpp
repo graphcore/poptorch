@@ -100,7 +100,7 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   const std::int64_t axis = input_shape.size() - normalized_shape.size();
 
   // Flatten into [M, N]
-  torch::jit::Node *flatten = createFlatten(graph, {input}, axis);
+  torch::jit::Node *flatten = createFlattenTypedOutput(graph, {input}, axis);
 
   // Normalize.
   torch::jit::Node *normalize = createGroupnormalization(

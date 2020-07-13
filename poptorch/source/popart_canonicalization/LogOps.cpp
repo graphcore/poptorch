@@ -12,7 +12,8 @@ torch::jit::Node *log10Handler(torch::jit::Graph *graph,
   // Log10(X) = Log(X) / Log(10)
 
   // Add log(x)
-  torch::jit::Node *logx = createLog(graph, {node->inputs()[0]});
+  torch::jit::Node *logx =
+      createUnarySameTypedOutput(createLog, graph, {node->input(0)});
 
   // Add log10
   const double log10_const =
@@ -31,7 +32,7 @@ torch::jit::Node *log1pHandler(torch::jit::Graph *graph,
   torch::jit::Node *one = createConstantFloat(graph, {1.0}, {});
 
   // Add x + 1
-  torch::jit::Node *add = createAdd(graph, {node->inputs()[0], one->output()});
+  torch::jit::Node *add = createAdd(graph, {node->input(0), one->output()});
 
   // Add the log
   return createLog(graph, {add->output()});
@@ -42,7 +43,8 @@ torch::jit::Node *log2Handler(torch::jit::Graph *graph,
   // Log2(X) = Log(X) / Log(2)
 
   // Add log(x)
-  torch::jit::Node *logx = createLog(graph, {node->inputs()[0]});
+  torch::jit::Node *logx =
+      createUnarySameTypedOutput(createLog, graph, {node->input(0)});
 
   // Add log2
   const double log2_const =
