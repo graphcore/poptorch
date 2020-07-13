@@ -400,8 +400,8 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
 
 popart::TensorId CompilerImpl::cast(const std::vector<popart::TensorId> &inputs,
                                     const std::string &type) {
-  auto aiOnnx = op_builder->aiOnnxOpset9();
-  return aiOnnx.cast(inputs, type);
+  auto ai_onnx = op_builder->aiOnnxOpset9();
+  return ai_onnx.cast(inputs, type);
 }
 
 popart::TensorId
@@ -645,7 +645,8 @@ void Compiler::addOutputTensor(poptorch::TensorId output) {
 
 void Compiler::setUpInputOp(poptorch::TensorId id, float *ptr,
                             const std::vector<std::int64_t> &dims) {
-  assertTensorIs(PopartTypes::FLOAT, id, __PRETTY_FUNCTION__);
+  assertTensorIs(PopartTypes::FLOAT, id,
+                 static_cast<const char *>(__PRETTY_FUNCTION__));
 
   // Popart wrapper around the tensor pointer.
   _impl->memory_manager.push_back(
@@ -657,7 +658,8 @@ void Compiler::setUpInputOp(poptorch::TensorId id, float *ptr,
 
 void Compiler::setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
                             const std::vector<std::int64_t> &dims) {
-  assertTensorIs(PopartTypes::INT32, id, __PRETTY_FUNCTION__);
+  assertTensorIs(PopartTypes::INT32, id,
+                 static_cast<const char *>(__PRETTY_FUNCTION__));
 
   // Popart wrapper around the tensor pointer.
   _impl->memory_manager.push_back(
@@ -670,9 +672,12 @@ void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
                             const std::vector<std::int64_t> &dims,
                             bool float16) {
   if (float16) {
-    assertTensorIs(PopartTypes::FLOAT16, id, __PRETTY_FUNCTION__);
+    assertTensorIs(PopartTypes::FLOAT16, id,
+                   static_cast<const char *>(__PRETTY_FUNCTION__));
+
   } else {
-    assertTensorIs(PopartTypes::INT16, id, __PRETTY_FUNCTION__);
+    assertTensorIs(PopartTypes::INT16, id,
+                   static_cast<const char *>(__PRETTY_FUNCTION__));
   }
 
   // Popart wrapper around the tensor pointer.
@@ -1083,15 +1088,15 @@ const std::vector<OutputType> &Compiler::outputTypes() const {
 void Compiler::assertTensorIs(const PopartTypes dataType,
                               const poptorch::TensorId &id,
                               const char *caller) const {
-  PopartTypes actualType;
+  PopartTypes actual_type;
   try {
-    actualType = getPopartType(id);
+    actual_type = getPopartType(id);
   } catch (const popart::error &) {
     // Rare case of input tensor never used, so not in IR
     return;
   }
 
-  ERROR_ON_MSG(actualType != dataType,
+  ERROR_ON_MSG(actual_type != dataType,
                "Incorrect type for tensor, " << id << " used in " << caller);
 }
 

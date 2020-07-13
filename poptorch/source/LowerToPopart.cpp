@@ -33,6 +33,10 @@ public:
   // tensor.
   const TensorList &tensors(torch::jit::Value *value) const;
 
+  bool hasTensor(torch::jit::Value *value) const {
+    return _map.count(value) == 1;
+  }
+
   void setTensor(torch::jit::Value *value, poptorch::TensorId id);
   void setTuple(torch::jit::Value *value, const TensorList &tensors);
 
@@ -376,6 +380,16 @@ void LowerToPopart::lowerBody() {
         }
       }
       ERROR_ON_MSG(tensor_it != tensors.end(), "Didn't unpack all the tensors");
+    } else if (kind == symbols::poptorch::host_side_cast) {
+      // Map to the input value since the type will be casted host side
+      ERROR_ON_MSG(!_valueMap.hasTensor(node->input()),
+                   "Input to host side cast has not been registered");
+
+      ERROR_ON_MSG(node->inputs().size() != 1,
+                   "Host side cast should only have one input.");
+
+      _valueMap.setTensor(node->output(), _valueMap.tensor(node->input()));
+
     } else {
       logging::err("Couldn't find a registered operation for node {}", *node);
     }

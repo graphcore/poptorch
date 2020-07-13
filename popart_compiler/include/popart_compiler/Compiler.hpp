@@ -13,7 +13,7 @@
 
 namespace popart {
 enum class DataType;
-}
+} // namespace popart
 
 namespace poptorch {
 
@@ -228,7 +228,7 @@ public:
   const std::vector<OutputType> &outputTypes() const;
 
 private:
-  void assertTensorIs(const PopartTypes dataType, const poptorch::TensorId &id,
+  void assertTensorIs(PopartTypes dataType, const poptorch::TensorId &id,
                       const char *caller) const;
 
   std::unique_ptr<detail::CompilerImpl> _impl;

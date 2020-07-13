@@ -26,16 +26,21 @@ def test_simple_tuple():
 
 def test_nested_tuples():
     class SimpleAdder(nn.Module):
-        def forward(self, tpl1, t2, tpl3456):
+        def forward(self, tpl1, t2, tpl34567):
             (t1, ) = tpl1
-            (t3, (t4, t5), t6) = tpl3456
+            (t3, (t4, t5), _) = tpl34567
+            (t6, _) = tpl34567[2]
+            t7 = tpl34567[2][1]
+
             assert isinstance(t1, torch.Tensor)
             assert isinstance(t2, torch.Tensor)
             assert isinstance(t3, torch.Tensor)
             assert isinstance(t4, torch.Tensor)
             assert isinstance(t5, torch.Tensor)
             assert isinstance(t6, torch.Tensor)
-            return t1 + t2 + t3 + t4 + t5 + t6
+            assert isinstance(t7, torch.Tensor)
+
+            return t1 + t2 + t3 + t4 + t5 + t6 + t7
 
     model = SimpleAdder()
     inference_model = poptorch.inferenceModel(model)
@@ -43,11 +48,12 @@ def test_nested_tuples():
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
     t3 = torch.tensor([3.])
-    t4 = torch.tensor([4.])
+    t4 = torch.tensor([4.], dtype=torch.float64)
     t5 = torch.tensor([5.])
     t6 = torch.tensor([6.])
+    t7 = torch.tensor([7.], dtype=torch.float64)
 
-    assert inference_model((t1, ), t2, (t3, (t4, t5), t6)) == 21.0
+    assert inference_model((t1, ), t2, (t3, (t4, t5), (t6, t7))) == 28.0
 
 
 def test_optional_inputs():
@@ -80,8 +86,8 @@ def test_list_inputs():
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
-    t4 = torch.tensor([4.])
+    t3 = torch.tensor([4.])
 
     expected = [torch.tensor([1.0]), torch.tensor([5.0])]
 
-    assert inference_model(t1, t2, t4) == expected
+    assert inference_model(t1, t2, t3) == expected

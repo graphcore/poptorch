@@ -509,10 +509,13 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
                     });
 
       new_node = createTranspose(graph, {node->input(0)}, permutation);
-    } else if (kind == c10::aten::contiguous) {
+    } else if (kind == c10::aten::contiguous || kind == c10::aten::detach) {
       // clang-format off
       // aten::contiguous(Tensor self, *, MemoryFormat memory_format=contiguous_format) -> Tensor // NOLINT
       // Returns a copy of the tensor but in contiguous memory.
+      //
+      // aten::detach(Tensor self) -> Tensor
+      // Returns the tensor
       // clang-format on
 
       node->output()->replaceAllUsesWith(node->input(0));

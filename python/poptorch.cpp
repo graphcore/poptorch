@@ -22,6 +22,8 @@
 #include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/ShapeInference.hpp"
+#include "poptorch/TypeAndConstantCanonicalization.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -275,11 +277,22 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
 
     Optimizer optimizer = parseOptimizer(optimizerDict);
 
+    logging::trace("Lowered graph:\n{}", *graph);
+
+    torch::jit::EliminateDeadCode(graph);
+    torch::jit::PeepholeOptimize(graph);
+    torch::jit::EliminateDeadCode(graph);
+
     torch::jit::EliminateDeadCode(graph);
     torch::jit::PeepholeOptimize(graph);
     torch::jit::EliminateDeadCode(graph);
 
     torch::jit::RemoveInplaceOps(graph);
+
+    logging::trace("Graph right before casting unsupported inputs:\n{}",
+                   *graph);
+    poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
+        graph.get());
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
 
@@ -361,6 +374,11 @@ compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
     }
 
     torch::jit::RemoveInplaceOps(graph);
+
+    logging::trace("Graph right before casting unsupported inputs:\n{}",
+                   *graph);
+    poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
+        graph.get());
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
 

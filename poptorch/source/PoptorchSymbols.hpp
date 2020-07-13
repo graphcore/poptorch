@@ -35,6 +35,12 @@ namespace symbols {
 SYMBOL_DECL(poptorch, begin_ipu_block)
 SYMBOL_DECL(poptorch, end_ipu_block)
 SYMBOL_DECL(poptorch, identity_loss)
+
+// Casting is done before passing the input to the IPU: the op is used so that
+// so that that input types match those received from pytorch but that the input
+// types to later ops have the correct type.
+SYMBOL_DECL(poptorch, host_side_cast)
+
 #undef OP_DECL
 #undef SYMBOL_DECL
 } // namespace symbols
