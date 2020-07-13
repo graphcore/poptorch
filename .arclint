@@ -42,7 +42,7 @@
             "(\\.inc.hpp$)",
             "(^docs/.*)"
           ],
-          "script-and-regex.script": "sh -c '{ .linters/clang-tidy --fix $0 -- -I.linters/include/ -I.linters/clang_include/ -Ipopart_compiler/include -Ipoptorch/shared/include -Ipoptorch/include -Ipoptorch_logging/include -I../spdlog/spdlog/include/ -DONNX_NAMESPACE=onnx -I.linters/torch/include -I../popart/popart/willow/include/ -I.linters/poplar_includes/ `cat .linters/python_includes` -std=c++17; } || true'",
+          "script-and-regex.script": "sh -c '{ .linters/clang-tidy $0 --fix  -- -I.linters/include/ -I.linters/clang_include/ -Ipopart_compiler/include -Ipoptorch/shared/include -Ipoptorch/include -Ipoptorch_logging/include -I../spdlog/spdlog/include/ -DONNX_NAMESPACE=onnx -I.linters/torch/include -I../popart/popart/willow/include/ -I.linters/poplar_includes/ `cat .linters/python_includes` -std=c++17 -fsized-deallocation; } || true'",
           "script-and-regex.regex": "/^(?P<file>[^ :]*):(?P<line>[^:]+):(?P<char>[^:]+): (?P<severity>[^:]+): (?P<message>.*)\\[(?P<name>.+)\\]$/m"
         },
         "copyright":{

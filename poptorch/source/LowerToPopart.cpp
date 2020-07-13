@@ -8,7 +8,7 @@
 #include <random>
 #include <utility>
 
-#include "PoptorchSymbols.h"
+#include "PoptorchSymbols.hpp"
 #include "popart_compiler/Compiler.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -478,7 +478,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
      return _compiler.function(inputs Args);                                   \
    }},
 
-#include "popart_compiler/SupportedOperations.inc.h"
+#include "popart_compiler/SupportedOperations.inc.hpp"
 
 #undef BODY_ARG
 #undef OP_DECL

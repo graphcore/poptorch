@@ -126,7 +126,7 @@ public:
   poptorch::TensorId function(                                                 \
       const std::vector<poptorch::TensorId> &inputs Args);
 
-#include "SupportedOperations.inc.h"
+#include "SupportedOperations.inc.hpp"
 
 #undef BODY_ARG
 #undef OP_DECL

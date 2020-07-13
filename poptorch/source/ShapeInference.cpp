@@ -4,7 +4,7 @@
 #include <poptorch/ShapeInference.hpp>
 #include <poptorch_logging/Logging.hpp>
 
-#include "PoptorchSymbols.h"
+#include "PoptorchSymbols.hpp"
 
 namespace poptorch {
 

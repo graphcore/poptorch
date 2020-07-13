@@ -31,7 +31,7 @@ namespace symbols {
 #define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
   SYMBOL_DECL(Namespace, FuncName)
 
-#include "popart_compiler/SupportedOperations.inc.h"
+#include "popart_compiler/SupportedOperations.inc.hpp"
 SYMBOL_DECL(poptorch, begin_ipu_block)
 SYMBOL_DECL(poptorch, end_ipu_block)
 SYMBOL_DECL(poptorch, identity_loss)

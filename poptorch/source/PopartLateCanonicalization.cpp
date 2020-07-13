@@ -1,16 +1,13 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-/*
- * No lint due to the linter expecting PopartLateCanonicalization.hpp which
- * rightly doesn't exist.
- */
-#include <functional> // NOLINT
+#include <torch/csrc/jit/ir/ir.h>
 
-#include <poptorch/OpBuilder.hpp>              // NOLINT
-#include <poptorch/PopartCanonicalization.hpp> // NOLINT
-#include <torch/csrc/jit/ir/ir.h>              // NOLINT
+#include <functional>
 
-#include "PoptorchSymbols.h"
+#include <poptorch/OpBuilder.hpp>
+#include <poptorch/PopartCanonicalization.hpp>
+
+#include "PoptorchSymbols.hpp"
 
 namespace poptorch {
 

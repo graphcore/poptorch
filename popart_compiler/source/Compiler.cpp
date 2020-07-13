@@ -586,7 +586,7 @@ static bool IsLoss(const std::string &operation) {
     return HandleOutput<decltype(output)>{}(output, isLoss, _impl.get());      \
   }
 
-#include "popart_compiler/SupportedOperations.inc.h"
+#include "popart_compiler/SupportedOperations.inc.hpp"
 #undef BODY_ARG
 #undef OP_DECL
 #undef ARG
