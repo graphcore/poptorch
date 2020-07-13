@@ -278,7 +278,7 @@ for opset in classes:
 
         header += "create" + funcName + "(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args"
 
-        cppFile = " torch::jit::Node *new_node = graph->create(symbols::popart::" + name + ", args"
+        cppFile = " torch::jit::Node *new_node = createAndInsertNode(graph,symbols::popart::" + name + ", args"
         if name in MultipleOutputsOps:
             cppFile += ", %s" % MultipleOutputsOps[name]
         cppFile += ");\n"
@@ -296,7 +296,6 @@ for opset in classes:
             cppFile += "new_node->" + attr + "_(c10::Symbol::fromQualString(\"attr::" + arg[
                 "name"] + "\")," + arg["name"] + ");\n"
 
-        cppFile += "graph->insertNode(new_node);\n"
         cppFile += "return new_node;\n"
 
         cppFile = header + ") {\n" + cppFile + "}"

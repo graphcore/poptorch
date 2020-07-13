@@ -991,10 +991,9 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       // This could maybe be improved. Can we add attributes on the frontend?
       // TODO(tbd)
-      new_node = graph->create(
-          c10::Symbol::fromQualString("poptorch::begin_ipu_block"), {},
+      new_node = createAndInsertNode(
+          graph, c10::Symbol::fromQualString("poptorch::begin_ipu_block"), {},
           node->outputs().size());
-      graph->insertNode(new_node);
 
       // Convert the prim::Constant into an attribute.
       std::int64_t ipu_id =
@@ -1365,8 +1364,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
         index += slice_size;
       }
 
-      new_node = graph->create(at::prim::ListConstruct, slices);
-      graph->insertNode(new_node);
+      new_node = createAndInsertNode(graph, at::prim::ListConstruct, slices);
     } else if (kind == c10::aten::masked_fill) {
       // clang-format off
       // Derived from documentation

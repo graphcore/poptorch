@@ -4,42 +4,50 @@
 #include <poptorch_logging/Error.hpp>
 namespace poptorch {
 
+torch::jit::Node *
+createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
+                    torch::jit::ArrayRef<torch::jit::Value *> inputs,
+                    size_t num_outputs) {
+  torch::jit::Node *new_node = graph->create(kind, inputs, num_outputs);
+  graph->insertNode(new_node);
+  return new_node;
+}
+
 /*
  * Manually added operation.
  */
 torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape) {
   torch::jit::Node *new_node =
-      graph->create(symbols::popart::reshape_static_shape, {A});
+      createAndInsertNode(graph, symbols::popart::reshape_static_shape, {A});
   new_node->is_(c10::attr::shape, new_shape);
-  graph->insertNode(new_node);
   return new_node;
 }
 
 torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
                                     const std::vector<int64_t> &data,
                                     const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *new_node = graph->create(symbols::poptorch::int_constant);
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::int_constant);
   new_node->is_(c10::attr::data, data);
   new_node->is_(c10::attr::shape, new_shape);
-  graph->insertNode(new_node);
   return new_node;
 }
 
 torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
                                       const std::vector<double> &data,
                                       const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *new_node = graph->create(symbols::poptorch::float_constant);
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::float_constant);
   new_node->fs_(c10::attr::data, data);
   new_node->is_(c10::attr::shape, new_shape);
-  graph->insertNode(new_node);
   return new_node;
 }
 
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
                              c10::ScalarType scalar) {
-  torch::jit::Node *new_node = graph->create(symbols::poptorch::cast, {A});
-  graph->insertNode(new_node);
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::cast, {A});
 
   std::string new_type;
 
@@ -110,8 +118,7 @@ torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
                                     const std::vector<int64_t> &pad_shape,
                                     float constant) {
   torch::jit::Node *new_node =
-      graph->create(symbols::poptorch::constant_pad, {A});
-  graph->insertNode(new_node);
+      createAndInsertNode(graph, symbols::poptorch::constant_pad, {A});
   new_node->is_(c10::Symbol::fromQualString("attr::pads"),
                 convertPytorchPads(pad_shape));
   new_node->f_(c10::Symbol::fromQualString("attr::value"), constant);
@@ -120,8 +127,8 @@ torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
 
 torch::jit::Node *createEdgePad(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &pad_shape) {
-  torch::jit::Node *new_node = graph->create(symbols::poptorch::edge_pad, {A});
-  graph->insertNode(new_node);
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::edge_pad, {A});
   new_node->is_(c10::Symbol::fromQualString("attr::pads"),
                 convertPytorchPads(pad_shape));
   return new_node;
@@ -131,8 +138,7 @@ torch::jit::Node *createReflectionPad(torch::jit::Graph *graph,
                                       torch::jit::Value *A,
                                       const std::vector<int64_t> &pad_shape) {
   torch::jit::Node *new_node =
-      graph->create(symbols::poptorch::reflection_pad, {A});
-  graph->insertNode(new_node);
+      createAndInsertNode(graph, symbols::poptorch::reflection_pad, {A});
   new_node->is_(c10::Symbol::fromQualString("attr::pads"),
                 convertPytorchPads(pad_shape));
 
@@ -143,8 +149,7 @@ torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,
                                       torch::jit::Value *A,
                                       torch::jit::Value *B) {
   torch::jit::Node *new_node =
-      graph->create(symbols::poptorch::add_not_in_place, {A, B});
-  graph->insertNode(new_node);
+      createAndInsertNode(graph, symbols::poptorch::add_not_in_place, {A, B});
   return new_node;
 }
 

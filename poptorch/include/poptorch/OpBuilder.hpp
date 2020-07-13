@@ -8,6 +8,11 @@
 
 namespace poptorch {
 
+torch::jit::Node *
+createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
+                    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
+                    size_t num_outputs = 1);
+
 // Manually added.
 torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape);
