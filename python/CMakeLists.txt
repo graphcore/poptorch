@@ -10,6 +10,8 @@ set(POPTORCH_CORE_SOURCES
   "poptorch.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/LowerToPopart.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/OpBuilder.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/PopartCanonicalizationUtils.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ReshapeOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CanonicalizeLists.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartLateCanonicalization.cpp"
