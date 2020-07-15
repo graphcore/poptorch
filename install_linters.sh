@@ -88,6 +88,7 @@ ln -fs ${VE}/bin/yapf ${DIR}/.linters/yapf
 ln -fs ${VE}/bin/cpplint ${DIR}/.linters/cpplint
 ln -fs $torch_path .linters/torch
 ln -fs ${POPLAR_PATH}/include .linters/poplar_includes
+nproc > .linters/num_threads
 python3-config --includes > .linters/python_includes
 
 echo "All linters have been successfully installed"
