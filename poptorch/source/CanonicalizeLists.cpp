@@ -1,14 +1,13 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-/*
- * No lint due to the linter expecting PopartLateCanonicalization.hpp which
- * rightly doesn't exist.
- */
-#include <functional> // NOLINT
+#include <torch/csrc/jit/ir/ir.h>
 
-#include <poptorch/OpBuilder.hpp>              // NOLINT
-#include <poptorch/PopartCanonicalization.hpp> // NOLINT
-#include <torch/csrc/jit/ir/ir.h>              // NOLINT
+#include <functional>
+
+#include "poptorch_logging/Error.hpp"
+#include <poptorch/OpBuilder.hpp>
+#include <poptorch/PopartCanonicalization.hpp>
+#include <poptorch/Utils.hpp>
 
 namespace poptorch {
 
@@ -17,6 +16,8 @@ void canonicalizeLists(torch::jit::Graph *graph) {
 
   // 1st pass. Looking for broadcasts.
   for (torch::jit::Node *node : graph->nodes()) {
+    logging::LogContext ctx("canonicalizeLists1 Processing " +
+                            nodeToString(node));
     const torch::jit::Symbol kind = node->kind();
     const std::string kind_as_str = kind.toDisplayString();
 
@@ -34,6 +35,8 @@ void canonicalizeLists(torch::jit::Graph *graph) {
 
   // 2nd pass. Hitting the actual loops.
   for (torch::jit::Node *list : graph->nodes()) {
+    logging::LogContext ctx("canonicalizeLists2 Processing " +
+                            nodeToString(list));
     const torch::jit::Symbol kind = list->kind();
     const std::string kind_as_str = kind.toDisplayString();
 

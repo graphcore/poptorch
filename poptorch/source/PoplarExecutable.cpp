@@ -8,7 +8,7 @@
 #include "torch/csrc/DynamicTypes.h"
 
 #include "poptorch/PoplarExecutable.hpp"
-#include "poptorch/ToString.hpp"
+#include "poptorch/Utils.hpp"
 
 #include <poptorch_logging/Error.hpp>
 #include <poptorch_logging/Logging.hpp>
@@ -34,9 +34,9 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
                    popart_dims.begin(), [](std::int64_t j) { return j; });
 
     // Handle input based on the PyTorch input type
-    at::ScalarType elemType = pytorch_tensor.scalar_type();
+    at::ScalarType elem_type = pytorch_tensor.scalar_type();
 
-    switch (elemType) {
+    switch (elem_type) {
     case at::ScalarType::Float:
       _compiler.setUpInputOp(popart_id,
                              static_cast<float *>(pytorch_tensor.data_ptr()),
@@ -72,7 +72,8 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
           popart_dims);
       break;
     default:
-      ERROR("Unsupported input type torch." << torch::getDtype(elemType)->name);
+      ERROR("Unsupported input type torch."
+            << torch::getDtype(elem_type)->name);
     }
   }
 
@@ -104,9 +105,6 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
       _compiler.setUpOutputOp(popart_id, static_cast<float *>(data_ptr), dims);
       break;
     case at::ScalarType::Half:
-      _compiler.setUpOutputOp(popart_id, static_cast<std::int16_t *>(data_ptr),
-                              dims);
-      break;
     case at::ScalarType::Short:
       _compiler.setUpOutputOp(popart_id, static_cast<std::int16_t *>(data_ptr),
                               dims);

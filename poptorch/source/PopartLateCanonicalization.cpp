@@ -4,10 +4,11 @@
 
 #include <functional>
 
+#include "PoptorchSymbols.hpp"
+#include "poptorch_logging/Error.hpp"
 #include <poptorch/OpBuilder.hpp>
 #include <poptorch/PopartCanonicalization.hpp>
-
-#include "PoptorchSymbols.hpp"
+#include <poptorch/Utils.hpp>
 
 namespace poptorch {
 
@@ -23,6 +24,8 @@ void canonicalizeLate(torch::jit::Graph *graph) {
 
   // Look for the nodes.
   for (torch::jit::Node *node : graph->nodes()) {
+    logging::LogContext ctx("canonicalizeLate Processing " +
+                            nodeToString(node));
     const torch::jit::Symbol kind = node->kind();
 
     if (kind == symbols::popart::slice) {

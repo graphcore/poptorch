@@ -3,7 +3,7 @@
 #include "poptorch_logging/Error.hpp"
 
 #include "poptorch/OpBuilder.hpp"
-#include "poptorch/ToString.hpp"
+#include "poptorch/Utils.hpp"
 
 #include "PoptorchSymbols.hpp"
 

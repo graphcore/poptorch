@@ -17,6 +17,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Peephole.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/EliminateListConstructs.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/Utils.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/WarnOnUnsupportedAten.cpp"
   )
 

@@ -162,75 +162,78 @@ void copyWeightsToDeviceImpl(
 std::vector<pybind11::object>
 execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
         const pybind11::tuple &inputs, py::dict *optimizerDict) {
-  // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
+  try {
+    // Create a jit stack from the incoming pytorch tensors.
+    torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
 
-  // And turn convert them into at tensors which we can then resolve the
-  // address of.
-  std::vector<at::Tensor> input_tensors;
-  for (const torch::jit::IValue &value : input_stack) {
-    buildTensorList(value, &input_tensors);
-  }
-
-  Optimizer optimizer{{}};
-
-  if (optimizerDict) {
-    optimizer = parseOptimizer(*optimizerDict);
-  }
-
-  std::vector<at::IValue> output_tensors =
-      executable->run(&input_tensors, optimizer);
-
-  std::vector<pybind11::object> returnee;
-
-  // Reshape the output tensors in the structure expected by the user
-  auto tensor_it = output_tensors.begin();
-  auto &output_types = executable->outputTypes();
-  auto type_it = output_types.begin();
-  ERROR_ON(type_it == output_types.end());
-  std::uint64_t num_outputs = type_it->num_elements;
-  std::function<pybind11::object()> process_output;
-  process_output = [&]() -> pybind11::object {
-    ERROR_ON_MSG(type_it == output_types.end(), "Invalid OutputTypes object");
-    switch (type_it->type) {
-    case OutputType::Type::Tensor: {
-      ERROR_ON_MSG(tensor_it == output_tensors.end(),
-                   "Not enough tensors to unpack");
-      auto object = torch::jit::toPyObject(*tensor_it);
-      tensor_it++;
-      return object;
+    // And turn convert them into at tensors which we can then resolve the
+    // address of.
+    std::vector<at::Tensor> input_tensors;
+    for (const torch::jit::IValue &value : input_stack) {
+      buildTensorList(value, &input_tensors);
     }
-    case OutputType::Type::Tuple: {
-      std::int64_t num_elements = type_it->num_elements;
-      pybind11::tuple pytuple(num_elements);
-      for (std::int64_t i = 0; i < num_elements; ++i) {
-        type_it++;
-        pytuple[i] = process_output();
+
+    Optimizer optimizer{{}};
+
+    if (optimizerDict) {
+      optimizer = parseOptimizer(*optimizerDict);
+    }
+
+    std::vector<at::IValue> output_tensors =
+        executable->run(&input_tensors, optimizer);
+
+    std::vector<pybind11::object> returnee;
+
+    // Reshape the output tensors in the structure expected by the user
+    auto tensor_it = output_tensors.begin();
+    auto &output_types = executable->outputTypes();
+    auto type_it = output_types.begin();
+    ERROR_ON(type_it == output_types.end());
+    std::uint64_t num_outputs = type_it->num_elements;
+    std::function<pybind11::object()> process_output;
+    process_output = [&]() -> pybind11::object {
+      ERROR_ON_MSG(type_it == output_types.end(), "Invalid OutputTypes object");
+      switch (type_it->type) {
+      case OutputType::Type::Tensor: {
+        ERROR_ON_MSG(tensor_it == output_tensors.end(),
+                     "Not enough tensors to unpack");
+        auto object = torch::jit::toPyObject(*tensor_it);
+        tensor_it++;
+        return object;
       }
-      return std::move(pytuple);
-    }
-    case OutputType::Type::List: {
-      std::int64_t num_elements = type_it->num_elements;
-      pybind11::list pylist(num_elements);
-      for (std::int64_t i = 0; i < num_elements; ++i) {
-        type_it++;
-        pylist[i] = process_output();
+      case OutputType::Type::Tuple: {
+        std::int64_t num_elements = type_it->num_elements;
+        pybind11::tuple pytuple(num_elements);
+        for (std::int64_t i = 0; i < num_elements; ++i) {
+          type_it++;
+          pytuple[i] = process_output();
+        }
+        return std::move(pytuple);
       }
-      return std::move(pylist);
-    }
-    default:
-      ERROR("Unsupported OutputType");
-    }
-  };
+      case OutputType::Type::List: {
+        std::int64_t num_elements = type_it->num_elements;
+        pybind11::list pylist(num_elements);
+        for (std::int64_t i = 0; i < num_elements; ++i) {
+          type_it++;
+          pylist[i] = process_output();
+        }
+        return std::move(pylist);
+      }
+      default:
+        ERROR("Unsupported OutputType");
+      }
+    };
 
-  for (std::uint64_t i = 0; i < num_outputs; ++i) {
-    type_it++;
-    returnee.push_back(process_output());
+    for (std::uint64_t i = 0; i < num_outputs; ++i) {
+      type_it++;
+      returnee.push_back(process_output());
+    }
+    ERROR_ON_MSG(tensor_it != output_tensors.end(),
+                 "Not all the output tensors were unpacked");
+
+    return returnee;
   }
-  ERROR_ON_MSG(tensor_it != output_tensors.end(),
-               "Not all the output tensors were unpacked");
-
-  return returnee;
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 torch::jit::script::Module *asModule(py::handle h) {
@@ -262,148 +265,167 @@ std::shared_ptr<poptorch::PoplarExecutable>
 compileWithTrace(py::handle h, const pybind11::tuple &inputs,
                  const pybind11::dict &options, bool training,
                  const py::dict &optimizerDict) {
-  auto module = asModule(h);
+  try {
+    auto module = asModule(h);
 
-  auto forward = module->get_method("forward");
-  auto graph_and_tensors =
-      torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
-  auto graph = graph_and_tensors.first;
+    auto forward = module->get_method("forward");
+    auto graph_and_tensors =
+        torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
+    auto graph = graph_and_tensors.first;
 
-  Optimizer optimizer = parseOptimizer(optimizerDict);
+    Optimizer optimizer = parseOptimizer(optimizerDict);
 
-  torch::jit::EliminateDeadCode(graph);
-  torch::jit::PeepholeOptimize(graph);
-  torch::jit::EliminateDeadCode(graph);
+    torch::jit::EliminateDeadCode(graph);
+    torch::jit::PeepholeOptimize(graph);
+    torch::jit::EliminateDeadCode(graph);
 
-  torch::jit::RemoveInplaceOps(graph);
+    torch::jit::RemoveInplaceOps(graph);
 
-  logging::debug("Graph right before canonicalization:\n{}", *graph);
+    logging::debug("Graph right before canonicalization:\n{}", *graph);
 
-  poptorch::canonicalizeLists(graph.get());
+    poptorch::canonicalizeLists(graph.get());
 
-  // Convert any unsupported ATEN nodes in the graph to a popart
-  // representation.
-  poptorch::canonicalize(graph.get());
+    // Convert any unsupported ATEN nodes in the graph to a popart
+    // representation.
+    poptorch::canonicalize(graph.get());
 
-  // Enforce any constraints that aren't enforced by popart.
-  poptorch::canonicalizeLate(graph.get());
+    // Enforce any constraints that aren't enforced by popart.
+    poptorch::canonicalizeLate(graph.get());
 
-  // Warn the user if any operations couldn't be canonicalised.
-  poptorch::warnOnUnsupportedAten(graph.get());
+    // Warn the user if any operations couldn't be canonicalised.
+    poptorch::warnOnUnsupportedAten(graph.get());
 
-  // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
+    // Create a jit stack from the incoming pytorch tensors.
+    torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
 
-  // And turn convert them into at tensors which we can then resolve the
-  // address of.
-  std::vector<at::Tensor> input_tensors;
-  for (const torch::jit::IValue &value : input_stack) {
-    buildTensorList(value, &input_tensors);
-  }
-
-  // Find the parameter data from.
-  std::vector<at::Tensor> parameter_data;
-  for (const at::Tensor &param : graph_and_tensors.second) {
-    if (!param.is_contiguous()) {
-      logging::debug("Tensor is NOT continguous!");
+    // And turn convert them into at tensors which we can then resolve the
+    // address of.
+    std::vector<at::Tensor> input_tensors;
+    for (const torch::jit::IValue &value : input_stack) {
+      buildTensorList(value, &input_tensors);
     }
 
-    parameter_data.push_back(param);
+    // Find the parameter data from.
+    std::vector<at::Tensor> parameter_data;
+    for (const at::Tensor &param : graph_and_tensors.second) {
+      if (!param.is_contiguous()) {
+        logging::debug("Tensor is NOT continguous!");
+      }
+
+      parameter_data.push_back(param);
+    }
+
+    logging::debug("Graph right before popart:\n{}", *graph);
+
+    return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
+                                   training, optimizer,
+                                   parseSessionOptions(options));
   }
-
-  logging::debug("Graph right before popart:\n{}", *graph);
-
-  return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
-                                 training, optimizer,
-                                 parseSessionOptions(options));
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
 compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
                   const pybind11::dict &options, bool training) {
-  auto module = asModule(h);
-  auto arg_graph = asGraph(g);
+  try {
+    auto module = asModule(h);
+    auto arg_graph = asGraph(g);
 
-  torch::jit::Inline(*arg_graph);
-  constantPropagation(arg_graph);
-  peepholeOptimizations(arg_graph, training);
+    torch::jit::Inline(*arg_graph);
+    constantPropagation(arg_graph);
+    peepholeOptimizations(arg_graph, training);
 
-  auto graph_and_tensors =
-      torch::jit::LowerGraph(*arg_graph, module->_ivalue());
-  auto graph = graph_and_tensors.first;
-  graph->dump();
+    auto graph_and_tensors =
+        torch::jit::LowerGraph(*arg_graph, module->_ivalue());
+    auto graph = graph_and_tensors.first;
+    graph->dump();
 
-  int loop_count = 0;
-  std::string graph_string;
-  while (true) {
-    propagateInputShapes(graph.get());
-    torch::jit::PeepholeOptimize(graph, true);
-    torch::jit::ConstantPropagation(graph);
-    torch::jit::EliminateDeadCode(graph);
-    peepholeOptimizations(graph.get(), training);
+    int loop_count = 0;
+    std::string graph_string;
+    while (true) {
+      propagateInputShapes(graph.get());
+      torch::jit::PeepholeOptimize(graph, true);
+      torch::jit::ConstantPropagation(graph);
+      torch::jit::EliminateDeadCode(graph);
+      peepholeOptimizations(graph.get(), training);
 
-    std::string post_passes_graph = graph->toString(false);
-    if (graph_string == post_passes_graph) {
-      std::cout << "Breaking from const folding after " << loop_count
-                << " iterations.\n";
-      break;
+      std::string post_passes_graph = graph->toString(false);
+      if (graph_string == post_passes_graph) {
+        std::cout << "Breaking from const folding after " << loop_count
+                  << " iterations.\n";
+        break;
+      }
+      graph_string = std::move(post_passes_graph);
+
+      loop_count++;
     }
-    graph_string = std::move(post_passes_graph);
 
-    loop_count++;
+    torch::jit::RemoveInplaceOps(graph);
+
+    logging::debug("Graph right before canonicalization:\n{}", *graph);
+
+    // Convert any unsupported ATEN nodes in the graph to a popart
+    // representation.
+    poptorch::canonicalize(graph.get());
+
+    // Clean up the module as we will likely have stopped using lots of
+    // constants.
+
+    // Create a jit stack from the incoming pytorch tensors.
+    torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
+
+    // And turn convert them into at tensors which we can then resolve the
+    // address of.
+    std::vector<at::Tensor> input_tensors;
+    for (const torch::jit::IValue &value : input_stack) {
+      input_tensors.push_back(value.toTensor());
+    }
+
+    // Find the parameter data from.
+    std::vector<at::Tensor> parameter_data = graph_and_tensors.second;
+    std::cout << "There should be " << parameter_data.size()
+              << " parameters.\n";
+
+    logging::debug("Graph right before popart:\n{}", *graph);
+
+    Optimizer optimizer{{}};
+    return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
+                                   training, optimizer,
+                                   parseSessionOptions(options));
   }
-
-  torch::jit::RemoveInplaceOps(graph);
-
-  logging::debug("Graph right before canonicalization:\n{}", *graph);
-
-  // Convert any unsupported ATEN nodes in the graph to a popart
-  // representation.
-  poptorch::canonicalize(graph.get());
-
-  // Clean up the module as we will likely have stopped using lots of
-  // constants.
-
-  // Create a jit stack from the incoming pytorch tensors.
-  torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
-
-  // And turn convert them into at tensors which we can then resolve the
-  // address of.
-  std::vector<at::Tensor> input_tensors;
-  for (const torch::jit::IValue &value : input_stack) {
-    input_tensors.push_back(value.toTensor());
-  }
-
-  // Find the parameter data from.
-  std::vector<at::Tensor> parameter_data = graph_and_tensors.second;
-  std::cout << "There should be " << parameter_data.size() << " parameters.\n";
-
-  logging::debug("Graph right before popart:\n{}", *graph);
-
-  Optimizer optimizer{{}};
-  return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
-                                 training, optimizer,
-                                 parseSessionOptions(options));
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void pyPropagateInputShapes(py::handle h) {
-  auto graph = asGraph(h);
-  propagateInputShapes(graph);
+  try {
+    auto graph = asGraph(h);
+    propagateInputShapes(graph);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void pyPeepholeOptimizations(py::handle h, bool training) {
-  auto graph = asGraph(h);
-  peepholeOptimizations(graph, training);
+  try {
+    auto graph = asGraph(h);
+    peepholeOptimizations(graph, training);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void pyEliminateListConstructs(py::handle h) {
-  auto graph = asGraph(h);
-  eliminateListConstructs(graph);
+  try {
+    auto graph = asGraph(h);
+    eliminateListConstructs(graph);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void pyCanonicalize(py::handle h) {
-  auto graph = asGraph(h);
-  canonicalize(graph);
+  try {
+    auto graph = asGraph(h);
+    canonicalize(graph);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 } // namespace poptorch

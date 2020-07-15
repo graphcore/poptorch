@@ -1,6 +1,8 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include "poptorch_logging/Error.hpp"
 #include <poptorch/Peephole.hpp>
+
+#include <poptorch/Utils.hpp>
+#include <poptorch_logging/Error.hpp>
 
 namespace poptorch {
 
@@ -61,6 +63,8 @@ private:
 
   void run(torch::jit::Block *block) {
     for (auto node : block->nodes()) {
+      logging::LogContext ctx("PeepholeOptimizer Processing " +
+                              nodeToString(node));
       for (auto b : node->blocks()) {
         run(b);
       }

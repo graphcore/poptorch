@@ -4,7 +4,9 @@
 
 #include <poptorch_logging/Logging.hpp>
 
+#include "poptorch_logging/Error.hpp"
 #include <poptorch/EliminateListConstructs.hpp>
+#include <poptorch/Utils.hpp>
 
 namespace poptorch {
 
@@ -182,6 +184,8 @@ void eliminateListConstructs(torch::jit::Block *block) {
   std::vector<torch::jit::Node *> to_delete;
 
   for (auto node : block->nodes()) {
+    logging::LogContext ctx("eliminateListConstructs Processing " +
+                            nodeToString(node));
     if (node->kind() == c10::prim::ListConstruct) {
       if (tryCreateConstantNode(node)) {
         to_delete.push_back(node);

@@ -40,7 +40,7 @@ LoggingContext &context() {
 }
 
 Level logLevelFromString(const std::string &level) {
-  if (level == "TRACE") {
+  if (level == "TRACE" || level == "TRACE_ALL") {
     return Level::Trace;
   }
   if (level == "DEBUG") {
@@ -59,10 +59,10 @@ Level logLevelFromString(const std::string &level) {
     return Level::Off;
   }
 
-  throw std::runtime_error(
-      fmt::format("Unknown POPTORCH_LOG_LEVEL '{}'. Valid values are TRACE, "
-                  "DEBUG, INFO, WARN, ERR and OFF.",
-                  level));
+  throw std::runtime_error(fmt::format(
+      "Unknown POPTORCH_LOG_LEVEL '{}'. Valid values are TRACE_ALL, TRACE, "
+      "DEBUG, INFO, WARN, ERR and OFF.",
+      level));
 }
 
 template <typename Mutex>

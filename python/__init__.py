@@ -18,7 +18,7 @@ ipu_print_tensor = torch.ops.poptorch.ipu_print_tensor
 
 # Create a poptorch logger which outputs to the console INFO messages and above
 logger = logging.getLogger("poptorch")
-if os.environ.get("POPTORCH_LOG_LEVEL") in ["DEBUG", "TRACE"]:
+if os.environ.get("POPTORCH_LOG_LEVEL") in ["DEBUG", "TRACE", "TRACE_ALL"]:
     logger.setLevel(logging.DEBUG)
 else:
     logger.setLevel(logging.INFO)

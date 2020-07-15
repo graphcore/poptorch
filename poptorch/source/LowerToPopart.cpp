@@ -1,4 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "poptorch/LowerToPopart.hpp"
+
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
@@ -6,18 +8,13 @@
 #include <random>
 #include <utility>
 
-#include "torch/csrc/jit/ir/ir.h"
-
+#include "PoptorchSymbols.hpp"
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/PopartEnums.hpp"
 
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
-
-#include "poptorch/LowerToPopart.hpp"
-#include "poptorch/ToString.hpp"
-
-#include "PoptorchSymbols.hpp"
 
 namespace poptorch {
 
@@ -136,11 +133,14 @@ private:
 std::string typeToPopartStr(at::ScalarType type) {
   if (type == at::ScalarType::Float || type == at::ScalarType::Double) {
     return "FLOAT";
-  } else if (type == at::ScalarType::Half) {
+  }
+  if (type == at::ScalarType::Half) {
     return "FLOAT16";
-  } else if (type == at::ScalarType::Int || type == at::ScalarType::Long) {
+  }
+  if (type == at::ScalarType::Int || type == at::ScalarType::Long) {
     return "INT32";
-  } else if (type == at::ScalarType::Bool) {
+  }
+  if (type == at::ScalarType::Bool) {
     return "BOOL";
   }
 
@@ -205,14 +205,14 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizer);
 
-  std::vector<at::ScalarType> dataTypes;
+  std::vector<at::ScalarType> data_types;
   for (auto id : _outputTensorHooks) {
-    dataTypes.emplace_back(fromPopartType(_compiler.getPopartType(id)));
+    data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
   }
 
   return std::make_shared<poptorch::PoplarExecutable>(
       std::move(_compiler), std::move(_inputTensorHooks),
-      std::move(_outputTensorHooks), std::move(dataTypes));
+      std::move(_outputTensorHooks), std::move(data_types));
 }
 
 void LowerToPopart::lower() {
@@ -281,6 +281,8 @@ void LowerToPopart::lowerReturn() {
 // Lower the main body of the _graph.
 void LowerToPopart::lowerBody() {
   for (torch::jit::Node *node : _graph.nodes()) {
+    logging::LogContext ctx("LowerToPopart::lowerBody Processing " +
+                            nodeToString(node));
     // Switch/lookup based on the actual int value.
     const c10::Symbol kind = node->kind();
 
