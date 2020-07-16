@@ -36,6 +36,24 @@ template <typename T>
 std::vector<T> handleListConstruct(torch::jit::Node *node);
 
 template <typename T> std::optional<T> handleConstant(torch::jit::Node *node);
+
+// Some operations take in an optional tensor. A "none" constant is passed in to
+// mark a tensor which is not there.
+bool isNone(torch::jit::Node *node);
+
+std::int64_t handleDimensionParam(torch::jit::Node *node, int index);
+
+// Turn a prim::Constant scalar input into a popart graph level scalar constant.
+torch::jit::Node *createIRConstant(torch::jit::Graph *graph,
+                                   torch::jit::Value *value);
+
+// Do not cast the operand.
+torch::jit::Value *handleParamOrConstantNoCast(torch::jit::Graph *graph,
+                                               torch::jit::Value *operand);
+
+// Both pytorch and popart represent reduce as an enum but with different
+// values.
+std::int32_t convertReduceToPopart(std::int32_t pytorchReduce);
 } // namespace poptorch
 
 #endif // SOURCE_POPART_CANONICALIZATION_UTILS_H

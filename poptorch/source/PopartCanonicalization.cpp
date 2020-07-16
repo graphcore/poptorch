@@ -20,37 +20,6 @@ namespace poptorch {
 
 namespace {
 
-// Some operations take in an optional tensor. A "none" constant is passed in to
-// mark a tensor which is not there.
-bool isNone(torch::jit::Node *node) {
-  if (node->kind() != c10::prim::Constant) {
-    return false;
-  }
-
-  auto sym = c10::attr::value;
-  return !node->hasAttribute(sym);
-}
-
-// Return true if we know how to fold a given compile time constant operation.
-// Return true if we know how to fold a given compile time constant operation.
-bool canBeConstFolded(torch::jit::Node *node) {
-  return node->kind() == c10::aten::size;
-}
-
-// Convert that IR type into a C++ vector of ints.
-std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
-  // Extract the type from the pytorch IR.
-  c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-
-  // Convert that IR type into a C++ vector of ints.
-  std::vector<std::int64_t> shape;
-  for (auto optional_int : *dims.sizes()) {
-    shape.push_back(*optional_int);
-  }
-  return shape;
-}
-
 // An odd function which returns each tensor dimension as an array, a helper for
 // torch.max(tensor) and torch.min(tensor). I.E a 4D tensor will return (0, 1,
 // 2, 3).
@@ -103,28 +72,16 @@ private:
   static std::vector<torch::jit::Value *>
   handleTensorList(torch::jit::Node *node);
 
-  template <typename T> std::optional<T> handleConstant(torch::jit::Node *node);
-
   // Cast the operand to type T.
   template <typename T>
   torch::jit::Value *handleParamOrConstant(torch::jit::Graph *graph,
                                            torch::jit::Value *operand);
-
-  // Do not cast the operand.
-  torch::jit::Value *handleParamOrConstantNoCast(torch::jit::Graph *graph,
-                                                 torch::jit::Value *operand);
 
   // Just returns operand if it is a tensor otherwise adds it as a constant and
   // casts it to the right type.
   torch::jit::Value *handleParamOrConstantDeduceType(torch::jit::Graph *graph,
                                                      torch::jit::Value *operand,
                                                      torch::jit::Node *user);
-
-  // Turn a parameter constant into an IR constant.
-  torch::jit::Node *createIRConstant(torch::jit::Graph *graph,
-                                     torch::jit::Value *value);
-
-  std::int64_t handleDimensionParam(torch::jit::Node *node, int index);
 
   // Delete a node and also its users if they are also unused.
   void searchAndPossiblyDestroy(torch::jit::Node *node);
@@ -193,26 +150,6 @@ template <> struct Handle<std::vector<double>> {
   }
 };
 
-// Both pytorch and popart represent reduce as an enum but with different
-// values.
-std::int32_t convertReduceToPopart(std::int32_t pytorchReduce) {
-  // Popart:
-  // Sum = 0, Mean =1, NoReduction = 2
-  // Pytorch
-  // Sum = 2, Mean =1, NoReduction = 0
-  if (pytorchReduce == 0) {
-    return 2;
-  }
-  if (pytorchReduce == 1) {
-    return 1;
-  }
-  if (pytorchReduce == 2) {
-    return 0;
-  }
-
-  ERROR("Unsupported pytorch reduce");
-}
-
 /*
  * ConvertAtenToPopart implementation.
  */
@@ -228,32 +165,6 @@ template <typename T> T CanonicalizeImpl::foldConstant(torch::jit::Node *node) {
 
   // Get that requested index.
   return *dims[index];
-}
-
-template <typename T>
-std::optional<T> CanonicalizeImpl::handleConstant(torch::jit::Node *node) {
-  // Lists should be explicitly handled in handle list construct.
-  if (node->kind() == c10::prim::ListConstruct) {
-    return std::nullopt;
-  }
-
-  if (node->kind() != c10::prim::Constant && canBeConstFolded(node)) {
-    if (std::is_integral<T>::value) {
-      return foldConstant<T>(node);
-    }
-  }
-
-  if (node->kind() != c10::prim::Constant) {
-    return std::nullopt;
-  }
-
-  auto sym = c10::attr::value;
-
-  if (!node->hasAttribute(sym)) {
-    return std::nullopt;
-  }
-
-  return Handle<T>{}(sym, node);
 }
 
 torch::jit::Value *
@@ -285,19 +196,6 @@ CanonicalizeImpl::handleParamOrConstantDeduceType(torch::jit::Graph *graph,
     ERROR("Internal error: Tensor scalar type is unsupported");
   }
   }
-}
-
-torch::jit::Value *
-CanonicalizeImpl::handleParamOrConstantNoCast(torch::jit::Graph *graph,
-                                              torch::jit::Value *operand) {
-  torch::jit::Value *value_to_return = operand;
-  torch::jit::Node *constant = createIRConstant(graph, operand);
-
-  if (constant) {
-    value_to_return = constant->output();
-  }
-
-  return value_to_return;
 }
 
 template <typename T>
@@ -360,66 +258,6 @@ std::vector<T> CanonicalizeImpl::handleListConstruct(torch::jit::Node *node) {
   return result;
 }
 
-std::int64_t CanonicalizeImpl::handleDimensionParam(torch::jit::Node *node,
-                                                    int index) {
-  // Extract the dim.
-  std::int64_t dim = *handleConstant<std::int64_t>(node->input(index)->node());
-
-  // Get the tensor type. Deduce on the first parameter.
-  c10::TensorTypePtr as_tensor =
-      node->input(0)->type()->cast<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-
-  // If dim is less than zero subtract it to get the actual dimension.
-  if (dim < 0) {
-    dim = *dims.size() + dim;
-  }
-
-  // Return the dim.
-  return dim;
-}
-
-// Turn a prim::Constant scalar input into a popart graph level scalar constant.
-torch::jit::Node *CanonicalizeImpl::createIRConstant(torch::jit::Graph *graph,
-                                                     torch::jit::Value *value) {
-  // Get the scalar type of the result.
-  c10::FloatTypePtr as_float = value->type()->cast<c10::FloatType>();
-  c10::IntTypePtr as_int = value->type()->cast<c10::IntType>();
-  if (as_int) {
-    return createConstantInt(
-        graph, {*handleConstant<std::int64_t>(value->node())}, {1});
-  }
-  if (as_float) {
-    return createConstantFloat(graph, {*handleConstant<float>(value->node())},
-                               {1});
-  }
-
-  // If this is still a constant.
-  if (value->node()->kind() == c10::prim::Constant) {
-    // Scalar doubles and longs are tensors somehow.
-    c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
-
-    auto sizes = as_tensor->sizes();
-    auto type = as_tensor->scalarType();
-
-    if (sizes.size() && *sizes.size() == 0 && type) {
-      if (*type == at::kDouble) {
-        return createConstantFloat(
-            graph, {*handleConstant<float>(value->node())}, {1});
-      }
-      if (*type == at::kLong) {
-        return createConstantInt(
-            graph, {*handleConstant<std::int64_t>(value->node())}, {1});
-      }
-    }
-
-    ERROR("Internal error: Constant type is unsupported");
-  }
-
-  // Legal to return null means |value| was not a constant.
-  return nullptr;
-}
-
 void CanonicalizeImpl::searchAndPossiblyDestroy(torch::jit::Node *node) {
   // Skip parameters and nodes with any uses.
   if (node->kind() == c10::prim::Param || node->hasUses()) {
@@ -453,47 +291,6 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 
     if (SymbolHandler handler = getHandler(node)) {
       new_node = handler(graph, node);
-    } else if (kind == c10::aten::expand_as) {
-      // clang-format off
-      // aten::expand(Tensor self, int[] size, *, bool implicit) -> Tensor
-      // aten::expand_as(Tensor self, Tensor other) -> Tensor
-      // clang-format on
-
-      // Extract the type from the pytorch IR.
-      c10::TensorTypePtr self_tensor =
-          node->input(0)->type()->expect<c10::TensorType>();
-      c10::VaryingShape self_dims = self_tensor->sizes();
-
-      std::int64_t old_elem_count = 0;
-      for (auto optional_int : *self_dims.sizes()) {
-        old_elem_count += *optional_int;
-      }
-
-      // Extract the type from the pytorch IR.
-      c10::TensorTypePtr as_tensor =
-          node->input(1)->type()->expect<c10::TensorType>();
-      c10::VaryingShape dims = as_tensor->sizes();
-
-      // Convert that IR type into a C++ vector of ints.
-      std::vector<std::int64_t> new_shape;
-      std::int64_t new_elem_count = 0;
-
-      for (auto optional_int : *dims.sizes()) {
-        new_shape.push_back(*optional_int);
-        new_elem_count += *optional_int;
-      }
-
-      // Elements don't change so just a reshape.
-      if (new_elem_count == old_elem_count) {
-        new_node = createReshape(graph, node->input(0), new_shape);
-      } else {
-        new_node = createConstantInt(graph, new_shape,
-                                     {static_cast<int64_t>(new_shape.size())});
-
-        new_node = createCast(graph, new_node->output(), c10::kLong);
-
-        new_node = createExpand(graph, {node->input(0), new_node->output()});
-      }
     }
 
 // Handle a constant input.
@@ -579,102 +376,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 #undef ALPHA
 
     // NOLINTNEXTLINE
-    else if (kind == c10::aten::_convolution) {
-      // clang-format off
-      /*
-      aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[]
-      stride, int[] padding, int[] dilation, bool transposed, int[]
-      output_padding, int groups) -> Tensor
-      */
-      // clang-format on
-      std::optional<std::int64_t> transposed =
-          handleConstant<std::int64_t>(node->input(6)->node());
-
-      torch::jit::Value *input = node->input(0);
-      torch::jit::Value *kernel = node->input(1);
-
-      std::vector<torch::jit::Value *> inputs{input, kernel};
-
-      if (!isNone(node->input(2)->node())) {
-        inputs.push_back(node->input(2));
-      }
-
-      std::vector<std::int64_t> stride =
-          handleList<int64_t>(node->input(3)->node());
-      std::vector<std::int64_t> padding =
-          handleList<std::int64_t>(node->input(4)->node());
-
-      // Pytorch gives the padding as being the amount to pad in both
-      // directions. Popart two arguments for each axis, the amount to pad in
-      // each direction along that axis. In the form (Axis0Left, AxisNLeft...,
-      // Axis0Right, AxisNRight) where left and right refer to the direction
-      // along the axis to add zeros to.
-      const std::size_t num_pads = padding.size();
-      for (std::size_t pad_index = 0; pad_index < num_pads; ++pad_index) {
-        padding.push_back(padding[pad_index]);
-      }
-
-      std::vector<std::int64_t> dilation =
-          handleList<std::int64_t>(node->input(5)->node());
-      // torch::jit::Value* output_padding = node->input(8);
-      std::int64_t groups =
-          *handleConstant<std::int64_t>(node->input(8)->node());
-
-      if (transposed && *transposed == 0) {
-        // Create a "normal" convolution.
-        new_node = poptorch::createConv(graph, inputs, dilation, groups, {},
-                                        padding, stride);
-
-      } else {
-        logging::err("Transposed convolutions are not currently supported.");
-
-        /* TODO(T22979) Re-enable once PopART supports transposed convolutions.
-        // Output shape.
-        // Give popart the shape of the output so it can autogenerate pads.
-        std::vector<std::int64_t> outputShape = shapeFromTensor(node->output())
-
-        new_node = poptorch::createConvtranspose(graph, inputs, dilation,
-        groups, {}, {}, outputShape, padding, stride);
-        */
-      }
-    } else if (kind == c10::aten::conv2d) {
-      /*
-      aten::conv2d(Tensor input, Tensor weight, Tensor? bias, int[] stride,
-      int[] padding, int[] dilation, int groups) -> Tensor
-      */
-      auto input = node->input(0);
-      auto kernel = node->input(1);
-
-      std::vector<torch::jit::Value *> inputs{input, kernel};
-
-      // Add bias if present.
-      if (!isNone(node->input(2)->node())) {
-        inputs.push_back(node->input(2));
-      }
-
-      std::vector<std::int64_t> stride =
-          handleList<std::int64_t>(node->input(3)->node());
-      std::vector<std::int64_t> padding =
-          handleList<std::int64_t>(node->input(4)->node());
-
-      // Pytorch gives the padding as being the amount to pad in both
-      // directions. Popart two arguments for each axis, the amount to pad in
-      // each direction along that axis. In the form (Axis0Left, AxisNLeft...,
-      // Axis0Right, AxisNRight) where left and right refer to the direction
-      // along the axis to add zeros to.
-      const std::size_t num_pads = padding.size();
-      for (std::size_t pad_index = 0; pad_index < num_pads; ++pad_index) {
-        padding.push_back(padding[pad_index]);
-      }
-
-      std::vector<std::int64_t> dilation =
-          handleList<std::int64_t>(node->input(5)->node());
-      std::int64_t groups =
-          *handleConstant<std::int64_t>(node->input(6)->node());
-
-      new_node = poptorch::createConv(graph, inputs, dilation, groups, {},
-                                      padding, stride);
-    } else if (kind == c10::aten::batch_norm) {
+    else if (kind == c10::aten::batch_norm) {
       // clang-format off
       /*
       aten::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor?
@@ -740,208 +442,6 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
         // This is now the new node.
         new_node = createReshape(graph, new_node->output(), original_shape);
       }
-
-    } else if (kind == c10::aten::max_pool1d || kind == c10::aten::avg_pool1d ||
-               kind == c10::aten::max_pool2d || kind == c10::aten::avg_pool2d ||
-               kind == c10::aten::max_pool3d || kind == c10::aten::avg_pool3d) {
-      // clang-format off
-      /*
-        aten::max_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
-        padding, int[] dilation, bool ceil_mode) -> Tensor
-
-        aten::avg_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
-                         padding, bool ceil_mode, bool count_include_pad,
-                         int? divisor_override) -> Tensor
-     */
-      // clang-format on
-      std::vector<std::int64_t> kernel_size =
-          handleList<std::int64_t>(node->input(1)->node());
-      std::vector<std::int64_t> stride =
-          handleList<std::int64_t>(node->input(2)->node());
-      std::vector<std::int64_t> padding =
-          handleList<std::int64_t>(node->input(3)->node());
-
-      // Pytorch gives the padding as being the amount to pad in both
-      // directions. Popart two arguments for each axis, the amount to pad in
-      // each direction along that axis. In the form (Axis0Left, AxisNLeft...,
-      // Axis0Right, AxisNRight) where left and right refer to the direction
-      // along the axis to add zeros to.
-      const std::size_t num_pads = padding.size();
-      for (std::size_t pad_index = 0; pad_index < num_pads; ++pad_index) {
-        padding.push_back(padding[pad_index]);
-      }
-
-      if (kind == c10::aten::max_pool1d || kind == c10::aten::max_pool2d ||
-          kind == c10::aten::max_pool3d) {
-        new_node = poptorch::createMaxpool(graph, {node->input(0)}, 1,
-                                           kernel_size, padding, 0, stride);
-      } else {
-        // ceil_mode, countIncludePad, divisor_override are ignored for now due
-        // to not being supported directly in popart.
-        new_node = poptorch::createAveragepool(graph, {node->input(0)},
-                                               kernel_size, 0, padding, stride);
-      }
-    } else if (kind == c10::aten::adaptive_avg_pool2d ||
-               kind == c10::aten::adaptive_max_pool2d) { // clang-format off
-      // aten::adaptive_avg_pool2d(Tensor self, int[] output_size) -> Tensor
-      // aten::adaptive_max_pool2d(Tensor self, int[] output_size) -> Tensor
-      // clang-format on
-      std::vector<std::int64_t> output_shape =
-          handleList<std::int64_t>(node->input(1)->node());
-
-      c10::TensorTypePtr as_tensor =
-          node->input(0)->type()->cast<c10::TensorType>();
-      c10::VaryingShape dims = as_tensor->sizes();
-      std::vector<std::int64_t> input_shape{*dims[2], *dims[3]};
-
-      // Need to clean this code up.
-      // TODO(tbd)
-      const std::vector<int64_t> &stride{input_shape[0] / output_shape[0],
-                                         input_shape[1] / output_shape[1]};
-
-      const std::vector<int64_t> &kernel_shape{
-          input_shape[0] - (output_shape[0] - 1) * stride[0],
-          input_shape[1] - (output_shape[1] - 1) * stride[1]};
-      const std::vector<int64_t> &padding{0, 0, 0, 0};
-
-      if (kind == c10::aten::adaptive_avg_pool2d) {
-        new_node = createAveragepool(graph, {node->input(0)}, kernel_shape, 0,
-                                     padding, stride);
-      } else {
-        logging::err("Adaptive max pooling isn't currently supported.");
-        /* // TODO(T22978) Fix the number of inputs in PopParse so this can
-           return 2.
-           // Supported by Onnx.
-
-            new_node = poptorch::createMaxpool(graph,
-           {node->input(0)}, 2, kernel_shape, padding, 0, stride);*/
-      }
-    } else if (kind == c10::aten::softmax) {
-      // "aten::softmax(Tensor self, int dim, int? dtype) -> Tensor"
-
-      std::int64_t dim = *handleConstant<std::int64_t>(node->input(1)->node());
-
-      c10::TensorTypePtr as_tensor =
-          node->input(0)->type()->cast<c10::TensorType>();
-      c10::VaryingShape dims = as_tensor->sizes();
-
-      if (dim < 0) {
-        dim = *dims.size() + dim;
-      }
-
-      new_node = createSoftmax(graph, {node->input(0)}, dim);
-    } else if (kind == c10::aten::log10) {
-      // Log10(X) = Log(X) / Log(10)
-
-      // Add log(x)
-      torch::jit::Node *logx = createLog(graph, {node->inputs()[0]});
-
-      // Add log10
-      const double log10_const =
-          2.302585092994045684017991454684364207601101488628772976033;
-      torch::jit::Node *log10 = createConstantFloat(graph, {log10_const}, {});
-
-      // Add the divide.
-      new_node = createDiv(graph, {logx->output(), log10->output()});
-    } else if (kind == c10::aten::log1p) {
-      // Log1p(x) = log(x + 1)
-
-      // Add the one constant
-      torch::jit::Node *one = createConstantFloat(graph, {1.0}, {});
-
-      // Add x + 1
-      torch::jit::Node *add =
-          createAdd(graph, {node->inputs()[0], one->output()});
-
-      // Add the log
-      new_node = createLog(graph, {add->output()});
-    } else if (kind == c10::aten::log2) {
-      // Log2(X) = Log(X) / Log(2)
-
-      // Add log(x)
-      torch::jit::Node *logx = createLog(graph, {node->inputs()[0]});
-
-      // Add log2
-      const double log2_const =
-          0.693147180559945309417232121458176568075500134360255254120;
-      torch::jit::Node *log2 = createConstantFloat(graph, {log2_const}, {});
-
-      // Add the divide.
-      new_node = createDiv(graph, {logx->output(), log2->output()});
-    } else if (kind == c10::aten::log_softmax) {
-      // "aten::log_softmax(Tensor self, int dim, int? dtype) -> Tensor"
-
-      std::int64_t dim = *handleConstant<std::int64_t>(node->input(1)->node());
-
-      c10::TensorTypePtr as_tensor =
-          node->input(0)->type()->cast<c10::TensorType>();
-      c10::VaryingShape dims = as_tensor->sizes();
-
-      if (dim < 0) {
-        dim = *dims.size() + dim;
-      }
-
-      new_node = createSoftmax(graph, {node->input(0)}, dim);
-
-      new_node = createLog(graph, {new_node->output()});
-    } else if (kind == c10::aten::nll_loss) {
-      // This is derived by me (stephenm@graphcore.ai) not parsed from the
-      // pytorch headers like the others as I can't find it in them.
-
-      // "aten::nll_loss(Tensor input, Tensor label, Tensor? weight, int
-      // reduction, int ignore_index) -> Tensor"
-
-      std::int64_t reduction =
-          *handleConstant<std::int64_t>(node->input(3)->node());
-      std::int64_t ignore_index =
-          *handleConstant<std::int64_t>(node->input(4)->node());
-
-      // Convert to popart reduce values.
-      reduction = convertReduceToPopart(reduction);
-
-      new_node = createNllloss(graph, {node->input(0), node->input(1)},
-                               reduction, ignore_index);
-    } else if (kind == c10::aten::l1_loss) {
-      std::int64_t reduction =
-          *handleConstant<std::int64_t>(node->input(2)->node());
-
-      // Convert to popart reduce values.
-      reduction = convertReduceToPopart(reduction);
-
-      // Popart calculates the L1 loss as being the difference from an input to
-      // 0. So we have to manually subract the losses first.
-      torch::jit::Node *subtract =
-          createSub(graph, {node->input(0), node->input(1)});
-
-      const float scale = 1.0f;
-      new_node = createL1loss(graph, {subtract->output()}, scale, reduction);
-
-    } else if (kind == c10::aten::mse_loss) {
-      std::int64_t reduction =
-          *handleConstant<std::int64_t>(node->input(2)->node());
-
-      // Convert to popart reduce values.
-      reduction = convertReduceToPopart(reduction);
-
-      // Subtract X - Y
-      torch::jit::Node *subtract =
-          createSub(graph, {node->input(0), node->input(1)});
-
-      // Square it.
-      torch::jit::Node *square =
-          createMul(graph, {subtract->output(), subtract->output()});
-
-      torch::jit::Node *final_node = square;
-
-      if (reduction == 0) {
-        // Sum
-        final_node = createSum(graph, {square->output()});
-      } else if (reduction == 1) {
-        // Mean
-        final_node = createMean(graph, {square->output()});
-      }
-
-      new_node = createIdentityloss(graph, {final_node->output()}, reduction);
 
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       // This could maybe be improved. Can we add attributes on the frontend?

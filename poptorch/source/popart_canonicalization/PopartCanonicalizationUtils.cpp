@@ -1,14 +1,21 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PopartCanonicalizationUtils.hpp"
 
-#include <map> // NOLINT
+#include <unordered_map>
 
+#include "poptorch_logging/Logging.hpp"
+#include <poptorch/OpBuilder.hpp>
 #include <poptorch_logging/Error.hpp>
 
 namespace poptorch {
 
 namespace {
-std::map<c10::Symbol, SymbolHandler> symbol_handlers;
+
+// This avoids the static initialisation order fiasco,
+std::unordered_map<c10::Symbol, SymbolHandler> &symbolHandlers() {
+  static std::unordered_map<c10::Symbol, SymbolHandler> symbol_handlers;
+  return symbol_handlers;
+}
 /*
  * Helper structs to help deduce the attribute types.
  */
@@ -68,6 +75,7 @@ template <> struct Handle<std::vector<double>> {
     return std::nullopt;
   }
 };
+
 // Return true if we know how to fold a given compile time constant operation.
 bool canBeConstFolded(torch::jit::Node *node) {
   return node->kind() == c10::aten::size;
@@ -89,7 +97,8 @@ template <typename T> T foldConstant(torch::jit::Node *node) {
 } // namespace
 
 bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler) {
-  bool new_handler = symbol_handlers.emplace(symbol, handler).second;
+  logging::trace("Registering handler for symbol {}", symbol.toDisplayString());
+  bool new_handler = symbolHandlers().emplace(symbol, handler).second;
   ERROR_ON_MSG(!new_handler, "Symbol " << symbol.toDisplayString()
                                        << " already has a handler registered");
   return new_handler;
@@ -98,8 +107,8 @@ bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler) {
 // Return a pointer to a handler if one is registered for this kind of node or
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::Node *node) {
-  auto it = symbol_handlers.find(node->kind());
-  if (it != symbol_handlers.end()) {
+  auto it = symbolHandlers().find(node->kind());
+  if (it != symbolHandlers().end()) {
     return it->second;
   }
   return {};
@@ -135,8 +144,6 @@ template <typename T> std::vector<T> handleList(torch::jit::Node *node) {
   ERROR("List inputs must be of type prim::ListConstruct");
 }
 
-template std::vector<std::int64_t> handleList(torch::jit::Node *node);
-
 template <typename T>
 std::vector<T> handleListConstruct(torch::jit::Node *node) {
   ERROR_ON(node->kind() != c10::prim::ListConstruct);
@@ -160,7 +167,7 @@ template <typename T> std::optional<T> handleConstant(torch::jit::Node *node) {
   }
 
   if (node->kind() != c10::prim::Constant && canBeConstFolded(node)) {
-    if constexpr (std::is_integral<T>::value) {
+    if (std::is_integral<T>::value) {
       return foldConstant<T>(node);
     }
   }
@@ -177,5 +184,107 @@ template <typename T> std::optional<T> handleConstant(torch::jit::Node *node) {
 
   return Handle<T>{}(sym, node);
 }
+
+bool isNone(torch::jit::Node *node) {
+  if (node->kind() != c10::prim::Constant) {
+    return false;
+  }
+
+  auto sym = c10::attr::value;
+  return !node->hasAttribute(sym);
+}
+
+std::int64_t handleDimensionParam(torch::jit::Node *node, int index) {
+  // Extract the dim.
+  std::int64_t dim = *handleConstant<std::int64_t>(node->input(index)->node());
+
+  // Get the tensor type. Deduce on the first parameter.
+  c10::TensorTypePtr as_tensor =
+      node->input(0)->type()->expect<c10::TensorType>();
+  c10::VaryingShape dims = as_tensor->sizes();
+
+  // If dim is less than zero subtract it to get the actual dimension.
+  if (dim < 0) {
+    dim = *dims.size() + dim;
+  }
+
+  // Return the dim.
+  return dim;
+}
+
+torch::jit::Node *createIRConstant(torch::jit::Graph *graph,
+                                   torch::jit::Value *value) {
+  // Get the scalar type of the result.
+  c10::FloatTypePtr as_float = value->type()->cast<c10::FloatType>();
+  c10::IntTypePtr as_int = value->type()->cast<c10::IntType>();
+  if (as_int) {
+    return createConstantInt(
+        graph, {*handleConstant<std::int64_t>(value->node())}, {1});
+  }
+  if (as_float) {
+    return createConstantFloat(graph, {*handleConstant<float>(value->node())},
+                               {1});
+  }
+
+  // If this is still a constant.
+  if (value->node()->kind() == c10::prim::Constant) {
+    // Scalar doubles and longs are tensors somehow.
+    c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
+
+    auto sizes = as_tensor->sizes();
+    auto type = as_tensor->scalarType();
+
+    if (sizes.size() && *sizes.size() == 0 && type) {
+      if (*type == at::kDouble) {
+        return createConstantFloat(
+            graph, {*handleConstant<float>(value->node())}, {1});
+      }
+      if (*type == at::kLong) {
+        return createConstantInt(
+            graph, {*handleConstant<std::int64_t>(value->node())}, {1});
+      }
+    }
+
+    ERROR("Internal error: Constant type is unsupported");
+  }
+
+  // Legal to return null means |value| was not a constant.
+  return nullptr;
+}
+
+torch::jit::Value *handleParamOrConstantNoCast(torch::jit::Graph *graph,
+                                               torch::jit::Value *operand) {
+  torch::jit::Value *value_to_return = operand;
+  torch::jit::Node *constant = createIRConstant(graph, operand);
+
+  if (constant) {
+    value_to_return = constant->output();
+  }
+
+  return value_to_return;
+}
+
+std::int32_t convertReduceToPopart(std::int32_t pytorchReduce) {
+  // Popart:
+  // Sum = 0, Mean =1, NoReduction = 2
+  // Pytorch
+  // Sum = 2, Mean =1, NoReduction = 0
+  if (pytorchReduce == 0) {
+    return 2;
+  }
+  if (pytorchReduce == 1) {
+    return 1;
+  }
+  if (pytorchReduce == 2) {
+    return 0;
+  }
+
+  ERROR("Unsupported pytorch reduce");
+}
+
+template std::vector<std::int64_t> handleList(torch::jit::Node *node);
+template std::optional<float> handleConstant(torch::jit::Node *);
+template std::optional<int> handleConstant(torch::jit::Node *);
+template std::optional<bool> handleConstant(torch::jit::Node *);
 
 } // namespace poptorch
