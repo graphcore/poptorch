@@ -35,15 +35,16 @@
             "exclude": "(^docs/.*)"
         },
         "clang-tidy":{
-          "type": "script-and-regex-mt",
+          "type": "clang-tidy",
           "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
+          "clang-tidy": ["./.linters/clang-tidy", "./install_linters.sh"],
+          "yml2json": ["./.linters/yml2json", "./install_linters.sh"],
           "exclude": [
             "(\\.inc.h$)",
             "(\\.inc.hpp$)",
             "(^docs/.*)"
           ],
-          "script-and-regex.script": "sh -c '{ .linters/clang-tidy $0 --fix -- -I.linters/include/ -I.linters/clang_include/ -Ipopart_compiler/include -Ipoptorch/shared/include -Ipoptorch/include -Ipoptorch_logging/include -I../spdlog/spdlog/include/ -DONNX_NAMESPACE=onnx -I.linters/torch/include -I../popart/popart/willow/include/ -I.linters/poplar_includes/ `cat .linters/python_includes` -std=c++17 -fsized-deallocation; } || true'",
-          "script-and-regex.regex": "/^(?P<file>[^ :]*):(?P<line>[^:]+):(?P<char>[^:]+): (?P<severity>[^:]+): (?P<message>.*)\\[(?P<name>.+)\\]$/m",
+          "flags": "-I.linters/include/ -I.linters/clang_include/ -Ipopart_compiler/include -Ipoptorch/shared/include -Ipoptorch/include -Ipoptorch_logging/include -I../spdlog/spdlog/include/ -DONNX_NAMESPACE=onnx -I.linters/torch/include -I../popart/popart/willow/include/ -I.linters/poplar_includes/ `cat .linters/python_includes` -std=c++17 -fsized-deallocation",
           "num-threads": "./.linters/num_threads"
         },
         "copyright":{

@@ -674,7 +674,6 @@ void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
   if (float16) {
     assertTensorIs(PopartTypes::FLOAT16, id,
                    static_cast<const char *>(__PRETTY_FUNCTION__));
-
   } else {
     assertTensorIs(PopartTypes::INT16, id,
                    static_cast<const char *>(__PRETTY_FUNCTION__));
