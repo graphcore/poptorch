@@ -15,6 +15,20 @@ import pytest
 # Sparse
 # torch.nn.Embedding, torch.nn.Embedding.from_pretrained, torch.nn.EmbeddingBag, torch.nn.EmbeddingBag.from_pretrained,
 
+include_bias = [True, False]
+
+# The inner dimensions used in testing bilinear layers
+input_feature_shapes = [
+    {
+        "x1": (),
+        "x2": ()
+    },
+    {  # ND feature inputs
+        "x1": (4, 5),
+        "x2": (4, 5)
+    }
+]
+
 
 def test_linear():
     model = torch.nn.Linear(20, 30)
@@ -29,6 +43,26 @@ def test_linear():
 
     assert nativeOut.size() == poptorch_out.size()
     torch.testing.assert_allclose(nativeOut, poptorch_out)
+
+
+@pytest.mark.parametrize("include_bias", include_bias)
+@pytest.mark.parametrize("input_feature_shapes", input_feature_shapes)
+def test_bilinear(include_bias, input_feature_shapes):
+    model = torch.nn.Bilinear(20, 30, 40, bias=include_bias)
+    shape1 = input_feature_shapes['x1']
+    shape2 = input_feature_shapes['x2']
+    x1 = torch.randn(128, *shape1, 20)
+    x2 = torch.randn(128, *shape2, 30)
+
+    # Run on CPU
+    native_out = model(x1, x2)
+
+    # Run on IPU
+    poptorch_model = poptorch.inferenceModel(model)
+    actual = poptorch_model(x1, x2)
+
+    assert native_out.size() == actual.size()
+    torch.testing.assert_allclose(native_out, actual)
 
 
 def test_identity():

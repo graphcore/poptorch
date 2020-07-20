@@ -17,6 +17,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ReshapeOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/SoftmaxOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ConvolutionOps.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/BilinearOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CanonicalizeLists.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartLateCanonicalization.cpp"
