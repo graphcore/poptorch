@@ -118,6 +118,8 @@ OP_CONVERTOR(aten::elu, NONE, createElu, {PARAM(0)} COMMA HANDLE(1, float))
 OP_CONVERTOR(aten::elu_, NONE, createElu, {PARAM(0)} COMMA HANDLE(1, float))
 OP_CONVERTOR(aten::leaky_relu, NONE, createLeakyrelu, {PARAM(0)} COMMA HANDLE(1, float))
 OP_CONVERTOR(aten::leaky_relu_, NONE, createLeakyrelu, {PARAM(0)} COMMA HANDLE(1, float))
+OP_CONVERTOR(aten::hardtanh, NONE, createClip, {PARAM(0)} COMMA HANDLE(2, float) COMMA HANDLE(1, float))
+OP_CONVERTOR(aten::hardtanh_, NONE, createClip, {PARAM(0)} COMMA HANDLE(2, float) COMMA HANDLE(1, float))
 
 
 // Comparison ops.
