@@ -206,6 +206,7 @@ at::ScalarType fromPopartType(const poptorch::PopartTypes type) {
  * Lower to popart impl.
  */
 std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
+  logging::LogContext ctx("LowerToPopart::compiler ");
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizer);
 

@@ -843,6 +843,8 @@ void Compiler::initSession(const Optimizer &opt) {
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.
+    logging::LogContext ctx{
+        "Compiler::initSession popart::InferenceSession::createFromOnnxModel"};
     _impl->session = popart::InferenceSession::createFromOnnxModel(
         _impl->op_builder->getModelProto(), data_flow, device, {}, options,
         popart::PatternsLevel::Default);
@@ -869,6 +871,8 @@ void Compiler::initSession(const Optimizer &opt) {
     transformer.prepareNodesForTraining();
 
     // Create the training session.
+    logging::LogContext ctx{
+        "Compiler::initSession popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
         transformer.getModelProto(), data_flow, loss_root, optimizer, device,
         {}, options, popart::PatternsLevel::Default);

@@ -1,9 +1,12 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import datetime as dt
 import enum
 import logging
 import os
+import string
 import sys
+import traceback
 
 import torch
 import torch.nn as nn
@@ -17,16 +20,64 @@ end_ipu_block = torch.ops.poptorch.end_ipu_block
 ipu_print_tensor = torch.ops.poptorch.ipu_print_tensor
 
 # Create a poptorch logger which outputs to the console INFO messages and above
-logger = logging.getLogger("poptorch")
+logger = logging.getLogger("poptorch::python")
 if os.environ.get("POPTORCH_LOG_LEVEL") in ["DEBUG", "TRACE", "TRACE_ALL"]:
     logger.setLevel(logging.DEBUG)
 else:
     logger.setLevel(logging.INFO)
+
+
+class _PoptorchFormatter(logging.Formatter):
+    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(30, 38)
+    RESET_COLOR = "\033[0m"
+    BOLD_COLOR_SEQ = "\033[1;%dm"
+    COLOR_SEQ = "\033[%dm"
+    FORMATS = {
+        logging.DEBUG: COLOR_SEQ % CYAN,
+        logging.INFO: RESET_COLOR,
+        logging.WARNING: BOLD_COLOR_SEQ % YELLOW,
+        logging.ERROR: BOLD_COLOR_SEQ % RED,
+        logging.CRITICAL: BOLD_COLOR_SEQ % RED,
+    }
+
+    def outputToFile(self):
+        return not sys.stdout.isatty() or not sys.stderr.isatty()
+
+    def __init__(self):
+        fmt = "[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s"
+        # Disable the colours when the output is redirected to a file.
+        if self.outputToFile():
+            super().__init__(fmt)
+        else:
+            super().__init__("%(color)s" + fmt + self.RESET_COLOR)
+
+    def formatTime(self, record, datefmt=None):
+        ct = dt.datetime.fromtimestamp(record.created)
+        if datefmt:
+            s = ct.strftime(datefmt)
+        else:
+            t = ct.strftime("%H:%M:%S")
+            s = "%s.%03d" % (t, record.msecs)
+        return s
+
+    def format(self, record):
+        record.color = self.FORMATS[record.levelno]
+        record.levelname = record.levelname.lower()
+        return super().format(record)
+
+
+def _excepthook(*args):
+    e = traceback.format_exception(*args)
+    logger.critical(e[-1] + "\n" + "".join(e))
+    exit(1)
+
+
 console = logging.StreamHandler()
-formatter = logging.Formatter('%(name)s:%(levelname)s: %(message)s')
+formatter = _PoptorchFormatter()
 console.setFormatter(formatter)
 console.setLevel(logging.DEBUG)
 logger.addHandler(console)
+sys.excepthook = _excepthook
 
 
 def identity_loss(x, reduction="none"):
@@ -41,11 +92,9 @@ def identity_loss(x, reduction="none"):
 
 
 def _convertOptimizerToDict(optimizer):
-    if len(optimizer.param_groups) != 1:
-        print(
-            "Error: Poptorch currently only supports one parameter group! (all parameters)"
-        )
-        exit()
+    assert len(optimizer.param_groups) == 1, (
+        "Poptorch currently only "
+        "supports one parameter group! (all parameters)")
 
     return {
         "lr": (optimizer.param_groups[0]["lr"], False),
@@ -56,7 +105,8 @@ def _convertOptimizerToDict(optimizer):
 
 
 class _OptionsDict:
-    """Safe dictionary to store options: only keys which have been passed to the constructor can later be updated.
+    """Safe dictionary to store options: only keys which have been passed to 
+    the constructor can later be updated.
     """
 
     def __init__(self, **default_values):
@@ -64,8 +114,9 @@ class _OptionsDict:
 
     def set(self, **kwargs):
         for option, value in kwargs.items():
-            assert option in self._values, "Invalid option %s, valid options are %s" % (
-                option, self._values.keys())
+            assert option in self._values, ("Invalid option %s, valid options"
+                                            " are %s") % (option,
+                                                          self._values.keys())
             assert type(value) == type(
                 self._values[option]
             ), "Unexpected type %s for option %s. Expected %s" % (
@@ -157,8 +208,10 @@ class AnchorMode(enum.IntEnum):
 class ConnectionType(enum.IntEnum):
     """
     - Always: Attach to the IPU from the start (Default).
-    - OnDemand: Wait until the compilation is complete and the executable is ready to be run to attach to the IPU.
-    - Never: Never try to attach to an IPU. (Useful for offline compilation, but trying to run an executable will raise an exception).
+    - OnDemand: Wait until the compilation is complete and the executable is 
+      ready to be run to attach to the IPU.
+    - Never: Never try to attach to an IPU. (Useful for offline compilation,
+      but trying to run an executable will raise an exception).
     """
     Always = 0
     OnDemand = 1
@@ -212,7 +265,8 @@ class Options(_OptionsDict):
         return self
 
     def enablePipelining(self, enable_pipelining):
-        """Enable pipelining of virtual graphs (Default: False if 1 IPU used, True otherwise)"""
+        """Enable pipelining of virtual graphs (Default: False if 1 IPU used,
+        True otherwise)"""
         self.createOrSet(enable_pipelining=enable_pipelining)
         return self
 
@@ -249,8 +303,10 @@ class Options(_OptionsDict):
     def connectionType(self, connection_type):
         """set the IPU connection type to one of:
         - Always: Attach to the IPU from the start (Default).
-        - OnDemand: Wait until the compilation is complete and the executable is ready to be run to attach to the IPU.
-        - Never: Never try to attach to an IPU. (Useful for offline compilation, but trying to run an executable will raise an exception).
+        - OnDemand: Wait until the compilation is complete and the executable
+          is ready to be run to attach to the IPU.
+        - Never: Never try to attach to an IPU. (Useful for offline compilation,
+          but trying to run an executable will raise an exception).
         """
         assert isinstance(connection_type, ConnectionType)
         self.set(connection_type=connection_type.value)
@@ -269,11 +325,13 @@ class Options(_OptionsDict):
     def useIpuId(self, ipu_id):
         """ Use the specified IPU id as provided by gc-info.
 
-        The number of IPUs associated with the id must be equal to the number of IPUs used by your grpah multiplied by the replication factor.
+        The number of IPUs associated with the id must be equal to the number
+        of IPUs used by your grpah multiplied by the replication factor.
 
-        E.g. if your model uses 1 IPU and the replication factor is 2 you will need to provide an id with 2 IPUs.
-        If your model is pipelined across 4 IPUs, the replication factor is 4, you will need to provide an id containing 16 IPUs.
-        total.
+        E.g. if your model uses 1 IPU and the replication factor is 2 you will
+        need to provide an id with 2 IPUs.
+        If your model is pipelined across 4 IPUs, the replication factor is 4,
+        you will need to provide an id containing 16 IPUs total.
         """
         assert isinstance(ipu_id, int)
         self.createOrSet(ipu_id=ipu_id)
@@ -303,7 +361,10 @@ class Options(_OptionsDict):
 
         # Check the anchor return period makes sense.
         if anchor_mode == AnchorMode.EveryN:
-            assert anchor_return_period and anchor_return_period > 0, "EveryN anchor must have anchor_return_period set to valid positive integer"
+            assert anchor_return_period and anchor_return_period > 0, (
+                "EveryN"
+                " anchor must have anchor_return_period set to valid"
+                " positive integer")
         elif anchor_return_period:
             logging.info(
                 "Anchor return period argument ignored with anchor_mode set to %s"
@@ -314,11 +375,13 @@ class Options(_OptionsDict):
         return self
 
     def defaultAnchorMode(self):
-        """Return True if the anchor_mode is currently set to Default, False otherwise."""
+        """Return True if the anchor_mode is currently set to Default,
+        False otherwise."""
         return self.anchor_mode == AnchorMode.Default
 
     def toDict(self):
-        """ Merge all the options, except for the Jit ones, into a single dictionary to be serialised and passed to the cpp side."""
+        """ Merge all the options, except for the Jit ones, into a ringle
+        dictionary to be serialised and passed to the cpp side."""
         assert not self.defaultAnchorMode(
         ), "An anchor mode must be picked before serialisation"
         out = {}
@@ -370,8 +433,10 @@ class _Args:
                 self._args.append(args[i])
                 assert name not in kwargs, "Parameter %s was passed more than once" % name
             elif name in kwargs:
-                assert not none_passed, "Torch doesn't support passing tensors after the following parameters have defaulted to None. %s" % ", ".join(
-                    none_passed)
+                assert not none_passed, (
+                    "Torch doesn't support passing tensors"
+                    " after the following parameters have defaulted to None."
+                    " %s") % ", ".join(none_passed)
                 self._args.append(kwargs[name])
             else:
                 assert i >= first_optional, "Mandatory parameter %s missing" % name
@@ -450,7 +515,8 @@ class _PoplarExecutor:
 
             class WrappedModel(type(m)):
                 def copyWeightsToHostIfNeeded(self_model):
-                    """ Return True if the weights on the host were dirty and have been updated.
+                    """ Return True if the weights on the host were dirty and
+                    have been updated.
                     Return False if the weights were already up to date.
                     """
                     if self.dirty_host_weights:
@@ -470,14 +536,16 @@ class _PoplarExecutor:
                     return super().named_parameters(*args, **kwargs)
 
             # __call__ is an attribute, not a method, unfortunately we cannot just
-            # replace it in the model object: we have to create a wrapper class and change the object's class.
+            # replace it in the model object: we have to create a wrapper class
+            # and change the object's class.
             m.__class__ = WrappedModel
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
         copyWeightsToHost_impl(self.executable)
 
-    # Write from host memory to IPU memory. This is done automatically on compilation so should be rarely used.
+    # Write from host memory to IPU memory. This is done automatically on
+    # compilation so should be rarely used.
     def copyWeightsToDevice(self):
         copyWeightsToDevice_impl(self.executable)
 
@@ -502,7 +570,8 @@ class _PoplarExecutor:
                 "First time call to model will invoke poplar compilation. " +
                 str(self.options.device_iterations) + " " + str(self.training))
 
-            # Input will be in form of [BatchSize* BatchPerStep, ...] so we should slice it up so we compile by the batch size alone.
+            # Input will be in form of [BatchSize* BatchPerStep, ...] so we
+            # should slice it up so we compile by the batch size alone.
             extra_poplar_batch_dims = self.options.device_iterations * \
                 self.options.replication_factor * self.options.Training.gradient_accumulation
 
@@ -512,10 +581,30 @@ class _PoplarExecutor:
             # will partition it up.
             in_tensors_trace_view = _Args(self.model, args, kwargs,
                                           self.training)
-            in_tensors_trace_view.forEach(lambda t: t.narrow(
-                0, 0,
-                t.size()[0] // extra_poplar_batch_dims) if isinstance(
-                    t, torch.Tensor) else t)
+
+            def narrowTensor(tensor):
+                if not isinstance(tensor, torch.Tensor):
+                    return tensor
+                assert tensor.size()[0] % extra_poplar_batch_dims == 0, (
+                    "Invalid batch dimension: In the input %s, the batch "
+                    "dimension (%d) must be a multiple of "
+                    "Options.deviceIterations(%d) * "
+                    "Options.replicationFactor(%d) * "
+                    "Options.Training.gradientAccumulation(%d) = %d "
+                    "because it is used to calculate the batch size which will "
+                    "be executed on the device in any given iteration. For a "
+                    "full explanation see the batching semantics page of the "
+                    "documentation.") % (
+                        tensor.shape, tensor.size()[0],
+                        self.options.device_iterations,
+                        self.options.replication_factor,
+                        self.options.Training.gradient_accumulation,
+                        extra_poplar_batch_dims)
+                return tensor.narrow(
+                    0, 0,
+                    tensor.size()[0] // extra_poplar_batch_dims)
+
+            in_tensors_trace_view.forEach(narrowTensor)
 
             # Compile the poplar executable based on the batchsize.
             if self.options.Jit.trace_model:

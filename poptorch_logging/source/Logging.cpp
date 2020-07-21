@@ -108,7 +108,7 @@ LoggingContext::LoggingContext() {
     }
   }
 
-  logger->set_pattern("[%T.%e] [%l] %v");
+  logger->set_pattern("[%T.%e] [poptorch:cpp] [%l] %v");
   logger->set_level(translate(default_level));
 }
 
