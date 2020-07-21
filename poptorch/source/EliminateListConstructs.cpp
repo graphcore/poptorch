@@ -2,11 +2,10 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 
-#include <poptorch_logging/Logging.hpp>
-
+#include "poptorch/EliminateListConstructs.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
-#include <poptorch/EliminateListConstructs.hpp>
-#include <poptorch/Utils.hpp>
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 

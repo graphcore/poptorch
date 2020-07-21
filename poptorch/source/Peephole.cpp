@@ -1,8 +1,8 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include <poptorch/Peephole.hpp>
+#include "poptorch/Peephole.hpp"
 
-#include <poptorch/Utils.hpp>
-#include <poptorch_logging/Error.hpp>
+#include "poptorch/Utils.hpp"
+#include "poptorch_logging/Error.hpp"
 
 namespace poptorch {
 

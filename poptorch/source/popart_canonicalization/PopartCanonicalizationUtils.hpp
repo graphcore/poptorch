@@ -54,6 +54,13 @@ torch::jit::Value *handleParamOrConstantNoCast(torch::jit::Graph *graph,
 // Both pytorch and popart represent reduce as an enum but with different
 // values.
 std::int32_t convertReduceToPopart(std::int32_t pytorchReduce);
+
+void markNodeForDeletion(torch::jit::Node *node);
+bool isMarkedForDeletion(torch::jit::Node *node);
+
+void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val);
+void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
+                      std::uint64_t outputIdx);
 } // namespace poptorch
 
 #endif // SOURCE_POPART_CANONICALIZATION_UTILS_H

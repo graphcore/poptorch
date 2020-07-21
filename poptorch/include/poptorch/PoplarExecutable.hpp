@@ -2,12 +2,12 @@
 #ifndef INCLUDE_POPTORCH_POPLAR_EXECUTABLE_HPP
 #define INCLUDE_POPTORCH_POPLAR_EXECUTABLE_HPP
 
+#include <torch/csrc/jit/ir/ir.h>
+
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include "torch/csrc/jit/ir/ir.h"
 
 #include "popart_compiler/Compiler.hpp"
 

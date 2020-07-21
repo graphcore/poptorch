@@ -1,9 +1,9 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PopartCanonicalizationUtils.hpp"
 
-#include <poptorch/OpBuilder.hpp>
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 namespace {
@@ -44,8 +44,11 @@ torch::jit::Node *logSoftmaxHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
+// clang-format off
 static bool handlers =
-    registerHandlers(c10::aten::softmax, softmaxHandler, c10::aten::log_softmax,
-                     logSoftmaxHandler);
+    registerHandlers(
+        c10::aten::softmax, softmaxHandler,
+        c10::aten::log_softmax, logSoftmaxHandler);
+// clang-format on
 
 } // namespace poptorch

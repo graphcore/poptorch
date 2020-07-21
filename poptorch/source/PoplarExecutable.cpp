@@ -1,17 +1,16 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+#include <torch/csrc/Dtype.h>
+#include <torch/csrc/DynamicTypes.h>
+
 #include <iostream>
 #include <sstream>
 #include <string>
 
-#include "torch/csrc/Dtype.h"
-#include "torch/csrc/DynamicTypes.h"
-
 #include "poptorch/PoplarExecutable.hpp"
 #include "poptorch/Utils.hpp"
-
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 

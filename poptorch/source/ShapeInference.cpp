@@ -1,8 +1,8 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <utility>
 
-#include <poptorch/ShapeInference.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include "poptorch/ShapeInference.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 #include "PoptorchSymbols.hpp"
 

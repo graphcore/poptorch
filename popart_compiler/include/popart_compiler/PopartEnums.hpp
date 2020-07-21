@@ -3,7 +3,7 @@
 #define POPART_COMPILER_POPART_ENUMS_HPP
 #include <string>
 
-#include <poptorch_logging/Error.hpp>
+#include "poptorch_logging/Error.hpp"
 
 namespace poptorch {
 

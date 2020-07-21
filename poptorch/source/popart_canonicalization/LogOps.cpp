@@ -1,9 +1,9 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PopartCanonicalizationUtils.hpp"
 
-#include <poptorch/OpBuilder.hpp>
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 namespace {
@@ -54,8 +54,12 @@ torch::jit::Node *log2Handler(torch::jit::Graph *graph,
 }
 } // namespace
 
+// clang-format off
 static bool handlers =
-    registerHandlers(c10::aten::log10, log10Handler, c10::aten::log1p,
-                     log1pHandler, c10::aten::log2, log2Handler);
+    registerHandlers(
+        c10::aten::log10, log10Handler,
+        c10::aten::log1p, log1pHandler,
+        c10::aten::log2, log2Handler);
+// clang-format on
 
 } // namespace poptorch

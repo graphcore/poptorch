@@ -20,11 +20,11 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/session.hpp>
 #include <popart/tensors.hpp>
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
 
-#include <popart_compiler/Compiler.hpp>
-#include <popart_compiler/PopartEnums.hpp>
+#include "popart_compiler/Compiler.hpp"
+#include "popart_compiler/PopartEnums.hpp"
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
@@ -1084,7 +1084,7 @@ const std::vector<OutputType> &Compiler::outputTypes() const {
   return _impl->output_types;
 }
 
-void Compiler::assertTensorIs(const PopartTypes dataType,
+void Compiler::assertTensorIs(PopartTypes dataType,
                               const poptorch::TensorId &id,
                               const char *caller) const {
   PopartTypes actual_type;

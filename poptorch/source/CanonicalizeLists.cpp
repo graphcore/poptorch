@@ -4,10 +4,10 @@
 
 #include <functional>
 
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch/PopartCanonicalization.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
-#include <poptorch/OpBuilder.hpp>
-#include <poptorch/PopartCanonicalization.hpp>
-#include <poptorch/Utils.hpp>
 
 namespace poptorch {
 

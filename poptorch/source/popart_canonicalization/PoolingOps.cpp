@@ -1,9 +1,9 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PopartCanonicalizationUtils.hpp"
 
-#include <poptorch/OpBuilder.hpp>
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 namespace {
@@ -82,12 +82,16 @@ torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
 
 } // namespace
 
+// clang-format off
 static bool handlers = registerHandlers(
-    c10::aten::max_pool1d, poolingHandler, c10::aten::avg_pool1d,
-    poolingHandler, c10::aten::max_pool2d, poolingHandler,
-    c10::aten::avg_pool2d, poolingHandler, c10::aten::max_pool3d,
-    poolingHandler, c10::aten::avg_pool3d, poolingHandler,
+    c10::aten::max_pool1d, poolingHandler,
+    c10::aten::avg_pool1d, poolingHandler,
+    c10::aten::max_pool2d, poolingHandler,
+    c10::aten::avg_pool2d, poolingHandler,
+    c10::aten::max_pool3d, poolingHandler,
+    c10::aten::avg_pool3d, poolingHandler,
     c10::aten::adaptive_avg_pool2d, adaptivePoolingHandler,
     c10::aten::adaptive_max_pool2d, adaptivePoolingHandler);
+// clang-format on
 
 } // namespace poptorch

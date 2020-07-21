@@ -3,19 +3,23 @@
 
 #include <unordered_map>
 
+#include "poptorch/OpBuilder.hpp"
+#include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
-#include <poptorch/OpBuilder.hpp>
-#include <poptorch_logging/Error.hpp>
 
 namespace poptorch {
 
 namespace {
+
+const c10::Symbol delete_node_attr =
+    c10::Symbol::fromQualString("attr::delete_node");
 
 // This avoids the static initialisation order fiasco,
 std::unordered_map<c10::Symbol, SymbolHandler> &symbolHandlers() {
   static std::unordered_map<c10::Symbol, SymbolHandler> symbol_handlers;
   return symbol_handlers;
 }
+
 /*
  * Helper structs to help deduce the attribute types.
  */
@@ -280,6 +284,29 @@ std::int32_t convertReduceToPopart(std::int32_t pytorchReduce) {
   }
 
   ERROR("Unsupported pytorch reduce");
+}
+
+void markNodeForDeletion(torch::jit::Node *node) {
+  node->i_(delete_node_attr, 1);
+}
+
+bool isMarkedForDeletion(torch::jit::Node *node) {
+  return node->hasAttribute(delete_node_attr) && node->i(delete_node_attr) > 0;
+}
+
+void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
+  // Take the type of the old value.
+  new_val->setType(old_val->type());
+
+  // Replace the old value with the new one.
+  old_val->replaceAllUsesWith(new_val);
+}
+
+void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
+                      std::uint64_t outputIdx) {
+  torch::jit::Value *new_val = new_node->output(outputIdx);
+  torch::jit::Value *old_val = oldNode->output(outputIdx);
+  replaceOutputUse(old_val, new_val);
 }
 
 template std::vector<std::int64_t> handleList(torch::jit::Node *node);

@@ -72,6 +72,7 @@ pip install yapf==0.27.0
 pip install cpplint==1.4.4
 pip install yml2json
 
+rm -f .linters/system_includes
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   export CLANG_PLATFORM=linux-gnu-ubuntu-18.04
   export TAR_EXTRA_OPTS="--occurrence"
@@ -80,6 +81,8 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
   export CLANG_PLATFORM=darwin-apple
   export TAR_EXTRA_OPTS="--fast-read"
   install_clang_format
+  # This include is needed on Mac but breaks things on Linux
+  echo " -I.linters/include/c++/v1/ " >> .linters/system_includes
 else
   echo "ERROR: '${OSTYPE}' platform not supported"
   exit -1
@@ -91,7 +94,7 @@ ln -fs ${VE}/bin/cpplint ${DIR}/.linters/cpplint
 ln -fs $torch_path .linters/torch
 ln -fs ${POPLAR_PATH}/include .linters/poplar_includes
 nproc > .linters/num_threads
-python3-config --includes > .linters/python_includes
+python3-config --includes >> .linters/system_includes
 
 echo "All linters have been successfully installed"
 

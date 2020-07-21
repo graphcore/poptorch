@@ -2,9 +2,9 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
-#include <poptorch/PopartCanonicalization.hpp>
-#include <poptorch_logging/Error.hpp>
-#include <poptorch_logging/Logging.hpp>
+#include "poptorch/PopartCanonicalization.hpp"
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
