@@ -33,7 +33,7 @@ The basis of PopTorch integration comes from these two model wrapping functions.
 .. literalinclude:: trainingModel.py
     :language: python
     :caption: An example of the use of ``trainingModel()``
-    :emphasize-lines: 13-18
+    :emphasize-lines: 14-18
 
 .. py:function:: inferenceModel(model, device_iterations=1,replication_factor=1, profile=False, trace_model=True)
 
@@ -104,13 +104,13 @@ pipeline.
 
 
 .. literalinclude:: pipeline_simple.py
-   :lines: 2-33
-   :emphasize-lines: 16-17, 20-21, 24-25
+   :lines: 3-33
+   :emphasize-lines: 15-16, 19-20, 23-24
    :caption: Annotations can be attached to layers in existing models.
 
 .. literalinclude:: pipeline_simple.py
-    :lines: 38-53
-    :emphasize-lines: 5, 9, 13
+    :lines: 37-52
+    :emphasize-lines: 6, 10, 14
     :caption: PopTorch also supports annotating the model directly. Both forms can be used interchangeably.
 
 
@@ -127,8 +127,8 @@ Helper operations to be used within a model.
 
     :param ipu_print_tensor: The tensor to print.
 
-.. literalinclude:: api.py
-   :lines: 3-9
+    .. literalinclude:: api.py
+        :lines: 3-9
 
 
 .. py:function:: poptorch.identity_loss(loss, reduction="none")
@@ -146,5 +146,5 @@ Helper operations to be used within a model.
     * "mean": Take the mean of the losses.
 
 
-.. literalinclude:: api.py
-   :lines: 12-22
+  .. literalinclude:: api.py
+    :lines: 11-21

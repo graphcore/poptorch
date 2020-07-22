@@ -1,6 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-# Wrap the mdoel in a PopTorch training wrapper.
+# Wrap the model in a PopTorch training wrapper.
 poptorch_model = poptorch.trainingModel(model,
                                         device_iterations=1,
                                         loss=loss_function,

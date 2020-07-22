@@ -1,34 +1,33 @@
 .. _supported_ops:
 
-************************
-IPU Supported Operations
+IPU supported operations
 ************************
 
 Below is a list of currently supported operations that can be
 executed on IPU hardware. This list will be expanded over time
-as we add more support. Some overloads and modes of operations
+as we add more support. Some overloads and modes of operation
 for ops are not supported and we've tried to list all the caveats
 but some may have been missed.
 
 
-Torch Operations
+Torch operations
 ================
 
-Tensor Operations
+Tensor operations
 -----------------
 
 Many of the tensor operations will be executed before even reaching the IPU
-so we can consider them supported anyway. Some, like ``contiguous()``,make
-no sense on a distributed memory system like the IPU so are ignored and we
-have no constraints on the memory format of how operations should be called
+so we can consider them supported anyway. Some, like ``contiguous()``, make
+no sense on a distributed memory system like the IPU so are ignored. There
+are no constraints on the memory format of how operations should be called
 other than the constraint that all graph inputs should be contiguous.
 
-We will also create tensor views, however the aliasing propety of views
-w.r.t inplace ops should not be relied on as we may have slightly different
+We will also create tensor views. However, the aliasing property of views
+with respect to in-place operations should not be relied on as we may have slightly different
 view behaviour.
 
-Additionaly some PyTorch operations may be implemented by composition of
-the below ops and may not be explicitly listed but are in fact supported.
+Additionally some PyTorch operations may be implemented by composition of
+the listed ops but may not be explicitly listed but are in fact supported.
 
 
 Creation ops
@@ -140,7 +139,7 @@ Pooling layers
 --------------
 
 Currently the max pool layers do not return the indices
-so only the variants with `return_indices=False` are supported.
+so only the variants with ``return_indices=False`` are supported.
 
 * ``torch.nn.MaxPool1d``
 * ``torch.nn.MaxPool2d``
@@ -184,7 +183,7 @@ Activations
 Normalization layers
 --------------------
 
-Currently only `affine=True` is supported as a parameter. That is to say, only the variants with trainable parameters are supported.
+Currently only ``affine=True`` is supported as a parameter. That is to say, only the variants with trainable parameters are supported.
 
 * ``torch.nn.BatchNorm1d``
 * ``torch.nn.BatchNorm2d``
@@ -195,7 +194,7 @@ Currently only `affine=True` is supported as a parameter. That is to say, only t
 Recurrent layers
 ----------------
 
-LSTM only supports the default options for parameters `batch_first` (False), `dropout` (off/0), and `bias` (True).
+LSTM only supports the default options for parameters ``batch_first`` (False), ``dropout`` (off/0), and ``bias`` (True).
 
 * ``torch.nn.LSTM``
 
@@ -213,7 +212,7 @@ Dropout
 Sparse layers
 -------------
 
-Embedding is supported with the exception of `padding_idx` being ignored.
+Embedding is supported with the exception of ``padding_idx`` being ignored.
 
 * ``torch.nn.Embedding``
 
@@ -221,12 +220,12 @@ Loss functions
 --------------
 
 This version supports a limited subset of loss functions. However, we support
-``poptorch.identity_loss`` which gives users the ability to implement any arbritary
+``poptorch.identity_loss`` which gives users the ability to implement any arbitrary
 loss function. See operation explanation in the overview.
 
-One caveat of the below loss functions is if they are used they will always be included
-in the backpropagation and will always recieve a gradient, which is a slight deviation from
-normal PyTorch operation where they have to opt in to the gradient pass.
+One caveat for the following loss functions is if they are used they will always be included
+in the back propagation and will always receive a gradient, which is a slight deviation from
+normal PyTorch operations, where they have to opt in to the gradient pass.
 
 * ``torch.nn.L1Loss``
 * ``torch.nn.MSELoss``
