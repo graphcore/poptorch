@@ -1,8 +1,11 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PopartCanonicalizationUtils.hpp"
 
+#include <functional>
+#include <numeric>
 #include <unordered_map>
 
+#include "../PoptorchSymbols.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -81,21 +84,30 @@ template <> struct Handle<std::vector<double>> {
 };
 
 // Return true if we know how to fold a given compile time constant operation.
+// Only allow const folding for scalar poptorch::int_constant nodes
 bool canBeConstFolded(torch::jit::Node *node) {
-  return node->kind() == c10::aten::size;
+  if (node->kind() != symbols::poptorch::int_constant ||
+      !node->hasAttribute(c10::attr::shape) ||
+      !node->hasAttribute(c10::attr::data)) {
+    return false;
+  }
+  // Use the shape to determine the total number of elements
+  const std::vector<int64_t> &shape = node->is(c10::attr::shape);
+  int64_t numel = std::accumulate(shape.begin(), shape.end(), 1,
+                                  std::multiplies<int64_t>());
+
+  return numel == 1;
 }
 
 template <typename T> T foldConstant(torch::jit::Node *node) {
-  // The index of aten::size must be constant.
-  std::size_t index = *handleConstant<std::size_t>(node->input(1)->node());
+  auto data_sym = c10::attr::data;
+  ERROR_ON_MSG(!node->hasAttribute(data_sym),
+               "Internal Compiler Error: Node must have data attribute");
 
-  // Get the shape of the tensor.
-  c10::TensorTypePtr as_tensor =
-      node->input(0)->type()->cast<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-
-  // Get that requested index.
-  return *dims[index];
+  const std::vector<int64_t> &value = node->is(data_sym);
+  ERROR_ON_MSG(value.size() != 1,
+               "Internal Compiler Error: Node value must be a scalar");
+  return value[0];
 }
 
 } // namespace

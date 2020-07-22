@@ -271,4 +271,23 @@ def test_view():
     assert torch.equal(nativeOut, poptorch_out)
 
 
-t = torch.tensor([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+@pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 2), (2, 3, 4)])
+def test_size(input_shapes):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            # Use size as input to another operation to workaround pruning error
+            return x.view(x.size())
+
+    model = Model()
+    x = torch.ones(*input_shapes)
+
+    # Run on CPU.
+    native_out = model(x)
+    assert torch.equal(x, native_out)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+
+    assert native_out.size() == poptorch_out.size()
+    assert torch.equal(native_out, poptorch_out)
