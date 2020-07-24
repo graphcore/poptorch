@@ -42,6 +42,9 @@ public:
 
   const std::vector<OutputType> &outputTypes() const;
 
+  // Get the IR from popart.
+  std::string getPopartIR() const;
+
 private:
   poptorch::Compiler _compiler;
 

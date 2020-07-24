@@ -91,17 +91,48 @@ def identity_loss(x, reduction="none"):
     return torch.ops.poptorch.identity_loss(x, 2)
 
 
-def _convertOptimizerToDict(optimizer):
-    assert len(optimizer.param_groups) == 1, (
-        "Poptorch currently only "
-        "supports one parameter group! (all parameters)")
+class OptimizerType(enum.IntEnum):
+    SGD = 0
+    ADAM = 1
 
-    return {
-        "lr": (optimizer.param_groups[0]["lr"], False),
-        "momentum": (optimizer.param_groups[0]["momentum"], False),
-        "weight_decay": (optimizer.param_groups[0]["weight_decay"], False),
-        "dampening": (optimizer.param_groups[0]["dampening"], False)
-    }
+
+def _convertOptimizerToDict(optimizer):
+    assert len(
+        optimizer.param_groups
+    ) == 1, "Poptorch currently only supports one parameter group! (all parameters)"
+
+    learning_rate = optimizer.param_groups[0]["lr"]
+    weight_decay = optimizer.param_groups[0]["weight_decay"]
+
+    if isinstance(optimizer, optim.SGD):
+        momentum = optimizer.param_groups[0]["momentum"]
+        dampening = optimizer.param_groups[0]["dampening"]
+        # We will default momentum, weight decay, and dampening, to be constant if they are set to zero.
+        return {
+            "optimizerType": OptimizerType.SGD,
+            "lr": (learning_rate, False),
+            "momentum": (momentum, momentum == 0.0),
+            "weight_decay": (weight_decay, weight_decay == 0.0),
+            "dampening": (dampening, dampening == 0.0)
+        }
+    elif isinstance(optimizer, optim.Adam):
+        beta1 = optimizer.param_groups[0]["betas"][0]
+        beta2 = optimizer.param_groups[0]["betas"][1]
+        eps = optimizer.param_groups[0]["eps"]
+
+        assert optimizer.param_groups[0][
+            "amsgrad"] == False, "Only non-amsgrad Adam optimizers are supported."
+        return {
+            "optimizerType": OptimizerType.ADAM,
+            "lr": (learning_rate, False),
+            "beta1": (beta1, False),
+            "beta2": (beta2, False),
+            "weight_decay": (weight_decay, weight_decay == 0.0),
+            "eps": (eps, eps == 1e-08)
+        }
+
+    assert False, "Unsupported optimizer type. Types supported %s" % str(
+        list(OptimizerType))
 
 
 class _OptionsDict:
@@ -539,6 +570,9 @@ class _PoplarExecutor:
             # replace it in the model object: we have to create a wrapper class
             # and change the object's class.
             m.__class__ = WrappedModel
+
+    def _debugGetPopartIR(self):
+        return poptorch_core._getPopartIR(self.executable)
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):

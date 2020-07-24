@@ -54,15 +54,25 @@ namespace {
 // Process the user provided dictionary and extract the relevant optimizer
 // information.
 Optimizer parseOptimizer(const py::dict &opt) {
+  // optimizer is the map containing all set options.
   std::unordered_map<std::string, std::pair<float, bool>> optimizer;
+  OptimizerType type = OptimizerType::NONE;
 
+  // Extract all options from the python dictionary.
   for (auto element : opt) {
-    std::pair<float, bool> p = element.second.cast<std::pair<float, bool>>();
-
-    optimizer[element.first.cast<std::string>()] = p;
+    // All values are in the form of pair{float, bool} except for the optimizer
+    // option.
+    if (py::isinstance<py::int_>(element.second)) {
+      // Get the optimizer type.
+      type = static_cast<OptimizerType>(element.second.cast<std::uint64_t>());
+    } else {
+      // Get the name of the optimizer option.
+      const std::string name = element.first.cast<std::string>();
+      optimizer[name] = element.second.cast<std::pair<float, bool>>();
+    }
   }
 
-  return Optimizer{optimizer};
+  return Optimizer{type, optimizer};
 }
 
 std::string castToString(py::handle obj) {
@@ -161,6 +171,11 @@ void copyWeightsToDeviceImpl(
   }
 }
 
+std::string
+getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  return executable->getPopartIR();
+}
+
 std::vector<pybind11::object>
 execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
         const pybind11::tuple &inputs, py::dict *optimizerDict) {
@@ -175,7 +190,8 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
       buildTensorList(value, &input_tensors);
     }
 
-    Optimizer optimizer{{}};
+    // Create an empty optimizer for inference, this will not be applied.
+    Optimizer optimizer{OptimizerType::NONE, {}};
 
     if (optimizerDict) {
       optimizer = parseOptimizer(*optimizerDict);
@@ -406,7 +422,7 @@ compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    Optimizer optimizer{{}};
+    Optimizer optimizer{OptimizerType::NONE, {}};
     return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
                                    training, optimizer,
                                    parseSessionOptions(options));
@@ -464,4 +480,5 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);
   m.def("ipuHardwareIsAvailable", poptorch::ipuHardwareIsAvailable,
         py::arg("numIpus") = 1);
+  m.def("_getPopartIR", poptorch::getPopartIR);
 }

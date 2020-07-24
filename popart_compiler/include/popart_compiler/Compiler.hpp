@@ -31,9 +31,9 @@ struct OutputType {
 };
 
 // Extract the value from the map or return zero.
-static std::pair<float, bool> findInMapOrZero(
+static std::pair<float, bool> findInMapOrDefault(
     const std::unordered_map<std::string, std::pair<float, bool>> &opts,
-    const std::string &name) {
+    const std::string &name, float defaultValue = 0.0f) {
 
   // Lookup map.
   auto itr = opts.find(name);
@@ -43,7 +43,7 @@ static std::pair<float, bool> findInMapOrZero(
 
   logging::info("Optimizer map didn't have field for {}, defaulting to zero {}",
                 name);
-  return {0.0f, false};
+  return {defaultValue, false};
 }
 
 /* Returns true if the system contains a device with numIpus
@@ -53,32 +53,52 @@ bool ipuHardwareIsAvailable(std::uint64_t num_ipus = 1);
 
 struct Optimizer {
   explicit Optimizer(
-      const std::unordered_map<std::string, std::pair<float, bool>> &opts) {
+      OptimizerType t,
+      const std::unordered_map<std::string, std::pair<float, bool>> &opts)
+      : type(t) {
     // It is valid to not pass in a optimizer.
-    if (opts.empty()) {
-      type = OptimizerType::NONE;
+    if (opts.empty() || type == OptimizerType::NONE) {
       return;
     }
 
-    // Until popart supports more optimizers we only support SGD.
-    type = OptimizerType::SGD;
-
+    // We will assume all optimizers will have a learning rate.
     auto itr = opts.find("lr");
     ERROR_ON_MSG(itr == opts.end(),
                  "Learning rate was not provided in optimizer dictionary!");
-
     learning_rate = itr->second;
-    momentum = findInMapOrZero(opts, "momentum");
-    weight_decay = findInMapOrZero(opts, "weight_decay");
-    dampening = findInMapOrZero(opts, "dampening");
+    weight_decay = findInMapOrDefault(opts, "weight_decay");
+
+    switch (type) {
+    case OptimizerType::SGD: {
+      momentum = findInMapOrDefault(opts, "momentum");
+      dampening = findInMapOrDefault(opts, "dampening");
+      break;
+    }
+    case OptimizerType::ADAM: {
+      beta1 = findInMapOrDefault(opts, "beta1", 0.9);
+      beta2 = findInMapOrDefault(opts, "beta2", 0.999);
+      eps = findInMapOrDefault(opts, "eps", 1e-08);
+      break;
+    }
+    case OptimizerType::NONE:
+    default:
+      ERROR("UNREACHABLE: Unsupported optimizer type");
+    }
   }
 
   OptimizerType type;
 
   std::pair<float, bool> learning_rate;
-  std::pair<float, bool> momentum;
   std::pair<float, bool> weight_decay;
+
+  // Unique to SGD
+  std::pair<float, bool> momentum;
   std::pair<float, bool> dampening;
+
+  // Unique to Adam
+  std::pair<float, bool> beta1;
+  std::pair<float, bool> beta2;
+  std::pair<float, bool> eps;
 };
 
 class Compiler;
@@ -226,6 +246,10 @@ public:
   // For example: ( T0, T2, (T3, T4)) is represented as:
   // [ Tuple3, Tensor, Tensor, Tuple2, Tensor, Tensor ]
   const std::vector<OutputType> &outputTypes() const;
+
+  // We return this as a unique char pointer to avoid leaking memory while
+  // protecting the ABI boundry.
+  std::unique_ptr<char> getPopartIR() const;
 
 private:
   void assertTensorIs(PopartTypes dataType, const poptorch::TensorId &id,

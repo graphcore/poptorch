@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include <popart/adam.hpp>
 #include <popart/builder.hpp>
 #include <popart/graphtransformer.hpp>
 #include <popart/ir.hpp>
@@ -517,6 +518,29 @@ template <> struct HandleOutput<popart::TensorId> {
   }
 };
 
+static std::unique_ptr<popart::Optimizer> getOptimizer(const Optimizer &opt) {
+  if (opt.type == OptimizerType::SGD) {
+    return std::unique_ptr<popart::Optimizer>(
+        new popart::SGD({opt.learning_rate,
+                         opt.weight_decay,
+                         opt.momentum,
+                         opt.dampening,
+                         {1.0f, true},    // Velocity scaling, off.
+                         {1.0f, true}})); // Loss scaling, off.
+  }
+  if (opt.type == OptimizerType::ADAM) {
+    return std::unique_ptr<popart::Optimizer>(
+        new popart::Adam(opt.learning_rate, opt.weight_decay, opt.beta1,
+                         opt.beta2, opt.eps, {1.0f, true}, // Loss scaling, off.
+                         popart::AdamMode::Adam,
+                         popart::DataType::FLOAT, // Always accumulate as float.
+                         popart::DataType::FLOAT, popart::DataType::FLOAT));
+  }
+
+  ERROR("Unreachable: Unsupported optimizer");
+  return nullptr;
+}
+
 namespace detail {
 
 popart::TensorId
@@ -849,17 +873,25 @@ void Compiler::initSession(const Optimizer &opt) {
         _impl->op_builder->getModelProto(), data_flow, device, {}, options,
         popart::PatternsLevel::Default);
   } else {
-    logging::debug(
-        "Adding initial graph optimizer SGD with parameters:: Learning rate "
-        "{}, weight decay {}, Momentum {}, Dampening {}",
-        opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
-        opt.dampening.first);
+    // Print to debug the new optimizer.
+    if (opt.type == OptimizerType::SGD) {
+      logging::debug(
+          "Adding inital graph optimizer SGD with parameters: Learning rate "
+          "{}, weight decay {}, Momentum {}, Dampening {}",
+          opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
+          opt.dampening.first);
+    } else if (opt.type == OptimizerType::ADAM) {
+      logging::debug(
+          "Adding inital graph optimizer ADAM with parameters: Learning rate "
+          "{}, weight decay {}, beta1 {}, beta2 {}, eps {}",
+          opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
+          opt.beta2.first, opt.eps.first);
+    } else {
+      ERROR("Unreachable: Unsupported optimizer.");
+    }
 
     // Create the optimizer from user provided parameters.
-    auto optimizer =
-        popart::SGD(opt.learning_rate, opt.weight_decay, opt.momentum,
-                    opt.dampening, {1.0f, true}, // Velocity scaling, off.
-                    {1.0f, true});               // Loss scaling, off.
+    std::unique_ptr<popart::Optimizer> optimizer = getOptimizer(opt);
 
     // set a global identity loss that all other losses derive from.
     popart::TensorId loss_root =
@@ -874,7 +906,7 @@ void Compiler::initSession(const Optimizer &opt) {
     logging::LogContext ctx{
         "Compiler::initSession popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
-        transformer.getModelProto(), data_flow, loss_root, optimizer, device,
+        transformer.getModelProto(), data_flow, loss_root, *optimizer, device,
         {}, options, popart::PatternsLevel::Default);
   }
 
@@ -907,6 +939,18 @@ void Compiler::initSession(const Optimizer &opt) {
   copyWeightsToDevice();
 }
 
+std::unique_ptr<char> Compiler::getPopartIR() const {
+  const std::string as_string =
+      _impl->session->serializeIr(popart::IrSerializationFormat::JSON);
+
+  // Copy into a memory managed array to get around ABI.
+  std::unique_ptr<char> ptr =
+      std::unique_ptr<char>(new char[as_string.size() + 1]);
+  std::memcpy(ptr.get(), as_string.data(), as_string.size());
+  ptr.get()[as_string.size()] = '\0';
+  return ptr;
+}
+
 // Write the weights into IPU memory from the pytorch tensor buffers in the
 // model.
 void Compiler::copyWeightsToDevice() {
@@ -922,25 +966,31 @@ void Compiler::copyWeightsToHost() {
   _impl->session->readWeights(_impl->weight_callback);
 }
 
-void Compiler::run(const Optimizer &optimizer) {
-  if (optimizer.type != OptimizerType::NONE && _impl->is_training) {
-    // Convert the map from the user into a popart SGD class.
-    auto new_optimizer = popart::SGD(
-        optimizer.learning_rate, optimizer.weight_decay, optimizer.momentum,
-        optimizer.dampening, {1.0f, true}, // Velocity scaling, off.
-        {1.0f, true});                     // Loss scaling, off.
+void Compiler::run(const Optimizer &opt) {
+  if (opt.type != OptimizerType::NONE && _impl->is_training) {
+    std::unique_ptr<popart::Optimizer> optimizer = getOptimizer(opt);
 
     // Print to debug the new optimizer.
-    logging::debug(
-        "Updating graph optimizer SGD with parameters: Learning rate "
-        "{}, weight decay {}, Momentum {}, Dampening {}",
-        optimizer.learning_rate.first, optimizer.weight_decay.first,
-        optimizer.momentum.first, optimizer.dampening.first);
+    if (opt.type == OptimizerType::SGD) {
+      logging::debug(
+          "Updating graph optimizer SGD with parameters: Learning rate "
+          "{}, weight decay {}, Momentum {}, Dampening {}",
+          opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
+          opt.dampening.first);
+    } else if (opt.type == OptimizerType::ADAM) {
+      logging::debug(
+          "Updating graph optimizer ADAM with parameters: Learning rate "
+          "{}, weight decay {}, beta1 {}, beta2 {}, eps {}",
+          opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
+          opt.beta2.first, opt.eps.first);
+    } else {
+      ERROR("Unreachable: Unsupported optimizer.");
+    }
 
     // Update the popart graph/poplar executable with the new optimizer.
     popart::TrainingSession &session =
         dynamic_cast<popart::TrainingSession &>(*_impl->session);
-    session.updateOptimizerFromHost(&new_optimizer);
+    session.updateOptimizerFromHost(optimizer.get());
   }
 
   // Execute the model on IPU.

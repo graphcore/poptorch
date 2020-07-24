@@ -14,7 +14,7 @@ namespace poptorch {
  */
 
 // The training optimizer algorithm used.
-enum OptimizerType : std::uint8_t { NONE, SGD };
+enum OptimizerType : std::uint8_t { SGD = 0, ADAM, LAMB, NONE };
 
 // The types supported by popart.
 enum class PopartTypes {
