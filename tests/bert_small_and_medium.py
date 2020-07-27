@@ -31,6 +31,27 @@ def test_bert_small():
                               atol=1e-02)
 
 
+def test_bert_small_half():
+    torch.manual_seed(42)
+
+    # Bert small.
+    pretrained_weights = 'mrm8488/bert-small-finetuned-squadv2'
+    model = transformers.BertModel.from_pretrained(pretrained_weights,
+                                                   torchscript=True)
+    tokenizer = transformers.BertTokenizer.from_pretrained(pretrained_weights)
+
+    # It *just* fits on one IPU but if the sequence length is too big it will need two.
+    input_ids = torch.tensor([tokenizer.encode("E")])
+
+    opts = poptorch.Options().profile(False)
+    model.half()
+    inference_model = poptorch.inferenceModel(model, opts)
+    poptorchOut = inference_model(input_ids)
+
+    # Just check that we compile for now.
+    assert poptorchOut[0].dtype == torch.half
+
+
 def test_bert_medium_result():
     torch.manual_seed(42)
 

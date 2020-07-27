@@ -648,15 +648,58 @@ class _PoplarExecutor:
 
             in_tensors_trace_view.forEach(narrowTensor)
 
+            # Normal bools don't get captured in python.
+            hasConvertedAnyHalf = [False]
+
+            def possiblyConvertFromHalf(tensor):
+                if tensor.dtype == torch.half:
+                    hasConvertedAnyHalf[0] = True
+                    return tensor.float()
+                return tensor
+
+            in_tensors_trace_view.forEach(possiblyConvertFromHalf)
+
             # Compile the poplar executable based on the batchsize.
             if self.options.Jit.trace_model:
                 logger.info('Compiling the model using tracing')
+
+                convertedLayers = []
+
+                for name, layer in self.model.named_modules():
+                    anyIsHalf = False
+                    for param in layer.parameters():
+                        if param.dtype == torch.half:
+                            anyIsHalf = True
+                            break
+
+                    if anyIsHalf:
+                        layer.float()
+
+                        convertedLayers.append(name)
+
+                # We will trace using the normal trace view.
                 n = torch.jit.trace(self.model,
                                     in_tensors_trace_view.asTuple())
 
-                self.executable = compileWithTrace(  # pylint: disable=undefined-variable
-                    n._c, in_tensors_trace_view.asTuple(),
-                    self.options.toDict(), self.training, self.optimizer)
+                # Convert any converted params back to half.
+                for name, layer in n.named_modules():
+                    if name in convertedLayers:
+                        layer.half()
+
+                if hasConvertedAnyHalf[0]:
+                    # Get the originals back.
+                    in_tensors_as_half = _Args(self.model, args, kwargs,
+                                               self.training)
+                    in_tensors_as_half.forEach(narrowTensor)
+
+                    # Compile using the actual halves.
+                    self.executable = compileWithTrace(  # pylint: disable=undefined-variable
+                        n._c, in_tensors_as_half.asTuple(),
+                        self.options.toDict(), self.training, self.optimizer)
+                else:
+                    self.executable = compileWithTrace(  # pylint: disable=undefined-variable
+                        n._c, in_tensors_trace_view.asTuple(),
+                        self.options.toDict(), self.training, self.optimizer)
             else:
                 logger.info('Compiling the model using scripting')
                 n = torch.jit.script(self.model)

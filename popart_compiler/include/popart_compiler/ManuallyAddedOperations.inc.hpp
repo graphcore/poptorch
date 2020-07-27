@@ -6,8 +6,8 @@ OP_DECL(poptorch, ipu_print_tensor, ipu_print_tensor,
 OP_DECL(poptorch, int_constant, int_constant, _impl->intConstant,
         ARG(INT_VEC, data) ARG(INT_VEC, shape), BODY_ARG(int64ToInt32(data)) BODY_ARG(shape))
 OP_DECL(poptorch, float_constant, float_constant, _impl->floatConstant,
-        ARG(FLOAT_VEC, data) ARG(INT_VEC, shape),
-        BODY_ARG(data) BODY_ARG(shape))
+        ARG(FLOAT_VEC, data) ARG(INT_VEC, shape) ARG(INT, isHalf),
+        BODY_ARG(data) BODY_ARG(shape) BODY_ARG(static_cast<bool>(isHalf)))
 OP_DECL(poptorch, cast, cast, _impl->cast, ARG(STRING, type), BODY_ARG(type))
 OP_DECL(poptorch, constant_pad, constant_pad, AiOnnxOpset9.pad,
         ARG(INT_VEC, pads) ARG(FLOAT, value),

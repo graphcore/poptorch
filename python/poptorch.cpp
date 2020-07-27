@@ -344,6 +344,9 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
       parameter_data.push_back(param);
     }
 
+    // Convert the IR to half to match the inputs/actual usage.
+    poptorch::canonicaliseHalf(graph.get(), input_tensors, parameter_data);
+
     logging::debug("Graph right before popart:\n{}", *graph);
 
     return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,

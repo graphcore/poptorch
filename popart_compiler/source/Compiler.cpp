@@ -111,7 +111,8 @@ public:
 
   popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
                                  const std::vector<double> &data,
-                                 const std::vector<int64_t> &shape);
+                                 const std::vector<int64_t> &shape,
+                                 bool isHalf);
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
@@ -438,10 +439,12 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
 popart::TensorId
 CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
                             const std::vector<double> &data,
-                            const std::vector<int64_t> &shape) {
+                            const std::vector<int64_t> &shape, bool isHalf) {
   UNUSED(inputs);
+
+  const std::string type = isHalf ? "FLOAT16" : "FLOAT";
   // Create the tensor info for our new tensor.
-  popart::TensorInfo info{"FLOAT", shape};
+  popart::TensorInfo info{type, shape};
 
   std::int64_t total_size = std::accumulate(shape.begin(), shape.end(), 1,
                                             std::multiplies<std::int64_t>());

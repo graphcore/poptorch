@@ -22,3 +22,5 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 - Adds support for torch.nn.PReLU
 
 - Adds support for Adam optimizer.
+
+- Adds support for half type models and inputs.

@@ -170,7 +170,8 @@ at::ScalarType fromPopartType(const poptorch::PopartTypes type) {
   case poptorch::PopartTypes::INT16: {
     return at::ScalarType::Short;
   }
-  case poptorch::PopartTypes::INT32: {
+  case poptorch::PopartTypes::INT32:
+  case poptorch::PopartTypes::UINT32: {
     return at::ScalarType::Int;
   }
   case poptorch::PopartTypes::INT64: {

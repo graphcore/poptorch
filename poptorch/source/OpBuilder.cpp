@@ -46,6 +46,8 @@ torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
       createAndInsertNode(graph, symbols::poptorch::float_constant);
   new_node->fs_(c10::attr::data, data);
   new_node->is_(c10::attr::shape, new_shape);
+  new_node->i_(c10::Symbol::fromQualString("attr::isHalf"), 0);
+
   return new_node;
 }
 
