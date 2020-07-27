@@ -2,20 +2,17 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import torch.nn as nn
-import numpy as np
-
 import poptorch
 import torchvision.models as models
 import torchvision
 
-from PIL import Image
 from torchvision import transforms
 
 training_batch_size = 1
 training_ipu_step_size = 100
 gradient_accumulation = 2
-training_combined_batch_size = gradient_accumulation * training_batch_size * training_ipu_step_size
+training_combined_batch_size = gradient_accumulation * training_batch_size * \
+        training_ipu_step_size
 
 preprocess = transforms.Compose([
     transforms.Resize(256),
@@ -66,7 +63,7 @@ def train():
 
             acc = 0.0
             if len(elms) == 2:
-                if elms[0] == True:
+                if elms[0]:
                     acc = (counts[0].item() /
                            training_combined_batch_size) * 100.0
                 else:

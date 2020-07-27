@@ -35,7 +35,7 @@ def test_custom_loss():
     out = model(input)
     assert not torch.allclose(out, target, rtol=1e-02, atol=1e-02)
 
-    for i in range(0, 2500):
+    for _ in range(0, 2500):
         out, loss = poptorch_model(input, target)
 
     # Check we have trained the "model"

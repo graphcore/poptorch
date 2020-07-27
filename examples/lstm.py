@@ -11,8 +11,8 @@ class SimpleLSTM(nn.Module):
         super().__init__()
         self.lstm = nn.LSTM(3, 3)
 
-    def forward(self, inputs, hidden):
-        Y, (Y_h, Y_c) = self.lstm(inputs, hidden)
+    def forward(self, input_tensors, hidden):
+        Y, (Y_h, Y_c) = self.lstm(input_tensors, hidden)
         return Y, (Y_h, Y_c)
 
 

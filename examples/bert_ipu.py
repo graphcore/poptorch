@@ -25,10 +25,8 @@ questions = [
 
 batches = len(questions)
 
-running_on_hardware = False
-
 # Pipeline the model over two IPUs. You must have at least as many batches (questions) as you have IPUs.
-if running_on_hardware:
+if poptorch.ipuHardwareIsAvailable():
     model.bert.embeddings.position_embeddings = poptorch.IPU(
         1, model.bert.embeddings.position_embeddings)
 
@@ -37,7 +35,7 @@ opts = poptorch.Options().deviceIterations(batches)
 inference_model = poptorch.inferenceModel(model, opts)
 
 # Batch by the number of iterations so we fill the pipeline.
-encoding, input_ids, attention_mask = [None] * batches, [None] * batches, [
+encoding, input_ids, attention_mask = [None] * batches, [[None]] * batches, [
     None
 ] * batches
 

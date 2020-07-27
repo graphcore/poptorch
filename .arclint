@@ -30,10 +30,19 @@
         },
         "yapf": {
             "type": "yapf",
+            "flags": ["--style={based_on_style: pep8}"],
             "bin": ["./.linters/yapf", "./install_linters.sh"],
             "include": "(\\.py$)",
             "exclude": "(^docs/.*)"
         },
+        "pylint": {
+            "type": "pylint",
+            "pylint.config": ".pylintrc",
+            "bin": ["./.linters/pylint"],
+            "include": "(\\.py$)",
+            "exclude": "(^docs/.*)"
+        },
+
         "clang-tidy":{
           "type": "clang-tidy",
           "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",

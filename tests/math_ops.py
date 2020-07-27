@@ -2,9 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import torch.nn as nn
 import poptorch
-
 import pytest
 
 # Unsupported and uncatergorised math ops.
@@ -121,15 +119,15 @@ def test_binary_pow():
     unary_op_harness(op, input1, compare)
 
     # Test "int" parameter
-    def op(x):
+    def op_int(x):
         return torch.pow(x, 3)
 
-    unary_op_harness(op, input1, compare)
+    unary_op_harness(op_int, input1, compare)
 
-    def op(x):
+    def op_float(x):
         return torch.pow(x, 2.5)
 
-    unary_op_harness(op, input1, compare)
+    unary_op_harness(op_float, input1, compare)
 
 
 @pytest.mark.parametrize("op", unary_ops_int)
@@ -200,7 +198,7 @@ def test_binary_ops_elementwise_edgecases(op):
             super(ConstOnLHS, self).__init__()
             self.op = op
 
-        def forward(self, x, y):
+        def forward(self, x, _y):
             return self.op(x, 4.0)
 
     binary_op_harness(ConstOnLHS(op), input1, input2, compare)
@@ -211,7 +209,7 @@ def test_binary_ops_elementwise_edgecases(op):
             super(ConstOnRHS, self).__init__()
             self.op = op
 
-        def forward(self, x, y):
+        def forward(self, x, _y):
             return self.op(2.5, x)
 
     binary_op_harness(ConstOnRHS(op), input1, input2, compare)
@@ -222,7 +220,7 @@ def test_binary_ops_elementwise_edgecases(op):
             super(ConstOnLHSInt, self).__init__()
             self.op = op
 
-        def forward(self, x, y):
+        def forward(self, x, _y):
             return self.op(x, 4)
 
     binary_op_harness(ConstOnLHSInt(op), input1, input2, compare)
@@ -233,7 +231,7 @@ def test_binary_ops_elementwise_edgecases(op):
             super(ConstOnRHSInt, self).__init__()
             self.op = op
 
-        def forward(self, x, y):
+        def forward(self, x, _y):
             return self.op(134, x)
 
     binary_op_harness(ConstOnRHSInt(op), input1, input2, compare)
@@ -281,8 +279,7 @@ def test_reduction_ops_float(op):
 
         if x.dtype == torch.float32:
             return torch.allclose(x, y)
-        else:
-            return torch.eq(x, y)
+        return torch.eq(x, y)
 
     unary_op_harness(op, input, compare)
 
@@ -300,12 +297,10 @@ def test_reduction_ops_float_api2(op):
 
         if x.dtype == torch.float32:
             return torch.allclose(x, y)
-        else:
-
-            if torch.numel(x) > 1:
-                # Work around not returning longs from popart.
-                return torch.equal(x, y.type_as(x))
-            return torch.eq(x, y)
+        if torch.numel(x) > 1:
+            # Work around not returning longs from popart.
+            return torch.equal(x, y.type_as(x))
+        return torch.eq(x, y)
 
     unary_op_harness(operation, input, compare)
 
@@ -342,7 +337,7 @@ def test_compare_operations(op):
 
     binary_op_harness(op, lhs, rhs, torch.equal)
 
-    if op != torch.min and op != torch.max:
+    if op not in (torch.min, torch.max):
 
         def constant_rhs(x):
             return op(x, 0.34)

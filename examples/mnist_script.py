@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import rlcompleter, readline
-readline.parse_and_bind('tab:complete')
-
+import readline
 import torch
 import torch.nn as nn
 import torch.functional
 import torchvision
 import numpy as np
 import poptorch
+
+readline.parse_and_bind('tab:complete')
 
 # Load the MNIST data.
 validation_batch_size = 100

@@ -2,7 +2,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import torch.nn as nn
 import torchvision.models as models
 import poptorch
 

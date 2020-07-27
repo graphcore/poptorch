@@ -2,12 +2,11 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import argparse
-import clang.cindex
 from ctypes.util import find_library
-import json
 import logging
 import os
-import sys
+
+import clang.cindex
 
 logger = logging.getLogger("PopParse")
 parser = argparse.ArgumentParser()
@@ -46,7 +45,7 @@ nodeBlacklist = {
 }
 
 
-def find_children(node, argNum):
+def find_children(node, _argNum):
     argDict = {}
     if node.kind == clang.cindex.CursorKind.PARM_DECL:
         argDict["type"] = node.type.spelling
@@ -58,7 +57,7 @@ def find_children(node, argNum):
 def find_functions(node, namespace):
     global jsonOutput
     # If this is not the file path provided on the comand line, skip.
-    if node.location.file != None and str(node.location.file) not in files:
+    if node.location.file is not None and str(node.location.file) not in files:
         return
     if node.spelling in nodeBlacklist:
         return
@@ -78,11 +77,11 @@ def find_functions(node, namespace):
         for c in node.get_children():
 
             # Traverse the children to find any parameters
-            arg = find_children(c, argNum)
+            argument = find_children(c, argNum)
 
-            if len(arg) > 0:
-                arg["num"] = argNum
-                operation["args"].append(arg)
+            if argument:
+                argument["num"] = argNum
+                operation["args"].append(argument)
                 argNum += 1
 
     else:
@@ -108,11 +107,11 @@ tu = index.parse(popart_dir + "/builder.hpp",
                  ])
 
 for diag in tu.diagnostics:
-    logger.warn(diag)
+    logger.warning(diag)
 
 root_node = tu.cursor
 find_functions(root_node, "")
-logger.debug("jsonOutput Keys:%s" % jsonOutput.keys())
+logger.debug("jsonOutput Keys:%s", jsonOutput.keys())
 
 classes = []
 
@@ -136,7 +135,7 @@ for opset in classes:
 
     for name in toRemove:
         jsonOutput[opset].pop(name)
-logger.debug("addedFunctions: %s" % addedFunctions)
+logger.debug("addedFunctions: %s", addedFunctions)
 
 MultipleOutputsOps = {"lstm": "2", "split": "num_outputs", "topk": "2"}
 
@@ -171,8 +170,7 @@ def toType(cxxType):
     if cleaned in CXXTypeToTypeClass:
         return CXXTypeToTypeClass[cleaned]
 
-    logger.debug(
-        "toType: Unknown cxxType=%s / cleaned=%s" % (cxxType, cleaned))
+    logger.debug("toType: Unknown cxxType=%s / cleaned=%s", cxxType, cleaned)
 
     # Soft fail as it isn't unexpected for some popart functions to be unsupported right now.
     return "UNKNOWN"
@@ -181,7 +179,8 @@ def toType(cxxType):
 # Convert from the popart header types into normal C++ types that can be used by pytorch.
 def convertCxxConvert(cxxType):
 
-    if "nonstd::optional<int>" in cxxType or "nonstd::optional<int64_t>" in cxxType:
+    if "nonstd::optional<int>" in cxxType or \
+            "nonstd::optional<int64_t>" in cxxType:
         return "std::int32_t"
 
     if "popart::ReductionType" in cxxType:
@@ -208,6 +207,7 @@ def attrTypeGetter(ty):
         return "f"
 
     assert False, "Invalid type: " + ty
+    return None
 
 
 macroFile = ""
@@ -247,16 +247,16 @@ for opset in classes:
             macroType = toType(arg["type"])
 
             if macroType == "UNKNOWN":
-                logger.debug("Skipping OP: " + name +
-                             " due to parse failure on " + str(arg))
+                logger.debug("Skipping OP: %s"
+                             " due to parse failure on %s", name, str(arg))
                 earlyExit = True
                 break
 
             argVector += "ARG(" + macroType + "," + arg["name"] + ") "
 
             if "ReductionType" in arg["type"]:
-                bodyArgVector += "BODY_ARG(static_cast<popart::ReductionType>(" + arg[
-                    "name"] + ")) "
+                bodyArgVector += "BODY_ARG(static_cast<popart::ReductionType>("\
+                + arg["name"] + ")) "
             else:
                 bodyArgVector += "BODY_ARG(" + arg["name"] + ") "
 
@@ -276,9 +276,11 @@ for opset in classes:
 
         header = "torch::jit::Node* "
 
-        header += "create" + funcName + "(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args"
+        header += "create" + funcName + "(torch::jit::Graph *graph,  const " \
+            "std::vector<torch::jit::Value *>& args"
 
-        cppFile = " torch::jit::Node *new_node = createAndInsertNode(graph,symbols::popart::" + name + ", args"
+        cppFile = " torch::jit::Node *new_node = createAndInsertNode(graph, " \
+               "symbols::popart::" + name + ", args"
         if name in MultipleOutputsOps:
             cppFile += ", %s" % MultipleOutputsOps[name]
         cppFile += ");\n"
@@ -293,8 +295,8 @@ for opset in classes:
 
             attr = attrTypeGetter(toType(arg["type"]))
 
-            cppFile += "new_node->" + attr + "_(c10::Symbol::fromQualString(\"attr::" + arg[
-                "name"] + "\")," + arg["name"] + ");\n"
+            cppFile += "new_node->" + attr + "_(c10::Symbol::fromQualString("\
+                "\"attr::" + arg["name"] + "\")," + arg["name"] + ");\n"
 
         cppFile += "return new_node;\n"
 
@@ -306,22 +308,27 @@ for opset in classes:
 
         cxxFile += cppFile + "\n"
 
-autogeneratedComment = "// Copyright (c) 2020 Graphcore Ltd. All rights reserved.\n// Auto generated file, do not modify\n// Run `python3 PopParse.py to regenerate\n// clang-format off\n"
+autoComment = """// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+// Auto generated file, do not modify
+// Run `python3 PopParse.py to regenerate
+// clang-format off
+"""
+
 with open(
         os.path.join(current_dir, 'popart_compiler', 'include',
                      'popart_compiler', 'CompilerOperationMacros.inc.hpp'),
         'w') as f:
-    print(autogeneratedComment, file=f)
+    print(autoComment, file=f)
     print(macroFile, file=f)
 
 with open(
         os.path.join(current_dir, 'poptorch', 'include', 'poptorch',
                      'CompilerOps.inc.hpp'), 'w') as f:
-    print(autogeneratedComment, file=f)
+    print(autoComment, file=f)
     print(headerStubs, file=f)
 
 with open(
         os.path.join(current_dir, 'poptorch', 'source', 'CompilerOps.cpp.inc'),
         'w') as f:
-    print(autogeneratedComment, file=f)
+    print(autoComment, file=f)
     print(cxxFile, file=f)

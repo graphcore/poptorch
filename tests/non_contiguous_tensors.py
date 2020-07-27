@@ -6,9 +6,6 @@ import poptorch
 
 
 class FiveAdder(torch.nn.Module):
-    def __init__(self):
-        super(FiveAdder, self).__init__()
-
     def forward(self, in_1, in_2, in_3, in_4, in_5):
         return in_1 + in_2 + in_3 + in_4 + in_5
 

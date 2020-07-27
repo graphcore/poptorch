@@ -3,8 +3,6 @@
 
 import torch
 import torch.nn as nn
-import numpy as np
-
 import poptorch
 
 
@@ -38,9 +36,11 @@ def test_conv2d():
     # Shrinking the graph is mostly done for debugability.
     m = torch.jit.script(m)
     graph = m.graph
+    # pylint: disable=protected-access
     torch._C._jit_pass_inline(graph)
     torch._C._jit_pass_constant_propagation(graph)
-    graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+    graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
+    # pylint: enable=protected-access
     # Observe the graph doesn't already have a shape for the output.
     assert _getOutputShape(graph) is None
 
@@ -70,10 +70,12 @@ def test_batchnorm():
     # Shrinking the graph is mostly done for debugability.
     m = torch.jit.script(m)
     graph = m.graph
+    # pylint: disable=protected-access
     torch._C._jit_pass_inline(graph)
     poptorch.poptorch_core.peepholeOptimizations(graph, False)
-    graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+    graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
     torch._C._jit_pass_constant_propagation(graph)
+    # pylint: enable=protected-access
     # Observe the graph doesn't already have a shape for the output.
     assert _getOutputShape(graph) is None
 
@@ -103,9 +105,11 @@ def test_maxpool2d():
     # Shrinking the graph is mostly done for debugability.
     m = torch.jit.script(m)
     graph = m.graph
+    # pylint: disable=protected-access
     torch._C._jit_pass_inline(graph)
     torch._C._jit_pass_constant_propagation(graph)
-    graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+    graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
+    # pylint: enable=protected-access
     # Observe the graph doesn't already have a shape for the output.
     assert _getOutputShape(graph) is None
 
@@ -119,9 +123,6 @@ def test_maxpool2d():
 
 def test_view():
     class X(nn.Module):
-        def __init__(self, *args, **kwargs):
-            super(X, self).__init__()
-
         def forward(self, x):
             return x.view(50, -1)
 
@@ -132,8 +133,10 @@ def test_view():
     print(actualOutputShape)
     m = torch.jit.script(m)
     graph = m.graph
-    graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+    # pylint: disable=protected-access
+    graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
     torch._C._jit_pass_constant_propagation(graph)
+    # pylint: enable=protected-access
     assert _getOutputShape(graph) is None
 
     poptorch.propagateInputShapes(graph, (dummyInput, ))
@@ -146,9 +149,6 @@ def test_view():
 # "aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta, Scalar alpha) -> Tensor") ||
 def test_addmm():
     class X(nn.Module):
-        def __init__(self, *args, **kwargs):
-            super(X, self).__init__()
-
         def forward(self, x, y, z):
             return torch.addmm(x, y, z)
 
@@ -158,7 +158,9 @@ def test_addmm():
 
     m = torch.jit.script(m)
     graph = m.graph
-    graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+    # pylint: disable=protected-access
+    graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
+    # pylint: enable=protected-access
     assert _getOutputShape(graph) is None
 
     poptorch.propagateInputShapes(graph, dummyInputs)
@@ -173,9 +175,6 @@ def test_add():
         print(f'run_test({shape_a}, {shape_b})')
 
         class X(nn.Module):
-            def __init__(self):
-                super(X, self).__init__()
-
             def forward(self, a, b):
                 return a + b
 
@@ -185,7 +184,9 @@ def test_add():
 
         m = torch.jit.script(m)
         graph = m.graph
-        graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+        # pylint: disable=protected-access
+        graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
+        # pylint: enable=protected-access
         assert _getOutputShape(graph) is None
 
         poptorch.propagateInputShapes(graph, dummyInputs)
@@ -217,12 +218,14 @@ def test_adaptive_average_pool2d():
         m = torch.jit.script(m)
         graph = m.graph
         list(graph.inputs())[1].inferTypeFrom(dummyInputs[0])
-        graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+        # pylint: disable=protected-access
+        graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
         torch._C._jit_pass_peephole(graph, True)
         torch._C._jit_pass_constant_propagation(graph)
 
         torch._C._jit_pass_loop_unrolling(graph)
         torch._C._jit_pass_constant_propagation(graph)
+        # pylint: enable=protected-access
         poptorch.poptorch_core.eliminateListConstructs(graph)
 
         assert _getOutputShape(graph) is None
@@ -241,9 +244,6 @@ def test_adaptive_average_pool2d():
 def test_flatten():
     def run_test(input_shape):
         class X(nn.Module):
-            def __init__(self):
-                super(X, self).__init__()
-
             def forward(self, x):
                 return torch.flatten(x)
 
@@ -254,9 +254,11 @@ def test_flatten():
         m = torch.jit.script(m)
         graph = m.graph
         list(graph.inputs())[1].inferTypeFrom(dummyInputs[0])
-        graph, params = torch._C._jit_pass_lower_graph(graph, m._c)
+        # pylint: disable=protected-access
+        graph, _ = torch._C._jit_pass_lower_graph(graph, m._c)
         torch._C._jit_pass_peephole(graph, True)
         torch._C._jit_pass_constant_propagation(graph)
+        # pylint: enable=protected-access
         assert _getOutputShape(graph) is None
 
         poptorch.propagateInputShapes(graph, dummyInputs)

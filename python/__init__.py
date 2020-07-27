@@ -68,8 +68,8 @@ class _PoptorchFormatter(logging.Formatter):
 
 def _excepthook(*args):
     e = traceback.format_exception(*args)
-    logger.critical(e[-1] + "\n" + "".join(e))
-    exit(1)
+    logger.critical("%s\n%s", e[-1], "".join(e))
+    sys.exit(1)
 
 
 console = logging.StreamHandler()
@@ -81,10 +81,10 @@ sys.excepthook = _excepthook
 
 
 def identity_loss(x, reduction="none"):
-    if (reduction == "sum"):
+    if reduction == "sum":
         return torch.ops.poptorch.identity_loss(x, 0)
 
-    if (reduction == "mean"):
+    if reduction == "mean":
         return torch.ops.poptorch.identity_loss(x, 1)
 
     assert reduction == "none", "Unsupported reduction type!"
@@ -97,9 +97,9 @@ class OptimizerType(enum.IntEnum):
 
 
 def _convertOptimizerToDict(optimizer):
-    assert len(
-        optimizer.param_groups
-    ) == 1, "Poptorch currently only supports one parameter group! (all parameters)"
+    assert len(optimizer.param_groups) == 1, (
+        "Poptorch currently only "
+        "supports one parameter group! (all parameters)")
 
     learning_rate = optimizer.param_groups[0]["lr"]
     weight_decay = optimizer.param_groups[0]["weight_decay"]
@@ -115,13 +115,14 @@ def _convertOptimizerToDict(optimizer):
             "weight_decay": (weight_decay, weight_decay == 0.0),
             "dampening": (dampening, dampening == 0.0)
         }
-    elif isinstance(optimizer, optim.Adam):
+    if isinstance(optimizer, optim.Adam):
         beta1 = optimizer.param_groups[0]["betas"][0]
         beta2 = optimizer.param_groups[0]["betas"][1]
         eps = optimizer.param_groups[0]["eps"]
 
-        assert optimizer.param_groups[0][
-            "amsgrad"] == False, "Only non-amsgrad Adam optimizers are supported."
+        assert not optimizer.param_groups[0]["amsgrad"], (
+            "Only non-amsgrad "
+            "Adam optimizers are supported.")
         return {
             "optimizerType": OptimizerType.ADAM,
             "lr": (learning_rate, False),
@@ -133,10 +134,11 @@ def _convertOptimizerToDict(optimizer):
 
     assert False, "Unsupported optimizer type. Types supported %s" % str(
         list(OptimizerType))
+    return None
 
 
 class _OptionsDict:
-    """Safe dictionary to store options: only keys which have been passed to 
+    """Safe dictionary to store options: only keys which have been passed to
     the constructor can later be updated.
     """
 
@@ -148,8 +150,8 @@ class _OptionsDict:
             assert option in self._values, ("Invalid option %s, valid options"
                                             " are %s") % (option,
                                                           self._values.keys())
-            assert type(value) == type(
-                self._values[option]
+            assert isinstance(
+                value, type(self._values[option])
             ), "Unexpected type %s for option %s. Expected %s" % (
                 type(value), option, type(self._values[option]))
             self._values[option] = value
@@ -162,8 +164,9 @@ class _OptionsDict:
                 self._values[option] = value
 
     def __getattr__(self, option):
-        assert option in self._values, "Invalid option %s, valid options are %s" % (
-            option, self._values.keys())
+        assert option in self._values, ("Invalid option %s, "
+                                        "valid options are %s") % (
+                                            option, self._values.keys())
         return self._values[option]
 
     def update(self, other):
@@ -173,8 +176,9 @@ class _OptionsDict:
         return other
 
     def __call__(self, option):
-        assert option in self._values, "Invalid option %s, valid options are %s" % (
-            option, self._values.keys())
+        assert option in self._values, ("Invalid option %s, "
+                                        "valid options are %s") % (
+                                            option, self._values.keys())
         return self._values[option]
 
 
@@ -239,7 +243,7 @@ class AnchorMode(enum.IntEnum):
 class ConnectionType(enum.IntEnum):
     """
     - Always: Attach to the IPU from the start (Default).
-    - OnDemand: Wait until the compilation is complete and the executable is 
+    - OnDemand: Wait until the compilation is complete and the executable is
       ready to be run to attach to the IPU.
     - Never: Never try to attach to an IPU. (Useful for offline compilation,
       but trying to run an executable will raise an exception).
@@ -326,7 +330,8 @@ class Options(_OptionsDict):
         """Use the IPU model or physical hardware.
 
         Default: False (Real Hardware)
-        This setting takes precedence over the POPTORCH_IPU_MODEL environment variable.
+        This setting takes precedence over the POPTORCH_IPU_MODEL environment
+        variable.
         """
         self.set(use_model=use_model)
         return self
@@ -349,7 +354,7 @@ class Options(_OptionsDict):
         - SinglePipeline
         - PingPong
         """
-        assert isinstance(sync_patter, SyncPattern)
+        assert isinstance(sync_pattern, SyncPattern)
         self.set(sync_pattern=sync_pattern.value)
         return self
 
@@ -385,7 +390,8 @@ class Options(_OptionsDict):
                 All: Return a result for each batch.
                 Sum: Return the sum of all the batches
                 Final: Return the last batch.
-                EveryN: Return every N batches. N is passed in as |anchor_return_period|
+                EveryN: Return every N batches. N is passed in as
+                    |anchor_return_period|
                 Default: "All" for inference, "Final" for training.
         """
         assert isinstance(anchor_mode, AnchorMode)
@@ -398,8 +404,8 @@ class Options(_OptionsDict):
                 " positive integer")
         elif anchor_return_period:
             logging.info(
-                "Anchor return period argument ignored with anchor_mode set to %s"
-                % anchor_mode)
+                "Anchor return period argument ignored with anchor_mode"
+                " set to %s", anchor_mode)
 
         self.set(anchor_mode=anchor_mode.value,
                  anchor_return_period=anchor_return_period or 1)
@@ -452,17 +458,17 @@ class _Args:
         argcount = fn.__code__.co_argcount
         varnames = varnames[1:argcount]
         argcount -= 1
-        assert len(args) + len(
-            kwargs
-        ) <= argcount, "Too many arguments provided: expected %s (%d) but got %d" % (
-            varnames, len(varnames), len(args) + len(kwargs))
+        assert len(args) + len(kwargs) <= argcount, (
+            "Too many arguments provided: expected %s (%d) "
+            "but got %d") % (varnames, len(varnames), len(args) + len(kwargs))
         defaults = fn.__defaults__ or []
         first_optional = len(varnames) - len(defaults)
         none_passed = []
         for i, name in enumerate(varnames):
             if i < len(args):
                 self._args.append(args[i])
-                assert name not in kwargs, "Parameter %s was passed more than once" % name
+                assert name not in kwargs, ("Parameter %s was passed more "
+                                            "than once") % name
             elif name in kwargs:
                 assert not none_passed, (
                     "Torch doesn't support passing tensors"
@@ -470,9 +476,10 @@ class _Args:
                     " %s") % ", ".join(none_passed)
                 self._args.append(kwargs[name])
             else:
-                assert i >= first_optional, "Mandatory parameter %s missing" % name
+                assert i >= first_optional, ("Mandatory parameter %s "
+                                             "missing") % name
                 value = defaults[i - first_optional]
-                if value == None:
+                if value is None:
                     none_passed.append("%s (%d)" % (name, i))
                 if not none_passed:
                     self._args.append(value)
@@ -482,34 +489,31 @@ class _Args:
     def _forEach(self, data, fn):
         if isinstance(data, (tuple, list)):
             return type(data)(self._forEach(d, fn) for d in data)
-        elif isinstance(data, dict):
+        if isinstance(data, dict):
             return {
                 key: self._forEach(value, fn)
                 for key, value in data.items()
             }
-        else:
-            return fn(data)
+        return fn(data)
 
     def _forEachMatched(self, data, condition, doOnTrue, conditionMatches):
         if isinstance(data, (tuple, list)):
             return type(data)(
                 self._forEachMatched(d, condition, doOnTrue, conditionMatches)
                 for d in data)
-        elif isinstance(data, dict):
+        if isinstance(data, dict):
             return {
                 key: self._forEachMatched(value, condition, doOnTrue,
                                           conditionMatches)
                 for key, value in data.items()
             }
-        else:
-            if condition(data):
-                conditionMatches.setTrue()
-                return doOnTrue(data)
-            else:
-                return data
+        if condition(data):
+            conditionMatches.setTrue()
+            return doOnTrue(data)
+        return data
 
     def forEachMatchedAtLeastOnce(self, condition, doOnTrue=None):
-        class ConditionMatches(object):
+        class ConditionMatches:
             def __init__(self):
                 self._matches = False
 
@@ -532,38 +536,39 @@ class _Args:
 
 
 class _PoplarExecutor:
-    def __init__(self, model, options, training, optimizer={}):
+    def __init__(self, model, options, training, optimizer=None):
         self.executable = None
         self.options = options
         self.model = model
         self.training = training
-        self.optimizer = optimizer
-        self.new_optimizer = optimizer
+        self.optimizer = optimizer or {}
+        self.new_optimizer = optimizer or {}
         self.warned_not_contiguous_input = False
         self.dirty_host_weights = False
         if self.training:
             m = self.model.model
+            parent = self
 
             class WrappedModel(type(m)):
-                def copyWeightsToHostIfNeeded(self_model):
+                def copyWeightsToHostIfNeeded(self):
                     """ Return True if the weights on the host were dirty and
                     have been updated.
                     Return False if the weights were already up to date.
                     """
-                    if self.dirty_host_weights:
+                    if parent.dirty_host_weights:
                         logger.debug("Implicit copyWeightsToHost()")
-                        self.copyWeightsToHost()
-                        self.dirty_host_weights = False
+                        parent.copyWeightsToHost()
+                        parent.dirty_host_weights = False
                         return True
                     return False
 
-                def __call__(self_model, *args, **kwargs):
+                def __call__(self, *args, **kwargs):
                     # If the model has been trained on the IPU: update the host side weights
-                    self_model.copyWeightsToHostIfNeeded()
-                    return self.model.real_model_call(*args, **kwargs)
+                    self.copyWeightsToHostIfNeeded()
+                    return parent.model.real_model_call(*args, **kwargs)
 
-                def named_parameters(self_model, *args, **kwargs):
-                    self_model.copyWeightsToHostIfNeeded()
+                def named_parameters(self, *args, **kwargs):
+                    self.copyWeightsToHostIfNeeded()
                     return super().named_parameters(*args, **kwargs)
 
             # __call__ is an attribute, not a method, unfortunately we cannot just
@@ -572,16 +577,18 @@ class _PoplarExecutor:
             m.__class__ = WrappedModel
 
     def _debugGetPopartIR(self):
-        return poptorch_core._getPopartIR(self.executable)
+        return poptorch_core._getPopartIR(self.executable)  # pylint: disable=protected-access
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
-        copyWeightsToHost_impl(self.executable)
+        copyWeightsToHost_impl(  # pylint: disable=undefined-variable
+            self.executable)
 
     # Write from host memory to IPU memory. This is done automatically on
     # compilation so should be rarely used.
     def copyWeightsToDevice(self):
-        copyWeightsToDevice_impl(self.executable)
+        copyWeightsToDevice_impl(  # pylint: disable=undefined-variable
+            self.executable)
 
     def setOptimizer(self, optimizer):
         self.new_optimizer = optimizer
@@ -594,20 +601,21 @@ class _PoplarExecutor:
                 condition=lambda t: not t.is_contiguous(),
                 doOnTrue=lambda t: t.contiguous()):
             if not self.warned_not_contiguous_input:
-                logger.warning(
-                    "At least one input tensor is not contiguous: " +
-                    "non-contiguous tensors will be converted.")
+                logger.warning("At least one input tensor is not contiguous: "
+                               "non-contiguous tensors will be converted.")
                 self.warned_not_contiguous_input = True
 
-        if self.executable == None:
+        if self.executable is None:
             logger.info(
-                "First time call to model will invoke poplar compilation. " +
-                str(self.options.device_iterations) + " " + str(self.training))
+                "First time call to model will invoke poplar compilation."
+                " %s %s", str(self.options.device_iterations),
+                str(self.training))
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we
             # should slice it up so we compile by the batch size alone.
             extra_poplar_batch_dims = self.options.device_iterations * \
-                self.options.replication_factor * self.options.Training.gradient_accumulation
+                self.options.replication_factor * \
+                self.options.Training.gradient_accumulation
 
             # There are two concepts of batch size. First is the "model" batch size then there is the
             # concept of batching at the popart level. Here we divide by the popart batch size so the
@@ -646,7 +654,7 @@ class _PoplarExecutor:
                 n = torch.jit.trace(self.model,
                                     in_tensors_trace_view.asTuple())
 
-                self.executable = compileWithTrace(
+                self.executable = compileWithTrace(  # pylint: disable=undefined-variable
                     n._c, in_tensors_trace_view.asTuple(),
                     self.options.toDict(), self.training, self.optimizer)
             else:
@@ -658,21 +666,22 @@ class _PoplarExecutor:
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 
-                self.executable = compileWithScript(
+                self.executable = compileWithScript(  # pylint: disable=undefined-variable
                     n._c, n.graph, in_tensors_trace_view.asTuple(),
                     self.options.toDict(), self.training)
 
         if self.options.connectionType == ConnectionType.Never:
             logger.info(
-                "Compilation complete and ConnectionType.Never selected: returning"
-            )
-            return
+                "Compilation complete and ConnectionType.Never selected:"
+                " returning")
+            return None
 
         # If this is an inference model: check if the same model is not being trained on a different IPU.
         # If it is: make sure the weights are updated.
         if not self.training:
-            copyWeightsToHostIfNeeded = getattr(
-                self.model, "copyWeightsToHostIfNeeded", None)
+            copyWeightsToHostIfNeeded = getattr(self.model,
+                                                "copyWeightsToHostIfNeeded",
+                                                None)
             if callable(copyWeightsToHostIfNeeded):
                 if copyWeightsToHostIfNeeded():
                     # Weights have now been updated on the Host: copy them to the second IPU.
@@ -682,18 +691,19 @@ class _PoplarExecutor:
         # Execute the poplar executable with the full size (batch * device interations)
         if self.new_optimizer and self.new_optimizer != self.optimizer:
             self.optimizer = self.new_optimizer
-            output = execute(self.executable, in_tensors.asTuple(),
-                             _convertOptimizerToDict(self.optimizer))
+            output = execute(  # pylint: disable=undefined-variable
+                self.executable, in_tensors.asTuple(),
+                _convertOptimizerToDict(self.optimizer))
         else:
-            output = execute(self.executable, in_tensors.asTuple(), {})
+            output = execute(  # pylint: disable=undefined-variable
+                self.executable, in_tensors.asTuple(), {})
 
         if self.training:
             self.dirty_host_weights = True
 
         if len(output) > 1:
             return output
-        else:
-            return output[0]
+        return output[0]
 
 
 def trainingModel(model, options=None, loss=None, optimizer=None):

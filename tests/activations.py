@@ -2,7 +2,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import torch.nn as nn
 import poptorch
 
 import pytest
@@ -31,7 +30,7 @@ def test_activations(op):
 
     input = torch.randn([2, 200])
 
-    if op == torch.nn.Softmax or op == torch.nn.LogSoftmax:
+    if op in (torch.nn.Softmax, torch.nn.LogSoftmax):
         model = op(dim=1)
     else:
         model = op()

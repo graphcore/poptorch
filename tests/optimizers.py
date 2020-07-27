@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import torch
-import poptorch
-import torch.optim as optim
-import pytest
-import json
 from io import StringIO
+import json
+
+import poptorch
+import pytest
+import torch
+import torch.optim as optim
 
 
-@pytest.mark.parametrize("opt", [optim.SGD, optim.Adam])
-def test_optimizer(opt):
+@pytest.mark.parametrize("opt, reduction",
+                         zip((optim.SGD, optim.Adam), ("mean", "sum")))
+def test_optimizer(opt, reduction):
     torch.manual_seed(42)
 
     model = torch.nn.Linear(10, 10)
@@ -19,17 +21,17 @@ def test_optimizer(opt):
 
     poptorch_model = poptorch.trainingModel(
         model,
-        loss=torch.nn.CrossEntropyLoss(reduction="mean"),
+        loss=torch.nn.CrossEntropyLoss(reduction=reduction),
         optimizer=optimizer)
 
     input = torch.randn(1, 10)
     label = torch.randint(0, 10, [1])
 
     # Make sure the first run doesn't already pass the test.
-    original, original_loss = poptorch_model(input, label)
+    _, original_loss = poptorch_model(input, label)
 
     # Loss shouldn't change.
-    for i in range(0, 50):
+    for _ in range(0, 50):
         out, loss = poptorch_model(input, label)
         assert loss == original_loss
 
@@ -41,7 +43,7 @@ def test_optimizer(opt):
     poptorch_model.setOptimizer(optimizer)
     poptorch_model(input, label)
 
-    for i in range(0, 1000):
+    for _ in range(0, 1000):
         out, loss = poptorch_model(input, label)
 
     # Check we have trained the "model"
@@ -50,8 +52,9 @@ def test_optimizer(opt):
     assert torch.argmax(out, dim=1) == label
 
 
-@pytest.mark.parametrize("opt", [optim.SGD, optim.Adam])
-def test_sgd_IR(opt):
+@pytest.mark.parametrize("opt, reduction",
+                         zip((optim.SGD, optim.Adam), ("mean", "sum")))
+def test_sgd_IR(opt, reduction):
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
@@ -60,15 +63,15 @@ def test_sgd_IR(opt):
 
     poptorch_model = poptorch.trainingModel(
         model,
-        loss=torch.nn.CrossEntropyLoss(reduction="mean"),
+        loss=torch.nn.CrossEntropyLoss(reduction=reduction),
         optimizer=optimizer)
 
     input = torch.randn(1, 10)
     label = torch.randint(0, 10, [1])
 
-    original, original_loss = poptorch_model(input, label)
+    poptorch_model(input, label)
 
-    as_json = json.load(StringIO(poptorch_model._debugGetPopartIR()))
+    as_json = json.load(StringIO(poptorch_model._debugGetPopartIR()))  # pylint: disable=protected-access
 
     AdamVarUpdate = 0
     AdamUpdater = 0

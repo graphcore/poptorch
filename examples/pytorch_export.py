@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import readline
-import rlcompleter
-readline.parse_and_bind('tab: complete')
-
-import torch
-import torch.nn as nn
-import numpy as np
 import os
-
+import readline
+import torch
 import poptorch
 import torchvision.models as models
 
 from PIL import Image
 from torchvision import transforms
+
+readline.parse_and_bind('tab: complete')
 
 # Image loading from https://pytorch.org/hub/pytorch_vision_resnet/
 this_dir = os.path.dirname(os.path.realpath(__file__))

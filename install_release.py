@@ -13,13 +13,13 @@ def install_release(release_utils, release_id, snapshot_id, version_str):
 
     # Tag the view repository with the release.
     release_utils.tag_view_repo(
-            'ssh://git@phabricator.sourcevertex.net/diffusion/' \
-            + 'POPONNXVIEW/poponnxview.git',
-            snapshot_id,
-            release_id,
-            tag)
+        'ssh://git@phabricator.sourcevertex.net/diffusion/' \
+        + 'POPONNXVIEW/poponnxview.git',
+        snapshot_id,
+        release_id,
+        tag)
 
     # Increment the point version number.
     release_utils.increment_version_point(
-            'ssh://git@phabricator.sourcevertex.net/diffusion/' \
-            + 'POPTORCH/poptorch.git')
+        'ssh://git@phabricator.sourcevertex.net/diffusion/' \
+        + 'POPTORCH/poptorch.git')

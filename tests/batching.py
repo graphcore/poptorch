@@ -3,8 +3,6 @@
 
 import torch
 import poptorch
-import torch.optim as optim
-
 import pytest
 
 
@@ -53,8 +51,8 @@ def test_trainingBatching():
     # Sanity check we weren't already matching the label.
     assert not torch.equal(torch.argmax(out, dim=1), label)
 
-    for i in range(0, 1000):
-        poptorchOut, loss = poptorch_model(input, label)
+    for _ in range(0, 1000):
+        _, loss = poptorch_model(input, label)
 
         # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
         assert len(loss.size()) == 1
@@ -130,7 +128,7 @@ def test_trainingAnchors(anchor):
     model = torch.nn.Linear(10, 10)
 
     # Run pytorch native on CPU batchsize 10.
-    nativeOutput = model(input)
+    model(input)
 
     # Run on IPU batch size 1 * 1000 popart batches.
     opts = poptorch.Options().deviceIterations(1000)

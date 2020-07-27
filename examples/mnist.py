@@ -4,7 +4,6 @@
 import torch
 import torch.nn as nn
 import torchvision
-import numpy as np
 import poptorch
 
 # Normal pytorch batch size
@@ -19,7 +18,8 @@ replication_factor = 4
 # This is the amount of data we will pull out of the data loader at each step. This is not
 # how much will be running on the IPU in a single model batch however. We just give the IPUs
 # this much data to allow for more efficient data loading.
-training_combined_batch_size = training_batch_size * training_ipu_step_size * replication_factor
+training_combined_batch_size = training_batch_size * training_ipu_step_size \
+        * replication_factor
 
 # Load MNIST normally.
 training_data = torch.utils.data.DataLoader(
@@ -119,7 +119,7 @@ def train():
 
             acc = 0.0
             if len(elms) == 2:
-                if elms[0] == True:
+                if elms[0]:
                     acc = (counts[0].item() /
                            training_combined_batch_size) * 100.0
                 else:
@@ -134,7 +134,7 @@ def test():
     correct = 0
     total = 0
     with torch.no_grad():
-        for batch_number, (data, labels) in enumerate(validation_data):
+        for (data, labels) in validation_data:
             output = inference_model(data)
 
             # Argmax the probabilities to get the highest.
@@ -146,8 +146,8 @@ def test():
             # Count the number which are True and the number which are False.
             elms, counts = torch.unique(eq, sorted=False, return_counts=True)
 
-            if len(elms) == 2 or elms[0] == True:
-                if elms[0] == True:
+            if len(elms) == 2 or elms[0]:
+                if elms[0]:
                     correct += counts[0].item()
                 else:
                     correct += counts[1].item()

@@ -2,8 +2,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
 import poptorch
-import torch.optim as optim
-
 import pytest
 
 # Linears

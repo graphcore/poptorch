@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import unittest.mock
 
 import torch
 import torch.nn as nn
-import numpy as np
 import poptorch
 import poptorch.testing
 import pytest
-import unittest.mock
 
 
 def test_jit_script():
@@ -46,7 +45,7 @@ def test_set_options():
     x = torch.ones(2)
     y = torch.zeros(2)
 
-    ipu = inference_model(x, y)
+    inference_model(x, y)
 
 
 def test_set_popart_options():
@@ -71,7 +70,7 @@ def test_set_popart_options():
     x = torch.ones(2)
     y = torch.zeros(2)
 
-    ipu = inference_model(x, y)
+    inference_model(x, y)
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
@@ -88,7 +87,7 @@ def test_real_ipu_selection():
     x = torch.ones(2)
     y = torch.zeros(2)
 
-    ipu = inference_model(x, y)
+    inference_model(x, y)
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
@@ -105,7 +104,7 @@ def test_ipu_id_selection():
     x = torch.ones(2)
     y = torch.zeros(2)
 
-    ipu = inference_model(x, y)
+    inference_model(x, y)
 
 
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_IPU_MODEL": "0"})
@@ -117,10 +116,12 @@ def test_offline_ipu():
     model = Network()
     # Force-disable the IPU model
     opts = poptorch.Options().useOfflineIpuTarget()
-    inference_model = poptorch.inferenceModel(model, opts)
-    x = torch.ones(2)
-    y = torch.zeros(2)
+    poptorch.inferenceModel(model, opts)
 
     #TODO(T23447): Support offline compilation
+    #inference_model = poptorch.inferenceModel(model, opts)
+    #x = torch.ones(2)
+    #y = torch.zeros(2)
+
     #ipu = inference_model(x, y)
     #assert not ipu, "Offline compilation shouldn't return anything"

@@ -71,6 +71,7 @@ source ${VE}/bin/activate
 pip install yapf==0.27.0
 pip install cpplint==1.4.4
 pip install yml2json
+pip install pylint==2.5.3
 
 rm -f .linters/system_includes
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
@@ -91,6 +92,7 @@ fi
 ln -fs ${VE}/bin/yapf ${DIR}/.linters/yapf
 ln -fs ${VE}/bin/yml2json ${DIR}/.linters/yml2json
 ln -fs ${VE}/bin/cpplint ${DIR}/.linters/cpplint
+ln -fs ${VE}/bin/pylint ${DIR}/.linters/pylint
 ln -fs $torch_path .linters/torch
 ln -fs ${POPLAR_PATH}/include .linters/poplar_includes
 nproc > .linters/num_threads

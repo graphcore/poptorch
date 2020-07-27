@@ -84,8 +84,8 @@ def test_lstm_batched():
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), batch, -1)
     print(inputs.shape)
-    hidden = (torch.randn(1, batch, numHidden), torch.randn(
-        1, batch, numHidden))
+    hidden = (torch.randn(1, batch,
+                          numHidden), torch.randn(1, batch, numHidden))
     out = lstm(inputs, hidden)
     ipuOut = ipuLstm(inputs, hidden)
     assert poptorch.testing.allclose(out, ipuOut)
@@ -101,8 +101,8 @@ def test_lstm_batched_batch_first():
     inputs = [torch.randn(batch, inputSize) for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(batch, len(inputs), -1)
-    hidden = (torch.randn(1, batch, numHidden), torch.randn(
-        1, batch, numHidden))
+    hidden = (torch.randn(1, batch,
+                          numHidden), torch.randn(1, batch, numHidden))
     out = lstm(inputs, hidden)
     ipuOut = ipuLstm(inputs, hidden)
     assert poptorch.testing.allclose(out, ipuOut)

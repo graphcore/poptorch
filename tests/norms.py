@@ -2,8 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import poptorch
 import torch.optim as optim
+import poptorch
 
 # Norms
 #'torch.nn.BatchNorm1d', 'torch.nn.BatchNorm2d', 'torch.nn.BatchNorm3d', 'torch.nn.GroupNorm', 'torch.nn.SyncBatchNorm', 'torch.nn.SyncBatchNorm.convert_sync_batchnorm',
@@ -136,7 +136,7 @@ def test_layerNormPretrainedWeights():
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     model.train()
-    for i in range(0, 10):
+    for _ in range(0, 10):
         outputs = model(input)
         optimizer.zero_grad()
         loss = criterion(outputs, torch.ones([3, 5, 3, 10]))
@@ -157,7 +157,7 @@ def test_layerNormPretrainedWeights():
 def test_groupNorm():
     torch.manual_seed(42)
 
-    for i in range(1, 4):
+    for _ in range(1, 4):
         input = torch.randn([3, 10, 5, 2])
 
         groupNorm = torch.nn.GroupNorm(5, 10)

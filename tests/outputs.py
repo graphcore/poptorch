@@ -3,16 +3,12 @@
 
 import torch
 import torch.nn as nn
-import numpy as np
 import poptorch
 import poptorch.testing
 
 
 def test_multiple_tensors():
     class Network(nn.Module):
-        def __init__(self):
-            super(Network, self).__init__()
-
         def forward(self, x, y):
 
             t1 = (x + y)
@@ -35,9 +31,6 @@ def test_multiple_tensors():
 
 def test_simple_list():
     class Network(nn.Module):
-        def __init__(self):
-            super(Network, self).__init__()
-
         def forward(self, x, y):
 
             t1 = (x + y)
@@ -60,9 +53,6 @@ def test_simple_list():
 
 def test_simple_tuple():
     class Network(nn.Module):
-        def __init__(self):
-            super(Network, self).__init__()
-
         def forward(self, x, y):
 
             t1 = (x + y)
@@ -85,9 +75,6 @@ def test_simple_tuple():
 
 def test_nested_tuples():
     class Network(nn.Module):
-        def __init__(self):
-            super(Network, self).__init__()
-
         def forward(self, x, y):
 
             t1 = (x + y)
@@ -111,9 +98,6 @@ def test_nested_tuples():
 
 def test_same_tensor():
     class Network(nn.Module):
-        def __init__(self):
-            super(Network, self).__init__()
-
         def forward(self, x, y):
 
             t1 = (x + y)

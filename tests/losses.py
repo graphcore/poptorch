@@ -2,8 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import poptorch
 import torch.optim as optim
+import poptorch
 
 
 # Test L1 loss by directly running it against the pytorch native L1 in inference.
@@ -16,7 +16,7 @@ def test_L1Loss_direct():
 
         poptorch_model = poptorch.inferenceModel(model)
 
-        for i in range(0, 10):
+        for _ in range(0, 10):
             target = torch.randn(10)
             input = torch.randn(10)
 
@@ -50,12 +50,10 @@ def test_L1Loss_training():
         assert original_loss > 0.1
         assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
-        optimizer = None
         for i in range(0, 2000):
             out, loss = poptorch_model(input, target)
 
             # Model needs to adjust the LR in the middle to converge
-            optimizer = None
             if i == 1000:
                 poptorch_model.setOptimizer(
                     optim.SGD(model.parameters(), lr=0.001))
@@ -64,7 +62,7 @@ def test_L1Loss_training():
         assert loss < original_loss
 
         # "sum" L1 losses tend to be very large compared to "mean"
-        if (reduction == "sum"):
+        if reduction == "sum":
             assert loss < 0.1
         else:
             assert loss < 0.001
@@ -83,7 +81,7 @@ def test_MSELoss_direct():
 
         poptorch_model = poptorch.inferenceModel(model)
 
-        for i in range(0, 10):
+        for _ in range(0, 10):
             target = torch.randn(10)
             input = torch.randn(10)
 
@@ -109,7 +107,7 @@ def test_MSELoss_training():
     assert original_loss > 0.1
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
-    for i in range(0, 2500):
+    for _ in range(0, 2500):
         out, loss = poptorch_model(input, target)
 
     # Check we have trained the "model"
@@ -127,7 +125,7 @@ def test_CrossEntropy_direct():
 
         poptorch_model = poptorch.inferenceModel(model)
 
-        for i in range(0, 10):
+        for _ in range(0, 10):
             label = torch.randint(0, 10, [1])
             input = torch.randn(1, 10)
 
@@ -155,13 +153,13 @@ def test_LogSoftmax():
     poptorch_model = poptorch.trainingModel(
         model, loss=torch.nn.NLLLoss(reduction="mean"))
 
-    for i in range(0, 10):
+    for _ in range(0, 10):
         label = torch.randint(0, 10, [1])
         input = torch.randn(1, 10)
 
         # Run on host.
         groundTruth = model(input)
-        poptorch_out, loss = poptorch_model(input, label)
+        poptorch_out, _ = poptorch_model(input, label)
 
         assert torch.allclose(groundTruth, poptorch_out)
 
@@ -192,9 +190,9 @@ def test_NLLLoss_training():
         label = torch.randint(0, 10, [1])
 
         # Make sure the first run doesn't already pass the test.
-        original, original_loss = poptorch_model(input, label)
+        _, original_loss = poptorch_model(input, label)
 
-        for i in range(0, 1000):
+        for _ in range(0, 1000):
             out, loss = poptorch_model(input, label)
 
         # # Check we have trained the "model"
@@ -218,9 +216,9 @@ def test_CrossEntropyLoss_training():
         label = torch.randint(0, 10, [1])
 
         # Make sure the first run doesn't already pass the test.
-        original, original_loss = poptorch_model(input, label)
+        _, original_loss = poptorch_model(input, label)
 
-        for i in range(0, 1000):
+        for _ in range(0, 1000):
             out, loss = poptorch_model(input, label)
 
         # # Check we have trained the "model"
@@ -238,7 +236,7 @@ def test_BCE_direct():
 
         poptorch_model = poptorch.inferenceModel(model)
 
-        for i in range(0, 10):
+        for _ in range(0, 10):
             target = torch.empty(10).random_(2)
             input = torch.empty(10).uniform_()
 
@@ -289,9 +287,9 @@ def test_BCE_training():
         input = torch.randn(10)
 
         # Make sure the first run doesn't already pass the test.
-        original, original_loss = poptorch_model(input, target)
+        _, original_loss = poptorch_model(input, target)
 
-        for i in range(0, 1000):
+        for _ in range(0, 1000):
             out, loss = poptorch_model(input, target)
 
         print(out)
