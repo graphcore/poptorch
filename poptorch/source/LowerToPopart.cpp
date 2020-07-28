@@ -393,7 +393,7 @@ void LowerToPopart::lowerBody() {
       _valueMap.setTensor(node->output(), _valueMap.tensor(node->input()));
 
     } else {
-      logging::err("Couldn't find a registered operation for node {}", *node);
+      ERROR("Couldn't find a registered operation for node");
     }
   }
 }

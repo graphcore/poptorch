@@ -66,14 +66,22 @@ def test_bert_medium_result():
     question = "What is the capital of Scotland?"
     encoding = tokenizer.encode_plus(question, context)
 
+    mask = encoding["attention_mask"]
     ins = encoding["input_ids"]
-    input_ids = torch.tensor([encoding["input_ids"]])
+    input_ids = torch.tensor([ins, ins])
 
-    attention_mask = torch.tensor([encoding["attention_mask"]])
+    attention_mask = torch.tensor([mask, mask])
     start_scores_native, end_scores_native = model(
         input_ids, attention_mask=attention_mask)
 
     opts = poptorch.Options().profile(False)
+    opts.deviceIterations(2)
+
+    # Enable pipelining if the test is run on real HW.
+    if poptorch.ipuHardwareIsAvailable():
+        model.bert.embeddings.position_embeddings = poptorch.IPU(
+            1, model.bert.embeddings.position_embeddings)
+
     inference_model = poptorch.inferenceModel(model, opts)
     start_score_pop, end_scores_pop = inference_model(input_ids,
                                                       attention_mask)
@@ -91,9 +99,9 @@ def test_bert_medium_result():
     assert torch.argmax(start_score_pop), torch.argmax(start_scores_native)
     assert torch.argmax(end_scores_pop), torch.argmax(end_scores_native)
 
-    # Convert to string.
-    ans_tokens = ins[torch.argmax(start_score_pop
-                                  ):torch.argmax(end_scores_pop) + 1]
+    # Convert to string (Only check the first result as we've already established the two were identical)
+    ans_tokens = ins[torch.argmax(start_score_pop[0]
+                                  ):torch.argmax(end_scores_pop[0]) + 1]
     answer_tokens = tokenizer.convert_ids_to_tokens(ans_tokens)
 
     answer_tokens_to_string = tokenizer.convert_tokens_to_string(answer_tokens)

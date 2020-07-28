@@ -246,10 +246,6 @@ void CanonicalizeImpl::searchAndPossiblyDestroy(torch::jit::Node *node) {
 }
 
 void CanonicalizeImpl::run(torch::jit::Graph *graph) {
-  // When we transform a node mark it for deletion, this will also clean up
-  // unused users afterwards.
-  std::unordered_set<torch::jit::Node *> to_delete;
-
   for (torch::jit::Node *node : graph->nodes()) {
     logging::LogContext ctx("PopartCanonicalization processing " +
                             nodeToString(node));
@@ -360,12 +356,17 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
         }
       }
     }
+  }
+
+  // Build a list of nodes marked for deletion.
+  std::unordered_set<torch::jit::Node *> to_delete;
+  for (torch::jit::Node *node : graph->nodes()) {
     if (isMarkedForDeletion(node)) {
       to_delete.insert(node);
     }
   }
 
-  // Remove any dead nodes.
+  // Remove the dead nodes.
   for (torch::jit::Node *node : to_delete) {
     searchAndPossiblyDestroy(node);
   }

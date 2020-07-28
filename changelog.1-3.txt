@@ -10,6 +10,8 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 
 - An Options object can now be passed to poptorch.trainingModel / poptorch.inferenceModel to configure the session and select IPUs
 
+- Add support for POPTORCH_IPU_MODEL and POPTORCH_WAIT_FOR_IPU environment variables.
+
 - Adds support for the torch comparisons operations:
     torch.eq, torch.ge, torch.gt,
     torch.le, torch.lt, torch.max,
