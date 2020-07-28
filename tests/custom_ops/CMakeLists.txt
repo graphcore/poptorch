@@ -20,6 +20,7 @@ add_definitions(-DONNX_NAMESPACE=onnx)
 find_package(ONNX REQUIRED)
 find_package(PROTOBUF REQUIRED)
 find_package(poplar REQUIRED)
+find_package(Popart REQUIRED)
 
 link_directories("${POPLAR_INSTALL_DIR}/lib")
 
@@ -32,5 +33,4 @@ target_include_directories(custom_cube_op SYSTEM PRIVATE
                                         ${POPLIBS_INCLUDE_DIR}
                                         ${PROTOBUF_INCLUDE_DIR})
 
-target_link_libraries(custom_cube_op popart poplar popops poplin popnn poprand)
-
+target_link_libraries(custom_cube_op ${POPART_LIB} poplar popops poplin popnn poprand)
