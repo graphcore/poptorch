@@ -39,16 +39,30 @@ at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   return t;
 }
 
+c10::List<at::Tensor>
+customOperation(c10::List<at::Tensor> inputs,            // NOLINT
+                std::string name, std::string domain,    // NOLINT
+                int64_t version, int64_t num_outputs,    // NOLINT
+                c10::List<at::Tensor> example_outputs) { // NOLINT
+  UNUSED(inputs);
+  UNUSED(name);
+  UNUSED(domain);
+  UNUSED(version);
+  UNUSED(num_outputs);
+
+  return example_outputs;
+}
+
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
         .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
+        .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss);
 //.op("popart::convolution", convolution,
 // torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));
 
 namespace poptorch {
-
 namespace {
 
 // Process the user provided dictionary and extract the relevant optimizer
@@ -209,7 +223,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     ERROR_ON(type_it == output_types.end());
     std::uint64_t num_outputs = type_it->num_elements;
     std::function<pybind11::object()> process_output;
-    process_output = [&]() -> pybind11::object {
+    process_output = [&]() -> pybind11::object { // NOLINT
       ERROR_ON_MSG(type_it == output_types.end(), "Invalid OutputTypes object");
       switch (type_it->type) {
       case OutputType::Type::Tensor: {

@@ -48,9 +48,6 @@ private:
   template <typename T>
   std::vector<T> handleListConstruct(torch::jit::Node *node);
 
-  static std::vector<torch::jit::Value *>
-  handleTensorList(torch::jit::Node *node);
-
   // Cast the operand to type T.
   template <typename T>
   torch::jit::Value *handleParamOrConstant(torch::jit::Graph *graph,
@@ -209,18 +206,6 @@ std::vector<T> CanonicalizeImpl::handleList(torch::jit::Node *node) {
   ERROR("List inputs must be of type prim::ListConstruct");
 }
 
-std::vector<torch::jit::Value *>
-CanonicalizeImpl::handleTensorList(torch::jit::Node *node) {
-  std::vector<torch::jit::Value *> result;
-
-  // Just convert the node->inputs array ref to vector and return it.
-  for (torch::jit::Value *value : node->inputs()) {
-    result.push_back(value);
-  }
-
-  return result;
-}
-
 template <typename T>
 std::vector<T> CanonicalizeImpl::handleListConstruct(torch::jit::Node *node) {
   ERROR_ON(node->kind() != c10::prim::ListConstruct);
@@ -349,6 +334,11 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     PreBuildCalls new_node = PopartBuilder(graph, Params);                     \
   }
 
+// Create a function decl with the given call and arguments.
+#define OP_CONVERTOR_POP(Sym, PreBuildCalls, PopartBuilder, Params)            \
+  else if (kind == Sym) { /* NOLINT */                                         \
+    PreBuildCalls newNode = PopartBuilder(graph, Params);                      \
+  }
 #include "CanonicalizationOps.h.inc"
 
 #undef OP_CONVERTOR

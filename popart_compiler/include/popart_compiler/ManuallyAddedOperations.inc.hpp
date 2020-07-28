@@ -13,10 +13,12 @@ OP_DECL(poptorch, constant_pad, constant_pad, AiOnnxOpset9.pad,
         ARG(INT_VEC, pads) ARG(FLOAT, value),
         BODY_ARG(pads) BODY_ARG("constant") BODY_ARG(value))
 OP_DECL(poptorch, reflection_pad, reflection_pad, AiOnnxOpset9.pad,
-        ARG(INT_VEC, pads),
-        BODY_ARG(pads) BODY_ARG("reflect"))
-OP_DECL(poptorch, edge_pad, edge_pad, AiOnnxOpset9.pad,
-        ARG(INT_VEC, pads),
+        ARG(INT_VEC, pads), BODY_ARG(pads) BODY_ARG("reflect"))
+OP_DECL(poptorch, edge_pad, edge_pad, AiOnnxOpset9.pad, ARG(INT_VEC, pads),
         BODY_ARG(pads) BODY_ARG("edge"))
 
 OP_DECL(poptorch, add_not_in_place, add_not_in_place, _impl->addNotInPlace, NONE, NONE)
+
+OP_DECL(poptorch, custom_operation, custom_operation, _impl->customOperation,
+        ARG(STRING, name) ARG(STRING, domain) ARG(INT, version) ARG(INT, num_outputs),
+        BODY_ARG(name) BODY_ARG(domain) BODY_ARG(version) BODY_ARG(num_outputs))

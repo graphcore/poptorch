@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <numeric>
+#include <string>
 #include <unordered_map>
 
 #include "../PoptorchSymbols.hpp"
@@ -83,6 +84,17 @@ template <> struct Handle<std::vector<double>> {
   }
 };
 
+template <> struct Handle<std::string> {
+  std::optional<std::string> operator()(const c10::Symbol &sym,
+                                        torch::jit::Node *node) {
+    if (node->kindOf(sym) == torch::jit::AttributeKind::s) {
+      return node->s(sym);
+    }
+
+    return std::nullopt;
+  }
+};
+
 // Return true if we know how to fold a given compile time constant operation.
 // Only allow const folding for scalar poptorch::int_constant nodes
 bool canBeConstFolded(torch::jit::Node *node) {
@@ -128,6 +140,15 @@ SymbolHandler getHandler(torch::jit::Node *node) {
     return it->second;
   }
   return {};
+}
+
+std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node) {
+  std::vector<torch::jit::Value *> result;
+  // Just convert the node->inputs array ref to vector and return it.
+  for (torch::jit::Value *value : node->inputs()) {
+    result.push_back(value);
+  }
+  return result;
 }
 
 // Convert that IR type into a C++ vector of ints.
@@ -183,7 +204,7 @@ template <typename T> std::optional<T> handleConstant(torch::jit::Node *node) {
   }
 
   if (node->kind() != c10::prim::Constant && canBeConstFolded(node)) {
-    if (std::is_integral<T>::value) {
+    if constexpr (std::is_integral<T>::value) { // NOLINT
       return foldConstant<T>(node);
     }
   }
@@ -325,5 +346,6 @@ template std::vector<std::int64_t> handleList(torch::jit::Node *node);
 template std::optional<float> handleConstant(torch::jit::Node *);
 template std::optional<int> handleConstant(torch::jit::Node *);
 template std::optional<bool> handleConstant(torch::jit::Node *);
+template std::optional<std::string> handleConstant(torch::jit::Node *);
 
 } // namespace poptorch

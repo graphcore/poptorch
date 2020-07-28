@@ -114,6 +114,11 @@ public:
                                  const std::vector<int64_t> &shape,
                                  bool isHalf);
 
+  std::vector<popart::TensorId>
+  customOperation(const std::vector<popart::TensorId> &args,
+                  const std::string &op, const std::string &domain,
+                  std::int64_t version, std::int64_t num_outputs);
+
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
   void updateUseModelConfig();
@@ -404,6 +409,19 @@ popart::TensorId CompilerImpl::cast(const std::vector<popart::TensorId> &inputs,
                                     const std::string &type) {
   auto ai_onnx = op_builder->aiOnnxOpset9();
   return ai_onnx.cast(inputs, type);
+}
+
+std::vector<popart::TensorId>
+CompilerImpl::customOperation(const std::vector<popart::TensorId> &args,
+                              const std::string &op, const std::string &domain,
+                              std::int64_t version, std::int64_t num_outputs) {
+  logging::info("Adding operator with {} inputs ",
+                static_cast<std::int32_t>(args.size()));
+
+  const std::int32_t num_inputs = static_cast<std::int32_t>(args.size());
+  popart::OperatorIdentifier id = {domain, op, 1, num_inputs};
+
+  return op_builder->customOp(id, version, args, num_outputs, {});
 }
 
 popart::TensorId

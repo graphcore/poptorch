@@ -51,7 +51,8 @@
           "exclude": [
             "(\\.inc.h$)",
             "(\\.inc.hpp$)",
-            "(^docs/.*)"
+            "(^docs/.*)",
+	    "(custom_cube_op.cpp$)"
           ],
           "flags": "-I.linters/include/ -I.linters/clang_include/ -Ipopart_compiler/include -Ipoptorch/shared/include -Ipoptorch/include -Ipoptorch_logging/include -I../spdlog/spdlog/include/ -DONNX_NAMESPACE=onnx -I.linters/torch/include -I../popart/popart/willow/include/ -I.linters/poplar_includes/ `cat .linters/system_includes` -std=c++17 -fsized-deallocation",
           "num-threads": "./.linters/num_threads"

@@ -17,6 +17,7 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 
     torch.min and torch.max only support (tensor, tensor) and (tensor) overloads. They do
     not support the (tensor, dim=, keepdim=) overload.
+
 - Automatically synchronise the weights back to the Host after using the IPU for training. (i.e no need to explicitly call copyWeightsToHost() anymore)
 
 - Adds support for torch.nn.PReLU
@@ -24,3 +25,10 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 - Adds support for Adam optimizer.
 
 - Adds support for half type models and inputs.
+
+- Adds support for user provided custom operations. See PopART documentation for information on
+  how to write them. They are exposed by `poptorch.custom_op` this takes in a list of
+  input tensors, strings for the PopART op name and domain, the domain version, and
+  a list of tensors the same shape and size as the expected output tensors. This is to
+  ensure the pytorch trace remains valid as it traces on CPU so won't actually execute
+  the operation when building the graph.

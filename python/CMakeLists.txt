@@ -15,6 +15,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ComparisonOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ConstantOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ConvolutionOps.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/CustomOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/EmbeddingOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/FillOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/LogOps.cpp"

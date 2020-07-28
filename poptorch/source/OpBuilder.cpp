@@ -151,6 +151,22 @@ torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *
+createCustomOperation(torch::jit::Graph *graph,
+                      const std::vector<torch::jit::Value *> &inputs,
+                      const std::string &name, const std::string &domain,
+                      std::int64_t domainVersion, std::int64_t numOutputs) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::custom_operation, inputs, numOutputs);
+
+  new_node->s_(c10::Symbol::fromQualString("attr::name"), name);
+  new_node->s_(c10::Symbol::fromQualString("attr::domain"), domain);
+  new_node->i_(c10::Symbol::fromQualString("attr::version"), domainVersion);
+  new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"), numOutputs);
+
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */

@@ -35,6 +35,8 @@ template <typename T> std::vector<T> handleList(torch::jit::Node *node);
 template <typename T>
 std::vector<T> handleListConstruct(torch::jit::Node *node);
 
+std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node);
+
 template <typename T> std::optional<T> handleConstant(torch::jit::Node *node);
 
 // Some operations take in an optional tensor. A "none" constant is passed in to
