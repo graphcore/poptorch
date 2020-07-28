@@ -240,7 +240,7 @@ ONNX_OPERATOR_SET_SCHEMA_EX(
         .TypeConstraint(
             "T", {"tensor(float)", "tensor(int32)", "tensor(float16)"},
             "Constrain input and output types to signed numeric tensors.")
-        .TypeAndShapeInferenceFunction(CubeShapeInference));
+        .TypeAndShapeInferenceFunction(CubeShapeInference))
 
 static bool registerOps() {
   auto &d = ONNX_NAMESPACE::OpSchemaRegistry::DomainToVersionRange::Instance();
