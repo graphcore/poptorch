@@ -10,7 +10,7 @@ import poptorch
 if platform.system() == "Darwin":
     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_cube_op.dylib")
 else:
-    myso = os.path.join(os.getcwd(), "custom_ops/custom_cube_op.so")
+    myso = os.path.join(os.getcwd(), "custom_ops/libcustom_cube_op.so")
 
 myop = ctypes.cdll.LoadLibrary(myso)
 

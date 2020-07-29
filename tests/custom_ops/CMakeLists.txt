@@ -19,7 +19,7 @@ add_definitions(-DONNX_NAMESPACE=onnx)
 
 find_package(ONNX REQUIRED)
 find_package(PROTOBUF REQUIRED)
-find_package(poplar REQUIRED)
+find_package(Poplar REQUIRED)
 find_package(Popart REQUIRED)
 
 link_directories("${POPLAR_INSTALL_DIR}/lib")
