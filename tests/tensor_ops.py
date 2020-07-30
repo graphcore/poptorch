@@ -290,3 +290,40 @@ def test_size(input_shapes):
 
     assert native_out.size() == poptorch_out.size()
     assert torch.equal(native_out, poptorch_out)
+
+
+input_shapes = [(1, 4, 5), (2, ), (2, 2), (2, 3, 4, 1, 3, 4)]
+dtypes = [torch.float, torch.float16, torch.int32]
+
+
+@pytest.mark.parametrize("input_shapes", input_shapes)
+@pytest.mark.parametrize("t", dtypes)
+def test_fill(input_shapes, t):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            value = 42 if x.dtype == torch.int32 else 1.2345
+            return x.fill_(value), torch.full_like(x, value), torch.full(
+                input_shapes, value, dtype=x.dtype)
+
+    model = Model()
+    x = torch.ones(*input_shapes, dtype=t)
+
+    # Run on CPU.
+    if t != torch.float16:
+        native_out = model(x)
+    else:
+        native_out = (torch.full(input_shapes,
+                                 1.2345), torch.full(input_shapes, 1.2345),
+                      torch.full(input_shapes, 1.2345))
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+
+    for native, pop in zip(native_out, poptorch_out):
+        if t == torch.float16:
+            pop.float()
+
+        assert native.size() == pop.size()
+        assert torch.equal(native, pop)
+        assert native.dtype == pop.dtype

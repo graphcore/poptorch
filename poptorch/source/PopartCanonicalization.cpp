@@ -266,6 +266,11 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 
 #define HANDLE_LIST(Index, Type)                                               \
   handleListConstruct<Type>(node->input(Index)->node())
+
+#define HANDLE_LIST_AS_IR_CONSTANT(Index)                                      \
+  intVectorToIrConstant(                                                       \
+      graph, handleListConstruct<std::int64_t>(node->input(Index)->node()))
+
 #define HANDLE_TENSOR_LIST(Index) handleTensorList(node->input(Index)->node())
 #define PARAM(Index) node->inputs()[Index]
 #define COMMA ,
@@ -285,7 +290,14 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 // Returns an integer list of dimension that a tensor has. For reduce functions.
 // A 5D tensor would return (0, 1, 2, 3, 4)
 #define DIMENISON_LENGTH_LIST(Index)                                           \
-  reduceHelperDimensionCreator(node->inputs()[Index])
+  reduceHelperDimensionCreator(node->input(Index))
+
+// Returns the shape of the tensor as a vector of ints.
+#define TENSOR_SHAPE(Index) shapeFromTensor(node->input(Index))
+
+#define TENSOR_SHAPE_AS_IR(Index) shapeFromTensorAsIR(graph, node->input(Index))
+
+#define GET_RETURN_TYPE getNodeScalarType(node->output())
 
 // Check if the number of inputs is |num|. Used for overload resolution.
 #define NUM_INPUTS_EQUALS(Num) node->inputs().size() == Num
@@ -331,6 +343,13 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   }
 
 // Create a function decl with the given call and arguments.
+#define OP_CONVERTOR_WITH_CAST(AtenID, PreBuildCalls, PopartBuilder, Params,   \
+                               CastType)                                       \
+  else if (kind == c10::AtenID) { /* NOLINT */                                 \
+    PreBuildCalls new_node = PopartBuilder(graph, Params);                     \
+    new_node = createCast(graph, new_node->output(), CastType);                \
+  }
+
 #define OP_CONVERTOR_POP(Sym, PreBuildCalls, PopartBuilder, Params)            \
   else if (kind == Sym) { /* NOLINT */                                         \
     PreBuildCalls newNode = PopartBuilder(graph, Params);                      \

@@ -26,7 +26,19 @@ bool registerHandlers(c10::Symbol symbol, const SymbolHandler &handler,
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::Node *node);
 
+// Get the tensor shape as a vector of ints.
 std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value);
+
+// Get the tensor shape and add it to the IR as a constant primative.
+torch::jit::Value *shapeFromTensorAsIR(torch::jit::Graph *graph,
+                                       torch::jit::Value *value);
+
+// Get the scalar type of this tensor.
+at::ScalarType getNodeScalarType(torch::jit::Value *tensor);
+
+torch::jit::Value *
+intVectorToIrConstant(torch::jit::Graph *graph,
+                      const std::vector<std::int64_t> &shape);
 
 // This handles the case of both `prim::ListConstruct`
 // and 'prim::Constant[value=[x, y, z]]'.

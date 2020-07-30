@@ -145,3 +145,10 @@ OP_CONVERTOR(aten::topk, NONE, createTopk, {PARAM(0)} COMMA HANDLE(1, int64_t) C
 // Opset 10
 //OP_CONVERTOR(aten::isinf, NONE, createIsinf, {PARAM(0)} COMMA 1 COMMA 1)
 OP_CONVERTOR(aten::isnan, NONE, createIsnan, {PARAM(0)})
+
+// full_like(Tensor self, Scalar fill_value, *, MemoryFormat? memory_format=None) -> Tensor
+// full_like.dtype(Tensor self, Scalar fill_value, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, MemoryFormat? memory_format=None) -> Tensor
+OP_CONVERTOR(aten::full_like, NONE, createExpand, {PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(1) COMMA TENSOR_SHAPE_AS_IR(0)})
+
+// full(int[] size, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+OP_CONVERTOR_WITH_CAST(aten::full, NONE, createExpand, {PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(1) COMMA HANDLE_LIST_AS_IR_CONSTANT(0)}, GET_RETURN_TYPE)

@@ -165,6 +165,32 @@ std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
   return shape;
 }
 
+// Add a vector of ints to the IR as a constant.
+torch::jit::Value *
+intVectorToIrConstant(torch::jit::Graph *graph,
+                      const std::vector<std::int64_t> &shape) {
+  const std::vector<std::int64_t> dimensions = {
+      static_cast<std::int64_t>(shape.size())};
+  return createConstantInt(graph, shape, dimensions)->output();
+}
+
+// Get the shape of a tensor and add it to the graph as a constant value.
+torch::jit::Value *shapeFromTensorAsIR(torch::jit::Graph *graph,
+                                       torch::jit::Value *value) {
+  // Extract the type from the pytorch IR.
+  std::vector<std::int64_t> shape = shapeFromTensor(value);
+  return intVectorToIrConstant(graph, shape);
+}
+
+// Get the scalar type of a given tensor.
+at::ScalarType getNodeScalarType(torch::jit::Value *tensor) {
+  // The returned value must be a tensor.
+  c10::TensorTypePtr return_tensor = tensor->type()->expect<c10::TensorType>();
+
+  // Deduce the type from the scalar type on the return.
+  return *return_tensor->scalarType();
+}
+
 template <typename T> std::vector<T> handleList(torch::jit::Node *node) {
   if (node->kind() == c10::prim::ListConstruct) {
     return handleListConstruct<T>(node);

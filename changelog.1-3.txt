@@ -15,10 +15,12 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 - Adds support for the torch comparisons operations:
     torch.eq, torch.ge, torch.gt,
     torch.le, torch.lt, torch.max,
-    torch.min, torch.ne, torch.isnan
+    torch.min, torch.ne, torch.isnan, torch.topk
 
     torch.min and torch.max only support (tensor, tensor) and (tensor) overloads. They do
     not support the (tensor, dim=, keepdim=) overload.
+
+    torch.topk only supports sorted=False and Largest=True
 
 - Automatically synchronise the weights back to the Host after using the IPU for training. (i.e no need to explicitly call copyWeightsToHost() anymore)
 
@@ -27,6 +29,8 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 - Adds support for Adam optimizer.
 
 - Adds support for half type models and inputs.
+
+- Support for tensor.fill_, torch.full, torch.full_like
 
 - Adds support for user provided custom operations. See PopART documentation for information on
   how to write them. They are exposed by `poptorch.custom_op` this takes in a list of
