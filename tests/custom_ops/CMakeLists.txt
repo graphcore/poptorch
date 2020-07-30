@@ -33,4 +33,4 @@ target_include_directories(custom_cube_op SYSTEM PRIVATE
                                         ${POPLIBS_INCLUDE_DIR}
                                         ${PROTOBUF_INCLUDE_DIR})
 
-target_link_libraries(custom_cube_op ${POPART_LIB} poplar popops poplin popnn poprand)
+target_link_libraries(custom_cube_op ${POPART_LIB} ${POPLAR_LIB} ${POPOPS_LIB} ${POPLIN_LIB} ${POPNN_LIB} ${POPRAND_LIB})
