@@ -11,19 +11,25 @@ namespace poptorch {
 void warnOnUnsupportedAten(torch::jit::Graph *graph) {
   // Check that all of the "aten::" ops have been eliminated.
   bool has_unsupported_op = false;
+
+  std::unordered_set<std::string> previously_reported_node;
   for (torch::jit::Node *node : graph->nodes()) {
     const torch::jit::Symbol kind = node->kind();
 
     if (kind.is_aten()) {
       const std::string domain = kind.toQualString();
 
-      logging::warn(
-          "Unsupported operation found in compiled module: {}. Not all "
-          "operations are supported yet by Graphcore's pytorch compiler. "
-          "If you believe this one should be, please report this message to "
-          "support@graphcore.ai.",
-          domain);
-      has_unsupported_op = true;
+      if (previously_reported_node.count(domain) == 0) {
+        logging::warn(
+            "Unsupported operation found in compiled module: {}. Not all "
+            "operations are supported yet by Graphcore's pytorch compiler. "
+            "If you believe this one should be, please report this message to "
+            "support@graphcore.ai.",
+            domain);
+
+        previously_reported_node.insert(domain);
+        has_unsupported_op = true;
+      }
     }
   }
 
