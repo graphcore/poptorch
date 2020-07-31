@@ -29,8 +29,7 @@ std::unordered_map<c10::Symbol, SymbolHandler> &symbolHandlers() {
  */
 
 template <typename T> struct Handle {
-  template <
-      typename = typename std::enable_if<std::is_integral<T>::value>::type>
+  template <std::enable_if_t<std::is_integral<T>::value, int> = 0>
   std::optional<T> operator()(const c10::Symbol &sym, torch::jit::Node *node) {
     if (node->kindOf(sym) == torch::jit::AttributeKind::i) {
       return node->i(sym);

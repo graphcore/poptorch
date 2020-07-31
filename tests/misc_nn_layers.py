@@ -28,6 +28,25 @@ input_feature_shapes = [
 ]
 
 
+@pytest.mark.parametrize("scale_factor", [5.00001, 5.12498])
+@pytest.mark.parametrize("input_shape", [(1, 2, 8), (2, 2, 2, 8),
+                                         (2, 3, 4, 2, 8)])
+def test_upsample(scale_factor, input_shape):
+    mode = "nearest"  # Other modes not supported by Popart
+    model = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)
+    x = torch.randn(*input_shape)
+
+    # Run on CPU.
+    nativeOut = model(x)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+
+    assert nativeOut.size() == poptorch_out.size()
+    torch.testing.assert_allclose(nativeOut, poptorch_out)
+
+
 def test_linear():
     model = torch.nn.Linear(20, 30)
     x = torch.randn(128, 20)

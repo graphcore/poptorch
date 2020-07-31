@@ -344,6 +344,44 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   }
   return createCast(graph, node->input(0), *cast_to);
 }
+
+torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
+                                  torch::jit::Node *node) {
+  // aten::upsample_nearest1d(Tensor self, int[] output_size, float? scales) ->
+  // Tensor
+  //
+  // aten::upsample_nearest2d(Tensor self, int[] output_size, float?
+  // scales_h, float? scales_w) -> Tensor
+  //
+  // aten::upsample_nearest3d(Tensor self, int[] output_size, float? scales_d,
+  // float? scales_h, float? scales_w) -> Tensor
+  //
+  // Not supported by Popart yet:
+  //
+  // aten::upsample_linear1d(Tensor self, int[] output_size, bool align_corners,
+  // float? scales) -> Tensor
+  //
+  // aten::upsample_bilinear2d(Tensor self, int[] output_size, bool
+  // align_corners, float? scales_h, float? scales_w) -> Tensor
+  //
+  // aten::upsample_trilinear3d(Tensor self, int[] output_size, bool
+  // align_corners, float? scales_d, float? scales_h, float? scales_w) -> Tensor
+
+  std::vector<std::int64_t> output_size = shapeFromTensor(node->output());
+  std::vector<std::int64_t> input_size = shapeFromTensor(node->input(0));
+  std::vector<double> scales;
+  ERROR_ON_MSG(output_size.size() != input_size.size(),
+               "Input / output rank mismatch: " << input_size.size() << " != "
+                                                << output_size.size());
+  for (std::uint64_t d = 0; d < input_size.size(); ++d) {
+    scales.push_back(static_cast<double>(output_size[d]) / input_size[d]);
+  }
+
+  torch::jit::Node *scales_node = createConstantFloat(
+      graph, scales, {static_cast<std::int64_t>(scales.size())});
+  return createResize(graph, {node->input(0), scales_node->output()},
+                      "nearest");
+}
 } // namespace
 
 // clang-format off
@@ -363,6 +401,9 @@ static bool handlers = registerHandlers(
     c10::aten::permute,  permuteHandler,
     c10::aten::transpose, transposeHandler,
     c10::aten::to, toHandler,
+    c10::aten::upsample_nearest1d, upsampleHandler,
+    c10::aten::upsample_nearest2d, upsampleHandler,
+    c10::aten::upsample_nearest3d, upsampleHandler,
     c10::aten::squeeze, reshapeHandler);
 // clang-format on
 
