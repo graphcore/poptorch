@@ -42,6 +42,7 @@ tested_subset = [
     models.resnet18,
     models.resnext50_32x4d,
     models.mnasnet1_0,
+    models.mobilenet_v2,
 ]
 
 # Deliberately un-tested models
@@ -56,7 +57,6 @@ unsupported_models = [
     # Unrelated to us but seems to get stuck in a loop.
     models.inception_v3,
     models.googlenet,  # Doesn't seem to support JIT.
-    models.mobilenet_v2,  # Popart issue with regions
 ]
 
 
@@ -95,3 +95,7 @@ def test_resnext50_32x4d():
 
 def test_mnasnet1_0():
     inference_harness(models.mnasnet1_0)
+
+
+def test_mobilenet_v2():
+    inference_harness(models.mobilenet_v2)
