@@ -537,6 +537,7 @@ template <typename T> struct HandleOutput {
     std::set<popart::TensorId> ids;
 
     for (const popart::TensorId &id : in) {
+      logging::trace("{}", id);
       ids.insert(id);
       _impl->ids.push_back(id);
 
@@ -560,6 +561,7 @@ template <> struct HandleOutput<popart::TensorId> {
     _impl->op_builder->virtualGraph(in, _impl->active_ipu);
     _impl->used_ipus.insert(_impl->active_ipu);
     _impl->ids.push_back(in);
+    logging::trace("{}", in);
 
     if (loss) {
       _impl->losses.push_back(in);

@@ -305,6 +305,7 @@ void LowerToPopart::lowerBody() {
                      });
 
       // Call the callback.
+      logging::trace("{} was lowered to ", *node);
       poptorch::TensorId first_output_tensor = itr->second(inputs, node);
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other

@@ -111,6 +111,12 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
   std::int64_t dim = *handleConstant<std::int64_t>(node->input(1)->node());
 
   std::int64_t index = *handleConstant<std::int64_t>(node->input(2)->node());
+  if (index < 0) {
+    c10::TensorTypePtr as_tensor =
+        node->input(0)->type()->cast<c10::TensorType>();
+    c10::VaryingShape dims = as_tensor->sizes();
+    index += *dims[dim];
+  }
 
   return createSlice(graph, {node->input(0)}, {index + 1}, {index}, {dim});
 }
@@ -125,11 +131,25 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
   std::int64_t start = *handleConstant<std::int64_t>(node->input(2)->node());
 
   std::int64_t end = *handleConstant<std::int64_t>(node->input(3)->node());
-  if (end == 9223372036854775807 || end == -1) {
-    c10::TensorTypePtr as_tensor =
-        node->input(0)->type()->cast<c10::TensorType>();
-    c10::VaryingShape dims = as_tensor->sizes();
+  c10::TensorTypePtr as_tensor =
+      node->input(0)->type()->cast<c10::TensorType>();
+  c10::VaryingShape dims = as_tensor->sizes();
 
+  // Based on aten/src/ATen/native/TensorShape.cpp slice()
+  if (start < 0) {
+    start += *dims[dim];
+  }
+  if (end < 0) {
+    end += *dims[dim];
+  }
+  if (start < 0) {
+    start = 0;
+  } else if (start >= *dims[dim]) {
+    start = *dims[dim];
+  }
+  if (end < start) {
+    end = start;
+  } else if (end >= *dims[dim]) {
     end = *dims[dim];
   }
 

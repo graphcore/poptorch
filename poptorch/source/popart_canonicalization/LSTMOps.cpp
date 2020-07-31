@@ -92,10 +92,13 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
   torch::jit::Node *concat_states =
       createConcat(graph, {hidden_layers[0], hidden_layers[1]}, 0);
 
+  std::vector<std::int64_t> input_shape = shapeFromTensor(input);
+  std::int64_t batch_dim = 0;
   // Transpose output BSF -> SBF
   if (batch_first) {
     torch::jit::Node *transpose = createTranspose(graph, {input}, {1, 0, 2});
     input = transpose->output();
+    batch_dim = 1;
   }
   std::vector<torch::jit::Value *> args;
   args.push_back(input);
@@ -105,9 +108,10 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
 
   torch::jit::Node *lstm = createLstm(graph, args, 1);
 
-  // Keep the last slice from Y
-  torch::jit::Node *y_h =
-      createSlice(graph, {lstm->output(0)}, {INT_MAX}, {-1}, {0});
+  // Keep the last slice from Y `[seq_length, num_directions, batch_size,
+  // hidden_size]
+  torch::jit::Node *y_h = createSlice(graph, {lstm->output(0)}, {INT_MAX},
+                                      {input_shape[batch_dim] - 1}, {0});
 
   torch::jit::Value *output = lstm->output(0);
   // Transpose output SBF -> BSF
