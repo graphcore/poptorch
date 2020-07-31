@@ -4,6 +4,8 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 namespace poptorch {
@@ -16,6 +18,10 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
 // Manually added.
 torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape);
+
+torch::jit::Node *createConstantInt64(torch::jit::Graph *graph,
+                                      const std::vector<int64_t> &data,
+                                      const std::vector<int64_t> &new_shape);
 
 torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
                                     const std::vector<int64_t> &data,
@@ -50,12 +56,43 @@ torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,
                                       torch::jit::Value *A,
                                       torch::jit::Value *B);
 
+template <typename... Ints,
+          std::enable_if_t<std::is_integral<typename std::tuple_element<
+                               0, std::tuple<Ints...>>::type>::value,
+                           int> = 0>
+torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph, Ints... values) {
+  std::vector<int64_t> data{std::forward<Ints>(values)...};
+  return createConstantInt(graph, data,
+                           {static_cast<std::int64_t>(data.size())})
+      ->output();
+}
+
+template <typename... Floats,
+          std::enable_if_t<std::is_floating_point<typename std::tuple_element<
+                               0, std::tuple<Floats...>>::type>::value,
+                           int> = 0>
+torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph,
+                                    Floats... values) {
+  std::vector<double> data{std::forward<Floats>(values)...};
+  return createConstantFloat(graph, data,
+                             {static_cast<std::int64_t>(data.size())})
+      ->output();
+}
+
 // Default to int in the helper.
 template <typename T> struct CreateConstant {
   torch::jit::Node *operator()(torch::jit::Graph *graph,
                                const std::vector<int64_t> &data,
                                const std::vector<int64_t> &new_shape) {
     return createConstantInt(graph, data, new_shape);
+  }
+};
+
+template <> struct CreateConstant<std::int64_t> {
+  torch::jit::Node *operator()(torch::jit::Graph *graph,
+                               const std::vector<int64_t> &data,
+                               const std::vector<int64_t> &new_shape) {
+    return createConstantInt64(graph, data, new_shape);
   }
 };
 

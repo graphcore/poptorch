@@ -118,7 +118,9 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
     index += *dims[dim];
   }
 
-  return createSlice(graph, {node->input(0)}, {index + 1}, {index}, {dim});
+  return createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
+                             wrapInConstant1D(graph, index + 1),
+                             wrapInConstant1D(graph, dim)});
 }
 
 torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
@@ -153,7 +155,9 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
     end = *dims[dim];
   }
 
-  return createSlice(graph, {node->input(0)}, {end}, {start}, {dim});
+  return createSlice(graph, {node->input(0), wrapInConstant1D(graph, start),
+                             wrapInConstant1D(graph, end),
+                             wrapInConstant1D(graph, dim)});
 }
 
 torch::jit::Node *contiguousHandler(torch::jit::Graph *graph,
@@ -289,8 +293,10 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   // Slice up according to the canonicalised split vector.
   for (std::int64_t slice_size : size_of_each_split) {
     // Create a slice.
-    torch::jit::Node *slice = createSlice(
-        graph, {node->input(0)}, {index + slice_size}, {index}, {axis});
+    torch::jit::Node *slice =
+        createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
+                            wrapInConstant1D(graph, index + slice_size),
+                            wrapInConstant1D(graph, axis)});
 
     // Add the slice to the graph.
     slices.push_back(slice->output());

@@ -29,6 +29,16 @@ torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
   return new_node;
 }
 
+torch::jit::Node *createConstantInt64(torch::jit::Graph *graph,
+                                      const std::vector<int64_t> &data,
+                                      const std::vector<int64_t> &new_shape) {
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::int64_constant);
+  new_node->is_(c10::attr::data, data);
+  new_node->is_(c10::attr::shape, new_shape);
+  return new_node;
+}
+
 torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
                                     const std::vector<int64_t> &data,
                                     const std::vector<int64_t> &new_shape) {
@@ -53,13 +63,8 @@ torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
 
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
                              c10::ScalarType scalar) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::cast, {A});
-
   std::string new_type = scalarTypeToOnnxString(scalar);
-  new_node->s_(c10::Symbol::fromQualString("attr::type"), new_type);
-
-  return new_node;
+  return createCast(graph, {A}, new_type);
 }
 
 static std::vector<std::int64_t>

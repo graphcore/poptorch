@@ -89,7 +89,6 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
   }
   return createArgmin(graph, {input}, dim_to_use, keep_dim);
 }
-
 } // namespace
 
 // clang-format off

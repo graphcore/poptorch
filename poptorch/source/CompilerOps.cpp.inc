@@ -59,6 +59,121 @@ torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vecto
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 return new_node;
 }
+torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::averagepool, args);
+new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);
+new_node->i_(c10::Symbol::fromQualString("attr::ceil_mode"),ceil_mode);
+new_node->i_(c10::Symbol::fromQualString("attr::count_include_pad"),count_include_pad);
+new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
+new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
+return new_node;
+}
+torch::jit::Node* createConvinteger(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::convinteger, args);
+new_node->is_(c10::Symbol::fromQualString("attr::dilations"),dilations);
+new_node->i_(c10::Symbol::fromQualString("attr::group"),group);
+new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);
+new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
+new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
+return new_node;
+}
+torch::jit::Node* createDequantizelinear(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dequantizelinear, args);
+return new_node;
+}
+torch::jit::Node* createDropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float ratio) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dropout, args);
+new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
+new_node->f_(c10::Symbol::fromQualString("attr::ratio"),ratio);
+return new_node;
+}
+torch::jit::Node* createIsinf(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t detect_negative,int64_t detect_positive) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::isinf, args);
+new_node->i_(c10::Symbol::fromQualString("attr::detect_negative"),detect_negative);
+new_node->i_(c10::Symbol::fromQualString("attr::detect_positive"),detect_positive);
+return new_node;
+}
+torch::jit::Node* createMatmulinteger(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::matmulinteger, args);
+return new_node;
+}
+torch::jit::Node* createMaxpool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,const std::vector<int64_t> & dilations,const std::vector<int64_t> & pads,int64_t storage_order,const std::vector<int64_t> & strides) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::maxpool, args);
+new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
+new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);
+new_node->i_(c10::Symbol::fromQualString("attr::ceil_mode"),ceil_mode);
+new_node->is_(c10::Symbol::fromQualString("attr::dilations"),dilations);
+new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
+new_node->i_(c10::Symbol::fromQualString("attr::storage_order"),storage_order);
+new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
+return new_node;
+}
+torch::jit::Node* createMod(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t fmod) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::mod, args);
+new_node->i_(c10::Symbol::fromQualString("attr::fmod"),fmod);
+return new_node;
+}
+torch::jit::Node* createNonmaxsuppression(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t center_point_box) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::nonmaxsuppression, args);
+new_node->i_(c10::Symbol::fromQualString("attr::center_point_box"),center_point_box);
+return new_node;
+}
+torch::jit::Node* createQlinearconv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::qlinearconv, args);
+new_node->is_(c10::Symbol::fromQualString("attr::dilations"),dilations);
+new_node->i_(c10::Symbol::fromQualString("attr::group"),group);
+new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);
+new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
+new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
+return new_node;
+}
+torch::jit::Node* createQlinearmatmul(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::qlinearmatmul, args);
+return new_node;
+}
+torch::jit::Node* createQuantizelinear(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::quantizelinear, args);
+return new_node;
+}
+torch::jit::Node* createResize(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::resize, args);
+new_node->s_(c10::Symbol::fromQualString("attr::mode"),mode);
+return new_node;
+}
+torch::jit::Node* createReversesequence(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t batch_axis,int64_t time_axis) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::reversesequence, args);
+new_node->i_(c10::Symbol::fromQualString("attr::batch_axis"),batch_axis);
+new_node->i_(c10::Symbol::fromQualString("attr::time_axis"),time_axis);
+return new_node;
+}
+torch::jit::Node* createRoialign(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode,int64_t output_height,int64_t output_width,int64_t sampling_ratio,float spatial_scale) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::roialign, args);
+new_node->s_(c10::Symbol::fromQualString("attr::mode"),mode);
+new_node->i_(c10::Symbol::fromQualString("attr::output_height"),output_height);
+new_node->i_(c10::Symbol::fromQualString("attr::output_width"),output_width);
+new_node->i_(c10::Symbol::fromQualString("attr::sampling_ratio"),sampling_ratio);
+new_node->f_(c10::Symbol::fromQualString("attr::spatial_scale"),spatial_scale);
+return new_node;
+}
+torch::jit::Node* createSlice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::slice, args);
+return new_node;
+}
+torch::jit::Node* createThresholdedrelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float alpha) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::thresholdedrelu, args);
+new_node->f_(c10::Symbol::fromQualString("attr::alpha"),alpha);
+return new_node;
+}
+torch::jit::Node* createTopk(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::topk, args, 2);
+new_node->i_(c10::Symbol::fromQualString("attr::axis"),axis);
+return new_node;
+}
+torch::jit::Node* createUpsample(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::upsample, args);
+new_node->s_(c10::Symbol::fromQualString("attr::mode"),mode);
+return new_node;
+}
 torch::jit::Node* createAcosh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::acosh, args);
 return new_node;
@@ -76,6 +191,11 @@ torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std:
 new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
 new_node->f_(c10::Symbol::fromQualString("attr::epsilon"),epsilon);
 new_node->f_(c10::Symbol::fromQualString("attr::momentum"),momentum);
+return new_node;
+}
+torch::jit::Node* createCast(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & to) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::cast, args);
+new_node->s_(c10::Symbol::fromQualString("attr::to"),to);
 return new_node;
 }
 torch::jit::Node* createCompress(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t axis) {
@@ -182,15 +302,6 @@ torch::jit::Node* createMax(torch::jit::Graph *graph,  const std::vector<torch::
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::max, args);
 return new_node;
 }
-torch::jit::Node* createMaxpool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,int64_t storage_order,const std::vector<int64_t> & strides) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::maxpool, args);
-new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
-new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);
-new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
-new_node->i_(c10::Symbol::fromQualString("attr::storage_order"),storage_order);
-new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
-return new_node;
-}
 torch::jit::Node* createMean(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::mean, args);
 return new_node;
@@ -223,26 +334,12 @@ torch::jit::Node* createAtan(torch::jit::Graph *graph,  const std::vector<torch:
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::atan, args);
 return new_node;
 }
-torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::averagepool, args);
-new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);
-new_node->i_(c10::Symbol::fromQualString("attr::count_include_pad"),count_include_pad);
-new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
-new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
-return new_node;
-}
 torch::jit::Node* createCos(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::cos, args);
 return new_node;
 }
 torch::jit::Node* createDiv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::div, args);
-return new_node;
-}
-torch::jit::Node* createDropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float ratio) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dropout, args);
-new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
-new_node->f_(c10::Symbol::fromQualString("attr::ratio"),ratio);
 return new_node;
 }
 torch::jit::Node* createEqual(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
@@ -441,6 +538,13 @@ torch::jit::Node* createLogical_not(torch::jit::Graph *graph,  const std::vector
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::logical_not, args);
 return new_node;
 }
+torch::jit::Node* createPad(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & pads,const std::string & mode,float value) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::pad, args);
+new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
+new_node->s_(c10::Symbol::fromQualString("attr::mode"),mode);
+new_node->f_(c10::Symbol::fromQualString("attr::value"),value);
+return new_node;
+}
 torch::jit::Node* createRandomnormallike(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t dtype,float mean,float scale,float seed) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::randomnormallike, args);
 new_node->i_(c10::Symbol::fromQualString("attr::dtype"),dtype);
@@ -547,13 +651,6 @@ torch::jit::Node* createSize(torch::jit::Graph *graph,  const std::vector<torch:
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::size, args);
 return new_node;
 }
-torch::jit::Node* createSlice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & ends,const std::vector<int64_t> & starts,const std::vector<int64_t> & axes) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::slice, args);
-new_node->is_(c10::Symbol::fromQualString("attr::ends"),ends);
-new_node->is_(c10::Symbol::fromQualString("attr::starts"),starts);
-new_node->is_(c10::Symbol::fromQualString("attr::axes"),axes);
-return new_node;
-}
 torch::jit::Node* createSoftmax(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::softmax, args);
 new_node->i_(c10::Symbol::fromQualString("attr::axis"),axis);
@@ -594,12 +691,6 @@ return new_node;
 }
 torch::jit::Node* createTile(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::tile, args);
-return new_node;
-}
-torch::jit::Node* createTopk(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t k,int64_t axis) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::topk, args, 2);
-new_node->i_(c10::Symbol::fromQualString("attr::k"),k);
-new_node->i_(c10::Symbol::fromQualString("attr::axis"),axis);
 return new_node;
 }
 torch::jit::Node* createTranspose(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & perm) {

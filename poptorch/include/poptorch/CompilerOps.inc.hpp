@@ -14,10 +14,30 @@ torch::jit::Node* createReplicatedallreduce(torch::jit::Graph *graph,  const std
 torch::jit::Node* createL1loss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const float lamda,std::int32_t reduction);
 torch::jit::Node* createNllloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,std::int32_t ignoreIndex);
 torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction);
+torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
+torch::jit::Node* createConvinteger(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
+torch::jit::Node* createDequantizelinear(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createDropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float ratio);
+torch::jit::Node* createIsinf(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t detect_negative,int64_t detect_positive);
+torch::jit::Node* createMatmulinteger(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createMaxpool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,const std::vector<int64_t> & dilations,const std::vector<int64_t> & pads,int64_t storage_order,const std::vector<int64_t> & strides);
+torch::jit::Node* createMod(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t fmod);
+torch::jit::Node* createNonmaxsuppression(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t center_point_box);
+torch::jit::Node* createQlinearconv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
+torch::jit::Node* createQlinearmatmul(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createQuantizelinear(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createResize(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode);
+torch::jit::Node* createReversesequence(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t batch_axis,int64_t time_axis);
+torch::jit::Node* createRoialign(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode,int64_t output_height,int64_t output_width,int64_t sampling_ratio,float spatial_scale);
+torch::jit::Node* createSlice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createThresholdedrelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float alpha);
+torch::jit::Node* createTopk(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis);
+torch::jit::Node* createUpsample(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & mode);
 torch::jit::Node* createAcosh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createAsinh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createAtanh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum);
+torch::jit::Node* createCast(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & to);
 torch::jit::Node* createCompress(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t axis);
 torch::jit::Node* createCosh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createErf(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
@@ -40,7 +60,6 @@ torch::jit::Node* createSinh(torch::jit::Graph *graph,  const std::vector<torch:
 torch::jit::Node* createWhere(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createExpand(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createMax(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createMaxpool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,int64_t storage_order,const std::vector<int64_t> & strides);
 torch::jit::Node* createMean(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createMin(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSum(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
@@ -49,10 +68,8 @@ torch::jit::Node* createAdd(torch::jit::Graph *graph,  const std::vector<torch::
 torch::jit::Node* createLogical_and(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createAsin(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createAtan(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
 torch::jit::Node* createCos(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDiv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createDropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float ratio);
 torch::jit::Node* createEqual(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createMul(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createMultinomial(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t dtype,int64_t sample_size,float seed);
@@ -91,6 +108,7 @@ torch::jit::Node* createLppool(torch::jit::Graph *graph,  const std::vector<torc
 torch::jit::Node* createMaxroipool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & pooled_shape,float spatial_scale);
 torch::jit::Node* createNeg(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createLogical_not(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createPad(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & pads,const std::string & mode,float value);
 torch::jit::Node* createRandomnormallike(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t dtype,float mean,float scale,float seed);
 torch::jit::Node* createRandomuniformlike(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t dtype,float high,float low,float seed);
 torch::jit::Node* createReciprocal(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
@@ -110,7 +128,6 @@ torch::jit::Node* createSelu(torch::jit::Graph *graph,  const std::vector<torch:
 torch::jit::Node* createShape(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSigmoid(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSize(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createSlice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & ends,const std::vector<int64_t> & starts,const std::vector<int64_t> & axes);
 torch::jit::Node* createSoftmax(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis);
 torch::jit::Node* createSoftplus(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSoftsign(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
@@ -120,7 +137,6 @@ torch::jit::Node* createSqrt(torch::jit::Graph *graph,  const std::vector<torch:
 torch::jit::Node* createSqueeze(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & axes);
 torch::jit::Node* createTanh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createTile(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createTopk(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t k,int64_t axis);
 torch::jit::Node* createTranspose(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & perm);
 torch::jit::Node* createUnsqueeze(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & axes);
 

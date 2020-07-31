@@ -140,7 +140,7 @@ OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(1), NONE, createReducemin, {PARAM(0
 // Unsupported due to PopART/Onnx not returning the indices as well. TODO(T23333)
 //OP_CONVERTOR(aten::max and NUM_INPUTS_EQUALS(3), NONE, createReducemax, {PARAM(0)} COMMA {HANDLE_DIM(1)} COMMA HANDLE(2, int64_t))
 //OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(3), NONE, createReducemin, {PARAM(0)} COMMA {HANDLE_DIM(1)} COMMA HANDLE(2, int64_t))
-OP_CONVERTOR(aten::topk, NONE, createTopk, {PARAM(0)} COMMA HANDLE(1, int64_t) COMMA  HANDLE_DIM(2))
+OP_CONVERTOR(aten::topk, NONE, createTopk, {PARAM(0) COMMA HANDLE_CONSTANT_AS_IR(1, int64_t)} COMMA  HANDLE_DIM(2))
 
 // Opset 10
 //OP_CONVERTOR(aten::isinf, NONE, createIsinf, {PARAM(0)} COMMA 1 COMMA 1)

@@ -39,10 +39,7 @@ popart_dir = popart_include_dir_partial + "popart"
 
 files = [popart_dir + "/builder.hpp", popart_dir + "/builder.h.gen"]
 
-nodeBlacklist = {
-    "DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset10",
-    "AiOnnxOpset11"
-}
+nodeBlacklist = {"DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11"}
 
 
 def find_children(node, _argNum):
@@ -67,6 +64,8 @@ def find_functions(node, namespace):
 
     operation = {}
     if node.kind == clang.cindex.CursorKind.CXX_METHOD:
+        functionName = node.spelling
+
         returnType = str(node.type.spelling).split("(")[0]
 
         operation["type"] = returnType
@@ -92,7 +91,7 @@ def find_functions(node, namespace):
 
         if namespace not in jsonOutput:
             jsonOutput[namespace] = {}
-        jsonOutput[namespace][node.spelling] = operation
+        jsonOutput[namespace][functionName] = operation
 
 
 index = clang.cindex.Index.create()
@@ -111,7 +110,7 @@ for diag in tu.diagnostics:
 
 root_node = tu.cursor
 find_functions(root_node, "")
-logger.debug("jsonOutput Keys:%s", jsonOutput.keys())
+logger.debug("jsonOutput Keys:%s", sorted(jsonOutput.keys()))
 
 classes = []
 
@@ -135,7 +134,7 @@ for opset in classes:
 
     for name in toRemove:
         jsonOutput[opset].pop(name)
-logger.debug("addedFunctions: %s", addedFunctions)
+logger.debug("addedFunctions: %s", sorted(addedFunctions))
 
 MultipleOutputsOps = {"lstm": "2", "split": "num_outputs", "topk": "2"}
 
@@ -158,7 +157,10 @@ CXXTypeToTypeClass = {
 
     # Non-scalar integers.
     "std::vector<int64_t>": "INT_VEC",
-    "nonstd::optional<std::vector<int64_t> >": "INT_VEC"
+    "nonstd::optional<std::vector<int64_t> >": "INT_VEC",
+
+    # String
+    "std::string": "STRING"
 }
 
 
@@ -206,6 +208,9 @@ def attrTypeGetter(ty):
     if ty == "FLOAT":
         return "f"
 
+    if ty == "STRING":
+        return "s"
+
     assert False, "Invalid type: " + ty
     return None
 
@@ -217,7 +222,9 @@ headerStubs = ""
 cxxFile = ""
 
 for opset in classes:
+    macroFile += "// Ops from %s\n" % opset
     for name in jsonOutput[opset]:
+        logger.debug("Generating code for %s::%s", opset, name)
         # Generate the macro
         opDecl = "OP_DECL("
 
@@ -225,7 +232,7 @@ for opset in classes:
         opDecl += "popart, " + name + ", " + name
 
         if opset.startswith("AiOnnxOpset"):
-            opDecl += ", AiOnnxOpset9." + name
+            opDecl += ", AiOnnxOpset10." + name
         else:
             opDecl += ", " + opset + "." + name
 
@@ -247,8 +254,8 @@ for opset in classes:
             macroType = toType(arg["type"])
 
             if macroType == "UNKNOWN":
-                logger.debug("Skipping OP: %s"
-                             " due to parse failure on %s", name, str(arg))
+                logger.info("Skipping OP: %s"
+                            " due to parse failure on %s", name, str(arg))
                 earlyExit = True
                 break
 

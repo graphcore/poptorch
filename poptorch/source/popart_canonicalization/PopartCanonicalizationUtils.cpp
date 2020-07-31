@@ -58,6 +58,20 @@ template <> struct Handle<float> {
     }
     if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
       const at::Tensor &value = node->t(sym);
+      return *value.data_ptr<float>();
+    }
+    return std::nullopt;
+  }
+};
+
+template <> struct Handle<double> {
+  std::optional<float> operator()(const c10::Symbol &sym,
+                                  torch::jit::Node *node) {
+    if (node->kindOf(sym) == torch::jit::AttributeKind::f) {
+      return node->f(sym);
+    }
+    if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
+      const at::Tensor &value = node->t(sym);
       return *value.data_ptr<double>();
     }
     return std::nullopt;
@@ -297,18 +311,27 @@ torch::jit::Node *createIRConstant(torch::jit::Graph *graph,
     auto sizes = as_tensor->sizes();
     auto type = as_tensor->scalarType();
 
-    if (sizes.size() && *sizes.size() == 0 && type) {
-      if (*type == at::kDouble) {
-        return createConstantFloat(
-            graph, {*handleConstant<float>(value->node())}, {1});
-      }
-      if (*type == at::kLong) {
-        return createConstantInt(
-            graph, {*handleConstant<std::int64_t>(value->node())}, {1});
-      }
+    ERROR_ON_MSG(!sizes.size(),
+                 "Internal error: Constant of unknown size not supported");
+    ERROR_ON_MSG(!type,
+                 "Internal error: Constant of unknown type not supported");
+    ERROR_ON_MSG(*sizes.size(),
+                 "Internal error: Only constants of size 0 supported, size: "
+                     << *sizes.size());
+    if (*type == at::kDouble) {
+      return createConstantFloat(graph,
+                                 {*handleConstant<double>(value->node())}, {1});
+    }
+    if (*type == at::kFloat) {
+      return createConstantFloat(graph, {*handleConstant<float>(value->node())},
+                                 {1});
+    }
+    if (*type == at::kLong) {
+      return createConstantInt(
+          graph, {*handleConstant<std::int64_t>(value->node())}, {1});
     }
 
-    ERROR("Internal error: Constant type is unsupported");
+    ERROR("Internal error: Constant type not supported " << *type);
   }
 
   // Legal to return null means |value| was not a constant.
@@ -368,6 +391,7 @@ void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
   replaceOutputUse(old_val, new_val);
 }
 
+template std::vector<int> handleListConstruct(torch::jit::Node *node);
 template std::vector<std::int64_t> handleList(torch::jit::Node *node);
 template std::optional<float> handleConstant(torch::jit::Node *);
 template std::optional<int> handleConstant(torch::jit::Node *);

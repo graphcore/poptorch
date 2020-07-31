@@ -49,12 +49,12 @@ bool maybeConvertTensor(torch::jit::Value *tensor) {
   const std::string float_string{"FLOAT"};
   const std::string half_string{"FLOAT16"};
 
-  if (node->kind() == symbols::poptorch::cast) {
-    if (float_string == node->s(c10::Symbol::fromQualString("attr::type"))) {
-      node->s_(c10::Symbol::fromQualString("attr::type"), "FLOAT16");
+  if (node->kind() == symbols::popart::cast) {
+    if (float_string == node->s(c10::Symbol::fromQualString("attr::to"))) {
+      node->s_(c10::Symbol::fromQualString("attr::to"), "FLOAT16");
       return true;
     }
-    if (half_string == node->s(c10::Symbol::fromQualString("attr::type"))) {
+    if (half_string == node->s(c10::Symbol::fromQualString("attr::to"))) {
       // Don't propagate through half casts, implies node above is not half by
       // design.
       return false;

@@ -342,6 +342,11 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     PreBuildCalls new_node = PopartBuilder(graph, Params);                     \
   }
 
+#define HANDLE_CONSTANT_AS_IR(Index, Type)                                     \
+  CreateConstant<Type>{}(                                                      \
+      graph, {*handleConstant<Type>(node->input(Index)->node())}, {1})         \
+      ->output()
+
 // Create a function decl with the given call and arguments.
 #define OP_CONVERTOR_WITH_CAST(AtenID, PreBuildCalls, PopartBuilder, Params,   \
                                CastType)                                       \
@@ -357,6 +362,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 #include "CanonicalizationOps.h.inc"
 
 #undef OP_CONVERTOR
+#undef HANDLE_CONSTANT_AS_IR
 #undef PARAM
 #undef COMMA
 #undef HANDLE

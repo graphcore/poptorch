@@ -119,12 +119,18 @@ public:
   popart::TensorId reshape(const std::vector<popart::TensorId> &inputs,
                            const std::vector<int64_t> &shape);
 
-  popart::TensorId cast(const std::vector<popart::TensorId> &inputs,
-                        const std::string &type);
+  template <popart::DataType PopartType, typename CType>
+  popart::TensorId constant(const std::vector<popart::TensorId> &inputs,
+                            const std::vector<CType> &data,
+                            const std::vector<int64_t> &shape);
 
   popart::TensorId intConstant(const std::vector<popart::TensorId> &inputs,
                                const std::vector<int32_t> &data,
                                const std::vector<int64_t> &shape);
+
+  popart::TensorId int64Constant(const std::vector<popart::TensorId> &inputs,
+                                 const std::vector<int64_t> &data,
+                                 const std::vector<int64_t> &shape);
 
   popart::TensorId floatConstant(const std::vector<popart::TensorId> &inputs,
                                  const std::vector<double> &data,
@@ -416,14 +422,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
 popart::TensorId
 CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
                       const std::vector<int64_t> &shape) {
-  auto ai_onnx = op_builder->aiOnnxOpset9();
-  return op_builder->reshape_const(ai_onnx, inputs, shape);
-}
+  auto ai_onnx = op_builder->aiOnnxOpset10();
 
-popart::TensorId CompilerImpl::cast(const std::vector<popart::TensorId> &inputs,
-                                    const std::string &type) {
-  auto ai_onnx = op_builder->aiOnnxOpset9();
-  return ai_onnx.cast(inputs, type);
+  popart::Shape s = {static_cast<int64_t>(shape.size())};
+  popart::TensorInfo tensor_info("INT64", s);
+  auto new_shape = ai_onnx.constant({shape.data(), tensor_info});
+  return ai_onnx.reshape({inputs[0], new_shape});
 }
 
 std::vector<popart::TensorId>
@@ -439,24 +443,26 @@ CompilerImpl::customOperation(const std::vector<popart::TensorId> &args,
   return op_builder->customOp(id, version, args, num_outputs, {});
 }
 
+template <popart::DataType PopartType, typename CType>
 popart::TensorId
-CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
-                          const std::vector<int32_t> &data,
-                          const std::vector<int64_t> &shape) {
+CompilerImpl::constant(const std::vector<popart::TensorId> &inputs,
+                       const std::vector<CType> &data,
+                       const std::vector<int64_t> &shape) {
   UNUSED(inputs);
   // Create the tensor info for our new tensor.
-  popart::TensorInfo info{"INT32", shape};
+  popart::TensorInfo info{PopartType, shape};
 
   std::int64_t total_size = std::accumulate(shape.begin(), shape.end(), 1,
                                             std::multiplies<std::int64_t>());
-  std::vector<int32_t> broadcasted_data(total_size);
+  std::vector<CType> broadcasted_data;
 
   // Create the inital data for the variable.
   popart::ConstVoidData the_data;
 
   if (data.size() == 1 && total_size != 1) {
+    broadcasted_data.resize(total_size);
     std::for_each(broadcasted_data.begin(), broadcasted_data.end(),
-                  [&data](std::int32_t &i) { i = data[0]; });
+                  [&data](CType &i) { i = data[0]; });
 
     the_data.data = broadcasted_data.data();
     the_data.info = info;
@@ -465,44 +471,36 @@ CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
     the_data.info = info;
   }
 
-  auto ai_onnx = op_builder->aiOnnxOpset9();
+  auto ai_onnx = op_builder->aiOnnxOpset10();
   return ai_onnx.constant(the_data);
+}
+
+popart::TensorId
+CompilerImpl::intConstant(const std::vector<popart::TensorId> &inputs,
+                          const std::vector<int32_t> &data,
+                          const std::vector<int64_t> &shape) {
+  return constant<popart::DataType::INT32>(inputs, data, shape);
+}
+
+popart::TensorId
+CompilerImpl::int64Constant(const std::vector<popart::TensorId> &inputs,
+                            const std::vector<int64_t> &data,
+                            const std::vector<int64_t> &shape) {
+  return constant<popart::DataType::INT64>(inputs, data, shape);
 }
 
 popart::TensorId
 CompilerImpl::floatConstant(const std::vector<popart::TensorId> &inputs,
                             const std::vector<double> &data,
                             const std::vector<int64_t> &shape, bool isHalf) {
-  UNUSED(inputs);
-
-  const std::string type = isHalf ? "FLOAT16" : "FLOAT";
-  // Create the tensor info for our new tensor.
-  popart::TensorInfo info{type, shape};
-
-  std::int64_t total_size = std::accumulate(shape.begin(), shape.end(), 1,
-                                            std::multiplies<std::int64_t>());
-  std::vector<float> broadcasted_data(total_size);
-
-  // Create the inital data for the variable.
-  popart::ConstVoidData the_data;
-
-  if (data.size() == 1 && total_size != 1) {
-    std::for_each(broadcasted_data.begin(), broadcasted_data.end(),
-                  [&data](float &i) { i = data[0]; });
-
-    the_data.data = broadcasted_data.data();
-    the_data.info = info;
-  } else {
-    int counter = 0;
-    std::for_each(broadcasted_data.begin(), broadcasted_data.end(),
-                  [&](float &i) { i = data[counter++]; });
-
-    the_data.data = broadcasted_data.data();
-    the_data.info = info;
+  std::vector<float> converted_data(data.size());
+  int counter = 0;
+  std::for_each(converted_data.begin(), converted_data.end(),
+                [&data, &counter](float &i) { i = data[counter++]; });
+  if (isHalf) {
+    return constant<popart::DataType::FLOAT16>(inputs, converted_data, shape);
   }
-
-  auto ai_onnx = op_builder->aiOnnxOpset9();
-  return ai_onnx.constant(the_data);
+  return constant<popart::DataType::FLOAT>(inputs, converted_data, shape);
 }
 
 } // namespace detail
@@ -598,7 +596,7 @@ namespace detail {
 
 popart::TensorId
 CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
-  auto ai_onnx = op_builder->aiOnnxOpset9();
+  auto ai_onnx = op_builder->aiOnnxOpset10();
   popart::TensorId output = ai_onnx.add(in);
   op_builder->setInplacePreferences(
       output, {{"AddLhsInplace", -1}, {"AddRhsInplace", -1}});
@@ -655,7 +653,7 @@ static bool IsLoss(const std::string &operation) {
 #define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
   poptorch::TensorId Compiler::function(                                       \
       const std::vector<poptorch::TensorId> &inputs Args) {                    \
-    auto AiOnnxOpset9 = _impl->op_builder->aiOnnxOpset9();                     \
+    auto AiOnnxOpset10 = _impl->op_builder->aiOnnxOpset10();                   \
     auto AiGraphcoreOpset1 = _impl->op_builder->aiGraphcoreOpset1();           \
     const bool isLoss = IsLoss(#ns "::" #funcName);                            \
     std::vector<popart::TensorId> ins;                                         \

@@ -80,7 +80,7 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   //                Tensor? bias, float eps, bool cudnn_enable) -> Tensor
 
   // Tensor to normalise.
-  torch::jit::Value *x = node->input(0);
+  torch::jit::Value *input = node->input(0);
 
   // Bias to add
   torch::jit::Value *gamma = node->input(2);
@@ -93,33 +93,21 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   // Pytorch normalizes across arbitrary number of dimensions from the end.
   // We flatten into a [M, N] array and normalize the N.
 
+  std::vector<std::int64_t> output_shape = shapeFromTensor(node->output());
   std::vector<std::int64_t> normalized_shape =
       handleList<int64_t>(node->input(1)->node());
-
-  // Opset 9 Flatten does not handle negative axis
-  auto tensor_type = x->type()->expect<c10::TensorType>();
-  const std::int64_t axis = *tensor_type->dim() - normalized_shape.size();
+  std::vector<std::int64_t> input_shape = shapeFromTensor(input);
+  const std::int64_t axis = input_shape.size() - normalized_shape.size();
 
   // Flatten into [M, N]
-  torch::jit::Node *flatten = createFlatten(graph, {x}, axis);
+  torch::jit::Node *flatten = createFlatten(graph, {input}, axis);
 
   // Normalize.
   torch::jit::Node *normalize = createGroupnormalization(
       graph, {flatten->output(), gamma, beta}, 1, epsilon);
 
-  // Reshape back into the expected shape.
-  c10::TensorTypePtr converted_to_tensor =
-      node->output()->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = converted_to_tensor->sizes();
-
-  std::vector<std::int64_t> original_shape;
-
-  for (auto optional_int : *dims.sizes()) {
-    original_shape.push_back(*optional_int);
-  }
-
   // Perform the reshape.
-  return createReshape(graph, normalize->output(), original_shape);
+  return createReshape(graph, normalize->output(), output_shape);
 }
 } // namespace
 

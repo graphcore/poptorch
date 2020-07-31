@@ -35,12 +35,12 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
 
   if (kind == c10::aten::max_pool1d || kind == c10::aten::max_pool2d ||
       kind == c10::aten::max_pool3d) {
-    return createMaxpool(graph, {node->input(0)}, 1, kernel_size, padding, 0,
-                         stride);
+    return createMaxpool(graph, {node->input(0)}, 1, kernel_size, 0, {},
+                         padding, 0, stride);
   }
   // ceil_mode, countIncludePad, divisor_override are ignored for now due
   // to not being supported directly in popart.
-  return createAveragepool(graph, {node->input(0)}, kernel_size, 0, padding,
+  return createAveragepool(graph, {node->input(0)}, kernel_size, 0, 0, padding,
                            stride);
 }
 
@@ -68,8 +68,8 @@ torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
   const std::vector<int64_t> &padding{0, 0, 0, 0};
 
   if (kind == c10::aten::adaptive_avg_pool2d) {
-    return createAveragepool(graph, {node->input(0)}, kernel_shape, 0, padding,
-                             stride);
+    return createAveragepool(graph, {node->input(0)}, kernel_shape, 0, 0,
+                             padding, stride);
   }
   ERROR("Adaptive max pooling isn't currently supported.");
   /* // TODO(T22978) Fix the number of inputs in PopParse so this can
