@@ -6,6 +6,12 @@ find_package(Torch REQUIRED)
 # Ensure ABI matches that of PyTorch
 add_definitions("-D_GLIBCXX_USE_CXX11_ABI=${Torch_USE_CXX11_ABI}")
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+# Workaround for clang / pybind / c++17
+# https://github.com/pybind/pybind11/issues/1818
+add_compile_options(-fsized-deallocation)
+endif()
+
 set(POPTORCH_CORE_SOURCES
   "poptorch.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/LowerToPopart.cpp"

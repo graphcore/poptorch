@@ -38,7 +38,7 @@
         "pylint": {
             "type": "pylint",
             "pylint.config": ".pylintrc",
-            "bin": ["./.linters/pylint"],
+            "bin": ["./.linters/pylint", "./install_linters.sh"],
             "include": "(\\.py$)",
             "exclude": "(^docs/.*)"
         },
