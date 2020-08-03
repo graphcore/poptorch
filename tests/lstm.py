@@ -106,3 +106,60 @@ def test_lstm_batched_batch_first():
     out = lstm(inputs, hidden)
     ipuOut = ipuLstm(inputs, hidden)
     assert poptorch.testing.allclose(out, ipuOut)
+
+
+def test_lstm_fc():
+    class LSTMModel(nn.Module):
+        def __init__(self, input_size, hidden_size, classes):
+            super(LSTMModel, self).__init__()
+            self.lstm = nn.LSTM(input_size,
+                                hidden_size,
+                                num_layers=1,
+                                bias=True)
+            self.fc = nn.Linear(hidden_size, classes, bias=False)
+
+        def forward(self, x):
+            h1, _ = self.lstm(x)
+            h2 = h1[-1, :, :]
+            h3 = self.fc(h2)
+            return h3
+
+    torch.manual_seed(42)
+    batch_size = 2
+    input_size = 5
+    classes = 3
+    lstm = LSTMModel(input_size=input_size, hidden_size=3, classes=classes)
+
+    ipuLstm = poptorch.inferenceModel(lstm)
+    input = torch.randn(1, batch_size, input_size)
+    out = lstm(input)
+    ipuOut = ipuLstm(input)
+    assert poptorch.testing.allclose(out, ipuOut)
+
+
+def test_lstm_fc_training():
+    class LSTMModel(nn.Module):
+        def __init__(self, input_size, hidden_size, classes):
+            super(LSTMModel, self).__init__()
+            self.lstm = nn.LSTM(input_size,
+                                hidden_size,
+                                num_layers=1,
+                                bias=True)
+            self.fc = nn.Linear(hidden_size, classes, bias=False)
+
+        def forward(self, x):
+            h1, _ = self.lstm(x)
+            h2 = h1[-1, :, :]
+            h3 = self.fc(h2)
+            return h3
+
+    torch.manual_seed(42)
+    batch_size = 2
+    input_size = 5
+    classes = 3
+    lstm = LSTMModel(input_size=input_size, hidden_size=3, classes=classes)
+
+    ipuLstm = poptorch.trainingModel(lstm, loss=nn.CrossEntropyLoss())
+    input = torch.randn(1, batch_size, input_size)
+    label = torch.tensor([1, 2])
+    ipuLstm(input, label.long())
