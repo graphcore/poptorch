@@ -382,6 +382,16 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   return createResize(graph, {node->input(0), scales_node->output()},
                       "nearest");
 }
+
+torch::jit::Node *unsupportedUpsampleHandler(torch::jit::Graph *graph,
+                                             torch::jit::Node *node) {
+  UNUSED(graph);
+  ERROR("Unsupported upsample mode "
+        << node->kind().toQualString()
+        << ": currently only 'nearest' is supported");
+  return nullptr;
+}
+
 } // namespace
 
 // clang-format off
@@ -404,6 +414,10 @@ static bool handlers = registerHandlers(
     c10::aten::upsample_nearest1d, upsampleHandler,
     c10::aten::upsample_nearest2d, upsampleHandler,
     c10::aten::upsample_nearest3d, upsampleHandler,
+    c10::aten::upsample_linear1d, unsupportedUpsampleHandler,
+    c10::aten::upsample_bilinear2d, unsupportedUpsampleHandler,
+    c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler,
+    c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler,
     c10::aten::squeeze, reshapeHandler);
 // clang-format on
 

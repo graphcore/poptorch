@@ -47,6 +47,21 @@ def test_upsample(scale_factor, input_shape):
     torch.testing.assert_allclose(nativeOut, poptorch_out)
 
 
+@pytest.mark.parametrize("mode, input_shape", [("linear", (1, 2, 3)),
+                                               ("bilinear", (1, 2, 3, 4)),
+                                               ("bicubic", (1, 2, 3, 4)),
+                                               ("trilinear", (1, 2, 3, 4, 5))])
+def test_unsupported_upsample(mode, input_shape):
+    scale_factor = 2
+    model = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)
+    x = torch.randn(*input_shape)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    with pytest.raises(RuntimeError, match="only 'nearest' is supported"):
+        poptorch_model(x)
+
+
 def test_linear():
     model = torch.nn.Linear(20, 30)
     x = torch.randn(128, 20)
