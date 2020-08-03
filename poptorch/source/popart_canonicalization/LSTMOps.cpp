@@ -111,8 +111,9 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
   // Keep the last slice from Y `[seq_length, num_directions, batch_size,
   // hidden_size]
   torch::jit::Node *y_h = createSlice(
-      graph, {lstm->output(0), wrapInConstant1D(graph, input_shape[batch_dim] - 1),
-              wrapInConstant1D(graph, INT_MAX), wrapInConstant1D(graph, 0)});
+      graph,
+      {lstm->output(0), wrapInConstant1D(graph, input_shape[batch_dim] - 1),
+       wrapInConstant1D(graph, INT_MAX), wrapInConstant1D(graph, 0)});
 
   torch::jit::Value *output = lstm->output(0);
   // Transpose output SBF -> BSF

@@ -4,15 +4,19 @@
 
 namespace logging {
 
+std::string &getContext() {
+  static std::string log_context;
+  return log_context;
+}
+
 namespace detail {
 struct LogContextImpl {
-  LogContextImpl() : saved_context(context), cleared(true) {}
+  LogContextImpl() : saved_context(getContext()), cleared(true) {}
   std::string saved_context;
   bool cleared;
-  static std::string context;
   static bool trace_enabled;
 };
-std::string LogContextImpl::context = ""; // NOLINT
+
 bool LogContextImpl::trace_enabled = []() {
   auto level = std::getenv("POPTORCH_LOG_LEVEL");
   if (!level) {
@@ -32,10 +36,10 @@ LogContext::LogContext(const char *context) : LogContext() {
 
 void LogContext::updateContext(const std::string &new_context) {
   clear();
-  _impl->context = _impl->saved_context + " " + new_context;
+  getContext() = _impl->saved_context + " " + new_context;
   _impl->cleared = false;
   if (detail::LogContextImpl::trace_enabled) {
-    logging::trace("[{}] Start", _impl->context);
+    logging::trace("[{}] Start", getContext());
   }
 }
 
@@ -44,12 +48,12 @@ void LogContext::clear() {
     // Don't restore the saved context if we're handling an exception
     // we might want to recover the context later.
     if (!std::uncaught_exceptions()) {
-      if (detail::LogContextImpl::trace_enabled && !_impl->context.empty()) {
-        logging::trace("[{}] End", _impl->context);
+      if (detail::LogContextImpl::trace_enabled && !getContext().empty()) {
+        logging::trace("[{}] End", getContext());
       }
       // Don't restore the saved context if the context has been cleared.
-      if (!_impl->context.empty()) {
-        _impl->context = _impl->saved_context;
+      if (!getContext().empty()) {
+        getContext() = _impl->saved_context;
       }
     }
     _impl->cleared = true;
@@ -58,14 +62,8 @@ void LogContext::clear() {
 
 LogContext::~LogContext() { clear(); }
 
-/* static */ const char *LogContext::context() {
-  return detail::LogContextImpl::context.c_str();
-}
-/* static */ void LogContext::resetContext() {
-  return detail::LogContextImpl::context.clear();
-}
-/* static */ bool LogContext::isEmpty() {
-  return detail::LogContextImpl::context.empty();
-}
+/* static */ const char *LogContext::context() { return getContext().c_str(); }
+/* static */ void LogContext::resetContext() { return getContext().clear(); }
+/* static */ bool LogContext::isEmpty() { return getContext().empty(); }
 
 } // namespace logging
