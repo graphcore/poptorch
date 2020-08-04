@@ -99,8 +99,10 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-static bool handlers =
-    registerHandlers(c10::aten::_convolution, convolutionHandler,
-                     c10::aten::conv2d, conv2dHandler);
+// clang-format off
+static bool handlers = registerHandlers(
+    c10::aten::_convolution, convolutionHandler,
+    c10::aten::conv2d, conv2dHandler);
+// clang-format on
 
 } // namespace poptorch

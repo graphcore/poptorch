@@ -38,3 +38,7 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
   a list of tensors the same shape and size as the expected output tensors. This is to
   ensure the pytorch trace remains valid as it traces on CPU so won't actually execute
   the operation when building the graph.
+
+- Adds support for torch.nn.Conv1D / torch.nn.Conv2D / torch.nn.Conv3D
+
+- Adds support for torch.nn.Upsample ('nearest' mode only)
