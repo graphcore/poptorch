@@ -144,6 +144,9 @@ public:
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
+  popart::TensorId randomUniform(const std::vector<popart::TensorId> &inputs,
+                                 const std::vector<int64_t> &shape);
+
   void updateUseModelConfig();
   std::string checkSystemConfig();
 };
@@ -599,6 +602,14 @@ CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
   op_builder->setInplacePreferences(
       output, {{"AddLhsInplace", -1}, {"AddRhsInplace", -1}});
   return output;
+}
+
+popart::TensorId
+CompilerImpl::randomUniform(const std::vector<popart::TensorId> &inputs,
+                            const std::vector<int64_t> &shape) {
+  UNUSED(inputs);
+  auto ai_onnx = op_builder->aiOnnxOpset10();
+  return ai_onnx.randomuniform(shape);
 }
 
 } // namespace detail

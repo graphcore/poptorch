@@ -25,3 +25,6 @@ OP_DECL(poptorch, add_not_in_place, add_not_in_place, _impl->addNotInPlace, NONE
 OP_DECL(poptorch, custom_operation, custom_operation, _impl->customOperation,
         ARG(STRING, name) ARG(STRING, domain) ARG(INT, version) ARG(INT, num_outputs),
         BODY_ARG(name) BODY_ARG(domain) BODY_ARG(version) BODY_ARG(num_outputs))
+
+OP_DECL(poptorch, random_uniform, random_uniform, _impl->randomUniform, ARG(INT_VEC, shape),
+        BODY_ARG(shape))
