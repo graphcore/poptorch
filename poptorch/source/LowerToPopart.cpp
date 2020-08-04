@@ -128,6 +128,8 @@ private:
   void lowerBody();
 
   void lowerReturn();
+
+  std::string tensorNames(std::int64_t first_tensor, std::int64_t num_tensors);
 };
 
 /*
@@ -284,6 +286,17 @@ void LowerToPopart::lowerReturn() {
   }
 }
 
+std::string LowerToPopart::tensorNames(std::int64_t first_tensor,
+                                       std::int64_t num_tensors) {
+  std::string sep{};
+  std::string names;
+  for (std::int64_t i = 0; i < num_tensors; ++i) {
+    names += sep + _compiler.tensorName(first_tensor + i);
+    sep = ", ";
+  }
+  return names;
+}
+
 // Lower the main body of the _graph.
 void LowerToPopart::lowerBody() {
   for (torch::jit::Node *node : _graph.nodes()) {
@@ -305,8 +318,9 @@ void LowerToPopart::lowerBody() {
                      });
 
       // Call the callback.
-      logging::trace("{} was lowered to ", *node);
       poptorch::TensorId first_output_tensor = itr->second(inputs, node);
+      logging::trace("{} was lowered to {}", nodeToString(node),
+                     tensorNames(first_output_tensor, node->outputs().size()));
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other
       // IDs.

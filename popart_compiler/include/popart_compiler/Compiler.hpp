@@ -168,6 +168,7 @@ public:
                             const std::vector<std::int64_t> &dims, void *data);
 
   bool tensorIdIsValid(poptorch::TensorId id) const;
+  const char *tensorName(poptorch::TensorId id) const;
 
   std::vector<std::int64_t> getSize(poptorch::TensorId id) const;
 
