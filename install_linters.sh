@@ -68,6 +68,7 @@ then
 fi
 
 source ${VE}/bin/activate
+pip install wheel
 pip install yapf==0.27.0
 pip install cpplint==1.4.4
 pip install yml2json
