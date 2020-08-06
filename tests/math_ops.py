@@ -396,3 +396,20 @@ def test_topk():
         return values_equal and indices_equal
 
     unary_op_harness(operation, input, compare)
+
+
+types = [torch.float32, torch.int32]
+
+
+@pytest.mark.parametrize("ty", types)
+def test_constant_arrays(ty):
+    torch.manual_seed(42)
+
+    input = torch.randn([10])
+
+    def operation(x):
+        constant_tensor = torch.tensor([1, -2, -3, 4, 5, 6, 7, -8, 9, -10],
+                                       dtype=ty)
+        return torch.sub(x, constant_tensor)
+
+    unary_op_harness(operation, input, torch.equal)

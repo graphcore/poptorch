@@ -335,6 +335,8 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
     // Enforce any constraints that aren't enforced by popart.
     poptorch::canonicalizeLate(graph.get());
 
+    logging::debug("Graph right after canonicalization:\n{}", *graph);
+
     // Warn the user if any operations couldn't be canonicalised.
     poptorch::warnOnUnsupportedAten(graph.get());
 

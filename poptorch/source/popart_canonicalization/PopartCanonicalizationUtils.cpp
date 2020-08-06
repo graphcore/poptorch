@@ -305,32 +305,48 @@ torch::jit::Node *createIRConstant(torch::jit::Graph *graph,
   // If this is still a constant.
   if (value->node()->kind() == c10::prim::Constant) {
     // Scalar doubles and longs are tensors somehow.
-    c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
+    at::Tensor tensor = value->node()->t(c10::attr::value);
 
-    auto sizes = as_tensor->sizes();
-    auto type = as_tensor->scalarType();
-
-    ERROR_ON_MSG(!sizes.size(),
-                 "Internal error: Constant of unknown size not supported");
-    ERROR_ON_MSG(!type,
-                 "Internal error: Constant of unknown type not supported");
-    ERROR_ON_MSG(*sizes.size(),
-                 "Internal error: Only constants of size 0 supported, size: "
-                     << *sizes.size());
-    if (*type == at::kDouble) {
-      return createConstantFloat(graph,
-                                 {*handleConstant<double>(value->node())}, {1});
-    }
-    if (*type == at::kFloat) {
-      return createConstantFloat(graph, {*handleConstant<float>(value->node())},
-                                 {1});
-    }
-    if (*type == at::kLong) {
-      return createConstantInt(
-          graph, {*handleConstant<std::int64_t>(value->node())}, {1});
+    // Create the dimensions.
+    std::vector<std::int64_t> dimensions{};
+    for (auto dim : tensor.sizes()) {
+      dimensions.push_back(dim);
     }
 
-    ERROR("Internal error: Constant type not supported " << *type);
+    c10::ScalarType type = tensor.scalar_type();
+
+    // Convert the tensor if it isn't already in one of these types. The
+    // double/long constraint comes from the IR attribute needing to be double
+    // or long.
+    if (type == at::ScalarType::Float) {
+      tensor = tensor.to(at::ScalarType::Double);
+    } else if (type == at::ScalarType::Int) {
+      tensor = tensor.to(at::ScalarType::Long);
+    }
+
+    type = tensor.scalar_type();
+    // Add the actual constant.
+    if (type == at::ScalarType::Long) {
+      std::vector<std::int64_t> data;
+      data.resize(tensor.numel());
+      const std::int64_t *the_data = tensor.data_ptr<int64_t>();
+
+      std::memcpy(data.data(), the_data, tensor.nbytes());
+
+      return createConstantInt(graph, data, dimensions);
+    }
+    if (type == at::ScalarType::Double) {
+      std::vector<double> data;
+      data.resize(tensor.numel());
+
+      const double *the_data = tensor.data_ptr<double>();
+
+      std::memcpy(data.data(), the_data, tensor.nbytes());
+
+      return createConstantFloat(graph, data, dimensions);
+    }
+    ERROR("Internal error: Constant type not supported "
+          << tensor.scalar_type());
   }
 
   // Legal to return null means |value| was not a constant.
