@@ -91,6 +91,7 @@ OP_CONVERTOR(aten::acos, NONE, createAcos, {PARAM(0)})
 OP_CONVERTOR(aten::asin, NONE, createAsin, {PARAM(0)})
 OP_CONVERTOR(aten::atan, NONE, createAtan, {PARAM(0)})
 OP_CONVERTOR(aten::ceil, NONE, createCeil, {PARAM(0)})
+OP_CONVERTOR(aten::clamp, NONE, createClip, {PARAM(0)} COMMA HANDLE(2, float) COMMA HANDLE(1, float)) 
 OP_CONVERTOR(aten::cos, NONE, createCos, {PARAM(0)})
 OP_CONVERTOR(aten::cosh, NONE, createCosh, {PARAM(0)})
 OP_CONVERTOR(aten::erf, NONE, createErf, {PARAM(0)})
@@ -107,7 +108,6 @@ OP_CONVERTOR(aten::square, NONE, createMul, {PARAM(0) COMMA PARAM(0)})
 OP_CONVERTOR(aten::tan, NONE, createTan, {PARAM(0)})
 OP_CONVERTOR(aten::tanh, NONE, createTanh, {PARAM(0)})
 OP_CONVERTOR(aten::logical_not, NONE, createLogical_not, {PARAM(0)})
-
 
 // Activations
 OP_CONVERTOR(aten::selu, NONE, createSelu, {PARAM(0)} COMMA 1.6732632423543772848170429916717f COMMA 1.0507009873554804934193349852946f)

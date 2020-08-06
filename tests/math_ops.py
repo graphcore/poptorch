@@ -142,6 +142,17 @@ def test_unary_ops_int(op):
     unary_op_harness(op, input, compare)
 
 
+def test_clamp():
+    torch.manual_seed(42)
+
+    input = torch.randn([1, 2, 10, 200])
+
+    def op_clamp(x):
+        return x.clamp(min=0.2, max=0.8)
+
+    unary_op_harness(op_clamp, input, torch.equal)
+
+
 binary_ops_float = [
     torch.add,
     # torch.atan2,

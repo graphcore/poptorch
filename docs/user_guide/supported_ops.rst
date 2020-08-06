@@ -64,6 +64,7 @@ Pointwise Ops
 * ``torch.asin``
 * ``torch.atan``
 * ``torch.ceil``
+* ``torch.clamp``
 * ``torch.cos``
 * ``torch.cosh``
 * ``torch.div``
