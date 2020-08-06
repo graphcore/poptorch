@@ -33,6 +33,31 @@ class IPU(nn.Module):
         return out
 
 
+class DataLoader(torch.utils.data.DataLoader):
+    def __init__(self,
+                 options,
+                 dataset,
+                 batch_size=1,
+                 shuffle=False,
+                 num_workers=0,
+                 **kwargs):
+        assert isinstance(options, Options)
+        self._combined_batch_size = batch_size * \
+            options.device_iterations * \
+            options.replication_factor * \
+            options.Training.gradient_accumulation
+
+        super().__init__(dataset,
+                         batch_size=self._combined_batch_size,
+                         shuffle=shuffle,
+                         num_workers=num_workers,
+                         **kwargs)
+
+    @property
+    def combinedBatchSize(self):
+        return self._combined_batch_size
+
+
 def trainingModel(model, options=None, loss=None, optimizer=None):
     options = options or Options()
     if options.defaultAnchorMode():
@@ -72,6 +97,10 @@ def inferenceModel(model, options=None):
     if options.defaultAnchorMode():
         # In inference it makes sense to see all the results, by default.
         options.anchorMode(AnchorMode.All)
+    assert options.Training.gradient_accumulation == 1, (
+        "Gradient accumulation"
+        " should be left to its default value (1) for inference")
+
     return _impl.PoplarExecutor(model=model, options=options, training=False)
 
 

@@ -246,7 +246,8 @@ class PoplarExecutor:
         in_tensors = _Args(self.model, args, kwargs, self.training)
 
         if in_tensors.forEachMatchedAtLeastOnce(
-                condition=lambda t: not t.is_contiguous(),
+                condition=lambda t: isinstance(t, torch.Tensor
+                                               ) and not t.is_contiguous(),
                 doOnTrue=lambda t: t.contiguous()):
             if not self.warned_not_contiguous_input:
                 logger.warning("At least one input tensor is not contiguous: "
@@ -300,7 +301,8 @@ class PoplarExecutor:
             hasConvertedAnyHalf = [False]
 
             def possiblyConvertFromHalf(tensor):
-                if tensor.dtype == torch.half:
+                if isinstance(tensor,
+                              torch.Tensor) and tensor.dtype == torch.half:
                     hasConvertedAnyHalf[0] = True
                     return tensor.float()
                 return tensor

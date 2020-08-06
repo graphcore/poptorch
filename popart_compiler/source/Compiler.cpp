@@ -816,6 +816,8 @@ void Compiler::initSession(const Optimizer &opt) {
   std::shared_ptr<popart::DeviceInfo> device;
   const std::uint64_t num_ipus =
       _impl->used_ipus.size() * options.replicatedGraphCount;
+  ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
+                              "operations have been optimised out)");
   if (_impl->options.ipu_model) {
     ERROR_ON_MSG(num_ipus > 1,
                  "The IPU model can only be used with models running on a "

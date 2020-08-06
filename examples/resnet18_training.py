@@ -11,8 +11,9 @@ from torchvision import transforms
 training_batch_size = 1
 training_ipu_step_size = 100
 gradient_accumulation = 2
-training_combined_batch_size = gradient_accumulation * training_batch_size * \
-        training_ipu_step_size
+
+opts = poptorch.Options().deviceIterations(training_ipu_step_size)
+opts.Training.gradientAccumulation(gradient_accumulation)
 
 preprocess = transforms.Compose([
     transforms.Resize(256),
@@ -27,11 +28,11 @@ dataset = torchvision.datasets.CIFAR10('CIFAR10/',
                                        download=True,
                                        transform=preprocess)
 
-training_data = torch.utils.data.DataLoader(
-    dataset,
-    batch_size=training_combined_batch_size,
-    shuffle=True,
-    drop_last=True)
+training_data = poptorch.DataLoader(opts,
+                                    dataset,
+                                    batch_size=training_batch_size,
+                                    shuffle=True,
+                                    drop_last=True)
 
 
 class NormWrapper(torch.nn.Module):
@@ -45,15 +46,14 @@ class NormWrapper(torch.nn.Module):
 
 model = models.resnet18(pretrained=False, norm_layer=NormWrapper)
 model.train()
-
-opts = poptorch.Options().deviceIterations(training_ipu_step_size)
-opts.Training.gradientAccumulation(gradient_accumulation)
 training_model = poptorch.trainingModel(model, opts, loss=torch.nn.NLLLoss())
 
 
 def train():
     for batch_number, (data, labels) in enumerate(training_data):
-        result = training_model(data, labels)
+        result, _ = training_model(data, labels)
+        if batch_number == 0:
+            print("Model compiled, training...", flush=True)
 
         if batch_number % 10 == 0:
             # Pick the highest probability.
@@ -65,13 +65,14 @@ def train():
             if len(elms) == 2:
                 if elms[0]:
                     acc = (counts[0].item() /
-                           training_combined_batch_size) * 100.0
+                           training_data.combinedBatchSize) * 100.0
                 else:
                     acc = (counts[1].item() /
-                           training_combined_batch_size) * 100.0
+                           training_data.combinedBatchSize) * 100.0
 
             print("Training accuracy:  " + str(acc) + "% from batch of size " +
-                  str(training_combined_batch_size))
+                  str(training_data.combinedBatchSize),
+                  flush=True)
 
 
 train()
