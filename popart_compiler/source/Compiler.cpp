@@ -16,6 +16,7 @@
 #include <popart/graphtransformer.hpp>
 #include <popart/ir.hpp>
 #include <popart/ndarraywrapper.hpp>
+#include <popart/onnxutil.hpp>
 #include <popart/op/identity.hpp>
 #include <popart/op/matmul.hpp>
 #include <popart/op/nll.hpp>
@@ -144,9 +145,13 @@ public:
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
-  popart::TensorId randomUniform(const std::vector<popart::TensorId> &inputs,
-                                 const std::vector<int64_t> &shape);
+  popart::TensorId randomNormal(const std::vector<popart::TensorId> &inputs,
+                                const std::vector<int64_t> &shape, float mean,
+                                float scale);
 
+  popart::TensorId randomUniform(const std::vector<popart::TensorId> &inputs,
+                                 const std::vector<int64_t> &shape, float high,
+                                 float low);
   void updateUseModelConfig();
   std::string checkSystemConfig();
 };
@@ -601,11 +606,23 @@ CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
 }
 
 popart::TensorId
-CompilerImpl::randomUniform(const std::vector<popart::TensorId> &inputs,
-                            const std::vector<int64_t> &shape) {
+CompilerImpl::randomNormal(const std::vector<popart::TensorId> &inputs,
+                           const std::vector<int64_t> &shape, float mean,
+                           float scale) {
   UNUSED(inputs);
   auto ai_onnx = op_builder->aiOnnxOpset10();
-  return ai_onnx.randomuniform(shape);
+  auto dtype = ONNX_NAMESPACE::TensorProto_DataType_FLOAT;
+  return ai_onnx.randomnormal(shape, dtype, mean, scale);
+}
+
+popart::TensorId
+CompilerImpl::randomUniform(const std::vector<popart::TensorId> &inputs,
+                            const std::vector<int64_t> &shape, float high,
+                            float low) {
+  UNUSED(inputs);
+  auto ai_onnx = op_builder->aiOnnxOpset10();
+  auto dtype = ONNX_NAMESPACE::TensorProto_DataType_FLOAT;
+  return ai_onnx.randomuniform(shape, dtype, high, low);
 }
 
 } // namespace detail

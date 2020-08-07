@@ -152,3 +152,13 @@ OP_CONVERTOR(aten::full_like, NONE, createExpand, {PARAM_OR_CONSTANT_ANY_TYPE_NO
 
 // full(int[] size, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
 OP_CONVERTOR_WITH_CAST(aten::full, NONE, createExpand, {PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(1) COMMA HANDLE_LIST_AS_IR_CONSTANT(0)}, GET_RETURN_TYPE)
+
+// Random Sampling ops
+// aten::rand(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor
+OP_CONVERTOR(aten::rand, NONE, createRandomUniform, OUTPUT_TENSOR_SHAPE(0) COMMA 1.0f COMMA 0.0f)
+// aten::uniform_(Tensor self, float low, float high, Generator?) -> Tensor
+OP_CONVERTOR(aten::uniform_, NONE, createRandomUniform, TENSOR_SHAPE(0) COMMA HANDLE(2, float) COMMA HANDLE(1, float))
+// aten::randn(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor
+OP_CONVERTOR(aten::randn, NONE, createRandomNormal, OUTPUT_TENSOR_SHAPE(0) COMMA 0.0f COMMA 1.0f)
+// aten::normal_(Tensor self, float mean, float std, Generator?) -> Tensor
+OP_CONVERTOR(aten::normal_, NONE, createRandomNormal, TENSOR_SHAPE(0) COMMA HANDLE(1, float) COMMA HANDLE(2, float))

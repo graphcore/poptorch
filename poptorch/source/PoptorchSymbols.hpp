@@ -24,6 +24,8 @@ SYMBOL_DECL(aten, elu_)
 SYMBOL_DECL(aten, selu_)
 SYMBOL_DECL(aten, isnan)
 SYMBOL_DECL(aten, isinf)
+SYMBOL_DECL(aten, uniform_)
+SYMBOL_DECL(aten, normal_)
 } // namespace c10
 
 namespace poptorch {

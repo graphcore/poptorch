@@ -49,6 +49,8 @@ install_clang_format() {
     curl -O $URL
     tar ${TAR_EXTRA_OPTS} -xf ${ARCHIVE_NAME} ${FOLDER_NAME}/bin/clang-format ${FOLDER_NAME}/bin/clang-tidy ${INCLUDE_FOLDER} ${CLANG_INCLUDE_FOLDER}
     mv ${INCLUDE_FOLDER} ${DIR}/.linters/include
+    mkdir -p ${DIR}/.linters/include/onnx/
+    echo "namespace onnx { enum TensorProto_DataType { TensorProto_DataType_FLOAT }; }" > ${DIR}/.linters/include/onnx/onnx_pb.h
     mv ${CLANG_INCLUDE_FOLDER} ${DIR}/.linters/clang_include
     mv ${FOLDER_NAME}/bin/clang-format ${DIR}/.linters/clang-format
     mv ${FOLDER_NAME}/bin/clang-tidy ${DIR}/.linters/clang-tidy

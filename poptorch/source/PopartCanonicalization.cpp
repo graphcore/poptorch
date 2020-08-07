@@ -295,6 +295,9 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 // Returns the shape of the tensor as a vector of ints.
 #define TENSOR_SHAPE(Index) shapeFromTensor(node->input(Index))
 
+// Returns the output shape of the tensor as a vector of ints.
+#define OUTPUT_TENSOR_SHAPE(Index) shapeFromTensor(node->output(Index))
+
 #define TENSOR_SHAPE_AS_IR(Index) shapeFromTensorAsIR(graph, node->input(Index))
 
 #define GET_RETURN_TYPE getNodeScalarType(node->output())
