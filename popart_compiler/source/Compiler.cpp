@@ -367,16 +367,13 @@ SessionOptionsImpl::SessionOptionsImpl() {
 
   ADD_POPART_UINT64_OPTION(firstDotOp);
   ADD_POPART_UINT64_OPTION(finalDotOp);
-  ADD_POPART_UINT64_OPTION(pingPongPhases);
   ADD_POPART_UINT64_OPTION(numIOTiles);
-  ADD_POPART_UINT64_OPTION(batchSerializationFactor);
   ADD_POPART_UINT64_OPTION(mergeVarUpdateMemThreshold);
   ADD_POPART_UINT64_OPTION(looseThresholdAtPeak);
   ADD_POPART_UINT64_OPTION(accumulationFactor);
   ADD_POPART_UINT64_OPTION(swapLimitScheduler);
   ADD_POPART_UINT64_OPTION(globalReplicationFactor);
   ADD_POPART_UINT64_OPTION(globalReplicaOffset);
-  ADD_POPART_UINT64_OPTION(replicatedWeightShardingMinNumElements);
 
   ADD_POPART_BOOL_OPTION(dotOpNames);
   ADD_POPART_BOOL_OPTION(exportPoplarComputationGraph);
@@ -398,7 +395,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableFloatingPointChecks);
   ADD_POPART_BOOL_OPTION(enableStochasticRounding);
   ADD_POPART_BOOL_OPTION(explicitRecomputation);
-  ADD_POPART_BOOL_OPTION(replicatedWeightSharding);
   ADD_POPART_BOOL_OPTION(aliasZeroCopy);
   ADD_POPART_BOOL_OPTION(delayVarUpdates);
   ADD_POPART_BOOL_OPTION(enableFullyConnectedPass);
