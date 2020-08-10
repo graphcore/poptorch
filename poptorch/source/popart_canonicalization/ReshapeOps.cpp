@@ -118,7 +118,8 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
     index += *dims[dim];
   }
 
-  return createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
+  return createSlice(graph, {handleParamOrConstantNoCast(graph, node->input(0)),
+                             wrapInConstant1D(graph, index),
                              wrapInConstant1D(graph, index + 1),
                              wrapInConstant1D(graph, dim)});
 }

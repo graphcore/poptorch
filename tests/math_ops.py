@@ -416,11 +416,46 @@ types = [torch.float32, torch.int32]
 def test_constant_arrays(ty):
     torch.manual_seed(42)
 
-    input = torch.randn([10])
+    input = torch.randn([10]).to(ty)
 
     def operation(x):
         constant_tensor = torch.tensor([1, -2, -3, 4, 5, 6, 7, -8, 9, -10],
                                        dtype=ty)
         return torch.sub(x, constant_tensor)
+
+    unary_op_harness(operation, input, torch.equal)
+
+
+@pytest.mark.parametrize("ty", types)
+def test_big_constant_arrays_sliced(ty):
+    torch.manual_seed(42)
+
+    input = torch.randn([1]).to(ty)
+
+    def operation(x):
+        big_array = torch.tensor(
+            [[
+                155, 229, 322, 453, 655, 888, 1128, 1694, 2036, 2502, 3089,
+                3858, 4636, 5883, 7375, 9172, 10149, 12462, 15113, 17660,
+                21157, 24747, 27980, 31506, 35713, 41035, 47021, 43, 59138,
+                63927, 69176, 74386, 80589, 86498, 92472, 97689, 45, -424, 5,
+                6, 435, 124632, 128948, 132547, 135586, 42, 5, 147577, 5
+            ],
+             [
+                 2, 1, 1, 3, 45, 46, 46, 83, 149, 160, 276, 414, 523, 589, 622,
+                 724, 724, 1045, 1045, 1439, 24, 2335, 2749, 2941, 4025, 4440,
+                 4440, 24, 7024, 7024, 8326, 9362, 10361, 10950, 12384, 13030,
+                 -8, 324, 425, 67, -245, -2425, 21815, 22837, 24392, 324, 234,
+                 2435, 4325
+             ],
+             [
+                 3, 7, 10, 12, 17, 21, 29, 34, 52, 79, 107, 148, 197, 233, 366,
+                 463, 631, 827, -2344, -2, 1441, 1809, 2158, 2503, 2978, 3405,
+                 4032, -324, 5664, 45, 53, -25, 8215, 9134, 10023, 10779,
+                 -2345, 4, 13155, 5, 98754, 143535, 245232, 16523, 17127, 2,
+                 42, 5, 19468
+             ]],
+            dtype=ty)
+        return x * big_array[0]
 
     unary_op_harness(operation, input, torch.equal)
