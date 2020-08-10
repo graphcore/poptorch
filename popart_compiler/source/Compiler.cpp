@@ -16,13 +16,13 @@
 #include <popart/graphtransformer.hpp>
 #include <popart/ir.hpp>
 #include <popart/ndarraywrapper.hpp>
-#include <popart/onnxutil.hpp>
 #include <popart/op/identity.hpp>
 #include <popart/op/matmul.hpp>
 #include <popart/op/nll.hpp>
 #include <popart/optimizer.hpp>
 #include <popart/popx/devicex.hpp>
 #include <popart/session.hpp>
+#include <popart/tensorinfo.hpp>
 #include <popart/tensors.hpp>
 
 #include "popart_compiler/Compiler.hpp"
@@ -611,7 +611,7 @@ CompilerImpl::randomNormal(const std::vector<popart::TensorId> &inputs,
                            float scale) {
   UNUSED(inputs);
   auto ai_onnx = op_builder->aiOnnxOpset10();
-  auto dtype = ONNX_NAMESPACE::TensorProto_DataType_FLOAT;
+  auto dtype = popart::getONNXDataTypeAsInt(popart::DataType::FLOAT);
   return ai_onnx.randomnormal(shape, dtype, mean, scale);
 }
 
@@ -621,7 +621,7 @@ CompilerImpl::randomUniform(const std::vector<popart::TensorId> &inputs,
                             float low) {
   UNUSED(inputs);
   auto ai_onnx = op_builder->aiOnnxOpset10();
-  auto dtype = ONNX_NAMESPACE::TensorProto_DataType_FLOAT;
+  auto dtype = popart::getONNXDataTypeAsInt(popart::DataType::FLOAT);
   return ai_onnx.randomuniform(shape, dtype, high, low);
 }
 
