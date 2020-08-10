@@ -16,29 +16,49 @@ namespace poptorch {
 // The training optimizer algorithm used.
 enum OptimizerType : std::uint8_t { SGD = 0, ADAM, LAMB, NONE };
 
+#define FOR_ALL_FIXED_POINT_TYPES(_)                                           \
+  _(UINT8)                                                                     \
+  _(INT8)                                                                      \
+  _(UINT16)                                                                    \
+  _(INT16)                                                                     \
+  _(INT32)                                                                     \
+  _(INT64)                                                                     \
+  _(UINT32)                                                                    \
+  _(UINT64)                                                                    \
+  _(BOOL)
+
+#define FOR_ALL_FLOATING_POINT_TYPES(_)                                        \
+  _(FLOAT)                                                                     \
+  _(FLOAT16)                                                                   \
+  _(BFLOAT16)                                                                  \
+  _(DOUBLE)                                                                    \
+  _(COMPLEX64)                                                                 \
+  _(COMPLEX128)
+
+#define FOR_ALL_POPART_TYPES(_)                                                \
+  FOR_ALL_FIXED_POINT_TYPES(_)                                                 \
+  FOR_ALL_FLOATING_POINT_TYPES(_)                                              \
+  _(STRING)                                                                    \
+  _(UNDEFINED)
+
 // The types supported by popart.
-enum class PopartTypes {
-  // fixed point types
-  UINT8 = 0,
-  INT8,
-  UINT16,
-  INT16,
-  INT32,
-  INT64,
-  UINT32,
-  UINT64,
-  BOOL,
-  // floating point types
-  FLOAT,
-  FLOAT16,
-  BFLOAT16,
-  DOUBLE,
-  COMPLEX64,
-  COMPLEX128,
-  // other types
-  STRING,
-  UNDEFINED,
-};
+#define DEFINE_ENUM(value) value,
+enum class PopartType { FOR_ALL_POPART_TYPES(DEFINE_ENUM) };
+#undef DEFINE_ENUM
+
+#define DEFINE_CASE(value)                                                     \
+  case PopartType::value: {                                                    \
+    return #value;                                                             \
+  }
+
+inline std::string toPopartTypeStr(const PopartType &type) {
+  switch (type) {
+    FOR_ALL_POPART_TYPES(DEFINE_CASE)
+  default:
+    ERROR("Unsupported PopartType");
+  }
+}
+#undef DEFINE_CASE
 
 // See popart DataFlow.hpp for a full description of each.
 // Must be kept in sync with AnchorMode in python/__init__.py

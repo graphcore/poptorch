@@ -12,8 +12,7 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
   // aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[]
   //                    stride, int[] padding, int[] dilation, bool transposed,
   //                    int[] output_padding, int groups) -> Tensor
-  std::optional<std::int64_t> transposed =
-      handleConstant<std::int64_t>(node->input(6)->node());
+  std::optional<bool> transposed = constantToBool(node->input(6)->node());
 
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *kernel = node->input(1);
@@ -24,10 +23,9 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
     inputs.push_back(node->input(2));
   }
 
-  std::vector<std::int64_t> stride =
-      handleList<int64_t>(node->input(3)->node());
-  std::vector<std::int64_t> padding =
-      handleList<std::int64_t>(node->input(4)->node());
+  std::vector<std::int64_t> stride = constantToLongVec(node->input(3)->node());
+
+  std::vector<std::int64_t> padding = constantToLongVec(node->input(4)->node());
 
   // Pytorch gives the padding as being the amount to pad in both
   // directions. Popart two arguments for each axis, the amount to pad in
@@ -40,9 +38,9 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
   }
 
   std::vector<std::int64_t> dilation =
-      handleList<std::int64_t>(node->input(5)->node());
+      constantToLongVec(node->input(5)->node());
   // torch::jit::Value* output_padding = node->input(8);
-  std::int64_t groups = *handleConstant<std::int64_t>(node->input(8)->node());
+  std::int64_t groups = constantToLong(node->input(8)->node());
 
   if (transposed && *transposed == 0) {
     // Create a "normal" convolution.
@@ -75,10 +73,8 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
     inputs.push_back(node->input(2));
   }
 
-  std::vector<std::int64_t> stride =
-      handleList<std::int64_t>(node->input(3)->node());
-  std::vector<std::int64_t> padding =
-      handleList<std::int64_t>(node->input(4)->node());
+  std::vector<std::int64_t> stride = constantToLongVec(node->input(3)->node());
+  std::vector<std::int64_t> padding = constantToLongVec(node->input(4)->node());
 
   // Pytorch gives the padding as being the amount to pad in both
   // directions. Popart two arguments for each axis, the amount to pad in
@@ -91,8 +87,8 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
   }
 
   std::vector<std::int64_t> dilation =
-      handleList<std::int64_t>(node->input(5)->node());
-  std::int64_t groups = *handleConstant<std::int64_t>(node->input(6)->node());
+      constantToLongVec(node->input(5)->node());
+  std::int64_t groups = constantToLong(node->input(6)->node());
 
   return poptorch::createConv(graph, inputs, dilation, groups, {}, padding,
                               stride);

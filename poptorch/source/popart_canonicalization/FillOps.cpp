@@ -31,7 +31,7 @@ torch::jit::Node *maskedFillHandler(torch::jit::Graph *graph,
   // Prepare input and update
   mask = createCast(graph, node->input(1), c10::kFloat);
 
-  float other_as_const = *handleConstant<float>(node->input(2)->node());
+  float other_as_const = constantToFloat(node->input(2)->node());
   torch::jit::Node *other = createConstantFloat(graph, {other_as_const}, {1});
 
   torch::jit::Node *update =

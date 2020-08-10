@@ -1,4 +1,3 @@
-
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PopartCanonicalizationUtils.hpp"
 
@@ -13,8 +12,8 @@ torch::jit::Node *embeddingHandler(torch::jit::Graph *graph,
   // aten::embedding(Tensor weight, Tensor indices, int padding_idx, bool
   // scale_grad_by_freq, bool sparse) -> Tensor
 
-  bool scale_grad_by_freq = *handleConstant<bool>(node->input(3)->node());
-  bool sparse = *handleConstant<bool>(node->input(4)->node());
+  bool scale_grad_by_freq = constantToBool(node->input(3)->node());
+  bool sparse = constantToBool(node->input(4)->node());
 
   ERROR_ON_MSG(scale_grad_by_freq || sparse,
                "Unsupported aten::embedding operation");

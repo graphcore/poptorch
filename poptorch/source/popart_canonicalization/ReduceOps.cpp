@@ -4,6 +4,8 @@
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch_logging/Error.hpp"
 
+#include "../PoptorchSymbols.hpp"
+
 namespace poptorch {
 namespace {
 
@@ -23,22 +25,20 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
 
   // Case 2.
   if (node->inputs().size() == 2) {
-    torch::jit::Node *flatten = createFlatten(graph, {node->inputs()[0]}, 0);
+    torch::jit::Node *flatten = createFlatten(graph, {node->input(0)}, 0);
     input = flatten->output();
     axes = {1};
   } else {
     // Case 1.
     // Sometimes the dimensions are just one int.
-    std::optional<std::int64_t> as_int =
-        handleConstant<std::int64_t>(node->inputs()[1]->node());
 
-    if (as_int) {
-      axes.push_back(*as_int);
+    if (node->input(1)->node()->kind() == symbols::poptorch::tensor_constant) {
+      axes.push_back(constantToLong(node->input(1)->node()));
     } else {
-      axes = handleListConstruct<std::int64_t>(node->inputs()[1]->node());
+      axes = constantToLongVec(node->input(1)->node());
     }
 
-    keepdim = *handleConstant<std::int64_t>(node->inputs()[2]->node());
+    keepdim = constantToLong(node->input(2)->node());
   }
 
   // Output the correct reduction.
@@ -66,10 +66,13 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
 
   torch::jit::Symbol kind = node->kind();
   torch::jit::Value *input = node->input(0);
-  std::optional<std::int64_t> dim =
-      handleConstant<std::int64_t>(node->inputs()[1]->node());
-  std::int64_t keep_dim =
-      *handleConstant<std::int64_t>(node->inputs()[2]->node());
+
+  std::optional<std::int64_t> dim;
+  if (node->input(1)->node()->kind() == symbols::poptorch::tensor_constant) {
+    dim = constantToLong(node->input(1)->node());
+  }
+
+  std::int64_t keep_dim = constantToLong(node->input(2)->node());
 
   // If dim is not provided we will flatten input so just use 0 in that
   // case.
@@ -77,7 +80,7 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
 
   // Check if dim is NONE.
   if (!dim) {
-    torch::jit::Node *flatten = createFlatten(graph, {node->inputs()[0]}, 0);
+    torch::jit::Node *flatten = createFlatten(graph, {node->input(0)}, 0);
     input = flatten->output();
   } else {
     dim_to_use = *dim;

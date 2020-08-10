@@ -11,7 +11,7 @@ torch::jit::Node *softmaxHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   // "aten::softmax(Tensor self, int dim, int? dtype) -> Tensor"
 
-  std::int64_t dim = *handleConstant<std::int64_t>(node->input(1)->node());
+  std::int64_t dim = constantToLong(node->input(1)->node());
 
   c10::TensorTypePtr as_tensor =
       node->input(0)->type()->cast<c10::TensorType>();
@@ -28,7 +28,7 @@ torch::jit::Node *logSoftmaxHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   // "aten::log_softmax(Tensor self, int dim, int? dtype) -> Tensor"
 
-  std::int64_t dim = *handleConstant<std::int64_t>(node->input(1)->node());
+  std::int64_t dim = constantToLong(node->input(1)->node());
 
   c10::TensorTypePtr as_tensor =
       node->input(0)->type()->cast<c10::TensorType>();

@@ -2,6 +2,7 @@
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch {
@@ -11,16 +12,14 @@ torch::jit::Node *customOpHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   std::vector<torch::jit::Value *> inputs =
       handleTensorList(node->input(0)->node());
-  std::string name = *handleConstant<std::string>(node->input(1)->node());
-  std::string domain = *handleConstant<std::string>(node->input(2)->node());
+  std::string name = constantToString(node->input(1)->node());
+  std::string domain = constantToString(node->input(2)->node());
 
   // Get the domain version.
-  std::int64_t domain_version =
-      *handleConstant<std::int64_t>(node->input(3)->node());
+  std::int64_t domain_version = constantToLong(node->input(3)->node());
 
   // Get the number of outputs.
-  std::int64_t num_outputs =
-      *handleConstant<std::int64_t>(node->input(4)->node());
+  std::int64_t num_outputs = constantToLong(node->input(4)->node());
 
   // Add the custom op with a variadic number of outputs.
   torch::jit::Node *custom_op = createCustomOperation(

@@ -130,7 +130,7 @@ def test_distributions_normal():
         nd = torch.distributions.Normal(loc=h, scale=torch.sqrt(h))
         return nd.sample((5, 10000))
 
-    errmsg = "Invalid input arguments."
+    errmsg = "random normal is only supported with a scalar mean"
     with pytest.raises(RuntimeError, match=errmsg):
         rng_harness(rng_op, None)
 

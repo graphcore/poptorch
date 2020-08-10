@@ -129,10 +129,6 @@ bool maybeConvertTensor(torch::jit::Value *tensor) {
       // design.
       return false;
     }
-  } else if (node->kind() == symbols::poptorch::float_constant) {
-    // Tell the backend this constant should be generated as half.
-    node->i_(c10::Symbol::fromQualString("attr::isHalf"), 1);
-    return true;
   }
 
   c10::TypePtr type = tensor->type();
@@ -146,6 +142,11 @@ bool maybeConvertTensor(torch::jit::Value *tensor) {
   }
 
   tensor->setType(as_tensor->withScalarType(c10::ScalarType::Half));
+
+  if (node->kind() == symbols::poptorch::tensor_constant) {
+    node->t_(c10::attr::value,
+             node->t(c10::attr::value).to(at::ScalarType::Half));
+  }
 
   return true;
 }

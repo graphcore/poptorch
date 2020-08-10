@@ -57,8 +57,8 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   std::vector<torch::jit::Value *> input_tensors{input, weight, bias,
                                                  running_mean, running_var};
 
-  float momentum = *handleConstant<float>(node->input(6)->node());
-  float epsilon = *handleConstant<float>(node->input(7)->node());
+  float momentum = constantToFloat(node->input(6)->node());
+  float epsilon = constantToFloat(node->input(7)->node());
 
   new_node = poptorch::createBatchnormalization(graph, input_tensors, 1,
                                                 epsilon, momentum);
@@ -88,14 +88,14 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   // Weight to multiply.
   torch::jit::Value *beta = node->input(3);
 
-  const float epsilon = *handleConstant<float>(node->input(4)->node());
+  const float epsilon = constantToFloat(node->input(4)->node());
 
   // Pytorch normalizes across arbitrary number of dimensions from the end.
   // We flatten into a [M, N] array and normalize the N.
 
   std::vector<std::int64_t> output_shape = shapeFromTensor(node->output());
   std::vector<std::int64_t> normalized_shape =
-      handleList<int64_t>(node->input(1)->node());
+      constantToLongVec(node->input(1)->node());
   std::vector<std::int64_t> input_shape = shapeFromTensor(input);
   const std::int64_t axis = input_shape.size() - normalized_shape.size();
 

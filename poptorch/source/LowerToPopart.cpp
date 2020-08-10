@@ -161,47 +161,90 @@ std::vector<int64_t> getTensorDimensions(const at::Tensor &tensor) {
   return dims;
 }
 
-at::ScalarType fromPopartType(const poptorch::PopartTypes type) {
+at::ScalarType fromPopartType(const poptorch::PopartType type) {
   switch (type) {
-  case poptorch::PopartTypes::UINT8: {
+  case poptorch::PopartType::UINT8: {
     return at::ScalarType::Byte;
   }
-  case poptorch::PopartTypes::INT8: {
+  case poptorch::PopartType::INT8: {
     return at::ScalarType::Char;
   }
-  case poptorch::PopartTypes::INT16: {
+  case poptorch::PopartType::INT16: {
     return at::ScalarType::Short;
   }
-  case poptorch::PopartTypes::INT32:
-  case poptorch::PopartTypes::UINT32: {
+  case poptorch::PopartType::INT32:
+  case poptorch::PopartType::UINT32: {
     return at::ScalarType::Int;
   }
-  case poptorch::PopartTypes::INT64: {
+  case poptorch::PopartType::INT64: {
     return at::ScalarType::Long;
   }
-  case poptorch::PopartTypes::BOOL: {
+  case poptorch::PopartType::BOOL: {
     return at::ScalarType::Bool;
   }
-  case poptorch::PopartTypes::FLOAT: {
+  case poptorch::PopartType::FLOAT: {
     return at::ScalarType::Float;
   }
-  case poptorch::PopartTypes::FLOAT16: {
+  case poptorch::PopartType::FLOAT16: {
     return at::ScalarType::Half;
   }
-  case poptorch::PopartTypes::BFLOAT16: {
+  case poptorch::PopartType::BFLOAT16: {
     return at::ScalarType::BFloat16;
   }
-  case poptorch::PopartTypes::DOUBLE: {
+  case poptorch::PopartType::DOUBLE: {
     return at::ScalarType::Double;
   }
-  case poptorch::PopartTypes::COMPLEX64: {
+  case poptorch::PopartType::COMPLEX64: {
     return at::ScalarType::ComplexFloat;
   }
-  case poptorch::PopartTypes::COMPLEX128: {
+  case poptorch::PopartType::COMPLEX128: {
     return at::ScalarType::ComplexDouble;
   }
   default:
     ERROR("Unsupported PopART data type");
+  }
+}
+
+PopartType toPopartType(const at::ScalarType type) {
+  switch (type) {
+  case at::ScalarType::Byte: {
+    return PopartType::UINT8;
+  }
+  case at::ScalarType::Char: {
+    return PopartType::INT8;
+  }
+  case at::ScalarType::Short: {
+    return PopartType::INT16;
+  }
+  case at::ScalarType::Int: {
+    return PopartType::INT32;
+  }
+  case at::ScalarType::Long: {
+    return PopartType::INT64;
+  }
+  case at::ScalarType::Bool: {
+    return PopartType::BOOL;
+  }
+  case at::ScalarType::Float: {
+    return PopartType::FLOAT;
+  }
+  case at::ScalarType::Half: {
+    return PopartType::FLOAT16;
+  }
+  case at::ScalarType::BFloat16: {
+    return PopartType::BFLOAT16;
+  }
+  case at::ScalarType::Double: {
+    return PopartType::DOUBLE;
+  }
+  case at::ScalarType::ComplexFloat: {
+    return PopartType::COMPLEX64;
+  }
+  case at::ScalarType::ComplexDouble: {
+    return PopartType::COMPLEX128;
+  }
+  default:
+    ERROR("Unsupported PyTorch scalar type");
   }
 }
 
@@ -520,6 +563,30 @@ template <typename T> StringConvertorHelper<T> convertString(T t) {
   return StringConvertorHelper<T>{t};
 }
 
+PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
+  logging::LogContext ctx("convertTensorConstantNode processing " +
+                          nodeToString(node));
+
+  ERROR_ON_MSG(
+      node->kind() != symbols::poptorch::tensor_constant,
+      "Only a poptorch::tensor_constant can be converted into a popart "
+      "constant");
+  auto output_type =
+      *node->output()->type()->expect<c10::TensorType>()->scalarType();
+  auto tensor_type = node->t(c10::attr::value).scalar_type();
+
+  ERROR_ON_MSG(output_type != tensor_type, "Output type is "
+                                               << c10::toString(output_type)
+                                               << " but tensor type is "
+                                               << c10::toString(tensor_type));
+
+  auto tensor = node->t(c10::attr::value);
+  ERROR_ON(!tensor.is_contiguous());
+
+  return {toPopartType(tensor.scalar_type()), tensor.data_ptr(),
+          getTensorDimensions(tensor)};
+}
+
 } // namespace
 
 LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
@@ -558,6 +625,9 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 // expects for attribute accessing.
 #define ARG(Type, Name)                                                        \
   , convertString(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
+
+#define POPART_CONSTANT_ARG(unused) , convertTensorConstantNode(node)
+
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
@@ -573,6 +643,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 #undef BODY_STR_ARG
 #undef STR_ARG
 #undef BODY_ARG
+#undef POPART_CONSTANT_ARG
 #undef OP_DECL
 #undef ARG
 #undef NONE

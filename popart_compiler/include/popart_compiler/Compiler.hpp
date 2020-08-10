@@ -13,6 +13,7 @@
 
 namespace popart {
 enum class DataType;
+class ConstVoidData;
 } // namespace popart
 
 namespace poptorch {
@@ -126,6 +127,23 @@ private:
   friend Compiler;
 };
 
+// A class to store all the data and info required to create a constant in the
+// popart builder for convenience. Internally, it is a simple wrapper to
+// popart::ConstVoidData.
+class PopartConstant {
+public:
+  PopartConstant(const PopartType &popart_type, const void *data,
+                 const std::vector<std::int64_t> &shape);
+
+  ~PopartConstant(); // Required for opaque pointer
+
+  const popart::ConstVoidData *getPopartData() const { return _data.get(); }
+
+private:
+  // Use an opaque pointer to avoid the need for popart headers
+  std::unique_ptr<popart::ConstVoidData> _data;
+};
+
 class Compiler {
 public:
   Compiler(bool is_training, const SessionOptions &options);
@@ -143,6 +161,7 @@ public:
 #define STRING const char *
 #define NONE
 #define ARG(Type, Name) , Type Name
+#define POPART_CONSTANT_ARG(Name) , const PopartConstant &Name
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
@@ -154,9 +173,10 @@ public:
 
 #undef OP_DECL
 #undef BODY_ARG
+#undef POPART_CONSTANT_ARG
 #undef ARG
-#undef STRING
 #undef NONE
+#undef STRING
 #undef BOOL
 #undef INT
 #undef FLOAT
@@ -222,7 +242,7 @@ public:
   void copyWeightsToHost();
 
   // Return the type of the given tensor.
-  PopartTypes getPopartType(poptorch::TensorId tensor) const;
+  PopartType getPopartType(poptorch::TensorId tensor) const;
 
   /*
    * Execute the compiled popart graph using poplar. An optimizer can be
@@ -253,7 +273,7 @@ public:
   std::unique_ptr<char> getPopartIR() const;
 
 private:
-  void assertTensorIs(PopartTypes dataType, const poptorch::TensorId &id,
+  void assertTensorIs(PopartType dataType, const poptorch::TensorId &id,
                       const char *caller) const;
 
   std::unique_ptr<detail::CompilerImpl> _impl;

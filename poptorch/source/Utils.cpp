@@ -1,15 +1,19 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-#include "poptorch/Utils.hpp"
+#include <torch/csrc/jit/ir/ir.h>
 
 #include <sstream>
+#include <unordered_set>
+
+#include "PoptorchSymbols.hpp"
+#include "poptorch/Utils.hpp"
 
 namespace poptorch {
-
-std::string nodeToString(torch::jit::Node *node) {
+std::string nodeToString(const torch::jit::Node *node) {
   std::stringstream ss;
   ss << *node;
   std::string node_str = ss.str();
-  return node_str.substr(0, node_str.size() - 1); // Remove trailing line return
+  node_str.pop_back(); // Remove trailing line return
+  return node_str;
 }
 
 std::string scalarTypeToOnnxString(const at::ScalarType type) {
@@ -48,4 +52,54 @@ std::string scalarTypeToOnnxString(const at::ScalarType type) {
     return "(unknown type)";
   }
 }
+
+namespace {
+bool shouldDestroy(torch::jit::Node *node) {
+  // Skip parameters and nodes with any uses.
+  return !(node->kind() == c10::prim::Param || node->hasUses());
+}
+
+// Store the inputs used by this node.
+// Ops may use the same input twice, so use a set to store only unique inputs.
+std::unordered_set<torch::jit::Value *> copyInputs(torch::jit::Node *node) {
+  std::unordered_set<torch::jit::Value *> inputs;
+  for (torch::jit::Value *user : node->inputs()) {
+    inputs.insert(user);
+  }
+  return inputs;
+}
+} // namespace
+
+void searchAndPossiblyDestroy(torch::jit::Node *node) {
+  if (!shouldDestroy(node)) {
+    return;
+  }
+
+  auto inputs = copyInputs(node);
+  node->destroy();
+
+  // If any of the previously used values now have no users repeat the process
+  // for them.
+  for (auto *user : inputs) {
+    searchAndPossiblyDestroy(user->node());
+  }
+}
+
+void searchAndPossiblyDestroy(torch::jit::graph_node_list_iterator *node_it) {
+  torch::jit::Node *node = **node_it;
+
+  if (!shouldDestroy(node)) {
+    return;
+  }
+
+  auto inputs = copyInputs(node);
+
+  // Delete the node without invalidating iterator
+  node_it->destroyCurrent();
+
+  for (auto *user : inputs) {
+    searchAndPossiblyDestroy(user->node());
+  }
+}
+
 } // namespace poptorch

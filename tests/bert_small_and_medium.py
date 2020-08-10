@@ -4,6 +4,7 @@
 import transformers
 import torch
 import poptorch
+import pytest
 
 
 def test_bert_small():
@@ -31,6 +32,7 @@ def test_bert_small():
                               atol=1e-02)
 
 
+@pytest.mark.skip(reason="TODO(T21014)")
 def test_bert_small_half():
     torch.manual_seed(42)
 
@@ -52,6 +54,7 @@ def test_bert_small_half():
     assert poptorchOut[0].dtype == torch.half
 
 
+@pytest.mark.skip(reason="TODO(T21014)")
 def test_bert_medium_result():
     torch.manual_seed(42)
 

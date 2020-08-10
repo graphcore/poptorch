@@ -16,12 +16,9 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
   // aten::avg_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
   //                   padding, bool ceil_mode, bool count_include_pad,
   //                   int? divisor_override) -> Tensor
-  std::vector<std::int64_t> kernel_size =
-      handleList<std::int64_t>(node->input(1)->node());
-  std::vector<std::int64_t> stride =
-      handleList<std::int64_t>(node->input(2)->node());
-  std::vector<std::int64_t> padding =
-      handleList<std::int64_t>(node->input(3)->node());
+  auto kernel_size = constantToLongVec(node->input(1)->node());
+  auto stride = constantToLongVec(node->input(2)->node());
+  auto padding = constantToLongVec(node->input(3)->node());
 
   // Pytorch gives the padding as being the amount to pad in both
   // directions. Popart two arguments for each axis, the amount to pad in
@@ -50,7 +47,7 @@ torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
   // aten::adaptive_avg_pool2d(Tensor self, int[] output_size) -> Tensor
   // aten::adaptive_max_pool2d(Tensor self, int[] output_size) -> Tensor
   std::vector<std::int64_t> output_shape =
-      handleList<std::int64_t>(node->input(1)->node());
+      constantToLongVec(node->input(1)->node());
 
   c10::TensorTypePtr as_tensor =
       node->input(0)->type()->cast<c10::TensorType>();

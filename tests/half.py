@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import torch
-import torch.nn as nn
 import poptorch
+import pytest
+import torch
 import torchvision.models as models
 import helpers
 
@@ -47,8 +47,9 @@ def test_model_with_weights():
                                   atol=1e-04)
 
 
+@pytest.mark.skip(reason="TODO(T21014)")
 def test_simple_model():
-    class SimpleAdder(nn.Module):
+    class SimpleAdder(torch.nn.Module):
         def forward(self, x, y, z, w):
             return x + y + 5, z + w + 5
 
@@ -74,7 +75,7 @@ def test_lstm():
     torch.manual_seed(42)
     numHidden = 5
     inputSize = 3
-    lstm = nn.LSTM(3, numHidden)
+    lstm = torch.nn.LSTM(3, numHidden)
     lstm.half()
     ipuLstm = poptorch.inferenceModel(lstm)
     inputs = [torch.randn(1, inputSize).half() for _ in range(5)]

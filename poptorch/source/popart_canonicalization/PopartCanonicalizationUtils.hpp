@@ -4,6 +4,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <functional>
+#include <string>
 #include <vector>
 
 namespace poptorch {
@@ -40,16 +41,7 @@ torch::jit::Value *
 intVectorToIrConstant(torch::jit::Graph *graph,
                       const std::vector<std::int64_t> &shape);
 
-// This handles the case of both `prim::ListConstruct`
-// and 'prim::Constant[value=[x, y, z]]'.
-template <typename T> std::vector<T> handleList(torch::jit::Node *node);
-
-template <typename T>
-std::vector<T> handleListConstruct(torch::jit::Node *node);
-
 std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node);
-
-template <typename T> std::optional<T> handleConstant(torch::jit::Node *node);
 
 // Some operations take in an optional tensor. A "none" constant is passed in to
 // mark a tensor which is not there.
@@ -57,13 +49,31 @@ bool isNone(torch::jit::Node *node);
 
 std::int64_t handleDimensionParam(torch::jit::Node *node, int index);
 
-// Turn a prim::Constant scalar input into a popart graph level scalar constant.
-torch::jit::Node *createIRConstant(torch::jit::Graph *graph,
-                                   torch::jit::Value *value);
+// Force a constant to be a float: this is appropriate if required for popart
+// (onnx); e.g. Gemm alpha and beta are always floats
+float constantToFloat(torch::jit::Node *node);
 
-// Do not cast the operand.
-torch::jit::Value *handleParamOrConstantNoCast(torch::jit::Graph *graph,
-                                               torch::jit::Value *operand);
+// Force a constant to be a long constant by casting.
+// This is appropriate if required for popart (onnx)
+// e.g. TopK takes int64 indices as a tensor.
+torch::jit::Node *constantToLongConstant(torch::jit::Node *node);
+
+// Force a constant to be an int: this is appropriate if required for popart
+// (onnx)
+std::int32_t constantToInt(torch::jit::Node *node);
+
+// Force a constant to be a long: this is appropriate if required for popart
+// (onnx) e.g. Slice takes int64 indices
+std::int64_t constantToLong(torch::jit::Node *node);
+
+// Forces a ListConstruct to be a vector of int64_ts
+std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node);
+
+// Extract a boolean from a constant containing one (encoded as an int32_t)
+bool constantToBool(torch::jit::Node *node);
+
+// Extracts a string from a constant containing a string
+std::string constantToString(torch::jit::Node *node);
 
 // Both pytorch and popart represent reduce as an enum but with different
 // values.

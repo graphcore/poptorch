@@ -100,23 +100,6 @@ torch::jit::Node *rsubHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *other = node->input(1);
 
-  std::optional<float> as_scalar = handleConstant<float>(other->node());
-
-  // This operation can also take a scalar for other. If it is that overload
-  // then we have to add it as a popart scalar and work with that instead.
-  if (as_scalar) {
-    torch::jit::Node *as_constant =
-        createConstantFloat(graph, {*as_scalar}, {1});
-
-    other->replaceAllUsesWith(as_constant->output());
-
-    // Mark it for deletion.
-    markNodeForDeletion(other->node());
-
-    // Use the popart constant instead.
-    other = as_constant->output();
-  }
-
   return createSub(graph, {other, node->input(0)});
 }
 } // namespace

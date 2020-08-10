@@ -3,11 +3,11 @@
 
 #include <functional>
 #include <numeric>
-#include <string>
 #include <unordered_map>
 
 #include "../PoptorchSymbols.hpp"
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -23,118 +23,6 @@ std::unordered_map<c10::Symbol, SymbolHandler> &symbolHandlers() {
   static std::unordered_map<c10::Symbol, SymbolHandler> symbol_handlers;
   return symbol_handlers;
 }
-
-/*
- * Helper structs to help deduce the attribute types.
- */
-
-template <typename T> struct Handle {
-  template <std::enable_if_t<std::is_integral<T>::value, int> = 0>
-  std::optional<T> operator()(const c10::Symbol &sym, torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::i) {
-      return node->i(sym);
-    }
-    if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
-      // Sometimes a single long constant is encoded as an at::Tensor.
-      const at::Tensor &tensor = node->t(sym);
-
-      if (tensor.sizes().empty()) {
-        // Cast tensor to correct value.
-        T value = *static_cast<T *>(tensor.data_ptr());
-        return value;
-      }
-    }
-
-    return std::nullopt;
-  }
-};
-
-template <> struct Handle<float> {
-  std::optional<float> operator()(const c10::Symbol &sym,
-                                  torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::f) {
-      return node->f(sym);
-    }
-    if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
-      const at::Tensor &value = node->t(sym);
-      return *value.data_ptr<float>();
-    }
-    return std::nullopt;
-  }
-};
-
-template <> struct Handle<double> {
-  std::optional<float> operator()(const c10::Symbol &sym,
-                                  torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::f) {
-      return node->f(sym);
-    }
-    if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
-      const at::Tensor &value = node->t(sym);
-      return *value.data_ptr<double>();
-    }
-    return std::nullopt;
-  }
-};
-
-template <> struct Handle<std::vector<std::int64_t>> {
-  std::optional<std::vector<std::int64_t>> operator()(const c10::Symbol &sym,
-                                                      torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::is) {
-      return node->is(sym);
-    }
-    return std::nullopt;
-  }
-};
-
-template <> struct Handle<std::vector<double>> {
-  std::optional<std::vector<double>> operator()(const c10::Symbol &sym,
-                                                torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::fs) {
-      return node->fs(sym);
-    }
-    return std::nullopt;
-  }
-};
-
-template <> struct Handle<std::string> {
-  std::optional<std::string> operator()(const c10::Symbol &sym,
-                                        torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::s) {
-      return node->s(sym);
-    }
-
-    return std::nullopt;
-  }
-};
-
-// Return true if we know how to fold a given compile time constant operation.
-// Only allow const folding for scalar poptorch::int_constant nodes
-bool canBeConstFolded(torch::jit::Node *node) {
-  if (node->kind() != symbols::poptorch::int_constant ||
-      !node->hasAttribute(c10::attr::shape) ||
-      !node->hasAttribute(c10::attr::data)) {
-    return false;
-  }
-  // Use the shape to determine the total number of elements
-  const std::vector<int64_t> &shape = node->is(c10::attr::shape);
-  int64_t numel = std::accumulate(shape.begin(), shape.end(), 1,
-                                  std::multiplies<int64_t>());
-
-  return numel == 1;
-}
-
-template <typename T> T foldConstant(torch::jit::Node *node) {
-  auto data_sym = c10::attr::data;
-  ERROR_ON_MSG(!node->hasAttribute(data_sym),
-               "Internal Compiler Error: Node must have data attribute");
-
-  const std::vector<int64_t> &value = node->is(data_sym);
-  ERROR_ON_MSG(value.size() != 1,
-               "Internal Compiler Error: Node value must be a scalar");
-  return value[0];
-}
-
 } // namespace
 
 bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler) {
@@ -204,63 +92,6 @@ at::ScalarType getNodeScalarType(torch::jit::Value *tensor) {
   return *return_tensor->scalarType();
 }
 
-template <typename T> std::vector<T> handleList(torch::jit::Node *node) {
-  if (node->kind() == c10::prim::ListConstruct) {
-    return handleListConstruct<T>(node);
-  }
-  if (node->kind() == c10::prim::Constant) {
-    auto sym = c10::attr::value;
-
-    ERROR_ON_MSG(!node->hasAttribute(sym), "Node must have value attribute");
-
-    return *Handle<std::vector<T>>{}(sym, node);
-  }
-  std::cerr << "Unhandled list input node:\n";
-  node->dump();
-  ERROR("List inputs must be of type prim::ListConstruct");
-}
-
-template <typename T>
-std::vector<T> handleListConstruct(torch::jit::Node *node) {
-  ERROR_ON(node->kind() != c10::prim::ListConstruct);
-
-  std::vector<T> result;
-
-  for (torch::jit::Value *value : node->inputs()) {
-    std::optional<T> val = handleConstant<T>(value->node());
-    if (val) {
-      result.push_back(*val);
-    }
-  }
-
-  return result;
-}
-
-template <typename T> std::optional<T> handleConstant(torch::jit::Node *node) {
-  // Lists should be explicitly handled in handle list construct.
-  if (node->kind() == c10::prim::ListConstruct) {
-    return std::nullopt;
-  }
-
-  if (node->kind() != c10::prim::Constant && canBeConstFolded(node)) {
-    if constexpr (std::is_integral<T>::value) { // NOLINT
-      return foldConstant<T>(node);
-    }
-  }
-
-  if (node->kind() != c10::prim::Constant) {
-    return std::nullopt;
-  }
-
-  auto sym = c10::attr::value;
-
-  if (!node->hasAttribute(sym)) {
-    return std::nullopt;
-  }
-
-  return Handle<T>{}(sym, node);
-}
-
 bool isNone(torch::jit::Node *node) {
   if (node->kind() != c10::prim::Constant) {
     return false;
@@ -272,7 +103,7 @@ bool isNone(torch::jit::Node *node) {
 
 std::int64_t handleDimensionParam(torch::jit::Node *node, int index) {
   // Extract the dim.
-  std::int64_t dim = *handleConstant<std::int64_t>(node->input(index)->node());
+  std::int64_t dim = constantToLong(node->input(index)->node());
 
   // Get the tensor type. Deduce on the first parameter.
   c10::TensorTypePtr as_tensor =
@@ -288,81 +119,85 @@ std::int64_t handleDimensionParam(torch::jit::Node *node, int index) {
   return dim;
 }
 
-torch::jit::Node *createIRConstant(torch::jit::Graph *graph,
-                                   torch::jit::Value *value) {
-  // Get the scalar type of the result.
-  c10::FloatTypePtr as_float = value->type()->cast<c10::FloatType>();
-  c10::IntTypePtr as_int = value->type()->cast<c10::IntType>();
-  if (as_int) {
-    return createConstantInt(
-        graph, {*handleConstant<std::int64_t>(value->node())}, {1});
-  }
-  if (as_float) {
-    return createConstantFloat(graph, {*handleConstant<float>(value->node())},
-                               {1});
+float constantToFloat(torch::jit::Node *node) {
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+               "Cannot force a non-constant node to a float");
+
+  if (node->output()->type()->cast<c10::TensorType>()) {
+    return node->t(c10::attr::value).to(at::ScalarType::Float).item<float>();
   }
 
-  // If this is still a constant.
-  if (value->node()->kind() == c10::prim::Constant) {
-    // Scalar doubles and longs are tensors somehow.
-    at::Tensor tensor = value->node()->t(c10::attr::value);
-
-    // Create the dimensions.
-    std::vector<std::int64_t> dimensions{};
-    for (auto dim : tensor.sizes()) {
-      dimensions.push_back(dim);
-    }
-
-    c10::ScalarType type = tensor.scalar_type();
-
-    // Convert the tensor if it isn't already in one of these types. The
-    // double/long constraint comes from the IR attribute needing to be double
-    // or long.
-    if (type == at::ScalarType::Float) {
-      tensor = tensor.to(at::ScalarType::Double);
-    } else if (type == at::ScalarType::Int) {
-      tensor = tensor.to(at::ScalarType::Long);
-    }
-
-    type = tensor.scalar_type();
-    // Add the actual constant.
-    if (type == at::ScalarType::Long) {
-      std::vector<std::int64_t> data;
-      data.resize(tensor.numel());
-      const std::int64_t *the_data = tensor.data_ptr<int64_t>();
-
-      std::memcpy(data.data(), the_data, tensor.nbytes());
-
-      return createConstantInt(graph, data, dimensions);
-    }
-    if (type == at::ScalarType::Double) {
-      std::vector<double> data;
-      data.resize(tensor.numel());
-
-      const double *the_data = tensor.data_ptr<double>();
-
-      std::memcpy(data.data(), the_data, tensor.nbytes());
-
-      return createConstantFloat(graph, data, dimensions);
-    }
-    ERROR("Internal error: Constant type not supported "
-          << tensor.scalar_type());
-  }
-
-  // Legal to return null means |value| was not a constant.
-  return nullptr;
+  ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
+  auto s = torch::jit::constant_as<at::Scalar>(node->output());
+  return s->toFloat();
 }
 
-torch::jit::Value *handleParamOrConstantNoCast(torch::jit::Graph *graph,
-                                               torch::jit::Value *operand) {
-  torch::jit::Value *value_to_return = operand;
-  torch::jit::Node *constant = createIRConstant(graph, operand);
+torch::jit::Node *constantToLongConstant(torch::jit::Node *node) {
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+               "Cannot force a non-constant node to a long constant");
+  ERROR_ON(!node->output()->type()->cast<c10::TensorType>());
+  node->t_(c10::attr::value,
+           node->t(c10::attr::value).to(at::ScalarType::Long));
+  node->output()->inferTypeFrom(node->t(c10::attr::value));
+  return node;
+}
 
-  if (constant) {
-    value_to_return = constant->output();
+std::int32_t constantToInt(torch::jit::Node *node) {
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+               "Cannot force a non-constant node to an int");
+
+  if (node->output()->type()->cast<c10::TensorType>()) {
+    return node->t(c10::attr::value)
+        .to(at::ScalarType::Int)
+        .item<std::int32_t>();
   }
 
-  return value_to_return;
+  ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
+  auto s = torch::jit::constant_as<at::Scalar>(node->output());
+  return s->toLong();
+}
+
+std::int64_t constantToLong(torch::jit::Node *node) {
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+               "Cannot force a non-constant node to a long");
+
+  if (node->output()->type()->cast<c10::TensorType>()) {
+    return node->t(c10::attr::value)
+        .to(at::ScalarType::Long)
+        .item<std::int64_t>();
+  }
+
+  ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
+  auto s = torch::jit::constant_as<at::Scalar>(node->output());
+  return s->toLong();
+}
+
+std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node) {
+  ERROR_ON(node->kind() != c10::prim::ListConstruct);
+
+  std::vector<std::int64_t> result;
+  for (torch::jit::Value *value : node->inputs()) {
+    result.push_back(constantToLong(value->node()));
+  }
+
+  return result;
+}
+
+bool constantToBool(torch::jit::Node *node) {
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+               "Cannot force a non-constant node to a bool");
+
+  return constantToInt(node);
+}
+
+std::string constantToString(torch::jit::Node *node) {
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+               "Cannot force a non-constant node to a string");
+
+  auto &&t = node->t(c10::attr::value);
+  auto length = t.sizes().at(0);
+  std::string s(reinterpret_cast<char *>(t.data_ptr()), length);
+  return s;
 }
 
 std::int32_t convertReduceToPopart(std::int32_t pytorchReduce) {
@@ -405,12 +240,5 @@ void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
   torch::jit::Value *old_val = oldNode->output(outputIdx);
   replaceOutputUse(old_val, new_val);
 }
-
-template std::vector<int> handleListConstruct(torch::jit::Node *node);
-template std::vector<std::int64_t> handleList(torch::jit::Node *node);
-template std::optional<float> handleConstant(torch::jit::Node *);
-template std::optional<int> handleConstant(torch::jit::Node *);
-template std::optional<bool> handleConstant(torch::jit::Node *);
-template std::optional<std::string> handleConstant(torch::jit::Node *);
 
 } // namespace poptorch

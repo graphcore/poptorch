@@ -46,6 +46,7 @@ def get_simple_add_two():
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
+@pytest.mark.skip(reason="TODO(T21014)")
 def test_add_two_many_types(input_type):
     model = get_simple_add_two()
 

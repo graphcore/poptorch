@@ -8,13 +8,23 @@
 #include "PoptorchSymbols.hpp"
 
 namespace poptorch {
-
 torch::jit::Node *
 createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
                     torch::jit::ArrayRef<torch::jit::Value *> inputs,
                     size_t num_outputs) {
   torch::jit::Node *new_node = graph->create(kind, inputs, num_outputs);
+
   graph->insertNode(new_node);
+  return new_node;
+}
+
+torch::jit::Node *tensorToConstant(torch::jit::Graph *graph,
+                                   const at::Tensor &t) {
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::tensor_constant);
+  new_node->output()->inferTypeFrom(t);
+  new_node->t_(c10::attr::value, t);
+
   return new_node;
 }
 
@@ -29,36 +39,57 @@ torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
   return new_node;
 }
 
-torch::jit::Node *createConstantInt64(torch::jit::Graph *graph,
-                                      const std::vector<int64_t> &data,
-                                      const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::int64_constant);
-  new_node->is_(c10::attr::data, data);
-  new_node->is_(c10::attr::shape, new_shape);
-  return new_node;
-}
-
 torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
                                     const std::vector<int64_t> &data,
                                     const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::int_constant);
-  new_node->is_(c10::attr::data, data);
-  new_node->is_(c10::attr::shape, new_shape);
-  return new_node;
+  auto total_size = static_cast<size_t>(std::accumulate(
+      new_shape.begin(), new_shape.end(), 1, std::multiplies<int64_t>()));
+
+  size_t stride = 0;
+  if (data.size() != 1) {
+    ERROR_ON(total_size != data.size());
+    stride = 1;
+  }
+
+  auto t =
+      at::empty({new_shape}, at::dtype(at::ScalarType::Int)
+                                 .memory_format(c10::MemoryFormat::Contiguous));
+
+  for (size_t i = 0; i < total_size; i++) {
+    // NOLINTNEXTLINE
+    *(t.data_ptr<int32_t>() + i) = static_cast<int32_t>(data[i * stride]);
+  }
+
+  // Use bounds checking for the last element
+  data.at((total_size - 1) * stride);
+
+  return tensorToConstant(graph, t);
 }
 
 torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
                                       const std::vector<double> &data,
                                       const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::float_constant);
-  new_node->fs_(c10::attr::data, data);
-  new_node->is_(c10::attr::shape, new_shape);
-  new_node->i_(c10::Symbol::fromQualString("attr::isHalf"), 0);
+  auto total_size = static_cast<size_t>(std::accumulate(
+      new_shape.begin(), new_shape.end(), 1, std::multiplies<std::int64_t>()));
+  size_t stride = 0;
+  if (data.size() != 1) {
+    ERROR_ON(total_size != data.size());
+    stride = 1;
+  }
 
-  return new_node;
+  auto t =
+      at::empty({new_shape}, at::dtype(at::ScalarType::Float)
+                                 .memory_format(c10::MemoryFormat::Contiguous));
+
+  for (size_t i = 0; i < total_size; i++) {
+    // NOLINTNEXTLINE
+    *(t.data_ptr<float>() + i) = static_cast<float>(data[i * stride]);
+  }
+
+  // Use bounds checking for the last element
+  data.at((total_size - 1) * stride);
+
+  return tensorToConstant(graph, t);
 }
 
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,

@@ -18,7 +18,7 @@ class Tensor;
 
 namespace poptorch {
 /*
-    The first canonicalization pass cleans up the pytorch IR to use popart
+   The first canonicalization pass cleans up the pytorch IR to use popart
    specific operations and will remove all others. Constants will be folded into
    the attributes of the ops themselves.
 */

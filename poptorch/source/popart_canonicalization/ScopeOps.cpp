@@ -4,6 +4,8 @@
 
 #include "../PoptorchSymbols.hpp"
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
+
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch {
@@ -19,7 +21,7 @@ torch::jit::Node *beginIpuBlockHandler(torch::jit::Graph *graph,
       node->outputs().size());
 
   // Convert the prim::Constant into an attribute.
-  std::int64_t ipu_id = *handleConstant<std::int64_t>(node->input()->node());
+  std::int64_t ipu_id = constantToLong(node->input()->node());
   new_node->i_(c10::Symbol::fromQualString("attr::ipu"), ipu_id);
   return new_node;
 }

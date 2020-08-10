@@ -9,19 +9,19 @@
 #include <vector>
 
 namespace poptorch {
-
 torch::jit::Node *
 createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
                     torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
                     size_t num_outputs = 1);
 
+// Create a poptorch::tensor_constant node from the given tensors, setting the
+// output type accordingly
+torch::jit::Node *tensorToConstant(torch::jit::Graph *graph,
+                                   const at::Tensor &t);
+
 // Manually added.
 torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape);
-
-torch::jit::Node *createConstantInt64(torch::jit::Graph *graph,
-                                      const std::vector<int64_t> &data,
-                                      const std::vector<int64_t> &new_shape);
 
 torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
                                     const std::vector<int64_t> &data,
@@ -85,14 +85,6 @@ template <typename T> struct CreateConstant {
                                const std::vector<int64_t> &data,
                                const std::vector<int64_t> &new_shape) {
     return createConstantInt(graph, data, new_shape);
-  }
-};
-
-template <> struct CreateConstant<std::int64_t> {
-  torch::jit::Node *operator()(torch::jit::Graph *graph,
-                               const std::vector<int64_t> &data,
-                               const std::vector<int64_t> &new_shape) {
-    return createConstantInt64(graph, data, new_shape);
   }
 };
 

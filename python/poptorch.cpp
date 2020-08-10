@@ -8,6 +8,7 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/inliner.h>
 #include <torch/csrc/jit/passes/lower_graph.h>
+#include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/peephole.h>
 #include <torch/csrc/jit/passes/remove_inplace_ops.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
@@ -17,18 +18,19 @@
 #include <unordered_map>
 
 #include "popart_compiler/Compiler.hpp"
+
+// Shared enums across the ABI boundary.
+#include "popart_compiler/PopartEnums.hpp"
+
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
+
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/ShapeInference.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
-
-#include "poptorch_logging/Error.hpp"
-#include "poptorch_logging/Logging.hpp"
-
-// Shared enums across the ABI boundary.
-#include "popart_compiler/PopartEnums.hpp"
 
 void beginIpuBlock(int64_t ipu_id) { UNUSED(ipu_id); }
 void endIpuBlock() {}
@@ -313,15 +315,23 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
     torch::jit::PeepholeOptimize(graph);
     torch::jit::EliminateDeadCode(graph);
 
-    torch::jit::EliminateDeadCode(graph);
+    torch::jit::RemoveInplaceOps(graph);
+    torch::jit::LowerSimpleTuples(graph);
     torch::jit::PeepholeOptimize(graph);
-    torch::jit::EliminateDeadCode(graph);
 
     torch::jit::RemoveInplaceOps(graph);
 
     logging::trace("Graph right before casting unsupported inputs:\n{}",
                    *graph);
     poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
+        graph.get());
+
+    logging::trace("Graph right before output type changes:\n{}", *graph);
+    poptorch::type_and_constant_canonicalization::checkAndChangeOutputTypes(
+        graph.get());
+
+    logging::trace("Graph right before constant canonicalisation\n{}", *graph);
+    poptorch::type_and_constant_canonicalization::canonicaliseConstants(
         graph.get());
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
@@ -413,6 +423,15 @@ compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
     logging::trace("Graph right before casting unsupported inputs:\n{}",
                    *graph);
     poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
+        graph.get());
+
+    logging::trace("Graph right before output type changes:\n{}", *graph);
+    poptorch::type_and_constant_canonicalization::checkAndChangeOutputTypes(
+        graph.get());
+
+    logging::trace("Graph right before number constant replacement:\n{}",
+                   *graph);
+    poptorch::type_and_constant_canonicalization::canonicaliseConstants(
         graph.get());
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);

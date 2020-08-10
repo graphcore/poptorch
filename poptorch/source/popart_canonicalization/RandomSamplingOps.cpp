@@ -12,12 +12,20 @@ torch::jit::Node *normalHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::normal(float mean, float std, int[] size, Generator?, int? dtype,
   // int? layout, Device? device, bool? pin_memory) -> Tensor
+
+  ERROR_ON_MSG(node->input(0)->node()->kind() !=
+                   symbols::poptorch::tensor_constant,
+               "random normal is only supported with a scalar mean");
+
+  ERROR_ON_MSG(
+      node->input(1)->node()->kind() != symbols::poptorch::tensor_constant,
+      "random normal is only supported with a scalar standard deviation");
+
   std::vector<int64_t> shape = shapeFromTensor(node->output());
-  std::optional<float> mean = handleConstant<float>(node->input(0)->node());
-  std::optional<float> scale = handleConstant<float>(node->input(1)->node());
-  ERROR_ON_MSG(!mean || !scale, "Invalid input arguments. Expected scalar "
-                                "float values for both mean and std.");
-  return createRandomNormal(graph, shape, *mean, *scale);
+  float mean = constantToFloat(node->input(0)->node());
+  float scale = constantToFloat(node->input(1)->node());
+
+  return createRandomNormal(graph, shape, mean, scale);
 }
 
 } // namespace

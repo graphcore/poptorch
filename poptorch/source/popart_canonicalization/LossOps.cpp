@@ -10,8 +10,7 @@ namespace poptorch {
 namespace {
 torch::jit::Node *l1LossHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
-  std::int64_t reduction =
-      *handleConstant<std::int64_t>(node->input(2)->node());
+  std::int64_t reduction = constantToLong(node->input(2)->node());
 
   // Convert to popart reduce values.
   reduction = convertReduceToPopart(reduction);
@@ -27,8 +26,7 @@ torch::jit::Node *l1LossHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *mseLossHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
-  std::int64_t reduction =
-      *handleConstant<std::int64_t>(node->input(2)->node());
+  std::int64_t reduction = constantToLong(node->input(2)->node());
 
   // Convert to popart reduce values.
   reduction = convertReduceToPopart(reduction);
@@ -62,10 +60,8 @@ torch::jit::Node *nllLossHandler(torch::jit::Graph *graph,
   // "aten::nll_loss(Tensor input, Tensor label, Tensor? weight, int
   // reduction, int ignore_index) -> Tensor"
 
-  std::int64_t reduction =
-      *handleConstant<std::int64_t>(node->input(3)->node());
-  std::int64_t ignore_index =
-      *handleConstant<std::int64_t>(node->input(4)->node());
+  std::int64_t reduction = constantToLong(node->input(3)->node());
+  std::int64_t ignore_index = constantToLong(node->input(4)->node());
 
   // Convert to popart reduce values.
   reduction = convertReduceToPopart(reduction);
@@ -76,8 +72,7 @@ torch::jit::Node *nllLossHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *identityLossHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
-  std::int64_t reduction =
-      *handleConstant<std::int64_t>(node->input(1)->node());
+  std::int64_t reduction = constantToLong(node->input(1)->node());
 
   return createIdentityloss(graph, {node->input(0)}, reduction);
 }
@@ -100,8 +95,7 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
   torch::jit::Value *weight = node->input(2);
 
   // Loss reduction.
-  std::int64_t reduction =
-      *handleConstant<std::int64_t>(node->input(3)->node());
+  std::int64_t reduction = constantToLong(node->input(3)->node());
 
   // Convert to popart reduce values.
   reduction = convertReduceToPopart(reduction);

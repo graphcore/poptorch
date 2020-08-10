@@ -21,19 +21,19 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
   torch::jit::ArrayRef<torch::jit::Value *> weights_list =
       node->input(2)->node()->inputs();
 
-  bool use_bias = *handleConstant<bool>(node->input(3)->node());
+  bool use_bias = constantToBool(node->input(3)->node());
   ERROR_ON_MSG(!use_bias, "LSTM without biases not supported");
-  std::int64_t num_layers =
-      *handleConstant<std::int64_t>(node->input(4)->node());
+  std::int64_t num_layers = constantToLong(node->input(4)->node());
+
   ERROR_ON_MSG(num_layers != 1, "Only LSTM with 1 layer supported");
 
-  float dropout = *handleConstant<float>(node->input(5)->node());
+  float dropout = constantToFloat(node->input(5)->node());
   ERROR_ON_MSG(dropout != 0.0f, "LSTM only supports dropout = 0.0");
 
-  bool bidirectional = *handleConstant<bool>(node->input(7)->node());
+  bool bidirectional = constantToBool(node->input(7)->node());
   ERROR_ON_MSG(bidirectional, "bidirectional LSTM not supported");
 
-  bool batch_first = *handleConstant<bool>(node->input(8)->node());
+  bool batch_first = constantToBool(node->input(8)->node());
 
   // An LSTM state is made of 4 values
   constexpr std::uint64_t state_size = 4;

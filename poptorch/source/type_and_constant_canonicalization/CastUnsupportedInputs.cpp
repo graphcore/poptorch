@@ -92,6 +92,8 @@ void processInput(torch::jit::Graph *graph, torch::jit::Value *input) {
 
 void castUnsupportedInputs(torch::jit::Graph *graph) {
   for (torch::jit::Value *input : graph->inputs()) {
+    logging::LogContext ctx("castUnsupportedInputs processing" +
+                            input->debugName());
     processInput(graph, input);
   }
 }

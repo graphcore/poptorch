@@ -38,212 +38,20 @@ reduceHelperDimensionCreator(torch::jit::Value *value) {
 
 class CanonicalizeImpl {
 public:
-  void run(torch::jit::Graph *graph);
-
-private:
-  // This handles the case of both `prim::ListConstruct`
-  // and 'prim::Constant[value=[x, y, z]]'.
-  template <typename T> std::vector<T> handleList(torch::jit::Node *node);
-
-  template <typename T>
-  std::vector<T> handleListConstruct(torch::jit::Node *node);
-
-  // Cast the operand to type T.
-  template <typename T>
-  torch::jit::Value *handleParamOrConstant(torch::jit::Graph *graph,
-                                           torch::jit::Value *operand);
-
-  // Just returns operand if it is a tensor otherwise adds it as a constant and
-  // casts it to the right type.
-  torch::jit::Value *handleParamOrConstantDeduceType(torch::jit::Graph *graph,
-                                                     torch::jit::Value *operand,
-                                                     torch::jit::Node *user);
-
-  // Delete a node and also its users if they are also unused.
-  void searchAndPossiblyDestroy(torch::jit::Node *node);
-
-  // Fold the constant.
-  template <typename T> T foldConstant(torch::jit::Node *node);
+  static void run(torch::jit::Graph *graph);
 };
 
-/*
- * Helper structs to help deduce the attribute types.
- */
-
-template <typename T> struct Handle {
-  template <
-      typename = typename std::enable_if<std::is_integral<T>::value>::type>
-  std::optional<T> operator()(const c10::Symbol &sym, torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::i) {
-      return node->i(sym);
-    }
-    if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
-      // Sometimes a single long constant is encoded as an at::Tensor.
-      const at::Tensor &tensor = node->t(sym);
-
-      if (tensor.sizes().empty()) {
-        // Cast tensor to correct value.
-        T value = *static_cast<T *>(tensor.data_ptr());
-        return value;
-      }
-    }
-
-    return std::nullopt;
+bool hasUnityValue(torch::jit::Value *value) {
+  auto tensor = value->node()->t(c10::attr::value);
+  if (tensor.numel() != 1) {
+    return false;
   }
-};
-
-template <> struct Handle<float> {
-  std::optional<float> operator()(const c10::Symbol &sym,
-                                  torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::f) {
-      return node->f(sym);
-    }
-    if (node->kindOf(sym) == torch::jit::AttributeKind::t) {
-      const at::Tensor &value = node->t(sym);
-      return *value.data_ptr<double>();
-    }
-    return std::nullopt;
-  }
-};
-
-template <> struct Handle<std::vector<std::int64_t>> {
-  std::optional<std::vector<std::int64_t>> operator()(const c10::Symbol &sym,
-                                                      torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::is) {
-      return node->is(sym);
-    }
-    return std::nullopt;
-  }
-};
-
-template <> struct Handle<std::vector<double>> {
-  std::optional<std::vector<double>> operator()(const c10::Symbol &sym,
-                                                torch::jit::Node *node) {
-    if (node->kindOf(sym) == torch::jit::AttributeKind::fs) {
-      return node->fs(sym);
-    }
-    return std::nullopt;
-  }
-};
+  return tensor.to(at::ScalarType::Float).item<float>() == 1.0;
+}
 
 /*
  * ConvertAtenToPopart implementation.
  */
-
-template <typename T> T CanonicalizeImpl::foldConstant(torch::jit::Node *node) {
-  // The index of aten::size must be constant.
-  std::size_t index = *handleConstant<std::size_t>(node->input(1)->node());
-
-  // Get the shape of the tensor.
-  c10::TensorTypePtr as_tensor =
-      node->input(0)->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-
-  // Get that requested index.
-  return *dims[index];
-}
-
-torch::jit::Value *
-CanonicalizeImpl::handleParamOrConstantDeduceType(torch::jit::Graph *graph,
-                                                  torch::jit::Value *operand,
-                                                  torch::jit::Node *user) {
-  // The returned value must be a tensor.
-  c10::TensorTypePtr return_tensor =
-      user->output()->type()->expect<c10::TensorType>();
-
-  // Deduce the type from the scalar type on the return.
-  auto optional_scalar_type = return_tensor->scalarType();
-
-  // Means something in the JIT has failed.
-  ERROR_ON_MSG(!optional_scalar_type,
-               "Internal error: Tensor doesn't have a scalar type.");
-
-  switch (*optional_scalar_type) {
-  case c10::ScalarType::Bool:
-  case c10::ScalarType::Int:
-  case c10::ScalarType::Long: {
-    return handleParamOrConstant<std::int32_t>(graph, operand);
-  }
-  case c10::ScalarType::Float:
-  case c10::ScalarType::Double: {
-    return handleParamOrConstant<float>(graph, operand);
-  }
-  default: {
-    ERROR("Internal error: Tensor scalar type is unsupported");
-  }
-  }
-}
-
-template <typename T>
-torch::jit::Value *
-CanonicalizeImpl::handleParamOrConstant(torch::jit::Graph *graph,
-                                        torch::jit::Value *operand) {
-  torch::jit::Value *value_to_return = operand;
-  torch::jit::Node *constant = createIRConstant(graph, operand);
-
-  if (constant) {
-    torch::jit::Node *cast = castToType<T>(graph, constant->output());
-    value_to_return = cast->output();
-  }
-
-  return value_to_return;
-}
-
-template <typename T>
-std::vector<T> CanonicalizeImpl::handleList(torch::jit::Node *node) {
-  if (node->kind() == c10::prim::ListConstruct) {
-    return handleListConstruct<T>(node);
-  }
-  if (node->kind() == c10::prim::Constant) {
-    auto sym = c10::attr::value;
-
-    ERROR_ON_MSG(!node->hasAttribute(sym), "Node must have value attribute");
-
-    return *Handle<std::vector<T>>{}(sym, node);
-  }
-  std::cerr << "Unhandled list input node:\n";
-  node->dump();
-  ERROR("List inputs must be of type prim::ListConstruct");
-}
-
-template <typename T>
-std::vector<T> CanonicalizeImpl::handleListConstruct(torch::jit::Node *node) {
-  ERROR_ON(node->kind() != c10::prim::ListConstruct);
-
-  std::vector<T> result;
-
-  for (torch::jit::Value *value : node->inputs()) {
-    std::optional<T> val = handleConstant<T>(value->node());
-    if (val) {
-      result.push_back(*val);
-    }
-  }
-
-  return result;
-}
-
-void CanonicalizeImpl::searchAndPossiblyDestroy(torch::jit::Node *node) {
-  // Skip parameters and nodes with any uses.
-  if (node->kind() == c10::prim::Param || node->hasUses()) {
-    return;
-  }
-
-  // Store the inputs used by this node.
-  // Ops may use the same input twice, so use a set to store only unique inputs.
-  std::unordered_set<torch::jit::Value *> inputs;
-  for (torch::jit::Value *user : node->inputs()) {
-    inputs.insert(user);
-  }
-
-  // Delete the node.
-  node->destroy();
-
-  // If any of the previously used values now have no users repeat the process
-  // for them.
-  for (torch::jit::Value *user : inputs) {
-    searchAndPossiblyDestroy(user->node());
-  }
-}
 
 void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   for (torch::jit::Node *node : graph->nodes()) {
@@ -257,35 +65,19 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
       new_node = handler(graph, node);
     }
 
-// Handle a constant input.
-#define HANDLE(Index, Type) *handleConstant<Type>(node->input(Index)->node())
-
 // Handle an integer dimension attribute (this can be negative hence the special
 // case)
 #define HANDLE_DIM(Index) handleDimensionParam(node, Index)
 
-#define HANDLE_LIST(Index, Type)                                               \
-  handleListConstruct<Type>(node->input(Index)->node())
+#define HANDLE_LIST(Index) constantToLongVec(node->input(Index)->node())
 
 #define HANDLE_LIST_AS_IR_CONSTANT(Index)                                      \
-  intVectorToIrConstant(                                                       \
-      graph, handleListConstruct<std::int64_t>(node->input(Index)->node()))
+  intVectorToIrConstant(graph, constantToLongVec(node->input(Index)->node()))
 
 #define HANDLE_TENSOR_LIST(Index) handleTensorList(node->input(Index)->node())
-#define PARAM(Index) node->inputs()[Index]
+#define PARAM(Index) node->input(Index)
 #define COMMA ,
 #define NONE
-
-// Only to be used on operations which return a tensor and which this operand
-// should be of the same scalar type as the return.
-#define PARAM_OR_CONSTANT_ANY_TYPE(Index)                                      \
-  handleParamOrConstantDeduceType(graph, node->inputs()[Index], node)
-
-// Add the constant as is but don't try and deduce it to the "right" type as
-// that may be ambigous. I.E if an operation takes in an int and a float and
-// returns a bool.
-#define PARAM_OR_CONSTANT_ANY_TYPE_NO_CAST(Index)                              \
-  handleParamOrConstantNoCast(graph, node->inputs()[Index])
 
 // Returns an integer list of dimension that a tensor has. For reduce functions.
 // A 5D tensor would return (0, 1, 2, 3, 4)
@@ -305,50 +97,33 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 // Check if the number of inputs is |num|. Used for overload resolution.
 #define NUM_INPUTS_EQUALS(Num) node->inputs().size() == Num
 
-#define PARAM_OR_CONSTANT(Index, Type)                                         \
-  handleParamOrConstant<Type>(graph, node->inputs()[Index])
-// Handle all supported scalar values and pass the correct C++ type to the given
-// body.
-#define ANY_SCALAR_CONSTANT_HANDLER(Body)                                      \
-  at::IntTypePtr type = alphaValue->type()->cast<at::IntType>();               \
-  if (type) {                                                                  \
-    Body(int) /* NOLINT */                                                     \
-  }
+// Extract a float from the constant casting if required
+#define CONSTANT_TO_FLOAT(Index) constantToFloat(node->input(Index)->node())
 
-// Many binary element wise operations contained a fused "Alpha" component. The
-// form of this is A (+, -) B * alpha. Most of the time this will be zero so can
-// be skipped but it could be non-zero and must be handled.
+// Extract a long from the constant by casting if required
+#define CONSTANT_TO_LONG(Index) constantToLong(node->input(Index)->node())
 
-// We have a helper macro to insert the alpha value if needed.
-#define ALPHA_BODY(Type)                                                       \
-  Type alphaAsScalar = *handleConstant<Type>(alphaValue->node());              \
-  if (alphaAsScalar != 1) {                                                    \
-    torch::jit::Node *alphaConst =                                             \
-        CreateConstant<Type>{}(graph, {alphaAsScalar}, {1});                   \
-    torch::jit::Node *alphaNode =                                              \
-        createMul(graph, {alphaConst->output(), valueToMultiply});             \
-    alphaValue = alphaNode->output();                                          \
-  }
+#define CONSTANT_TO_LONG_CONSTANT(Index)                                       \
+  constantToLongConstant(node->input(Index)->node())->output()
 
+// Many binary element wise operations contained a fused "Alpha" component.
+// The form of this is A (+, -) B * alpha. Most of the time this will be unity
+// so can be skipped but it could be non-unity and must be handled.
 // If the alpha is 1 we just ignore it otherwise we perform the alpha
 // multiplication and use that. This is the macro which should be used.
 #define ALPHA(ValueToMultiply, AlphaParam)                                     \
-  torch::jit::Value *alphaValue = AlphaParam;                                  \
-  torch::jit::Value *valueToMultiply = ValueToMultiply;                        \
-  ANY_SCALAR_CONSTANT_HANDLER(ALPHA_BODY)                                      \
-  if (alphaValue == (AlphaParam))                                              \
-    alphaValue = valueToMultiply;
+  torch::jit::Value *alphaParam = AlphaParam;                                  \
+  torch::jit::Value *alphaValue = ValueToMultiply;                             \
+  if (!hasUnityValue(alphaParam)) {                                            \
+    auto alphaNode = createMul(graph, {alphaParam, alphaValue});               \
+    alphaValue = alphaNode->output();                                          \
+  }
 
 // Create a function decl with the given call and arguments.
 #define OP_CONVERTOR(AtenID, PreBuildCalls, PopartBuilder, Params)             \
   else if (kind == c10::AtenID) { /* NOLINT */                                 \
     PreBuildCalls new_node = PopartBuilder(graph, Params);                     \
   }
-
-#define HANDLE_CONSTANT_AS_IR(Index, Type)                                     \
-  CreateConstant<Type>{}(                                                      \
-      graph, {*handleConstant<Type>(node->input(Index)->node())}, {1})         \
-      ->output()
 
 // Create a function decl with the given call and arguments.
 #define OP_CONVERTOR_WITH_CAST(AtenID, PreBuildCalls, PopartBuilder, Params,   \
@@ -364,13 +139,25 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   }
 #include "CanonicalizationOps.h.inc"
 
+#undef OP_CONVERTOR_POP
+#undef OP_CONVERTOR_WITH_CAST
 #undef OP_CONVERTOR
-#undef HANDLE_CONSTANT_AS_IR
-#undef PARAM
-#undef COMMA
-#undef HANDLE
-#undef NONE
 #undef ALPHA
+#undef CONSTANT_TO_LONG_CONSTANT
+#undef CONSTANT_TO_LONG
+#undef CONSTANT_TO_FLOAT
+#undef NUM_INPUTS_EQUALS
+#undef GET_RETURN_TYPE
+#undef TENSOR_SHAPE_AS_IR
+#undef TENSOR_SHAPE
+#undef DIMENISON_LENGTH_LIST
+#undef NONE
+#undef COMMA
+#undef PARAM
+#undef HANDLE_TENSOR_LIST
+#undef HANDLE_LIST_AS_IR_CONSTANT
+#undef HANDLE_LIST
+#undef HANDLE_DIM
 
     // If we have a new node add it and replace the old use.
     if (new_node) {
