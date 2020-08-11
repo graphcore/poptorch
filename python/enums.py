@@ -38,4 +38,4 @@ class ConnectionType(enum.IntEnum):
 class SyncPattern(enum.IntEnum):
     Full = 0
     SinglePipeline = 1
-    PingPong = 2
+    ReplicaAndLadder = 2

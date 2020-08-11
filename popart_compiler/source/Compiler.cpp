@@ -281,8 +281,8 @@ SessionOptionsImpl::SessionOptionsImpl() {
   };
 
   uint64_options["sync_pattern"] = [&](std::uint64_t value) {
-    ERROR_ON_MSG(value >
-                     static_cast<std::uint64_t>(popart::SyncPattern::PingPong),
+    ERROR_ON_MSG(value > static_cast<std::uint64_t>(
+                             popart::SyncPattern::ReplicaAndLadder),
                  "Value for SyncPattern out of range");
     poptorch_options.sync_pattern = static_cast<popart::SyncPattern>(value);
   };

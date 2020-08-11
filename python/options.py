@@ -137,10 +137,10 @@ class Options(_impl.OptionsDict):
         return self
 
     def syncPattern(self, sync_pattern):
-        """set the IPU SyncPatter to one of:
+        """set the IPU SyncPattern to one of:
         - Full
         - SinglePipeline
-        - PingPong
+        - ReplicaAndLadder
         """
         assert isinstance(sync_pattern, enums.SyncPattern)
         self.set(sync_pattern=sync_pattern.value)
