@@ -87,12 +87,22 @@ public:
 
   popart::SessionOptions popart_options;
   struct Options {
+    // Enable / disable the generation of GraphReport.json
     bool profile;
+    // Number of times the graph will be executed for each execution.
     std::uint64_t steps;
+    // Strategy to adopt for returning the graph's output tensors.
     PopartAnchorTypes anchor_mode;
+    // 'N' when anchor_mode == PopartAnchorTypes::EveryN
     std::uint64_t anchor_return_period;
+    // True if running on the model, False otherwise.
     bool ipu_model;
+    // Only used for offline compilation (DeviceConnectionType.Never): version
+    // of the IPU should the Poplar compiler be targeting.
     std::uint64_t ipu_version;
+    // ID of the specific IPU the user wants to use. (If not set we'll just
+    // iterate over the IPUs present on the system and try to connect to one
+    // that matches our requirements).
     std::uint64_t ipu_id;
     popart::DeviceConnectionType connection_type;
     popart::SyncPattern sync_pattern;
@@ -154,6 +164,20 @@ public:
                                  float low);
   void updateUseModelConfig();
   std::string checkSystemConfig();
+  template <typename T, typename U>
+  void setOptionIfNotSet(T &option, U value, const std::string &name,
+                         const std::string &value_as_string) {
+    if (options_set.count(name) && option != static_cast<T>(value)) {
+      logging::warn("{} forced by the user to {}", name, value_as_string);
+    } else {
+      option = value;
+    }
+  }
+
+  template <typename T, typename U>
+  void setOptionIfNotSet(T &option, U value, const std::string &name) {
+    setOptionIfNotSet(option, value, name, std::to_string(value));
+  }
 };
 
 std::string CompilerImpl::checkSystemConfig() {
@@ -239,9 +263,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   };
   bool_options["use_model"] = [&](bool value) {
     poptorch_options.ipu_model = value;
-  };
-  bool_options["constant_weights"] = [&](bool value) {
-    popart_options.constantWeights = value;
   };
   bool_options["enable_pipelining"] = [&](bool value) {
     popart_options.enablePipelining = value;
@@ -915,31 +936,18 @@ void Compiler::initSession(const Optimizer &opt) {
   }
 
   // If Pipelining wasn't set: enable it if more than 1 IPU is used.
-  if (!_impl->options_set.count("enablePipelining")) {
-    options.enablePipelining = _impl->used_ipus.size() > 1;
-  }
+  _impl->setOptionIfNotSet(options.enablePipelining,
+                           _impl->used_ipus.size() > 1, "enablePipelining");
 
-  bool enable_replicated_graphs = options.replicatedGraphCount != 1;
-  if (_impl->options_set.count("enable_replicated_graphs") &&
-      options.enableReplicatedGraphs != enable_replicated_graphs) {
-    logging::warn("enable_replicated_graphs forced by the user to {}",
-                  options.enableReplicatedGraphs);
-  } else {
-    options.enableReplicatedGraphs = enable_replicated_graphs;
-  }
+  _impl->setOptionIfNotSet(options.enableReplicatedGraphs,
+                           options.replicatedGraphCount > 1,
+                           "enableReplicatedGraphs");
 
   logging::info("Popart replication enabled: {} with factor set to {}",
                 options.enableReplicatedGraphs, options.replicatedGraphCount);
 
   // Disable constant_weights by default: causes problems with Popart
-  const bool constant_weights = false;
-  if (_impl->options_set.count("constant_weights") &&
-      options.constantWeights != constant_weights) {
-    logging::warn("constant_weights forced by the user to {}",
-                  options.constantWeights);
-  } else {
-    options.constantWeights = constant_weights;
-  }
+  _impl->setOptionIfNotSet(options.constantWeights, false, "constantWeights");
 
   if (_impl->used_ipus.size() > 1) {
     if (!options.enablePipelining) {
@@ -947,13 +955,9 @@ void Compiler::initSession(const Optimizer &opt) {
                     "poptorch.Options.enablePipelining() is False",
                     _impl->used_ipus.size());
     }
-    if (_impl->options_set.count("virtualGraphMode") &&
-        options.virtualGraphMode != popart::VirtualGraphMode::Manual) {
-      logging::warn("virtualGraphMode forced by the user to {} ",
-                    popart::toString(options.virtualGraphMode));
-    } else {
-      options.virtualGraphMode = popart::VirtualGraphMode::Manual;
-    }
+    _impl->setOptionIfNotSet(
+        options.virtualGraphMode, popart::VirtualGraphMode::Manual,
+        "virtualGraphMode", popart::toString(options.virtualGraphMode));
   }
   ERROR_ON_MSG(_impl->used_ipus.size() > popartBatchDim(),
                "poptorch.Options.deviceIterations("
@@ -967,14 +971,9 @@ void Compiler::initSession(const Optimizer &opt) {
                       "by the model: "
                    << _impl->used_ipus.size());
 
-  bool enable_gradient_accumulation = options.accumulationFactor > 1;
-  if (_impl->options_set.count("enable_gradient_accumulation") &&
-      !options.enableGradientAccumulation) {
-    logging::warn("enable_gradient_accumulation forced by the user to {}",
-                  options.enableGradientAccumulation);
-  } else {
-    options.enableGradientAccumulation = enable_gradient_accumulation;
-  }
+  _impl->setOptionIfNotSet(options.enableGradientAccumulation,
+                           options.accumulationFactor > 1,
+                           "enableGradientAccumulation");
 
   // Create the anchors, these are used to copy to the host.
   auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);

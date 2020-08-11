@@ -8,6 +8,10 @@ from . import enums
 from .logging import logger
 
 
+def ceil_div(a, b):
+    return (a + b - 1) // b
+
+
 def convertOptimizerToDict(optimizer):
     assert len(optimizer.param_groups) == 1, (
         "Poptorch currently only "
