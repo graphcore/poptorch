@@ -45,9 +45,7 @@ def test_training():
             self.ln = torch.nn.Linear(100, 100)
             self.softmax = nn.Softmax(1)
 
-        def forward(self, ins):
-            x = ins[0]
-            bias = ins[1]
+        def forward(self, x, bias):
             x, y = poptorch.custom_op([x, bias],
                                       "Cube",
                                       "com.acme",

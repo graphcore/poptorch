@@ -76,8 +76,13 @@ def trainingModel(model, options=None, loss=None, optimizer=None):
             # Store the real __call__ method before PoplarExecutor wraps it
             self.real_model_call = model.__call__
 
-        def __call__(self, args, loss_inputs):
-            output = self.real_model_call(args)
+        def __call__(self, args, loss_inputs=None):
+            if isinstance(args, (tuple, list)):
+                output = self.real_model_call(*args)
+            elif isinstance(args, dict):
+                output = self.real_model_call(**args)
+            else:
+                output = self.real_model_call(args)
 
             if self.loss:
                 loss = self.loss(output, loss_inputs)
