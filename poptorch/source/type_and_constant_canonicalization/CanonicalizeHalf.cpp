@@ -6,6 +6,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "poptorch/PopartCanonicalization.hpp"
+#include "poptorch/Utils.hpp"
 
 #include "../PoptorchSymbols.hpp"
 
@@ -33,10 +34,79 @@ public:
   void convertUses();
 
 private:
+  c10::TypePtr convertTensorIfNeeded(const at::Tensor &tensor,
+                                     torch::jit::Value *value);
+  c10::TypePtr
+  convertValueIfNeeded(torch::jit::Value *value,
+                       const std::vector<at::Tensor> &in_tensors,
+                       std::vector<at::Tensor>::const_iterator *input_iterator,
+                       std::int64_t input_index);
+
   torch::jit::Graph *_graph;
 
   std::unordered_set<torch::jit::Value *> _converted_tensors;
 };
+
+c10::TypePtr ConvertHalfImpl::convertValueIfNeeded(
+    torch::jit::Value *value, const std::vector<at::Tensor> &in_tensors,
+    std::vector<at::Tensor>::const_iterator *input_iterator,
+    std::int64_t input_index) {
+  c10::TypePtr new_type = nullptr;
+  switch (value->type()->kind()) {
+  case c10::TypeKind::TensorType: {
+    ERROR_ON(*input_iterator == in_tensors.end());
+    new_type = convertTensorIfNeeded(**input_iterator, value);
+    (*input_iterator)++;
+    break;
+  }
+  case c10::TypeKind::TupleType: {
+    auto tuple = value->type()->expect<c10::TupleType>();
+    std::vector<c10::TypePtr> new_types;
+    bool type_changed = false;
+    // Until we encounter something else we only support TupleUnpack
+    ERROR_ON(value->uses().size() != 1);
+    auto user = value->uses()[0].user;
+    ERROR_ON(user->kind() != c10::prim::TupleUnpack);
+    ERROR_ON(tuple->elements().size() != user->outputs().size());
+    for (auto output : user->outputs()) {
+      auto changed_type =
+          convertValueIfNeeded(output, in_tensors, input_iterator, input_index);
+      if (changed_type) {
+        new_types.push_back(changed_type);
+        type_changed = true;
+      } else {
+        new_types.push_back(output->type());
+      }
+    }
+    if (type_changed) {
+      new_type = c10::TupleType::create(new_types);
+      value->setType(new_type);
+    }
+    break;
+  }
+  default:
+    ERROR("Unsupported parameter type '"
+          << c10::typeKindToString(value->type()->kind()) << "' for input "
+          << input_index);
+  }
+  return new_type;
+}
+
+c10::TypePtr ConvertHalfImpl::convertTensorIfNeeded(const at::Tensor &tensor,
+                                                    torch::jit::Value *value) {
+  c10::TypePtr new_type = nullptr;
+  // If the actual input tensor is half.
+  if (tensor.scalar_type() == at::ScalarType::Half) {
+    logging::trace("Converting parameter {} to half",
+                   nodeToString(value->node()));
+    c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
+    new_type = as_tensor->withScalarType(c10::ScalarType::Half);
+    value->setType(new_type);
+    // Add it to the list of converted tensors.
+    _converted_tensors.insert(value);
+  }
+  return new_type;
+}
 
 /*
  * Static helper functions.
@@ -86,26 +156,27 @@ bool maybeConvertTensor(torch::jit::Value *tensor) {
 void ConvertHalfImpl::convertGraphInputs(
     const std::vector<at::Tensor> &in_tensors,
     const std::vector<at::Tensor> &parameters) {
+  std::size_t index = 0;
+  std::size_t num_inputs =
+      _graph->param_node()->outputs().size() - parameters.size();
+  auto tensor_it = in_tensors.begin();
+
   // For each input in the IR view.
-  for (std::size_t index = 0; index < _graph->inputs().size(); ++index) {
-    // Take the tensor from either the parameters or the input tensor. They are
-    // flattened in the IR at this point.
-    const at::Tensor &tensor = index >= in_tensors.size()
-                                   ? parameters[index - in_tensors.size()]
-                                   : in_tensors[index];
-
-    // If the actual input tensor is half.
-    if (tensor.scalar_type() == at::ScalarType::Half) {
-      logging::trace("Converting parameter {} to half", index);
-      // Convert the IR type to half.
-      c10::TypePtr type = _graph->inputs()[index]->type();
-      c10::TensorTypePtr as_tensor = type->expect<c10::TensorType>();
-      _graph->inputs()[index]->setType(
-          as_tensor->withScalarType(c10::ScalarType::Half));
-
-      // Add it to the list of converted tensors.
-      _converted_tensors.insert(_graph->inputs()[index]);
+  for (torch::jit::Value *value : _graph->inputs()) {
+    if (index < num_inputs) {
+      // Lower user provided input
+      ERROR_ON(value->node()->kind() != c10::prim::Param);
+      convertValueIfNeeded(value, in_tensors, &tensor_it, index);
+    } else {
+      ERROR_ON_MSG(tensor_it != in_tensors.end(),
+                   "Not all the input tensors have been used");
+      // Can't have tuples for parameters:
+      ERROR_ON(value->type()->kind() != c10::TypeKind::TensorType);
+      // Lower the other params (i.e the weights)
+      const at::Tensor &tensor_as_param = parameters.at(index - num_inputs);
+      convertTensorIfNeeded(tensor_as_param, value);
     }
+    ++index;
   }
 }
 

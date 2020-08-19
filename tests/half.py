@@ -68,3 +68,20 @@ def test_simple_model():
 
     assert outFloat.dtype == torch.float
     assert outFloat == 12.0
+
+
+def test_lstm():
+    torch.manual_seed(42)
+    numHidden = 5
+    inputSize = 3
+    lstm = nn.LSTM(3, numHidden)
+    lstm.half()
+    ipuLstm = poptorch.inferenceModel(lstm)
+    inputs = [torch.randn(1, inputSize).half() for _ in range(5)]
+    # Add the extra 2nd dimension
+    inputs = torch.cat(inputs).view(len(inputs), 1, -1)
+    hidden = (torch.randn(1, 1,
+                          numHidden).half(), torch.randn(1, 1,
+                                                         numHidden).half())
+    ipuOut = ipuLstm(inputs, hidden)
+    assert isinstance(ipuOut[0], torch.HalfTensor)

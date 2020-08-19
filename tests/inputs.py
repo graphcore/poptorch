@@ -4,9 +4,11 @@
 import torch
 import torch.nn as nn
 import poptorch
+import pytest
 
 
-def test_simple_tuple():
+@pytest.mark.parametrize("use_half", [True, False])
+def test_simple_tuple(use_half):
     class SimpleAdder(nn.Module):
         def forward(self, t):
             assert isinstance(t, tuple)
@@ -21,10 +23,15 @@ def test_simple_tuple():
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 
-    assert inference_model((t1, t2)) == 3.0
+    if use_half:
+        model.half()
+        t1 = t1.half()
+        t2 = t2.half()
+    assert inference_model((t1, t2)).float() == 3.0
 
 
-def test_nested_tuples():
+@pytest.mark.parametrize("use_half", [True, False])
+def test_nested_tuples(use_half):
     class SimpleAdder(nn.Module):
         def forward(self, tpl1, t2, tpl34567):
             (t1, ) = tpl1
@@ -53,12 +60,29 @@ def test_nested_tuples():
     t6 = torch.tensor([6.])
     t7 = torch.tensor([7.], dtype=torch.float64)
 
-    assert inference_model((t1, ), t2, (t3, (t4, t5), (t6, t7))) == 28.0
+    if use_half:
+        model.half()
+        t1 = t1.half()
+        t2 = t2.half()
+        t3 = t3.half()
+        t4 = t4.half()
+        t5 = t5.half()
+        t6 = t6.half()
+        t7 = t7.half()
+    assert inference_model((t1, ), t2,
+                           (t3, (t4, t5), (t6, t7))).float() == 28.0
 
 
-def test_optional_inputs():
+@pytest.mark.parametrize("use_half", [True, False])
+def test_optional_inputs(use_half):
+    dtype = torch.float16 if use_half else torch.float32
+
     class SimpleAdder(nn.Module):
-        def forward(self, t1, t2, t3=torch.ones(1), t4=torch.zeros(1)):
+        def forward(self,
+                    t1,
+                    t2,
+                    t3=torch.ones(1, dtype=dtype),
+                    t4=torch.zeros(1, dtype=dtype)):
             return t1 * t3 + t2 * t4
 
     model = SimpleAdder()
@@ -68,12 +92,19 @@ def test_optional_inputs():
     t2 = torch.tensor([2.])
     t4 = torch.tensor([4.])
 
-    assert inference_model(t1, t2) == 1.0
-    assert inference_model(t1, t2, t4=t4) == 9.0
-    assert inference_model(t4=t4, t1=t1, t2=t2) == 9.0
+    if use_half:
+        model.half()
+        t1 = t1.half()
+        t2 = t2.half()
+        t4 = t4.half()
+
+    assert inference_model(t1, t2).float() == 1.0
+    assert inference_model(t1, t2, t4=t4).float() == 9.0
+    assert inference_model(t4=t4, t1=t1, t2=t2).float() == 9.0
 
 
-def test_list_inputs():
+@pytest.mark.parametrize("use_half", [True, False])
+def test_list_inputs(use_half):
     class SimpleAdder(nn.Module):
         def forward(self, t1, t2, x):
             l = [t1, t2]
@@ -88,6 +119,12 @@ def test_list_inputs():
     t2 = torch.tensor([2.])
     t3 = torch.tensor([4.])
 
+    if use_half:
+        model.half()
+        t1 = t1.half()
+        t2 = t2.half()
+        t3 = t3.half()
+
     expected = [torch.tensor([1.0]), torch.tensor([5.0])]
 
-    assert inference_model(t1, t2, t3) == expected
+    assert [t.float() for t in inference_model(t1, t2, t3)] == expected
