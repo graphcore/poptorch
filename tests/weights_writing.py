@@ -6,13 +6,15 @@ import types
 import poptorch
 import torch
 import torch.optim as optim
+import helpers
 
 
 def test_weights_sharing_ipu_cpu():
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
-    training_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
+    training_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss())
     training_model.deviceToHostCounter = 0
     realMethod = training_model.copyWeightsToHost
 
@@ -98,7 +100,8 @@ def test_weights_sharing_ipus():
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
-    training_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
+    training_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss())
     training_model.deviceToHostCounter = 0
     realMethod = training_model.copyWeightsToHost
 
@@ -258,7 +261,8 @@ def test_weight_overwrite_trained_weight():
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
-    poptorch_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss())
     target = torch.randn(10)
     input = torch.randn(10)
 

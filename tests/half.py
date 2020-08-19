@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import poptorch
 import torchvision.models as models
+import helpers
 
 
 def test_resnet():
@@ -17,7 +18,8 @@ def test_resnet():
     model.train()
     model.half()
 
-    training_model = poptorch.trainingModel(model, loss=torch.nn.NLLLoss())
+    training_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.NLLLoss())
 
     # Run on IPU.
     poptorch_out, loss = training_model(image_input, t1)

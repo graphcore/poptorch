@@ -58,54 +58,14 @@ class DataLoader(torch.utils.data.DataLoader):
         return self._combined_batch_size
 
 
-def trainingModel(model, options=None, loss=None, optimizer=None):
-    options = options or Options()
-    if options.defaultAnchorMode():
-        # In training it makes sense to see only the last result, by default.
-        options.anchorMode(AnchorMode.Final)
-    if not optimizer:
-        optimizer = optim.SGD(model.parameters(), lr=0.01)
-
-    optimizer = _impl.convertOptimizerToDict(optimizer)
-
-    class ModelTrainingWrapper(nn.Module):
-        def __init__(self, model, loss=None):
-            super().__init__()
-            self.model = model
-            self.loss = loss
-            # Store the real __call__ method before PoplarExecutor wraps it
-            self.real_model_call = model.__call__
-
-        def __call__(self, args, loss_inputs=None):
-            if isinstance(args, (tuple, list)):
-                output = self.real_model_call(*args)
-            elif isinstance(args, dict):
-                output = self.real_model_call(**args)
-            else:
-                output = self.real_model_call(args)
-
-            if self.loss:
-                loss = self.loss(output, loss_inputs)
-                return output, loss
-
-            return output
-
-    wrappedModel = ModelTrainingWrapper(model, loss)
-    return _impl.PoplarExecutor(model=wrappedModel,
+def trainingModel(model, options=None, optimizer=None):
+    return _impl.PoplarExecutor(model=model,
                                 options=options,
                                 training=True,
                                 optimizer=optimizer)
 
 
 def inferenceModel(model, options=None):
-    options = options or Options()
-    if options.defaultAnchorMode():
-        # In inference it makes sense to see all the results, by default.
-        options.anchorMode(AnchorMode.All)
-    assert options.Training.gradient_accumulation == 1, (
-        "Gradient accumulation"
-        " should be left to its default value (1) for inference")
-
     return _impl.PoplarExecutor(model=model, options=options, training=False)
 
 

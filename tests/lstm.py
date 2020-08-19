@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import poptorch
 import poptorch.testing
+import helpers
 
 
 def test_lstm():
@@ -159,7 +160,7 @@ def test_lstm_fc_training():
     classes = 3
     lstm = LSTMModel(input_size=input_size, hidden_size=3, classes=classes)
 
-    ipuLstm = poptorch.trainingModel(lstm, loss=nn.CrossEntropyLoss())
+    ipuLstm = helpers.trainingModelWithLoss(lstm, loss=nn.CrossEntropyLoss())
     input = torch.randn(1, batch_size, input_size)
     label = torch.tensor([1, 2])
     ipuLstm(input, label.long())

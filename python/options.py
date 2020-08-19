@@ -1,10 +1,54 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-from . import _impl
 from . import enums
 from .logging import logger
 
 
-class _JitOptions(_impl.OptionsDict):
+class _OptionsDict:
+    """Safe dictionary to store options: only keys which have been passed to
+    the constructor can later be updated.
+    """
+
+    def __init__(self, **default_values):
+        self._values = default_values
+
+    def set(self, **kwargs):
+        for option, value in kwargs.items():
+            assert option in self._values, ("Invalid option %s, valid options"
+                                            " are %s") % (option,
+                                                          self._values.keys())
+            assert isinstance(
+                value, type(self._values[option])
+            ), "Unexpected type %s for option %s. Expected %s" % (
+                type(value), option, type(self._values[option]))
+            self._values[option] = value
+
+    def createOrSet(self, **kwargs):
+        for option, value in kwargs.items():
+            if option in self._values:
+                self.set(option=value)
+            else:
+                self._values[option] = value
+
+    def __getattr__(self, option):
+        assert option in self._values, ("Invalid option %s, "
+                                        "valid options are %s") % (
+                                            option, self._values.keys())
+        return self._values[option]
+
+    def update(self, other):
+        assert not set(self._values.keys()).intersection(
+            other), "Can't merge dictionaries, they have some keys in common"
+        other.update(self._values)
+        return other
+
+    def __call__(self, option):
+        assert option in self._values, ("Invalid option %s, "
+                                        "valid options are %s") % (
+                                            option, self._values.keys())
+        return self._values[option]
+
+
+class _JitOptions(_OptionsDict):
     """Options related to Pytorch's JIT
     """
 
@@ -22,7 +66,7 @@ class _JitOptions(_impl.OptionsDict):
         return self
 
 
-class _TrainingOptions(_impl.OptionsDict):
+class _TrainingOptions(_OptionsDict):
     """Options specific to model training.
     """
 
@@ -47,7 +91,7 @@ class _PopartOptions:
         return self
 
 
-class Options(_impl.OptionsDict):
+class Options(_OptionsDict):
     def __init__(self):
         self._jit = _JitOptions()
         self._training = _TrainingOptions()

@@ -4,6 +4,7 @@
 import torch
 import poptorch
 import pytest
+import helpers
 
 
 def test_inferenceBatching():
@@ -41,9 +42,8 @@ def test_trainingBatching():
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
-    poptorch_model = poptorch.trainingModel(model,
-                                            opts,
-                                            loss=torch.nn.CrossEntropyLoss())
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, options=opts, loss=torch.nn.CrossEntropyLoss())
 
     # Run all 10 batches as batchsize 10.
     out = model(input)
@@ -133,9 +133,8 @@ def test_trainingAnchors(anchor):
     # Run on IPU batch size 1 * 1000 popart batches.
     opts = poptorch.Options().deviceIterations(1000)
     opts.anchorMode(anchor, anchor_return_period=20)
-    poptorch_model = poptorch.trainingModel(model,
-                                            opts,
-                                            loss=torch.nn.CrossEntropyLoss())
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, options=opts, loss=torch.nn.CrossEntropyLoss())
 
     poptorchOut, loss = poptorch_model(input, label)
 

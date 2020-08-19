@@ -4,6 +4,7 @@
 import torch
 import torch.optim as optim
 import poptorch
+import helpers
 
 
 # Test L1 loss by directly running it against the pytorch native L1 in inference.
@@ -37,7 +38,7 @@ def test_L1Loss_training():
 
         model = torch.nn.Linear(10, 10)
 
-        poptorch_model = poptorch.trainingModel(
+        poptorch_model = helpers.trainingModelWithLoss(
             model,
             loss=torch.nn.L1Loss(reduction=reduction),
             optimizer=optim.SGD(model.parameters(), lr=0.01))
@@ -97,7 +98,8 @@ def test_MSELoss_training():
 
     model = torch.nn.Linear(10, 10)
 
-    poptorch_model = poptorch.trainingModel(model, loss=torch.nn.MSELoss())
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss())
 
     target = torch.randn(10)
     input = torch.randn(10)
@@ -150,7 +152,7 @@ def test_LogSoftmax():
 
     model = Net()
 
-    poptorch_model = poptorch.trainingModel(
+    poptorch_model = helpers.trainingModelWithLoss(
         model, loss=torch.nn.NLLLoss(reduction="mean"))
 
     for _ in range(0, 10):
@@ -184,7 +186,7 @@ def test_NLLLoss_training():
 
         model = Net()
 
-        poptorch_model = poptorch.trainingModel(
+        poptorch_model = helpers.trainingModelWithLoss(
             model, loss=torch.nn.NLLLoss(reduction=reduction))
         input = torch.randn(1, 10)
         label = torch.randint(0, 10, [1])
@@ -210,7 +212,7 @@ def test_CrossEntropyLoss_training():
     for reduction in reductions:
         model = torch.nn.Linear(10, 10)
 
-        poptorch_model = poptorch.trainingModel(
+        poptorch_model = helpers.trainingModelWithLoss(
             model, loss=torch.nn.CrossEntropyLoss(reduction=reduction))
         input = torch.randn(1, 10)
         label = torch.randint(0, 10, [1])
@@ -278,7 +280,7 @@ def test_BCE_training():
         model = torch.nn.Sequential(torch.nn.Linear(10, 10),
                                     torch.nn.Sigmoid())
 
-        poptorch_model = poptorch.trainingModel(
+        poptorch_model = helpers.trainingModelWithLoss(
             model,
             loss=torch.nn.BCELoss(reduction=reduction),
             optimizer=optim.SGD(model.parameters(), lr=0.1))

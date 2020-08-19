@@ -7,6 +7,7 @@ import poptorch
 import pytest
 import torch
 import torch.optim as optim
+import helpers
 
 
 @pytest.mark.parametrize("opt, reduction",
@@ -19,7 +20,7 @@ def test_optimizer(opt, reduction):
     # "Train" with learning rate of zero and check the loss remains the same.
     optimizer = opt(model.parameters(), lr=0.00)
 
-    poptorch_model = poptorch.trainingModel(
+    poptorch_model = helpers.trainingModelWithLoss(
         model,
         loss=torch.nn.CrossEntropyLoss(reduction=reduction),
         optimizer=optimizer)
@@ -61,7 +62,7 @@ def test_sgd_IR(opt, reduction):
     # "Train" with learning rate of zero and check the loss remains the same.
     optimizer = opt(model.parameters(), lr=0.01)
 
-    poptorch_model = poptorch.trainingModel(
+    poptorch_model = helpers.trainingModelWithLoss(
         model,
         loss=torch.nn.CrossEntropyLoss(reduction=reduction),
         optimizer=optimizer)

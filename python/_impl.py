@@ -6,6 +6,7 @@ import poptorch.poptorch_core as poptorch_core
 
 from . import enums
 from .logging import logger
+from .options import Options
 
 
 def ceil_div(a, b):
@@ -54,154 +55,140 @@ def convertOptimizerToDict(optimizer):
     return None
 
 
-class OptionsDict:
-    """Safe dictionary to store options: only keys which have been passed to
-    the constructor can later be updated.
-    """
+class ArgsParser:
+    class Args:
+        def __init__(self):
+            self._args = []
 
-    def __init__(self, **default_values):
-        self._values = default_values
+        def _forEach(self, data, fn):
+            if isinstance(data, (tuple, list)):
+                return type(data)(self._forEach(d, fn) for d in data)
+            if isinstance(data, dict):
+                return {
+                    key: self._forEach(value, fn)
+                    for key, value in data.items()
+                }
+            return fn(data)
 
-    def set(self, **kwargs):
-        for option, value in kwargs.items():
-            assert option in self._values, ("Invalid option %s, valid options"
-                                            " are %s") % (option,
-                                                          self._values.keys())
-            assert isinstance(
-                value, type(self._values[option])
-            ), "Unexpected type %s for option %s. Expected %s" % (
-                type(value), option, type(self._values[option]))
-            self._values[option] = value
+        def _forEachMatched(self, data, condition, doOnTrue, conditionMatches):
+            if isinstance(data, (tuple, list)):
+                return type(data)(self._forEachMatched(
+                    d, condition, doOnTrue, conditionMatches) for d in data)
+            if isinstance(data, dict):
+                return {
+                    key: self._forEachMatched(value, condition, doOnTrue,
+                                              conditionMatches)
+                    for key, value in data.items()
+                }
+            if condition(data):
+                conditionMatches.setTrue()
+                return doOnTrue(data)
+            return data
 
-    def createOrSet(self, **kwargs):
-        for option, value in kwargs.items():
-            if option in self._values:
-                self.set(option=value)
-            else:
-                self._values[option] = value
+        def forEachMatchedAtLeastOnce(self, condition, doOnTrue=None):
+            class ConditionMatches:
+                def __init__(self):
+                    self._matches = False
 
-    def __getattr__(self, option):
-        assert option in self._values, ("Invalid option %s, "
-                                        "valid options are %s") % (
-                                            option, self._values.keys())
-        return self._values[option]
+                def __bool__(self):
+                    return self._matches
 
-    def update(self, other):
-        assert not set(self._values.keys()).intersection(
-            other), "Can't merge dictionaries, they have some keys in common"
-        other.update(self._values)
-        return other
+                def setTrue(self):
+                    self._matches = True
 
-    def __call__(self, option):
-        assert option in self._values, ("Invalid option %s, "
-                                        "valid options are %s") % (
-                                            option, self._values.keys())
-        return self._values[option]
+            matches = ConditionMatches()
+            self._args = self._forEachMatched(self._args, condition, doOnTrue,
+                                              matches)
+            return bool(matches)
 
+        def forEach(self, fn):
+            self._args = self._forEach(self._args, fn)
 
-class _Args:
-    def __init__(self, model, args, kwargs, training):
+        def asTuple(self):
+            return tuple(self._args)
+
+    def __init__(self, model):
         # Combine args and kwargs:
-        self._args = []
-        fn = model.__call__ if training else model.forward
+        fn = model.forward
         varnames = fn.__code__.co_varnames
-        # Remove 'self'
+        # Don't count 'self'
         assert varnames[0] == 'self'
         argcount = fn.__code__.co_argcount
-        varnames = varnames[1:argcount]
-        argcount -= 1
-        assert len(args) + len(kwargs) <= argcount, (
+        self._argcount = argcount - 1
+        self._varnames = varnames[1:argcount]
+        self._defaults = fn.__defaults__ or []
+
+    def __call__(self, args, kwargs):
+        a = ArgsParser.Args()
+        assert len(args) + len(kwargs) <= self._argcount, (
             "Too many arguments provided: expected %s (%d) "
-            "but got %d") % (varnames, len(varnames), len(args) + len(kwargs))
-        defaults = fn.__defaults__ or []
-        first_optional = len(varnames) - len(defaults)
+            "but got %d") % (self._varnames, len(
+                self._varnames), len(args) + len(kwargs))
+        first_optional = len(self._varnames) - len(self._defaults)
         none_passed = []
-        for i, name in enumerate(varnames):
+        for i, name in enumerate(self._varnames):
             if i < len(args):
-                self._args.append(args[i])
+                a._args.append(args[i])
                 assert name not in kwargs, ("Parameter %s was passed more "
                                             "than once") % name
             elif name in kwargs:
                 assert not none_passed, (
-                    "Torch doesn't support passing tensors"
+                    "Torch doesn't support passing tensors (%s)"
                     " after the following parameters have defaulted to None."
-                    " %s") % ", ".join(none_passed)
-                self._args.append(kwargs[name])
+                    " %s") % (name, ", ".join(none_passed))
+                a._args.append(kwargs[name])
             else:
                 assert i >= first_optional, ("Mandatory parameter %s "
                                              "missing") % name
-                value = defaults[i - first_optional]
+                value = self._defaults[i - first_optional]
                 if value is None:
                     none_passed.append("%s (%d)" % (name, i))
                 if not none_passed:
-                    self._args.append(value)
-
-        self._varnames = varnames
-
-    def _forEach(self, data, fn):
-        if isinstance(data, (tuple, list)):
-            return type(data)(self._forEach(d, fn) for d in data)
-        if isinstance(data, dict):
-            return {
-                key: self._forEach(value, fn)
-                for key, value in data.items()
-            }
-        return fn(data)
-
-    def _forEachMatched(self, data, condition, doOnTrue, conditionMatches):
-        if isinstance(data, (tuple, list)):
-            return type(data)(
-                self._forEachMatched(d, condition, doOnTrue, conditionMatches)
-                for d in data)
-        if isinstance(data, dict):
-            return {
-                key: self._forEachMatched(value, condition, doOnTrue,
-                                          conditionMatches)
-                for key, value in data.items()
-            }
-        if condition(data):
-            conditionMatches.setTrue()
-            return doOnTrue(data)
-        return data
-
-    def forEachMatchedAtLeastOnce(self, condition, doOnTrue=None):
-        class ConditionMatches:
-            def __init__(self):
-                self._matches = False
-
-            def __bool__(self):
-                return self._matches
-
-            def setTrue(self):
-                self._matches = True
-
-        matches = ConditionMatches()
-        self._args = self._forEachMatched(self._args, condition, doOnTrue,
-                                          matches)
-        return bool(matches)
-
-    def forEach(self, fn):
-        self._args = self._forEach(self._args, fn)
-
-    def asTuple(self):
-        return tuple(self._args)
+                    a._args.append(value)
+        return a
 
 
 class PoplarExecutor:
-    def __init__(self, model, options, training, optimizer=None):
+    def __init__(self,
+                 model,
+                 options,
+                 training,
+                 optimizer=None,
+                 user_model=None):
+        options = options or Options()
+        self.model = model
+        self.user_model = user_model or self.model
+        if training:
+            if options.defaultAnchorMode():
+                # In training it makes sense to see only the last result, by default.
+                options.anchorMode(enums.AnchorMode.Final)
+            if not optimizer:
+                optimizer = optim.SGD(user_model.parameters(), lr=0.01)
+            optimizer = convertOptimizerToDict(optimizer)
+        else:
+            if options.defaultAnchorMode():
+                # In inference it makes sense to see all the results, by default.
+                options.anchorMode(enums.AnchorMode.All)
+            assert options.Training.gradient_accumulation == 1, (
+                "Gradient accumulation"
+                " should be left to its default value (1) for inference")
+            assert not optimizer, "Optimizer should be None for inference"
+
         self.executable = None
         self.options = options
-        self.model = model
+        # The args parser needs to be initilialised before the model gets wrapped
+        # otherwise we will not be able to retrieve the real arguments list
+        self._args_parser = ArgsParser(model)
         self.training = training
         self.optimizer = optimizer or {}
         self.new_optimizer = optimizer or {}
         self.warned_not_contiguous_input = False
         self.dirty_host_weights = False
         if self.training:
-            m = self.model.model
             parent = self
+            real_model_call = self.user_model.__call__
 
-            class WrappedModel(type(m)):
+            class WrappedModel(type(self.user_model)):
                 def copyWeightsToHostIfNeeded(self):
                     """ Return True if the weights on the host were dirty and
                     have been updated.
@@ -217,7 +204,7 @@ class PoplarExecutor:
                 def __call__(self, *args, **kwargs):
                     # If the model has been trained on the IPU: update the host side weights
                     self.copyWeightsToHostIfNeeded()
-                    return parent.model.real_model_call(*args, **kwargs)
+                    return real_model_call(*args, **kwargs)
 
                 def named_parameters(self, *args, **kwargs):
                     self.copyWeightsToHostIfNeeded()
@@ -226,7 +213,7 @@ class PoplarExecutor:
             # __call__ is an attribute, not a method, unfortunately we cannot just
             # replace it in the model object: we have to create a wrapper class
             # and change the object's class.
-            m.__class__ = WrappedModel
+            self.user_model.__class__ = WrappedModel
 
     def _debugGetPopartIR(self):
         return poptorch_core._getPopartIR(self.executable)  # pylint: disable=protected-access
@@ -247,7 +234,7 @@ class PoplarExecutor:
 
     def __call__(self, *args, **kwargs):
         # Convert single tensor to tuple.
-        in_tensors = _Args(self.model, args, kwargs, self.training)
+        in_tensors = self._args_parser(args, kwargs)
 
         if in_tensors.forEachMatchedAtLeastOnce(
                 condition=lambda t: isinstance(t, torch.Tensor
@@ -274,8 +261,7 @@ class PoplarExecutor:
             # concept of batching at the popart level. Here we divide by the popart batch size so the
             # trace "sees" the model batch size but when we call execute we pass the full batch and popart
             # will partition it up.
-            in_tensors_trace_view = _Args(self.model, args, kwargs,
-                                          self.training)
+            in_tensors_trace_view = self._args_parser(args, kwargs)
 
             def narrowTensor(tensor):
                 if not isinstance(tensor, torch.Tensor):
@@ -342,8 +328,7 @@ class PoplarExecutor:
 
                 if hasConvertedAnyHalf[0]:
                     # Get the originals back.
-                    in_tensors_as_half = _Args(self.model, args, kwargs,
-                                               self.training)
+                    in_tensors_as_half = self._args_parser(args, kwargs)
                     in_tensors_as_half.forEach(narrowTensor)
 
                     # Compile using the actual halves.
@@ -376,7 +361,7 @@ class PoplarExecutor:
         # If this is an inference model: check if the same model is not being trained on a different IPU.
         # If it is: make sure the weights are updated.
         if not self.training:
-            copyWeightsToHostIfNeeded = getattr(self.model,
+            copyWeightsToHostIfNeeded = getattr(self.user_model,
                                                 "copyWeightsToHostIfNeeded",
                                                 None)
             if callable(copyWeightsToHostIfNeeded):

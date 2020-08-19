@@ -6,6 +6,7 @@ import platform
 import torch
 import torch.nn as nn
 import poptorch
+import helpers
 
 if platform.system() == "Darwin":
     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_cube_op.dylib")
@@ -45,7 +46,9 @@ def test_training():
             self.ln = torch.nn.Linear(100, 100)
             self.softmax = nn.Softmax(1)
 
-        def forward(self, x, bias):
+        def forward(self, t):
+            x = t[0]
+            bias = t[1]
             x, y = poptorch.custom_op([x, bias],
                                       "Cube",
                                       "com.acme",
@@ -68,7 +71,7 @@ def test_training():
 
         return l1 + l2
 
-    training = poptorch.trainingModel(model, loss=custom_loss)
+    training = helpers.trainingModelWithLoss(model, custom_loss)
 
     for _ in range(0, 100):
         x = torch.rand((1, 100))

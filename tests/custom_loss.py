@@ -3,6 +3,7 @@
 
 import torch
 import poptorch
+import helpers
 
 
 # Test custom loss by training to a target
@@ -20,7 +21,7 @@ def test_custom_loss():
 
     loss = CustomLoss()
 
-    poptorch_model = poptorch.trainingModel(model, loss=loss)
+    poptorch_model = helpers.trainingModelWithLoss(model, loss=loss)
 
     target = torch.randn(10)
     input = torch.randn(10)
