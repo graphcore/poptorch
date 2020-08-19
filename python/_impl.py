@@ -184,9 +184,9 @@ class PoplarExecutor:
         self.new_optimizer = optimizer or {}
         self.warned_not_contiguous_input = False
         self.dirty_host_weights = False
+
         if self.training:
             parent = self
-            real_model_call = self.user_model.__call__
 
             class WrappedModel(type(self.user_model)):
                 def copyWeightsToHostIfNeeded(self):
@@ -201,17 +201,19 @@ class PoplarExecutor:
                         return True
                     return False
 
-                def __call__(self, *args, **kwargs):
-                    # If the model has been trained on the IPU: update the host side weights
-                    self.copyWeightsToHostIfNeeded()
-                    return real_model_call(*args, **kwargs)
+                def __getattribute__(self, name):
+                    if name in ("_parameters", "forward"):
+                        self.copyWeightsToHostIfNeeded()
+                    return object.__getattribute__(self, name)
 
-                def named_parameters(self, *args, **kwargs):
-                    self.copyWeightsToHostIfNeeded()
-                    return super().named_parameters(*args, **kwargs)
+                def __getattr__(self, name):
+                    attribute = super().__getattr__(name)
+                    if isinstance(attribute, torch.nn.parameter.Parameter):
+                        self.copyWeightsToHostIfNeeded()
+                    return attribute
 
-            # __call__ is an attribute, not a method, unfortunately we cannot just
-            # replace it in the model object: we have to create a wrapper class
+            # __getattr__ and __getattribute__ are attributes, not methods, unfortunately we cannot just
+            # replace them in the model object: we have to create a wrapper class
             # and change the object's class.
             self.user_model.__class__ = WrappedModel
 

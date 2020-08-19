@@ -36,7 +36,7 @@ def test_weights_sharing_ipu_cpu():
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
     # Train on IPU.
-    for _ in range(0, 1000):
+    for _ in range(0, 100):
         out, _ = training_model(input, target)
 
     assert training_model.deviceToHostCounter == 0, \
@@ -66,7 +66,7 @@ def test_weights_sharing_ipu_cpu():
             "No implicit copy needed to access the parameters after inference"
 
     # Train on IPU.
-    for _ in range(0, 1000):
+    for _ in range(0, 50):
         out, _ = training_model(input, target)
 
     current_parameters = str(list(model.parameters()))
@@ -75,8 +75,29 @@ def test_weights_sharing_ipu_cpu():
     assert original_parameters != current_parameters
     training_model.deviceToHostCounter = 0  # reset counter
 
-    for _ in range(0, 500):
+    for _ in range(0, 50):
         out, _ = training_model(input, target)
+
+    # Access a parameter directly:
+    print(model.weight.data)
+
+    assert training_model.deviceToHostCounter == 1, \
+            "1 implicit copy after having trained the model"
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    for _ in range(0, 50):
+        out, _ = training_model(input, target)
+
+    # Check state_dict works: torch.save(model.state_dict(), "/tmp/model.save")
+    model.state_dict()
+
+    assert training_model.deviceToHostCounter == 1, \
+            "1 implicit copy after having trained the model"
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    for _ in range(0, 50):
+        out, _ = training_model(input, target)
+
     assert training_model.deviceToHostCounter == 0, \
             "No implicit copy needed to train the model"
 
