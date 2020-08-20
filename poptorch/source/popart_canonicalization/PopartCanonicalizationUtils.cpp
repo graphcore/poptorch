@@ -104,6 +104,10 @@ bool isNone(torch::jit::Node *node) {
   return !node->hasAttribute(sym);
 }
 
+bool isNone(const torch::jit::Value *value) {
+  return (value->type()->cast<c10::NoneType>() != nullptr);
+}
+
 std::int64_t handleDimensionParam(torch::jit::Node *node, int index) {
   // Extract the dim.
   std::int64_t dim = constantToLong(node->input(index)->node());

@@ -7,6 +7,49 @@
 namespace poptorch {
 namespace {
 
+// Ensures running_mean and running_var tensors by creating constants if they
+// are not set (None) The running_mean and running_var may be none e.g. if
+// track_running_stats is set to False for the relevant PyTorch BatchNorm layer.
+// To satisfy popart/onnx, create a zero input for running_mean and all ones for
+// running_var
+void maybeInitializeRunningParamConstants(
+    torch::jit::Graph *graph, const c10::ScalarType input_type,
+    torch::jit::Value **running_mean, torch::jit::Value **running_var,
+    const std::vector<std::int64_t> &new_shape) {
+
+  std::vector<int64_t> running_shape{new_shape[1]};
+
+  if (!isNone(*running_mean)) {
+      ERROR_ON(isNone(*running_var));
+    return;
+  }
+
+  ERROR_ON(!isNone(*running_var));
+
+  switch (input_type) {
+  case c10::ScalarType::Int: {
+    *running_mean = createConstantInt(graph, {0}, running_shape)->output();
+    *running_var = createConstantInt(graph, {1}, running_shape)->output();
+    break;
+  }
+  case c10::ScalarType::Float: {
+    *running_mean = createConstantFloat(graph, {0.0}, running_shape)->output();
+    *running_var = createConstantFloat(graph, {1.0}, running_shape)->output();
+    break;
+  }
+  case c10::ScalarType::Half: {
+    *running_mean =
+        createConstantFloat16(graph, {0.0}, running_shape)->output();
+    *running_var = createConstantFloat16(graph, {1.0}, running_shape)->output();
+    break;
+  }
+  default: {
+    ERROR("Batch norm input"
+          << " of type " << c10::toString(input_type) << " not supported");
+  }
+  }
+}
+
 torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   torch::jit::Node *new_node;
@@ -49,11 +92,20 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *weight = node->input(1);
   torch::jit::Value *bias = node->input(2);
+
+  // In the PyTorch source code at the time of writing, weight and bias are
+  // always set despite being optional in at aten::batch_norm
+  ERROR_ON(weight->type()->cast<c10::TensorType>() == nullptr);
+  ERROR_ON(bias->type()->cast<c10::TensorType>() == nullptr);
+
   torch::jit::Value *running_mean = node->input(3);
   torch::jit::Value *running_var = node->input(4);
 
-  // TODO(T22645): These will have to be checked if they are actual tensors
-  // in the future.
+  // Use initialised constants if running_mean and running_var are none
+  maybeInitializeRunningParamConstants(
+      graph, *input->type()->expect<c10::TensorType>()->scalarType(),
+      &running_mean, &running_var, new_shape);
+
   std::vector<torch::jit::Value *> input_tensors{input, weight, bias,
                                                  running_mean, running_var};
 

@@ -46,6 +46,7 @@ std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node);
 // Some operations take in an optional tensor. A "none" constant is passed in to
 // mark a tensor which is not there.
 bool isNone(torch::jit::Node *node);
+bool isNone(const torch::jit::Value *value);
 
 std::int64_t handleDimensionParam(torch::jit::Node *node, int index);
 

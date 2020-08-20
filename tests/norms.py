@@ -4,6 +4,7 @@
 import torch
 import torch.optim as optim
 import poptorch
+import pytest
 
 # Norms
 #'torch.nn.BatchNorm1d', 'torch.nn.BatchNorm2d', 'torch.nn.BatchNorm3d', 'torch.nn.GroupNorm', 'torch.nn.SyncBatchNorm', 'torch.nn.SyncBatchNorm.convert_sync_batchnorm',
@@ -14,11 +15,14 @@ batch_norms = [
 ]
 
 
-def test_batchNorm1D():
+@pytest.mark.parametrize("running_stats", {True, False})
+@pytest.mark.parametrize("training", {True, False})
+def test_batchNorm1D(running_stats, training):
     torch.manual_seed(42)
 
     input = torch.randn([2, 10, 1000])
-    norm = torch.nn.BatchNorm1d(10)
+    norm = torch.nn.BatchNorm1d(10, track_running_stats=running_stats)
+    norm.train(training)
 
     # Run pytorch native on CPU.
     nativeOutput = norm(input)
@@ -33,11 +37,14 @@ def test_batchNorm1D():
                                   rtol=0.1)
 
 
-def test_batchNorm2D():
+@pytest.mark.parametrize("running_stats", {True, False})
+@pytest.mark.parametrize("training", {True, False})
+def test_batchNorm2D(running_stats, training):
     torch.manual_seed(42)
 
     input = torch.randn([20, 10, 35, 45])
-    norm = torch.nn.BatchNorm2d(10)
+    norm = torch.nn.BatchNorm2d(10, track_running_stats=running_stats)
+    norm.train(training)
 
     # Run pytorch native on CPU.
     nativeOutput = norm(input)
@@ -52,11 +59,14 @@ def test_batchNorm2D():
                                   rtol=0.1)
 
 
-def test_batchNorm3D():
+@pytest.mark.parametrize("running_stats", {True, False})
+@pytest.mark.parametrize("training", {True, False})
+def test_batchNorm3D(running_stats, training):
     torch.manual_seed(42)
 
     input = torch.randn([20, 10, 35, 45, 10])
-    norm = torch.nn.BatchNorm3d(10)
+    norm = torch.nn.BatchNorm3d(10, track_running_stats=running_stats)
+    norm.train(training)
 
     # Run pytorch native on CPU.
     nativeOutput = norm(input)
