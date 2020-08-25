@@ -194,3 +194,79 @@ def test_normal_tensor_std():
     stat_funs = [torch.mean, torch.std]
 
     rng_harness(rng_op, stat_funs)
+
+
+# Filter the following expected warnings
+@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
+@pytest.mark.filterwarnings(
+    "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.parametrize("t", [torch.float, torch.half])
+def test_normal_half(t):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            torch.manual_seed(42)
+            x.normal_(mean=20.0, std=8.0)
+            return x
+
+    model = Model()
+    input_data = torch.ones(3, 5, 1000, dtype=t)
+
+    # Run on IPU and check that the result has the correct dtype
+    pop_model = poptorch.inferenceModel(model)
+    pop_out = pop_model(input_data)
+    assert pop_out.dtype == t
+
+    if t is not torch.half:
+        # Run on CPU
+        native_out = model(input_data)
+        assert native_out.size() == pop_out.size()
+
+    # Test summary stats - promoting half to float to workaround
+    # torch limitations with half
+    torch.testing.assert_allclose(20.0,
+                                  torch.mean(pop_out.float()),
+                                  atol=1e-2,
+                                  rtol=0.1)
+
+    torch.testing.assert_allclose(8.0,
+                                  torch.std(pop_out.float()),
+                                  atol=1e-2,
+                                  rtol=0.1)
+
+
+# Filter the following expected warnings
+@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
+@pytest.mark.filterwarnings(
+    "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.parametrize("t", [torch.float, torch.half])
+def test_uniform_half(t):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            torch.manual_seed(42)
+            x.uniform_(-1, 1)
+            return x
+
+    model = Model()
+    input_data = torch.ones(3, 5, 1000, dtype=t)
+
+    # Run on IPU and check that the result has the correct dtype
+    pop_model = poptorch.inferenceModel(model)
+    pop_out = pop_model(input_data)
+    assert pop_out.dtype == t
+
+    if t is not torch.half:
+        # Run on CPU
+        native_out = model(input_data)
+        assert native_out.size() == pop_out.size()
+
+    # Test summary stats - promoting half to float to workaround
+    # torch limitations with half
+    torch.testing.assert_allclose(-1.0,
+                                  torch.min(pop_out.float()),
+                                  atol=1e-2,
+                                  rtol=0.1)
+
+    torch.testing.assert_allclose(1.0,
+                                  torch.max(pop_out.float()),
+                                  atol=1e-2,
+                                  rtol=0.1)

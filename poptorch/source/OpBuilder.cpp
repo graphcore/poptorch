@@ -351,12 +351,14 @@ createCustomOperation(torch::jit::Graph *graph,
 
 torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
                                      const std::vector<int64_t> &shape,
-                                     float mean, float scale) {
+                                     float mean, float scale,
+                                     at::ScalarType dataType) {
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::random_normal);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::mean, mean);
   new_node->f_(c10::attr::scale, scale);
+  new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
   setNodeOutputsTypes(new_node, ImplicitCast::None,
                       ImplicitCastOutput::AlwaysFloat);
 
@@ -365,12 +367,14 @@ torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
 
 torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
                                       const std::vector<int64_t> &shape,
-                                      float high, float low) {
+                                      float high, float low,
+                                      at::ScalarType dataType) {
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::random_uniform);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::high, high);
   new_node->f_(c10::attr::low, low);
+  new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
   setNodeOutputsTypes(new_node, ImplicitCast::None,
                       ImplicitCastOutput::AlwaysFloat);
 

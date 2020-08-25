@@ -22,9 +22,9 @@ OP_DECL(poptorch, custom_operation, custom_operation, _impl->customOperation,
         BODY_ARG(name) BODY_ARG(domain) BODY_ARG(version) BODY_ARG(num_outputs))
 
 OP_DECL(poptorch, random_uniform, random_uniform, _impl->randomUniform,
-        ARG(INT_VEC, shape) ARG(FLOAT, high) ARG(FLOAT, low),
-        BODY_ARG(shape) BODY_ARG(high) BODY_ARG(low))
+        ARG(INT_VEC, shape) ARG(FLOAT, high) ARG(FLOAT, low) ARG(STRING, dtype),
+        BODY_ARG(shape) BODY_ARG(high) BODY_ARG(low) BODY_ARG(dtype))
 
 OP_DECL(poptorch, random_normal, random_normal, _impl->randomNormal,
-        ARG(INT_VEC, shape) ARG(FLOAT, mean) ARG(FLOAT, scale),
-        BODY_ARG(shape) BODY_ARG(mean) BODY_ARG(scale))
+        ARG(INT_VEC, shape) ARG(FLOAT, mean) ARG(FLOAT, scale) ARG(STRING, dtype),
+        BODY_ARG(shape) BODY_ARG(mean) BODY_ARG(scale) BODY_ARG(dtype))

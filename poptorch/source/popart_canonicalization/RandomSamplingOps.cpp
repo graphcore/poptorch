@@ -38,12 +38,13 @@ torch::jit::Node *normalHandler(torch::jit::Graph *graph,
   torch::jit::Value *mean = node->input(0);
   torch::jit::Value *std = node->input(1);
   std::vector<int64_t> shape = shapeFromTensor(node->output());
+  at::ScalarType dtype = getNodeScalarType(node->output());
 
   if (isConstantScalar(mean) && isConstantScalar(std)) {
     // Both mean and std are scalar constant floats
     float mean_constant = constantToFloat(mean->node());
     float std_constant = constantToFloat(std->node());
-    return createRandomNormal(graph, shape, mean_constant, std_constant);
+    return createRandomNormal(graph, shape, mean_constant, std_constant, dtype);
   }
 
   // One or both of mean/std inputs must be tensors.  Generate the output tensor
@@ -53,7 +54,8 @@ torch::jit::Node *normalHandler(torch::jit::Graph *graph,
   //   normal(mean=0, std=1) * std + mean
   //
   // Broadcasting will take care of expanding any scalars to the correct shape.
-  torch::jit::Node *normal = createRandomNormal(graph, shape, 0.0f, 1.0f);
+  torch::jit::Node *normal =
+      createRandomNormal(graph, shape, 0.0f, 1.0f, dtype);
   torch::jit::Node *mul = poptorch::createMul(graph, {normal->output(), std});
   return poptorch::createAdd(graph, {mul->output(), mean});
 }
