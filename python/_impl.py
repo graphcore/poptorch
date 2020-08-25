@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import copy
 import torch
 import torch.optim as optim
 import poptorch.poptorch_core as poptorch_core
@@ -184,6 +185,7 @@ class PoplarExecutor:
         self.new_optimizer = optimizer or {}
         self.warned_not_contiguous_input = False
         self.dirty_host_weights = False
+        self.trace = None
 
         if self.training:
             parent = self
@@ -307,6 +309,55 @@ class PoplarExecutor:
 
                 convertedLayers = []
 
+                savedParams = {}
+
+                modules = []
+
+                def backupRealParams(m):
+                    params = m._parameters  # pylint: disable=protected-access
+                    buffers = m._buffers  # pylint: disable=protected-access
+
+                    # Save all the parameters and buffers with their names
+                    tensors = {
+                        n: t
+                        for n, t in m.named_parameters(recurse=False)
+                        if t is not None
+                    }
+                    tensors.update({
+                        n: t
+                        for n, t in m.named_buffers(recurse=False)
+                        if t is not None
+                    })
+                    modules.append(tensors)
+
+                    # Replace the original weights with copies
+                    m._parameters = copy.deepcopy(params)  # pylint: disable=protected-access
+
+                    m._buffers = copy.deepcopy(buffers)  # pylint: disable=protected-access
+
+                    savedParams[id(m)] = (params, buffers)
+
+                def restoreRealParams(m):
+                    params, buffers = savedParams[id(m)]
+
+                    m._parameters = params  # pylint: disable=protected-access
+                    m._buffers = buffers  # pylint: disable=protected-access
+
+                parameters = []
+
+                def mapTracedParamsToRealParams(m):
+                    tensors = modules.pop(0)
+                    params = m._parameters  # pylint: disable=protected-access
+                    buffers = m._buffers  # pylint: disable=protected-access
+                    parameters.extend((new_tensor, tensors[name])
+                                      for name, new_tensor in params.items()
+                                      if new_tensor is not None)
+                    parameters.extend((new_tensor, tensors[name])
+                                      for name, new_tensor in buffers.items()
+                                      if new_tensor is not None)
+
+                self.model.apply(backupRealParams)
+
                 for name, layer in self.model.named_modules():
                     anyIsHalf = False
                     for param in layer.parameters():
@@ -320,13 +371,16 @@ class PoplarExecutor:
                         convertedLayers.append(name)
 
                 # We will trace using the normal trace view.
-                n = torch.jit.trace(self.model,
-                                    in_tensors_trace_view.asTuple())
+                self.trace = torch.jit.trace(self.model,
+                                             in_tensors_trace_view.asTuple())
 
                 # Convert any converted params back to half.
-                for name, layer in n.named_modules():
+                for name, layer in self.trace.named_modules():
                     if name in convertedLayers:
                         layer.half()
+
+                self.model.apply(restoreRealParams)
+                self.trace.apply(mapTracedParamsToRealParams)
 
                 if hasConvertedAnyHalf[0]:
                     # Get the originals back.
@@ -334,25 +388,28 @@ class PoplarExecutor:
                     in_tensors_as_half.forEach(narrowTensor)
 
                     # Compile using the actual halves.
-                    self.executable = poptorch_core.compileWithTrace(  # pylint: disable=undefined-variable
-                        n._c, in_tensors_as_half.asTuple(),
-                        self.options.toDict(), self.training, self.optimizer)
+                    self.executable = poptorch_core.compileWithTrace(
+                        self.trace._c, tuple(parameters),
+                        in_tensors_as_half.asTuple(), self.options.toDict(),
+                        self.training, self.optimizer)
                 else:
-                    self.executable = poptorch_core.compileWithTrace(  # pylint: disable=undefined-variable
-                        n._c, in_tensors_trace_view.asTuple(),
-                        self.options.toDict(), self.training, self.optimizer)
+                    self.executable = poptorch_core.compileWithTrace(
+                        self.trace._c, tuple(parameters),
+                        in_tensors_trace_view.asTuple(), self.options.toDict(),
+                        self.training, self.optimizer)
             else:
                 logger.info('Compiling the model using scripting')
-                n = torch.jit.script(self.model)
-                graphInputs = list(n.graph.inputs())
+                self.trace = torch.jit.script(self.model)
+                graphInputs = list(self.trace.graph.inputs())
                 for graphInput, argIn in zip(graphInputs[1:],
                                              in_tensors_trace_view.asTuple()):
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 
-                self.executable = poptorch_core.compileWithScript(  # pylint: disable=undefined-variable
-                    n._c, n.graph, in_tensors_trace_view.asTuple(),
-                    self.options.toDict(), self.training)
+                self.executable = poptorch_core.compileWithScript(
+                    self.trace._c, self.trace.graph,
+                    in_tensors_trace_view.asTuple(), self.options.toDict(),
+                    self.training)
 
         if self.options.connectionType == enums.ConnectionType.Never:
             logger.info(

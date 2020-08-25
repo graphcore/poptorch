@@ -296,9 +296,9 @@ void constantPropagation(torch::jit::Graph *graph) {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, const pybind11::tuple &inputs,
-                 const pybind11::dict &options, bool training,
-                 const py::dict &optimizerDict) {
+compileWithTrace(py::handle h, const pybind11::tuple &parameters,
+                 const pybind11::tuple &inputs, const pybind11::dict &options,
+                 bool training, const py::dict &optimizerDict) {
   try {
     auto module = asModule(h);
 
@@ -309,6 +309,8 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
 
     // Create a jit stack from the incoming pytorch tensors.
     torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
+    torch::jit::Stack parameter_stack =
+        torch::jit::toTraceableStack(parameters);
 
     // And turn convert them into at tensors which we can then resolve the
     // address of.
@@ -317,14 +319,31 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
       buildTensorList(value, &input_tensors);
     }
 
-    // Find the parameter data from.
-    std::vector<at::Tensor> parameter_data;
-    for (const at::Tensor &param : graph_and_tensors.second) {
-      if (!param.is_contiguous()) {
-        logging::debug("Tensor is NOT continguous!");
-      }
+    // We need to remap the traced to tensors to the real tensors but some
+    // parameters have actually been optimised out during LowerGraph so we need
+    // to create a map traced tensors <-> real tensors then remap the traced
+    // tensors.
+    //
+    // Convert the list of tuples new_tensor / real_tensor into a map:
+    // [(new_tensor, real_tensor), ...] -> map[new_tensor.data_ptr()] =
+    // real_tensor
+    std::vector<at::Tensor> parameter_tensors;
+    std::map<void *, at::Tensor> parameters_map;
+    for (const torch::jit::IValue &value : parameter_stack) {
+      ERROR_ON(!value.isTuple());
+      auto tuple = value.toTuple();
+      ERROR_ON(tuple->elements().size() != 2);
+      parameters_map.insert({tuple->elements().front().toTensor().data_ptr(),
+                             tuple->elements().back().toTensor()});
+    }
 
-      parameter_data.push_back(param);
+    // Now create parameter_tensors by remapping all the traced tensors to the
+    // real tensors.
+    for (auto &param : graph_and_tensors.second) {
+      parameter_tensors.push_back(parameters_map.at(param.data_ptr()));
+      if (!parameter_tensors.back().is_contiguous()) {
+        parameter_tensors.back().contiguous();
+      }
     }
 
     Optimizer optimizer = parseOptimizer(optimizerDict);
@@ -356,7 +375,7 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
 
     // Convert the IR to half to match the inputs/actual usage.
     logging::debug("Graph before canonicalising half:\n{}", *graph);
-    poptorch::canonicaliseHalf(graph.get(), input_tensors, parameter_data);
+    poptorch::canonicaliseHalf(graph.get(), input_tensors, parameter_tensors);
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
 
@@ -376,8 +395,8 @@ compileWithTrace(py::handle h, const pybind11::tuple &inputs,
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
-                                   training, optimizer,
+    return poptorch::lowerToPopart(graph.get(), &input_tensors,
+                                   &parameter_tensors, training, optimizer,
                                    parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
