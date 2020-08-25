@@ -13,6 +13,7 @@
 
 #include <popart/adam.hpp>
 #include <popart/builder.hpp>
+#include <popart/error.hpp>
 #include <popart/graphtransformer.hpp>
 #include <popart/ir.hpp>
 #include <popart/ndarraywrapper.hpp>
@@ -1102,9 +1103,16 @@ bool Compiler::tensorIdIsValid(poptorch::TensorId id) const {
 }
 
 std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
-  popart::TensorInfo info = _impl->session->getInfo(_impl->ids[id]);
+  if (_impl->session) {
+    return _impl->session->getInfo(_impl->ids[id]).shape();
+  }
 
-  return info.shape();
+  auto popart_id = _impl->ids.at(id);
+  try {
+    return _impl->op_builder->getTensorShape(popart_id);
+  } catch (const popart::error &e) {
+    return {};
+  }
 }
 
 void Compiler::setActiveIpu(std::uint64_t id) { _impl->active_ipu = id; }

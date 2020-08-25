@@ -130,6 +130,8 @@ private:
   void lowerReturn();
 
   std::string tensorNames(std::int64_t first_tensor, std::int64_t num_tensors);
+
+  std::string tensorShapes(std::int64_t first_tensor, std::int64_t num_tensors);
 };
 
 /*
@@ -340,6 +342,41 @@ std::string LowerToPopart::tensorNames(std::int64_t first_tensor,
   return names;
 }
 
+std::string LowerToPopart::tensorShapes(std::int64_t first_tensor,
+                                        std::int64_t num_tensors) {
+  std::string sep{};
+  std::string shapes;
+
+  const char *shape_inf_failed = "(shape inference failed)";
+
+  for (std::int64_t i = 0; i < num_tensors; ++i) {
+    std::ostringstream shape_str;
+
+    try {
+      auto tensor_shape = _compiler.getSize(first_tensor + i);
+
+      if (tensor_shape.empty()) {
+        shape_str << shape_inf_failed;
+      } else {
+        shape_str << "(";
+        for (auto it = tensor_shape.begin(); it != tensor_shape.end(); it++) {
+          shape_str << *it;
+          if (it + 1 != tensor_shape.end()) {
+            shape_str << ", ";
+          }
+        }
+        shape_str << ")";
+      }
+    } catch (const logging::Error &) {
+      shape_str << shape_inf_failed;
+    }
+
+    shapes += sep + shape_str.str();
+    sep = ", ";
+  }
+  return shapes;
+}
+
 // Lower the main body of the _graph.
 void LowerToPopart::lowerBody() {
   for (torch::jit::Node *node : _graph.nodes()) {
@@ -360,10 +397,9 @@ void LowerToPopart::lowerBody() {
                        return _valueMap.tensor(val);
                      });
 
-      // Call the callback.
+      // Call the callback
       poptorch::TensorId first_output_tensor = itr->second(inputs, node);
-      logging::trace("{} was lowered to {}", nodeToString(node),
-                     tensorNames(first_output_tensor, node->outputs().size()));
+
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other
       // IDs.
@@ -374,6 +410,10 @@ void LowerToPopart::lowerBody() {
                      "Output " << i << " doesn't exist of Node " << *node);
         _valueMap.setTensor(output, output_tensor);
       }
+
+      logging::trace("{} was lowered to {} [{}]", nodeToString(node),
+                     tensorNames(first_output_tensor, node->outputs().size()),
+                     tensorShapes(first_output_tensor, node->outputs().size()));
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       _compiler.setActiveIpu(node->i(c10::Symbol::fromQualString("attr::ipu")));
     } else if (kind == symbols::poptorch::end_ipu_block) {
