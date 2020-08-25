@@ -357,6 +357,8 @@ torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::mean, mean);
   new_node->f_(c10::attr::scale, scale);
+  setNodeOutputsTypes(new_node, ImplicitCast::None,
+                      ImplicitCastOutput::AlwaysFloat);
 
   return new_node;
 }
@@ -369,6 +371,8 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::high, high);
   new_node->f_(c10::attr::low, low);
+  setNodeOutputsTypes(new_node, ImplicitCast::None,
+                      ImplicitCastOutput::AlwaysFloat);
 
   return new_node;
 }

@@ -31,7 +31,7 @@ def rng_harness(rng_op, stat_funs):
     # that the distribution statistics are consistent
     print("Checking summary statistics for generated random numbers:")
     for ss in stat_funs:
-        print("  {}".format(ss.__name__))
+        print("  {} = {}".format(ss.__name__, ss(pop_out)))
         torch.testing.assert_allclose(ss(native_out),
                                       ss(pop_out),
                                       atol=1e-2,
@@ -117,6 +117,7 @@ def test_normal_():
 
 
 # torch.distributions.Normal
+# The sample method uses torch.normal(Tensor mean, Tensor std)
 # Filter the following expected warnings
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings(
@@ -126,13 +127,20 @@ def test_normal_():
 def test_distributions_normal():
     def rng_op():
         torch.manual_seed(42)
-        h = torch.tensor(234.0)
+        h = torch.tensor([234.0, 100.0])
         nd = torch.distributions.Normal(loc=h, scale=torch.sqrt(h))
-        return nd.sample((5, 10000))
+        return nd.sample((10000, 5))
 
-    errmsg = "random normal is only supported with a scalar mean"
-    with pytest.raises(RuntimeError, match=errmsg):
-        rng_harness(rng_op, None)
+    # Generates (10000, 5, 2) tensor
+    mean = lambda x: torch.mean(x, dim=[0, 1])
+    mean.__name__ = "torch.mean(x, dim=[0, 1])"
+
+    std = lambda x: torch.std(x, dim=[0, 1])
+    std.__name__ = "torch.std(x, dim=[0, 1])"
+
+    stat_funs = [mean, std]
+
+    rng_harness(rng_op, stat_funs)
 
 
 # torch.randn
@@ -146,5 +154,43 @@ def test_randn():
         return torch.randn(3, 5, 10000)
 
     stat_funs = [torch.mean, torch.var]
+
+    rng_harness(rng_op, stat_funs)
+
+
+# torch.normal(Tensor mean, float std)
+# Filter the following expected warnings
+@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
+@pytest.mark.filterwarnings(
+    "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.filterwarnings(
+    "ignore:torch.Tensor results are registered as constants in the trace")
+def test_normal_tensor_mean():
+    def rng_op():
+        torch.manual_seed(42)
+        mean = torch.full(size=(10000, 2), fill_value=4.0)
+        std = 3.0
+        return torch.normal(mean=mean, std=std)
+
+    stat_funs = [torch.mean, torch.std]
+
+    rng_harness(rng_op, stat_funs)
+
+
+# torch.normal(float mean, Tensor std)
+# Filter the following expected warnings
+@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
+@pytest.mark.filterwarnings(
+    "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.filterwarnings(
+    "ignore:torch.Tensor results are registered as constants in the trace")
+def test_normal_tensor_std():
+    def rng_op():
+        torch.manual_seed(42)
+        mean = 3.0
+        std = torch.full(size=(10000, 2), fill_value=9.0)
+        return torch.normal(mean=mean, std=std)
+
+    stat_funs = [torch.mean, torch.std]
 
     rng_harness(rng_op, stat_funs)
