@@ -87,18 +87,24 @@ The above functions return a ``PoplarExecutor`` class which is just a wrapper ar
 Pipeline annotator
 ------------------
 
-You can use the ``IPU`` wrapper class to define model parallelism. This wraps
-layers in a model so you can designate them to be placed on specific IPUs in a
-pipeline.
+You can use the ``IPU`` wrapper class to define model parallelism in a PopTorch multi-IPU 
+device. Conceptually this is collecting the layers of a model into pipeline stages 
+to be run on specific IPUs. However, as there is a 1:1 mapping of pipeline stages 
+to IPUs, we simply use an IPU index to declare where the layer will be run.
 
 .. py:class:: IPU(ipu_id, layer_to_call=None)
 
-    Runs a layer on a specified IPU. All layers after this layer will also run on the same IPU until another IPU wrapper is encountered. The IPUs will be "pipelined" where each IPU is executing one stage of the operation, as the previous
-    IPU is executing a previous stage on the next batch and subsequent IPUs are executing subsequent stages on previous batches.
+    Runs a layer on a specified IPU. All layers after this layer will also run on 
+    the same IPU until another IPU wrapper is encountered. The execution will be 
+    "pipelined" where each IPU is executing one stage of the operation, as the 
+    previous IPU is executing a previous stage on the next batch and subsequent IPUs 
+    are executing subsequent stages on previous batches. 
 
     :param int ipu_id: The id of the IPU to run on. All subsequent layers of the
                         network will run on this IPU until another layer is wrapped. By default all
-                        layers will be on IPU 0 until the first pipeline annotation is encountered.
+                        layers will be on IPU 0 until the first pipeline annotation is encountered. 
+                        Note that the ``ipu_id`` is an index in a multi-IPU device within PopTorch, and 
+                        is separate and distinct from the device ids in ``gc-info``.
 
     :param layer_to_call: The layer to run on the specified IPU.
 
