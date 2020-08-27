@@ -164,7 +164,7 @@ class PoplarExecutor:
                 # In training it makes sense to see only the last result, by default.
                 options.anchorMode(enums.AnchorMode.Final)
             if not optimizer:
-                optimizer = optim.SGD(user_model.parameters(), lr=0.01)
+                optimizer = optim.SGD(self.user_model.parameters(), lr=0.01)
             optimizer = convertOptimizerToDict(optimizer)
         else:
             if options.defaultAnchorMode():
