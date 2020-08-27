@@ -24,21 +24,17 @@ on IPU. However, it does have some differences from native PyTorch execution.
   .. literalinclude:: poptorch_training_simple.py
     :caption: A simple example of training using PyTorch on the CPU
     :linenos:
-    :lines: 17-33
+    :lines: 96-128
 
   .. literalinclude:: poptorch_training_simple.py
     :caption: Equivalent code using PopTorch to train on the IPU
     :linenos:
-    :lines: 3-16
+    :lines:54-89
 
-* Under the hood PopTorch uses the ``torch.jit.trace`` API. That means it inherits some of the constraints of
-  that API. These include:
-    * Keyword arguments to a model forward operator are not supported. Inputs must be torch tensors or
-      tuples/lists containing torch tensors.
-    * ``torch.jit.trace`` cannot handle control flow or shape variations within the model.
-      That is, the inputs passed at run-time cannot vary the control flow of the model or the shapes/sizes of results.
-    * Half type is no supported.
-    * Not all PyTorch operations have been implemented by the backend yet.
+* Under the hood PopTorch uses the ``torch.jit.trace`` API. That means it inherits some of the constraints of that API. These include:
+  * Keyword arguments to a model forward operator are not supported. Inputs must be torch tensors or tuples/lists containing torch tensors.
+  * ``torch.jit.trace`` cannot handle control flow or shape variations within the model. That is, the inputs passed at run-time cannot vary the control flow of the model or the shapes/sizes of results.
+  * Not all PyTorch operations have been implemented by the backend yet.
 
 * PopTorch follows PopART's data batching semantics. By default this means you will just pass in data
   of the normal batch size. However, there are a number of options provided in PopTorch which will enable

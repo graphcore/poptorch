@@ -1,21 +1,54 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-x = self.layer1(x)
-
-# It is important to make sure the result of the print is used.
-x = poptorch.ipu_print_tensor(x)
-
-x = self.layer2(x)
+import poptorch
+import torch
 
 
-class CustomLoss(torch.nn.Module):
-    def forward(self, x, target):
-        # Mean squared error with a scale
-        loss = x - target
-        loss = loss * loss * 5
-        return poptorch.identity_loss(loss, reduction="mean")
+class ExampleModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bias = torch.nn.Parameter(torch.zeros(()))
+
+    def forward(self, x):
+        x += 1
+
+        # It is important to make sure the result of the print is used.
+        x = poptorch.ipu_print_tensor(x)
+
+        return x + self.bias
 
 
-poptorch_model = poptorch.trainingModel(model,
-                                        device_iterations=1,
-                                        loss=CustomLoss())
+model = poptorch.inferenceModel(ExampleModel())
+model(torch.tensor([1.0, 2.0, 3.0]))
+
+
+def custom_loss(output, target):
+    # Mean squared error with a scale
+    loss = output - target
+    loss = loss * loss * 5
+    return poptorch.identity_loss(loss, reduction="mean")
+
+
+class ExampleModelWithCustomLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = ExampleModel()
+
+    def forward(self, input, target):
+        out = self.model(input)
+        return out, custom_loss(out, target)
+
+
+model_with_loss = ExampleModelWithCustomLoss()
+poptorch_model = poptorch.trainingModel(model_with_loss)
+
+print(f"Bias before training: {model_with_loss.model.bias}")
+
+for _ in range(1000):
+    out, loss = poptorch_model(input=torch.tensor([1.0, 2.0, 3.0]),
+                               target=torch.tensor([3.0, 4.0, 5.0]))
+    print(f"Out = {out}, loss = {float(loss):.2f}")
+
+print(f"Bias after training: {model_with_loss.model.bias}")
+
+torch.testing.assert_allclose(model_with_loss.model.bias, 1.0)

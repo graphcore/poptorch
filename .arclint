@@ -6,8 +6,7 @@
             "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
             "exclude": [
               "(\\.inc.h$)",
-              "(\\.inc.hpp$)",
-              "(^docs/.*)"
+              "(\\.inc.hpp$)"
             ]
         },
         "cpplint": {
@@ -17,8 +16,7 @@
             "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp)$)",
             "exclude": [
               "(\\.inc.h$)",
-              "(\\.inc.hpp$)",
-              "(^docs/.*)"
+              "(\\.inc.hpp$)"
             ],
             "severity": {
               "runtime/references": "disabled",
@@ -32,15 +30,13 @@
             "type": "yapf",
             "flags": ["--style={based_on_style: pep8}"],
             "bin": ["./.linters/yapf", "./install_linters.sh"],
-            "include": "(\\.py$)",
-            "exclude": "(^docs/.*)"
+            "include": "(\\.py$)"
         },
         "pylint": {
             "type": "pylint",
             "pylint.config": ".pylintrc",
             "bin": ["./.linters/pylint", "./install_linters.sh"],
-            "include": "(\\.py$)",
-            "exclude": "(^docs/.*)"
+            "include": "(\\.py$)"
         },
 
         "clang-tidy":{
@@ -51,7 +47,6 @@
           "exclude": [
             "(\\.inc.h$)",
             "(\\.inc.hpp$)",
-            "(^docs/.*)",
             "(custom_cube_op.cpp$)"
           ],
           "flags": "-I.linters/include/ -I.linters/clang_include/ -Ipopart_compiler/include -Ipoptorch/shared/include -Ipoptorch/include -Ipoptorch_logging/include -I../spdlog/spdlog/include/ -DONNX_NAMESPACE=onnx -I.linters/torch/include -I../popart/popart/willow/include/ -I.linters/poplar_includes/ `cat .linters/system_includes` -std=c++17 -fsized-deallocation",

@@ -15,7 +15,7 @@ on the device will not change, just how much data is available for PopART load f
 
   .. literalinclude:: device_iterations.py
     :caption: Use of device iterations
-    :lines: 3-31
+    :lines: 3-78
     :linenos:
 
 
@@ -27,7 +27,7 @@ are:
 
   .. literalinclude:: device_iterations.py
     :caption: Use of replication factor
-    :lines: 33-40
+    :lines: 82-108
     :linenos:
 
 
@@ -37,5 +37,5 @@ are:
 
   .. literalinclude:: device_iterations.py
     :caption: Use of gradient accumulation
-    :lines: 42-50
+    :lines: 110-
     :linenos:

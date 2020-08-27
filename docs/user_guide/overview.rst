@@ -6,6 +6,8 @@ Model wrapping functions
 
 The basis of PopTorch integration comes from these two model wrapping functions.
 
+.. TODO(T26087)
+
 .. py:function:: trainingModel(model, device_iterations, gradient_accumulation=1, replication_factor=1, profile=False, trace_model=True, loss=None, optimizer=None)
 
     Create a PopTorch training model, from a PyTorch model, to run on IPU
@@ -33,7 +35,10 @@ The basis of PopTorch integration comes from these two model wrapping functions.
 .. literalinclude:: trainingModel.py
     :language: python
     :caption: An example of the use of ``trainingModel()``
-    :emphasize-lines: 14-18
+    :linenos:
+    :lines: 3-
+    :emphasize-lines: 21
+
 
 .. py:function:: inferenceModel(model, device_iterations=1,replication_factor=1, profile=False, trace_model=True)
 
@@ -52,10 +57,14 @@ The basis of PopTorch integration comes from these two model wrapping functions.
                             (script is experimental, default True).
     :return: The :any:`PoplarExecutor` wrapper to use in place of ``mode``.
 
+
 .. literalinclude:: inference.py
+    :language: python
     :caption: An example of the use of ``inferenceModel()``
     :linenos:
-    :emphasize-lines: 15
+    :lines: 3-
+    :emphasize-lines: 17
+
 
 The above functions return a ``PoplarExecutor`` class which is just a wrapper around the provided model.
 
@@ -87,36 +96,39 @@ The above functions return a ``PoplarExecutor`` class which is just a wrapper ar
 Pipeline annotator
 ------------------
 
-You can use the ``IPU`` wrapper class to define model parallelism in a PopTorch multi-IPU 
-device. Conceptually this is collecting the layers of a model into pipeline stages 
-to be run on specific IPUs. However, as there is a 1:1 mapping of pipeline stages 
+You can use the ``IPU`` wrapper class to define model parallelism in a PopTorch multi-IPU
+device. Conceptually this is collecting the layers of a model into pipeline stages
+to be run on specific IPUs. However, as there is a 1:1 mapping of pipeline stages
 to IPUs, we simply use an IPU index to declare where the layer will be run.
 
 .. py:class:: IPU(ipu_id, layer_to_call=None)
 
-    Runs a layer on a specified IPU. All layers after this layer will also run on 
-    the same IPU until another IPU wrapper is encountered. The execution will be 
-    "pipelined" where each IPU is executing one stage of the operation, as the 
-    previous IPU is executing a previous stage on the next batch and subsequent IPUs 
-    are executing subsequent stages on previous batches. 
+    Runs a layer on a specified IPU. All layers after this layer will also run on
+    the same IPU until another IPU wrapper is encountered. The execution will be
+    "pipelined" where each IPU is executing one stage of the operation, as the
+    previous IPU is executing a previous stage on the next batch and subsequent IPUs
+    are executing subsequent stages on previous batches.
 
     :param int ipu_id: The id of the IPU to run on. All subsequent layers of the
                         network will run on this IPU until another layer is wrapped. By default all
-                        layers will be on IPU 0 until the first pipeline annotation is encountered. 
-                        Note that the ``ipu_id`` is an index in a multi-IPU device within PopTorch, and 
+                        layers will be on IPU 0 until the first pipeline annotation is encountered.
+                        Note that the ``ipu_id`` is an index in a multi-IPU device within PopTorch, and
                         is separate and distinct from the device ids in ``gc-info``.
 
     :param layer_to_call: The layer to run on the specified IPU.
 
 
 .. literalinclude:: pipeline_simple.py
-   :lines: 3-33
-   :emphasize-lines: 15-16, 19-20, 23-24
-   :caption: Annotations can be attached to layers in existing models.
+    :language: python
+    :lines: 3-34
+    :emphasize-lines: 15, 18, 21
+    :caption: Annotations can be attached to layers in existing models.
+
 
 .. literalinclude:: pipeline_simple.py
-    :lines: 37-52
-    :emphasize-lines: 6, 10, 14
+    :language: python
+    :lines: 77-
+    :emphasize-lines: 20, 23, 27
     :caption: PopTorch also supports annotating the model directly. Both forms can be used interchangeably.
 
 
@@ -134,7 +146,9 @@ Helper operations to be used within a model.
     :param ipu_print_tensor: The tensor to print.
 
     .. literalinclude:: api.py
-        :lines: 3-9
+        :language: python
+        :lines: 7-18
+        :emphasize-lines: 10
 
 
 .. py:function:: poptorch.identity_loss(loss, reduction="none")
@@ -153,4 +167,6 @@ Helper operations to be used within a model.
 
 
   .. literalinclude:: api.py
-    :lines: 11-21
+    :language: python
+    :lines: 25-43
+    :emphasize-lines: 5

@@ -1,33 +1,131 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-# Wrap the model in a PopTorch training wrapper.
+import torch
+import poptorch
+
+
+class ExampleModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bias = torch.nn.Parameter(torch.zeros(()))
+
+    def forward(self, x):
+        return torch.cat([
+            100 * torch.nn.LeakyReLU()(-x + self.bias),
+            100 * torch.nn.LeakyReLU()(x - self.bias)
+        ],
+                         dim=-1)
+
+
+class ExampleModelWithLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = ExampleModel()
+
+    def forward(self, input, target):
+        out = self.model(input)
+
+        return (torch.nn.Softmax()(out),
+                torch.nn.CrossEntropyLoss(reduction="mean")(out, target))
+
+
+class ExampleDataset(torch.utils.data.Dataset):
+    def __init__(self, shape, length):
+        self._shape = shape
+        self._length = length
+
+        self._all_data = []
+        self._all_labels = []
+
+        torch.manual_seed(0)
+        for _ in range(length):
+            label = 1 if torch.rand(()) > 0.5 else 0
+            data = (torch.rand(self._shape) + label) * 0.5
+            self._all_data.append(data)
+            self._all_labels.append(label)
+
+    def __len__(self):
+        return self._length
+
+    def __getitem__(self, index):
+        return self._all_data[index], self._all_labels[index]
+
+
+# Set up the PyTorch DataLoader to load that much data at each iteration
+opts = poptorch.Options()
+opts.deviceIterations(10)
+training_data = poptorch.DataLoader(options=opts,
+                                    dataset=ExampleDataset(shape=[1],
+                                                           length=20000),
+                                    batch_size=10,
+                                    shuffle=True,
+                                    drop_last=True)
+
+model = ExampleModelWithLoss()
+model.train()
+
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+# Wrap the model in a PopTorch training wrapper
 poptorch_model = poptorch.trainingModel(model,
-                                        device_iterations=1,
-                                        loss=loss_function,
+                                        options=opts,
                                         optimizer=optimizer)
-for batch, loss_input in batches:
+
+momentum_loss = None
+
+for batch, target in training_data:
     # Performs forward pass, loss function evaluation,
     # backward pass and weight update in one go on the device.
-    output, loss = poptorch_model(batch, loss_input)
+    _, loss = poptorch_model(batch, target)
+
+    if momentum_loss is None:
+        momentum_loss = loss
+    else:
+        momentum_loss = momentum_loss * 0.95 + loss * 0.05
 
     # Optimizer can be updated via setOptimizer.
-    if someConditionIsMet:
-        poptorch_model.setOptimizer(newOptimizer)
+    if momentum_loss < 0.1:
+        poptorch_model.setOptimizer(
+            torch.optim.Adam(model.parameters(), lr=0.0001))
 
-# Host equiv
+print(model.model.bias)
+assert (model.model.bias > 0.4 and model.model.bias < 0.6)
+
+# Host equivalent
+
+training_data = torch.utils.data.DataLoader(ExampleDataset(shape=[1],
+                                                           length=20000),
+                                            batch_size=10,
+                                            shuffle=True,
+                                            drop_last=True)
+
+model = ExampleModelWithLoss()
 model.train()
-for batch,loss_input in batches:
+
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+momentum_loss = None
+
+for batch, target in training_data:
     # Zero gradients
     optimizer.zero_grad()
 
     # Run model.
-    outputs = model(batch)
-
-    # Get the loss.
-    loss = loss_function(loss_input, outputs)
+    _, loss = model(batch, target)
 
     # Back probagate the gradients.
     loss.backward()
 
     # Update the weights.
     optimizer.step()
+
+    if momentum_loss is None:
+        momentum_loss = loss
+    else:
+        momentum_loss = momentum_loss * 0.95 + loss * 0.05
+
+    if momentum_loss < 0.1:
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+
+print(model.model.bias)
+assert (model.model.bias > 0.4 and model.model.bias < 0.6)
