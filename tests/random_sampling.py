@@ -22,7 +22,8 @@ def rng_harness(rng_op, stat_funs):
     native_out = model()
 
     # Run on IPU
-    pop_model = poptorch.inferenceModel(model)
+    opts = poptorch.Options().randomSeed(8)
+    pop_model = poptorch.inferenceModel(model, opts)
     pop_out = pop_model()
 
     assert native_out.size() == pop_out.size()
@@ -212,7 +213,8 @@ def test_normal_half(t):
     input_data = torch.ones(3, 5, 1000, dtype=t)
 
     # Run on IPU and check that the result has the correct dtype
-    pop_model = poptorch.inferenceModel(model)
+    opts = poptorch.Options().randomSeed(8)
+    pop_model = poptorch.inferenceModel(model, opts)
     pop_out = pop_model(input_data)
     assert pop_out.dtype == t
 
@@ -250,7 +252,8 @@ def test_uniform_half(t):
     input_data = torch.ones(3, 5, 1000, dtype=t)
 
     # Run on IPU and check that the result has the correct dtype
-    pop_model = poptorch.inferenceModel(model)
+    opts = poptorch.Options().randomSeed(8)
+    pop_model = poptorch.inferenceModel(model, opts)
     pop_out = pop_model(input_data)
     assert pop_out.dtype == t
 
@@ -270,3 +273,23 @@ def test_uniform_half(t):
                                   torch.max(pop_out.float()),
                                   atol=1e-2,
                                   rtol=0.1)
+
+
+# Filter the following expected warnings
+@pytest.mark.filterwarnings(
+    "ignore:Output nr 1. of the traced function does not match")
+def test_random_seed_repeatability():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x.normal_()
+
+    # Run the model once with a random seed
+    model = Model()
+    opts = poptorch.Options().randomSeed(42)
+    first_model = poptorch.inferenceModel(model, opts)
+    first_run = first_model(torch.empty((2, 2)))
+
+    # Second run with the same seed should produce identical results
+    second_model = poptorch.inferenceModel(model, opts)
+    second_run = second_model(torch.empty((2, 2)))
+    assert torch.equal(first_run, second_run)

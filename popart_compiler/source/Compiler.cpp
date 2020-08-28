@@ -107,6 +107,7 @@ public:
     std::uint64_t ipu_id;
     popart::DeviceConnectionType connection_type;
     popart::SyncPattern sync_pattern;
+    std::uint64_t random_seed;
   };
 
   // List of options which have been explicitely set by the user.
@@ -293,6 +294,10 @@ SessionOptionsImpl::SessionOptionsImpl() {
                              popart::SyncPattern::ReplicaAndLadder),
                  "Value for SyncPattern out of range");
     poptorch_options.sync_pattern = static_cast<popart::SyncPattern>(value);
+  };
+
+  uint64_options["random_seed"] = [&](std::uint64_t value) {
+    poptorch_options.random_seed = value;
   };
 
   string_options["log_dir"] = [&](const std::string &value) {
@@ -992,6 +997,12 @@ void Compiler::initSession(const Optimizer &opt) {
     stream.close();
 
     std::rethrow_exception(std::current_exception());
+  }
+
+  // Set the random seed (if one was provided) following compilation
+  if (_impl->options_set.count("random_seed")) {
+    logging::trace("Setting random seed to: {}", _impl->options.random_seed);
+    _impl->session->setRandomSeed(_impl->options.random_seed);
   }
 
   if (_impl->options.profile) {

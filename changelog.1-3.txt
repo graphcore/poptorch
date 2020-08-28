@@ -45,9 +45,11 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 
 - Adds support for tensor.size
 
-- Adds support for random sampling operations:
+- Adds support for the following random sampling operations.
     torch.rand, torch.uniform_, torch.distributions.Uniform,
     torch.randn, torch.normal, torch.normal_
+
+    For repeatable random number generation use the `randomSeed` method of `poptorch.Options`
 
 - Adds support for torch.clamp
 

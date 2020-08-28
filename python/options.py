@@ -248,6 +248,13 @@ class Options(_OptionsDict):
         False otherwise."""
         return self.anchor_mode == enums.AnchorMode.Default
 
+    def randomSeed(self, random_seed):
+        """Set the seed for the random number generator on the IPU.
+        """
+        assert isinstance(random_seed, int)
+        self.createOrSet(random_seed=random_seed)
+        return self
+
     def toDict(self):
         """ Merge all the options, except for the Jit ones, into a ringle
         dictionary to be serialised and passed to the cpp side."""
