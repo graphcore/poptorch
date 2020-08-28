@@ -156,7 +156,8 @@ public:
   void setOptionIfNotSet(T &option, U value, const std::string &name,
                          const std::string &value_as_string) {
     if (options_set.count(name) && option != static_cast<T>(value)) {
-      logging::warn("{} forced by the user to {}", name, value_as_string);
+      logging::warn("{} forced by the user from default of {}", name,
+                    value_as_string);
     } else {
       option = value;
     }
@@ -927,6 +928,14 @@ void Compiler::initSession(const Optimizer &opt) {
                    << " must be greater or equal than the number of IPUs used "
                       "by the model: "
                    << _impl->used_ipus.size());
+
+  // If we are pipelining we want to turn on recompute by default.
+  if (options.enablePipelining) {
+    _impl->setOptionIfNotSet(
+        options.autoRecomputation, popart::RecomputationType::Pipeline,
+        "autoRecomputation",
+        popart::toString(popart::RecomputationType::Pipeline));
+  }
 
   _impl->setOptionIfNotSet(options.enableGradientAccumulation,
                            options.accumulationFactor > 1,
