@@ -308,34 +308,55 @@ class PoplarExecutor:
                 logger.info('Compiling the model using tracing')
 
                 convertedLayers = []
-                original_parameters = []
 
-                def backupRealParams(param):
-                    original_parameters.append(param)
-                    return copy.deepcopy(param)
+                savedParams = {}
 
-                restore_it = iter(original_parameters)
+                modules = []
 
-                def restoreRealParams(_):
-                    return next(restore_it)
+                def backupRealParams(m):
+                    params = m._parameters  # pylint: disable=protected-access
+                    buffers = m._buffers  # pylint: disable=protected-access
+
+                    # Save all the parameters and buffers with their names
+                    tensors = {
+                        n: t
+                        for n, t in m.named_parameters(recurse=False)
+                        if t is not None
+                    }
+                    tensors.update({
+                        n: t
+                        for n, t in m.named_buffers(recurse=False)
+                        if t is not None
+                    })
+                    modules.append(tensors)
+
+                    # Replace the original weights with copies
+                    m._parameters = copy.deepcopy(params)  # pylint: disable=protected-access
+
+                    m._buffers = copy.deepcopy(buffers)  # pylint: disable=protected-access
+
+                    savedParams[id(m)] = (params, buffers)
+
+                def restoreRealParams(m):
+                    params, buffers = savedParams[id(m)]
+
+                    m._parameters = params  # pylint: disable=protected-access
+                    m._buffers = buffers  # pylint: disable=protected-access
 
                 parameters = []
 
-                trace_it = iter(original_parameters)
-
                 def mapTracedParamsToRealParams(m):
-                    assert isinstance(m, torch.nn.Module)
-                    parameters.extend((param, next(trace_it))
-                                      for param in m.parameters()
-                                      if param is not None)
-                    parameters.extend((buffer, next(trace_it))
-                                      for buffer in m.buffers()
-                                      if buffer is not None)
+                    tensors = modules.pop(0)
+                    params = m._parameters  # pylint: disable=protected-access
+                    buffers = m._buffers  # pylint: disable=protected-access
+                    parameters.extend((new_tensor, tensors[name])
+                                      for name, new_tensor in params.items()
+                                      if new_tensor is not None)
+                    parameters.extend((new_tensor, tensors[name])
+                                      for name, new_tensor in buffers.items()
+                                      if new_tensor is not None)
 
-                # Make sure the parameters get replaced (Not just their content)
-                torch.__future__.set_overwrite_module_params_on_conversion(
-                    True)
-                self.model._apply(backupRealParams)
+                self.model.apply(backupRealParams)
 
                 for name, layer in self.model.named_modules():
                     anyIsHalf = False
@@ -346,6 +367,7 @@ class PoplarExecutor:
 
                     if anyIsHalf:
                         layer.float()
+
                         convertedLayers.append(name)
 
                 # We will trace using the normal trace view.
@@ -357,7 +379,7 @@ class PoplarExecutor:
                     if name in convertedLayers:
                         layer.half()
 
-                self.model._apply(restoreRealParams)
+                self.model.apply(restoreRealParams)
                 self.trace.apply(mapTracedParamsToRealParams)
 
                 if hasConvertedAnyHalf[0]:
