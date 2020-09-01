@@ -22,6 +22,11 @@ def test_batchNorm1D(running_stats, training):
 
     input = torch.randn([2, 10, 1000])
     norm = torch.nn.BatchNorm1d(10, track_running_stats=running_stats)
+
+    # pylint: disable=W0212
+    norm._buffers["running_mean"] = torch.randn([10])
+    norm._buffers["running_var"] = torch.clamp(torch.randn([10]) + 1.0,
+                                               min=0.1)
     norm.train(training)
 
     # Run pytorch native on CPU.
@@ -44,6 +49,11 @@ def test_batchNorm2D(running_stats, training):
 
     input = torch.randn([20, 10, 35, 45])
     norm = torch.nn.BatchNorm2d(10, track_running_stats=running_stats)
+
+    # pylint: disable=W0212
+    norm._buffers["running_mean"] = torch.randn([10])
+    norm._buffers["running_var"] = torch.clamp(torch.randn([10]) + 1.0,
+                                               min=0.1)
     norm.train(training)
 
     # Run pytorch native on CPU.
@@ -66,6 +76,11 @@ def test_batchNorm3D(running_stats, training):
 
     input = torch.randn([20, 10, 35, 45, 10])
     norm = torch.nn.BatchNorm3d(10, track_running_stats=running_stats)
+
+    # pylint: disable=W0212
+    norm._buffers["running_mean"] = torch.randn([10])
+    norm._buffers["running_var"] = torch.clamp(torch.randn([10]) + 1.0,
+                                               min=0.1)
     norm.train(training)
 
     # Run pytorch native on CPU.

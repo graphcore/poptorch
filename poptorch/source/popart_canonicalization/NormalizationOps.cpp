@@ -112,8 +112,16 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   float momentum = constantToFloat(node->input(6)->node());
   float epsilon = constantToFloat(node->input(7)->node());
 
-  new_node = poptorch::createBatchnormalization(graph, input_tensors, 1,
-                                                epsilon, momentum);
+  bool training = constantToBool(node->input(5)->node());
+
+  // To indicate training, for BatchNormalization-9, use num_outputs = 5
+  // From ONNX
+  // Output case #1: Y, mean, var, saved_mean, saved_var (training mode)
+  // Output case #2: Y (test mode)
+  // Popart supports this with "if (output->n() > 1)"
+
+  new_node = poptorch::createBatchnormalization(
+      graph, input_tensors, training ? 5 : 1, epsilon, momentum);
 
   // If we reshaped, reshape back.
   if (original_shape.size() != 4) {
