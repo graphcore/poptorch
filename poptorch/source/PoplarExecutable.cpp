@@ -21,8 +21,8 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
 
   // Set up the input tensors in the poplar graph to point to the incoming
   // pytorch tensors.
-  for (std::size_t i = 0; i < _popartInputs.size(); ++i) {
-    poptorch::TensorId popart_id = _popartInputs[i];
+  for (std::size_t i = 0; i < _popart_inputs.size(); ++i) {
+    poptorch::TensorId popart_id = _popart_inputs[i];
     at::Tensor &pytorch_tensor = inTensors->at(i);
 
     ERROR_ON(!pytorch_tensor.is_contiguous());
@@ -57,17 +57,17 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
           popart_dims);
       break;
     case at::ScalarType::Long:
-      _convertedInputs[i] = pytorch_tensor.toType(at::ScalarType::Int);
+      _converted_inputs[i] = pytorch_tensor.toType(at::ScalarType::Int);
       _compiler.setUpInputOp(
           popart_id,
-          static_cast<std::int32_t *>(_convertedInputs[i].data_ptr()),
+          static_cast<std::int32_t *>(_converted_inputs[i].data_ptr()),
           popart_dims);
       break;
     case at::ScalarType::Double:
     case at::ScalarType::BFloat16:
-      _convertedInputs[i] = pytorch_tensor.toType(at::ScalarType::Float);
+      _converted_inputs[i] = pytorch_tensor.toType(at::ScalarType::Float);
       _compiler.setUpInputOp(
-          popart_id, static_cast<float *>(_convertedInputs[i].data_ptr()),
+          popart_id, static_cast<float *>(_converted_inputs[i].data_ptr()),
           popart_dims);
       break;
     default:
@@ -78,11 +78,11 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
 
   // Temp buffers for the output state.
   std::vector<at::IValue> returnees;
-  returnees.reserve(_popartOutputs.size());
+  returnees.reserve(_popart_outputs.size());
 
   // Set up the outputs.
-  for (size_t i = 0; i < _popartOutputs.size(); i++) {
-    poptorch::TensorId &popart_id(_popartOutputs[i]);
+  for (size_t i = 0; i < _popart_outputs.size(); i++) {
+    poptorch::TensorId &popart_id(_popart_outputs[i]);
     std::vector<std::int64_t> dims = _compiler.getSize(popart_id);
     // Treat scalars as 1D tensors.
     if (dims.empty()) {
@@ -93,7 +93,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
     dims[0] *= _compiler.popartBatchDimForAnchor(popart_id);
 
     // Create the torch tensor and use its memory for the popart tensor.
-    at::ScalarType type = _popartOutputTypes[i];
+    at::ScalarType type = _popart_output_types[i];
     returnees.emplace_back(at::empty(
         {dims}, at::dtype(type).memory_format(c10::MemoryFormat::Contiguous)));
 
@@ -127,11 +127,23 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
 }
 
 // Tell popart to copy weights off the IPU and write into host memory.
-void PoplarExecutable::copyWeightsToHost() { _compiler.copyWeightsToHost(); }
+void PoplarExecutable::copyWeightsToHost(
+    const std::map<std::string, void *> &buffers) {
+  std::vector<void *> pointers;
+  for (const std::string &name : _parameter_names) {
+    pointers.push_back(buffers.at(name));
+  }
+  _compiler.copyWeightsToHost(pointers);
+}
 
 // Tell popart to copy weights from host into IPU memory.
-void PoplarExecutable::copyWeightsToDevice() {
-  _compiler.copyWeightsToDevice();
+void PoplarExecutable::copyWeightsToDevice(
+    const std::map<std::string, void *> &buffers) {
+  std::vector<void *> pointers;
+  for (const std::string &name : _parameter_names) {
+    pointers.push_back(buffers.at(name));
+  }
+  _compiler.copyWeightsToDevice(pointers);
 }
 
 const std::vector<OutputType> &PoplarExecutable::outputTypes() const {

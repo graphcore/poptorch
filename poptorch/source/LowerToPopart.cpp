@@ -94,7 +94,8 @@ void ValueMap::setTuple(torch::jit::Value *value,
 class LowerToPopart {
 public:
   LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
-                std::vector<at::Tensor> *params, bool training,
+                std::vector<at::Tensor> *params,
+                const std::vector<std::string> &parameter_names, bool training,
                 const Optimizer &opt, const SessionOptions &options);
 
   void lower();
@@ -107,6 +108,7 @@ private:
   std::vector<at::Tensor> &_in_tensors;
 
   std::vector<at::Tensor> &_parameters;
+  const std::vector<std::string> &_parameter_names;
 
   std::vector<poptorch::TensorId> _inputTensorHooks;
 
@@ -265,7 +267,7 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
 
   return std::make_shared<poptorch::PoplarExecutable>(
       std::move(_compiler), std::move(_inputTensorHooks),
-      std::move(_outputTensorHooks), std::move(data_types));
+      std::move(_outputTensorHooks), std::move(data_types), _parameter_names);
 }
 
 void LowerToPopart::lower() {
@@ -561,6 +563,7 @@ void LowerToPopart::lowerParameters() {
                    "Not all the input tensors have been used");
       // Lower the other params (i.e the weights)
       at::Tensor &tensor_as_param = _parameters[index - num_inputs];
+      const std::string &name = _parameter_names.at(index - num_inputs);
 
       // Convert the tensor type to the correct vector size.
       std::vector<int64_t> dims = getTensorDimensions(tensor_as_param);
@@ -569,7 +572,7 @@ void LowerToPopart::lowerParameters() {
 
       std::string popart_type = typeToPopartStr(tensor_as_param.scalar_type());
       _valueMap.setTensor(value, _compiler.addInitializedInputTensor(
-                                     "Weight", popart_type.c_str(), dims,
+                                     name.c_str(), popart_type.c_str(), dims,
                                      tensor_as_param.data_ptr()));
     }
     ++index;
@@ -630,10 +633,12 @@ PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
 } // namespace
 
 LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
-                             std::vector<at::Tensor> *params, bool training,
-                             const Optimizer &opt,
+                             std::vector<at::Tensor> *params,
+                             const std::vector<std::string> &parameter_names,
+                             bool training, const Optimizer &opt,
                              const SessionOptions &options)
-    : _graph(*g), _in_tensors(*ins), _parameters(*params), _optimizer(opt),
+    : _graph(*g), _in_tensors(*ins), _parameters(*params),
+      _parameter_names(parameter_names), _optimizer(opt),
       _compiler({training, options}) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
@@ -698,12 +703,14 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 
 std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
-              std::vector<at::Tensor> *parameters, bool training,
+              std::vector<at::Tensor> *parameters,
+              const std::vector<std::string> &parameter_names, bool training,
               const Optimizer &opt, const SessionOptions &options) {
   std::srand(std::time(nullptr));
 
-  LowerToPopart lower_impl{graph,    in_tensors, parameters,
-                           training, opt,        std::move(options)};
+  LowerToPopart lower_impl{
+      graph,    in_tensors, parameters,        parameter_names,
+      training, opt,        std::move(options)};
   lower_impl.lower();
 
   return lower_impl.compile();

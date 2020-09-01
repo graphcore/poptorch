@@ -4,6 +4,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -19,11 +20,13 @@ public:
   PoplarExecutable(poptorch::Compiler &&c,
                    std::vector<poptorch::TensorId> &&inputs,
                    std::vector<poptorch::TensorId> &&outputs,
-                   std::vector<at::ScalarType> &&outputTypes)
-      : _compiler(std::move(c)), _popartInputs(inputs), _popartOutputs(outputs),
-        _popartOutputTypes(outputTypes) {
+                   std::vector<at::ScalarType> &&outputTypes,
+                   std::vector<std::string> parameter_names)
+      : _compiler(std::move(c)), _popart_inputs(inputs),
+        _popart_outputs(outputs), _popart_output_types(outputTypes),
+        _parameter_names(std::move(parameter_names)) {
     for (size_t i = 0; i < inputs.size(); i++) {
-      _convertedInputs.emplace_back();
+      _converted_inputs.emplace_back();
     }
   }
 
@@ -35,10 +38,10 @@ public:
                               const Optimizer &optimizer);
 
   // Tell popart to copy weights off the IPU and write into host memory.
-  void copyWeightsToHost();
+  void copyWeightsToHost(const std::map<std::string, void *> &buffers);
 
   // Tell popart to copy weights from host into IPU memory.
-  void copyWeightsToDevice();
+  void copyWeightsToDevice(const std::map<std::string, void *> &buffers);
 
   const std::vector<OutputType> &outputTypes() const;
 
@@ -48,13 +51,14 @@ public:
 private:
   poptorch::Compiler _compiler;
 
-  std::vector<poptorch::TensorId> _popartInputs;
+  std::vector<poptorch::TensorId> _popart_inputs;
 
   // Used for types which need conversion to maintain the ref count
-  std::vector<at::Tensor> _convertedInputs;
+  std::vector<at::Tensor> _converted_inputs;
 
-  std::vector<poptorch::TensorId> _popartOutputs;
-  std::vector<at::ScalarType> _popartOutputTypes;
+  std::vector<poptorch::TensorId> _popart_outputs;
+  std::vector<at::ScalarType> _popart_output_types;
+  const std::vector<std::string> _parameter_names;
 };
 
 } // namespace poptorch

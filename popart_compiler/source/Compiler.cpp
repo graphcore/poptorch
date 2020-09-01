@@ -50,6 +50,20 @@ namespace poptorch {
 
 namespace detail {
 
+class WeightsIO : public popart::IWeightsIO {
+public:
+  ~WeightsIO() override = default;
+  bool contains(popart::TensorId id) const final;
+  popart::MutableVoidData weight(popart::TensorId id) const final;
+  void registerParameter(const popart::TensorId &id,
+                         const popart::TensorInfo &info);
+  void updateData(const std::vector<void *> &host_buffers);
+
+private:
+  std::map<popart::TensorId, popart::MutableVoidData> _weights;
+  std::vector<popart::TensorId> _weights_order;
+};
+
 struct CompilerImpl {
 public:
   friend Compiler;
@@ -78,7 +92,7 @@ public:
 
   std::unique_ptr<popart::Session> session;
 
-  popart::WeightsIO weight_callback;
+  WeightsIO weights;
 
   bool is_training;
 
@@ -168,6 +182,28 @@ public:
     setOptionIfNotSet(option, value, name, std::to_string(value));
   }
 };
+
+bool WeightsIO::contains(popart::TensorId id) const {
+  return _weights.find(id) != _weights.end();
+}
+
+popart::MutableVoidData WeightsIO::weight(popart::TensorId id) const {
+  return _weights.at(id);
+}
+
+void WeightsIO::registerParameter(const popart::TensorId &id,
+                                  const popart::TensorInfo &info) {
+  ERROR_ON(contains(id));
+  _weights[id].info = info;
+  _weights_order.push_back(id);
+}
+
+void WeightsIO::updateData(const std::vector<void *> &host_buffers) {
+  ERROR_ON(host_buffers.size() != _weights_order.size());
+  for (std::uint64_t i = 0; i < host_buffers.size(); ++i) {
+    _weights[_weights_order[i]].data = host_buffers[i];
+  }
+}
 
 std::string CompilerImpl::checkSystemConfig() {
   auto dm = popart::DeviceManager::createDeviceManager();
@@ -695,11 +731,7 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
 
   popart::TensorId id = _impl->ids[_impl->ids.size() - 1];
 
-  popart::MutableVoidData mutable_data;
-  mutable_data.data = data;
-  mutable_data.info = info;
-
-  _impl->weight_callback.insert(id, mutable_data);
+  _impl->weights.registerParameter(id, info);
 
   return _impl->ids.size() - 1;
 }
@@ -1020,9 +1052,6 @@ void Compiler::initSession(const Optimizer &opt) {
     stream << _impl->session->getGraphReport();
     stream.close();
   }
-
-  // Write the weights immediately after compilation to the IPU.
-  copyWeightsToDevice();
 }
 
 std::unique_ptr<char> Compiler::getPopartIR() const {
@@ -1039,17 +1068,19 @@ std::unique_ptr<char> Compiler::getPopartIR() const {
 
 // Write the weights into IPU memory from the pytorch tensor buffers in the
 // model.
-void Compiler::copyWeightsToDevice() {
+void Compiler::copyWeightsToDevice(const std::vector<void *> &host_buffers) {
   logging::info("Writing weights from host to IPU memory.");
-  _impl->session->writeWeights(_impl->weight_callback);
+  _impl->weights.updateData(host_buffers);
+  _impl->session->writeWeights(_impl->weights);
   _impl->session->weightsFromHost();
 }
 
 // Read the weights from IPU memory into the pytorch tensor buffers.
-void Compiler::copyWeightsToHost() {
+void Compiler::copyWeightsToHost(const std::vector<void *> &host_buffers) {
   logging::info("Writing weights from IPU to host.");
   _impl->session->weightsToHost();
-  _impl->session->readWeights(_impl->weight_callback);
+  _impl->weights.updateData(host_buffers);
+  _impl->session->readWeights(_impl->weights);
 }
 
 void Compiler::run(const Optimizer &opt) {

@@ -1,6 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import copy
 import torch
 import torch.optim as optim
 import poptorch.poptorch_core as poptorch_core
@@ -159,6 +158,7 @@ class PoplarExecutor:
         options = options or Options()
         self.model = model
         self.user_model = user_model or self.model
+        self._host_weights_version = 0
         if training:
             if options.defaultAnchorMode():
                 # In training it makes sense to see only the last result, by default.
@@ -198,12 +198,14 @@ class PoplarExecutor:
                     """
                     if parent.dirty_host_weights:
                         logger.debug("Implicit copyWeightsToHost()")
-                        parent.copyWeightsToHost()
                         parent.dirty_host_weights = False
+                        parent.copyWeightsToHost()
                         return True
                     return False
 
                 def __getattribute__(self, name):
+                    if name == "_host_weights_version":
+                        return parent._host_weights_version
                     if name in ("_parameters", "forward"):
                         self.copyWeightsToHostIfNeeded()
                     return object.__getattribute__(self, name)
@@ -217,6 +219,8 @@ class PoplarExecutor:
             # __getattr__ and __getattribute__ are attributes, not methods, unfortunately we cannot just
             # replace them in the model object: we have to create a wrapper class
             # and change the object's class.
+            WrappedModel.__name__ = "Wrapped%s" % type(
+                self.user_model).__name__
             self.user_model.__class__ = WrappedModel
 
     def _debugGetPopartIR(self):
@@ -224,14 +228,32 @@ class PoplarExecutor:
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
-        poptorch_core.copyWeightsToHost_impl(  # pylint: disable=undefined-variable
-            self.executable)
+        weights = {
+            **dict(self.model.named_parameters()),
+            **dict(self.model.named_buffers())
+        }
+        poptorch_core.copyWeightsToHost_impl(self.executable,
+                                             tuple(weights.keys()),
+                                             tuple(weights.values()))
+        self._host_weights_version += 1
 
     # Write from host memory to IPU memory. This is done automatically on
     # compilation so should be rarely used.
     def copyWeightsToDevice(self):
-        poptorch_core.copyWeightsToDevice_impl(  # pylint: disable=undefined-variable
-            self.executable)
+        # Don't trigger a copyToHost by accessing `named_parameters`
+        saved_dirty_flag = self.dirty_host_weights
+        self.dirty_host_weights = False
+
+        weights = {
+            **dict(self.model.named_parameters()),
+            **dict(self.model.named_buffers())
+        }
+        poptorch_core.copyWeightsToDevice_impl(self.executable,
+                                               tuple(weights.keys()),
+                                               tuple(weights.values()))
+
+        # Restore dirtiness flag
+        self.dirty_host_weights = saved_dirty_flag
 
     def setOptimizer(self, optimizer):
         self.new_optimizer = optimizer
@@ -313,51 +335,6 @@ class PoplarExecutor:
 
                 modules = []
 
-                def backupRealParams(m):
-                    params = m._parameters  # pylint: disable=protected-access
-                    buffers = m._buffers  # pylint: disable=protected-access
-
-                    # Save all the parameters and buffers with their names
-                    tensors = {
-                        n: t
-                        for n, t in m.named_parameters(recurse=False)
-                        if t is not None
-                    }
-                    tensors.update({
-                        n: t
-                        for n, t in m.named_buffers(recurse=False)
-                        if t is not None
-                    })
-                    modules.append(tensors)
-
-                    # Replace the original weights with copies
-                    m._parameters = copy.deepcopy(params)  # pylint: disable=protected-access
-
-                    m._buffers = copy.deepcopy(buffers)  # pylint: disable=protected-access
-
-                    savedParams[id(m)] = (params, buffers)
-
-                def restoreRealParams(m):
-                    params, buffers = savedParams[id(m)]
-
-                    m._parameters = params  # pylint: disable=protected-access
-                    m._buffers = buffers  # pylint: disable=protected-access
-
-                parameters = []
-
-                def mapTracedParamsToRealParams(m):
-                    tensors = modules.pop(0)
-                    params = m._parameters  # pylint: disable=protected-access
-                    buffers = m._buffers  # pylint: disable=protected-access
-                    parameters.extend((new_tensor, tensors[name])
-                                      for name, new_tensor in params.items()
-                                      if new_tensor is not None)
-                    parameters.extend((new_tensor, tensors[name])
-                                      for name, new_tensor in buffers.items()
-                                      if new_tensor is not None)
-
-                self.model.apply(backupRealParams)
-
                 for name, layer in self.model.named_modules():
                     anyIsHalf = False
                     for param in layer.parameters():
@@ -379,9 +356,10 @@ class PoplarExecutor:
                     if name in convertedLayers:
                         layer.half()
 
-                self.model.apply(restoreRealParams)
-                self.trace.apply(mapTracedParamsToRealParams)
-
+                parameters = {
+                    **dict(self.trace.named_parameters()),
+                    **dict(self.trace.named_buffers())
+                }
                 if hasConvertedAnyHalf[0]:
                     # Get the originals back.
                     in_tensors_as_half = self._args_parser(args, kwargs)
@@ -389,12 +367,14 @@ class PoplarExecutor:
 
                     # Compile using the actual halves.
                     self.executable = poptorch_core.compileWithTrace(
-                        self.trace._c, tuple(parameters),
+                        self.trace._c, tuple(parameters.keys()),
+                        tuple(parameters.values()),
                         in_tensors_as_half.asTuple(), self.options.toDict(),
                         self.training, self.optimizer)
                 else:
                     self.executable = poptorch_core.compileWithTrace(
-                        self.trace._c, tuple(parameters),
+                        self.trace._c, tuple(parameters.keys()),
+                        tuple(parameters.values()),
                         in_tensors_trace_view.asTuple(), self.options.toDict(),
                         self.training, self.optimizer)
             else:
@@ -406,10 +386,18 @@ class PoplarExecutor:
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 
+                parameters = {
+                    **dict(self.trace.named_parameters()),
+                    **dict(self.trace.named_buffers())
+                }
                 self.executable = poptorch_core.compileWithScript(
-                    self.trace._c, self.trace.graph,
+                    self.trace._c, self.trace.graph, tuple(parameters.keys()),
+                    tuple(parameters.values()),
                     in_tensors_trace_view.asTuple(), self.options.toDict(),
                     self.training)
+
+            # Upload the weights to the IPU
+            self.copyWeightsToDevice()
 
         if self.options.connectionType == enums.ConnectionType.Never:
             logger.info(
@@ -424,20 +412,24 @@ class PoplarExecutor:
                                                 "copyWeightsToHostIfNeeded",
                                                 None)
             if callable(copyWeightsToHostIfNeeded):
-                if copyWeightsToHostIfNeeded():
+                copyWeightsToHostIfNeeded()
+                if self._host_weights_version != \
+                        self.user_model._host_weights_version:
                     # Weights have now been updated on the Host: copy them to the second IPU.
                     logger.debug("Implicit copyWeightsToDevice()")
                     self.copyWeightsToDevice()
+                    self._host_weights_version = \
+                            self.user_model._host_weights_version
 
         # Execute the poplar executable with the full size (batch * device interations)
         if self.new_optimizer and self.new_optimizer != self.optimizer:
             self.optimizer = self.new_optimizer
-            output = poptorch_core.execute(  # pylint: disable=undefined-variable
+            output = poptorch_core.execute(
                 self.executable, in_tensors.asTuple(),
                 convertOptimizerToDict(self.optimizer))
         else:
-            output = poptorch_core.execute(  # pylint: disable=undefined-variable
-                self.executable, in_tensors.asTuple(), {})
+            output = poptorch_core.execute(self.executable,
+                                           in_tensors.asTuple(), {})
 
         if self.training:
             self.dirty_host_weights = True

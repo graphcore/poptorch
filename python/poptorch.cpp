@@ -91,6 +91,51 @@ Optimizer parseOptimizer(const py::dict &opt) {
   return Optimizer{type, optimizer};
 }
 
+std::map<std::string, void *>
+getParameterBuffers(const pybind11::tuple &names,
+                    const pybind11::tuple &tensors) {
+  ERROR_ON(names.size() != tensors.size());
+  std::map<std::string, void *> parameters;
+  torch::jit::Stack stack = torch::jit::toTraceableStack(tensors);
+  for (std::uint64_t i = 0; i < names.size(); ++i) {
+    parameters.insert(
+        {names[i].cast<std::string>(), stack[i].toTensor().data_ptr()});
+  }
+  return parameters;
+}
+
+// python_names and python_tensors are the parameters from the python trace.
+// And trace_tensors is a subset of python_tensors (The unused parameters have
+// been removed). So we build a map[tensor] = name based on the python trace
+// which we then use to build the list of the names of the parameters in
+// traced_tensors.
+std::vector<std::string>
+getParameterNames(const pybind11::tuple &python_names,
+                  const pybind11::tuple &python_tensors,
+                  const std::vector<at::Tensor> &traced_tensors) {
+  std::vector<std::string> names;
+  for (auto name : python_names) {
+    ERROR_ON(!py::isinstance<py::str>(name));
+    names.push_back(name.cast<std::string>());
+  }
+
+  torch::jit::Stack parameter_stack =
+      torch::jit::toTraceableStack(python_tensors);
+  std::map<void *, std::string> parameters_map;
+  int name_idx = 0;
+  for (const torch::jit::IValue &value : parameter_stack) {
+    parameters_map.insert({value.toTensor().data_ptr(), names.at(name_idx)});
+    name_idx++;
+  }
+
+  std::vector<std::string> parameters;
+  parameters.reserve(traced_tensors.size());
+  for (auto &param : traced_tensors) {
+    parameters.push_back(parameters_map.at(param.data_ptr()));
+  }
+  return parameters;
+}
+
 std::string castToString(py::handle obj) {
   if (py::isinstance<py::str>(obj)) {
     return obj.cast<std::string>();
@@ -164,26 +209,32 @@ void buildTensorList(const torch::jit::IValue &value,
 } // namespace
 
 void copyWeightsToHostImpl(
-    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable,
+    const pybind11::tuple &parameter_names,
+    const pybind11::tuple &parameter_tensors) {
   // Copy the weights or warn if this is before first time compilation.
   if (!executable) {
     logging::warn(
         "Call to copyWeightsToHost ignored as model has not been compiled "
         "(Poptorch will compile models on first invocation).");
   } else {
-    executable->copyWeightsToHost();
+    executable->copyWeightsToHost(
+        getParameterBuffers(parameter_names, parameter_tensors));
   }
 }
 
 void copyWeightsToDeviceImpl(
-    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable,
+    const pybind11::tuple &parameter_names,
+    const pybind11::tuple &parameter_tensors) {
   // Copy the weights or warn if this is before first time compilation.
   if (!executable) {
     logging::warn(
         "Call to copyWeightsToDevice ignored as model has not been compiled "
         "(Poptorch will compile models on first invocation).");
   } else {
-    executable->copyWeightsToDevice();
+    executable->copyWeightsToDevice(
+        getParameterBuffers(parameter_names, parameter_tensors));
   }
 }
 
@@ -296,7 +347,8 @@ void constantPropagation(torch::jit::Graph *graph) {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, const pybind11::tuple &parameters,
+compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
+                 const pybind11::tuple &parameter_tensors,
                  const pybind11::tuple &inputs, const pybind11::dict &options,
                  bool training, const py::dict &optimizerDict) {
   try {
@@ -309,8 +361,6 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameters,
 
     // Create a jit stack from the incoming pytorch tensors.
     torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
-    torch::jit::Stack parameter_stack =
-        torch::jit::toTraceableStack(parameters);
 
     // And turn convert them into at tensors which we can then resolve the
     // address of.
@@ -319,32 +369,8 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameters,
       buildTensorList(value, &input_tensors);
     }
 
-    // We need to remap the traced to tensors to the real tensors but some
-    // parameters have actually been optimised out during LowerGraph so we need
-    // to create a map traced tensors <-> real tensors then remap the traced
-    // tensors.
-    //
-    // Convert the list of tuples new_tensor / real_tensor into a map:
-    // [(new_tensor, real_tensor), ...] -> map[new_tensor.data_ptr()] =
-    // real_tensor
-    std::vector<at::Tensor> parameter_tensors;
-    std::map<void *, at::Tensor> parameters_map;
-    for (const torch::jit::IValue &value : parameter_stack) {
-      ERROR_ON(!value.isTuple());
-      auto tuple = value.toTuple();
-      ERROR_ON(tuple->elements().size() != 2);
-      parameters_map.insert({tuple->elements().front().toTensor().data_ptr(),
-                             tuple->elements().back().toTensor()});
-    }
-
-    // Now create parameter_tensors by remapping all the traced tensors to the
-    // real tensors.
-    for (auto &param : graph_and_tensors.second) {
-      parameter_tensors.push_back(parameters_map.at(param.data_ptr()));
-      if (!parameter_tensors.back().is_contiguous()) {
-        parameter_tensors.back().contiguous();
-      }
-    }
+    std::vector<std::string> parameters = getParameterNames(
+        parameter_names, parameter_tensors, graph_and_tensors.second);
 
     Optimizer optimizer = parseOptimizer(optimizerDict);
 
@@ -375,7 +401,8 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameters,
 
     // Convert the IR to half to match the inputs/actual usage.
     logging::debug("Graph before canonicalising half:\n{}", *graph);
-    poptorch::canonicaliseHalf(graph.get(), input_tensors, parameter_tensors);
+    poptorch::canonicaliseHalf(graph.get(), input_tensors,
+                               graph_and_tensors.second);
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
 
@@ -395,16 +422,17 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameters,
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    return poptorch::lowerToPopart(graph.get(), &input_tensors,
-                                   &parameter_tensors, training, optimizer,
-                                   parseSessionOptions(options));
+    return poptorch::lowerToPopart(
+        graph.get(), &input_tensors, &graph_and_tensors.second, parameters,
+        training, optimizer, parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-std::shared_ptr<poptorch::PoplarExecutable>
-compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
-                  const pybind11::dict &options, bool training) {
+std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
+    py::handle h, py::handle g, const pybind11::tuple &parameter_names,
+    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
+    const pybind11::dict &options, bool training) {
   try {
     auto module = asModule(h);
     auto arg_graph = asGraph(g);
@@ -417,6 +445,8 @@ compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
         torch::jit::LowerGraph(*arg_graph, module->_ivalue());
     auto graph = graph_and_tensors.first;
     graph->dump();
+    std::vector<std::string> parameters = getParameterNames(
+        parameter_names, parameter_tensors, graph_and_tensors.second);
 
     int loop_count = 0;
     std::string graph_string;
@@ -482,7 +512,7 @@ compileWithScript(py::handle h, py::handle g, const pybind11::tuple &inputs,
 
     Optimizer optimizer{OptimizerType::NONE, {}};
     return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
-                                   training, optimizer,
+                                   parameters, training, optimizer,
                                    parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION

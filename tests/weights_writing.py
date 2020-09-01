@@ -52,6 +52,52 @@ def test_training_and_inference(use_half):
     assert torch.equal(torch.argmax(out.int(), dim=1), label)
 
 
+@pytest.mark.parametrize("use_half", [True, False])
+def test_training_inference_parameters(use_half):
+    torch.manual_seed(42)
+
+    # 10 Batches of 10.
+    input = torch.randn(10, 10)
+
+    # 10 batches of 1
+    label = torch.randint(0, 10, [1])
+    label = label.expand([10])
+    model = torch.nn.Linear(10, 10)
+
+    if use_half:
+        model.half()
+        input = input.half()
+
+    # Run on IPU batch size 1 * 10 popart batches.
+    opts = poptorch.Options().deviceIterations(10)
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, options=opts, loss=torch.nn.CrossEntropyLoss())
+    inference = poptorch.inferenceModel(model)
+
+    # Run all 10 batches as batchsize 10.
+    out = inference(input)
+
+    # Sanity check we weren't already matching the label.
+    assert not torch.equal(torch.argmax(out.int(), dim=1), label)
+
+    for _ in range(0, 1000):
+        _, loss = poptorch_model(input, label)
+
+        # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
+        assert len(loss.size()) == 1
+        assert loss.size()[0] == 1
+
+    # This will trigger copyWeightsToHost()
+    for _ in model.named_parameters():
+        pass
+
+    # Run with trained weights.
+    out = inference(input)
+
+    # Check we are now equal with labels.
+    assert torch.equal(torch.argmax(out.int(), dim=1), label)
+
+
 def test_weights_sharing_ipu_cpu():
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)

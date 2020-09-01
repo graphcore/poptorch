@@ -236,10 +236,10 @@ public:
 
   // Write the weights into IPU memory from the pytorch tensor buffers in the
   // model.
-  void copyWeightsToDevice();
+  void copyWeightsToDevice(const std::vector<void *> &host_buffers);
 
   // Read the weights from IPU memory into the pytorch tensor buffers.
-  void copyWeightsToHost();
+  void copyWeightsToHost(const std::vector<void *> &host_buffers);
 
   // Return the type of the given tensor.
   PopartType getPopartType(poptorch::TensorId tensor) const;
