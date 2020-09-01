@@ -118,6 +118,7 @@ BLAS and LAPACK Operations
 
 * ``torch.addmm``
 * ``torch.matmul``
+* ``torch.bmm``
 
 
 Torch.nn operations

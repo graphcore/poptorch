@@ -47,6 +47,8 @@ OP_CONVERTOR(aten::gelu, NONE, createGelu, {PARAM(0)})
 // aten::matmul(Tensor self, Tensor other) -> Tensor
 OP_CONVERTOR(aten::matmul, NONE, createMatmul, {PARAM(0) COMMA PARAM(1)})
 
+// aten::bmm(Tensor self, Tensor other) -> Tensor
+OP_CONVERTOR(aten::bmm, NONE, createMatmul, {PARAM(0) COMMA PARAM(1)})
 
 // aten::sigmoid(Tensor t) -> Tensor
 OP_CONVERTOR(aten::sigmoid, NONE, createSigmoid, {PARAM(0)})
