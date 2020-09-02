@@ -3,6 +3,12 @@
 #define INCLUDE_POPTORCH_TYPE_AND_CONSTANT_CANONICALIZATION_H
 
 #include <sstream>
+#include <string>
+#include <vector>
+
+namespace at {
+class Tensor;
+} // namespace at
 
 namespace c10 {
 struct Symbol;
@@ -17,6 +23,11 @@ struct Node;
 
 namespace poptorch {
 namespace type_and_constant_canonicalization {
+
+void makeConstantIntParams(torch::jit::Graph *graph,
+                           const std::vector<std::string> &parameter_names,
+                           const std::vector<at::Tensor> &traced_tensors);
+
 // Change the graph to add a poptorch::host_side_cast node after every graph
 // input whose type is unsupported (Long, Double, BFloat16) to reflect the
 // the casting which would happen on the host and the correct types as they

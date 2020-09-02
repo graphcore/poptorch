@@ -386,6 +386,12 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
 
     torch::jit::RemoveInplaceOps(graph);
 
+    logging::trace("Graph right before casting making integerer params as "
+                   "constants inputs:\n{}",
+                   *graph);
+    poptorch::type_and_constant_canonicalization::makeConstantIntParams(
+        graph.get(), parameters, graph_and_tensors.second);
+
     logging::trace("Graph right before casting unsupported inputs:\n{}",
                    *graph);
     poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
@@ -422,9 +428,10 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    return poptorch::lowerToPopart(
-        graph.get(), &input_tensors, &graph_and_tensors.second, parameters,
-        training, optimizer, parseSessionOptions(options));
+    return poptorch::lowerToPopart(graph.get(), &input_tensors,
+                                   std::move(graph_and_tensors.second),
+                                   std::move(parameters), training, optimizer,
+                                   parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
@@ -511,8 +518,9 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
     logging::debug("Graph right before popart:\n{}", *graph);
 
     Optimizer optimizer{OptimizerType::NONE, {}};
-    return poptorch::lowerToPopart(graph.get(), &input_tensors, &parameter_data,
-                                   parameters, training, optimizer,
+    return poptorch::lowerToPopart(graph.get(), &input_tensors,
+                                   std::move(parameter_data),
+                                   std::move(parameters), training, optimizer,
                                    parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION

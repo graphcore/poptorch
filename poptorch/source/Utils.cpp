@@ -8,6 +8,23 @@
 #include "poptorch/Utils.hpp"
 
 namespace poptorch {
+
+torch::jit::Node *findEarliestUser(const torch::jit::Value *value) {
+  auto &uses(value->uses());
+  if (uses.empty()) {
+    return nullptr;
+  }
+
+  torch::jit::Node *earliest_user = uses[0].user;
+  for (size_t i = 1; i < uses.size(); i++) {
+    auto node = uses[i].user;
+    if (node->isBefore(earliest_user)) {
+      earliest_user = node;
+    }
+  }
+  return earliest_user;
+}
+
 std::string nodeToString(const torch::jit::Node *node) {
   std::stringstream ss;
   ss << *node;

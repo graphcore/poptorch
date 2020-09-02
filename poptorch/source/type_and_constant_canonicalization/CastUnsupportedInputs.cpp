@@ -6,28 +6,13 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
+#include "poptorch/Utils.hpp"
 
 #include "../PoptorchSymbols.hpp"
 
 namespace poptorch {
 namespace type_and_constant_canonicalization {
 namespace {
-torch::jit::Node *findEarliestUser(const torch::jit::Value *value) {
-  auto &uses(value->uses());
-  if (uses.empty()) {
-    return nullptr;
-  }
-
-  torch::jit::Node *earliest_user = uses[0].user;
-  for (size_t i = 1; i < uses.size(); i++) {
-    auto node = uses[i].user;
-    if (node->isBefore(earliest_user)) {
-      earliest_user = node;
-    }
-  }
-  return earliest_user;
-}
-
 void processInputTensor(torch::jit::Graph *graph, torch::jit::Value *input) {
   auto tensor_type = input->type()->expect<c10::TensorType>();
   auto current_type = tensor_type->scalarType().value();

@@ -94,8 +94,8 @@ void ValueMap::setTuple(torch::jit::Value *value,
 class LowerToPopart {
 public:
   LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
-                std::vector<at::Tensor> *params,
-                const std::vector<std::string> &parameter_names, bool training,
+                std::vector<at::Tensor> params,
+                std::vector<std::string> parameter_names, bool training,
                 const Optimizer &opt, const SessionOptions &options);
 
   void lower();
@@ -107,8 +107,8 @@ private:
 
   std::vector<at::Tensor> &_in_tensors;
 
-  std::vector<at::Tensor> &_parameters;
-  const std::vector<std::string> &_parameter_names;
+  std::vector<at::Tensor> _parameters;
+  std::vector<std::string> _parameter_names;
 
   std::vector<poptorch::TensorId> _inputTensorHooks;
 
@@ -558,7 +558,7 @@ void LowerToPopart::lowerParameters() {
               << c10::typeKindToString(value->type()->kind()) << "' for input "
               << index);
       }
-    } else {
+    } else if (!value->uses().empty()) {
       ERROR_ON_MSG(tensor_it != _in_tensors.end(),
                    "Not all the input tensors have been used");
       // Lower the other params (i.e the weights)
@@ -574,6 +574,14 @@ void LowerToPopart::lowerParameters() {
       _valueMap.setTensor(value, _compiler.addInitializedInputTensor(
                                      name.c_str(), popart_type.c_str(), dims,
                                      tensor_as_param.data_ptr()));
+    } else {
+      logging::trace("Skipping unused parameter: {}",
+                     _parameter_names.at(index - num_inputs));
+
+      size_t erase_at = index - num_inputs;
+      _parameters.erase(_parameters.begin() + erase_at);
+      _parameter_names.erase(_parameter_names.begin() + erase_at);
+      --index;
     }
     ++index;
   }
@@ -633,12 +641,12 @@ PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
 } // namespace
 
 LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
-                             std::vector<at::Tensor> *params,
-                             const std::vector<std::string> &parameter_names,
+                             std::vector<at::Tensor> params,
+                             std::vector<std::string> parameter_names,
                              bool training, const Optimizer &opt,
                              const SessionOptions &options)
-    : _graph(*g), _in_tensors(*ins), _parameters(*params),
-      _parameter_names(parameter_names), _optimizer(opt),
+    : _graph(*g), _in_tensors(*ins), _parameters(std::move(params)),
+      _parameter_names(std::move(parameter_names)), _optimizer(opt),
       _compiler({training, options}) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
@@ -703,13 +711,13 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 
 std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
-              std::vector<at::Tensor> *parameters,
-              const std::vector<std::string> &parameter_names, bool training,
+              std::vector<at::Tensor> parameters,
+              std::vector<std::string> parameter_names, bool training,
               const Optimizer &opt, const SessionOptions &options) {
   std::srand(std::time(nullptr));
 
   LowerToPopart lower_impl{
-      graph,    in_tensors, parameters,        parameter_names,
+      graph,    in_tensors, std::move(parameters), std::move(parameter_names),
       training, opt,        std::move(options)};
   lower_impl.lower();
 

@@ -21,8 +21,8 @@ class SessionOptions;
  */
 std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
-              std::vector<at::Tensor> *parameters,
-              const std::vector<std::string> &parameter_names, bool training,
+              std::vector<at::Tensor> parameters,
+              std::vector<std::string> parameter_names, bool training,
               const Optimizer &opt, const SessionOptions &options);
 
 } // namespace poptorch

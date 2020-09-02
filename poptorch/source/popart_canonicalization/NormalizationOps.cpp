@@ -20,7 +20,7 @@ void maybeInitializeRunningParamConstants(
   std::vector<int64_t> running_shape{new_shape[1]};
 
   if (!isNone(*running_mean)) {
-      ERROR_ON(isNone(*running_var));
+    ERROR_ON(isNone(*running_var));
     return;
   }
 

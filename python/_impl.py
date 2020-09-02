@@ -331,10 +331,6 @@ class PoplarExecutor:
 
                 convertedLayers = []
 
-                savedParams = {}
-
-                modules = []
-
                 for name, layer in self.model.named_modules():
                     anyIsHalf = False
                     for param in layer.parameters():
