@@ -54,3 +54,5 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 - Adds support for torch.clamp
 
 - Adds poptorch.DataLoader
+
+- Adds support for torch.norm

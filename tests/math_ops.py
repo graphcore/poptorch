@@ -269,7 +269,8 @@ reduction_ops_api1 = [
     torch.argmin,
     # torch.dist,
     torch.mean,
-    #torch.median, torch.mode, torch.norm,
+    #torch.median, torch.mode,
+    torch.norm,
     torch.prod,
     #torch.std, torch.std_mean,
     torch.sum,
@@ -282,7 +283,8 @@ reduction_ops_api2 = [
     torch.argmin,
     # torch.dist,
     torch.mean,
-    #torch.median, torch.mode, torch.norm,
+    #torch.median, torch.mode,
+    torch.norm,
     torch.prod,
     torch.logsumexp,  # logsumexp doesn't support API 1.
     #torch.std, torch.std_mean,
@@ -325,6 +327,21 @@ def test_reduction_ops_float_api2(op):
         return torch.eq(x, y)
 
     unary_op_harness(operation, input, compare)
+
+
+# Interesting p-values for testing torch.norm(X, p=<>)
+norm_pvals = ['fro', float('inf'), float('-inf'), 1, 1.0, 2, 2.0, 3, 3.0]
+
+
+@pytest.mark.parametrize("p", norm_pvals)
+def test_norm_p_values(p):
+    torch.manual_seed(42)
+    input = torch.randn([1, 2, 10, 200])
+
+    def operation(x):
+        return torch.norm(x, p=p)
+
+    unary_op_harness(operation, input, torch.allclose)
 
 
 comparison_ops = [

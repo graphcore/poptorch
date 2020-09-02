@@ -63,7 +63,7 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
   torch::jit::Node *new_node;
 
   if (implicit_cast != ImplicitCast::None) {
-    logging::LogContext ctx(std::string("implicitically casting inputs of ") +
+    logging::LogContext ctx(std::string("implicitly casting inputs of ") +
                             kind.toQualString());
     auto possibly_casted_inputs = implicitCastInputs(&inputs, implicit_cast);
     ctx.clear();

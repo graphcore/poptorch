@@ -119,6 +119,17 @@ torch::jit::Node *createUnarySameTypedOutput(
                                    const std::vector<torch::jit::Value *> &),
     torch::jit::Graph *graph, const std::vector<torch::jit::Value *> &args);
 
+template <typename CreateFn, typename... Args>
+torch::jit::Node *
+createWithSameTypedOutput(CreateFn &&create_fn, torch::jit::Graph *graph,
+                          const std::vector<torch::jit::Value *> &args,
+                          Args &&... op_args) {
+  torch::jit::Node *new_node =
+      create_fn(graph, args, std::forward<Args>(op_args)...);
+  new_node->output()->setType(args[0]->type());
+  return new_node;
+}
+
 // Default to int in the helper.
 template <typename T> struct CreateConstant {
   torch::jit::Node *operator()(torch::jit::Graph *graph,

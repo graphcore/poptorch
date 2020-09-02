@@ -168,3 +168,8 @@ OP_CONVERTOR(aten::uniform_, NONE, createRandomUniform, TENSOR_SHAPE(0) COMMA CO
 OP_CONVERTOR(aten::randn, NONE, createRandomNormal, OUTPUT_TENSOR_SHAPE(0) COMMA 0.0f COMMA 1.0f COMMA GET_RETURN_TYPE)
 // aten::normal_(Tensor self, float mean, float std, Generator?) -> Tensor
 OP_CONVERTOR(aten::normal_, NONE, createRandomNormal, TENSOR_SHAPE(0) COMMA CONSTANT_TO_FLOAT(1) COMMA CONSTANT_TO_FLOAT(2) COMMA GET_RETURN_TYPE)
+
+// aten::frobenius_norm(Tensor in) -> Tensor
+OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(1), NONE, createReducel2, {PARAM(0)} COMMA DIMENISON_LENGTH_LIST(0) COMMA 0)
+// aten::frobenius_norm(Tensor in, int[] axes, int keepdim) -> Tensor
+OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(3), NONE, createReducel2, {PARAM(0)} COMMA HANDLE_LIST(1) COMMA CONSTANT_TO_LONG(2))
