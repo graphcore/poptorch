@@ -77,12 +77,17 @@ torch::jit::Node *roundHandler(torch::jit::Graph *graph,
 torch::jit::Node *floorDivideHandler(torch::jit::Graph *graph,
                                      torch::jit::Node *node) {
   // aten::floor_divide(Tensor x, Tensor y) -> Tensor
-  // floor_divide(x, y) = floor(x)/floor(y)
+  // floor_divide(x, y) = floor(x/y) where floor(...) rounds towards 0
 
-  torch::jit::Node *x = createFloor(graph, {node->input(0)});
-  torch::jit::Node *y = createFloor(graph, {node->input(1)});
+  torch::jit::Node *quotient =
+      createDiv(graph, {node->input(0), node->input(1)});
 
-  return createDiv(graph, {x->output(), y->output()});
+  torch::jit::Node *casted =
+      createCastTypedOutput(graph, quotient->output(), c10::kInt);
+
+  return createCastTypedOutput(
+      graph, casted->output(),
+      *quotient->output()->type()->expect<c10::TensorType>()->scalarType());
 }
 
 torch::jit::Node *trueDivideHandler(torch::jit::Graph *graph,

@@ -170,7 +170,7 @@ binary_ops_float = [
     torch.div,
     torch.sub,
     # torch.fmod,
-    # torch.floor_divide,
+    torch.floor_divide,
     torch.mul,
     # torch.remainder,
     torch.true_divide
@@ -180,8 +180,9 @@ binary_ops_float = [
 @pytest.mark.parametrize("op", binary_ops_float)
 def test_binary_ops_float(op):
     torch.manual_seed(42)
-    input1 = torch.randn([1, 2, 10, 200])
-    input2 = torch.randn([1, 2, 10, 200])
+
+    input1 = torch.randn([1, 2, 5, 1]) * 100.0
+    input2 = torch.randn([1, 2, 5, 1]) * 10.0
 
     def compare(x, y):
         return torch.allclose(x, y, atol=1e-05, equal_nan=True)
