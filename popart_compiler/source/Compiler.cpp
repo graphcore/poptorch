@@ -120,6 +120,12 @@ public:
     popart::DeviceConnectionType connection_type;
     popart::SyncPattern sync_pattern;
     std::uint64_t random_seed;
+    // When running in distributed mode: number of hosts the training is split
+    // over.
+    std::uint64_t num_distributed_hosts;
+    // In distributed mode: unique ID of this host in [0, num_distributed_hosts]
+    // range
+    std::uint64_t distributed_host_id;
   };
 
   // List of options which have been explicitely set by the user.
@@ -290,6 +296,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
 
   uint64_options["device_iterations"] = [&](std::uint64_t value) {
     poptorch_options.steps = value;
+  };
+  uint64_options["num_distributed_hosts"] = [&](std::uint64_t value) {
+    poptorch_options.num_distributed_hosts = value;
+  };
+  uint64_options["distributed_host_id"] = [&](std::uint64_t value) {
+    poptorch_options.distributed_host_id = value;
   };
   uint64_options["ipu_version"] = [&](std::uint64_t value) {
     poptorch_options.ipu_version = value;
@@ -893,7 +905,8 @@ void Compiler::initSession(const Optimizer &opt) {
                        "Failed to acquire " << num_ipus << " IPU(s)"
                                             << _impl->checkSystemConfig());
           if (device) {
-            logging::debug("Acquired IPU device, running on device.");
+            logging::debug("Acquired {} IPU(s): running on device Id {}.",
+                           num_ipus, device->getId());
           }
         } else {
           device =
@@ -923,6 +936,19 @@ void Compiler::initSession(const Optimizer &opt) {
   // If Pipelining wasn't set: enable it if more than 1 IPU is used.
   _impl->setOptionIfNotSet(options.enablePipelining,
                            _impl->used_ipus.size() > 1, "enablePipelining");
+
+  _impl->setOptionIfNotSet(options.enableDistributedReplicatedGraphs,
+                           _impl->options.num_distributed_hosts > 1,
+                           "enableDistributedReplicatedGraphs");
+
+  _impl->setOptionIfNotSet(options.globalReplicationFactor,
+                           _impl->options.num_distributed_hosts *
+                               options.replicatedGraphCount,
+                           "globalReplicationFactor");
+  _impl->setOptionIfNotSet(options.globalReplicaOffset,
+                           _impl->options.distributed_host_id *
+                               options.replicatedGraphCount,
+                           "globalReplicaOffset");
 
   _impl->setOptionIfNotSet(options.enableReplicatedGraphs,
                            options.replicatedGraphCount > 1,
@@ -971,6 +997,12 @@ void Compiler::initSession(const Optimizer &opt) {
   // Create the anchors, these are used to copy to the host.
   auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
 
+  logging::warn("enableReplicatedGraphs {} replicatedGraphCount {} "
+                "enableDistributedReplicatedGraphs {} globalReplicaOffset {} "
+                "globalReplicationFactor {}",
+                options.enableReplicatedGraphs, options.replicatedGraphCount,
+                options.enableDistributedReplicatedGraphs,
+                options.globalReplicaOffset, options.globalReplicationFactor);
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.

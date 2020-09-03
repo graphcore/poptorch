@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+# Regular execution (Runs on 4 IPUs):
+#
+# python ../poptorch/examples/mnist.py
+#
+# Distributed execution:
+# Requires two partitions:
+#   vipu-cli create partition training --size 8 --num-gcds 2 --gcd-sync-replicas 8
+#   vipu-cli create partition validation --size 1
+#
+# Then run using mpirun:
+# vipu-cli reset partition training
+# vipu-cli reset partition validation
+# mpirun --tag-output -np 2  python ../poptorch/examples/mnist.py
+
 import torch
 import torch.nn as nn
 import torchvision
@@ -8,21 +22,21 @@ import poptorch
 
 # Normal pytorch batch size
 training_batch_size = 20
+validation_batch_size = 100
 
+opts = poptorch.Options()
 # Device "step"
-training_ipu_step_size = 20
+opts.deviceIterations(20)
 
 # How many IPUs to replicate over.
-replication_factor = 4
+opts.replicationFactor(4)
 
-# This is the amount of data we will pull out of the data loader at each step. This is not
-# how much will be running on the IPU in a single model batch however. We just give the IPUs
-# this much data to allow for more efficient data loading.
-training_combined_batch_size = training_batch_size * training_ipu_step_size \
-        * replication_factor
+opts.randomSeed(42)
+opts.Distributed.IPUoFConfigFiles("~/.ipuof.conf.d/training_*")
 
 # Load MNIST normally.
-training_data = torch.utils.data.DataLoader(
+training_data = poptorch.DataLoader(
+    opts,
     torchvision.datasets.MNIST('mnist_data/',
                                train=True,
                                download=True,
@@ -31,23 +45,27 @@ training_data = torch.utils.data.DataLoader(
                                    torchvision.transforms.Normalize((0.1307, ),
                                                                     (0.3081, ))
                                ])),
-    batch_size=training_combined_batch_size,
+    batch_size=training_batch_size,
+    shuffle=True)
+
+# Load MNIST normally.
+val_options = poptorch.Options()
+# Only run the validation in the main process
+val_options.Distributed.disable().IPUoFConfigFiles(
+    "~/.ipuof.conf.d/validation_*")
+validation_data = poptorch.DataLoader(
+    val_options,
+    torchvision.datasets.MNIST('mnist_data/',
+                               train=True,
+                               download=True,
+                               transform=torchvision.transforms.Compose([
+                                   torchvision.transforms.ToTensor(),
+                                   torchvision.transforms.Normalize((0.1307, ),
+                                                                    (0.3081, ))
+                               ])),
+    batch_size=validation_batch_size,
     shuffle=True,
     drop_last=True)
-
-# Load MNIST normally. 100 is actually just the model batchsize this time.
-validation_batch_size = 100
-validation_data = torch.utils.data.DataLoader(torchvision.datasets.MNIST(
-    'mnist_data/',
-    train=True,
-    download=True,
-    transform=torchvision.transforms.Compose([
-        torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize((0.1307, ), (0.3081, ))
-    ])),
-                                              batch_size=validation_batch_size,
-                                              shuffle=True,
-                                              drop_last=True)
 
 
 # A helper block to build convolution-pool-relu blocks.
@@ -70,7 +88,7 @@ class Block(nn.Module):
 # Define the network using the above blocks.
 class Network(nn.Module):
     def __init__(self):
-        super(Network, self).__init__()
+        super().__init__()
         self.layer1 = Block(1, 10, 5, 2)
         self.layer2 = Block(10, 20, 5, 2)
         self.layer3 = nn.Linear(320, 256)
@@ -78,8 +96,9 @@ class Network(nn.Module):
         self.layer4 = nn.Linear(256, 10)
 
         self.softmax = nn.LogSoftmax(1)
+        self.loss = nn.NLLLoss(reduction="mean")
 
-    def forward(self, x):
+    def forward(self, x, target=None):
         x = self.layer1(x)
         x = self.layer2(x)
         x = x.view(-1, 320)
@@ -87,6 +106,10 @@ class Network(nn.Module):
         x = self.layer3_act(self.layer3(x))
         x = self.layer4(x)
         x = self.softmax(x)
+
+        if target is not None:
+            loss = self.loss(x, target)
+            return x, loss
         return x
 
 
@@ -94,40 +117,41 @@ class Network(nn.Module):
 model = Network()
 
 # Create model for training which will run on IPU.
-opts = poptorch.Options().deviceIterations(training_ipu_step_size)
-training_model = poptorch.trainingModel(model,
-                                        opts,
-                                        replication_factor=replication_factor,
-                                        loss=nn.NLLLoss(reduction="mean"))
+training_model = poptorch.trainingModel(model, training_data.options)
 
 # Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
-inference_model = poptorch.inferenceModel(model)
+inference_model = poptorch.inferenceModel(model, validation_data.options)
 
 
 def train():
     for batch_number, (data, labels) in enumerate(training_data):
-        result = training_model(data, labels)
+        print(f"Batch {batch_number}")
+        output, losses = training_model(data, labels)
 
         if batch_number % 10 == 0:
-            print("PoptorchIPU loss at batch: " + str(batch_number) + " is " +
-                  str(result[1]))
+            print(f"PoptorchIPU loss at batch: {batch_number} is {losses}")
 
             # Pick the highest probability.
-            _, ind = torch.max(result[0], 1)
+            _, ind = torch.max(output, 1)
+            assert training_data.options.anchor_mode in (
+                poptorch.AnchorMode.All, poptorch.AnchorMode.Final
+            ), "Only 'Final' and 'All' AnchorMode supported"
+            # If we're using Final: only keep the last labels, no-op if using All
+            num_labels = ind.shape[0]
+            labels = labels[-num_labels:]
             eq = torch.eq(ind, labels)
             elms, counts = torch.unique(eq, sorted=False, return_counts=True)
 
             acc = 0.0
             if len(elms) == 2:
                 if elms[0]:
-                    acc = (counts[0].item() /
-                           training_combined_batch_size) * 100.0
+                    acc = (counts[0].item() / num_labels) * 100.0
                 else:
-                    acc = (counts[1].item() /
-                           training_combined_batch_size) * 100.0
+                    acc = (counts[1].item() / num_labels) * 100.0
 
-            print("Training accuracy:  " + str(acc) + "% from batch of size " +
-                  str(training_combined_batch_size))
+            print(
+                f"Training accuracy:  {acc}% from batch of size {num_labels}")
+    print("Done training")
 
 
 def test():
@@ -160,7 +184,7 @@ def test():
 # Train on IPU.
 train()
 
-# Check validation loss on IPU once trained. Because PopTorch will be compiled on first call the
-# weights in model.parameters() will be copied implicitly. Subsequent calls will need to call
-# inference_model.copyWeightsToDevice()
-test()
+# Check validation loss on IPU once trained.
+# TODO(TXXXX) Bug in Poplar the device list is cached and not refreshed when IPUOF_CONFIG_PATH changes.
+# if training_data.options.Distributed.hostId == 0:
+#    test()

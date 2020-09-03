@@ -43,12 +43,45 @@ class DataLoader(torch.utils.data.DataLoader):
                  batch_size=1,
                  shuffle=False,
                  num_workers=0,
+                 drop_last=True,
                  **kwargs):
         assert isinstance(options, Options)
         self._combined_batch_size = batch_size * \
             options.device_iterations * \
             options.replication_factor * \
             options.Training.gradient_accumulation
+        self._options = options
+
+        num_elts = len(dataset)
+        assert drop_last or num_elts % (
+            self._combined_batch_size * options.Distributed.numHosts
+        ) == 0, (
+            f"The number of elements in the dataset ({num_elts}) is not "
+            "divisible by the number of elements processed per step "
+            f"({self._combined_batch_size * options.Distributed.numHosts}) and "
+            "drop_last=False. Switch to drop_last=True.")
+
+        if options.Distributed.numHosts > 1:
+            assert not shuffle or options.exists("random_seed"), (
+                "When using distributed execution you must set "
+                "poptorch.Options.randomSeed()")
+
+            class _SubDataset:
+                def __init__(self, dataset, opts, step):
+                    num_elts = len(dataset)
+                    per_host = step * (num_elts //
+                                       (step * opts.Distributed.numHosts))
+                    self._offset = opts.Distributed.hostId * per_host
+                    self._length = min(per_host, num_elts - self._offset)
+                    self._dataset = dataset
+
+                def __len__(self):
+                    return self._length
+
+                def __getitem__(self, index):
+                    return self._dataset[index + self._offset]
+
+            dataset = _SubDataset(dataset, options, self._combined_batch_size)
 
         super().__init__(dataset,
                          batch_size=self._combined_batch_size,
@@ -59,6 +92,10 @@ class DataLoader(torch.utils.data.DataLoader):
     @property
     def combinedBatchSize(self):
         return self._combined_batch_size
+
+    @property
+    def options(self):
+        return self._options
 
 
 # A dataloader which launches the dataloading process on a separate thread to

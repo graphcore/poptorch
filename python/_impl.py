@@ -9,10 +9,6 @@ from .logging import logger
 from .options import Options
 
 
-def ceil_div(a, b):
-    return (a + b - 1) // b
-
-
 def convertOptimizerToDict(optimizer):
     assert len(optimizer.param_groups) == 1, (
         "Poptorch currently only "

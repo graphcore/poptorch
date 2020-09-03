@@ -3,6 +3,7 @@ import datetime as dt
 import logging
 import os
 import sys
+import subprocess
 import traceback
 
 # Create a poptorch logger which outputs to the console INFO messages and above
@@ -54,7 +55,14 @@ class _PoptorchFormatter(logging.Formatter):
 
 def _excepthook(*args):
     e = traceback.format_exception(*args)
-    logger.critical("%s\n%s", e[-1], "".join(e))
+    extra_info = ""
+    # If the exception was raised by a subprocess print its
+    # stderr / stdout if available.
+    if isinstance(args[1], subprocess.CalledProcessError):
+        extra_info = args[1].stderr or args[1].stdout
+        extra_info = "\n" + extra_info.decode("utf-8")
+
+    logger.critical("%s\n%s%s", e[-1], "".join(e), extra_info)
     sys.exit(1)
 
 

@@ -1,4 +1,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import glob
+import json
+import os
+import torch
 from . import enums
 from .logging import logger
 
@@ -13,9 +17,9 @@ class _OptionsDict:
 
     def set(self, **kwargs):
         for option, value in kwargs.items():
-            assert option in self._values, ("Invalid option %s, valid options"
-                                            " are %s") % (option,
-                                                          self._values.keys())
+            assert self.exists(option), ("Invalid option %s, valid options"
+                                         " are %s") % (option,
+                                                       self._values.keys())
             assert isinstance(
                 value, type(self._values[option])
             ), "Unexpected type %s for option %s. Expected %s" % (
@@ -24,15 +28,18 @@ class _OptionsDict:
 
     def createOrSet(self, **kwargs):
         for option, value in kwargs.items():
-            if option in self._values:
+            if self.exists(option):
                 self.set(option=value)
             else:
                 self._values[option] = value
 
+    def exists(self, option):
+        return option in self._values
+
     def __getattr__(self, option):
-        assert option in self._values, ("Invalid option %s, "
-                                        "valid options are %s") % (
-                                            option, self._values.keys())
+        assert self.exists(
+            option), ("Invalid option %s, "
+                      "valid options are %s") % (option, self._values.keys())
         return self._values[option]
 
     def update(self, other):
@@ -42,9 +49,9 @@ class _OptionsDict:
         return other
 
     def __call__(self, option):
-        assert option in self._values, ("Invalid option %s, "
-                                        "valid options are %s") % (
-                                            option, self._values.keys())
+        assert self.exists(
+            option), ("Invalid option %s, "
+                      "valid options are %s") % (option, self._values.keys())
         return self._values[option]
 
 
@@ -91,11 +98,90 @@ class _PopartOptions:
         return self
 
 
+class _DistributedOptions(_OptionsDict):
+    """Options related to distributed execution.
+
+    Note: hostId and numHosts are set by MPI and therefore are read only.
+    To change the global replication factor change the `np` value used to
+    invoke your script.
+    e.g: mpirun -np 4 myscript.py
+    """
+
+    def __init__(self):
+        super().__init__(num_distributed_hosts=1,
+                         distributed_host_id=0,
+                         ipuof_configs={})
+        self._gcd_mappings = {}
+        self.setEnvVarNames("OMPI_COMM_WORLD_SIZE", "OMPI_COMM_WORLD_RANK")
+
+    def disable(self):
+        self.set(num_distributed_hosts=1, distributed_host_id=0)
+        return self
+
+    def IPUoFConfigFiles(self, files):
+        """ List of IPUoF configuration files to use for the different
+        GCDs
+
+        files: one or more glob compatible expressions
+
+        By default: "~/.ipuof.conf.d/*.conf"
+        """
+        if isinstance(files, str):
+            files = [files]
+        # Find all the config files
+        all_files = []
+        for f in files:
+            all_files += glob.glob(os.path.expanduser(f))
+        # remove duplicates
+        all_files = set(all_files)
+        self._gcd_mappings = {}
+        for f in all_files:
+            id = json.load(open(f))["attributes"].get("GCD Id")
+            gcd = int(id) if id else 0
+            assert gcd not in self._gcd_mappings, (
+                f"Multiple config files "
+                f"are registered to handle GCD {gcd}: {self._gcd_mappings[gcd]}"
+                f" and {f}")
+            self._gcd_mappings[gcd] = f
+        return self
+
+    def setEnvVarNames(self, var_num_hosts, var_host_id):
+        """Set the environment variables names to use to get the number of hosts
+        and the host identifier of the current process.
+
+        By default the OpenMPI "OMPI_COMM_WORLD_SIZE" and "OMPI_COMM_WORLD_RANK"
+        variables are used.
+        """
+        return self.configureProcessId(int(os.environ.get(var_host_id, "0")),
+                                       int(os.environ.get(var_num_hosts, "1")))
+
+    def configureProcessId(self, host_id, num_hosts):
+        """Manually set the current process ID and the total number of hosts.
+        """
+        self.set(distributed_host_id=host_id)
+        self.set(num_distributed_hosts=num_hosts)
+        return self
+
+    def getGcdConfigFile(self):
+        if not self._gcd_mappings:
+            self.IPUoFConfigFiles("~/.ipuof.conf.d/*.conf")
+        return self._gcd_mappings.get(self.hostId)
+
+    @property
+    def hostId(self):
+        return self.distributed_host_id
+
+    @property
+    def numHosts(self):
+        return self.num_distributed_hosts
+
+
 class Options(_OptionsDict):
     def __init__(self):
         self._jit = _JitOptions()
         self._training = _TrainingOptions()
         self._popart = _PopartOptions()
+        self._distributed = _DistributedOptions()
 
         super().__init__(
             replication_factor=1,
@@ -107,6 +193,11 @@ class Options(_OptionsDict):
             connection_type=enums.ConnectionType.Always.value,
             sync_pattern=enums.SyncPattern.Full.value,
         )
+
+    @property
+    def Distributed(self):
+        """Options specific to distributed execution."""
+        return self._distributed
 
     @property
     def Jit(self):
@@ -246,11 +337,12 @@ class Options(_OptionsDict):
         """Set the seed for the random number generator on the IPU.
         """
         assert isinstance(random_seed, int)
+        torch.manual_seed(random_seed)
         self.createOrSet(random_seed=random_seed)
         return self
 
     def toDict(self):
-        """ Merge all the options, except for the Jit ones, into a ringle
+        """ Merge all the options, except for the Jit ones, into a single
         dictionary to be serialised and passed to the cpp side."""
         assert not self.defaultAnchorMode(
         ), "An anchor mode must be picked before serialisation"
@@ -258,4 +350,13 @@ class Options(_OptionsDict):
         out.update(self._popart.options)
         out = self.update(out)
         out = self._training.update(out)
+        out = self._distributed.update(out)
+        config_file = self._distributed.getGcdConfigFile()
+        if self._distributed.numHosts > 1 or config_file:
+            assert config_file, ("No IPUoF configuration file found for "
+                                 "hostId %d" % self._distributed.hostId)
+            os.environ["IPUOF_CONFIG_PATH"] = config_file
+            logger.debug("'IPUOF_CONFIG_PATH' set to %s for hostId %d",
+                         config_file, self._distributed.hostId)
+
         return out
