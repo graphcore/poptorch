@@ -46,17 +46,10 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
     // Create a "normal" convolution.
     return poptorch::createConv(graph, inputs, dilation, groups, {}, padding,
                                 stride);
+  } else {
+    return poptorch::createConvtranspose(graph, inputs, dilation, groups, {},
+                                         {}, {}, padding, stride);
   }
-  ERROR("Transposed convolutions are not currently supported.");
-
-  /* TODO(T22979) Re-enable once PopART supports transposed convolutions.
-  // Output shape.
-  // Give popart the shape of the output so it can autogenerate pads.
-  std::vector<std::int64_t> outputShape = shapeFromTensor(node->output())
-
-  return poptorch::createConvtranspose(graph, inputs, dilation,
-    groups, {}, {}, outputShape, padding, stride);
-  */
 }
 
 torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
