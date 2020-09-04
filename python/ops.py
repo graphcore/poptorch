@@ -4,6 +4,7 @@ import torch
 begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 end_ipu_block = torch.ops.poptorch.end_ipu_block
 ipu_print_tensor = torch.ops.poptorch.ipu_print_tensor
+nop = torch.ops.poptorch.nop
 
 
 def custom_op(inputs, name, domain, domain_version, example_outputs):

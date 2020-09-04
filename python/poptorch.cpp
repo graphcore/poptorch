@@ -35,7 +35,7 @@
 void beginIpuBlock(int64_t ipu_id) { UNUSED(ipu_id); }
 void endIpuBlock() {}
 
-at::Tensor ipuPrintTensor(at::Tensor t) { return t; }
+at::Tensor identityOp(at::Tensor t) { return t; }
 at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   UNUSED(reduction);
   return t;
@@ -58,7 +58,8 @@ customOperation(c10::List<at::Tensor> inputs,            // NOLINT
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
-        .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
+        .op("poptorch::ipu_print_tensor", &identityOp)
+        .op("poptorch::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss);
 //.op("popart::convolution", convolution,

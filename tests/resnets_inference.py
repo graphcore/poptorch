@@ -53,10 +53,8 @@ unsupported_models = [
     models.wide_resnet50_2,  # Supported but doesn't fit on 1 IPU.
     # Supported on IPU_MODEL but runs into stream limit on IPU.
     models.alexnet,
-
-    # Unrelated to us but seems to get stuck in a loop.
-    models.inception_v3,
-    models.googlenet,  # Doesn't seem to support JIT.
+    models.inception_v3,  # TODO(T26199): Output mismatch
+    models.googlenet,  # TODO(T26198): popnn segfault
 ]
 
 
@@ -76,13 +74,16 @@ def inference_harness(imagenet_model):
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(image_input)
 
-    assert torch.allclose(nativeOut, poptorch_out, atol=1e-05)
+    torch.testing.assert_allclose(nativeOut,
+                                  poptorch_out,
+                                  atol=1e-05,
+                                  rtol=0.1)
 
     native_class = torch.topk(torch.softmax(nativeOut, 1), 5)
     pop_class = torch.topk(torch.softmax(poptorch_out, 1), 5)
 
     assert torch.equal(native_class.indices, pop_class.indices)
-    assert torch.allclose(native_class.values, pop_class.values)
+    torch.testing.assert_allclose(native_class.values, pop_class.values)
 
 
 def test_resnet18():
