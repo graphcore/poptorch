@@ -18,8 +18,7 @@ def test_bert_small():
     # It *just* fits on one IPU but if the sequence length is too big it will need two.
     input_ids = torch.tensor([tokenizer.encode("E")])
 
-    opts = poptorch.Options().profile(False)
-    inference_model = poptorch.inferenceModel(model, opts)
+    inference_model = poptorch.inferenceModel(model)
     poptorchOut = inference_model(input_ids)
 
     native = model(input_ids)
@@ -43,9 +42,8 @@ def test_bert_small_half():
     # It *just* fits on one IPU but if the sequence length is too big it will need two.
     input_ids = torch.tensor([tokenizer.encode("E")])
 
-    opts = poptorch.Options().profile(False)
     model.half()
-    inference_model = poptorch.inferenceModel(model, opts)
+    inference_model = poptorch.inferenceModel(model)
     poptorchOut = inference_model(input_ids)
 
     # Just check that we compile for now.
@@ -74,7 +72,7 @@ def test_bert_medium_result():
     start_scores_native, end_scores_native = model(
         input_ids, attention_mask=attention_mask)
 
-    opts = poptorch.Options().profile(False)
+    opts = poptorch.Options()
 
     # Enable pipelining if the test is run on real HW.
     if poptorch.ipuHardwareIsAvailable():

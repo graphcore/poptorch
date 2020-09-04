@@ -101,7 +101,6 @@ class Options(_OptionsDict):
             replication_factor=1,
             device_iterations=1,
             log_dir=".",
-            profile=False,
             anchor_mode=enums.AnchorMode.Default.value,
             anchor_return_period=1,
             use_model=False,
@@ -151,11 +150,6 @@ class Options(_OptionsDict):
     def logDir(self, log_dir):
         """Where to save log files (Default: Current directory)"""
         self.set(log_dir=log_dir)
-        return self
-
-    def profile(self, profile):
-        """Enable profiling (Default: False)"""
-        self.set(profile=profile)
         return self
 
     def useIpuModel(self, use_model):

@@ -102,8 +102,6 @@ public:
 
   popart::SessionOptions popart_options;
   struct Options {
-    // Enable / disable the generation of GraphReport.json
-    bool profile;
     // Number of times the graph will be executed for each execution.
     std::uint64_t steps;
     // Strategy to adopt for returning the graph's output tensors.
@@ -283,9 +281,6 @@ struct SessionOptionsImpl {
 SessionOptionsImpl::SessionOptionsImpl() {
   // The keys must match the name and type of the attributes of SessionOptions
   // in python/__init__.py
-  bool_options["profile"] = [&](bool value) {
-    poptorch_options.profile = value;
-  };
   bool_options["use_model"] = [&](bool value) {
     poptorch_options.ipu_model = value;
   };
@@ -1044,13 +1039,6 @@ void Compiler::initSession(const Optimizer &opt) {
   if (_impl->options_set.count("random_seed")) {
     logging::trace("Setting random seed to: {}", _impl->options.random_seed);
     _impl->session->setRandomSeed(_impl->options.random_seed);
-  }
-
-  if (_impl->options.profile) {
-    std::ofstream stream;
-    stream.open("GraphReport.json");
-    stream << _impl->session->getGraphReport();
-    stream.close();
   }
 }
 

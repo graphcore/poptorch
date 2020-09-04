@@ -10,6 +10,9 @@ are passed into the model wrapper via |anchor_mode| options are Sum, All, Final 
 
 - An Options object can now be passed to poptorch.trainingModel / poptorch.inferenceModel to configure the session and select IPUs
 
+- The 'profile' option has been removed, instead profiling can be enabled by
+setting the environment variable POPLAR_ENGINE_OPTIONS='{autoReport.all:true, autoReport.directory:.}'
+
 - Add support for POPTORCH_IPU_MODEL and POPTORCH_WAIT_FOR_IPU environment variables.
 
 - Adds support for the torch comparisons operations:
