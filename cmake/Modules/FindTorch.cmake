@@ -1,5 +1,6 @@
 set(WhatToDoString "Set Torch_DIR, \
 something like -DTorch_DIR=/path/to/directory/containing/TorchConfig.cmake/")
+set(TorchSupportedVersion 1.5.0)
 
 execute_process(COMMAND python3 -c "import torch; from pathlib import Path; print(Path(torch.__file__).parent, end='')"
                 OUTPUT_VARIABLE TorchInit_PATH)
@@ -9,9 +10,16 @@ execute_process(COMMAND
 python3 -c "import torch; print('1' if torch.compiled_with_cxx11_abi() else '0', end='')"
                 OUTPUT_VARIABLE Torch_USE_CXX11_ABI)
 
+execute_process(COMMAND python3 -c "import torch; print(torch.__version__.split('+')[0])"
+  OUTPUT_VARIABLE TorchVersion)
+
 find_library(LibTorch torch ${TorchInit_PATH}/lib)
 if (NOT LibTorch)
   message(FATAL_ERROR "Could not find shared library for torch.")
+endif()
+
+if (NOT TorchVersion VERSION_EQUAL TorchSupportedVersion)
+  message(FATAL_ERROR "Torch version mismatch: expected ${TorchSupportedVersion} but got ${TorchVersion}")
 endif()
 
 find_library(LibTorchPython torch_python ${TorchInit_PATH}/lib)
