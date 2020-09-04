@@ -15,6 +15,7 @@ from . import _impl
 from .enums import *
 from .ops import *
 from .options import *
+from . import distributed
 
 
 class IPU(nn.Module):
