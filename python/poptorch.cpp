@@ -369,9 +369,13 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
     for (const torch::jit::IValue &value : input_stack) {
       buildTensorList(value, &input_tensors);
     }
+    std::vector<at::Tensor> traced_tensors;
+    for (const torch::jit::IValue &value : graph_and_tensors.second) {
+      buildTensorList(value, &traced_tensors);
+    }
 
-    std::vector<std::string> parameters = getParameterNames(
-        parameter_names, parameter_tensors, graph_and_tensors.second);
+    std::vector<std::string> parameters =
+        getParameterNames(parameter_names, parameter_tensors, traced_tensors);
 
     Optimizer optimizer = parseOptimizer(optimizerDict);
 
@@ -391,7 +395,7 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
                    "constants inputs:\n{}",
                    *graph);
     poptorch::type_and_constant_canonicalization::makeConstantIntParams(
-        graph.get(), parameters, graph_and_tensors.second);
+        graph.get(), parameters, traced_tensors);
 
     logging::trace("Graph right before casting unsupported inputs:\n{}",
                    *graph);
@@ -408,8 +412,7 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
 
     // Convert the IR to half to match the inputs/actual usage.
     logging::debug("Graph before canonicalising half:\n{}", *graph);
-    poptorch::canonicaliseHalf(graph.get(), input_tensors,
-                               graph_and_tensors.second);
+    poptorch::canonicaliseHalf(graph.get(), input_tensors, traced_tensors);
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
 
@@ -430,7 +433,7 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
     logging::debug("Graph right before popart:\n{}", *graph);
 
     return poptorch::lowerToPopart(graph.get(), &input_tensors,
-                                   std::move(graph_and_tensors.second),
+                                   std::move(traced_tensors),
                                    std::move(parameters), training, optimizer,
                                    parseSessionOptions(options));
   }
@@ -452,9 +455,13 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
     auto graph_and_tensors =
         torch::jit::LowerGraph(*arg_graph, module->_ivalue());
     auto graph = graph_and_tensors.first;
+    std::vector<at::Tensor> parameter_data;
+    for (const torch::jit::IValue &value : graph_and_tensors.second) {
+      buildTensorList(value, &parameter_data);
+    }
     graph->dump();
-    std::vector<std::string> parameters = getParameterNames(
-        parameter_names, parameter_tensors, graph_and_tensors.second);
+    std::vector<std::string> parameters =
+        getParameterNames(parameter_names, parameter_tensors, parameter_data);
 
     int loop_count = 0;
     std::string graph_string;
@@ -512,7 +519,6 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
     }
 
     // Find the parameter data from.
-    std::vector<at::Tensor> parameter_data = graph_and_tensors.second;
     std::cout << "There should be " << parameter_data.size()
               << " parameters.\n";
 

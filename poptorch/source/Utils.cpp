@@ -78,44 +78,40 @@ bool shouldDestroy(torch::jit::Node *node) {
 
 // Store the inputs used by this node.
 // Ops may use the same input twice, so use a set to store only unique inputs.
-std::unordered_set<torch::jit::Value *> copyInputs(torch::jit::Node *node) {
-  std::unordered_set<torch::jit::Value *> inputs;
+std::unordered_set<torch::jit::Node *> copyInputs(torch::jit::Node *node) {
+  std::unordered_set<torch::jit::Node *> inputs;
   for (torch::jit::Value *user : node->inputs()) {
-    inputs.insert(user);
+    inputs.insert(user->node());
   }
   return inputs;
 }
-} // namespace
 
-void searchAndPossiblyDestroy(torch::jit::Node *node) {
+void searchAndPossiblyDestroyInternal(
+    torch::jit::Node *node, std::unordered_set<torch::jit::Node *> *destroyed) {
+  if (destroyed->count(node)) {
+    return;
+  }
   if (!shouldDestroy(node)) {
     return;
   }
 
   auto inputs = copyInputs(node);
   node->destroy();
+  destroyed->insert(node);
 
   // If any of the previously used values now have no users repeat the process
   // for them.
   for (auto *user : inputs) {
-    searchAndPossiblyDestroy(user->node());
+    searchAndPossiblyDestroyInternal(user, destroyed);
   }
 }
+} // namespace
 
-void searchAndPossiblyDestroy(torch::jit::graph_node_list_iterator *node_it) {
-  torch::jit::Node *node = **node_it;
-
-  if (!shouldDestroy(node)) {
-    return;
-  }
-
-  auto inputs = copyInputs(node);
-
-  // Delete the node without invalidating iterator
-  node_it->destroyCurrent();
-
-  for (auto *user : inputs) {
-    searchAndPossiblyDestroy(user->node());
+void searchAndPossiblyDestroy(
+    const std::unordered_set<torch::jit::Node *> &to_test) {
+  std::unordered_set<torch::jit::Node *> destroyed;
+  for (auto node : to_test) {
+    searchAndPossiblyDestroyInternal(node, &destroyed);
   }
 }
 

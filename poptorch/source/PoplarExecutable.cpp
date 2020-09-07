@@ -72,7 +72,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
       break;
     default:
       ERROR("Unsupported input type torch."
-            << torch::getDtype(elem_type)->name);
+            << torch::getTHPDtype(elem_type)->name);
     }
   }
 

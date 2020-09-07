@@ -182,9 +182,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   }
 
   // Remove the dead nodes.
-  for (torch::jit::Node *node : to_delete) {
-    searchAndPossiblyDestroy(node);
-  }
+  searchAndPossiblyDestroy(to_delete);
 }
 
 } // namespace

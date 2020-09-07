@@ -28,8 +28,8 @@ def test_inference():
 
     model = BasicNetwork()
 
-    x = torch.full((1, 8), 2)
-    bias = torch.full((1, 8), 4)
+    x = torch.full((1, 8), 2.0)
+    bias = torch.full((1, 8), 4.0)
 
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x, bias)
@@ -60,7 +60,7 @@ def test_training():
     model = TrainingNetwork()
 
     x = torch.rand((1, 100))
-    bias = torch.full((1, 100), 2)
+    bias = torch.full((1, 100), 2.0)
 
     y = torch.full([1], 42, dtype=torch.long)
 

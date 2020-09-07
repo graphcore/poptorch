@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <string>
+#include <unordered_set>
 
 namespace poptorch {
 
@@ -15,11 +16,8 @@ std::string nodeToString(const torch::jit::Node *node);
 std::string scalarTypeToOnnxString(at::ScalarType type);
 
 // Delete a node and also its users if they are also unused.
-void searchAndPossiblyDestroy(torch::jit::Node *node);
-
-// Delete a node and also its users if they are also unused
-// via an iterator
-void searchAndPossiblyDestroy(torch::jit::graph_node_list_iterator *node_it);
+void searchAndPossiblyDestroy(
+    const std::unordered_set<torch::jit::Node *> &to_test);
 
 } // namespace poptorch
 

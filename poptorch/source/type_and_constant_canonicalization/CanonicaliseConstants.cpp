@@ -102,6 +102,7 @@ void handleStringConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
 
 void canonicaliseConstants(torch::jit::Graph *graph) {
   auto nodes = graph->nodes();
+  std::unordered_set<torch::jit::Node *> to_delete;
   for (auto it = nodes.begin(); it != nodes.end(); it++) {
     auto node = *it;
 
@@ -114,7 +115,11 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
                                                       c10::nullopt, 1, false));
     }
 
-    if (node->kind() != c10::prim::Constant) {
+    // If it's not a constant or if it doesn't have a value (i.e is None) or if
+    // it's a Device
+    if (node->kind() != c10::prim::Constant ||
+        !node->hasAttribute(c10::attr::value) ||
+        node->output()->type()->isSubtypeOf(c10::DeviceObjType::get())) {
       continue;
     }
 
@@ -128,10 +133,13 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
     } else if (node->output()->type()->isSubtypeOf(c10::StringType::get())) {
       logging::LogContext ctx2("handling as string constant");
       handleStringConstant(graph, node);
+    } else {
+      ERROR("Unsupported type " << node->output()->type()->str());
     }
 
-    searchAndPossiblyDestroy(&it);
+    to_delete.insert(*it);
   }
+  searchAndPossiblyDestroy(to_delete);
 }
 
 } // namespace type_and_constant_canonicalization

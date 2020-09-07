@@ -73,7 +73,7 @@ void checkAndChangeOutputTypesForOutput(torch::jit::Node *node,
 
   ERROR_ON_MSG(!supportedType(*tensor_type->scalarType()),
                "Returning a torch."
-                   << torch::getDtype(*tensor_type->scalarType())->name
+                   << torch::getTHPDtype(*tensor_type->scalarType())->name
                    << " is not supported.\n");
 
   maybeReplaceOutputType(node, output, tensor_type.get(),

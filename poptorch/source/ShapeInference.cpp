@@ -141,7 +141,7 @@ void inferShapeAdaptiveAvgPool2d(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get data for shape input.");
     return;
   }
-  auto i1_data = node->input(1)->node()->is(c10::attr::value);
+  auto i1_data = node->input(1)->node()->ival(c10::attr::value).toIntVector();
 
   std::vector<int64_t> result_shape{i0_shape.at(0)};
   if (i0_shape.size() == 4) {
@@ -240,23 +240,29 @@ void inferShapeConv2d(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get stride");
     return;
   }
-  auto stride_data =
-      node->input(stride_input_index)->node()->is(c10::attr::value);
+  auto stride_data = node->input(stride_input_index)
+                         ->node()
+                         ->ival(c10::attr::value)
+                         .toIntVector();
 
   if (node->input(padding_input_index)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get padding\n");
     return;
   }
-  auto padding_data =
-      node->input(padding_input_index)->node()->is(c10::attr::value);
+  auto padding_data = node->input(padding_input_index)
+                          ->node()
+                          ->ival(c10::attr::value)
+                          .toIntVector();
 
   if (node->input(dilation_input_index)->node()->kind() !=
       c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get dilation\n");
     return;
   }
-  auto dilation_data =
-      node->input(dilation_input_index)->node()->is(c10::attr::value);
+  auto dilation_data = node->input(dilation_input_index)
+                           ->node()
+                           ->ival(c10::attr::value)
+                           .toIntVector();
 
   auto input_shape = *input_type->sizes().concrete_sizes();
   auto weight_shape = *weight_type->sizes().concrete_sizes();
@@ -309,30 +315,38 @@ void inferShapeMaxPool2d(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get kernel\n");
     return;
   }
-  auto kernel_data =
-      node->input(kernel_input_index)->node()->is(c10::attr::value);
+  auto kernel_data = node->input(kernel_input_index)
+                         ->node()
+                         ->ival(c10::attr::value)
+                         .toIntVector();
 
   if (node->input(stride_input_index)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get stride\n");
     return;
   }
-  auto stride_data =
-      node->input(stride_input_index)->node()->is(c10::attr::value);
+  auto stride_data = node->input(stride_input_index)
+                         ->node()
+                         ->ival(c10::attr::value)
+                         .toIntVector();
 
   if (node->input(padding_input_index)->node()->kind() != c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get padding\n");
     return;
   }
-  auto padding_data =
-      node->input(padding_input_index)->node()->is(c10::attr::value);
+  auto padding_data = node->input(padding_input_index)
+                          ->node()
+                          ->ival(c10::attr::value)
+                          .toIntVector();
 
   if (node->input(dilation_input_index)->node()->kind() !=
       c10::prim::Constant) {
     logging::err("Cannot infer shape, unable to get dilation\n");
     return;
   }
-  auto dilation_data =
-      node->input(dilation_input_index)->node()->is(c10::attr::value);
+  auto dilation_data = node->input(dilation_input_index)
+                           ->node()
+                           ->ival(c10::attr::value)
+                           .toIntVector();
 
   std::vector<int64_t> out_shape{n, c};
 
@@ -364,7 +378,8 @@ void inferShapeView(torch::jit::Node *node) {
     logging::err("Cannot infer shape, unable to get data for shape input\n");
     return;
   }
-  auto shape_data = node->input(1)->node()->is(c10::attr::value);
+  auto shape_data =
+      node->input(1)->node()->ival(c10::attr::value).toIntVector();
 
   auto get_number_elements = [](auto shape) {
     int64_t number_elements = 1;
