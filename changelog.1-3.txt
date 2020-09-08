@@ -59,3 +59,7 @@ setting the environment variable POPLAR_ENGINE_OPTIONS='{autoReport.all:true, au
 - Adds poptorch.DataLoader
 
 - Adds support for torch.norm
+
+- Upgraded from torch 1.5.0 to torch 1.6.0
+
+- Added experimental support for single host distributed execution

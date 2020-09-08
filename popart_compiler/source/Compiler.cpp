@@ -918,12 +918,21 @@ void Compiler::initSession(const Optimizer &opt) {
                            << _impl->options.ipu_id
                            << _impl->checkSystemConfig());
           ERROR_ON_MSG(device && static_cast<std::uint64_t>(
-                                     device->getNumIpus()) != num_ipus,
-                       "Expected replication factor * used IPUs = "
+                                     device->getNumIpus()) < num_ipus,
+                       "Expected at least replication factor * used IPUs = "
                            << _impl->used_ipus.size() << " * "
                            << options.replicatedGraphCount << " = " << num_ipus
                            << " device Ids but the user provided "
                            << device->getNumIpus());
+          if (device &&
+              static_cast<std::uint64_t>(device->getNumIpus()) != num_ipus) {
+            logging::warn(
+                "Expected replication factor * used IPUs = {} * {} "
+                "= {} device Ids but the device selected has {} IPUs which "
+                "means some of them will not be used.",
+                _impl->used_ipus.size(), options.replicatedGraphCount, num_ipus,
+                device->getNumIpus());
+          }
           if (device) {
             logging::debug("Acquired IPU device with id {}, running on device.",
                            _impl->options.ipu_id);

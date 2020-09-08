@@ -14,7 +14,7 @@ class IncrementDataset(torch.utils.data.Dataset):
         return self._length
 
     def __getitem__(self, index):
-        return torch.full(self._shape, index)
+        return torch.full(self._shape, index, dtype=torch.float32)
 
 
 class IncrementDatasetWithLabels(torch.utils.data.Dataset):
@@ -26,8 +26,8 @@ class IncrementDatasetWithLabels(torch.utils.data.Dataset):
         return self._length
 
     def __getitem__(self, index):
-        return (torch.full(self._shape, index), torch.full((1, ),
-                                                           index).long())
+        return (torch.full(self._shape, index, dtype=torch.float32),
+                torch.full((1, ), index, dtype=torch.long))
 
 
 class CheckOrderModel(torch.nn.Module):
@@ -63,11 +63,13 @@ def _run_test(shape=None,
                                batch_size=batch_size,
                                num_workers=num_workers)
 
+    assert len(data) == num_tensors // (device_iterations * batch_size *
+                                        replication_factor)
     model = poptorch.inferenceModel(CheckOrderModel(), opts)
     for it, d in enumerate(data):
         expected = torch.from_numpy(
             numpy.stack([
-                numpy.full(shape, i, dtype=float)
+                numpy.full(shape, i, dtype=numpy.float32)
                 for i in range(data.combinedBatchSize *
                                it, data.combinedBatchSize * (it + 1))
             ]))
@@ -132,7 +134,7 @@ def _run_process_test(shape=None,
         out = model(d)
 
         expected = torch.stack([
-            torch.full(shape, i * 2)
+            torch.full(shape, i * 2, dtype=torch.float32)
             for i in range(data.combinedBatchSize *
                            it, data.combinedBatchSize * (it + 1))
         ])
@@ -209,3 +211,46 @@ def test_multithreaded4():
                             device_iterations=10,
                             replication_factor=1,
                             num_workers=0)
+
+
+def _run_dataset_test(shape=None,
+                      num_tensors=100,
+                      batch_size=1,
+                      num_workers=0,
+                      device_iterations=1,
+                      replication_factor=1,
+                      host_id=0,
+                      num_hosts=1):
+    shape = shape or [2, 3]
+
+    opts = poptorch.Options()
+    opts.deviceIterations(device_iterations)
+    opts.replicationFactor(replication_factor)
+    opts.Distributed.configureProcessId(host_id, num_hosts)
+
+    data = poptorch.DataLoader(opts,
+                               IncrementDataset(shape, num_tensors),
+                               batch_size=batch_size,
+                               num_workers=num_workers)
+
+    offset = host_id * (num_tensors // num_hosts)
+    assert len(data) == num_tensors // (device_iterations * batch_size *
+                                        replication_factor * num_hosts)
+    for it, d in enumerate(data):
+        expected = torch.from_numpy(
+            numpy.stack([
+                numpy.full(shape, offset + i, dtype=numpy.float32)
+                for i in range(data.combinedBatchSize *
+                               it, data.combinedBatchSize * (it + 1))
+            ]))
+        diff = torch.sum(torch.sum(d - expected))
+
+    numpy.testing.assert_array_equal(diff.numpy(), [0.])
+
+
+def test_subdataset():
+    _run_dataset_test(batch_size=4, host_id=0, num_hosts=2)
+
+
+def test_subdataset2():
+    _run_dataset_test(batch_size=2, host_id=1, num_hosts=2)
