@@ -22,14 +22,11 @@ def test_constant_buffer():
 
     poptorch_model = poptorch.inferenceModel(model)
     assert poptorch_model(torch.tensor([2])) == 15
-    #Unfortnately any future tests will fail due to popart implacing issue
 
 
-@pytest.mark.xfail(strict=True)
 def test_constant_buffer_repeat():
     model = ConstantBuffer()
 
     poptorch_model = poptorch.inferenceModel(model)
     assert poptorch_model(torch.tensor([2])) == 15
     assert poptorch_model(torch.tensor([2])) == 15
-    #Expect this to fail for now
