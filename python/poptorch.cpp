@@ -35,6 +35,12 @@
 void beginIpuBlock(int64_t ipu_id) { UNUSED(ipu_id); }
 void endIpuBlock() {}
 
+at::Tensor setAvailableMemory(at::Tensor t, double mem) {
+  UNUSED(mem);
+  return t;
+}
+
+at::Tensor ipuPrintTensor(at::Tensor t) { return t; }
 at::Tensor identityOp(at::Tensor t) { return t; }
 at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   UNUSED(reduction);
@@ -61,7 +67,8 @@ static auto registry =
         .op("poptorch::ipu_print_tensor", &identityOp)
         .op("poptorch::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
-        .op("poptorch::identity_loss", &identityLoss);
+        .op("poptorch::identity_loss", &identityLoss)
+        .op("poptorch::set_available_memory", &setAvailableMemory);
 //.op("popart::convolution", convolution,
 // torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));
 
@@ -177,11 +184,19 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
                                    castToString(option).c_str());
       }
     } else if (py::isinstance<py::dict>(element.second)) {
-      for (auto option : element.second.cast<py::dict>()) {
-        options.insertStringPairOption(
-            element.first.cast<std::string>().c_str(),
-            option.first.cast<std::string>().c_str(),
-            castToString(option.second).c_str());
+      const std::string id = element.first.cast<std::string>();
+
+      if (id == "available_memory_proportion") {
+        for (auto option : element.second.cast<py::dict>()) {
+          options.setMemoryProportion(option.first.cast<std::uint64_t>(),
+                                      option.second.cast<float>());
+        }
+      } else {
+        for (auto option : element.second.cast<py::dict>()) {
+          options.insertStringPairOption(
+              id.c_str(), option.first.cast<std::string>().c_str(),
+              castToString(option.second).c_str());
+        }
       }
     } else {
       ERROR("Unknown option type " << element.second.get_type());

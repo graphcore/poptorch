@@ -135,7 +135,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 
 #define OP_CONVERTOR_POP(Sym, PreBuildCalls, PopartBuilder, Params)            \
   else if (kind == Sym) { /* NOLINT */                                         \
-    PreBuildCalls newNode = PopartBuilder(graph, Params);                      \
+    PreBuildCalls new_node = PopartBuilder(graph, Params);                     \
   }
 #include "CanonicalizationOps.h.inc"
 

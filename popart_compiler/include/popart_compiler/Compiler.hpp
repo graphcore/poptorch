@@ -112,6 +112,8 @@ public:
   SessionOptions(const SessionOptions &) = delete;
   SessionOptions &operator=(const SessionOptions &) = delete;
 
+  void setMemoryProportion(std::uint32_t ipu, float memory);
+
   void addStringOption(const char *option, const char *value);
   void addUint64Option(const char *option, std::uint64_t value);
   void addBoolOption(const char *option, bool value);
@@ -229,6 +231,10 @@ public:
 
   void setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
                      const std::vector<std::int64_t> &dims);
+
+  void
+  setAvailableMemoryProportion(const std::vector<poptorch::TensorId> &inputs,
+                               float availableMemoryProportion);
 
   void setActiveIpu(std::uint64_t id);
 

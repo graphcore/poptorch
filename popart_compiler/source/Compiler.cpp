@@ -120,6 +120,11 @@ public:
     popart::DeviceConnectionType connection_type;
     popart::SyncPattern sync_pattern;
     std::uint64_t random_seed;
+
+    // The frontend will unpack the user option and pass it directly in as
+    // [IPU_ID] = Memory proportion for that IPU
+    std::unordered_map<std::uint32_t, float> available_memory_proportion;
+
     // When running in distributed mode: number of hosts the training is split
     // over.
     std::uint64_t num_distributed_hosts;
@@ -264,6 +269,7 @@ struct SessionOptionsImpl {
   std::map<std::string, std::function<void(std::uint64_t)>> uint64_options;
   std::map<std::string, std::function<void(std::string)>> string_options;
   std::map<std::string, std::function<void(double)>> double_options;
+
   std::map<std::string,
            std::function<void(std::pair<std::string, std::string>)>>
       container_options;
@@ -271,6 +277,10 @@ struct SessionOptionsImpl {
 
   popart::SessionOptions popart_options;
   CompilerImpl::Options poptorch_options;
+
+  void setMemoryProportion(std::uint32_t ipu, float memory) {
+    poptorch_options.available_memory_proportion[ipu] = memory;
+  }
 
   template <typename ValueType>
   void set(const std::string &key, ValueType value,
@@ -544,12 +554,23 @@ template <typename T> struct HandleOutput {
   poptorch::TensorId operator()(T &in, bool loss, detail::CompilerImpl *_impl) {
     std::set<popart::TensorId> ids;
 
+    // See if any available memory has been set for this IPU.
+    auto itr =
+        _impl->options.available_memory_proportion.find(_impl->active_ipu);
+
     for (const popart::TensorId &id : in) {
       ids.insert(id);
       _impl->ids.push_back(id);
 
       if (loss) {
         _impl->losses.push_back(id);
+      }
+
+      // If this tensor needs a memory proportion, set it.
+      if (itr != _impl->options.available_memory_proportion.end()) {
+        logging::info("Setting memory proportion on tensor {} to {}. On IPU {}",
+                      in, itr->second, itr->first);
+        _impl->op_builder->setAvailableMemoryProportion(id, itr->second);
       }
     }
 
@@ -565,6 +586,15 @@ template <typename T> struct HandleOutput {
 template <> struct HandleOutput<popart::TensorId> {
   poptorch::TensorId operator()(const popart::TensorId &in, bool loss,
                                 detail::CompilerImpl *_impl) {
+    // See if any available memory has been set for this IPU.
+    auto itr =
+        _impl->options.available_memory_proportion.find(_impl->active_ipu);
+    if (itr != _impl->options.available_memory_proportion.end()) {
+      logging::info("Setting memory proportion on tensor {} to {}. On IPU {}",
+                    in, itr->second, itr->first);
+      _impl->op_builder->setAvailableMemoryProportion(in, itr->second);
+    }
+
     _impl->op_builder->virtualGraph(in, _impl->active_ipu);
     _impl->used_ipus.insert(_impl->active_ipu);
     _impl->ids.push_back(in);
@@ -1229,6 +1259,15 @@ std::uint64_t Compiler::popartBatchDimForAnchor(poptorch::TensorId id) const {
   return _impl->popart_options.replicatedGraphCount;
 }
 
+void Compiler::setAvailableMemoryProportion(
+    const std::vector<poptorch::TensorId> &inputs,
+    float availableMemoryProportion) {
+  for (const poptorch::TensorId &id : inputs) {
+    _impl->op_builder->setAvailableMemoryProportion(_impl->ids[id],
+                                                    availableMemoryProportion);
+  }
+}
+
 Compiler::Compiler(Compiler &&compiler) { _impl = std::move(compiler._impl); }
 
 Compiler::Compiler(bool is_training, const SessionOptions &options) {
@@ -1294,6 +1333,10 @@ void SessionOptions::insertStringPairOption(const char *option, const char *key,
                                             const char *value) {
   _impl->set(option, std::pair<std::string, std::string>(key, value),
              _impl->container_options, "map");
+}
+
+void SessionOptions::setMemoryProportion(std::uint32_t ipu, float memory) {
+  _impl->setMemoryProportion(ipu, memory);
 }
 
 SessionOptions::~SessionOptions() = default;

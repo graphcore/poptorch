@@ -420,6 +420,25 @@ void LowerToPopart::lowerBody() {
       _compiler.setActiveIpu(node->i(c10::Symbol::fromQualString("attr::ipu")));
     } else if (kind == symbols::poptorch::end_ipu_block) {
       // NOP for now.
+    } else if (kind == symbols::poptorch::set_available_memory) {
+      // Get the torch jit SSA for the input/output values.
+      std::vector<poptorch::TensorId> inputs;
+      std::transform(node->inputs().begin(), node->inputs().end(),
+                     std::back_inserter(inputs), [&](torch::jit::Value *val) {
+                       // Tuples aren't supported here but it's ok because
+                       // we don't support any operations which actually take in
+                       // tuples.
+                       return _valueMap.tensor(val);
+                     });
+
+      _compiler.setAvailableMemoryProportion(
+          inputs, node->f(c10::Symbol::fromQualString(
+                      "attr::availableMemoryProportion")));
+
+      for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
+        _valueMap.setTensor(node->output(i), inputs[i]);
+      }
+
     } else if (kind == c10::prim::TupleConstruct ||
                kind == c10::prim::ListConstruct) {
       // Get the torch jit SSA for the input/output values.

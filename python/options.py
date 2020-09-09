@@ -28,8 +28,8 @@ class _OptionsDict:
 
     def createOrSet(self, **kwargs):
         for option, value in kwargs.items():
-            if self.exists(option):
-                self.set(option=value)
+            if option in self._values:
+                self.set(**{option: value})
             else:
                 self._values[option] = value
 
@@ -183,16 +183,15 @@ class Options(_OptionsDict):
         self._popart = _PopartOptions()
         self._distributed = _DistributedOptions()
 
-        super().__init__(
-            replication_factor=1,
-            device_iterations=1,
-            log_dir=".",
-            anchor_mode=enums.AnchorMode.Default.value,
-            anchor_return_period=1,
-            use_model=False,
-            connection_type=enums.ConnectionType.Always.value,
-            sync_pattern=enums.SyncPattern.Full.value,
-        )
+        super().__init__(replication_factor=1,
+                         device_iterations=1,
+                         log_dir=".",
+                         anchor_mode=enums.AnchorMode.Default.value,
+                         anchor_return_period=1,
+                         use_model=False,
+                         connection_type=enums.ConnectionType.Always.value,
+                         sync_pattern=enums.SyncPattern.Full.value,
+                         available_memory_proportion={})
 
     @property
     def Distributed(self):
@@ -225,6 +224,22 @@ class Options(_OptionsDict):
         """Enable pipelining of virtual graphs (Default: False if 1 IPU used,
         True otherwise)"""
         self.createOrSet(enable_pipelining=enable_pipelining)
+        return self
+
+    def setAvailableMemoryProportion(self, available_memory_proportion):
+        """Memory is set on a per IPU basis, this should be a list of float values between 0 and 1."""
+        actual_memory = {}
+
+        for key in available_memory_proportion:
+            assert "IPU" in key, """Available memory proportions are expected
+                                    to be in a dictionary of {\"IPU0\": 0.5}
+                                    where the 0 in IPU is the index of the
+                                    IPU."""
+
+            ipu_id = int(key[3:])
+            actual_memory[ipu_id] = available_memory_proportion[key]
+
+        self.createOrSet(available_memory_proportion=actual_memory)
         return self
 
     def replicationFactor(self, replication_factor):

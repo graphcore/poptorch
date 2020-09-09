@@ -3,6 +3,7 @@
 
 import torch
 import poptorch
+from torch import nn
 
 import pytest
 
@@ -115,3 +116,68 @@ def test_conv3D(op):
                    dilation=(3, 1, 1))
 
         execute_and_check_wrapper(model, input)
+
+
+def test_available_memory():
+    torch.manual_seed(42)
+    input = torch.randn(2, 4, 3, 10)
+
+    class BasicNetwork(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 4, 3, stride=2)
+
+        def forward(self, x):
+            out = self.conv(x)
+            out = poptorch.set_available_memory(out, 0.6)
+            return out
+
+    # Just check we don't explode when the value is set.
+    model = BasicNetwork()
+    execute_and_check_wrapper(model, input)
+
+
+def test_available_memory_automatic():
+    torch.manual_seed(42)
+
+    # Just check we don't explode when the value is set.
+    class Network(nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            self.layer1 = nn.Sequential(nn.Conv2d(1, 10, 5), nn.MaxPool2d(2),
+                                        nn.ReLU())
+            self.layer2 = nn.Sequential(nn.Conv2d(10, 20, 5), nn.MaxPool2d(2),
+                                        nn.ReLU())
+            self.layer3 = nn.Linear(320, 256)
+            self.layer3_act = nn.ReLU()
+            self.layer4 = nn.Linear(256, 10)
+
+            self.softmax = nn.LogSoftmax(1)
+
+        def forward(self, x):
+            x = self.layer1(x)
+            x = self.layer2(x)
+            x = x.view(-1, 320)
+
+            x = self.layer3_act(self.layer3(x))
+            x = self.layer4(x)
+            x = self.softmax(x)
+            return x
+
+    model = Network()
+    # Run on CPU.
+    input = torch.randn(2, 1, 28, 28)
+    nativeOut = model(input)
+
+    # Run on IPU.
+    opts = poptorch.Options()
+    opts.setAvailableMemoryProportion(available_memory_proportion={
+        "IPU0": 0.7,
+        "IPU1": 0.2
+    })
+
+    poptorch_model = poptorch.inferenceModel(model, opts)
+    poptorch_out = poptorch_model(input)
+
+    torch.testing.assert_allclose(poptorch_out, nativeOut)

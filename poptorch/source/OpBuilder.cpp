@@ -381,6 +381,16 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
+                                           torch::jit::Value *value,
+                                           float proportion) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::set_available_memory, {value});
+  new_node->f_(c10::Symbol::fromQualString("attr::availableMemoryProportion"),
+               proportion);
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */
