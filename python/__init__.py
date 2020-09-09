@@ -88,6 +88,7 @@ class DataLoader(torch.utils.data.DataLoader):
                          batch_size=self._combined_batch_size,
                          shuffle=shuffle,
                          num_workers=num_workers,
+                         drop_last=drop_last,
                          **kwargs)
 
     @property
@@ -126,7 +127,7 @@ class AsynchronousDataAccessor:
     def terminate(self):
         self._data_fetcher.terminate()
 
-    def fetch_data(self, queue):
+    def fetch_data(self, queue, setup_complete):
         dataset_iterator = iter(self._training_data)
 
         data = next(dataset_iterator)
@@ -217,6 +218,10 @@ class AsynchronousDataAccessor:
             if not any_data_sent:
                 time.sleep(self._miss_sleep_time_in_ms)
 
+        # In the unlikely event the worker is done reading the dataset
+        # before the parent is done setting the buffers up: wait here.
+        setup_complete.get()
+
     def __iter__(self):
 
         # We use a small queue to get the initial data. The latency of
@@ -226,9 +231,15 @@ class AsynchronousDataAccessor:
         # in the hot loop.
         queue = multiprocessing.Queue()
 
+        # If the worker exits before the parent process is done
+        # setting up the _data_buffers then the queue will get freed
+        # and bad things will happen.
+        setup_complete = multiprocessing.Queue()
+
         # Fetch the data on a seperate process.
         self._data_fetcher = multiprocessing.Process(target=self.fetch_data,
-                                                     args=(queue, ))
+                                                     args=(queue,
+                                                           setup_complete))
         self._data_fetcher.start()
 
         self._ready_to_read_index = queue.get(block=True)
@@ -243,6 +254,9 @@ class AsynchronousDataAccessor:
             # Get the buffer from the host.
             buffer = queue.get(block=True)
             self._data_buffers.append(buffer)
+
+        # We're all set: let the worker know.
+        setup_complete.put(0)
 
         return self
 
@@ -274,6 +288,8 @@ class AsynchronousDataAccessor:
             # Processed all data and the process is dead, EOF.
             process_dead = not self._data_fetcher.is_alive()
             if self._previously_ready_element is None and process_dead:
+                assert self._data_fetcher.exitcode == 0, \
+                        "An error occurred in the data fetcher"
                 raise StopIteration
 
         # Return either one tensor or the list.
