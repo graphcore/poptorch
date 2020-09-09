@@ -126,9 +126,7 @@ if (DEFINED SWDB_PACKAGE_NAME)
   message(STATUS "Overriding package type '${PACKAGE_OS_TYPE}'")
 endif()
 
-execute_process(
-  COMMAND python -c "import torch ; print(torch.version.__version__.split('+')[0])"
-  OUTPUT_VARIABLE EXPECTED_TORCH_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+find_package(Torch REQUIRED)
 
 configure_file(setup.py.in
   ${PROJECT_BINARY_DIR}/setup.py

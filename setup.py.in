@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
     LONG_DESCRIPTION = fh.read()
 
 REQUIRES = [
-    'torch==@EXPECTED_TORCH_VERSION@',
+    'torch==@TorchSupportedVersion@',
 ],
 
 setup(
