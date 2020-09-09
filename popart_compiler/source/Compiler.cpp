@@ -554,10 +554,6 @@ template <typename T> struct HandleOutput {
   poptorch::TensorId operator()(T &in, bool loss, detail::CompilerImpl *_impl) {
     std::set<popart::TensorId> ids;
 
-    // See if any available memory has been set for this IPU.
-    auto itr =
-        _impl->options.available_memory_proportion.find(_impl->active_ipu);
-
     for (const popart::TensorId &id : in) {
       ids.insert(id);
       _impl->ids.push_back(id);
@@ -565,15 +561,7 @@ template <typename T> struct HandleOutput {
       if (loss) {
         _impl->losses.push_back(id);
       }
-
-      // If this tensor needs a memory proportion, set it.
-      if (itr != _impl->options.available_memory_proportion.end()) {
-        logging::info("Setting memory proportion on tensor {} to {}. On IPU {}",
-                      in, itr->second, itr->first);
-        _impl->op_builder->setAvailableMemoryProportion(id, itr->second);
-      }
     }
-
     _impl->op_builder->virtualGraph(ids, _impl->active_ipu);
     _impl->used_ipus.insert(_impl->active_ipu);
 
