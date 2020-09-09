@@ -36,6 +36,12 @@ class _OptionsDict:
     def exists(self, option):
         return option in self._values
 
+    def __getstate__(self):
+        return self._values
+
+    def __setstate__(self, state):
+        self._values = state
+
     def __getattr__(self, option):
         assert self.exists(
             option), ("Invalid option %s, "
