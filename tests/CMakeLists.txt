@@ -36,6 +36,7 @@ add_poptorch_py_unit_test(resnets_inference)
 add_poptorch_py_unit_test(shape_inference)
 add_poptorch_py_unit_test(tensor_ops)
 add_poptorch_py_unit_test(type_support1)
+add_poptorch_py_unit_test(torch_nn)
 add_poptorch_py_unit_test(weights_writing)
 
 #############

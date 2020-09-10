@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import inspect
 import torch
 import torch.optim as optim
 import poptorch.poptorch_core as poptorch_core
@@ -105,21 +106,21 @@ class ArgsParser:
 
     def __init__(self, model):
         # Combine args and kwargs:
-        fn = model.forward
-        varnames = fn.__code__.co_varnames
-        # Don't count 'self'
-        assert varnames[0] == 'self'
-        argcount = fn.__code__.co_argcount
-        self._argcount = argcount - 1
-        self._varnames = varnames[1:argcount]
-        self._defaults = fn.__defaults__ or []
+        sig = inspect.signature(model.forward)
+        self._has_variadic_arguments = any([
+            p.kind in [p.VAR_POSITIONAL, p.VAR_KEYWORD]
+            for p in sig.parameters.values()
+        ])
+        self._varnames = list(sig.parameters.keys())
+        self._defaults = [p.default for p in sig.parameters.values()]
 
     def __call__(self, args, kwargs):
         a = ArgsParser.Args()
-        assert len(args) + len(kwargs) <= self._argcount, (
-            "Too many arguments provided: expected %s (%d) "
-            "but got %d") % (self._varnames, len(
-                self._varnames), len(args) + len(kwargs))
+        assert self._has_variadic_arguments or len(args) + len(kwargs) <= len(
+            self._varnames), ("Too many arguments provided: expected %s (%d) "
+                              "but got %d") % (self._varnames,
+                                               len(self._varnames),
+                                               len(args) + len(kwargs))
         first_optional = len(self._varnames) - len(self._defaults)
         none_passed = []
         for i, name in enumerate(self._varnames):
