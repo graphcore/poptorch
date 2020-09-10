@@ -152,15 +152,15 @@ class PoplarExecutor:
                  optimizer=None,
                  user_model=None):
         options = options or Options()
-        self.model = model
-        self.user_model = user_model or self.model
+        self._model = model
+        self._user_model = user_model or self._model
         self._host_weights_version = 0
         if training:
             if options.defaultAnchorMode():
                 # In training it makes sense to see only the last result, by default.
                 options.anchorMode(enums.AnchorMode.Final)
             if not optimizer:
-                optimizer = optim.SGD(self.user_model.parameters(), lr=0.01)
+                optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
             optimizer = convertOptimizerToDict(optimizer)
         else:
             if options.defaultAnchorMode():
@@ -171,30 +171,30 @@ class PoplarExecutor:
                 " should be left to its default value (1) for inference")
             assert not optimizer, "Optimizer should be None for inference"
 
-        self.executable = None
-        self.options = options
+        self._executable = None
+        self._options = options
         # The args parser needs to be initilialised before the model gets wrapped
         # otherwise we will not be able to retrieve the real arguments list
         self._args_parser = ArgsParser(model)
-        self.training = training
-        self.optimizer = optimizer or {}
-        self.new_optimizer = optimizer or {}
-        self.warned_not_contiguous_input = False
-        self.dirty_host_weights = False
-        self.trace = None
+        self._training = training
+        self._optimizer = optimizer or {}
+        self._new_optimizer = optimizer or {}
+        self._warned_not_contiguous_input = False
+        self._dirty_host_weights = False
+        self._trace = None
 
-        if self.training:
+        if self._training:
             parent = self
 
-            class WrappedModel(type(self.user_model)):
+            class PoptorchModel(type(self._user_model)):
                 def copyWeightsToHostIfNeeded(self):
                     """ Return True if the weights on the host were dirty and
                     have been updated.
                     Return False if the weights were already up to date.
                     """
-                    if parent.dirty_host_weights:
+                    if parent._dirty_host_weights:  # pylint: disable=protected-access
                         logger.debug("Implicit copyWeightsToHost()")
-                        parent.dirty_host_weights = False
+                        parent._dirty_host_weights = False  # pylint: disable=protected-access
                         parent.copyWeightsToHost()
                         return True
                     return False
@@ -212,23 +212,39 @@ class PoplarExecutor:
                         self.copyWeightsToHostIfNeeded()
                     return attribute
 
+            class PoptorchParameter(torch.nn.Parameter):
+                def __getitem__(self, idx):
+                    parent._user_model.copyWeightsToHostIfNeeded()
+                    return super().__getitem__(idx)
+
+                def float(self):
+                    parent._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
+                    return super().float()
+
+            for p in self._user_model.parameters():
+                p.__class__ = PoptorchParameter
+
             # __getattr__ and __getattribute__ are attributes, not methods, unfortunately we cannot just
             # replace them in the model object: we have to create a wrapper class
             # and change the object's class.
-            WrappedModel.__name__ = "Wrapped%s" % type(
-                self.user_model).__name__
-            self.user_model.__class__ = WrappedModel
+            PoptorchModel.__name__ = "Poptorch%s" % type(
+                self._user_model).__name__
+            self._user_model.__class__ = PoptorchModel
+
+    @property
+    def model(self):
+        return self._user_model
 
     def _debugGetPopartIR(self):
-        return poptorch_core._getPopartIR(self.executable)  # pylint: disable=protected-access
+        return poptorch_core._getPopartIR(self._executable)  # pylint: disable=protected-access
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
         weights = {
-            **dict(self.model.named_parameters()),
-            **dict(self.model.named_buffers())
+            **dict(self._model.named_parameters()),
+            **dict(self._model.named_buffers())
         }
-        poptorch_core.copyWeightsToHost_impl(self.executable,
+        poptorch_core.copyWeightsToHost_impl(self._executable,
                                              tuple(weights.keys()),
                                              tuple(weights.values()))
         self._host_weights_version += 1
@@ -237,22 +253,22 @@ class PoplarExecutor:
     # compilation so should be rarely used.
     def copyWeightsToDevice(self):
         # Don't trigger a copyToHost by accessing `named_parameters`
-        saved_dirty_flag = self.dirty_host_weights
-        self.dirty_host_weights = False
+        saved_dirty_flag = self._dirty_host_weights
+        self._dirty_host_weights = False
 
         weights = {
-            **dict(self.model.named_parameters()),
-            **dict(self.model.named_buffers())
+            **dict(self._model.named_parameters()),
+            **dict(self._model.named_buffers())
         }
-        poptorch_core.copyWeightsToDevice_impl(self.executable,
+        poptorch_core.copyWeightsToDevice_impl(self._executable,
                                                tuple(weights.keys()),
                                                tuple(weights.values()))
 
         # Restore dirtiness flag
-        self.dirty_host_weights = saved_dirty_flag
+        self._dirty_host_weights = saved_dirty_flag
 
     def setOptimizer(self, optimizer):
-        self.new_optimizer = optimizer
+        self._new_optimizer = optimizer
 
     def __call__(self, *args, **kwargs):
         # Convert single tensor to tuple.
@@ -262,22 +278,22 @@ class PoplarExecutor:
                 condition=lambda t: isinstance(t, torch.Tensor
                                                ) and not t.is_contiguous(),
                 doOnTrue=lambda t: t.contiguous()):
-            if not self.warned_not_contiguous_input:
+            if not self._warned_not_contiguous_input:
                 logger.warning("At least one input tensor is not contiguous: "
                                "non-contiguous tensors will be converted.")
-                self.warned_not_contiguous_input = True
+                self._warned_not_contiguous_input = True
 
-        if self.executable is None:
+        if self._executable is None:
             logger.info(
                 "First time call to model will invoke poplar compilation."
-                " %s %s", str(self.options.device_iterations),
-                str(self.training))
+                " %s %s", str(self._options.device_iterations),
+                str(self._training))
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we
             # should slice it up so we compile by the batch size alone.
-            extra_poplar_batch_dims = self.options.device_iterations * \
-                self.options.replication_factor * \
-                self.options.Training.gradient_accumulation
+            extra_poplar_batch_dims = self._options.device_iterations * \
+                self._options.replication_factor * \
+                self._options.Training.gradient_accumulation
 
             # There are two concepts of batch size. First is the "model" batch size then there is the
             # concept of batching at the popart level. Here we divide by the popart batch size so the
@@ -299,9 +315,9 @@ class PoplarExecutor:
                     "full explanation see the batching semantics page of the "
                     "documentation.") % (
                         tensor.shape, tensor.size()[0],
-                        self.options.device_iterations,
-                        self.options.replication_factor,
-                        self.options.Training.gradient_accumulation,
+                        self._options.device_iterations,
+                        self._options.replication_factor,
+                        self._options.Training.gradient_accumulation,
                         extra_poplar_batch_dims)
                 return tensor.narrow(
                     0, 0,
@@ -322,12 +338,12 @@ class PoplarExecutor:
             in_tensors_trace_view.forEach(possiblyConvertFromHalf)
 
             # Compile the poplar executable based on the batchsize.
-            if self.options.Jit.trace_model:
+            if self._options.Jit.trace_model:
                 logger.info('Compiling the model using tracing')
 
                 convertedLayers = []
 
-                for name, layer in self.model.named_modules():
+                for name, layer in self._model.named_modules():
                     anyIsHalf = False
                     for param in layer.parameters():
                         if param.dtype == torch.half:
@@ -340,17 +356,17 @@ class PoplarExecutor:
                         convertedLayers.append(name)
 
                 # We will trace using the normal trace view.
-                self.trace = torch.jit.trace(self.model,
-                                             in_tensors_trace_view.asTuple())
+                self._trace = torch.jit.trace(self._model,
+                                              in_tensors_trace_view.asTuple())
 
                 # Convert any converted params back to half.
-                for name, layer in self.trace.named_modules():
+                for name, layer in self._trace.named_modules():
                     if name in convertedLayers:
                         layer.half()
 
                 parameters = {
-                    **dict(self.trace.named_parameters()),
-                    **dict(self.trace.named_buffers())
+                    **dict(self._trace.named_parameters()),
+                    **dict(self._trace.named_buffers())
                 }
                 if hasConvertedAnyHalf[0]:
                     # Get the originals back.
@@ -358,40 +374,41 @@ class PoplarExecutor:
                     in_tensors_as_half.forEach(narrowTensor)
 
                     # Compile using the actual halves.
-                    self.executable = poptorch_core.compileWithTrace(
-                        self.trace._c, tuple(parameters.keys()),
+                    self._executable = poptorch_core.compileWithTrace(
+                        self._trace._c, tuple(parameters.keys()),
                         tuple(parameters.values()),
-                        in_tensors_as_half.asTuple(), self.options.toDict(),
-                        self.training, self.optimizer)
+                        in_tensors_as_half.asTuple(), self._options.toDict(),
+                        self._training, self._optimizer)
                 else:
-                    self.executable = poptorch_core.compileWithTrace(
-                        self.trace._c, tuple(parameters.keys()),
+                    self._executable = poptorch_core.compileWithTrace(
+                        self._trace._c, tuple(parameters.keys()),
                         tuple(parameters.values()),
-                        in_tensors_trace_view.asTuple(), self.options.toDict(),
-                        self.training, self.optimizer)
+                        in_tensors_trace_view.asTuple(),
+                        self._options.toDict(), self._training,
+                        self._optimizer)
             else:
                 logger.info('Compiling the model using scripting')
-                self.trace = torch.jit.script(self.model)
-                graphInputs = list(self.trace.graph.inputs())
+                self._trace = torch.jit.script(self._model)
+                graphInputs = list(self._trace.graph.inputs())
                 for graphInput, argIn in zip(graphInputs[1:],
                                              in_tensors_trace_view.asTuple()):
                     if isinstance(argIn, torch.Tensor):
                         graphInput.inferTypeFrom(argIn)
 
                 parameters = {
-                    **dict(self.trace.named_parameters()),
-                    **dict(self.trace.named_buffers())
+                    **dict(self._trace.named_parameters()),
+                    **dict(self._trace.named_buffers())
                 }
-                self.executable = poptorch_core.compileWithScript(
-                    self.trace._c, self.trace.graph, tuple(parameters.keys()),
-                    tuple(parameters.values()),
-                    in_tensors_trace_view.asTuple(), self.options.toDict(),
-                    self.training)
+                self._executable = poptorch_core.compileWithScript(
+                    self._trace._c, self._trace.graph,
+                    tuple(parameters.keys()), tuple(parameters.values()),
+                    in_tensors_trace_view.asTuple(), self._options.toDict(),
+                    self._training)
 
             # Upload the weights to the IPU
             self.copyWeightsToDevice()
 
-        if self.options.connectionType == enums.ConnectionType.Never:
+        if self._options.connectionType == enums.ConnectionType.Never:
             logger.info(
                 "Compilation complete and ConnectionType.Never selected:"
                 " returning")
@@ -399,32 +416,32 @@ class PoplarExecutor:
 
         # If this is an inference model: check if the same model is not being trained on a different IPU.
         # If it is: make sure the weights are updated.
-        if not self.training:
-            copyWeightsToHostIfNeeded = getattr(self.user_model,
+        if not self._training:
+            copyWeightsToHostIfNeeded = getattr(self._user_model,
                                                 "copyWeightsToHostIfNeeded",
                                                 None)
             if callable(copyWeightsToHostIfNeeded):
                 copyWeightsToHostIfNeeded()
                 if self._host_weights_version != \
-                        self.user_model._host_weights_version:
+                        self._user_model._host_weights_version:
                     # Weights have now been updated on the Host: copy them to the second IPU.
                     logger.debug("Implicit copyWeightsToDevice()")
                     self.copyWeightsToDevice()
                     self._host_weights_version = \
-                            self.user_model._host_weights_version
+                            self._user_model._host_weights_version
 
         # Execute the poplar executable with the full size (batch * device interations)
-        if self.new_optimizer and self.new_optimizer != self.optimizer:
-            self.optimizer = self.new_optimizer
+        if self._new_optimizer and self._new_optimizer != self._optimizer:
+            self._optimizer = self._new_optimizer
             output = poptorch_core.execute(
-                self.executable, in_tensors.asTuple(),
-                convertOptimizerToDict(self.optimizer))
+                self._executable, in_tensors.asTuple(),
+                convertOptimizerToDict(self._optimizer))
         else:
-            output = poptorch_core.execute(self.executable,
+            output = poptorch_core.execute(self._executable,
                                            in_tensors.asTuple(), {})
 
-        if self.training:
-            self.dirty_host_weights = True
+        if self._training:
+            self._dirty_host_weights = True
 
         if len(output) > 1:
             return output
