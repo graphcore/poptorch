@@ -213,13 +213,10 @@ class PoplarExecutor:
                     return attribute
 
             class PoptorchParameter(torch.nn.Parameter):
-                def __getitem__(self, idx):
-                    parent._user_model.copyWeightsToHostIfNeeded()
-                    return super().__getitem__(idx)
-
-                def float(self):
+                def __getattribute__(self, name):
                     parent._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
-                    return super().float()
+
+                    return object.__getattribute__(self, name)
 
             for p in self._user_model.parameters():
                 p.__class__ = PoptorchParameter

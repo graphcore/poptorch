@@ -458,3 +458,54 @@ def test_weight_overwrite_trained_weight():
     assert not torch.allclose(loss, trained_loss)
 
     assert torch.allclose(host_out, out)
+
+
+@pytest.mark.parametrize("use_half", [True, False])
+def test_access_scalar_parameter(use_half):
+    class ExampleModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.bias = torch.nn.Parameter(torch.zeros(()))
+
+        def forward(self, x):
+            x += 1
+
+            # It is important to make sure the result of the print is used.
+            x = poptorch.ipu_print_tensor(x)
+
+            return x + self.bias
+
+    def custom_loss(output, target):
+        # Mean squared error with a scale
+        loss = output - target
+        loss = loss * loss * 5
+        return poptorch.identity_loss(loss, reduction="mean")
+
+    class ExampleModelWithCustomLoss(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = ExampleModel()
+
+        def forward(self, input, target):
+            out = self.model(input)
+            return out, custom_loss(self.model(input), target)
+
+    model = ExampleModelWithCustomLoss()
+    input = torch.tensor([1.0, 2.0, 3.0])
+    target = torch.tensor([30.0, 40.0, 50.0])
+    if use_half:
+        model.half()
+        input = input.half()
+        target = target.half()
+    poptorch_model = poptorch.trainingModel(model)
+    original_bias = str(poptorch_model.model.model.bias)
+
+    for _ in range(10):
+        poptorch_model(input=input, target=target)
+
+    updated_bias = str(poptorch_model.model.model.bias)
+    assert original_bias != updated_bias
+
+    poptorch_model.copyWeightsToHost()
+    # Bias should already be up to date
+    assert updated_bias == str(poptorch_model.model.model.bias)
