@@ -1,7 +1,8 @@
 {
   "dependencies" : [
     "popart",
-    "spdlog"
+    "spdlog",
+    "libpvti"
   ],
   "superproject_cmake_includes" : [ "SuperProjectConfig.cmake" ]
 }

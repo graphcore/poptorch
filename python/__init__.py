@@ -10,12 +10,19 @@ import torch.multiprocessing as multiprocessing
 import poptorch.poptorch_core as poptorch_core
 from poptorch.poptorch_core import ipuHardwareIsAvailable
 
+import libpvti as pvti
+
 from .logging import logger
 from . import _impl
 from .enums import *
 from .ops import *
 from .options import *
 from . import distributed
+
+# Create instrumentation channels.
+_pytorch_ic = pvti.createTraceChannel("PopTorch")
+_pytorchDataloader_ic = pvti.createTraceChannel("PopTorch.Dataloader")
+_pytorchDataSet_ic = pvti.createTraceChannel("PopTorch.Dataset")
 
 
 class IPU(nn.Module):
@@ -84,12 +91,24 @@ class DataLoader(torch.utils.data.DataLoader):
 
             dataset = _SubDataset(dataset, options, self._combined_batch_size)
 
+        if pvti.checkTraceChannel(_pytorchDataSet_ic):
+            pvti.instrument(dataset, ["__len__", "__getitem__"],
+                            _pytorchDataSet_ic)
+
         super().__init__(dataset,
                          batch_size=self._combined_batch_size,
                          shuffle=shuffle,
                          num_workers=num_workers,
                          drop_last=drop_last,
                          **kwargs)
+
+    def __iter__(self):
+
+        if pvti.checkTraceChannel(_pytorchDataloader_ic):
+            pvti.instrument(super().__iter__(), ["__iter__", "__next__"],
+                            _pytorchDataloader_ic)
+
+        return super().__iter__()
 
     @property
     def combinedBatchSize(self):
@@ -125,7 +144,9 @@ class AsynchronousDataAccessor:
         self._ring_read_index = 0
 
     def terminate(self):
-        self._data_fetcher.terminate()
+        with pvti.Tracepoint(_pytorchDataloader_ic,
+                             "AsynchronousDataAccessor.terminate"):
+            self._data_fetcher.terminate()
 
     def fetch_data(self, queue, setup_complete):
         dataset_iterator = iter(self._training_data)
@@ -223,81 +244,84 @@ class AsynchronousDataAccessor:
         setup_complete.get()
 
     def __iter__(self):
+        with pvti.Tracepoint(_pytorchDataloader_ic,
+                             "AsynchronousDataAccessor.__iter__"):
+            # We use a small queue to get the initial data. The latency of
+            # deserialising the python data is too high to be used for the
+            # actual fetch so we just use this to return the initial buffers
+            # in shared memory which will be used for the actual read/write
+            # in the hot loop.
+            queue = multiprocessing.Queue()
 
-        # We use a small queue to get the initial data. The latency of
-        # deserialising the python data is too high to be used for the
-        # actual fetch so we just use this to return the initial buffers
-        # in shared memory which will be used for the actual read/write
-        # in the hot loop.
-        queue = multiprocessing.Queue()
+            # If the worker exits before the parent process is done
+            # setting up the _data_buffers then the queue will get freed
+            # and bad things will happen.
+            setup_complete = multiprocessing.Queue()
 
-        # If the worker exits before the parent process is done
-        # setting up the _data_buffers then the queue will get freed
-        # and bad things will happen.
-        setup_complete = multiprocessing.Queue()
+            # Fetch the data on a separate process.
+            self._data_fetcher = multiprocessing.Process(target=self.fetch_data,
+                                                        args=(queue,
+                                                            setup_complete))
+            self._data_fetcher.start()
 
-        # Fetch the data on a seperate process.
-        self._data_fetcher = multiprocessing.Process(target=self.fetch_data,
-                                                     args=(queue,
-                                                           setup_complete))
-        self._data_fetcher.start()
+            self._ready_to_read_index = queue.get(block=True)
 
-        self._ready_to_read_index = queue.get(block=True)
+            buffer_len = queue.get(block=True)
 
-        buffer_len = queue.get(block=True)
+            self._is_single_tensor = queue.get(block=True)
 
-        self._is_single_tensor = queue.get(block=True)
+            self._data_buffers = []
 
-        self._data_buffers = []
+            for _ in range(0, buffer_len):
+                # Get the buffer from the host.
+                buffer = queue.get(block=True)
+                self._data_buffers.append(buffer)
 
-        for _ in range(0, buffer_len):
-            # Get the buffer from the host.
-            buffer = queue.get(block=True)
-            self._data_buffers.append(buffer)
+            # We're all set: let the worker know.
+            setup_complete.put(0)
 
-        # We're all set: let the worker know.
-        setup_complete.put(0)
-
-        return self
+            return self
 
     def __next__(self):
-        data = []
+        with pvti.Tracepoint(_pytorchDataloader_ic,
+                             "AsynchronousDataAccessor.__next__"):
+            data = []
 
-        # Set the previous iteration to false so it can be pulled in now
-        # avoiding any data races.
-        if self._previously_ready_element is not None:
-            self._ready_to_read_index[self._previously_ready_element] = False
+            # Set the previous iteration to false so it can be pulled in now
+            # avoiding any data races.
+            if self._previously_ready_element is not None:
+                self._ready_to_read_index[self._previously_ready_element] = False
 
-        self._previously_ready_element = None
-        # We block until the element is ready.
-        while self._previously_ready_element is None:
+            self._previously_ready_element = None
+            # We block until the element is ready.
+            while self._previously_ready_element is None:
 
-            # Grab the data waiting in the ring buffer.
-            if self._ready_to_read_index[self._ring_read_index]:
-                # Pull the ready buffer.
-                for _, buffer in enumerate(self._data_buffers):
-                    data.append(buffer[self._ring_read_index])
+                # Grab the data waiting in the ring buffer.
+                if self._ready_to_read_index[self._ring_read_index]:
+                    # Pull the ready buffer.
+                    for _, buffer in enumerate(self._data_buffers):
+                        data.append(buffer[self._ring_read_index])
 
-                self._previously_ready_element = self._ring_read_index
+                    self._previously_ready_element = self._ring_read_index
 
-                self._ring_read_index += 1
-                # Ring back around.
-                if self._ring_read_index >= self._buffer_size:
-                    self._ring_read_index = 0
+                    self._ring_read_index += 1
+                    # Ring back around.
+                    if self._ring_read_index >= self._buffer_size:
+                        self._ring_read_index = 0
 
-            # Processed all data and the process is dead, EOF.
-            process_dead = not self._data_fetcher.is_alive()
-            if self._previously_ready_element is None and process_dead:
-                assert self._data_fetcher.exitcode == 0, \
-                        "An error occurred in the data fetcher"
-                raise StopIteration
+                # Processed all data and the process is dead, EOF.
+                process_dead = not self._data_fetcher.is_alive()
+                if self._previously_ready_element is None and process_dead:
+                    assert self._data_fetcher.exitcode == 0, \
+                            "An error occurred in the data fetcher"
+                    raise StopIteration
 
-        # Return either one tensor or the list.
-        if self._is_single_tensor:
-            return data[0]
+            # Return either one tensor or the list.
+            if self._is_single_tensor:
+                return data[0]
 
-        # Else return the list.
-        return data
+            # Else return the list.
+            return data
 
 
 def trainingModel(model, options=None, optimizer=None):
