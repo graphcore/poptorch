@@ -175,3 +175,10 @@ OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(1), NONE, createReducel2
 OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(3), NONE, createReducel2, {PARAM(0)} COMMA HANDLE_LIST(1) COMMA CONSTANT_TO_LONG(2))
 
 OP_CONVERTOR_POP(symbols::poptorch::set_available_memory, NONE, createSetAvailableMemory, PARAM(0) COMMA CONSTANT_TO_FLOAT(1))
+
+// aten::masked_fill(Tensor self, Tensor mask, Tensor other) -> Tensor
+OP_CONVERTOR(aten::masked_fill, NONE, createWhere, {PARAM(1) COMMA PARAM(2) COMMA PARAM(0)})
+OP_CONVERTOR(aten::masked_fill_, NONE, createWhere, {PARAM(1) COMMA PARAM(2) COMMA PARAM(0)})
+
+OP_CONVERTOR(aten::where, NONE, createWhere, {PARAM(0) COMMA PARAM(1) COMMA PARAM(2)})
+OP_CONVERTOR(aten::where_, NONE, createWhere, {PARAM(0) COMMA PARAM(1) COMMA PARAM(2)})

@@ -329,3 +329,29 @@ def test_fill(input_shapes, t):
         assert native.size() == pop.size()
         assert torch.equal(native, pop)
         assert native.dtype == pop.dtype
+
+
+@pytest.mark.parametrize("input_shapes", input_shapes)
+@pytest.mark.parametrize("value", [0.666, -4.32, float("Inf"), float("-Inf")])
+def test_masked_fill(input_shapes, value):
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            fill_result = x.masked_fill(x > 0.5, value)
+            where_result = torch.where(x > 0.5, x, torch.tensor(value))
+            return fill_result, where_result
+
+    model = Model()
+    x = torch.randn(*input_shapes)
+
+    # Run on CPU.
+    native_out = model(x)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+
+    for pop, native in zip(poptorch_out, native_out):
+        assert native.size() == pop.size()
+        assert torch.equal(native, pop)
