@@ -1024,7 +1024,7 @@ void Compiler::initSession(const Optimizer &opt) {
   // Create the anchors, these are used to copy to the host.
   auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
 
-  logging::warn("enableReplicatedGraphs {} replicatedGraphCount {} "
+  logging::info("enableReplicatedGraphs {} replicatedGraphCount {} "
                 "enableDistributedReplicatedGraphs {} globalReplicaOffset {} "
                 "globalReplicationFactor {}",
                 options.enableReplicatedGraphs, options.replicatedGraphCount,
