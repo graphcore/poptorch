@@ -68,7 +68,9 @@ struct CompilerImpl {
 public:
   friend Compiler;
 
-  CompilerImpl() : op_builder(popart::Builder::create()), active_ipu(0) {}
+  CompilerImpl() : op_builder(popart::Builder::create()), active_ipu(0) {
+    ids.emplace_back(""); // None tensor
+  }
 
   std::unique_ptr<popart::Builder> op_builder;
 

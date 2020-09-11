@@ -439,6 +439,11 @@ void LowerToPopart::lowerBody() {
         _valueMap.setTensor(node->output(i), inputs[i]);
       }
 
+    } else if (kind == c10::prim::Constant) {
+      ERROR_ON_MSG(node->hasAttribute(c10::attr::value),
+                   "Only None constants should be left in the graph after the "
+                   "CanonicaliseConstants pass");
+      _valueMap.setTensor(node->output(), NoneTensor);
     } else if (kind == c10::prim::TupleConstruct ||
                kind == c10::prim::ListConstruct) {
       // Get the torch jit SSA for the input/output values.

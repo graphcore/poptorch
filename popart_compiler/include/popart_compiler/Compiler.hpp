@@ -20,6 +20,8 @@ namespace poptorch {
 
 using TensorId = std::size_t;
 
+static constexpr TensorId NoneTensor = 0; // NOLINT
+
 namespace detail {
 struct CompilerImpl;
 struct SessionOptionsImpl;

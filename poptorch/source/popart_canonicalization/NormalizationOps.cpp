@@ -93,11 +93,6 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   torch::jit::Value *weight = node->input(1);
   torch::jit::Value *bias = node->input(2);
 
-  // In the PyTorch source code at the time of writing, weight and bias are
-  // always set despite being optional in at aten::batch_norm
-  ERROR_ON(weight->type()->cast<c10::TensorType>() == nullptr);
-  ERROR_ON(bias->type()->cast<c10::TensorType>() == nullptr);
-
   torch::jit::Value *running_mean = node->input(3);
   torch::jit::Value *running_var = node->input(4);
 

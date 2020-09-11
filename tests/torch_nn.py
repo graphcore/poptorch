@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os
+import sys
 import torch
 from torch.testing._internal.jit_metaprogramming_utils import get_all_nn_module_tests, get_nn_mod_test_name, get_nn_module_name_from_kwargs
 import pytest
@@ -12,26 +14,19 @@ torch.set_default_dtype(torch.float32)
 # yapf: disable
 # pylint: disable=line-too-long
 EXPECTED_FAILURES = {
-    "test_nn_LayerNorm_3d_no_elementwise_affine": "Floating point exception",
-    "test_nn_LayerNorm_1d_no_elementwise_affine": "Floating point exception",
-    "test_nn_InstanceNorm3d_tracking_stats": "Floating point exception",
-    "test_nn_BatchNorm3d_not_affine": "Floating point exception",
-    "test_nn_BatchNorm3d_3d_simple_average": "Floating point exception",
-    "test_nn_BatchNorm3d": "Floating point exception",
-    "test_nn_BatchNorm2d_zero_batch": "Floating point exception",
-    "test_nn_BatchNorm1d_zero_batch": "Floating point exception",
-    "test_nn_LayerNorm_1d_empty_elementwise_affine": "Floating point exception",
+    "test_nn_LayerNorm_1d_empty_elementwise_affine": "Floating point exception", # TODO(T26648) Popart bug
 
-    "test_nn_LayerNorm_1d_elementwise_affine": "Internal assert failed",
-    "test_nn_LayerNorm_3d_elementwise_affine": "Internal assert failed",
-    "test_nn_GroupNorm_1d_no_affine_IN": "Internal assert failed",
-    "test_nn_GroupNorm_1d_no_affine_LN": "Internal assert failed",
-    "test_nn_GroupNorm_2d_no_affine_IN": "Internal assert failed",
-    "test_nn_GroupNorm_2d_no_affine_LN": "Internal assert failed",
+    "test_nn_BatchNorm3d_not_affine": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.onnx.BatchNormalization:9, inputs=[Reshape:0], outputs=[]), but input is not optional", # TODO(T26651) Popart feature request
 
-    "test_nn_softmax_lastdim_dtype": "RuntimeError: Double did not match Float",
-    "test_nn_softmax_spatial_dtype": "RuntimeError: Double did not match Float",
-    "test_nn_MultiheadAttention": "Cannot force a non-constant node to a long",
+    # TODO(T26652): Popart feature request
+    "test_nn_LayerNorm_3d_no_elementwise_affine": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
+    "test_nn_LayerNorm_1d_no_elementwise_affine": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
+    "test_nn_GroupNorm_1d_no_affine_IN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
+    "test_nn_GroupNorm_1d_no_affine_LN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
+    "test_nn_GroupNorm_2d_no_affine_IN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
+    "test_nn_GroupNorm_2d_no_affine_LN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
+
+    "test_nn_MultiheadAttention": "Cannot force a non-constant node to a long", # TODO(T26654) Poptorch feature: support non-constant start/end in sliceHandler
 
     "test_nn_interpolate_nearest_1d": "Cannot force a non-constant node to a float",
     "test_nn_interpolate_nearest_1d_zero_dim": "Cannot force a non-constant node to a float",
@@ -96,6 +91,7 @@ EXPECTED_FAILURES = {
     "test_nn_Padding332122_3dcircular": "hangs ? really slow ?",
 
 
+    "test_nn_softmax_spatial_dtype": "AssertionError: With rtol=0.0001 and atol=1e-05, found 64 element(s) (out of 64) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.662305723875761 (0.706894040107727 vs. 0.04458831623196602), which occurred at index (0, 1, 2, 3).",
     "test_nn_Softmin_multidim": "AssertionError: With rtol=0.0001 and atol=1e-05, found 300 element(s) (out of 300) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.528009258210659 (0.5376919507980347 vs. 0.009682692587375641), which occurred at index (0, 1, 4, 6).",
 
     "test_nn_GroupNorm_2d_affine": "AssertionError: With rtol=0.0001 and atol=1e-05, found 144 element(s) (out of 144) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 1.3549566268920898 (2.1383447647094727 vs. 0.7833881378173828), which occurred at index (2, 2, 1, 1).",
@@ -137,7 +133,9 @@ EXPECTED_FAILURES = {
     "test_nn_Bilinear": "TypeError: bilinear(): argument 'input2' (position 2) must be Tensor, not tuple",
     "test_nn_Embedding": "RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got torch.FloatTensor instead (while checking arguments for embedding)",
 
-    "test_nn_BatchNorm3d_zero_batch": "RuntimeError: ERROR in /home/anthonyb/_popart/poptorch/poptorch/source/popart_canonicalization/NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:40, 5:8, 2:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16) # /localdata/anthonyb/workspace/_popart_view/build/venv/lib/python3.6/site-packages/torch/nn/functional.py:2016:0",
+    "test_nn_BatchNorm2d_zero_batch": "ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:20, 5:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
+    "test_nn_BatchNorm1d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:45, 5:9, 9:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
+    "test_nn_BatchNorm3d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:40, 5:8, 2:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
 
     "test_nn_BCELoss_weights_no_reduce_scalar": "IndexError: tuple index out of range",
     "test_nn_BCEWithLogitsLoss_no_reduce_scalar": "IndexError: tuple index out of range",
@@ -173,6 +171,7 @@ EXPECTED_FAILURES = {
     "test_nn_Softmin_scalar": "IndexError: tuple index out of range",
     "test_nn_Tanhshrink_scalar": "IndexError: tuple index out of range",
 
+    "test_nn_InstanceNorm3d_tracking_stats": "Unsupported op(s): aten::instance_norm",
     "test_nn_FractionalMaxPool2d_ratio": "Unsupported op(s): aten::fractional_max_pool2d",
     "test_nn_FractionalMaxPool2d_size": "Unsupported op(s): aten::fractional_max_pool2d",
     "test_nn_FractionalMaxPool3d_ratio": "Unsupported op(s): aten::fractional_max_pool3d",
@@ -300,12 +299,15 @@ HALF_EXPECTED_FAILURES = {
     "test_nn_AvgPool3d": "Trying to connect tensor of type 'float' to field of type half",
     "test_nn_AvgPool3d_stride": "Trying to connect tensor of type 'float' to field of type half",
     "test_nn_AvgPool3d_stride1_pad0_gpu_input": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_BatchNorm3d_3d_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 30.140776455402374 (0.9842235445976257 vs. 31.125), which occurred at index (1, 0, 2, 2, 3).",
+    "test_nn_BatchNorm3d": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 312.5105660557747 (0.9894339442253113 vs. 313.5), which occurred at index (1, 2, 2, 1, 1).",
 
     }
 
 HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
     "test_nn_Conv3d_groups": (0.05, 1e-3),
+    "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002)
     }
 
 # pylint: enable=line-too-long
@@ -388,3 +390,13 @@ def test_pytorch_nn(test_name, use_half):
                                   poptorch_out.float(),
                                   rtol=rtol,
                                   atol=atol)
+
+
+if __name__ == "__main__":
+    assert len(sys.argv) == 2, f"Usage {sys.argv[0]} test_name"
+
+    # Disable expected failures:
+    EXPECTED_FAILURES.clear()
+    HALF_EXPECTED_FAILURES.clear()
+
+    test_pytorch_nn(sys.argv[1], os.environ.get("HALF", "0") == "1")

@@ -54,7 +54,8 @@ inferExpectedType(const torch::jit::ArrayRef<torch::jit::Value *> &inputs,
     logging::LogContext ctx(std::string("processing input ") +
                             std::to_string(input_num));
 
-    if (!skipInput(implicit_cast, input_num)) {
+    if (!skipInput(implicit_cast, input_num) &&
+        input->type()->kind() != c10::TypeKind::NoneType) {
       auto node = input->node();
       auto tensor_type = input->type()->expect<c10::TensorType>();
       ERROR_ON(!tensor_type->scalarType());
@@ -107,6 +108,10 @@ inferExpectedType(const torch::jit::ArrayRef<torch::jit::Value *> &inputs,
 
 bool needToRetype(const torch::jit::Value *input,
                   const c10::ScalarType expected_type) {
+  if (input->type()->kind() == c10::TypeKind::NoneType) {
+    return false;
+  }
+
   ERROR_ON(input->node()->kind() == at::prim::Constant);
 
   auto input_type = input->type()->cast<c10::TensorType>()->scalarType();
