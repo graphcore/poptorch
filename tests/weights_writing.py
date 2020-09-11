@@ -486,9 +486,11 @@ def test_access_scalar_parameter(use_half):
             super().__init__()
             self.model = ExampleModel()
 
-        def forward(self, input, target):
+        def forward(self, input, target=None):
             out = self.model(input)
-            return out, custom_loss(self.model(input), target)
+            if target is not None:
+                return out, custom_loss(out, target)
+            return out
 
     model = ExampleModelWithCustomLoss()
     input = torch.tensor([1.0, 2.0, 3.0])

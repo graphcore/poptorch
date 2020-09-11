@@ -56,6 +56,7 @@ class ArgsParser:
     class Args:
         def __init__(self):
             self._args = []
+            self.first_none = None
 
         def _forEach(self, data, fn):
             if isinstance(data, (tuple, list)):
@@ -123,6 +124,13 @@ class ArgsParser:
                                                len(args) + len(kwargs))
         first_optional = len(self._varnames) - len(self._defaults)
         none_passed = []
+
+        # Make sure all the arguments provided are allowed.
+        for k in kwargs.keys():
+            assert k in self._varnames, (
+                f"{k} is not a valid parameter."
+                f"Allowed values are {self._varnames}")
+
         for i, name in enumerate(self._varnames):
             if i < len(args):
                 a._args.append(args[i])
@@ -139,9 +147,13 @@ class ArgsParser:
                                              "missing") % name
                 value = self._defaults[i - first_optional]
                 if value is None:
+                    if a.first_none is None:
+                        a.first_none = i
                     none_passed.append("%s (%d)" % (name, i))
                 if not none_passed:
                     a._args.append(value)
+        if a.first_none is None:
+            a.first_none = len(self._varnames)
         return a
 
 
@@ -177,6 +189,8 @@ class PoplarExecutor:
         # The args parser needs to be initilialised before the model gets wrapped
         # otherwise we will not be able to retrieve the real arguments list
         self._args_parser = ArgsParser(model)
+        self._first_none_arg = None
+
         self._training = training
         self._optimizer = optimizer or {}
         self._new_optimizer = optimizer or {}
@@ -282,6 +296,7 @@ class PoplarExecutor:
                 self._warned_not_contiguous_input = True
 
         if self._executable is None:
+            self._first_none_arg = in_tensors.first_none
             logger.info(
                 "First time call to model will invoke poplar compilation."
                 " %s %s", str(self._options.device_iterations),
@@ -412,7 +427,8 @@ class PoplarExecutor:
                 " returning")
             return None
 
-        # If this is an inference model: check if the same model is not being trained on a different IPU.
+        # If this is an inference model: check if the same model is not being
+        # trained on a different IPU.
         # If it is: make sure the weights are updated.
         if not self._training:
             copyWeightsToHostIfNeeded = getattr(self._user_model,
@@ -422,12 +438,17 @@ class PoplarExecutor:
                 copyWeightsToHostIfNeeded()
                 if self._host_weights_version != \
                         self._user_model._host_weights_version:
-                    # Weights have now been updated on the Host: copy them to the second IPU.
+                    # Weights have now been updated on the Host: copy them to
+                    # the second IPU.
                     logger.debug("Implicit copyWeightsToDevice()")
                     self.copyWeightsToDevice()
                     self._host_weights_version = \
                             self._user_model._host_weights_version
 
+        assert in_tensors.first_none == self._first_none_arg, (
+            f"Number of arguments mismatch: {self._first_none_arg} "
+            f"arguments used to compile the model and "
+            f"{in_tensors.first_none} provided this time")
         # Execute the poplar executable with the full size (batch * device interations)
         if self._new_optimizer and self._new_optimizer != self._optimizer:
             self._optimizer = self._new_optimizer
