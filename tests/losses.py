@@ -3,6 +3,7 @@
 
 import torch
 import torch.optim as optim
+import pytest
 import poptorch
 import helpers
 
@@ -164,6 +165,55 @@ def test_LogSoftmax():
         poptorch_out, _ = poptorch_model(input, label)
 
         assert torch.allclose(groundTruth, poptorch_out)
+
+
+# Test softmax and logsoftmax for dimensions more than 2
+def op_withdim(op, input):
+    class Model(torch.nn.Module):
+        def __init__(self, op):
+            super(Model, self).__init__()
+            self.op = op
+
+        def forward(self, x):
+            return self.op(x)
+
+    model = Model(op)
+
+    # Run on CPU.
+    nativeOut = model(input)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(input)
+
+    torch.testing.assert_allclose(nativeOut, poptorch_out)
+
+
+ops_float = [
+    torch.nn.Softmax,
+    torch.nn.LogSoftmax,
+]
+
+
+@pytest.mark.parametrize("op", ops_float)
+@pytest.mark.parametrize("dim", range(-4, 3))
+def test_op_withdim_4d(op, dim):
+    N, C = 11, 22
+    M, K = 33, 44
+    torch.manual_seed(42)
+    x = torch.randn(N, C, M, K)
+
+    op_withdim(op(dim=dim), x)
+
+
+@pytest.mark.parametrize("op", ops_float)
+@pytest.mark.parametrize("dim", range(-2, 1))
+def test_op_withdim_2d(op, dim):
+    N, C = 17, 13
+    torch.manual_seed(42)
+    x = torch.randn(N, C)
+
+    op_withdim(op(dim=dim), x)
 
 
 # Test NLL loss by using it to match a target label.
