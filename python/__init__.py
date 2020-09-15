@@ -88,14 +88,14 @@ class DataLoader(torch.utils.data.DataLoader):
 
         num_elts = len(dataset)
         assert drop_last or num_elts % (
-            self._combined_batch_size * options.Distributed.numHosts
+            self._combined_batch_size * options.Distributed.numProcesses
         ) == 0, (
             f"The number of elements in the dataset ({num_elts}) is not "
             "divisible by the number of elements processed per step "
-            f"({self._combined_batch_size * options.Distributed.numHosts}) and "
-            "drop_last=False. Switch to drop_last=True.")
+            f"({self._combined_batch_size * options.Distributed.numProcesses})"
+            " and drop_last=False. Switch to drop_last=True.")
 
-        if options.Distributed.numHosts > 1:
+        if options.Distributed.numProcesses > 1:
             assert not shuffle or options.exists("random_seed"), (
                 "When using distributed execution you must set "
                 "poptorch.Options.randomSeed()")

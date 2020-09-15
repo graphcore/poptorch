@@ -20,7 +20,7 @@ def run_test(process_id=0, num_processes=1):
     opts.Distributed.configureProcessId(process_id, num_processes)
     opts.Distributed.IPUoFConfigFiles(f"~/.ipuof.conf.d/{partition_name}_*")
 
-    replicationFactor = localReplicationFactor * opts.Distributed.numHosts
+    replicationFactor = localReplicationFactor * opts.Distributed.numProcesses
 
     np.random.seed(42)
 

@@ -457,7 +457,7 @@ class Options(_OptionsDict):
         out = self._training.update(out)
         out = self._distributed.update(out)
         config_file = self._distributed.getGcdConfigFile()
-        if self._distributed.numHosts > 1 or config_file:
+        if self._distributed.numProcesses > 1 or config_file:
             assert config_file, ("No IPUoF configuration file found for "
                                  "processId %d" % self._distributed.processId)
             os.environ["IPUOF_CONFIG_PATH"] = config_file
