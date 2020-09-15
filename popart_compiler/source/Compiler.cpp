@@ -127,12 +127,12 @@ public:
     // [IPU_ID] = Memory proportion for that IPU
     std::unordered_map<std::uint32_t, float> available_memory_proportion;
 
-    // When running in distributed mode: number of hosts the training is split
-    // over.
-    std::uint64_t num_distributed_hosts;
-    // In distributed mode: unique ID of this host in [0, num_distributed_hosts]
-    // range
-    std::uint64_t distributed_host_id;
+    // When running in distributed mode: number of processes the training is
+    // split// over.
+    std::uint64_t num_distributed_processes;
+    // In distributed mode: unique ID of this process in [0,
+    // num_distributed_processes]// range
+    std::uint64_t distributed_process_id;
   };
 
   // List of options which have been explicitely set by the user.
@@ -309,11 +309,11 @@ SessionOptionsImpl::SessionOptionsImpl() {
   uint64_options["device_iterations"] = [&](std::uint64_t value) {
     poptorch_options.steps = value;
   };
-  uint64_options["num_distributed_hosts"] = [&](std::uint64_t value) {
-    poptorch_options.num_distributed_hosts = value;
+  uint64_options["num_distributed_processes"] = [&](std::uint64_t value) {
+    poptorch_options.num_distributed_processes = value;
   };
-  uint64_options["distributed_host_id"] = [&](std::uint64_t value) {
-    poptorch_options.distributed_host_id = value;
+  uint64_options["distributed_process_id"] = [&](std::uint64_t value) {
+    poptorch_options.distributed_process_id = value;
   };
   uint64_options["ipu_version"] = [&](std::uint64_t value) {
     poptorch_options.ipu_version = value;
@@ -967,15 +967,15 @@ void Compiler::initSession(const Optimizer &opt) {
                            _impl->used_ipus.size() > 1, "enablePipelining");
 
   _impl->setOptionIfNotSet(options.enableDistributedReplicatedGraphs,
-                           _impl->options.num_distributed_hosts > 1,
+                           _impl->options.num_distributed_processes > 1,
                            "enableDistributedReplicatedGraphs");
 
   _impl->setOptionIfNotSet(options.globalReplicationFactor,
-                           _impl->options.num_distributed_hosts *
+                           _impl->options.num_distributed_processes *
                                options.replicatedGraphCount,
                            "globalReplicationFactor");
   _impl->setOptionIfNotSet(options.globalReplicaOffset,
-                           _impl->options.distributed_host_id *
+                           _impl->options.distributed_process_id *
                                options.replicatedGraphCount,
                            "globalReplicaOffset");
 

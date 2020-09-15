@@ -1,5 +1,6 @@
+============
 Introduction
-------------
+============
 
 PopTorch is a set of extensions for PyTorch to enable PyTorch models to run directly
 on Graphcore IPU hardware.
@@ -21,20 +22,22 @@ on IPU. However, it does have some differences from native PyTorch execution.
   user-provided loss function and will perform the full forward and backward pass under the
   hood.
 
-  .. literalinclude:: poptorch_training_simple.py
-    :caption: A simple example of training using PyTorch on the CPU
-    :linenos:
-    :lines: 96-128
+.. literalinclude:: poptorch_training_simple.py
+  :caption: A simple example of training using PyTorch on the CPU
+  :linenos:
+  :lines: 96-128
 
-  .. literalinclude:: poptorch_training_simple.py
-    :caption: Equivalent code using PopTorch to train on the IPU
-    :linenos:
-    :lines:54-89
+.. literalinclude:: poptorch_training_simple.py
+  :caption: Equivalent code using PopTorch to train on the IPU
+  :linenos:
+  :lines: 54-89
 
 * Under the hood PopTorch uses the ``torch.jit.trace`` API. That means it inherits some of the constraints of that API. These include:
-  * Keyword arguments to a model forward operator are not supported. Inputs must be torch tensors or tuples/lists containing torch tensors.
-  * ``torch.jit.trace`` cannot handle control flow or shape variations within the model. That is, the inputs passed at run-time cannot vary the control flow of the model or the shapes/sizes of results.
-  * Not all PyTorch operations have been implemented by the backend yet.
+
+   * Inputs must be Torch tensors or tuples/lists containing Torch tensors.
+   * ``None`` can be used as a default value for a parameter but cannot be expliticly passed as an input value.
+   * ``torch.jit.trace`` cannot handle control flow or shape variations within the model. That is, the inputs passed at run-time cannot vary the control flow of the model or the shapes/sizes of results.
+   * Not all PyTorch operations have been implemented by the backend yet.
 
 * PopTorch follows PopART's data batching semantics. By default this means you will just pass in data
   of the normal batch size. However, there are a number of options provided in PopTorch which will enable

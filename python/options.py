@@ -62,7 +62,12 @@ class _OptionsDict:
 
 
 class _JitOptions(_OptionsDict):
-    """Options related to Pytorch's JIT
+    """Options related to Pytorch's JIT compiler.
+
+    Can be accessed via `poptorch.Options`:
+
+    >>> opts = poptorch.Options()
+    >>> opts.Jit.traceModel(True)
     """
 
     def __init__(self):
@@ -71,7 +76,7 @@ class _JitOptions(_OptionsDict):
     def traceModel(self, trace_model):
         """
         If True: use torch.jit.trace
-        If False: use torch.jit.script
+        If False: use torch.jit.script (Experimental)
 
         Trace model is enabled by default.
         """
@@ -81,19 +86,38 @@ class _JitOptions(_OptionsDict):
 
 class _TrainingOptions(_OptionsDict):
     """Options specific to model training.
+
+    Note: You must not set these options for inference models.
+
+    Can be accessed via `poptorch.Options`:
+
+    >>> opts = poptorch.Options()
+    >>> opts.Training.gradientAccumulation(4)
     """
 
     def __init__(self):
         super().__init__(gradient_accumulation=1)
 
     def gradientAccumulation(self, gradient_accumulation):
+        """Number of samples to accumulate for the gradient calculation.
+        Might be called "pipeline depth" in some other frameworks."""
         self.set(gradient_accumulation=gradient_accumulation)
         return self
 
 
 class _PopartOptions:
-    """Options specific to the Popart backend.
+    """Options specific to the PopART backend.
+
     Only for advanced users.
+
+    Any option from `popart.SessionOptions` can be set using this class.
+    Note: there is no mapping for the various PopART enums so integers need
+    to be used instead.
+
+    Can be accessed via `poptorch.Options`:
+
+    >>> opts = poptorch.Options()
+    >>> opts.Popart.set("autoRecomputation", 3) # RecomputationType::Pipeline
     """
 
     def __init__(self):
@@ -107,30 +131,44 @@ class _PopartOptions:
 class _DistributedOptions(_OptionsDict):
     """Options related to distributed execution.
 
-    Note: hostId and numHosts are set by MPI and therefore are read only.
-    To change the global replication factor change the `np` value used to
-    invoke your script.
-    e.g: mpirun -np 4 myscript.py
+    Can be accessed via `poptorch.Options`:
+
+    >>> opts = poptorch.Options()
+    >>> opts.Distributed.configureProcessId(0, 2)
     """
 
     def __init__(self):
-        super().__init__(num_distributed_hosts=1,
-                         distributed_host_id=0,
+        super().__init__(num_distributed_processes=1,
+                         distributed_process_id=0,
                          ipuof_configs={})
         self._gcd_mappings = {}
         self.setEnvVarNames("OMPI_COMM_WORLD_SIZE", "OMPI_COMM_WORLD_RANK")
 
     def disable(self):
-        self.set(num_distributed_hosts=1, distributed_host_id=0)
+        """Ignore the current options / environment variables and disable
+        distributed execution.
+        """
+        self.set(num_distributed_processes=1, distributed_process_id=0)
         return self
 
     def IPUoFConfigFiles(self, files):
         """ List of IPUoF configuration files to use for the different
-        GCDs
+        GCDs.
 
-        files: one or more glob compatible expressions
+        Important: One and exactly one configuration file must be provided
+        for each GCD.
 
-        By default: "~/.ipuof.conf.d/*.conf"
+        :param files: one or more glob compatible expressions
+
+        By default: `~/.ipuof.conf.d/*.conf`
+
+        The default value will work if you only own one partition.
+
+        If you own several then you will need to narrow down the number of
+        configuration files so that only the configuration files corresponding
+        to the partition to use are selected.
+
+        For example: `~/.ipuof.conf.d/partitionA_*.conf`
         """
         if isinstance(files, str):
             files = [files]
@@ -151,38 +189,57 @@ class _DistributedOptions(_OptionsDict):
             self._gcd_mappings[gcd] = f
         return self
 
-    def setEnvVarNames(self, var_num_hosts, var_host_id):
-        """Set the environment variables names to use to get the number of hosts
-        and the host identifier of the current process.
+    def setEnvVarNames(self, var_num_processes, var_process_id):
+        """Utility to read and set `processId` and `numProcesses` from
+        environment variables.
+
+        Useful if you use a third party library to manage the processes used for
+        the distributed execution such as mpirun.
+
+        For example: mpirun -np 4 myscript.py
 
         By default the OpenMPI "OMPI_COMM_WORLD_SIZE" and "OMPI_COMM_WORLD_RANK"
         variables are used.
         """
-        return self.configureProcessId(int(os.environ.get(var_host_id, "0")),
-                                       int(os.environ.get(var_num_hosts, "1")))
+        return self.configureProcessId(
+            int(os.environ.get(var_process_id, "0")),
+            int(os.environ.get(var_num_processes, "1")))
 
-    def configureProcessId(self, host_id, num_hosts):
-        """Manually set the current process ID and the total number of hosts.
+    def configureProcessId(self, process_id, num_processes):
+        """Manually set the current process ID and the total number of processess.
+
+        :param int process_id: The ID of this process.
+        :param int num_processes: The total number of processes the execution is
+            distributed over.
         """
-        self.set(distributed_host_id=host_id)
-        self.set(num_distributed_hosts=num_hosts)
+        self.set(distributed_process_id=process_id)
+        self.set(num_distributed_processes=num_processes)
         return self
 
     def getGcdConfigFile(self):
+        """Return all the GCD ids <-> file mappings.
+
+        :meta private:
+        """
         if not self._gcd_mappings:
             self.IPUoFConfigFiles("~/.ipuof.conf.d/*.conf")
-        return self._gcd_mappings.get(self.hostId)
+        return self._gcd_mappings.get(self.processId)
 
     @property
-    def hostId(self):
-        return self.distributed_host_id
+    def processId(self):
+        """Id of the current process."""
+        return self.distributed_process_id
 
     @property
-    def numHosts(self):
-        return self.num_distributed_hosts
+    def numProcesses(self):
+        """Total number of processes the execution is distributed over."""
+        return self.num_distributed_processes
 
 
 class Options(_OptionsDict):
+    """Options controlling how a model is run on the IPU.
+    """
+
     def __init__(self):
         self._jit = _JitOptions()
         self._training = _TrainingOptions()
@@ -201,28 +258,36 @@ class Options(_OptionsDict):
 
     @property
     def Distributed(self):
-        """Options specific to distributed execution."""
+        """Options specific to distributed execution.
+
+        .. seealso:: :py:class:`poptorch.options._DistributedOptions`"""
         return self._distributed
 
     @property
     def Jit(self):
-        """Options specific to PyTorch's JIT."""
+        """Options specific to upstream PyTorch's JIT compiler.
+
+        .. seealso:: :py:class:`poptorch.options._JitOptions`"""
         return self._jit
 
     @property
     def Training(self):
-        """Options specific to training."""
+        """Options specific to training.
+
+        .. seealso:: :py:class:`poptorch.options._TrainingOptions`"""
         return self._training
 
     @property
     def Popart(self):
-        """Options specific to the Popart backend.
+        """Options specific to the PopART backend.
         (Advanced users only).
-        """
+
+        .. seealso:: :py:class:`poptorch.options._PopartOptions`"""
         return self._popart
 
     def deviceIterations(self, device_iterations):
-        """Number of iterations run on the device per execution (Default: 1)"""
+        """Number of iterations the device should run over the data before
+        returning to the user. (Default: 1)"""
         self.set(device_iterations=device_iterations)
         return self
 
@@ -233,17 +298,22 @@ class Options(_OptionsDict):
         return self
 
     def setAvailableMemoryProportion(self, available_memory_proportion):
-        """Memory is set on a per IPU basis, this should be a list of float values between 0 and 1."""
+        """Memory is set on a per IPU basis, this should be a dictionary
+        of IPU ids and float values between 0 and 1.
+
+        For example: {"IPU0": 0.5}
+        """
         actual_memory = {}
 
-        for key in available_memory_proportion:
-            assert "IPU" in key, """Available memory proportions are expected
-                                    to be in a dictionary of {\"IPU0\": 0.5}
-                                    where the 0 in IPU is the index of the
-                                    IPU."""
+        for key, mem in available_memory_proportion.items():
+            assert key.startswith("IPU"), (
+                "Available memory proportions are expected"
+                " to be in a dictionary of {\"IPU0\": 0.5}"
+                " where the 0 in IPU is the index of the"
+                " IPU. Invalid key: %s" % key)
 
             ipu_id = int(key[3:])
-            actual_memory[ipu_id] = available_memory_proportion[key]
+            actual_memory[ipu_id] = mem
 
         self.createOrSet(available_memory_proportion=actual_memory)
         return self
@@ -251,7 +321,7 @@ class Options(_OptionsDict):
     def replicationFactor(self, replication_factor):
         """Number of model replications (Default: 1).
 
-        E.g. if your model uses 1 IPU, a
+        For example if your model uses 1 IPU, a
         replication factor of 2 will use 2 IPUs. If your model is
         pipelined across 4 IPUs, a replication factor of 4 will use 16 IPUs
         total.
@@ -267,8 +337,9 @@ class Options(_OptionsDict):
     def useIpuModel(self, use_model):
         """Use the IPU model or physical hardware.
 
-        Default: False (Real Hardware)
-        This setting takes precedence over the POPTORCH_IPU_MODEL environment
+        Default: False (Real Hardware).
+
+        This setting takes precedence over the `POPTORCH_IPU_MODEL` environment
         variable.
         """
         self.set(use_model=use_model)
@@ -276,36 +347,44 @@ class Options(_OptionsDict):
 
     def connectionType(self, connection_type):
         """set the IPU connection type to one of:
-        - Always: Attach to the IPU from the start (Default).
-        - OnDemand: Wait until the compilation is complete and the executable
-          is ready to be run to attach to the IPU.
-        - Never: Never try to attach to an IPU. (Useful for offline compilation,
-          but trying to run an executable will raise an exception).
+
+        :param poptorch.ConnectionType connection_type:
+            * Always: Attach to the IPU from the start (Default).
+            * OnDemand: Wait until the compilation is complete and the
+              executable is ready to be run to attach to the IPU.
+            * Never: Never try to attach to an IPU. (Useful for offline
+              compilation, but trying to run an executable will raise
+              an exception).
         """
         assert isinstance(connection_type, enums.ConnectionType)
         self.set(connection_type=connection_type.value)
         return self
 
     def syncPattern(self, sync_pattern):
-        """set the IPU SyncPattern to one of:
-        - Full
-        - SinglePipeline
-        - ReplicaAndLadder
+        """Set the IPU SyncPattern.
+
+        :param poptorch.SyncPattern sync_pattern:
+            * Full
+            * SinglePipeline
+            * ReplicaAndLadder
         """
         assert isinstance(sync_pattern, enums.SyncPattern)
         self.set(sync_pattern=sync_pattern.value)
         return self
 
     def useIpuId(self, ipu_id):
-        """ Use the specified IPU id as provided by gc-info.
+        """ Use the specified IPU id as provided by `gc-info`.
 
         The number of IPUs associated with the id must be equal to the number
         of IPUs used by your grpah multiplied by the replication factor.
 
-        E.g. if your model uses 1 IPU and the replication factor is 2 you will
-        need to provide an id with 2 IPUs.
+        For example if your model uses 1 IPU and the replication factor is 2
+        you will need to provide an id with 2 IPUs.
+
         If your model is pipelined across 4 IPUs, the replication factor is 4,
         you will need to provide an id containing 16 IPUs total.
+
+        :param int ipu_id: IPU id as provided by `gc-info`.
         """
         assert isinstance(ipu_id, int)
         self.createOrSet(ipu_id=ipu_id)
@@ -315,6 +394,9 @@ class Options(_OptionsDict):
         """Create an offline IPU target that can only be used for offline compilation.
 
         Note: the offline IPU target cannot be used if the IPU model is enabled.
+
+        :param int ipu_version: IPU version to target (1 for mk1, 2 for mk2).
+            Default: 1.
         """
         self.connectionType(enums.ConnectionType.Never)
         self.createOrSet(ipu_version=ipu_version)
@@ -323,14 +405,13 @@ class Options(_OptionsDict):
     def anchorMode(self, anchor_mode, anchor_return_period=None):
         """ How much data to return from a model
 
-        Args:
-            anchor_mode:
-                All: Return a result for each batch.
-                Sum: Return the sum of all the batches
-                Final: Return the last batch.
-                EveryN: Return every N batches. N is passed in as
-                    |anchor_return_period|
-                Default: "All" for inference, "Final" for training.
+        :param poptorch.AnchorMode anchor_mode:
+                * All: Return a result for each batch.
+                * Sum: Return the sum of all the batches
+                * Final: Return the last batch.
+                * EveryN: Return every N batches. N is passed in as
+                    `anchor_return_period`.
+                * Default: `All` for inference, `Final` for training.
         """
         assert isinstance(anchor_mode, enums.AnchorMode)
 
@@ -364,7 +445,10 @@ class Options(_OptionsDict):
 
     def toDict(self):
         """ Merge all the options, except for the Jit ones, into a single
-        dictionary to be serialised and passed to the cpp side."""
+        dictionary to be serialised and passed to the C++ backend.
+
+        :meta private:
+        """
         assert not self.defaultAnchorMode(
         ), "An anchor mode must be picked before serialisation"
         out = {}
@@ -375,9 +459,9 @@ class Options(_OptionsDict):
         config_file = self._distributed.getGcdConfigFile()
         if self._distributed.numHosts > 1 or config_file:
             assert config_file, ("No IPUoF configuration file found for "
-                                 "hostId %d" % self._distributed.hostId)
+                                 "processId %d" % self._distributed.processId)
             os.environ["IPUOF_CONFIG_PATH"] = config_file
-            logger.debug("'IPUOF_CONFIG_PATH' set to %s for hostId %d",
-                         config_file, self._distributed.hostId)
+            logger.debug("'IPUOF_CONFIG_PATH' set to %s for processId %d",
+                         config_file, self._distributed.processId)
 
         return out

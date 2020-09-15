@@ -16,10 +16,43 @@ from .enums import *
 from .ops import *
 from .options import *
 from . import distributed
+from ._impl import PoplarExecutor
 
 
 class IPU(nn.Module):
+    """Runs a layer on a specified IPU.
+
+    All layers after this layer will also run on
+    the same IPU until another IPU wrapper is encountered.
+
+    The execution will be "pipelined" where each IPU is executing one stage
+    of the operation, as the previous IPU is executing a previous stage on
+    the next batch and subsequent IPUs are executing subsequent stages on
+    previous batches.
+
+    Can be used as either a scope variable:
+
+    >>> with poptorch.IPU(1):
+    ...     self.layer = MyLayer(x)
+
+    Or as a wrapper:
+
+    >>> self.layer = poptorch.IPU(1, MyLayer(x))
+    """
+
     def __init__(self, ipu_id, layer_to_call=None):
+        """
+        :param int ipu_id: The id of the IPU to run on. All subsequent layers
+                           of the network will run on this IPU until another
+                           layer is wrapped. By default all layers will be on
+                           IPU 0 until the first pipeline annotation is
+                           encountered. Note that the ``ipu_id`` is an index
+                           in a multi-IPU device within PopTorch, and is
+                           separate and distinct from the device ids used by
+                           ``gc-info``.
+
+        :param layer_to_call: The layer to run on the specified IPU.
+        """
         super().__init__()
 
         self.ipu_id = ipu_id
@@ -70,10 +103,10 @@ class DataLoader(torch.utils.data.DataLoader):
             class _SubDataset:
                 def __init__(self, dataset, opts, step):
                     num_elts = len(dataset)
-                    per_host = step * (num_elts //
-                                       (step * opts.Distributed.numHosts))
-                    self._offset = opts.Distributed.hostId * per_host
-                    self._length = min(per_host, num_elts - self._offset)
+                    per_proc = step * (num_elts //
+                                       (step * opts.Distributed.numProcesses))
+                    self._offset = opts.Distributed.processId * per_proc
+                    self._length = min(per_proc, num_elts - self._offset)
                     self._dataset = dataset
 
                 def __len__(self):
@@ -301,14 +334,32 @@ class AsynchronousDataAccessor:
 
 
 def trainingModel(model, options=None, optimizer=None):
-    return _impl.PoplarExecutor(model=model,
-                                options=options,
-                                training=True,
-                                optimizer=optimizer)
+    """ Create a PopTorch training model, from a PyTorch model, to run on IPU
+    hardware in training mode.
+
+    :param torch.nn.Module model: The PyTorch model to wrap.
+    :param poptorch.Options options: The IPU specific options
+    :param torch.optim.Optimizer: The optimizers to apply during training.
+        ``optim.SGD`` and ``optim.ADAM`` are supported.
+    :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
+        of ``model``.
+    """
+    return PoplarExecutor(model=model,
+                          options=options,
+                          training=True,
+                          optimizer=optimizer)
 
 
 def inferenceModel(model, options=None):
-    return _impl.PoplarExecutor(model=model, options=options, training=False)
+    """ Create a PopTorch inference model, from a PyTorch model, to run on IPU
+    hardware in inference mode.
+
+    :param torch.nn.Module model: The PyTorch model to wrap.
+    :param poptorch.Options options: The IPU specific options
+    :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
+        of ``model``.
+    """
+    return PoplarExecutor(model=model, options=options, training=False)
 
 
 def propagateInputShapes(graph, dummyInputs):

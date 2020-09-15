@@ -1,5 +1,9 @@
+============
 Installation
-------------
+============
+
+.. contents::
+  :local:
 
 PopTorch is part of the Poplar SDK.  It is packaged as a Python wheel
 file that can be installed using ``pip``.
@@ -8,7 +12,7 @@ For more information about installing the Poplar SDK, see the Getting Started
 Guide for your IPU system.
 
 Using a Python virtual environment
-__________________________________
+==================================
 
 We recommend creating a virtual environment to isolate your PopTorch environment
 from the system Python environment You can use the Python tool ``virtualenv``
@@ -22,7 +26,7 @@ for this. You can create a virtual environment and install PopTorch as shown bel
 
 
 Setting the environment variables
-_________________________________
+=================================
 
 The PopART and Poplar runtime libraries are required to use PopTorch, so you
 will need to set the library search paths, using the scripts provided in the SDK:
@@ -37,7 +41,7 @@ will need to set the library search paths, using the scripts provided in the SDK
     $ source <path to popart installation>/enable.sh
 
 Validating the setup
-____________________
+====================
 
 You can run this simple example to verify that the system is working as
 expected. This example can be found in the Poplar SDK installation.

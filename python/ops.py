@@ -24,6 +24,19 @@ def custom_op(inputs, name, domain, domain_version, example_outputs):
 
 
 def identity_loss(x, reduction="none"):
+    """Marks this operation as being part of the loss calculation and, as such,
+    will back-propagate through it in the PopTorch autograd. This enables
+    multiple losses and custom losses.
+
+    :param tensor loss: The calculated loss.
+    :param string reduction: Reduce the loss output as per PyTorch loss
+        semantics. Supported values are:
+            * "none": Don't reduce
+            * "sum": Sum the losses.
+            * "mean": Take the mean of the losses.
+
+    :returns: An identity loss custom op.
+    """
     if reduction == "sum":
         return torch.ops.poptorch.identity_loss(x, 0)
 

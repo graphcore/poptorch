@@ -1,125 +1,87 @@
+========
 Features
 ========
 
+.. contents::
+  :local:
+
+Options
+=======
+
+The compilation and execution on the IPU can be controlled using :class:`poptorch.Options`:
+
+See :ref:`efficient_data_batching`  for a full
+explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
+``replication_factor`` interact with the output and input sizes.
+
+.. autoclass:: poptorch.Options
+   :members:
+
+.. autoclass:: poptorch.options._DistributedOptions
+   :members:
+
+.. autoclass:: poptorch.options._JitOptions
+   :members:
+
+.. autoclass:: poptorch.options._TrainingOptions
+   :members:
+
+.. autoclass:: poptorch.options._PopartOptions
+   :members:
+
 Model wrapping functions
-------------------------
+========================
+
 
 The basis of PopTorch integration comes from these two model wrapping functions.
 
-.. TODO(T26087)
+poptorch.trainingModel
+----------------------
 
-.. py:function:: trainingModel(model, device_iterations, gradient_accumulation=1, replication_factor=1, profile=False, trace_model=True, loss=None, optimizer=None)
-
-    Create a PopTorch training model, from a PyTorch model, to run on IPU
-    hardware in training mode. See :ref:`efficient_data_batching` for a full
-    explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
-    ``replication_factor`` interact with the output and input sizes.
-
-    :param nn.Module model: A PyTorch model.
-    :param int device_iterations: The number of iterations the device should run over
-                                  the data before returning to the user.
-    :param int gradient_accumulation: The level of gradient accumulation to perform.
-                                      This must be equal to or greater than the number of pipelined IPU stages.
-    :param int replication_factor: The number of replicas to replicate this model over. This will stack
-                                   with pipelines so a model pipelined over two IPUs with a replication
-                                   factor of 4 will run over 8 IPUs.
-    :param nn.Module loss: A PyTorch loss function to be added to the end of the model and fed into the autograd.
-                           See :any:`identity_loss()` for an example of custom losses.
-    :param optim.Optimizer: The optimizer to apply during training. Only ``optim.SGD`` is supported.
-    :param bool profile: Enable generation of graph reports by Poplar.
-    :param bool trace_model: If False, PopTorch will compile the model using ``torch.jit.script`` rather than
-                             ``torch.jit.trace`` (script is experimental, default True).
-    :return: The :any:`PoplarExecutor` wrapper to use in place of ``model``.
-
+.. autofunction:: poptorch.trainingModel
 
 .. literalinclude:: trainingModel.py
     :language: python
-    :caption: An example of the use of ``trainingModel()``
+    :caption: An example of the use of :py:func:`poptorch.trainingModel`
     :linenos:
     :lines: 3-
     :emphasize-lines: 21
 
+poptorch.inferenceModel
+-----------------------
 
-.. py:function:: inferenceModel(model, device_iterations=1,replication_factor=1, profile=False, trace_model=True)
-
-    Create a PopTorch inference model, from a PyTorch model, to run on IPU hardware in inference mode.
-    See :ref:`efficient_data_batching`  for a full
-    explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
-    ``replication_factor`` interact with the output and input sizes.
-
-    :param nn.Module model: A PyTorch model.
-    :param int device_iterations: The number of iterations the device should run over the data before returning to the user.
-    :param int replication_factor: The number of replicas to replicate this model over.
-                                   This will stack with pipelines so a model pipelined over two IPUs with a replication
-                                   factor of 4 will run over 8 IPUs.
-    :param bool profile: Enable generation of graph reports by Poplar.
-    :param bool trace_model: If False, PopTorch will compile the model using ``torch.jit.script`` rather than ``torch.jit.trace``
-                            (script is experimental, default True).
-    :return: The :any:`PoplarExecutor` wrapper to use in place of ``mode``.
-
+.. autofunction:: poptorch.inferenceModel
 
 .. literalinclude:: inference.py
     :language: python
-    :caption: An example of the use of ``inferenceModel()``
+    :caption: An example of the use of :py:func:`poptorch.inferenceModel`
     :linenos:
     :lines: 3-
-    :emphasize-lines: 17
+    :emphasize-lines: 14
 
 
-The above functions return a ``PoplarExecutor`` class which is just a wrapper around the provided model.
+poptorch.PoplarExecutor
+-----------------------
 
-.. py:class:: PoplarExecutor
-
-   This class should not be created directly but is a wrapper around the model
-   that was passed into :any:`inferenceModel` or :any:`trainingModel`. It only has a few methods
-   which can be used to interface with the IPU.
-
-   .. py:method:: __call__(*args, **kwargs)
-
-      Calls the wrapped model with the given tensors. Inputs must be tensors or
-      tuples/lists of tensors. Will compile for IPU on the first invocation.
-
-   .. py:method:: copyWeightsToHost()
-
-      Updates the parameters used in model with the weights stored on device. (The weights in ``model.parameters()``)
-
-   .. py:method:: copyWeightsToDevice()
-
-      Copies the weights from ``model.parameters()`` to the IPU device. Implicitly called on first call.
-
-   .. py:method:: setOptimizer(optimizer)
-
-      Sets the optimiser for a training model. Will overwrite the previous one. Only ``optim.SGD`` is supported.
-
+.. autoclass:: poptorch.PoplarExecutor
+   :special-members: __call__
+   :members:
 
 
 Pipeline annotator
-------------------
+==================
 
 You can use the ``IPU`` wrapper class to define model parallelism in a PopTorch multi-IPU
 device. Conceptually this is collecting the layers of a model into pipeline stages
 to be run on specific IPUs. However, as there is a 1:1 mapping of pipeline stages
 to IPUs, we simply use an IPU index to declare where the layer will be run.
 
-.. py:class:: IPU(ipu_id, layer_to_call=None)
-
-    Runs a layer on a specified IPU. All layers after this layer will also run on
-    the same IPU until another IPU wrapper is encountered. The execution will be
-    "pipelined" where each IPU is executing one stage of the operation, as the
-    previous IPU is executing a previous stage on the next batch and subsequent IPUs
-    are executing subsequent stages on previous batches.
-
-    :param int ipu_id: The id of the IPU to run on. All subsequent layers of the
-                        network will run on this IPU until another layer is wrapped. By default all
-                        layers will be on IPU 0 until the first pipeline annotation is encountered.
-                        Note that the ``ipu_id`` is an index in a multi-IPU device within PopTorch, and
-                        is separate and distinct from the device ids in ``gc-info``.
-
-    :param layer_to_call: The layer to run on the specified IPU.
-
+.. autoclass:: poptorch.IPU
+   :special-members: __init__
 
 .. literalinclude:: pipeline_simple.py
     :language: python
+    :linenos:
     :lines: 3-34
     :emphasize-lines: 15, 18, 21
     :caption: Annotations can be attached to layers in existing models.
@@ -127,46 +89,83 @@ to IPUs, we simply use an IPU index to declare where the layer will be run.
 
 .. literalinclude:: pipeline_simple.py
     :language: python
+    :linenos:
     :lines: 77-
-    :emphasize-lines: 20, 23, 27
+    :emphasize-lines: 17, 20, 24
     :caption: PopTorch also supports annotating the model directly. Both forms can be used interchangeably.
 
 
 Custom ops
-----------
+==========
 
 Helper operations to be used within a model.
 
+poptorch.ipu_print_tensor
+-------------------------
+
 .. py:class:: ipu_print_tensor(tensor_to_print)
 
-    Adds a tensor to be printed on the IPU. When this point is reached in execution the tensor will be copied back to host and printed.
-    The operation is an identity operation and it will return the exact same tensor. That tensor should then be used to make sure the print
-    isn't eliminated. When this operation is called in the backward pass it will print the gradient of the tensor.
+    Adds a tensor to be printed on the IPU. When this is executed the tensor 
+    will be copied back to host and printed.
+
+    When this operation is called in the backward pass it
+    will print the gradient of the tensor.
+
+    The operation is an identity operation and it will return the exact same
+    tensor. The returned tensor should be used in place of the original tensor,
+    in the rest of the program to make sure that the print operation isn't optimised away.
+
+    For example if the original code looks like this:
+
+    .. code-block:: python
+
+      def forward(self, c, d, b)
+        a = c + d
+        return a + b
+
+    And you want to print the value of `a`.
+    If you do:
+
+    .. code-block:: python
+
+      def forward(self, c, d, b)
+        a = c + d
+        poptorch.ipu_print_tensor(a)
+        return a + b
+
+    The result of `ipu_print_tensor` is not used, therefore it will be optimised out by the 
+    graph optimiser and `a` will not be printed.
+
+    Instead you should do:
+
+    .. code-block:: python
+
+      def forward(self, c, d, b)
+        a = c + d
+        x = poptorch.ipu_print_tensor(a)
+        return x + b
+
+    .. warning::
+       In order for the print operation to not be optimised out by the graph
+       optimiser, you must use the output of the print.
 
     :param ipu_print_tensor: The tensor to print.
+    :returns: The input unchanged.
 
-    .. literalinclude:: api.py
-        :language: python
-        :lines: 7-18
-        :emphasize-lines: 10
-
-
-.. py:function:: poptorch.identity_loss(loss, reduction="none")
-
-  Marks this operation as being part of the loss calculation and, as such, will back-propagate through it in the PopTorch autograd. This enables multiple losses and custom losses.
-
-  :param tensor loss: The calculated loss.
-
-  :param string reduction: Reduce the loss output as per PyTorch loss semantics. Supported values are:
-
-    * "none": Don't reduce
-
-    * "sum": Sum the losses.
-
-    * "mean": Take the mean of the losses.
-
-
-  .. literalinclude:: api.py
+.. literalinclude:: api.py
     :language: python
-    :lines: 25-43
-    :emphasize-lines: 5
+    :linenos:
+    :lines: 7-18
+    :emphasize-lines: 10
+
+
+poptorch.identity_loss
+----------------------
+
+.. autofunction:: poptorch.identity_loss
+
+.. literalinclude:: api.py
+  :language: python
+  :linenos:
+  :lines: 25-43
+  :emphasize-lines: 5

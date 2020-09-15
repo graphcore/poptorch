@@ -116,6 +116,10 @@ class ArgsParser:
         self._defaults = [p.default for p in sig.parameters.values()]
 
     def __call__(self, args, kwargs):
+        """Calls the wrapped model with the given tensors. Inputs must be
+        tensors or tuples/lists of tensors.
+        Will compile for IPU on the first invocation.
+        """
         a = ArgsParser.Args()
         assert self._has_variadic_arguments or len(args) + len(kwargs) <= len(
             self._varnames), ("Too many arguments provided: expected %s (%d) "
@@ -158,6 +162,11 @@ class ArgsParser:
 
 
 class PoplarExecutor:
+    """ This class should not be created directly but is a wrapper around
+    the model that was passed into `inferenceModel` or `trainingModel`.
+    It only has a few methods which can be used to interface with the IPU.
+    """
+
     def __init__(self,
                  model,
                  options,
@@ -252,6 +261,9 @@ class PoplarExecutor:
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self):
+        """ Updates the parameters used in `model` with the weights stored on device.
+        (The weights in ``model.parameters()``)
+        """
         weights = {
             **dict(self._model.named_parameters()),
             **dict(self._model.named_buffers())
@@ -264,6 +276,9 @@ class PoplarExecutor:
     # Write from host memory to IPU memory. This is done automatically on
     # compilation so should be rarely used.
     def copyWeightsToDevice(self):
+        """Copies the weights from ``model.parameters()`` to the IPU device.
+        Implicitly called on first call.
+        """
         # Don't trigger a copyToHost by accessing `named_parameters`
         saved_dirty_flag = self._dirty_host_weights
         self._dirty_host_weights = False
@@ -280,9 +295,19 @@ class PoplarExecutor:
         self._dirty_host_weights = saved_dirty_flag
 
     def setOptimizer(self, optimizer):
+        """ Sets the optimiser for a training model. Will overwrite the
+        previous one. ``optim.SGD`` and ``optim.ADAM`` are supported.
+        """
         self._new_optimizer = optimizer
 
     def __call__(self, *args, **kwargs):
+        """
+        Takes the same arguments as the wrapped PyTorch `model.__call__`.
+
+        .. note:: The first time the PoplarExecutor wrapper is called, the
+            wrapped model will be traced and compiled.
+
+        """
         # Convert single tensor to tuple.
         in_tensors = self._args_parser(args, kwargs)
 

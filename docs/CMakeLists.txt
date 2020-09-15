@@ -28,7 +28,7 @@ if (BUILD_DOCS)
 
   add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/html/poptorch_user_guide
-    COMMAND ${GCDOC} -v -r ${DOCS_VERSION} -b singlehtml ${CMAKE_CURRENT_SOURCE_DIR}/user_guide ${CMAKE_CURRENT_BINARY_DIR}/html/poptorch_user_guide
+    COMMAND ${GCDOC} -v -r ${DOCS_VERSION} -b html ${CMAKE_CURRENT_SOURCE_DIR}/user_guide ${CMAKE_CURRENT_BINARY_DIR}/html/poptorch_user_guide
     COMMENT "Building html user guide documentation"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )

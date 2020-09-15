@@ -12,12 +12,12 @@ from poptorch.distributed import VirtualIpuManager as vipu
 partition_name = "poptorch_tests"
 
 
-def run_test(host_id=0, num_hosts=1):
+def run_test(process_id=0, num_processes=1):
     localReplicationFactor = 2
 
     opts = poptorch.Options()
     opts.replicationFactor(localReplicationFactor)
-    opts.Distributed.configureProcessId(host_id, num_hosts)
+    opts.Distributed.configureProcessId(process_id, num_processes)
     opts.Distributed.IPUoFConfigFiles(f"~/.ipuof.conf.d/{partition_name}_*")
 
     replicationFactor = localReplicationFactor * opts.Distributed.numHosts
@@ -75,8 +75,8 @@ def run_test(host_id=0, num_hosts=1):
         # Update the weights
         optimizer.step()
 
-        # Only keep the output slice corresponding to this host
-        outputs = outputs[opts.Distributed.hostId *
+        # Only keep the output slice corresponding to this process
+        outputs = outputs[opts.Distributed.processId *
                           localReplicationFactor:][:localReplicationFactor]
         return [torch.cat(outputs), module.B.data, module.C.data]
 

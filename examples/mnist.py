@@ -186,5 +186,5 @@ train()
 
 # Check validation loss on IPU once trained.
 # TODO(TXXXX) Bug in Poplar the device list is cached and not refreshed when IPUOF_CONFIG_PATH changes.
-# if training_data.options.Distributed.hostId == 0:
+# if training_data.options.Distributed.processId == 0:
 #    test()
