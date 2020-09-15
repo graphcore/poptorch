@@ -33,13 +33,17 @@ the listed ops but may not be explicitly listed but are in fact supported.
 Creation ops
 ''''''''''''
 
-* ``torch.zeros``
-* ``torch.ones``
 * ``torch.arange``
-
+* ``tensor.fill``
+* ``torch.full``
+* ``torch.full_like``
+* ``torch.ones``
+* ``torch.zeros``
 
 Indexing, Slicing, Joining, Mutating Ops
 ''''''''''''''''''''''''''''''''''''''''
+
+PyTorch functions
 
 * ``torch.cat``
 * ``torch.chunk``
@@ -49,9 +53,23 @@ Indexing, Slicing, Joining, Mutating Ops
 * ``torch.t``
 * ``torch.transpose``
 * ``torch.unsqueeze``
+* ``torch.where``
+
+Tensor methods
+
 * ``tensor.expand``
 * ``tensor.expand_as``
+* ``tensor.masked_fill``
 
+Random Samplers
+'''''''''''''''
+To set the random state use poptorch.Options.randomSeed
+
+* ``torch.distributions.Uniform``
+* ``torch.normal``
+* ``torch.rand``
+* ``torch.randn``
+* ``torch.uniform``
 
 Math operations
 ---------------
@@ -71,12 +89,14 @@ Pointwise Ops
 * ``torch.exp``
 * ``torch.expm1``
 * ``torch.floor``
+* ``torch.floor_divide``
 * ``torch.frac``
 * ``torch.log``
 * ``torch.log10``
 * ``torch.log1p``
 * ``torch.log2``
 * ``torch.mul``
+* ``torch.norm``
 * ``torch.neg``
 * ``torch.pow``
 * ``torch.reciprocal``
@@ -95,7 +115,6 @@ Pointwise Ops
 * ``torch.trunc``
 
 
-
 Reduction Ops
 '''''''''''''
 
@@ -111,7 +130,22 @@ Comparison Ops
 ''''''''''''''
 
 * ``torch.eq``
+* ``torch.ge``
+* ``torch.gt``
+* ``torch.le``
+* ``torch.lt``
 
+    torch.min and torch.max only support (tensor, tensor) and (tensor) overloads. They do
+    not support the (tensor, dim=.*, keepdim=.*) overload.
+
+* ``torch.max``
+* ``torch.min``
+* ``torch.ne``
+* ``torch.isnan``
+
+    torch.topk only supports sorted=True and Largest=True arguments.
+
+* ``torch.topk``
 
 BLAS and LAPACK Operations
 ''''''''''''''''''''''''''
@@ -134,7 +168,14 @@ compiler wrappers and just work.
 Convolution layers
 ------------------
 
+Conv transpose operations do not yet support dilations.
+
+* ``torch.nn.Conv1d``
 * ``torch.nn.Conv2d``
+* ``torch.nn.Conv3d``
+* ``torch.nn.ConvTranspose1d``
+* ``torch.nn.ConvTranspose2d``
+* ``torch.nn.ConvTranspose3d``
 
 
 Pooling layers
@@ -180,6 +221,8 @@ Activations
 * ``torch.nn.Softmax``
 * ``torch.nn.Softsign``
 * ``torch.nn.Tanh``
+* ``torch.nn.PReLU``
+* ``torch.nn.Hardtanh``
 
 
 Normalization layers
@@ -196,8 +239,6 @@ Currently only ``affine=True`` is supported as a parameter. That is to say, only
 Recurrent layers
 ----------------
 
-LSTM only supports the default options for parameters ``batch_first`` (False), ``dropout`` (off/0), and ``bias`` (True).
-
 * ``torch.nn.LSTM``
 
 Linear layers
@@ -205,6 +246,7 @@ Linear layers
 
 * ``torch.nn.Identity``
 * ``torch.nn.Linear``
+* ``torch.nn.Bilinear``
 
 Dropout
 -------
@@ -234,3 +276,9 @@ normal PyTorch operations, where they have to opt in to the gradient pass.
 * ``torch.nn.CrossEntropyLoss``
 * ``torch.nn.NLLLoss``
 * ``torch.nn.BCELoss``
+
+Vision Layers
+-------------
+Only nearest is supported.
+
+* ``torch.nn.Upsample``

@@ -63,3 +63,5 @@ setting the environment variable POPLAR_ENGINE_OPTIONS='{autoReport.all:true, au
 - Upgraded from torch 1.5.0 to torch 1.6.0
 
 - Added experimental support for single host distributed execution
+
+- Added torch.where and tensor.masked_fill
