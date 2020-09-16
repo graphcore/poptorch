@@ -100,6 +100,13 @@ class _TrainingOptions(_OptionsDict):
 
     def gradientAccumulation(self, gradient_accumulation):
         """Number of samples to accumulate for the gradient calculation.
+
+        Accumulate the gradient N times before applying it. This is needed to
+        train with models expressing pipelined model parallelism using the IPU
+        annotation. This is due to weights being shared across pipeline batches
+        so gradients will be updated and used by subsequent batches out of
+        order.
+
         Might be called "pipeline depth" in some other frameworks."""
         self.set(gradient_accumulation=gradient_accumulation)
         return self
@@ -287,7 +294,12 @@ class Options(_OptionsDict):
 
     def deviceIterations(self, device_iterations):
         """Number of iterations the device should run over the data before
-        returning to the user. (Default: 1)"""
+        returning to the user. (Default: 1)
+
+        Essentially, it is the equivalent of launching the IPU in a loop over
+        that number of batches. This is efficient because that loop runs
+        on the IPU directly.
+        """
         self.set(device_iterations=device_iterations)
         return self
 

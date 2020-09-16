@@ -20,6 +20,13 @@ from ._impl import PoplarExecutor
 
 
 class DataLoader(torch.utils.data.DataLoader):
+    """ Thin wrapper around the traditional `torch.utils.data.DataLoader` to
+    abstract away some of the batch sizes calculations.
+
+    If this DataLoader is used in a distributed execution environment, it will
+    ensure that each process uses a different subset of the dataset.
+    """
+
     def __init__(self,
                  options,
                  dataset,
@@ -28,6 +35,22 @@ class DataLoader(torch.utils.data.DataLoader):
                  num_workers=0,
                  drop_last=True,
                  **kwargs):
+        """
+        :param poptorch.Options options: Options that will be used to compile
+            and run the model.
+        :param dataset: The dataset to get the data from.
+        :param int batch_size: This is the batch size in the conventional sense
+            of being the size that runs through an operation in the model at
+            any given time.
+        :param bool shuffle: Whether or not the dataset should be shuffled.
+        :param int num_workers: Number of worker processes to use to read the
+            data.
+        :param bool drop_last: If True and the number of elements in the
+            dataset is not a multiple of the combined batch size then the
+            incomplete batch at the end will be dropped.
+        :param kwargs: Other options to pass to the Torch's DataLoader's
+            constructor.
+        """
         assert isinstance(options, Options)
         self._combined_batch_size = batch_size * \
             options.device_iterations * \
@@ -75,17 +98,24 @@ class DataLoader(torch.utils.data.DataLoader):
 
     @property
     def combinedBatchSize(self):
+        """Total number of elements consumed from the dataset for a single
+        execution of the model."""
         return self._combined_batch_size
 
     @property
     def options(self):
+        """A reference to the options that were used to initialise this
+        DataLoader.
+        """
         return self._options
 
 
-# A dataloader which launches the dataloading process on a separate thread to
-# allow for the data to be preprocessed asynchronous on CPU to minimize CPU/IPU
-# transfer time.
 class AsynchronousDataAccessor:
+    """A dataloader which launches the dataloading process on a separate thread
+    to allow for the data to be preprocessed asynchronous on CPU to minimize
+    CPU/IPU transfer time.
+    """
+
     def __init__(self,
                  dataset,
                  buffer_size=3,

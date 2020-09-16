@@ -7,7 +7,7 @@ on Graphcore IPU hardware.
 
 PopTorch supports both inference and training. To run a model on the IPU you wrap your
 existing PyTorch model in either a PopTorch inference wrapper or a PopTorch training
-wrapper. You can provide further annotations to split the model across multiple IPUs.
+wrapper. You can provide further annotations to partition the model across multiple IPUs.
 
 You can wrap individual layers in an IPU helper to designate which IPU they
 should go on. Using the user-provided annotations, PopTorch will use PopART to parallelise
@@ -32,7 +32,8 @@ on IPU. However, it does have some differences from native PyTorch execution.
   :linenos:
   :lines: 54-89
 
-* Under the hood PopTorch uses the ``torch.jit.trace`` API. That means it inherits some of the constraints of that API. These include:
+* Under the hood PopTorch uses the ``torch.jit.trace`` API. That means it
+  inherits the constraints of that API. These include:
 
    * Inputs must be Torch tensors or tuples/lists containing Torch tensors.
    * ``None`` can be used as a default value for a parameter but cannot be expliticly passed as an input value.

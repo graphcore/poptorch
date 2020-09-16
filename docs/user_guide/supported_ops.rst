@@ -264,8 +264,10 @@ Loss functions
 --------------
 
 This version supports a limited subset of loss functions. However, we support
-``poptorch.identity_loss`` which gives users the ability to implement any arbitrary
-loss function. See operation explanation in the overview.
+:py:func:`poptorch.identity_loss` which gives users the ability to implement any arbitrary
+loss function. 
+
+.. seealso:: :py:func:`poptorch.identity_loss`
 
 One caveat for the following loss functions is if they are used they will always be included
 in the back propagation and will always receive a gradient, which is a slight deviation from

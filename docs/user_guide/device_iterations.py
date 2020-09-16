@@ -133,3 +133,28 @@ for batch_number, (data, labels) in enumerate(training_data):
     # final batch of each replica (the default AnchorMode).
     output, loss = poptorch_model(data, labels)
     print(f"{labels[-1]}, {output}, {loss}")
+
+# Not displayed: just to keep the linter happy
+shape = None
+num_tensors = 100
+batch_size = 1
+num_workers = 0
+device_iterations = 1
+replication_factor = 1
+# Example starts here:
+
+opts = poptorch.Options()
+opts.deviceIterations(device_iterations)
+opts.replicationFactor(replication_factor)
+
+data = poptorch.DataLoader(opts,
+                           ExampleDataset(shape=shape, length=num_tensors),
+                           batch_size=batch_size,
+                           num_workers=num_workers)
+
+loader = poptorch.AsynchronousDataAccessor(data)
+
+poptorch_model = poptorch.inferenceModel(model, opts)
+
+for it, d in enumerate(loader):
+    out = poptorch_model(d)
