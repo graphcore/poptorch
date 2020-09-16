@@ -410,7 +410,7 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
 
     torch::jit::RemoveInplaceOps(graph);
 
-    logging::trace("Graph right before casting making integerer params as "
+    logging::trace("Graph right before casting making integer params as "
                    "constants inputs:\n{}",
                    *graph);
     poptorch::type_and_constant_canonicalization::makeConstantIntParams(

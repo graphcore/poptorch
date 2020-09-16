@@ -196,6 +196,8 @@ public:
 
   std::vector<std::int64_t> getSize(poptorch::TensorId id) const;
 
+  std::vector<char> getTensorDTypeString(poptorch::TensorId id) const;
+
   poptorch::TensorId
   customOperation(const char *op,
                   const std::vector<poptorch::TensorId> &inputs);

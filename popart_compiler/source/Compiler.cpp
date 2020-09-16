@@ -1225,6 +1225,23 @@ std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
   }
 }
 
+std::vector<char> Compiler::getTensorDTypeString(poptorch::TensorId id) const {
+  std::string type_str;
+
+  if (_impl->session) {
+    type_str = _impl->session->getInfo(_impl->ids[id]).data_type();
+  } else {
+    auto popart_id = _impl->ids.at(id);
+    try {
+      type_str = _impl->op_builder->getTensorDtypeString(popart_id);
+    } catch (const popart::error &e) {
+      type_str = "unknown";
+    }
+  }
+
+  return std::vector<char>(type_str.begin(), type_str.end());
+}
+
 void Compiler::setActiveIpu(std::uint64_t id, std::int64_t phase_id) {
   _impl->active_ipu = id;
   _impl->active_phase = phase_id;

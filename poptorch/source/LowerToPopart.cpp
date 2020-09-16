@@ -133,7 +133,8 @@ private:
 
   std::string tensorNames(std::int64_t first_tensor, std::int64_t num_tensors);
 
-  std::string tensorShapes(std::int64_t first_tensor, std::int64_t num_tensors);
+  std::string tensorTypesAndShapes(std::int64_t first_tensor,
+                                   std::int64_t num_tensors);
 };
 
 /*
@@ -344,8 +345,8 @@ std::string LowerToPopart::tensorNames(std::int64_t first_tensor,
   return names;
 }
 
-std::string LowerToPopart::tensorShapes(std::int64_t first_tensor,
-                                        std::int64_t num_tensors) {
+std::string LowerToPopart::tensorTypesAndShapes(std::int64_t first_tensor,
+                                                std::int64_t num_tensors) {
   std::string sep{};
   std::string shapes;
 
@@ -356,6 +357,11 @@ std::string LowerToPopart::tensorShapes(std::int64_t first_tensor,
 
     try {
       auto tensor_shape = _compiler.getSize(first_tensor + i);
+
+      auto dtype_vec = _compiler.getTensorDTypeString(first_tensor + i);
+      for (auto ch : dtype_vec) {
+        shape_str << ch;
+      }
 
       if (tensor_shape.empty()) {
         shape_str << shape_inf_failed;
@@ -413,9 +419,10 @@ void LowerToPopart::lowerBody() {
         _valueMap.setTensor(output, output_tensor);
       }
 
-      logging::trace("{} was lowered to {} [{}]", nodeToString(node),
-                     tensorNames(first_output_tensor, node->outputs().size()),
-                     tensorShapes(first_output_tensor, node->outputs().size()));
+      logging::trace(
+          "{} was lowered to {} [{}]", nodeToString(node),
+          tensorNames(first_output_tensor, node->outputs().size()),
+          tensorTypesAndShapes(first_output_tensor, node->outputs().size()));
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       _compiler.setActiveIpu(
           node->i(c10::Symbol::fromQualString("attr::ipu")),
