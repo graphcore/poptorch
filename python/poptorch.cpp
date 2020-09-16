@@ -4,6 +4,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
+#include <sstream>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/inliner.h>
@@ -226,6 +227,52 @@ void buildTensorList(const torch::jit::IValue &value,
   }
 }
 
+// Print the graph input string which matches that of Graph::print
+void printGraphInputStr(std::ostream &os, const torch::jit::Graph &graph) {
+  bool first = true;
+  for (auto &input : graph.inputs()) {
+    if (!first) {
+      os << ",\n      ";
+    }
+    first = false;
+    os << "%" << input->debugName();
+    os << " : ";
+    os << *input->type();
+  }
+}
+
+// Prints the graph out to the log (trace), print both the trace inputs and
+// actual inputs if trace_input_str is not empty
+void logGraph(const char *intro_str, const torch::jit::Graph &graph,
+              const std::string &trace_input_str) {
+  if (trace_input_str.empty()) {
+    logging::trace("{}", graph);
+  } else {
+    std::ostringstream graph_str;
+
+    // Print the trace inputs
+    graph_str << intro_str << "\n" << trace_input_str << "\n";
+
+    // Print the original inputs
+    graph_str << "[orig:";
+    printGraphInputStr(graph_str, graph);
+    graph_str << "]\n";
+
+    std::vector<const torch::jit::Node *> groups;
+    for (auto n : graph.nodes()) {
+      n->print(graph_str, 1, &groups, true);
+    }
+    graph_str << "  return (" << graph.outputs() << ")\n";
+    size_t i = 0;
+
+    for (auto fg : groups) {
+      graph_str << "with " << fg->kind().toQualString() << "_" << i++ << " = "
+                << *fg->g(torch::jit::attr::Subgraph);
+    }
+    logging::trace("{}", graph_str.str());
+  }
+}
+
 } // namespace
 
 void copyWeightsToHostImpl(
@@ -366,11 +413,11 @@ void constantPropagation(torch::jit::Graph *graph) {
   ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
 }
 
-std::shared_ptr<poptorch::PoplarExecutable>
-compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
-                 const pybind11::tuple &parameter_tensors,
-                 const pybind11::tuple &inputs, const pybind11::dict &options,
-                 bool training, const py::dict &optimizerDict) {
+std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
+    py::handle h, const pybind11::tuple &parameter_names,
+    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
+    const std::string &trace_input_str, const pybind11::dict &options,
+    bool training, const py::dict &optimizerDict) {
   try {
     auto module = asModule(h);
 
@@ -398,7 +445,7 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
 
     Optimizer optimizer = parseOptimizer(optimizerDict);
 
-    logging::trace("Lowered graph:\n{}", *graph);
+    logGraph("Lowered graph:", *graph, trace_input_str);
 
     torch::jit::EliminateDeadCode(graph);
     torch::jit::PeepholeOptimize(graph);
@@ -410,27 +457,30 @@ compileWithTrace(py::handle h, const pybind11::tuple &parameter_names,
 
     torch::jit::RemoveInplaceOps(graph);
 
-    logging::trace("Graph right before casting making integer params as "
-                   "constants inputs:\n{}",
-                   *graph);
+    logGraph("Graph right before casting making integer params as constant "
+             "inputs:",
+             *graph, trace_input_str);
+
     poptorch::type_and_constant_canonicalization::makeConstantIntParams(
         graph.get(), parameters, traced_tensors);
 
-    logging::trace("Graph right before casting unsupported inputs:\n{}",
-                   *graph);
+    logGraph("Graph right before casting unsupported inputs:", *graph,
+             trace_input_str);
     poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
         graph.get());
 
-    logging::trace("Graph right before output type changes:\n{}", *graph);
+    logGraph("Graph right before output type changes:", *graph,
+             trace_input_str);
     poptorch::type_and_constant_canonicalization::checkAndChangeOutputTypes(
         graph.get());
 
-    logging::trace("Graph right before constant canonicalisation\n{}", *graph);
+    logGraph("Graph right before constant canonicalisation:", *graph,
+             trace_input_str);
     poptorch::type_and_constant_canonicalization::canonicaliseConstants(
         graph.get());
 
     // Convert the IR to half to match the inputs/actual usage.
-    logging::debug("Graph before canonicalising half:\n{}", *graph);
+    logGraph("Graph before canonicalising half:\n{}", *graph, trace_input_str);
     poptorch::canonicaliseHalf(graph.get(), input_tensors, traced_tensors);
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
@@ -552,6 +602,27 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+std::string getTraceInputStr(py::handle h) {
+  // This is a lot of work for just the input string but the graph does
+  // have to be lowered for the numbers to match. Therefore only do it
+  // if log level is Trace.
+  if (!logging::shouldLog(logging::Level::Trace)) {
+    return std::string();
+  }
+
+  auto module = asModule(h);
+  auto forward = module->get_method("forward");
+  auto graph_and_tensors =
+      torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
+  auto graph = graph_and_tensors.first;
+
+  std::ostringstream trace_input_str;
+  trace_input_str << "graph(";
+  printGraphInputStr(trace_input_str, *graph);
+  trace_input_str << "):";
+  return trace_input_str.str();
+}
+
 void pyPropagateInputShapes(py::handle h) {
   try {
     auto graph = asGraph(h);
@@ -600,6 +671,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("canonicalize", poptorch::pyCanonicalize);
   m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDeviceImpl);
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);
+  m.def("getTraceInputStr", poptorch::getTraceInputStr);
   m.def("ipuHardwareIsAvailable", poptorch::ipuHardwareIsAvailable,
         py::arg("numIpus") = 1);
   m.def("_getPopartIR", poptorch::getPopartIR);

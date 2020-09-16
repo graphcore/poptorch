@@ -397,6 +397,15 @@ class PoplarExecutor:
                 self._trace = torch.jit.trace(self._model,
                                               in_tensors_trace_view.asTuple())
 
+                # Save the inputs of the traced graph printout as it will be
+                # different after getting originals back.
+                # NB empty if log level is not TRACE.
+                if hasConvertedAnyHalf[0]:
+                    trace_input_string = poptorch_core.getTraceInputStr(
+                        self._trace._c).strip()
+                else:
+                    trace_input_string = ""
+
                 # Convert any converted params back to half.
                 for name, layer in self._trace.named_modules():
                     if name in convertedLayers:
@@ -415,13 +424,14 @@ class PoplarExecutor:
                     self._executable = poptorch_core.compileWithTrace(
                         self._trace._c, tuple(parameters.keys()),
                         tuple(parameters.values()),
-                        in_tensors_as_half.asTuple(), self._options.toDict(),
-                        self._training, self._optimizer)
+                        in_tensors_as_half.asTuple(), trace_input_string,
+                        self._options.toDict(), self._training,
+                        self._optimizer)
                 else:
                     self._executable = poptorch_core.compileWithTrace(
                         self._trace._c, tuple(parameters.keys()),
                         tuple(parameters.values()),
-                        in_tensors_trace_view.asTuple(),
+                        in_tensors_trace_view.asTuple(), trace_input_string,
                         self._options.toDict(), self._training,
                         self._optimizer)
             else:
