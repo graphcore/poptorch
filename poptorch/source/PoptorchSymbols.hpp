@@ -41,6 +41,7 @@ namespace symbols {
 SYMBOL_DECL(poptorch, begin_ipu_block)
 SYMBOL_DECL(poptorch, end_ipu_block)
 SYMBOL_DECL(poptorch, identity_loss)
+SYMBOL_DECL(poptorch, nop)
 SYMBOL_DECL(poptorch, set_available_memory)
 
 // Casting is done before passing the input to the IPU: the op is used so that
