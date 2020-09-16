@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+# Regular execution (Runs on 4 IPUs):
+#
+# python ../poptorch/examples/mnist.py
+#
+# Distributed execution:
+# Requires two partitions:
+#   vipu-cli create partition training --size 8 --num-gcds 2 --gcd-sync-replicas 8
+#   vipu-cli create partition validation --size 1
+#
+# Then run using mpirun:
+# vipu-cli reset partition training
+# vipu-cli reset partition validation
+# mpirun --tag-output -np 2  python ../poptorch/examples/mnist.py
+
 import torch
 import torch.nn as nn
 import torchvision
@@ -18,6 +32,7 @@ opts.deviceIterations(20)
 opts.replicationFactor(4)
 
 opts.randomSeed(42)
+opts.Distributed.IPUoFConfigFiles("~/.ipuof.conf.d/training_*")
 
 # Load MNIST normally.
 training_data = poptorch.DataLoader(
@@ -35,6 +50,9 @@ training_data = poptorch.DataLoader(
 
 # Load MNIST normally.
 val_options = poptorch.Options()
+# Only run the validation in the main process
+val_options.Distributed.disable().IPUoFConfigFiles(
+    "~/.ipuof.conf.d/validation_*")
 validation_data = poptorch.DataLoader(
     val_options,
     torchvision.datasets.MNIST('mnist_data/',
@@ -107,6 +125,7 @@ inference_model = poptorch.inferenceModel(model, validation_data.options)
 
 def train():
     for batch_number, (data, labels) in enumerate(training_data):
+        print(f"Batch {batch_number}")
         output, losses = training_model(data, labels)
 
         if batch_number % 10 == 0:
@@ -165,4 +184,7 @@ def test():
 # Train on IPU.
 train()
 
-test()
+# Check validation loss on IPU once trained.
+# TODO(TXXXX) Bug in Poplar the device list is cached and not refreshed when IPUOF_CONFIG_PATH changes.
+# if training_data.options.Distributed.processId == 0:
+#    test()
