@@ -19,57 +19,6 @@ from . import distributed
 from ._impl import PoplarExecutor
 
 
-class IPU(nn.Module):
-    """Runs a layer on a specified IPU.
-
-    All layers after this layer will also run on
-    the same IPU until another IPU wrapper is encountered.
-
-    The execution will be "pipelined" where each IPU is executing one stage
-    of the operation, as the previous IPU is executing a previous stage on
-    the next batch and subsequent IPUs are executing subsequent stages on
-    previous batches.
-
-    Can be used as either a scope variable:
-
-    >>> with poptorch.IPU(1):
-    ...     self.layer = MyLayer(x)
-
-    Or as a wrapper:
-
-    >>> self.layer = poptorch.IPU(1, MyLayer(x))
-    """
-
-    def __init__(self, ipu_id, layer_to_call=None):
-        """
-        :param int ipu_id: The id of the IPU to run on. All subsequent layers
-                           of the network will run on this IPU until another
-                           layer is wrapped. By default all layers will be on
-                           IPU 0 until the first pipeline annotation is
-                           encountered. Note that the ``ipu_id`` is an index
-                           in a multi-IPU device within PopTorch, and is
-                           separate and distinct from the device ids used by
-                           ``gc-info``.
-
-        :param layer_to_call: The layer to run on the specified IPU.
-        """
-        super().__init__()
-
-        self.ipu_id = ipu_id
-        self.layer_to_call = layer_to_call
-
-    def __enter__(self):
-        begin_ipu_block(self.ipu_id)
-
-    def __exit__(self, type, value, traceback):
-        end_ipu_block()
-
-    def __call__(self, *input, **kwargs):
-        begin_ipu_block(self.ipu_id)
-        out = self.layer_to_call(*input, **kwargs)
-        return out
-
-
 class DataLoader(torch.utils.data.DataLoader):
     def __init__(self,
                  options,

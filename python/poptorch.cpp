@@ -32,7 +32,11 @@
 #include "poptorch/ShapeInference.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 
-void beginIpuBlock(int64_t ipu_id) { UNUSED(ipu_id); }
+void beginIpuBlock(int64_t ipu_id, int64_t phase_id) {
+  UNUSED(ipu_id);
+  UNUSED(phase_id);
+}
+
 void endIpuBlock() {}
 
 at::Tensor setAvailableMemory(at::Tensor t, double mem) {

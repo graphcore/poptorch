@@ -417,7 +417,9 @@ void LowerToPopart::lowerBody() {
                      tensorNames(first_output_tensor, node->outputs().size()),
                      tensorShapes(first_output_tensor, node->outputs().size()));
     } else if (kind == symbols::poptorch::begin_ipu_block) {
-      _compiler.setActiveIpu(node->i(c10::Symbol::fromQualString("attr::ipu")));
+      _compiler.setActiveIpu(
+          node->i(c10::Symbol::fromQualString("attr::ipu")),
+          node->i(c10::Symbol::fromQualString("attr::phase")));
     } else if (kind == symbols::poptorch::end_ipu_block) {
       // NOP for now.
     } else if (kind == symbols::poptorch::set_available_memory) {

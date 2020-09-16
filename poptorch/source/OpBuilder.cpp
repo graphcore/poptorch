@@ -391,6 +391,18 @@ torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createBeginIpuBlock(torch::jit::Graph *graph,
+                                      std::uint64_t ipu_id,
+                                      std::int64_t phase) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, c10::Symbol::fromQualString("poptorch::begin_ipu_block"), {},
+      ImplicitCast::None, ImplicitCastOutput::None, 0);
+  new_node->i_(c10::Symbol::fromQualString("attr::ipu"), ipu_id);
+  new_node->i_(c10::Symbol::fromQualString("attr::phase"), phase);
+
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */

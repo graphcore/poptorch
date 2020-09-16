@@ -3,7 +3,6 @@
 
 import torch
 import poptorch
-import pytest
 
 
 class ConstantBuffer(torch.nn.Module):
