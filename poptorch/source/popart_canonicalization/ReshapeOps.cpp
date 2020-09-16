@@ -410,6 +410,24 @@ torch::jit::Node *unsupportedUpsampleHandler(torch::jit::Graph *graph,
   return nullptr;
 }
 
+torch::jit::Node *stackHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  std::int64_t dim = constantToLong(node->input(1)->node());
+
+  std::vector<torch::jit::Value *> values =
+      handleTensorList(node->input(0)->node());
+
+  std::vector<torch::jit::Value *> transformed_tensors;
+
+  transformed_tensors.reserve(values.size());
+  for (auto value : values) {
+    transformed_tensors.push_back(
+        createUnsqueeze(graph, {value}, {dim})->output());
+  }
+
+  return createConcat(graph, transformed_tensors, dim);
+}
+
 } // namespace
 
 // clang-format off
@@ -436,7 +454,8 @@ static bool handlers = registerHandlers(
     c10::aten::upsample_bilinear2d, unsupportedUpsampleHandler,
     c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler,
     c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler,
-    c10::aten::squeeze, reshapeHandler);
+    c10::aten::squeeze, reshapeHandler,
+    c10::aten::stack, stackHandler);
 // clang-format on
 
 } // namespace poptorch

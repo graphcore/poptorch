@@ -355,3 +355,33 @@ def test_masked_fill(input_shapes, value):
     for pop, native in zip(poptorch_out, native_out):
         assert native.size() == pop.size()
         assert torch.equal(native, pop)
+
+
+@pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (3, 4), (1, 3, 4)])
+@pytest.mark.parametrize("dim", [0, 1, 2])
+def test_stack(input_shapes, dim):
+
+    if dim > len(input_shapes):
+        pytest.skip()
+
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x, y, z):
+            return torch.stack([x, y, z], dim=dim)
+
+    model = Model()
+    a = torch.randn(*input_shapes)
+    b = torch.randn(*input_shapes)
+    c = torch.randn(*input_shapes)
+
+    # Run on CPU.
+    native_out = model(a, b, c)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(a, b, c)
+
+    for pop, native in zip(poptorch_out, native_out):
+        assert native.size() == pop.size()
+        assert torch.equal(native, pop)
