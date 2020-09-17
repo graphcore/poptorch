@@ -252,6 +252,73 @@ def test_NLLLoss_training():
         assert torch.argmax(out, dim=1) == label
 
 
+# Test NLL loss 2d by using it to match a target label.
+def test_NLLLoss2d_training():
+
+    reductions = ["mean", "sum"]
+    torch.manual_seed(42)
+    N, C, M = 3, 2, 5
+
+    for reduction in reductions:
+
+        class Net(torch.nn.Module):
+            def __init__(self):
+                super(Net, self).__init__()
+                self.linear = torch.nn.Linear(M * M, M * M * C)
+                self.softmax = torch.nn.LogSoftmax(dim=1)
+
+            def forward(self, x):
+                x = x.reshape(N, M * M)
+                x = self.linear(x).reshape(N, C, M, M)
+                return self.softmax(x)
+
+        model = Net()
+
+        poptorch_model = helpers.trainingModelWithLoss(
+            model, loss=torch.nn.NLLLoss(reduction=reduction))
+        x = torch.randn(N, M, M)
+        y = torch.empty(N, M, M, dtype=torch.long).random_(0, C)
+
+        _, original_loss = poptorch_model(x, y)
+
+        for _ in range(0, 1000):
+            out, loss = poptorch_model(x, y)
+
+        # # Check we have trained the "model"
+        assert loss < original_loss
+        torch.testing.assert_allclose(torch.argmax(out, dim=1), y)
+
+
+# Test nll loss 2d in an inference model, comparing against pytorch
+def test_NLLLoss2d_inference():
+    N, C, M = 11, 7, 13
+    reductions = ["mean", "sum", "none"]
+    torch.manual_seed(42)
+
+    for reduction in reductions:
+
+        class Net(torch.nn.Module):
+            def __init__(self, reduction):
+                super(Net, self).__init__()
+                self.softmax = torch.nn.LogSoftmax(dim=1)
+                self.loss = torch.nn.NLLLoss(reduction=reduction)
+
+            def forward(self, x, y):
+                x = self.softmax(x)
+                return self.loss(x, y)
+
+        model = Net(reduction)
+        poptorch_model = poptorch.inferenceModel(model)
+
+        x = torch.randn(N, C, M, M)
+        y = torch.empty(N, M, M, dtype=torch.long).random_(0, C)
+
+        native_out = model(x, y)
+        poptorch_out = poptorch_model(x, y)
+
+        torch.testing.assert_allclose(poptorch_out, native_out)
+
+
 # Test CrossEntropyLoss loss by using it to match a target label.
 def test_CrossEntropyLoss_training():
     torch.manual_seed(42)
