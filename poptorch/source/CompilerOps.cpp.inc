@@ -42,6 +42,10 @@ torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torc
 new_node->i_(c10::Symbol::fromQualString("attr::pass_through_creation"),pass_through_creation);
 return new_node;
 }
+torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::round, args, ImplicitCast::None, ImplicitCastOutput::None);
+return new_node;
+}
 torch::jit::Node* createReplicatedallreduce(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::replicatedallreduce, args, ImplicitCast::None, ImplicitCastOutput::None);
 return new_node;

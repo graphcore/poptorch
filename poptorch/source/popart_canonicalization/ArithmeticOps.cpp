@@ -52,28 +52,6 @@ torch::jit::Node *fracHandler(torch::jit::Graph *graph,
   return createSub(graph, {node->input(), trunc->output()});
 }
 
-torch::jit::Node *roundHandler(torch::jit::Graph *graph,
-                               torch::jit::Node *node) {
-  // round(x) = trunc(x + sign(x)*0.5)
-
-  // Add 0.5 as constant.
-  torch::jit::Node *zero_point_five = createConstantFloat(graph, {0.5}, {});
-
-  torch::jit::Node *sign =
-      createUnarySameTypedOutput(createSign, graph, {node->input()});
-
-  torch::jit::Node *broadcast_by_sign =
-      createMul(graph, {sign->output(), zero_point_five->output()});
-
-  torch::jit::Node *addition =
-      createAdd(graph, {node->input(), broadcast_by_sign->output()});
-
-  // Drop the exponent by casting to int and back.
-  torch::jit::Node *to_int = createCast(graph, addition->output(), c10::kInt);
-
-  return createCast(graph, to_int->output(), c10::kFloat);
-}
-
 torch::jit::Node *floorDivideHandler(torch::jit::Graph *graph,
                                      torch::jit::Node *node) {
   // aten::floor_divide(Tensor x, Tensor y) -> Tensor
@@ -121,7 +99,6 @@ static bool handlers = registerHandlers(
     c10::aten::expm1, expm1Handler,
     c10::aten::trunc, truncHandler,
     c10::aten::frac, fracHandler,
-    c10::aten::round, roundHandler,
     c10::aten::floor_divide, floorDivideHandler,
     c10::aten::true_divide, trueDivideHandler);
 // clang-format on

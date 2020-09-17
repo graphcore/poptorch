@@ -12,6 +12,7 @@ OP_DECL(popart, scale, scale, AiGraphcoreOpset1.scale, ARG(FLOAT,scale) , BODY_A
 OP_DECL(popart, lstm, lstm, AiGraphcoreOpset1.lstm, ARG(INT,outputFullSequence) , BODY_ARG(outputFullSequence) )
 OP_DECL(popart, gelu, gelu, AiGraphcoreOpset1.gelu, NONE, NONE)
 OP_DECL(popart, detach, detach, AiGraphcoreOpset1.detach, ARG(INT,pass_through_creation) , BODY_ARG(pass_through_creation) )
+OP_DECL(popart, round, round, AiGraphcoreOpset1.round, NONE, NONE)
 OP_DECL(popart, replicatedallreduce, replicatedallreduce, AiGraphcoreOpset1.replicatedallreduce, NONE, NONE)
 OP_DECL(popart, l1loss, l1loss, AiGraphcoreOpset1.l1loss, ARG(FLOAT,lamda) ARG(INT,reduction) , BODY_ARG(lamda) BODY_ARG(static_cast<popart::ReductionType>(reduction)) )
 OP_DECL(popart, nllloss, nllloss, AiGraphcoreOpset1.nllloss, ARG(INT,reduction) ARG(INT,ignoreIndex) ARG(INT,inputIsLogProbability) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(ignoreIndex) BODY_ARG(inputIsLogProbability) )
