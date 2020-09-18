@@ -1,6 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import multiprocessing
-import gc
 import os
 import numpy as np
 import torch
@@ -123,9 +122,6 @@ def test_weight_update_replicas():
     if vipu.isAvailable():
         configurePartition(2, 1, 2)
     run_test()
-    # Explicitly clean up to make sure we detach from the IPU and free the graph
-    # before the next test starts.
-    gc.collect()
 
 
 @pytest.mark.skipif(int(os.environ.get("POPTORCH_IPU_MODEL", "0")) != 0,
