@@ -184,5 +184,3 @@ OP_CONVERTOR(aten::masked_fill_, NONE, createWhere, {PARAM(1) COMMA PARAM(2) COM
 
 OP_CONVERTOR(aten::where, NONE, createWhere, {PARAM(0) COMMA PARAM(1) COMMA PARAM(2)})
 OP_CONVERTOR(aten::where_, NONE, createWhere, {PARAM(0) COMMA PARAM(1) COMMA PARAM(2)})
-
-OP_CONVERTOR_POP(symbols::poptorch::nop, NONE, createNop, {PARAM(0)})

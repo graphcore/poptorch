@@ -7,7 +7,6 @@
 OP_DECL(popart, groupnormalization, groupnormalization, AiGraphcoreOpset1.groupnormalization, ARG(INT,num_groups) ARG(FLOAT,epsilon) , BODY_ARG(num_groups) BODY_ARG(epsilon) )
 OP_DECL(popart, subsample, subsample, AiGraphcoreOpset1.subsample, ARG(INT_VEC,strides) , BODY_ARG(strides) )
 OP_DECL(popart, printtensor, printtensor, AiGraphcoreOpset1.printtensor, ARG(INT,print_gradient) , BODY_ARG(print_gradient) )
-OP_DECL(popart, nop, nop, AiGraphcoreOpset1.nop, NONE, NONE)
 OP_DECL(popart, scale, scale, AiGraphcoreOpset1.scale, ARG(FLOAT,scale) , BODY_ARG(scale) )
 OP_DECL(popart, lstm, lstm, AiGraphcoreOpset1.lstm, ARG(INT,outputFullSequence) , BODY_ARG(outputFullSequence) )
 OP_DECL(popart, gelu, gelu, AiGraphcoreOpset1.gelu, NONE, NONE)
@@ -15,7 +14,7 @@ OP_DECL(popart, detach, detach, AiGraphcoreOpset1.detach, ARG(INT,pass_through_c
 OP_DECL(popart, round, round, AiGraphcoreOpset1.round, NONE, NONE)
 OP_DECL(popart, replicatedallreduce, replicatedallreduce, AiGraphcoreOpset1.replicatedallreduce, NONE, NONE)
 OP_DECL(popart, l1loss, l1loss, AiGraphcoreOpset1.l1loss, ARG(FLOAT,lamda) ARG(INT,reduction) , BODY_ARG(lamda) BODY_ARG(static_cast<popart::ReductionType>(reduction)) )
-OP_DECL(popart, nllloss, nllloss, AiGraphcoreOpset1.nllloss, ARG(INT,reduction) ARG(INT,ignoreIndex) ARG(INT,inputIsLogProbability) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(ignoreIndex) BODY_ARG(inputIsLogProbability) )
+OP_DECL(popart, nllloss, nllloss, AiGraphcoreOpset1.nllloss, ARG(INT,reduction) ARG(INT,ignoreIndex) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(ignoreIndex) )
 OP_DECL(popart, identityloss, identityloss, AiGraphcoreOpset1.identityloss, ARG(INT,reduction) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) )
 // Ops from AiOnnxOpset10
 OP_DECL(popart, averagepool, averagepool, AiOnnxOpset10.averagepool, ARG(INT_VEC,kernel_shape) ARG(INT,ceil_mode) ARG(INT,count_include_pad) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(kernel_shape) BODY_ARG(ceil_mode) BODY_ARG(count_include_pad) BODY_ARG(pads) BODY_ARG(strides) )

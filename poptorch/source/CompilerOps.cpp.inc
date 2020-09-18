@@ -19,10 +19,6 @@ torch::jit::Node* createPrinttensor(torch::jit::Graph *graph,  const std::vector
 new_node->i_(c10::Symbol::fromQualString("attr::print_gradient"),print_gradient);
 return new_node;
 }
-torch::jit::Node* createNop(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::nop, args, ImplicitCast::None, ImplicitCastOutput::None);
-return new_node;
-}
 torch::jit::Node* createScale(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float scale) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::scale, args, ImplicitCast::None, ImplicitCastOutput::None);
 new_node->f_(c10::Symbol::fromQualString("attr::scale"),scale);
@@ -56,11 +52,10 @@ new_node->f_(c10::Symbol::fromQualString("attr::lamda"),lamda);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 return new_node;
 }
-torch::jit::Node* createNllloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,std::int32_t ignoreIndex,bool inputIsLogProbability) {
+torch::jit::Node* createNllloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,std::int32_t ignoreIndex) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::nllloss, args, ImplicitCast::None, ImplicitCastOutput::None);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 new_node->i_(c10::Symbol::fromQualString("attr::ignoreIndex"),ignoreIndex);
-new_node->i_(c10::Symbol::fromQualString("attr::inputIsLogProbability"),inputIsLogProbability);
 return new_node;
 }
 torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction) {
