@@ -13,4 +13,5 @@ PyTorch for the IPU (Preview): User Guide
     batching
     supported_ops
     example
+    experimental
     legal

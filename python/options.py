@@ -421,8 +421,8 @@ class Options(_OptionsDict):
                 * All: Return a result for each batch.
                 * Sum: Return the sum of all the batches
                 * Final: Return the last batch.
-                * EveryN: Return every N batches. N is passed in as
-                    `anchor_return_period`.
+                * EveryN: Return every N batches. N is passed in
+                  as ``anchor_return_period``.
                 * Default: `All` for inference, `Final` for training.
         """
         assert isinstance(anchor_mode, enums.AnchorMode)

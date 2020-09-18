@@ -24,6 +24,7 @@ def _vipu_cli(*args):
 class VirtualIpuManager:
     @staticmethod
     def isAvailable():
+        """Check if the ``vipu-cli`` utility is available."""
         try:
             version = _vipu_cli("--version")
             logger.debug(version)
@@ -34,7 +35,7 @@ class VirtualIpuManager:
 
     @staticmethod
     def numIpus():
-        """The number of IPUs available on the system"""
+        """The total number of IPUs present on the system"""
         clusters = json.loads(_vipu_cli("list", "cluster"))
         assert len(clusters) == 1
         cluster = clusters[0]
@@ -45,6 +46,7 @@ class VirtualIpuManager:
 
     @staticmethod
     def listPartitions():
+        """The list of existing partitions on the system"""
         partitions = json.loads(_vipu_cli("list", "partition"))
         retval = {}
         for p in partitions:
@@ -57,11 +59,18 @@ class VirtualIpuManager:
 
     @staticmethod
     def deletePartition(name):
+        """Delete a partition"""
         output = _vipu_cli("delete", "partition", name)
         logger.debug(output)
 
     @staticmethod
     def createPartition(name, partition):
+        """Create a partition
+
+        :param str name: Name of the partition.
+        :param poptorch.distributed.Partition partition: Details of the
+            partition to create.
+        """
         assert isinstance(partition, Partition)
         output = _vipu_cli("create", "partition", name, "--size",
                            partition.num_ipus, "--num-gcds",
@@ -71,5 +80,6 @@ class VirtualIpuManager:
 
     @staticmethod
     def resetPartition(name):
+        """Reset a partition"""
         output = _vipu_cli("reset", "partition", name)
         logger.debug(output)

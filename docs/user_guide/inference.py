@@ -30,3 +30,11 @@ native_top_five_classes = torch.topk(torch.softmax(native_out, 1), 5)
 # Models should be very close to native output although some operations are
 # numerically different and floating point differences can accumulate.
 assert any(top_five_classes[1][0] == native_top_five_classes[1][0])
+
+model = torch.nn.Linear(1, 10).half()
+t1 = torch.tensor([1.]).half()
+
+inference_model = poptorch.inferenceModel(model)
+out = inference_model(t1)
+
+assert out.dtype == torch.half

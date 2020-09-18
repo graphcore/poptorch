@@ -56,7 +56,7 @@ poptorch.inferenceModel
     :language: python
     :caption: An example of the use of :py:func:`poptorch.inferenceModel`
     :linenos:
-    :lines: 3-
+    :lines: 3-32
     :emphasize-lines: 14
 
 
@@ -66,6 +66,27 @@ poptorch.PoplarExecutor
 .. autoclass:: poptorch.PoplarExecutor
    :special-members: __call__
    :members:
+
+.. note:: The ``PoplarExecutor`` will implicitly keep in sync the parameters
+  of the source Torch model and the PopTorch model(s)
+  however weights need to be explicitly copied if the
+  model is trained on the CPU and inference is run on the IPU.
+
+  .. code-block:: python
+
+    model = Model()
+    poptorch_train = poptorch.trainingModel(model)
+    poptorch_inf = poptorch.inferenceModel(model)
+
+    train(poptorch_train)
+    torch.save(model.state_dict(), "model.save") # OK
+    validate(poptorch_inf) # OK
+    validate(model) # OK
+
+    train(model)
+    # Explicit copy needed
+    poptorch_inf.copyWeightsToDevice()
+    validate(poptorch_inf)
 
 
 Pipeline annotator
@@ -180,3 +201,55 @@ and will backpropagate a gradient of ones through it.
   :linenos:
   :lines: 25-43
   :emphasize-lines: 5
+
+Half / float 16 support
+=======================
+
+You need to cast the model and input tensors to float 16 using ``half()``
+
+.. literalinclude:: inference.py
+    :language: python
+    :caption: How to run a model using half precision
+    :linenos:
+    :lines: 34-40
+    :emphasize-lines: 1, 2
+
+Environment variables
+=====================
+
+Logging level
+-------------
+PopTorch uses different levels of logging: 
+  * ``OFF``: No logging.
+  * ``ERR``: Errors only.
+  * ``WARN``: Warnings and errors only.
+  * ``INFO``: Info, warnings and errors. (Default)
+  * ``DEBUG``: Adds some extra debugging information.
+  * ``TRACE`` and ``TRACE_ALL``: Trace everything inside PopTorch.
+
+The ``POPTORCH_LOG_LEVEL`` environment variable can be used to set the logging level:
+
+.. code-block:: bash
+  
+  export POPTORCH_LOG_LEVEL=DEBUG
+
+IPU Model
+---------
+
+By default PopTorch will try to attach to a physical IPU, if instead you want
+to use the model, you can do so by setting ``POPTORCH_IPU_MODEL`` to ``1``:
+
+.. code-block:: bash
+  
+  export POPTORCH_IPU_MODEL=1
+
+Wait for an IPU to become available
+-----------------------------------
+
+By default if you try to attach to an IPU but all the IPUs in the system are
+already in use, an exception will be raised. 
+If you would rather wait for an IPU to become available, you can do so by setting ``POPTORCH_WAIT_FOR_IPU`` to ``1``.
+
+.. code-block:: bash
+  
+  export POPTORCH_WAIT_FOR_IPU=1
