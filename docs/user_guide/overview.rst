@@ -71,10 +71,14 @@ poptorch.PoplarExecutor
 Pipeline annotator
 ==================
 
-You can use the ``IPU`` wrapper class to define model parallelism in a PopTorch multi-IPU
-device. Conceptually this is collecting the layers of a model into pipeline stages
-to be run on specific IPUs. However, as there is a 1:1 mapping of pipeline stages
-to IPUs, we simply use an IPU index to declare where the layer will be run.
+You can use the ``BeginPhase`` or ``Phase`` wrapper class to define model parallelism
+in a PopTorch multi-IPU device. Conceptually this is collecting the layers of a model
+into a phase which can be mapped onto a specific IPU. By default, these will execute
+using a pipelined model parallel execution strategy.
+
+We expose an additional argument `phase_id` through this API. This will be passed down to
+PopART and when used in conjunction with PopART session options can override the default
+pipeline execution strategy. Refer to the PopART user guide to enable other execution modes.
 
 .. autoclass:: poptorch.IPU
    :special-members: __init__
@@ -83,7 +87,7 @@ to IPUs, we simply use an IPU index to declare where the layer will be run.
     :language: python
     :linenos:
     :lines: 3-34
-    :emphasize-lines: 15, 18, 21
+    :emphasize-lines: 15-16, 19-20, 23-24
     :caption: Annotations can be attached to layers in existing models.
 
 
@@ -91,7 +95,7 @@ to IPUs, we simply use an IPU index to declare where the layer will be run.
     :language: python
     :linenos:
     :lines: 77-
-    :emphasize-lines: 17, 20, 24
+    :emphasize-lines: 20, 23, 27
     :caption: PopTorch also supports annotating the model directly. Both forms can be used interchangeably.
 
 
@@ -161,6 +165,13 @@ poptorch.ipu_print_tensor
 
 poptorch.identity_loss
 ----------------------
+
+This function is used to implement custom losses. This takes in a single torch tensor
+and will backpropagate a gradient of ones through it.
+
+.. warning::
+   Passing a pytorch loss function or another identity_loss to this function is not currently
+   supported. Multiple losses must be implemented via composite torch ops.
 
 .. autofunction:: poptorch.identity_loss
 

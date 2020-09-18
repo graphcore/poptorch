@@ -14,13 +14,16 @@ print(model)
 
 # All layers before "model.bert.encoder.layer[0]" will be on IPU 0 and all layers from
 # "model.bert.encoder.layer[0]" onwards (inclusive) will be on IPU 1.
-model.bert.encoder.layer[0] = poptorch.IPU(1, model.bert.encoder.layer[0])
+model.bert.encoder.layer[0] = poptorch.BeginPhase(1,
+                                                  model.bert.encoder.layer[0])
 
 # Now all layers before layer are on IPU 1 and this layer onward is on IPU 2
-model.bert.encoder.layer[2] = poptorch.IPU(2, model.bert.encoder.layer[2])
+model.bert.encoder.layer[2] = poptorch.BeginPhase(2,
+                                                  model.bert.encoder.layer[2])
 
 # Finally all layers from this layer till the end of the network are on IPU 3.
-model.bert.encoder.layer[4] = poptorch.IPU(3, model.bert.encoder.layer[4])
+model.bert.encoder.layer[4] = poptorch.BeginPhase(3,
+                                                  model.bert.encoder.layer[4])
 
 # We must batch the data by at least the number of IPUs. Each IPU will still execute
 # whatever the model batch size is.
@@ -90,14 +93,14 @@ class Network(torch.nn.Module):
         # Implicitly layers are on IPU 0 until a with IPU annotation is encountered.
         x = self.act(self.layer1(x))
 
-        with poptorch.IPU(1):
+        with poptorch.Phase(1):
             x = self.act(self.layer2(x))
 
-        with poptorch.IPU(2):
+        with poptorch.Phase(2):
             x = self.act(self.layer3(x))
             x = self.act(self.layer4(x))
 
-        with poptorch.IPU(3):
+        with poptorch.Phase(3):
             x = self.softmax(x)
         return x
 
