@@ -48,6 +48,7 @@ PyTorch functions
 * ``torch.cat``
 * ``torch.chunk``
 * ``torch.reshape``
+* ``torch.stack``
 * ``torch.split``
 * ``torch.squeeze``
 * ``torch.t``

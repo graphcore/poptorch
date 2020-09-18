@@ -114,6 +114,13 @@ class AsynchronousDataAccessor:
     """A dataloader which launches the dataloading process on a separate thread
     to allow for the data to be preprocessed asynchronous on CPU to minimize
     CPU/IPU transfer time.
+
+    This works by loading the data into a ring buffer of shared memory.
+    When the IPU needs another batch it uses the data ready in the in
+    the ring buffer. The memory is shared so will be used inplace and
+    won't be freed until the next batch is requested. Behind the scenes
+    the worker thread will be filling the unready elements of the ring
+    buffer.
     """
 
     def __init__(self,
@@ -121,6 +128,17 @@ class AsynchronousDataAccessor:
                  buffer_size=3,
                  miss_sleep_time_in_ms=0.1,
                  load_indefinitely=False):
+        """
+        :param dataset: The dataset to pull data from, this can be any Python
+            iterable.
+        :param buffer_size: The size of the ring buffer.
+        :param miss_sleep_time_in_ms: When the buffer is full how long should
+            we sleep the worker before checking again.
+        :param load_indefinitely: If True when we hit the end of the dataset
+            we will just loop round again.
+
+        """
+
         self._training_data = dataset
         self._buffer_size = buffer_size
         self._miss_sleep_time_in_ms = miss_sleep_time_in_ms
@@ -137,6 +155,10 @@ class AsynchronousDataAccessor:
         self._ring_read_index = 0
 
     def terminate(self):
+        """
+        An override function to kill the worker process manually usually used
+        in conjunction with the load_indefinitely option.
+        """
         self._data_fetcher.terminate()
 
     def fetch_data(self, queue, setup_complete):
@@ -235,7 +257,6 @@ class AsynchronousDataAccessor:
         setup_complete.get()
 
     def __iter__(self):
-
         # We use a small queue to get the initial data. The latency of
         # deserialising the python data is too high to be used for the
         # actual fetch so we just use this to return the initial buffers

@@ -25,7 +25,7 @@ class ExampleModelWithLoss(torch.nn.Module):
     def forward(self, input, target):
         out = self.model(input)
 
-        return (torch.nn.Softmax()(out),
+        return (torch.nn.functional.softmax(out),
                 torch.nn.CrossEntropyLoss(reduction="mean")(out, target))
 
 

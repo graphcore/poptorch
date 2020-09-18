@@ -26,11 +26,16 @@ in the model will process that number of elements at any given time.
 poptorch.AsynchronousDataAccessor
 =================================
 
-For optimum performance the data loading process can be offloaded to a
-separate thread using an :py:class:`~poptorch.AsynchronousDataAccessor`
+To reduce host overhead the data loading process can be offloaded to a
+separate thread using an :py:class:`~poptorch.AsynchronousDataAccessor`.
+Doing this allows you to reduce the host/IPU communication overhead by
+using the time that the IPU is running to load the next batch on the
+CPU. This means when the IPU is finished executing and returns to host
+the data will be ready for it to pull in again.
 
 .. autoclass:: poptorch.AsynchronousDataAccessor
    :special-members: __init__
+   :members: terminate
 
 Example
 -------
