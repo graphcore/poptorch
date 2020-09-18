@@ -252,6 +252,9 @@ class PoplarExecutor:
                 self._user_model).__name__
             self._user_model.__class__ = PoptorchModel
 
+    def __getattr__(self, attr):
+        return getattr(self._user_model, attr)
+
     @property
     def model(self):
         return self._user_model

@@ -307,7 +307,8 @@ HALF_EXPECTED_FAILURES = {
 HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
     "test_nn_Conv3d_groups": (0.05, 1e-3),
-    "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002)
+    "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
+    "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002)
     }
 
 # pylint: enable=line-too-long
