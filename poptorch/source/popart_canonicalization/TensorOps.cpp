@@ -62,11 +62,11 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
     transform_shape.push_back(padded_dim);
   }
 
-  new_node = createReshape(graph, {new_node->output()}, transform_shape);
+  new_node = createReshape(graph, new_node->output(), transform_shape);
   new_node = createExpand(
       graph, {new_node->output(), intVectorToIrConstant(graph, dim_expands)});
 
-  return createReshape(graph, {new_node->output()}, new_shape);
+  return createReshape(graph, new_node->output(), new_shape);
 }
 
 torch::jit::Node *copy_Handler(torch::jit::Graph *graph,
@@ -74,7 +74,7 @@ torch::jit::Node *copy_Handler(torch::jit::Graph *graph,
   // aten::copy_(Tensor self, Tensor src, bool non_blocking) -> Tensor
   at::ScalarType dest_type = getNodeScalarType(node->input(0));
 
-  return createCast(graph, {node->input(1)}, dest_type);
+  return createCast(graph, node->input(1), dest_type);
 }
 } // namespace
 
