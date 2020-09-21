@@ -96,7 +96,7 @@ class _TrainingOptions(_OptionsDict):
     """
 
     def __init__(self):
-        super().__init__(gradient_accumulation=1)
+        super().__init__(gradient_accumulation=1, loss_scaling=1.0)
 
     def gradientAccumulation(self, gradient_accumulation):
         """Number of samples to accumulate for the gradient calculation.
@@ -110,6 +110,18 @@ class _TrainingOptions(_OptionsDict):
         Might be called "pipeline depth" in some other frameworks."""
         self.set(gradient_accumulation=gradient_accumulation)
         return self
+
+    def lossScaling(self, loss_scaling):
+        """Loss scaling the Optimizer will use."""
+        self.set(loss_scaling=loss_scaling)
+        return self
+
+    def update(self, other):
+        res = super().update(other)
+        # Loss scaling is only used by the python side, no need to pass it
+        # to the c++ backend.
+        del res["loss_scaling"]
+        return res
 
 
 class _PopartOptions:

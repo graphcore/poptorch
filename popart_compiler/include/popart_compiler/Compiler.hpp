@@ -70,6 +70,7 @@ struct Optimizer {
                  "Learning rate was not provided in optimizer dictionary!");
     learning_rate = itr->second;
     weight_decay = findInMapOrDefault(opts, "weight_decay");
+    loss_scaling = findInMapOrDefault(opts, "loss_scaling", 1.0f);
 
     switch (type) {
     case OptimizerType::SGD: {
@@ -93,6 +94,7 @@ struct Optimizer {
 
   std::pair<float, bool> learning_rate;
   std::pair<float, bool> weight_decay;
+  std::pair<float, bool> loss_scaling;
 
   // Unique to SGD
   std::pair<float, bool> momentum;

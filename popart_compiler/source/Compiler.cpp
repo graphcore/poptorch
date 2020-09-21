@@ -617,15 +617,14 @@ static std::unique_ptr<popart::Optimizer> getOptimizer(const Optimizer &opt) {
                          opt.momentum,
                          opt.dampening,
                          {1.0f, true},    // Velocity scaling, off.
-                         {1.0f, true}})); // Loss scaling, off.
+                         opt.loss_scaling}));
   }
   if (opt.type == OptimizerType::ADAM) {
-    return std::unique_ptr<popart::Optimizer>(
-        new popart::Adam(opt.learning_rate, opt.weight_decay, opt.beta1,
-                         opt.beta2, opt.eps, {1.0f, true}, // Loss scaling, off.
-                         popart::AdamMode::Adam,
-                         popart::DataType::FLOAT, // Always accumulate as float.
-                         popart::DataType::FLOAT, popart::DataType::FLOAT));
+    return std::unique_ptr<popart::Optimizer>(new popart::Adam(
+        opt.learning_rate, opt.weight_decay, opt.beta1, opt.beta2, opt.eps,
+        opt.loss_scaling, popart::AdamMode::Adam,
+        popart::DataType::FLOAT, // Always accumulate as float.
+        popart::DataType::FLOAT, popart::DataType::FLOAT));
   }
 
   ERROR("Unreachable: Unsupported optimizer");

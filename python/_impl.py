@@ -10,13 +10,14 @@ from .logging import logger
 from .options import Options
 
 
-def convertOptimizerToDict(optimizer):
+def convertOptimizerToDict(optimizer, options):
     assert len(optimizer.param_groups) == 1, (
         "Poptorch currently only "
         "supports one parameter group! (all parameters)")
 
     learning_rate = optimizer.param_groups[0]["lr"]
     weight_decay = optimizer.param_groups[0]["weight_decay"]
+    loss_scaling = options.Training.loss_scaling
 
     if isinstance(optimizer, optim.SGD):
         momentum = optimizer.param_groups[0]["momentum"]
@@ -28,7 +29,8 @@ def convertOptimizerToDict(optimizer):
             "lr": (learning_rate, False),
             "momentum": (momentum, momentum == 0.0),
             "weight_decay": (weight_decay, weight_decay == 0.0),
-            "dampening": (dampening, dampening == 0.0)
+            "dampening": (dampening, dampening == 0.0),
+            "loss_scaling": (loss_scaling, loss_scaling == 1.0)
         }
     if isinstance(optimizer, optim.Adam):
         beta1 = optimizer.param_groups[0]["betas"][0]
@@ -44,7 +46,8 @@ def convertOptimizerToDict(optimizer):
             "beta1": (beta1, False),
             "beta2": (beta2, False),
             "weight_decay": (weight_decay, weight_decay == 0.0),
-            "eps": (eps, eps == 1e-08)
+            "eps": (eps, eps == 1e-08),
+            "loss_scaling": (loss_scaling, loss_scaling == 1.0)
         }
 
     assert False, "Unsupported optimizer type. Types supported %s" % str(
@@ -183,7 +186,7 @@ class PoplarExecutor:
                 options.anchorMode(enums.AnchorMode.Final)
             if not optimizer:
                 optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
-            optimizer = convertOptimizerToDict(optimizer)
+            optimizer = convertOptimizerToDict(optimizer, options)
         else:
             if options.defaultAnchorMode():
                 # In inference it makes sense to see all the results, by default.
@@ -492,7 +495,7 @@ class PoplarExecutor:
             self._optimizer = self._new_optimizer
             output = poptorch_core.execute(
                 self._executable, in_tensors.asTuple(),
-                convertOptimizerToDict(self._optimizer))
+                convertOptimizerToDict(self._optimizer, self._options))
         else:
             output = poptorch_core.execute(self._executable,
                                            in_tensors.asTuple(), {})
