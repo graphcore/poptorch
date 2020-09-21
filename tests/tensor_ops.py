@@ -385,3 +385,60 @@ def test_stack(input_shapes, dim):
     for pop, native in zip(poptorch_out, native_out):
         assert native.size() == pop.size()
         assert torch.equal(native, pop)
+
+
+@pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
+@pytest.mark.parametrize("dims",
+                         [[1], [3], [2, 1], [2, 3], [1, 1, 1], [3, 2, 4]])
+def test_repeat(input_shapes, dims):
+
+    if len(dims) < len(input_shapes):
+        pytest.skip(
+            "Number of dimensions of repeat dims can not be smaller than number of dimensions of tensor."
+        )
+
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x.repeat(dims)
+
+    model = Model()
+    a = torch.randn(*input_shapes)
+
+    # Run on CPU.
+    native_out = model(a)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(a)
+
+    for pop, native in zip(poptorch_out, native_out):
+        assert native.size() == pop.size()
+        assert torch.equal(native, pop)
+
+
+@pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
+@pytest.mark.parametrize("dtype", [torch.float, torch.int])
+def test_copy_(input_shapes, dtype):
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            return y.copy_(x)
+
+    model = Model()
+    x = torch.randn(*input_shapes)
+    y = torch.empty_like(x, dtype=dtype)
+
+    # Run on CPU.
+    native_out = model(x, y)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x, y)
+
+    for pop, native in zip(poptorch_out, native_out):
+        assert native.size() == pop.size()
+        assert native.dtype == pop.dtype
+        assert torch.equal(native, pop)
