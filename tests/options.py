@@ -73,6 +73,23 @@ def test_set_popart_options():
     inference_model(x, y)
 
 
+def test_popart_patterns():
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    # Create our model.
+    model = Network()
+    opts = poptorch.Options()
+    patterns = {"PadSum": True}
+    opts.Popart.setPatterns(patterns, 0)
+    inference_model = poptorch.inferenceModel(model, opts)
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    inference_model(x, y)
+
+
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 def test_real_ipu_selection():

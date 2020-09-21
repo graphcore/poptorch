@@ -134,6 +134,8 @@ public:
     // In distributed mode: unique ID of this process in [0,
     // num_distributed_processes]// range
     std::uint64_t distributed_process_id;
+
+    popart::Patterns patterns{popart::PatternsLevel::Default};
   };
 
   // List of options which have been explicitely set by the user.
@@ -1085,7 +1087,7 @@ void Compiler::initSession(const Optimizer &opt) {
         "Compiler::initSession popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
         transformer.getModelProto(), data_flow, loss_root, *optimizer, device,
-        {}, options, popart::PatternsLevel::Default);
+        {}, options, _impl->options.patterns);
   }
 
   logging::trace(
@@ -1357,6 +1359,17 @@ void SessionOptions::insertStringPairOption(const char *option, const char *key,
 
 void SessionOptions::setMemoryProportion(std::uint32_t ipu, float memory) {
   _impl->setMemoryProportion(ipu, memory);
+}
+
+void SessionOptions::setPatternsLevel(std::uint64_t level) {
+  _impl->options_set.insert("patterns");
+  ERROR_ON(level > static_cast<std::uint64_t>(popart::PatternsLevel::All));
+  _impl->poptorch_options.patterns =
+      popart::Patterns(static_cast<popart::PatternsLevel>(level));
+}
+
+void SessionOptions::addPattern(const char *pattern, bool enabled) {
+  _impl->poptorch_options.patterns.enablePattern(pattern, enabled);
 }
 
 SessionOptions::~SessionOptions() = default;

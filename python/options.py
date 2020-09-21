@@ -134,6 +134,19 @@ class _PopartOptions:
         self.options[key] = value
         return self
 
+    def setPatterns(self, patterns, level=2):
+        """Override the default patterns of Popart's compiler.
+
+        :param dict(str,bool) patterns: Dictionary of pattern names to
+            enable / disable.
+        :param int level: Integer value corresponding to the
+            ``popart::PaternsLevel`` to use to initialise the ``Patterns``.
+        """
+        assert isinstance(level, int)
+        assert isinstance(patterns, dict)
+        self.options["patterns_level"] = level
+        self.options["patterns"] = patterns
+
 
 class _DistributedOptions(_OptionsDict):
     """Options related to distributed execution.

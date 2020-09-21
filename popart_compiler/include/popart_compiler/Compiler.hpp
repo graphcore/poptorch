@@ -116,6 +116,9 @@ public:
 
   void setMemoryProportion(std::uint32_t ipu, float memory);
 
+  void setPatternsLevel(std::uint64_t level);
+  void addPattern(const char *pattern, bool enabled);
+
   void addStringOption(const char *option, const char *value);
   void addUint64Option(const char *option, std::uint64_t value);
   void addBoolOption(const char *option, bool value);

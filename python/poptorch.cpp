@@ -166,8 +166,8 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
   SessionOptions options;
 
   for (auto element : opt) {
-    // Exception _trace_model is only used by Python
-    if (element.first.cast<std::string>() == "_trace_model") {
+    // Exception patterns_level is handled at the same time as "patterns"
+    if (element.first.cast<std::string>() == "patterns_level") {
       continue;
     }
     if (py::isinstance<py::bool_>(element.second)) {
@@ -195,6 +195,13 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
         for (auto option : element.second.cast<py::dict>()) {
           options.setMemoryProportion(option.first.cast<std::uint64_t>(),
                                       option.second.cast<float>());
+        }
+      } else if (id == "patterns") {
+        options.setPatternsLevel(opt["patterns_level"].cast<std::uint64_t>());
+
+        for (auto option : element.second.cast<py::dict>()) {
+          options.addPattern(option.first.cast<std::string>().c_str(),
+                             option.second.cast<bool>());
         }
       } else {
         for (auto option : element.second.cast<py::dict>()) {
