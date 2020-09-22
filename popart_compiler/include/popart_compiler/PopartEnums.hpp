@@ -60,6 +60,10 @@ inline std::string toPopartTypeStr(const PopartType &type) {
 }
 #undef DEFINE_CASE
 
+// Returns the Onnx datatype as string corresponding the dtype int used in Onnx
+// and Popart ops which take an int64_t dtype argument, a.g. "randomnormal"
+const char *onnxStrFromDtypeInt(int64_t dtype);
+
 // See popart DataFlow.hpp for a full description of each.
 // Must be kept in sync with AnchorMode in python/__init__.py
 enum PopartAnchorTypes : std::uint8_t { Final = 0, EveryN, All, Sum, N };

@@ -46,10 +46,10 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
     // Create a "normal" convolution.
     return poptorch::createConv(graph, inputs, dilation, groups, {}, padding,
                                 stride);
-  } else {
-    return poptorch::createConvtranspose(graph, inputs, dilation, groups, {},
-                                         {}, {}, padding, stride);
   }
+
+  return poptorch::createConvtranspose(graph, inputs, dilation, groups, {}, {},
+                                       {}, padding, stride);
 }
 
 torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,

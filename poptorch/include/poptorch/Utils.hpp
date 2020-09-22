@@ -15,6 +15,8 @@ std::string nodeToString(const torch::jit::Node *node);
 
 std::string scalarTypeToOnnxString(at::ScalarType type);
 
+at::ScalarType onnxStrToScalarType(const char *type_str);
+
 // Delete a node and also its users if they are also unused.
 void searchAndPossiblyDestroy(
     const std::unordered_set<torch::jit::Node *> &to_test);

@@ -273,6 +273,37 @@ bool isMarkedForDeletion(torch::jit::Node *node) {
 
 void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
   // Take the type of the old value.
+  auto old_type = old_val->type()->cast<c10::TensorType>();
+  auto new_type = new_val->type()->cast<c10::TensorType>();
+
+  if (static_cast<bool>(old_type) && static_cast<bool>(new_type)) {
+    ERROR_ON(!(old_type->scalarType()));
+    ERROR_ON_MSG(!(new_type->scalarType()), "New output has no scalar type.");
+
+    if (old_type->scalarType() != new_type->scalarType()) {
+      if (old_type->scalarType() == at::ScalarType::Float &&
+          new_type->scalarType() == at::ScalarType::Half) {
+        // This occurs because we have to trace with Float so we can switch
+        // to Half here
+        new_val->setType(old_type->withScalarType(at::ScalarType::Half));
+        old_val->replaceAllUsesWith(new_val);
+        return;
+      }
+      if (old_type->scalarType() == at::ScalarType::Half &&
+          new_type->scalarType() == at::ScalarType::Float) {
+        // This occurs when a dtype is set to float on an op e.g. on a
+        // torch.zeros which *may* have been a half prior to tracing with
+        // floats. The current logic is to always have this as a Half.
+        new_val->setType(old_type->withScalarType(at::ScalarType::Half));
+        old_val->replaceAllUsesWith(new_val);
+        return;
+      }
+
+      ERROR("Scalar type mismatch " << *(old_type->scalarType())
+                                    << " != " << (*new_type->scalarType()));
+    }
+  }
+
   new_val->setType(old_val->type());
 
   // Replace the old value with the new one.
@@ -281,6 +312,8 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
 
 void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
                       std::uint64_t outputIdx) {
+  logging::trace("Replacing outputs with those of {}", *new_node);
+
   torch::jit::Value *new_val = new_node->output(outputIdx);
   torch::jit::Value *old_val = oldNode->output(outputIdx);
   replaceOutputUse(old_val, new_val);

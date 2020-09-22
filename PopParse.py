@@ -141,11 +141,10 @@ logger.debug("addedFunctions: %s", sorted(addedFunctions))
 CastingOps = [
     "add", "batchnormalization", "bitshift", "clip", "conv", "convtranspose",
     "div", "equal", "gru", "gemm", "greater", "instancenormalization", "less",
-    "lstm", "logical_and", "logical_or", "logical_xor", "logical_not",
-    "matmul", "max", "maxroipool", "mean", "min", "mod", "mul", "pow", "prelu",
-    "range", "rnn", "scan", "sequenceconstruct", "sub", "sum",
-    "groupnormalization", "call", "dynamicadd", "dynamicupdate",
-    "dynamicslice", "dynamiczero"
+    "lstm", "logical_and", "logical_or", "logical_xor", "matmul", "max",
+    "maxroipool", "mean", "min", "mod", "mul", "pow", "prelu", "range", "rnn",
+    "scan", "sequenceconstruct", "sub", "sum", "groupnormalization", "call",
+    "dynamicadd", "dynamicupdate", "dynamicslice", "dynamiczero"
 ]
 # Also Einsum, GreaterOrEqual, LessOrEqual
 
@@ -156,7 +155,7 @@ CastingExceptSecondArgsOps = [
 # Also Pad but only after >= 11
 CastingExceptThirdArgsOps = ["roialign"]
 
-# Implicit casting ops not in these catagories: ConvInteger MatMulInteger,
+# Implicit casting ops not in these catagories:
 # QLinearConv, QLinearMatMul
 
 # All implicitly casting ops produce an output the same as the promoted type
@@ -169,6 +168,58 @@ CastingAlwaysBoolOutput = [
 ]
 
 CastingAlwaysFloatOutput = ["dequantizelinear"]
+
+CastingAlwaysIntOutput = ["convinteger", "matmulinteger"]
+
+## Non implicit-casting type support
+
+OutputTypeSameAsFirstInput = [
+    "abs", "acos", "acos", "acosh", "asin", "asinh", "atan", "atanh",
+    "averagepool", "ceil", "celu", "compress", "concat", "cos", "cosh",
+    "cumsum", "depthtospace", "det", "detach", "dropout", "einsum", "elu",
+    "erf", "exp", "expand", "flatten", "floor", "gather", "gatherEeements",
+    "gathernd", "gelu", "globalaveragepool", "globallppool", "globalmaxpool",
+    "hardmax", "hardsigmoid", "identity", "identityloss", "l1loss", "lrn",
+    "leakyrelu", "log", "logical_not", "logsoftmax", "lpnormalization",
+    "lppool", "maxpool", "maxunpool", "meanvariancenormalization", "neg",
+    "nllloss", "nop", "pad", "printtensor", "range", "reciprocal", "reducel1",
+    "reducel2", "reducelogsum", "reducelogsumexp", "reducemax", "reducemean",
+    "reducemin", "reduceprod", "reducesum", "reducesumsquare", "relu",
+    "replicatedallreduce", "reshape", "resize", "reversesequence", "roialign",
+    "round", "scale", "scatter", "selu", "sequenceerase", "shrink", "sigmoid",
+    "sign", "sin", "sinh", "slice", "softmax", "softplus", "softsign",
+    "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
+    "subsample", "tan", "tanh", "thresholdedrelu", "tile", "transpose",
+    "unique", "unsqueeze", "upsample"
+]
+
+FirstOutputTypeSameAsFirstInputButSecondAlwaysInt = ["topk"]
+
+OutputTypeSameAsThirdInput = ["onehot"]
+
+OutputTypeAlwaysBool = ["isinf", "isnan"]
+
+OutputTypeAlwaysFloat = ["tfidfvectorizer"]
+
+OutputTypeAlwaysInt32 = [
+    "argmax", "argmin", "isinf", "isnan", "nonmaxsuppression", "nonzero",
+    "shape", "size"
+]
+
+OutputTypeAlwaysUint8 = [
+    "dynamicquantizelinear", "quantizelinear", "qlinearconv", "qlinearmatmul"
+]
+
+OutputTypeAsDtype = [
+    "cast", "eyelike", "multinomial", "randomnormal", "randomuniform"
+]
+
+OutputTypeAsDtypeOrFirstInput = ["randomnormallike", "randomuniformlike"]
+
+OutputTypeVariable = [
+    "concatfromsequence", "constant", "constantofshape", "loop", "multinomial",
+    "sequenceat", "sequentempty", "sequenceinsert ", "splittosequence"
+]
 
 MultipleOutputsOps = {"lstm": "2", "split": "num_outputs", "topk": "2"}
 
@@ -249,6 +300,50 @@ def attrTypeGetter(ty):
     return None
 
 
+def addCastingOptStr(name):
+    if name in CastingOps:
+        return "ImplicitCast::All"
+    if name in CastingExceptFirstArgsOps:
+        return "ImplicitCast::ExceptFirst"
+    if name in CastingExceptSecondArgsOps:
+        return "ImplicitCast::ExceptSecond"
+    if name in CastingExceptThirdArgsOps:
+        return "ImplicitCast::ExceptThird"
+    return "ImplicitCast::None"
+
+
+# pylint: disable=R0911
+def addOutputTypeStr(name):
+    if name in CastingAlwaysBoolOutput or name in OutputTypeAlwaysBool:
+        return "OutputType::AlwaysBool"
+    if name in CastingAlwaysFloatOutput or name in OutputTypeAlwaysFloat:
+        return "OutputType::AlwaysFloat"
+    if name in CastingAlwaysIntOutput or name in OutputTypeAlwaysInt32:
+        return "OutputType::AlwaysInt"
+    if any([
+            name in n
+            for n in (CastingOps, CastingExceptFirstArgsOps,
+                      CastingExceptSecondArgsOps, CastingExceptThirdArgsOps)
+    ]):
+        return "OutputType::AsImplicitCastPromoted"
+    if name in OutputTypeSameAsFirstInput:
+        return "OutputType::AsFirstInput"
+    if name in FirstOutputTypeSameAsFirstInputButSecondAlwaysInt:
+        return "OutputType::FirstAsFirstInputSecondAlwaysInt"
+    if name in OutputTypeSameAsThirdInput:
+        return "OutputType::AsThirdInput"
+    if name in OutputTypeAlwaysUint8:
+        return "OutputType::AlwaysUint8"
+    if name in OutputTypeAsDtype:
+        return "OutputType::AsDtype"
+    if name in OutputTypeAsDtypeOrFirstInput:
+        return "OutputType::AsDtypeOrFirstInput"
+    if name in OutputTypeVariable:
+        return "OutputType::Unknown"
+    print(f"Missing type spec for: {name}")
+    return "OutputType::Unknown"
+
+
 macroFile = ""
 
 headerStubs = ""
@@ -322,29 +417,8 @@ for opset in classes:
 
         cppFile = " torch::jit::Node *new_node = createAndInsertNode(graph, " \
                "symbols::popart::" + name + ", args"
-        if name in CastingOps:
-            cppFile += ", ImplicitCast::All"
-        elif name in CastingExceptFirstArgsOps:
-            cppFile += ", ImplicitCast::ExceptFirst"
-        elif name in CastingExceptSecondArgsOps:
-            cppFile += ", ImplicitCast::ExceptSecond"
-        elif name in CastingExceptThirdArgsOps:
-            cppFile += ", ImplicitCast::ExceptThird"
-        else:
-            cppFile += ", ImplicitCast::None"
 
-        if name in CastingAlwaysBoolOutput:
-            cppFile += ", ImplicitCastOutput::AlwaysBool"
-        elif name in CastingAlwaysFloatOutput:
-            cppFile += ", ImplicitCastOutput::AlwaysFloat"
-        elif any([
-                name in n for n in (CastingOps, CastingExceptFirstArgsOps,
-                                    CastingExceptSecondArgsOps,
-                                    CastingExceptThirdArgsOps)
-        ]):
-            cppFile += ", ImplicitCastOutput::AsPromoted"
-        else:
-            cppFile += ", ImplicitCastOutput::None"
+        cppFile += f", {addCastingOptStr(name)}, {addOutputTypeStr(name)}"
 
         if name in MultipleOutputsOps:
             cppFile += ", %s" % MultipleOutputsOps[name]

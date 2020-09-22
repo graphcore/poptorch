@@ -62,11 +62,10 @@ torch::jit::Node *softmaxHandler(torch::jit::Graph *graph,
     // always do softmax on the last dimension: dimensions - 1.
 
     return createTranspose(graph, {softmax->output()}, after_transpose);
-
-  } else {
-    return createSoftmax(graph, {node->input(0)}, dim);
-    // If "dim" is last dimension already, directly call popart::softmax()
   }
+
+  return createSoftmax(graph, {node->input(0)}, dim);
+  // If "dim" is last dimension already, directly call popart::softmax()
 }
 
 torch::jit::Node *logSoftmaxHandler(torch::jit::Graph *graph,

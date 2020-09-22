@@ -108,7 +108,7 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
   std::int64_t keepdim = 0;
 
   if (node->inputs().size() == 2) {
-    torch::jit::Node *flatten = createFlattenTypedOutput(graph, {input}, 0);
+    torch::jit::Node *flatten = createFlatten(graph, {input}, 0);
     input = flatten->output();
     axes = {1};
   } else {
@@ -138,23 +138,21 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
   }
 
   // sum(abs(x)**p)**(1./p)
-  torch::jit::Node *abs = createUnarySameTypedOutput(createAbs, graph, {input});
+  torch::jit::Node *abs = createAbs(graph, {input});
 
   torch::jit::Node *pow = createPow(graph, {abs->output(), p_val});
-  torch::jit::Node *sum = createWithSameTypedOutput(
-      createReducesum, graph, {pow->output()}, axes, keepdim);
+  torch::jit::Node *sum =
+      createReducesum(graph, {pow->output()}, axes, keepdim);
 
   at::ScalarType p_type = getNodeScalarType(p_val);
 
   if (p_type == c10::ScalarType::Int || p_type == c10::ScalarType::Long) {
     // Cast int to float before reciprocal
-    torch::jit::Node *to_float =
-        createCastTypedOutput(graph, p_val, c10::kFloat);
+    torch::jit::Node *to_float = createCast(graph, p_val, c10::kFloat);
     p_val = to_float->output();
   }
 
-  torch::jit::Node *one_over_p =
-      createUnarySameTypedOutput(createReciprocal, graph, {p_val});
+  torch::jit::Node *one_over_p = createReciprocal(graph, {p_val});
   return createPow(graph, {sum->output(), one_over_p->output()});
 }
 

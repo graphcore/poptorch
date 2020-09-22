@@ -69,6 +69,7 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
   return createReshape(graph, new_node->output(), new_shape);
 }
 
+// NOLINTNEXTLINE
 torch::jit::Node *copy_Handler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // aten::copy_(Tensor self, Tensor src, bool non_blocking) -> Tensor
@@ -79,8 +80,6 @@ torch::jit::Node *copy_Handler(torch::jit::Graph *graph,
 } // namespace
 
 static bool handlers = registerHandlers(
-    c10::aten::size, sizeHandler,
-    c10::prim::NumToTensor, numToTensorHandler,
-    c10::aten::repeat, repeatHandler,
-    c10::aten::copy_, copy_Handler);
+    c10::aten::size, sizeHandler, c10::prim::NumToTensor, numToTensorHandler,
+    c10::aten::repeat, repeatHandler, c10::aten::copy_, copy_Handler);
 } // namespace poptorch

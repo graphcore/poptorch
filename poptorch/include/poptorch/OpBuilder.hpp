@@ -10,13 +10,28 @@
 
 #include "poptorch/ImplicitCasting.hpp"
 
+// Represents how the output type of the op is to be determined
+enum class OutputType {
+  Unknown,
+  AsFirstInput,
+  AsThirdInput,
+  FirstAsFirstInputSecondAlwaysInt,
+  AsImplicitCastPromoted,
+  AsDtype,
+  AsDtypeOrFirstInput,
+  AlwaysBool,
+  AlwaysFloat,
+  AlwaysInt,
+  AlwaysUint8
+};
+
 namespace poptorch {
-torch::jit::Node *createAndInsertNode(
-    torch::jit::Graph *graph, torch::jit::NodeKind kind,
-    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
-    ImplicitCast implicit_cast = ImplicitCast::None,
-    ImplicitCastOutput implicit_cast_output = ImplicitCastOutput::None,
-    size_t num_outputs = 1);
+torch::jit::Node *
+createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
+                    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
+                    ImplicitCast implicit_cast = ImplicitCast::None,
+                    OutputType output_type = OutputType::Unknown,
+                    size_t num_outputs = 1);
 
 // Create a poptorch::tensor_constant node from the given tensors, setting the
 // output type accordingly
@@ -85,49 +100,6 @@ torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph,
   return createConstantFloat(graph, data,
                              {static_cast<std::int64_t>(data.size())})
       ->output();
-}
-
-// Ops which will return the correct ScalarType
-
-torch::jit::Node *createCastTypedOutput(torch::jit::Graph *graph,
-                                        torch::jit::Value *A,
-                                        c10::ScalarType scalar);
-
-torch::jit::Node *
-createConcatTypedOutput(torch::jit::Graph *graph,
-                        const std::vector<torch::jit::Value *> &args,
-                        int64_t axis);
-
-torch::jit::Node *
-createFlattenTypedOutput(torch::jit::Graph *graph,
-                         const std::vector<torch::jit::Value *> &args,
-                         int64_t axis);
-
-torch::jit::Node *createSplitTypedOutput(
-    torch::jit::Graph *graph, const std::vector<torch::jit::Value *> &args,
-    unsigned int num_outputs, int64_t axis, const std::vector<int64_t> &split);
-
-torch::jit::Node *
-createTransposeTypedOutput(torch::jit::Graph *graph,
-                           const std::vector<torch::jit::Value *> &args,
-                           const std::vector<int64_t> &perm);
-
-// Used to add to the output the same type as in input to a unary create
-// function
-torch::jit::Node *createUnarySameTypedOutput(
-    torch::jit::Node *(*create_fn)(torch::jit::Graph *,
-                                   const std::vector<torch::jit::Value *> &),
-    torch::jit::Graph *graph, const std::vector<torch::jit::Value *> &args);
-
-template <typename CreateFn, typename... Args>
-torch::jit::Node *
-createWithSameTypedOutput(CreateFn &&create_fn, torch::jit::Graph *graph,
-                          const std::vector<torch::jit::Value *> &args,
-                          Args &&... op_args) {
-  torch::jit::Node *new_node =
-      create_fn(graph, args, std::forward<Args>(op_args)...);
-  new_node->output()->setType(args[0]->type());
-  return new_node;
 }
 
 // Default to int in the helper.

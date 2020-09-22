@@ -1,8 +1,11 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <cstring>
 #include <sstream>
 #include <unordered_set>
+
+#include "poptorch_logging/Error.hpp"
 
 #include "PoptorchSymbols.hpp"
 #include "poptorch/Utils.hpp"
@@ -68,6 +71,47 @@ std::string scalarTypeToOnnxString(const at::ScalarType type) {
   default:
     return "(unknown type)";
   }
+}
+
+at::ScalarType onnxStrToScalarType(const char *type_str) {
+  if (strcmp(type_str, "UINT8") == 0) {
+    return at::ScalarType::Byte;
+  }
+  if (strcmp(type_str, "INT8") == 0) {
+    return at::ScalarType::Char;
+  }
+  if (strcmp(type_str, "INT16") == 0) {
+    return at::ScalarType::Short;
+  }
+  if (strcmp(type_str, "INT32") == 0) {
+    return at::ScalarType::Int;
+  }
+  if (strcmp(type_str, "INT64") == 0) {
+    return at::ScalarType::Long;
+  }
+  if (strcmp(type_str, "FLOAT16") == 0) {
+    return at::ScalarType::Half;
+  }
+  if (strcmp(type_str, "FLOAT") == 0) {
+    return at::ScalarType::Float;
+  }
+  if (strcmp(type_str, "DOUBLE") == 0) {
+    return at::ScalarType::Double;
+  }
+  if (strcmp(type_str, "COMPLEX64") == 0) {
+    return at::ScalarType::ComplexFloat;
+  }
+  if (strcmp(type_str, "COMPLEX128") == 0) {
+    return at::ScalarType::ComplexDouble;
+  }
+  if (strcmp(type_str, "BOOL") == 0) {
+    return at::ScalarType::Bool;
+  }
+  if (strcmp(type_str, "BFLOAT16") == 0) {
+    return at::ScalarType::BFloat16;
+  }
+
+  ERROR("No at::scalar_type for " << type_str);
 }
 
 namespace {

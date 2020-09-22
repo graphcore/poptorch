@@ -103,7 +103,7 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
   // Add the one constant
   torch::jit::Node *one = createConstantFloat(graph, {1.0}, {});
 
-  torch::jit::Node *log_x = createUnarySameTypedOutput(createLog, graph, {x});
+  torch::jit::Node *log_x = createLog(graph, {x});
 
   // Log(x)*y
   torch::jit::Node *log_x_mul_y = createMul(graph, {y, log_x->output()});
@@ -113,8 +113,7 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
   torch::jit::Node *y_minus_one = createSub(graph, {one->output(), y});
 
   // Log(1 - x)
-  torch::jit::Node *log_x_minus_one =
-      createUnarySameTypedOutput(createLog, graph, {x_minus_one->output()});
+  torch::jit::Node *log_x_minus_one = createLog(graph, {x_minus_one->output()});
 
   // (1 -y)*Log(1 - x)
   torch::jit::Node *subs_multiplied =
@@ -130,8 +129,7 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
     final_node = createMul(graph, {add_terms->output(), weight});
   }
 
-  final_node =
-      createUnarySameTypedOutput(createNeg, graph, {final_node->output()});
+  final_node = createNeg(graph, {final_node->output()});
   if (reduction == 0) {
     // Sum
     final_node = createSum(graph, {final_node->output()});
