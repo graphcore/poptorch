@@ -329,7 +329,7 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
 
   std::optional<c10::ScalarType> cast_to;
   if (node->input(1)->type()->cast<c10::DeviceObjType>() ||
-      node->input(1)->type()->cast<c10::IntType>()) {
+      node->input(1)->type()->cast<c10::TensorType>()) {
     cast_to = getNodeScalarType(node->output(0));
   }
 
