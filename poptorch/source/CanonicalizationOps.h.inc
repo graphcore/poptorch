@@ -19,17 +19,9 @@ OP_CONVERTOR(aten::relu_, NONE, createRelu, {PARAM(0)})
 OP_CONVERTOR(aten::sub, ALPHA(PARAM(1), PARAM(2)), createSub,
              {PARAM(0) COMMA alphaValue})
 
-// aten::mul(Tensor self, Tensor other)
-OP_CONVERTOR(aten::mul, NONE, createMul,
-             {PARAM(0) COMMA PARAM(1)})
-
 // aten::div(Tensor self, Tensor other)
 OP_CONVERTOR(aten::div, NONE, createDiv,
              {PARAM(0) COMMA PARAM(1)})
-
-// aten::add(Tensor self, Tensor other, *, Scalar alpha) -> Tensor
-OP_CONVERTOR(aten::add, ALPHA(PARAM(1), PARAM(2)), createAdd,
-             {PARAM(0) COMMA alphaValue})
 
 // aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta, Scalar
 // alpha) -> Tensor

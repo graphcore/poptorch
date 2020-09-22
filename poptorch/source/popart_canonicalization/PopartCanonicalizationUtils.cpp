@@ -46,6 +46,24 @@ SymbolHandler getHandler(torch::jit::Node *node) {
   return {};
 }
 
+bool allInputsBool(torch::jit::Node *node, int ignore_input) {
+  int idx = 0;
+  for (const auto &input : node->inputs()) {
+    if (idx++ == ignore_input) {
+      continue;
+    }
+
+    auto tensor_type = input->type()->cast<c10::TensorType>();
+    ERROR_ON(!tensor_type);
+    ERROR_ON(!tensor_type->scalarType());
+
+    if ((*tensor_type->scalarType()) != at::ScalarType::Bool) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node) {
   std::vector<torch::jit::Value *> result;
   // Just convert the node->inputs array ref to vector and return it.
@@ -93,6 +111,14 @@ at::ScalarType getNodeScalarType(torch::jit::Value *tensor) {
 
   // Deduce the type from the scalar type on the return.
   return *return_tensor->scalarType();
+}
+
+bool hasUnityValue(torch::jit::Value *value) {
+  auto tensor = value->node()->t(c10::attr::value);
+  if (tensor.numel() != 1) {
+    return false;
+  }
+  return tensor.to(at::ScalarType::Float).item<float>() == 1.0;
 }
 
 bool isNone(torch::jit::Node *node) {

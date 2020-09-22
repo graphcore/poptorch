@@ -616,7 +616,7 @@ static std::unique_ptr<popart::Optimizer> getOptimizer(const Optimizer &opt) {
                          opt.weight_decay,
                          opt.momentum,
                          opt.dampening,
-                         {1.0f, true},    // Velocity scaling, off.
+                         {1.0f, true}, // Velocity scaling, off.
                          opt.loss_scaling}));
   }
   if (opt.type == OptimizerType::ADAM) {

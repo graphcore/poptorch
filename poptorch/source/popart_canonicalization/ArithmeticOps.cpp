@@ -8,6 +8,26 @@
 namespace poptorch {
 namespace {
 
+torch::jit::Node *addHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  // aten::add(Tensor self, Tensor other, *, Scalar alpha) -> Tensor
+
+  torch::jit::Value *alpha_param = node->input(2);
+
+  // If both types are bool, use logical_or
+  if (allInputsBool(node, 2)) {
+    ERROR_ON(!hasUnityValue(alpha_param));
+    return createLogical_or(graph, {node->input(0), node->input(1)});
+  }
+
+  // Ordinary addition
+  torch::jit::Value *alpha_multiplicand = node->input(1);
+  if (!hasUnityValue(alpha_param)) {
+    auto alpha_node = createMul(graph, {alpha_param, alpha_multiplicand});
+    alpha_multiplicand = alpha_node->output();
+  }
+  return createAdd(graph, {node->input(0), alpha_multiplicand});
+}
+
 torch::jit::Node *rsqrtHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // rsqrt =  1 / sqrt(x)
@@ -68,6 +88,18 @@ torch::jit::Node *floorDivideHandler(torch::jit::Graph *graph,
       *quotient->output()->type()->expect<c10::TensorType>()->scalarType());
 }
 
+torch::jit::Node *mulHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  // aten::mul(Tensor self, Tensor other) -> Tensor
+
+  // If both types are bool, use logical_add
+  if (allInputsBool(node)) {
+    return createLogical_and(graph, {node->input(0), node->input(1)});
+  }
+
+  // Ordinary multiplication
+  return createMul(graph, {node->input(0), node->input(1)});
+}
+
 torch::jit::Node *trueDivideHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   // aten::true_divide(Tensor x, Tensor y) -> Tensor
@@ -94,12 +126,14 @@ torch::jit::Node *rsubHandler(torch::jit::Graph *graph,
 
 // clang-format off
 static bool handlers = registerHandlers(
+    c10::aten::add, addHandler,
     c10::aten::rsqrt, rsqrtHandler,
     c10::aten::rsub, rsubHandler,
     c10::aten::expm1, expm1Handler,
     c10::aten::trunc, truncHandler,
     c10::aten::frac, fracHandler,
     c10::aten::floor_divide, floorDivideHandler,
+    c10::aten::mul, mulHandler,
     c10::aten::true_divide, trueDivideHandler);
 // clang-format on
 

@@ -41,13 +41,6 @@ public:
   static void run(torch::jit::Graph *graph);
 };
 
-bool hasUnityValue(torch::jit::Value *value) {
-  auto tensor = value->node()->t(c10::attr::value);
-  if (tensor.numel() != 1) {
-    return false;
-  }
-  return tensor.to(at::ScalarType::Float).item<float>() == 1.0;
-}
 
 /*
  * ConvertAtenToPopart implementation.

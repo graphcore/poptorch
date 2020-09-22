@@ -344,7 +344,6 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
 
   if (!cast_to.has_value() || cast_to == *tensor_type->scalarType()) {
     // NOOP
-
     if (cast_to == *tensor_type->scalarType()) {
       logging::trace("Ignoring type cast to same type, {}, {}", *cast_to,
                      *tensor_type->scalarType());

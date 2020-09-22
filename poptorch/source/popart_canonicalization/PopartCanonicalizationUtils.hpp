@@ -27,6 +27,9 @@ bool registerHandlers(c10::Symbol symbol, const SymbolHandler &handler,
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::Node *node);
 
+// Returns true if all inputs are Bools
+bool allInputsBool(torch::jit::Node *node, int ignore_input = -1);
+
 // Get the tensor shape as a vector of ints.
 std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value);
 
@@ -42,6 +45,9 @@ intVectorToIrConstant(torch::jit::Graph *graph,
                       const std::vector<std::int64_t> &shape);
 
 std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node);
+
+// Returns true if the value is a constant of exactly unity (1)
+bool hasUnityValue(torch::jit::Value *value);
 
 // Some operations take in an optional tensor. A "none" constant is passed in to
 // mark a tensor which is not there.

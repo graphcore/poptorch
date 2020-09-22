@@ -260,6 +260,81 @@ def test_binary_ops_elementwise_edgecases(op):
     binary_op_harness(ConstOnRHSInt(op), input1, input2, compare)
 
 
+binary_ops_basic_element_wise_bool = [
+    torch.add,
+    torch.mul,
+]
+
+
+@pytest.mark.parametrize("op", binary_ops_basic_element_wise_bool)
+def test_binary_ops_elementwise_bools(op):
+    input1 = torch.tensor([0, 1, 0, 1])
+    input2 = torch.tensor([0, 0, 1, 1])
+
+    def compare(x, y):
+        return torch.all(torch.eq(x, y))
+
+    class BothBools(torch.nn.Module):
+        def __init__(self, op):
+            super().__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            x = x.to(torch.bool)
+            y = y.to(torch.bool)
+            return self.op(x, y)
+
+    binary_op_harness(BothBools(op), input1, input2, compare)
+
+    class FloatOnLHS(torch.nn.Module):
+        def __init__(self, op):
+            super().__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            x = x.to(torch.float) + 1.0
+            y = y.to(torch.bool)
+            return self.op(x, y)
+
+    binary_op_harness(FloatOnLHS(op), input1, input2, compare)
+
+    class FloatOnRHS(torch.nn.Module):
+        def __init__(self, op):
+            super().__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            x = x.to(torch.bool)
+            y = y.to(torch.float) + 1.0
+            return self.op(x, y)
+
+    binary_op_harness(FloatOnRHS(op), input1, input2, compare)
+
+    class IntOnLHS(torch.nn.Module):
+        def __init__(self, op):
+            super().__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            x = x.to(torch.int) + 1
+            y = y.to(torch.bool)
+            return self.op(x, y)
+
+    binary_op_harness(IntOnLHS(op), input1, input2, compare)
+
+    class IntOnRHS(torch.nn.Module):
+        def __init__(self, op):
+            super().__init__()
+            self.op = op
+
+        def forward(self, x, y):
+            x = x.to(torch.bool)
+            y = y.to(torch.int) + 1
+            return self.op(x, y)
+
+    binary_op_harness(IntOnRHS(op), input1, input2, compare)
+
+
 binary_op_int = [
     # torch.logical_or, torch.logical_xor, , torch.bitwise_and, torch.bitwise_or, torch.bitwise_xor, torch.logical_and,
 ]
