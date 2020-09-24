@@ -66,13 +66,6 @@ OP_CONVERTOR(aten::replication_pad2d, NONE, createEdgePad,
 OP_CONVERTOR(aten::replication_pad3d, NONE, createEdgePad,
              PARAM(0) COMMA HANDLE_LIST(1))
 
-// aten::group_norm(Tensor input, int num_groups, Tensor? weight, Tensor? bias,
-// float eps, bool cudnn_enabled) -> Tensor
-OP_CONVERTOR(aten::group_norm, NONE, createGroupnormalization,
-             {PARAM(0) COMMA PARAM(2) COMMA PARAM(3)}
-              COMMA CONSTANT_TO_LONG(1)
-              COMMA CONSTANT_TO_FLOAT(4))
-
 // aten::cat(Tensor[] tensors, int dim=0) -> Tensor
 OP_CONVERTOR(aten::cat, NONE, createConcat,
              HANDLE_TENSOR_LIST(0) COMMA CONSTANT_TO_LONG(1))

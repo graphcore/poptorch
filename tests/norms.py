@@ -3,16 +3,16 @@
 
 import torch
 import torch.optim as optim
+import torch.nn as nn
 import poptorch
 import pytest
+import helpers
 
 # Norms
 #'torch.nn.BatchNorm1d', 'torch.nn.BatchNorm2d', 'torch.nn.BatchNorm3d', 'torch.nn.GroupNorm', 'torch.nn.SyncBatchNorm', 'torch.nn.SyncBatchNorm.convert_sync_batchnorm',
 # 'torch.nn.InstanceNorm1d', 'torch.nn.InstanceNorm2d', 'torch.nn.InstanceNorm3d', 'torch.nn.LayerNorm', 'torch.nn.LocalResponseNorm',
 
-batch_norms = [
-    torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d
-]
+batch_norms = [nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]
 
 
 @pytest.mark.parametrize("running_stats", {True, False})
@@ -21,7 +21,7 @@ def test_batchNorm1D(running_stats, training):
     torch.manual_seed(42)
 
     input = torch.randn([2, 10, 1000])
-    norm = torch.nn.BatchNorm1d(10, track_running_stats=running_stats)
+    norm = nn.BatchNorm1d(10, track_running_stats=running_stats)
 
     # pylint: disable=W0212
     norm._buffers["running_mean"] = torch.randn([10])
@@ -48,7 +48,7 @@ def test_batchNorm2D(running_stats, training):
     torch.manual_seed(42)
 
     input = torch.randn([20, 10, 35, 45])
-    norm = torch.nn.BatchNorm2d(10, track_running_stats=running_stats)
+    norm = nn.BatchNorm2d(10, track_running_stats=running_stats)
 
     # pylint: disable=W0212
     norm._buffers["running_mean"] = torch.randn([10])
@@ -75,7 +75,7 @@ def test_batchNorm3D(running_stats, training):
     torch.manual_seed(42)
 
     input = torch.randn([20, 10, 35, 45, 10])
-    norm = torch.nn.BatchNorm3d(10, track_running_stats=running_stats)
+    norm = nn.BatchNorm3d(10, track_running_stats=running_stats)
 
     # pylint: disable=W0212
     norm._buffers["running_mean"] = torch.randn([10])
@@ -101,7 +101,7 @@ def test_layerNorm():
 
     for i in range(1, 4):
         input = torch.randn([3, 2, 5, 2])
-        layerNorm = torch.nn.LayerNorm(input.size()[i:])
+        layerNorm = nn.LayerNorm(input.size()[i:])
 
         # Run pytorch native on CPU.
         nativeOutput = layerNorm(input)
@@ -117,7 +117,7 @@ def test_layerNormScalar():
     torch.manual_seed(42)
 
     input = torch.randn([3, 2, 5, 2])
-    layerNorm = torch.nn.LayerNorm(2)
+    layerNorm = nn.LayerNorm(2)
 
     # Run pytorch native on CPU.
     nativeOutput = layerNorm(input)
@@ -132,11 +132,11 @@ def test_layerNormScalar():
 def test_layerNormPretrainedWeights():
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def __init__(self):
             super(Model, self).__init__()
-            self.conv = torch.nn.Conv2d(5, 5, kernel_size=(1, 1))
-            self.norm = torch.nn.LayerNorm((5, 3, 10))
+            self.conv = nn.Conv2d(5, 5, kernel_size=(1, 1))
+            self.norm = nn.LayerNorm((5, 3, 10))
 
         def forward(self, x):
             x = self.conv(x)
@@ -157,7 +157,7 @@ def test_layerNormPretrainedWeights():
     assert torch.allclose(poptorchOut, modelOut, rtol=1e-4, atol=1e-6)
 
     # We aren't training to any real target we just want to update the beta/gamma parameters and check they still work in popart.
-    criterion = torch.nn.MSELoss()
+    criterion = nn.MSELoss()
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     model.train()
@@ -179,13 +179,18 @@ def test_layerNormPretrainedWeights():
     assert torch.allclose(poptorchOut, outputs, rtol=1e-4, atol=1e-6)
 
 
-def test_groupNorm():
+@pytest.mark.parametrize("dims", {2, 3, 4, 5})
+def test_groupNorm(dims):
     torch.manual_seed(42)
 
-    for _ in range(1, 4):
-        input = torch.randn([3, 10, 5, 2])
+    shape = [3, 10]
+    if dims > 2:
+        rand_shape = torch.randint(2, 5, [dims - 2])
+        shape.extend(rand_shape.tolist())
 
-        groupNorm = torch.nn.GroupNorm(5, 10)
+    for _ in range(3):
+        input = torch.randn(shape)
+        groupNorm = nn.GroupNorm(5, 10)
 
         # Run pytorch native on CPU.
         nativeOutput = groupNorm(input)
@@ -197,3 +202,48 @@ def test_groupNorm():
         # Group norm is pending correctness changes in popart/poplar so we will just test the shape/type for now.
         assert poptorchOut.size() == nativeOutput.size()
         assert poptorchOut.type() == nativeOutput.type()
+
+
+@pytest.mark.parametrize("instanceNormXd", {(nn.InstanceNorm1d, 1),
+                                            (nn.InstanceNorm2d, 2),
+                                            (nn.InstanceNorm3d, 3)})
+def test_instanceNorm(instanceNormXd):
+    torch.manual_seed(42)
+
+    d = instanceNormXd[1]
+
+    class Model(nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.norm = instanceNormXd[0](6, affine=True)
+            self.fc1 = nn.Linear(6 * 2**d, 10)
+
+        def forward(self, x):
+            x = self.norm(x)
+            x = x.flatten(1)
+            return self.fc1(x)
+
+    for _ in range(3):
+        model = Model()
+        opt = optim.Adam(model.parameters(), lr=0.01)
+
+        poptorch_model = helpers.trainingModelWithLoss(
+            model, loss=nn.CrossEntropyLoss(), optimizer=opt)
+
+        shape = [5, 6]
+        shape.extend([2 for i in range(d)])
+
+        # Offset the data by multiplying by random values and shifting by a random bias
+        input = torch.randint(2, 10, shape) * torch.randn(
+            shape) + torch.randint(2, 10, [1]) * torch.randn(1)
+        label = torch.randint(0, 10, [shape[0]])
+
+        _, original_loss = poptorch_model(input, label)
+
+        for _ in range(0, 100):
+            out, loss = poptorch_model(input, label)
+
+        # Check we have trained the model
+        assert loss < original_loss
+        assert loss < 0.03
+        assert torch.equal(torch.argmax(out, dim=1), label)

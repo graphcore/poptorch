@@ -1,0 +1,3 @@
+New features:
+- Added support for torch.nn.InstanceNorm1d, torch.nn.InstanceNorm2d and torch.nn.InstanceNorm3d
+- Fixed issue with torch.nn.GroupNorm where only 4-dimensional inputs could be used
