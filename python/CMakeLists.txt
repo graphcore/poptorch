@@ -72,4 +72,4 @@ target_include_directories(poptorch_core SYSTEM PRIVATE
 install(TARGETS poptorch_core
   DESTINATION ${INSTALL_PYDIR})
 
-install(FILES __init__.py distributed.py _impl.py logging.py enums.py ops.py options.py testing.py DESTINATION "${INSTALL_PYDIR}")
+install(FILES __init__.py distributed.py _impl.py logging.py enums.py optim.py ops.py options.py testing.py DESTINATION "${INSTALL_PYDIR}")

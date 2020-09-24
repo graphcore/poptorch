@@ -20,6 +20,7 @@ def convertOptimizerToDict(optimizer, options):
     loss_scaling = options.Training.loss_scaling
 
     if isinstance(optimizer, optim.SGD):
+        velocity_scaling = getattr(optimizer, "velocity_scaling", 1.0)
         momentum = optimizer.param_groups[0]["momentum"]
         dampening = optimizer.param_groups[0]["dampening"]
         # We will default momentum, weight decay, and dampening, to be
@@ -30,7 +31,8 @@ def convertOptimizerToDict(optimizer, options):
             "momentum": (momentum, momentum == 0.0),
             "weight_decay": (weight_decay, weight_decay == 0.0),
             "dampening": (dampening, dampening == 0.0),
-            "loss_scaling": (loss_scaling, loss_scaling == 1.0)
+            "loss_scaling": (loss_scaling, loss_scaling == 1.0),
+            "velocity_scaling": (velocity_scaling, velocity_scaling == 1.0)
         }
     if isinstance(optimizer, optim.Adam):
         beta1 = optimizer.param_groups[0]["betas"][0]
@@ -506,3 +508,24 @@ class PoplarExecutor:
         if len(output) > 1:
             return output
         return output[0]
+
+
+def check_constructor_match_parent(child_class, extra_args=None):
+    parent = child_class.__bases__[0]
+    parent_params = inspect.signature(parent.__init__).parameters
+    child_params = inspect.signature(child_class.__init__).parameters
+    extra_args = extra_args or []
+    assert len(parent_params) + len(extra_args) == len(child_params), (
+        f"Expected {len(parent_params) + len(extra_args)} parameters but got "
+        f"{len(child_params)}")
+
+    child_params = iter(child_params.items())
+    for idx, (_, param) in enumerate(parent_params.items()):
+        _, child_param = next(child_params)
+        assert child_param == param, (f"Mismatch for parameter {idx}: expected"
+                                      f"'{param}' but got '{child_param}'")
+
+    for extra_arg in extra_args:
+        name, _ = next(child_params)
+        assert name == extra_arg, (f"Expected an extra argument named "
+                                   f"'{extra_arg}' but got '{name}'")
