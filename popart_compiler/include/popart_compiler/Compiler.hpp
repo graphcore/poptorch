@@ -44,8 +44,8 @@ static std::pair<float, bool> findInMapOrDefault(
     return itr->second;
   }
 
-  logging::info("Optimizer map didn't have field for {}, defaulting to zero {}",
-                name);
+  logging::info("Optimizer map didn't have field for {}, defaulting to {}",
+                name, defaultValue);
   return {defaultValue, false};
 }
 
