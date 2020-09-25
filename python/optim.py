@@ -24,13 +24,13 @@ class SGD(torch.optim.SGD):
             group.setdefault("velocity_scaling", velocity_scaling)
 
 
-class Adam(torch.optim.Adam):
+class AdamW(torch.optim.AdamW):
     def __init__(self,
                  params,
                  lr=1e-3,
                  betas=(0.9, 0.999),
                  eps=1e-8,
-                 weight_decay=0,
+                 weight_decay=0.01,
                  amsgrad=False,
                  loss_scaling=1.0):
         super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
@@ -41,4 +41,4 @@ class Adam(torch.optim.Adam):
 
 
 _impl.check_constructor_match_parent(SGD, ["loss_scaling", "velocity_scaling"])
-_impl.check_constructor_match_parent(Adam, ["loss_scaling"])
+_impl.check_constructor_match_parent(AdamW, ["loss_scaling"])

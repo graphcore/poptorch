@@ -79,7 +79,7 @@ struct Optimizer {
       dampening = findInMapOrDefault(opts, "dampening");
       break;
     }
-    case OptimizerType::ADAM: {
+    case OptimizerType::ADAMW: {
       beta1 = findInMapOrDefault(opts, "beta1", 0.9);
       beta2 = findInMapOrDefault(opts, "beta2", 0.999);
       eps = findInMapOrDefault(opts, "eps", 1e-08);
@@ -102,7 +102,7 @@ struct Optimizer {
   std::pair<float, bool> momentum;
   std::pair<float, bool> dampening;
 
-  // Unique to Adam
+  // Unique to AdamW
   std::pair<float, bool> beta1;
   std::pair<float, bool> beta2;
   std::pair<float, bool> eps;

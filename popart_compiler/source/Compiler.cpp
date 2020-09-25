@@ -618,10 +618,10 @@ static std::unique_ptr<popart::Optimizer> getOptimizer(const Optimizer &opt) {
                          opt.dampening,
          opt.velocity_scaling, opt.loss_scaling}));
   }
-  if (opt.type == OptimizerType::ADAM) {
+  if (opt.type == OptimizerType::ADAMW) {
     return std::unique_ptr<popart::Optimizer>(new popart::Adam(
         opt.learning_rate, opt.weight_decay, opt.beta1, opt.beta2, opt.eps,
-        opt.loss_scaling, popart::AdamMode::Adam,
+        opt.loss_scaling, popart::AdamMode::AdamNoBias,
         popart::DataType::FLOAT, // Always accumulate as float.
         popart::DataType::FLOAT, popart::DataType::FLOAT));
   }
@@ -1058,9 +1058,9 @@ void Compiler::initSession(const Optimizer &opt) {
           "{}, weight decay {}, Momentum {}, Dampening {}",
           opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
           opt.dampening.first);
-    } else if (opt.type == OptimizerType::ADAM) {
+    } else if (opt.type == OptimizerType::ADAMW) {
       logging::debug(
-          "Adding inital graph optimizer ADAM with parameters: Learning rate "
+          "Adding inital graph optimizer ADAMW with parameters: Learning rate "
           "{}, weight decay {}, beta1 {}, beta2 {}, eps {}",
           opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
           opt.beta2.first, opt.eps.first);
@@ -1153,9 +1153,9 @@ void Compiler::run(const Optimizer &opt) {
           "{}, weight decay {}, Momentum {}, Dampening {}",
           opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
           opt.dampening.first);
-    } else if (opt.type == OptimizerType::ADAM) {
+    } else if (opt.type == OptimizerType::ADAMW) {
       logging::debug(
-          "Updating graph optimizer ADAM with parameters: Learning rate "
+          "Updating graph optimizer ADAMW with parameters: Learning rate "
           "{}, weight decay {}, beta1 {}, beta2 {}, eps {}",
           opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
           opt.beta2.first, opt.eps.first);

@@ -14,7 +14,7 @@ namespace poptorch {
  */
 
 // The training optimizer algorithm used.
-enum OptimizerType : std::uint8_t { SGD = 0, ADAM, LAMB, NONE };
+enum OptimizerType : std::uint8_t { SGD = 0, ADAMW, LAMB, NONE };
 
 #define FOR_ALL_FIXED_POINT_TYPES(_)                                           \
   _(UINT8)                                                                     \

@@ -4,7 +4,7 @@ import enum
 
 class OptimizerType(enum.IntEnum):
     SGD = 0
-    ADAM = 1
+    ADAMW = 1
 
 
 class AnchorMode(enum.IntEnum):

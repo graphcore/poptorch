@@ -13,7 +13,7 @@ import helpers
 
 @pytest.mark.parametrize(
     "opt, reduction",
-    zip((optim.SGD, optim.Adam, poptorch.optim.SGD, poptorch.optim.Adam),
+    zip((optim.SGD, optim.AdamW, poptorch.optim.SGD, poptorch.optim.AdamW),
         ("mean", "sum")))
 def test_optimizer(opt, reduction):
     torch.manual_seed(42)
@@ -58,7 +58,7 @@ def test_optimizer(opt, reduction):
 
 @pytest.mark.parametrize(
     "opt, reduction",
-    zip((optim.SGD, optim.Adam, poptorch.optim.SGD, poptorch.optim.Adam),
+    zip((optim.SGD, optim.AdamW, poptorch.optim.SGD, poptorch.optim.AdamW),
         ("mean", "sum")))
 def test_sgd_IR(opt, reduction):
     torch.manual_seed(42)

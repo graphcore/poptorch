@@ -64,7 +64,7 @@ training_data = poptorch.DataLoader(options=opts,
 model = ExampleModelWithLoss()
 model.train()
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 
 # Wrap the model in a PopTorch training wrapper
 poptorch_model = poptorch.trainingModel(model,
@@ -86,7 +86,7 @@ for batch, target in training_data:
     # Optimizer can be updated via setOptimizer.
     if momentum_loss < 0.1:
         poptorch_model.setOptimizer(
-            torch.optim.Adam(model.parameters(), lr=0.0001))
+            torch.optim.AdamW(model.parameters(), lr=0.0001))
 
 print(model.model.bias)
 assert (model.model.bias > 0.4 and model.model.bias < 0.6)
@@ -102,7 +102,7 @@ training_data = torch.utils.data.DataLoader(ExampleDataset(shape=[1],
 model = ExampleModelWithLoss()
 model.train()
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 
 momentum_loss = None
 
@@ -125,7 +125,7 @@ for batch, target in training_data:
         momentum_loss = momentum_loss * 0.95 + loss * 0.05
 
     if momentum_loss < 0.1:
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
 
 print(model.model.bias)
 assert (model.model.bias > 0.4 and model.model.bias < 0.6)

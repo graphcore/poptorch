@@ -34,20 +34,20 @@ def convertOptimizerToDict(optimizer):
             "loss_scaling": (loss_scaling, loss_scaling == 1.0),
             "velocity_scaling": (velocity_scaling, velocity_scaling == 1.0)
         }
-    if isinstance(optimizer, optim.Adam):
+    if isinstance(optimizer, optim.AdamW):
         beta1 = optimizer.param_groups[0]["betas"][0]
         beta2 = optimizer.param_groups[0]["betas"][1]
         eps = optimizer.param_groups[0]["eps"]
 
         assert not optimizer.param_groups[0]["amsgrad"], (
             "Only non-amsgrad "
-            "Adam optimizers are supported.")
+            "AdamW optimizers are supported.")
         return {
-            "optimizerType": enums.OptimizerType.ADAM,
+            "optimizerType": enums.OptimizerType.ADAMW,
             "lr": (learning_rate, False),
             "beta1": (beta1, False),
             "beta2": (beta2, False),
-            "weight_decay": (weight_decay, weight_decay == 0.0),
+            "weight_decay": (weight_decay, weight_decay == 0.01),
             "eps": (eps, eps == 1e-08),
             "loss_scaling": (loss_scaling, loss_scaling == 1.0)
         }
@@ -304,7 +304,7 @@ class PoplarExecutor:
 
     def setOptimizer(self, optimizer):
         """ Sets the optimiser for a training model. Will overwrite the
-        previous one. ``optim.SGD`` and ``optim.ADAM`` are supported.
+        previous one. ``optim.SGD`` and ``optim.ADAMW`` are supported.
         """
         self._new_optimizer = optimizer
 
