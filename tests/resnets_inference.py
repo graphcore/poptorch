@@ -100,3 +100,7 @@ def test_mnasnet1_0():
 
 def test_mobilenet_v2():
     inference_harness(models.mobilenet_v2)
+
+
+def test_googlenet():
+    inference_harness(models.googlenet)
