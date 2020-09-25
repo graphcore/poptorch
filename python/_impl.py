@@ -10,14 +10,14 @@ from .logging import logger
 from .options import Options
 
 
-def convertOptimizerToDict(optimizer, options):
+def convertOptimizerToDict(optimizer):
     assert len(optimizer.param_groups) == 1, (
         "Poptorch currently only "
         "supports one parameter group! (all parameters)")
 
     learning_rate = optimizer.param_groups[0]["lr"]
     weight_decay = optimizer.param_groups[0]["weight_decay"]
-    loss_scaling = options.Training.loss_scaling
+    loss_scaling = getattr(optimizer, "loss_scaling", 1.0)
 
     if isinstance(optimizer, optim.SGD):
         velocity_scaling = getattr(optimizer, "velocity_scaling", 1.0)
@@ -188,7 +188,7 @@ class PoplarExecutor:
                 options.anchorMode(enums.AnchorMode.Final)
             if not optimizer:
                 optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
-            optimizer = convertOptimizerToDict(optimizer, options)
+            optimizer = convertOptimizerToDict(optimizer)
         else:
             if options.defaultAnchorMode():
                 # In inference it makes sense to see all the results, by default.
@@ -497,7 +497,7 @@ class PoplarExecutor:
             self._optimizer = self._new_optimizer
             output = poptorch_core.execute(
                 self._executable, in_tensors.asTuple(),
-                convertOptimizerToDict(self._optimizer, self._options))
+                convertOptimizerToDict(self._optimizer))
         else:
             output = poptorch_core.execute(self._executable,
                                            in_tensors.asTuple(), {})

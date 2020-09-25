@@ -10,9 +10,10 @@ import torch.optim as optim
 import helpers
 
 
-@pytest.mark.parametrize("opt, reduction",
-                         zip((optim.SGD, optim.Adam, poptorch.optim.SGD),
-                             ("mean", "sum")))
+@pytest.mark.parametrize(
+    "opt, reduction",
+    zip((optim.SGD, optim.Adam, poptorch.optim.SGD, poptorch.optim.Adam),
+        ("mean", "sum")))
 def test_optimizer(opt, reduction):
     torch.manual_seed(42)
 
@@ -54,9 +55,10 @@ def test_optimizer(opt, reduction):
     assert torch.argmax(out, dim=1) == label
 
 
-@pytest.mark.parametrize("opt, reduction",
-                         zip((optim.SGD, optim.Adam, poptorch.optim.SGD),
-                             ("mean", "sum")))
+@pytest.mark.parametrize(
+    "opt, reduction",
+    zip((optim.SGD, optim.Adam, poptorch.optim.SGD, poptorch.optim.Adam),
+        ("mean", "sum")))
 def test_sgd_IR(opt, reduction):
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
