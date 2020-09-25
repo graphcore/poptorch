@@ -4,7 +4,6 @@ import time
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.multiprocessing as multiprocessing
 
 import poptorch.poptorch_core as poptorch_core
@@ -17,6 +16,7 @@ from .ops import *
 from .options import *
 from . import distributed
 from ._impl import PoplarExecutor
+from . import optim
 
 
 class DataLoader(torch.utils.data.DataLoader):

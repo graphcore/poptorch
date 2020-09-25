@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import copy
 from io import StringIO
 import json
 
@@ -97,3 +98,29 @@ def test_sgd_IR(opt, reduction):
     else:
         assert SGD0VarUpdate == 0
         assert AdamVarUpdate == 2 and AdamUpdater == 2
+
+
+def test_velocity_scaling_copy():
+    torch.manual_seed(42)
+
+    model = torch.nn.Linear(10, 10)
+
+    # "Train" with learning rate of zero and check the loss remains the same.
+    optimizer = poptorch.optim.SGD(model.parameters(),
+                                   lr=0.01,
+                                   velocity_scaling=128)
+
+    poptorch_model = helpers.trainingModelWithLoss(
+        model,
+        loss=torch.nn.CrossEntropyLoss(reduction="sum"),
+        optimizer=optimizer)
+
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
+
+    # Make sure the first run doesn't already pass the test.
+    poptorch_model(input, label)
+
+    o = copy.copy(optimizer)
+    poptorch_model.setOptimizer(o)
+    poptorch_model(input, label)

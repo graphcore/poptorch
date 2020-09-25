@@ -17,8 +17,11 @@ class SGD(torch.optim.SGD):
                  velocity_scaling=1.0):
         super().__init__(params, lr, momentum, dampening, weight_decay,
                          nesterov)
-        self.loss_scaling = loss_scaling
-        self.velocity_scaling = velocity_scaling
+        self.defaults["loss_scaling"] = loss_scaling
+        self.defaults["velocity_scaling"] = velocity_scaling
+        for group in self.param_groups:
+            group.setdefault("loss_scaling", loss_scaling)
+            group.setdefault("velocity_scaling", velocity_scaling)
 
 
 class Adam(torch.optim.Adam):
@@ -31,7 +34,10 @@ class Adam(torch.optim.Adam):
                  amsgrad=False,
                  loss_scaling=1.0):
         super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
-        self.loss_scaling = loss_scaling
+
+        self.defaults["loss_scaling"] = loss_scaling
+        for group in self.param_groups:
+            group.setdefault("loss_scaling", loss_scaling)
 
 
 _impl.check_constructor_match_parent(SGD, ["loss_scaling", "velocity_scaling"])
