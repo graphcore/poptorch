@@ -16,6 +16,37 @@ namespace {
 at::ScalarType scalarTypeFromInput(const torch::jit::Node *node, size_t num) {
   return *node->input(num)->type()->expect<c10::TensorType>()->scalarType();
 }
+} // namespace
+
+torch::jit::Node *
+createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
+                    torch::jit::ArrayRef<torch::jit::Value *> inputs,
+                    const ImplicitCast implicit_cast, OutputType output_type,
+                    size_t num_outputs) {
+  torch::jit::Node *new_node;
+
+  if (implicit_cast != ImplicitCast::None) {
+    logging::LogContext ctx(std::string("implicitly casting inputs of ") +
+                            kind.toQualString());
+    auto possibly_casted_inputs = implicitCastInputs(&inputs, implicit_cast);
+    ctx.clear();
+
+    new_node = graph->create(kind, num_outputs);
+    for (auto input : possibly_casted_inputs) {
+      new_node->addInput(input);
+    }
+  } else {
+    new_node = graph->create(kind, inputs, num_outputs);
+  }
+
+  if (output_type != OutputType::AsDtype &&
+      output_type != OutputType::AsDtypeOrFirstInput) {
+    setNodeOutputsTypes(new_node, implicit_cast, output_type);
+  }
+
+  graph->insertNode(new_node);
+  return new_node;
+}
 
 // Sets the scalar types of every output of a node
 void setNodeOutputsTypes(torch::jit::Node *node,
@@ -58,10 +89,15 @@ void setNodeOutputsTypes(torch::jit::Node *node,
     }
 
     if (node->hasAttribute(c10::Symbol::fromQualString("attr::dtype"))) {
-      const auto onnx_dtype =
-          node->i(c10::Symbol::fromQualString("attr::dtype"));
-      resolved_output_type =
-          onnxStrToScalarType(onnxStrFromDtypeInt(onnx_dtype));
+      const auto dtype_sym = c10::Symbol::fromQualString("attr::dtype");
+      if (node->kindOf(dtype_sym) == torch::jit::AttributeKind::i) {
+        const auto onnx_dtype = node->i(dtype_sym);
+        resolved_output_type =
+            onnxStrToScalarType(onnxStrFromDtypeInt(onnx_dtype));
+      } else {
+        const auto &onnx_dtype = node->s(dtype_sym);
+        resolved_output_type = onnxStrToScalarType(onnx_dtype.c_str());
+      }
     } else {
       resolved_output_type = scalarTypeFromInput(node, 0);
     }
@@ -92,33 +128,6 @@ void setNodeOutputsTypes(torch::jit::Node *node,
     output->setType(c10::TensorType::create(resolved_output_type, c10::nullopt,
                                             c10::nullopt, c10::nullopt));
   }
-}
-} // namespace
-
-torch::jit::Node *
-createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
-                    torch::jit::ArrayRef<torch::jit::Value *> inputs,
-                    const ImplicitCast implicit_cast,
-                    const OutputType output_type, size_t num_outputs) {
-  torch::jit::Node *new_node;
-
-  if (implicit_cast != ImplicitCast::None) {
-    logging::LogContext ctx(std::string("implicitly casting inputs of ") +
-                            kind.toQualString());
-    auto possibly_casted_inputs = implicitCastInputs(&inputs, implicit_cast);
-    ctx.clear();
-
-    new_node = graph->create(kind, num_outputs);
-    for (auto input : possibly_casted_inputs) {
-      new_node->addInput(input);
-    }
-  } else {
-    new_node = graph->create(kind, inputs, num_outputs);
-  }
-
-  setNodeOutputsTypes(new_node, implicit_cast, output_type);
-  graph->insertNode(new_node);
-  return new_node;
 }
 
 torch::jit::Node *tensorToConstant(torch::jit::Graph *graph,
@@ -335,13 +344,16 @@ torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
                                      float mean, float scale,
                                      at::ScalarType dataType) {
   torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::random_normal);
+      createAndInsertNode(graph, symbols::poptorch::random_normal, {},
+                          ImplicitCast::None, OutputType::AsDtype);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::mean, mean);
   new_node->f_(c10::attr::scale, scale);
   new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
   new_node->output()->setType(c10::TensorType::create(
       dataType, c10::nullopt, c10::nullopt, c10::nullopt));
+  setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
+
   return new_node;
 }
 
@@ -350,13 +362,15 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
                                       float high, float low,
                                       at::ScalarType dataType) {
   torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::random_uniform);
+      createAndInsertNode(graph, symbols::poptorch::random_uniform, {},
+                          ImplicitCast::None, OutputType::AsDtype);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::high, high);
   new_node->f_(c10::attr::low, low);
   new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
   new_node->output()->setType(c10::TensorType::create(
       dataType, c10::nullopt, c10::nullopt, c10::nullopt));
+  setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
   return new_node;
 }
 

@@ -611,11 +611,8 @@ template <> struct HandleOutput<popart::TensorId> {
 
 static std::unique_ptr<popart::Optimizer> getOptimizer(const Optimizer &opt) {
   if (opt.type == OptimizerType::SGD) {
-    return std::unique_ptr<popart::Optimizer>(
-        new popart::SGD({opt.learning_rate,
-                         opt.weight_decay,
-                         opt.momentum,
-                         opt.dampening,
+    return std::unique_ptr<popart::Optimizer>(new popart::SGD(
+        {opt.learning_rate, opt.weight_decay, opt.momentum, opt.dampening,
          opt.velocity_scaling, opt.loss_scaling}));
   }
   if (opt.type == OptimizerType::ADAMW) {

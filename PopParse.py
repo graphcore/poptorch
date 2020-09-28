@@ -437,6 +437,13 @@ for opset in classes:
             cppFile += "new_node->" + attr + "_(c10::Symbol::fromQualString("\
                 "\"attr::" + arg["name"] + "\")," + arg["name"] + ");\n"
 
+        if name in OutputTypeAsDtype:
+            cppFile += "setNodeOutputsTypes(new_node, ImplicitCast::None, "
+            cppFile += "OutputType::AsDtype);\n"
+        if name in OutputTypeAsDtypeOrFirstInput:
+            cppFile += "setNodeOutputsTypes(new_node, ImplicitCast::None, "
+            cppFile += "OutputType::AsDtypeOrFirstInput);\n"
+
         cppFile += "return new_node;\n"
 
         cppFile = header + ") {\n" + cppFile + "}"

@@ -200,6 +200,7 @@ return new_node;
 torch::jit::Node* createCast(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & to) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::cast, args, ImplicitCast::None, OutputType::AsDtype);
 new_node->s_(c10::Symbol::fromQualString("attr::to"),to);
+setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
 return new_node;
 }
 torch::jit::Node* createCompress(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t axis) {
@@ -219,6 +220,7 @@ torch::jit::Node* createEyelike(torch::jit::Graph *graph,  const std::vector<tor
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::eyelike, args, ImplicitCast::None, OutputType::AsDtype);
 new_node->i_(c10::Symbol::fromQualString("attr::dtype"),dtype);
 new_node->i_(c10::Symbol::fromQualString("attr::k"),k);
+setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
 return new_node;
 }
 torch::jit::Node* createFlatten(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
@@ -359,6 +361,7 @@ torch::jit::Node* createMultinomial(torch::jit::Graph *graph,  const std::vector
 new_node->i_(c10::Symbol::fromQualString("attr::dtype"),dtype);
 new_node->i_(c10::Symbol::fromQualString("attr::sample_size"),sample_size);
 new_node->f_(c10::Symbol::fromQualString("attr::seed"),seed);
+setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
 return new_node;
 }
 torch::jit::Node* createLogical_or(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
@@ -555,6 +558,7 @@ new_node->i_(c10::Symbol::fromQualString("attr::dtype"),dtype);
 new_node->f_(c10::Symbol::fromQualString("attr::mean"),mean);
 new_node->f_(c10::Symbol::fromQualString("attr::scale"),scale);
 new_node->f_(c10::Symbol::fromQualString("attr::seed"),seed);
+setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
 return new_node;
 }
 torch::jit::Node* createRandomuniformlike(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t dtype,float high,float low,float seed) {
@@ -563,6 +567,7 @@ new_node->i_(c10::Symbol::fromQualString("attr::dtype"),dtype);
 new_node->f_(c10::Symbol::fromQualString("attr::high"),high);
 new_node->f_(c10::Symbol::fromQualString("attr::low"),low);
 new_node->f_(c10::Symbol::fromQualString("attr::seed"),seed);
+setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
 return new_node;
 }
 torch::jit::Node* createReciprocal(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {

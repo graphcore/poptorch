@@ -33,6 +33,12 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
                     OutputType output_type = OutputType::Unknown,
                     size_t num_outputs = 1);
 
+// Called by createAndInsertNode except in the cases of OutputType::AsDtype and
+// OutputType::AsDtypeOrFirstInput where it should be called manually once the
+// dtype attribute is set
+void setNodeOutputsTypes(torch::jit::Node *node, ImplicitCast implicit_cast,
+                         OutputType output_type);
+
 // Create a poptorch::tensor_constant node from the given tensors, setting the
 // output type accordingly
 torch::jit::Node *tensorToConstant(torch::jit::Graph *graph,
