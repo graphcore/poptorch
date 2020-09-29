@@ -225,7 +225,7 @@ def test_instanceNorm(instanceNormXd):
 
     for _ in range(3):
         model = Model()
-        opt = optim.Adam(model.parameters(), lr=0.01)
+        opt = optim.AdamW(model.parameters(), lr=0.01)
 
         poptorch_model = helpers.trainingModelWithLoss(
             model, loss=nn.CrossEntropyLoss(), optimizer=opt)
