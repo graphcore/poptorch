@@ -53,7 +53,10 @@ def test_pool2D(op):
 
     # pool of square window of size=3, stride=2
     model = op(3, stride=2)
+    execute_and_check_wrapper(model, input)
 
+    # pool of square window of size=3, stride=2, ceil_mode=True
+    model = op(3, stride=2, ceil_mode=True)
     execute_and_check_wrapper(model, input)
 
     #  pool of non-square window

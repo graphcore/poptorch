@@ -32,13 +32,18 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
 
   if (kind == c10::aten::max_pool1d || kind == c10::aten::max_pool2d ||
       kind == c10::aten::max_pool3d) {
-    return createMaxpool(graph, {node->input(0)}, 1, kernel_size, 0, {},
-                         padding, 0, stride);
+    auto dilations = constantToLongVec(node->input(4)->node());
+    auto ceil_mode = constantToLong(node->input(5)->node());
+
+    return createMaxpool(graph, {node->input(0)}, 1, kernel_size, ceil_mode,
+                         dilations, padding, 0, stride);
+  } else {
+    // countIncludePad, divisor_override are ignored for now due
+    // to not being supported directly in popart.
+    auto ceil_mode = constantToLong(node->input(4)->node());
+    return createAveragepool(graph, {node->input(0)}, kernel_size, ceil_mode,
+                             0, padding, stride);
   }
-  // ceil_mode, countIncludePad, divisor_override are ignored for now due
-  // to not being supported directly in popart.
-  return createAveragepool(graph, {node->input(0)}, kernel_size, 0, 0, padding,
-                           stride);
 }
 
 torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
