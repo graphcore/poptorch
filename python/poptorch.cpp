@@ -224,7 +224,7 @@ void buildTensorList(const torch::jit::IValue &value,
       buildTensorList(element, tensors);
     }
   } else if (value.isList()) {
-    for (const auto &element : value.toList()) {
+    for (const auto element : value.toList()) {
       buildTensorList(element, tensors);
     }
   } else if (value.isTensor()) {
