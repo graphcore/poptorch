@@ -32,6 +32,11 @@ setting the environment variable POPLAR_ENGINE_OPTIONS='{autoReport.all:true, au
 - Adds support for Adam optimizer.
 
 - Adds support for half type models and inputs.
+    Models that require operations on input tensors of mixed precision are not currently supported.  For example:
+      def forward(self, x, y):
+         x // Half
+         y // Float32
+         return x + y // Not supported.
 
 - Support for tensor.fill_, torch.full, torch.full_like
 
@@ -57,6 +62,8 @@ setting the environment variable POPLAR_ENGINE_OPTIONS='{autoReport.all:true, au
 - Adds support for torch.clamp
 
 - Adds poptorch.DataLoader
+
+- Adds optimized poptorch.AsynchronousDataAccessor which allows for a dataloader to be offloaded to a background thread asynchronously.
 
 - Adds support for torch.norm
 
