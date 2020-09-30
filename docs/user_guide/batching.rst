@@ -7,11 +7,16 @@ Efficient data batching
 By default PopTorch will process the `batch_size` which you provided to
 the :py:class:`poptorch.DataLoader`.
 
-When using the other options below, this changes slightly to allow PopART to
-load data more efficiently.
+When using the other options below, this actual number of samples used per step
+varies to allow the IPU(s) to process data more efficiently.
 
-However, the batch size actually being used on the device will not change, 
-just how much data is available for PopART to load from.
+However, the effective (mini-)batch size for operations which depend on it (such
+as batch normalization) will not change. All that changes is how much data is
+actually sent for a single step.
+
+.. note:: Failure to use :py:class:`poptorch.DataLoader` may result in
+   accidentally changing the effective batch size for operations which depend on
+   it such as batch normalization.
 
 poptorch.DataLoader
 ===================
@@ -49,7 +54,7 @@ Example
 poptorch.Options.deviceIterations
 =================================
 
-If you set :py:meth:`~poptorch.Options.deviceIterations` to more 
+If you set :py:meth:`~poptorch.Options.deviceIterations` to more
 than 1 then you are telling PopART to execute that many batches in serial.
 
 Essentially, it is the equivalent of launching the IPU in a loop over that
