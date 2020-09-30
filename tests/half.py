@@ -84,3 +84,15 @@ def test_lstm():
                                                          numHidden).half())
     ipuOut = ipuLstm(inputs, hidden)
     assert isinstance(ipuOut[0], torch.HalfTensor)
+
+
+def test_ipu_print_tensor():
+    class SimplePrinter(torch.nn.Module):
+        def forward(self, x):
+            return poptorch.ipu_print_tensor(x)
+
+    t1 = torch.tensor([1.], dtype=torch.float16)
+    inference_model = poptorch.inferenceModel(SimplePrinter())
+    out = inference_model(t1)
+    assert out == 1.0
+    assert out.dtype == torch.float16

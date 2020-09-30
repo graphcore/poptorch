@@ -374,6 +374,14 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
+                                       torch::jit::Value *value) {
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::ipu_print_tensor, {value},
+                          ImplicitCast::None, OutputType::AsFirstInput);
+  return new_node;
+}
+
 torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,
                                            float proportion) {

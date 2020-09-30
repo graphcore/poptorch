@@ -164,6 +164,9 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
                                       float high, float low,
                                       at::ScalarType dataType);
 
+torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
+                                       torch::jit::Value *value);
+
 torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,
                                            float proportion);
