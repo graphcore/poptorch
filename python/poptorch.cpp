@@ -45,7 +45,6 @@ at::Tensor setAvailableMemory(at::Tensor t, double mem) {
   return t;
 }
 
-at::Tensor ipuPrintTensor(at::Tensor t) { return t; }
 at::Tensor identityOp(at::Tensor t) { return t; }
 at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   UNUSED(reduction);
