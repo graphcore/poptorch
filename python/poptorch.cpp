@@ -252,32 +252,36 @@ void printGraphInputStr(std::ostream &os, const torch::jit::Graph &graph) {
 // actual inputs if trace_input_str is not empty
 void logGraph(const char *intro_str, const torch::jit::Graph &graph,
               const std::string &trace_input_str) {
+  std::ostringstream graph_str;
+  graph_str << intro_str << "\n";
+
+  // If there are no halves convereted to floats, simply print the graph
   if (trace_input_str.empty()) {
-    logging::trace("{}", graph);
-  } else {
-    std::ostringstream graph_str;
-
-    // Print the trace inputs
-    graph_str << intro_str << "\n" << trace_input_str << "\n";
-
-    // Print the original inputs
-    graph_str << "[orig:";
-    printGraphInputStr(graph_str, graph);
-    graph_str << "]\n";
-
-    std::vector<const torch::jit::Node *> groups;
-    for (auto n : graph.nodes()) {
-      n->print(graph_str, 1, &groups, true);
-    }
-    graph_str << "  return (" << graph.outputs() << ")\n";
-    size_t i = 0;
-
-    for (auto fg : groups) {
-      graph_str << "with " << fg->kind().toQualString() << "_" << i++ << " = "
-                << *fg->g(torch::jit::attr::Subgraph);
-    }
+    graph_str << graph;
     logging::trace("{}", graph_str.str());
+    return;
   }
+
+  // Print the trace inputs
+  graph_str << trace_input_str << "\n";
+
+  // Print the original inputs
+  graph_str << "[orig:";
+  printGraphInputStr(graph_str, graph);
+  graph_str << "]\n";
+
+  std::vector<const torch::jit::Node *> groups;
+  for (auto n : graph.nodes()) {
+    n->print(graph_str, 1, &groups, true);
+  }
+  graph_str << "  return (" << graph.outputs() << ")\n";
+  size_t i = 0;
+
+  for (auto fg : groups) {
+    graph_str << "with " << fg->kind().toQualString() << "_" << i++ << " = "
+              << *fg->g(torch::jit::attr::Subgraph);
+  }
+  logging::trace("{}", graph_str.str());
 }
 
 } // namespace
@@ -487,7 +491,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
         graph.get());
 
     // Convert the IR to half to match the inputs/actual usage.
-    logGraph("Graph before canonicalising half:\n{}", *graph, trace_input_str);
+    logGraph("Graph before canonicalising half:", *graph, trace_input_str);
     poptorch::canonicaliseHalf(graph.get(), input_tensors, traced_tensors);
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
