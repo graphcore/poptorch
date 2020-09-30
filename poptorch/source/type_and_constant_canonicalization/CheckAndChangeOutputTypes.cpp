@@ -26,6 +26,31 @@ constexpr bool supportedType(const at::ScalarType type) {
 
 void warnNonNativeSupport(torch::jit::Node *node,
                           const char *unsupported_type) {
+  // Ignore nodes for which the type is inconsequential
+  if (node->kind() == c10::aten::argmax || node->kind() == c10::aten::argmin ||
+      node->kind() == c10::aten::contiguous ||
+      node->kind() == c10::aten::chunk || node->kind() == c10::aten::detach ||
+      node->kind() == c10::aten::expand ||
+      node->kind() == c10::aten::expand_as ||
+      node->kind() == c10::aten::flatten || node->kind() == c10::aten::ones ||
+      node->kind() == c10::aten::ones || node->kind() == c10::aten::permute ||
+      node->kind() == c10::aten::reshape || node->kind() == c10::aten::select ||
+      node->kind() == c10::aten::slice || node->kind() == c10::aten::split ||
+      node->kind() == c10::aten::stack || node->kind() == c10::aten::squeeze ||
+      node->kind() == c10::aten::transpose ||
+      node->kind() == c10::aten::unsqueeze ||
+      node->kind() == c10::aten::upsample_nearest1d ||
+      node->kind() == c10::aten::upsample_nearest2d ||
+      node->kind() == c10::aten::upsample_nearest3d ||
+      node->kind() == c10::aten::upsample_linear1d ||
+      node->kind() == c10::aten::upsample_bilinear2d ||
+      node->kind() == c10::aten::upsample_trilinear3d ||
+      node->kind() == c10::aten::upsample_bicubic2d ||
+      node->kind() == c10::aten::view || node->kind() == c10::aten::zeros ||
+      node->kind() == c10::prim::NumToTensor) {
+    return;
+  }
+
   logging::warn("{}: {} is not supported natively on IPU, loss of "
                 "range/precision may occur",
                 nodeToString(node), unsupported_type);
@@ -42,6 +67,7 @@ void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
 
   // Constants will be retyped later
   if (node->kind() != c10::prim::Constant) {
+    warnNonNativeSupport(node, torch_type_str);
     output->setType(current_type->withScalarType(replacement_dtype));
   }
 
@@ -55,8 +81,6 @@ void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
       }
     }
   }
-
-  warnNonNativeSupport(node, torch_type_str);
 }
 
 void checkAndChangeOutputTypesForOutput(torch::jit::Node *node,

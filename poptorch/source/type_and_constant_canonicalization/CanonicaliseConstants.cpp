@@ -3,7 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 
-#include <climits>
+#include <limits>
 
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -30,6 +30,24 @@ void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
   }
 }
 
+void warnDoubleOutOfRange(double val, torch::jit::Node *n) {
+  if (val > std::numeric_limits<float>::max() ||
+      val < std::numeric_limits<float>::min()) {
+    logging::warn("{}: torch.float64 constant cannot be represented as a "
+                  "torch.float32",
+                  nodeToString(n));
+  }
+}
+
+void warnLongOutOfRange(int64_t val, torch::jit::Node *n) {
+  if (val > std::numeric_limits<int32_t>::max() ||
+      val < std::numeric_limits<int32_t>::min()) {
+    logging::warn("{}: torch.int64 constant cannot be represented as a "
+                  "torch.int32",
+                  nodeToString(n));
+  }
+}
+
 void handleNumberConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
   if (n->output()->type()->isSubtypeOf(c10::BoolType::get())) {
     replaceWithConstantTensor(
@@ -41,15 +59,20 @@ void handleNumberConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
 
     c10::ScalarType dtype;
     if (s.isFloatingPoint()) {
+      warnDoubleOutOfRange(s.toDouble(), n);
       dtype = at::kFloat;
     } else if (s.isIntegral(false)) {
       dtype = at::kInt;
 
       // Handle magic number 9223372036854775807
-      if (s.toLong() == LLONG_MAX) {
-        s = INT_MAX;
+      if (s.toLong() == std::numeric_limits<int64_t>::max()) {
+        s = std::numeric_limits<int32_t>::max();
+        logging::info("{}: Using max value for torch.int32 in place of max "
+                      "value for torch.int64",
+                      nodeToString(n));
+      } else {
+        warnLongOutOfRange(s.toLong(), n);
       }
-
     } else {
       ERROR("Unsupported constant type");
     }
@@ -68,11 +91,17 @@ void handleTensorConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
   }
 
   auto tensor = n->t(c10::attr::value);
+  ERROR_ON(!tensor.defined());
   bool was_wrapped = tensor.unsafeGetTensorImpl()->is_wrapped_number();
   if (tensor.scalar_type() == at::ScalarType::Double) {
+    warnDoubleOutOfRange(
+        *reinterpret_cast<double *>(tensor.unsafeGetTensorImpl()->data()), n);
     tensor = tensor.to(at::ScalarType::Float);
   }
   if (tensor.scalar_type() == at::ScalarType::Long) {
+    warnLongOutOfRange(
+        *reinterpret_cast<int64_t *>(tensor.unsafeGetTensorImpl()->data()), n);
+
     tensor = tensor.to(at::ScalarType::Int);
   }
 
