@@ -19,11 +19,12 @@ import pytest
 # torch._C.Generator.device,
 
 
-def test_zeros_and_ones():
+@pytest.mark.parametrize("dtype", (torch.float16, torch.float32, torch.int32))
+def test_zeros_and_ones(dtype):
     class Model(torch.nn.Module):
         def forward(self):
-            x = torch.zeros(3, 5, 1)
-            y = torch.ones(3, 5, 1)
+            x = torch.zeros(3, 5, 1, dtype=dtype)
+            y = torch.ones(3, 5, 1, dtype=dtype)
 
             # A stupid test to stop popart from prunning this.
             return x * y, y + x

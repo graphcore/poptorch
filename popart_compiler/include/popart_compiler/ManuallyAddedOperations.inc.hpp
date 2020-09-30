@@ -28,3 +28,10 @@ OP_DECL(poptorch, random_uniform, random_uniform, _impl->randomUniform,
 OP_DECL(poptorch, random_normal, random_normal, _impl->randomNormal,
         ARG(INT_VEC, shape) ARG(FLOAT, mean) ARG(FLOAT, scale) ARG(STRING, dtype),
         BODY_ARG(shape) BODY_ARG(mean) BODY_ARG(scale) BODY_ARG(dtype))
+
+OP_DECL(poptorch, ones, ones, _impl->ones,
+        ARG(INT_VEC, shape) ARG(STRING, dtype),
+        BODY_ARG(shape) BODY_ARG(dtype))
+OP_DECL(poptorch, zeros, zeros, _impl->zeros,
+        ARG(INT_VEC, shape) ARG(STRING, dtype),
+        BODY_ARG(shape) BODY_ARG(dtype))

@@ -2,7 +2,11 @@
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
+
 #include "poptorch_logging/Error.hpp"
+
+#include "../PoptorchSymbols.hpp"
 
 namespace poptorch {
 namespace {
@@ -27,26 +31,16 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
     operation_shape.push_back(*optional_int);
   }
 
-  switch (*as_tensor->scalarType()) {
-  case c10::ScalarType::Int:
-  case c10::ScalarType::Long: {
-    return createConstantInt(graph, {is_ones ? 1 : 0}, operation_shape);
-    break;
-  }
-  case c10::ScalarType::Float: {
-    return createConstantFloat(graph, {is_ones ? 1.0 : 0.0}, operation_shape);
-    break;
-  }
-  case c10::ScalarType::Half: {
-    return createConstantFloat16(graph, {is_ones ? 1.0 : 0.0}, operation_shape);
-    break;
-  }
-  default: {
-    ERROR((is_ones ? "aten::ones" : "aten::zeros")
-          << " of type " << c10::toString(*as_tensor->scalarType())
-          << " not supported");
-  }
-  }
+  auto new_node = createAndInsertNode(
+      graph, is_ones ? symbols::poptorch::ones : symbols::poptorch::zeros, {},
+      ImplicitCast::None, OutputType::AsDtype);
+
+  new_node->is_(c10::attr::shape, shapeFromTensor(node->output()));
+  new_node->s_(c10::attr::dtype,
+               scalarTypeToOnnxString(*as_tensor->scalarType()));
+  setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
+
+  return new_node;
 }
 
 torch::jit::Node *arangeHandler(torch::jit::Graph *graph,

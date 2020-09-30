@@ -15,6 +15,7 @@
 #include <popart/builder.hpp>
 #include <popart/error.hpp>
 #include <popart/graphtransformer.hpp>
+#include <popart/half.hpp>
 #include <popart/ir.hpp>
 #include <popart/ndarraywrapper.hpp>
 #include <popart/op/identity.hpp>
@@ -181,6 +182,17 @@ public:
                                  const std::vector<int64_t> &shape, float high,
                                  float low, const std::string &dtype);
 
+  popart::TensorId ones(const std::vector<popart::TensorId> &inputs,
+                        const std::vector<int64_t> &shape,
+                        const std::string &dtype);
+
+  popart::TensorId zeros(const std::vector<popart::TensorId> &inputs,
+                         const std::vector<int64_t> &shape,
+                         const std::string &dtype);
+
+  popart::TensorId zerosOrOnes(const std::vector<popart::TensorId> &inputs,
+                               const std::vector<int64_t> &shape,
+                               const std::string &dtype, bool zeros);
   void updateUseModelConfig();
   std::string checkSystemConfig();
   template <typename T, typename U>
@@ -661,6 +673,58 @@ CompilerImpl::randomUniform(const std::vector<popart::TensorId> &inputs,
   auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomuniform(shape, popart::getONNXDataTypeAsInt(pdt), high,
                                low);
+}
+
+popart::TensorId CompilerImpl::ones(const std::vector<popart::TensorId> &inputs,
+                                    const std::vector<int64_t> &shape,
+                                    const std::string &dtype) {
+  return zerosOrOnes(inputs, shape, dtype, false);
+}
+
+popart::TensorId
+CompilerImpl::zeros(const std::vector<popart::TensorId> &inputs,
+                    const std::vector<int64_t> &shape,
+                    const std::string &dtype) {
+  return zerosOrOnes(inputs, shape, dtype, true);
+}
+
+popart::TensorId
+CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &inputs,
+                          const std::vector<int64_t> &shape,
+                          const std::string &dtype, bool zeros) {
+  auto total_size = static_cast<size_t>(std::accumulate(
+      shape.begin(), shape.end(), 1, std::multiplies<size_t>()));
+
+  if (dtype == "INT32") {
+    std::vector<int32_t> const_buff;
+    const_buff.reserve(total_size);
+    for (size_t i = 0; i < total_size; i++) {
+      const_buff.emplace_back(zeros ? 0 : 1);
+    }
+    PopartConstant popart_const(PopartType::INT32, &const_buff[0], shape);
+    return tensorConstant(inputs, popart_const);
+  }
+  if (dtype == "FLOAT") {
+    std::vector<float> const_buff;
+    const_buff.reserve(total_size);
+    for (size_t i = 0; i < total_size; i++) {
+      const_buff.emplace_back(zeros ? 0 : 1);
+    }
+
+    PopartConstant popart_const(PopartType::FLOAT, &const_buff[0], shape);
+    return tensorConstant(inputs, popart_const);
+  }
+  if (dtype == "FLOAT16") {
+    std::vector<uint16_t> const_buff;
+    const_buff.reserve(total_size);
+    for (size_t i = 0; i < total_size; i++) {
+      const_buff.emplace_back(popart::floatToHalf(zeros ? 0 : 1));
+    }
+
+    PopartConstant popart_const(PopartType::FLOAT16, &const_buff[0], shape);
+    return tensorConstant(inputs, popart_const);
+  }
+  ERROR("Unsupported type " << dtype);
 }
 
 } // namespace detail
