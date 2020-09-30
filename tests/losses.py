@@ -352,3 +352,43 @@ def test_BCE_training():
         # # Check we have trained the "model"
         assert loss < original_loss
         torch.testing.assert_allclose(target, out, rtol=1e-03, atol=1e-03)
+
+
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum", "batchmean"})
+@pytest.mark.parametrize("log_target", {True, False})
+def test_KLDiv_direct(reduction, log_target):
+    torch.manual_seed(42)
+
+    model = torch.nn.KLDivLoss(reduction=reduction, log_target=log_target)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    for _ in range(3):
+        # 2D Tensors to test batchmean
+        target = torch.empty(3, 10).uniform_()
+        input = torch.randn(3, 10)
+
+        native_out = model(input, target)
+        # Must reshape since reduced losses are returned as 1D tensors rather than 0D
+        poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+
+        torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+@pytest.mark.parametrize("log_input", {True, False})
+@pytest.mark.parametrize("full", {True, False})
+def test_PoissonNLLLoss_direct(reduction, log_input, full):
+    torch.manual_seed(42)
+
+    model = torch.nn.PoissonNLLLoss(log_input, full, reduction=reduction)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    for _ in range(3):
+        target = torch.poisson(torch.rand(10) * 5)
+        input = torch.empty(10).uniform_()
+
+        native_out = model(input, target)
+        # Must reshape since reduced losses are returned as 1D tensors rather than 0D
+        poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+
+        torch.testing.assert_allclose(native_out, poptorch_out)

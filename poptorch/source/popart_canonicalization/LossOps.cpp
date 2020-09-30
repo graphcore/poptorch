@@ -39,17 +39,7 @@ torch::jit::Node *mseLossHandler(torch::jit::Graph *graph,
   torch::jit::Node *square =
       createMul(graph, {subtract->output(), subtract->output()});
 
-  torch::jit::Node *final_node = square;
-
-  if (reduction == 0) {
-    // Sum
-    final_node = createSum(graph, {square->output()});
-  } else if (reduction == 1) {
-    // Mean
-    final_node = createMean(graph, {square->output()});
-  }
-
-  return createIdentityloss(graph, {final_node->output()}, reduction);
+  return createIdentityloss(graph, {square->output()}, reduction);
 }
 
 torch::jit::Node *nllLossHandler(torch::jit::Graph *graph,
@@ -130,12 +120,116 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
   }
 
   final_node = createNeg(graph, {final_node->output()});
-  if (reduction == 0) {
-    // Sum
-    final_node = createSum(graph, {final_node->output()});
-  } else if (reduction == 1) {
-    // Mean
-    final_node = createMean(graph, {final_node->output()});
+
+  return createIdentityloss(graph, {final_node->output()}, reduction);
+}
+
+torch::jit::Node *klDivHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  // aten::kl_div(Tensor self, Tensor target, int reduction, bool log_target)
+
+  // Input
+  torch::jit::Value *x = node->input(0);
+  // Target
+  torch::jit::Value *y = node->input(1);
+  std::int64_t reduction = constantToLong(node->input(2)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+  // Whether the target is passed as log-probabilities
+  bool log_target = constantToBool(node->input(3)->node());
+
+  // log(y)
+  torch::jit::Value *log_y;
+  // Handle log-space targets at this stage
+  if (log_target) {
+    log_y = y;
+    y = createExp(graph, {y})->output();
+  } else {
+    log_y = createLog(graph, {y})->output();
+  }
+
+  // log(y) - x
+  torch::jit::Node *log_y_minus_x = createSub(graph, {log_y, x});
+
+  // y(log(y) - x)
+  torch::jit::Node *final_node = createMul(graph, {y, log_y_minus_x->output()});
+
+  return createIdentityloss(graph, {final_node->output()}, reduction);
+}
+
+torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
+                                        torch::jit::Node *node) {
+  // aten::poisson_nll_loss(Tensor input, Tensor target, bool log_input,
+  //                        bool full, float eps, int reduction)
+
+  // Input
+  torch::jit::Value *x = node->input(0);
+  // Target
+  torch::jit::Value *y = node->input(1);
+  // Whether the input is passed as log-probabilities
+  bool log_input = constantToBool(node->input(2)->node());
+  // Whether to compute full loss using Stirling approximation
+  bool full = constantToBool(node->input(3)->node());
+  // Added to avoid log(0) when log_input == false
+  torch::jit::Value *epsilon = node->input(4);
+
+  std::int64_t reduction = constantToLong(node->input(5)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // log(x)
+  torch::jit::Value *log_x;
+  // Handle log-space inputs at this stage
+  if (log_input) {
+    log_x = x;
+    x = createExp(graph, {x})->output();
+  } else {
+    torch::jit::Value *x_plus_eps = createAdd(graph, {x, epsilon})->output();
+    log_x = createLog(graph, {x_plus_eps})->output();
+  }
+
+  // y log(x)
+  torch::jit::Node *y_mul_log_x = createMul(graph, {y, log_x});
+
+  // x - y log(x)
+  torch::jit::Node *final_node = createSub(graph, {x, y_mul_log_x->output()});
+
+  // Stirling approximation term = y log(y) − y + 0.5 log(2πy)
+  if (full) {
+    // log(y)
+    torch::jit::Node *log_y = createLog(graph, {y});
+    // y log(y)
+    torch::jit::Node *y_mul_log_y = createMul(graph, {y, log_y->output()});
+    // y log(y) - y
+    torch::jit::Node *minus_y = createSub(graph, {y_mul_log_y->output(), y});
+
+    // 2π
+    torch::jit::Node *two_pi = createConstantFloat(graph, {2 * M_PI}, {});
+    // 2πy
+    torch::jit::Node *two_pi_y = createMul(graph, {two_pi->output(), y});
+    // log(2πy)
+    torch::jit::Node *log_two_pi_y = createLog(graph, {two_pi_y->output()});
+    // 0.5
+    torch::jit::Node *half = createConstantFloat(graph, {0.5}, {});
+    // 0.5 log(2πy)
+    torch::jit::Node *mul_half =
+        createMul(graph, {half->output(), log_two_pi_y->output()});
+
+    // y log(y) - y + 0.5 log(2πy)
+    torch::jit::Node *add =
+        createAdd(graph, {minus_y->output(), mul_half->output()});
+
+    // Approximation values only added for target values > 1
+    std::vector<std::int64_t> shape = shapeFromTensor(y);
+    torch::jit::Node *ones = createConstantFloat(graph, {1}, shape);
+    torch::jit::Node *mask = createGreater(graph, {y, ones->output()});
+    torch::jit::Node *zeros = createConstantFloat(graph, {0}, shape);
+    torch::jit::Node *masked_fill =
+        createWhere(graph, {mask->output(), add->output(), zeros->output()});
+
+    // x - y log(x) + y log(y) - y + 0.5 log(2πy)
+    final_node =
+        createAdd(graph, {final_node->output(), masked_fill->output()});
   }
 
   return createIdentityloss(graph, {final_node->output()}, reduction);
@@ -149,6 +243,8 @@ static bool handlers =
         c10::aten::nll_loss, nllLossHandler,
         c10::aten::mse_loss, mseLossHandler,
         c10::aten::binary_cross_entropy, binaryCrossEntropyHandler,
+        c10::aten::kl_div, klDivHandler,
+        c10::aten::poisson_nll_loss, poissonNllLossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 

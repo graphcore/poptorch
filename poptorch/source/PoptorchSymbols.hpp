@@ -29,6 +29,7 @@ SYMBOL_DECL(aten, uniform_)
 SYMBOL_DECL(aten, normal_)
 SYMBOL_DECL(aten, masked_fill_)
 SYMBOL_DECL(aten, where_)
+SYMBOL_DECL(aten, poisson_nll_loss)
 } // namespace c10
 
 namespace poptorch {
