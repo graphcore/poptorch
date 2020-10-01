@@ -126,9 +126,7 @@ torch::jit::Value *addCast(torch::jit::Value *input,
   auto new_node = createCast(input->owningGraph(), input, type);
   auto current_type = input->type()->cast<c10::TensorType>();
 
-  new_node->output()->setType(c10::TensorType::create(
-      type, current_type->device(), current_type->sizes(),
-      current_type->strides(), current_type->requiresGrad()));
+  new_node->output()->setType(current_type->withScalarType(type));
   node->replaceInputWith(input, new_node->output());
 
   return new_node->output();
