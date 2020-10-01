@@ -234,6 +234,55 @@ torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {final_node->output()}, reduction);
 }
+
+torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
+                                            torch::jit::Node *node) {
+  // aten::hinge_embedding_loss(Tensor input, Tensor target, float margin,
+  //                            int reduction)
+
+  // Input
+  torch::jit::Value *x = node->input(0);
+  // Target labels containing 1 or -1
+  torch::jit::Value *y = node->input(1);
+  // Margin
+  torch::jit::Value *delta = node->input(2);
+
+  std::int64_t reduction = constantToLong(node->input(3)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  std::vector<std::int64_t> shape = shapeFromTensor(x);
+
+  // Δ - x
+  torch::jit::Node *delta_minus_x = createSub(graph, {delta, x});
+  // 0
+  torch::jit::Node *zeros = createConstantFloat(graph, {0}, shape);
+  // max(0, Δ - x)
+  torch::jit::Node *max_delta_minus_x =
+      createMax(graph, {zeros->output(), delta_minus_x->output()});
+
+  // 1
+  torch::jit::Node *ones = createConstantInt(graph, {1}, shape);
+  // -1
+  torch::jit::Node *neg_ones = createConstantFloat(graph, {-1}, shape);
+  // if y = 1
+  torch::jit::Node *ones_mask = createEqual(graph, {y, ones->output()});
+  // if y = -1
+  torch::jit::Node *neg_ones_mask = createEqual(graph, {y, neg_ones->output()});
+
+  // l = x              if y = 1
+  torch::jit::Node *ones_masked_fill =
+      createWhere(graph, {ones_mask->output(), x, zeros->output()});
+  // l = max(0, Δ - x)  if y = -1
+  torch::jit::Node *neg_ones_masked_fill =
+      createWhere(graph, {neg_ones_mask->output(), max_delta_minus_x->output(),
+                          zeros->output()});
+
+  torch::jit::Node *final_node = createAdd(
+      graph, {ones_masked_fill->output(), neg_ones_masked_fill->output()});
+
+  return createIdentityloss(graph, {final_node->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -245,6 +294,7 @@ static bool handlers =
         c10::aten::binary_cross_entropy, binaryCrossEntropyHandler,
         c10::aten::kl_div, klDivHandler,
         c10::aten::poisson_nll_loss, poissonNllLossHandler,
+        c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 
