@@ -283,6 +283,83 @@ torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {final_node->output()}, reduction);
 }
+
+torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
+                                       torch::jit::Node *node) {
+  // aten::binary_cross_entropy_with_logits(Tensor input, Tensor target,
+  //                                        Tensor? weight, Tensor? pos_weight,
+  //                                        int reduction)
+
+  // Input
+  torch::jit::Value *x = node->input(0);
+  // Target
+  torch::jit::Value *y = node->input(1);
+  // Weight
+  torch::jit::Value *w = node->input(2);
+  // Weight of positive examples
+  torch::jit::Value *pos_w = node->input(3);
+
+  std::int64_t reduction = constantToLong(node->input(4)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // -x
+  torch::jit::Node *loss = createNeg(graph, {x});
+  // 0
+  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  // m = min(-x, 0)
+  torch::jit::Node *m = createMin(graph, {loss->output(), zeros->output()});
+
+  // -x - m
+  loss = createSub(graph, {loss->output(), m->output()});
+  // exp(-x - m)
+  loss = createExp(graph, {loss->output()});
+
+  // -m
+  torch::jit::Node *neg_m = createNeg(graph, {m->output()});
+  // exp(-m)
+  torch::jit::Node *exp_neg_m = createExp(graph, {neg_m->output()});
+
+  // exp(-m) + exp(-x - m)
+  loss = createAdd(graph, {exp_neg_m->output(), loss->output()});
+  // log(exp(-m) + exp(-x - m))
+  loss = createLog(graph, {loss->output()});
+  // m + log(exp(-m) + exp(-x - m))
+  loss = createAdd(graph, {m->output(), loss->output()});
+
+  // 1
+  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+
+  // if pos_weight is specified
+  if (!isNone(pos_w)) {
+    // p - 1
+    torch::jit::Node *p_minus_one = createSub(graph, {pos_w, ones->output()});
+    // (p - 1) y
+    torch::jit::Node *p_minus_one_mul_y =
+        createMul(graph, {p_minus_one->output(), y});
+    // l_p = (p - 1) y + 1
+    torch::jit::Node *l_p =
+        createAdd(graph, {p_minus_one_mul_y->output(), ones->output()});
+
+    // l_p (m + log(exp(-m) + exp(-x - m)))
+    loss = createMul(graph, {l_p->output(), loss->output()});
+  }
+
+  // (1 - y)
+  torch::jit::Node *one_minus_y = createSub(graph, {ones->output(), y});
+  // (1 - y) x
+  torch::jit::Node *mul_x = createMul(graph, {one_minus_y->output(), x});
+  // (1 - y) x + l_p (m + log(exp(-m) + exp(-x - m)))
+  loss = createAdd(graph, {mul_x->output(), loss->output()});
+
+  // if weight is specified
+  if (!isNone(w)) {
+    // w [(1 - y) x + l_p (m + log(exp(-m) + exp(-x - m)))]
+    loss = createMul(graph, {w, loss->output()});
+  }
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -295,6 +372,7 @@ static bool handlers =
         c10::aten::kl_div, klDivHandler,
         c10::aten::poisson_nll_loss, poissonNllLossHandler,
         c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler,
+        c10::aten::binary_cross_entropy_with_logits, bceWithLogitsHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 

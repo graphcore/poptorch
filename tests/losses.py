@@ -415,3 +415,38 @@ def test_HingeEmbeddingLoss_direct(reduction):
         poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
 
         torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+torch.manual_seed(42)
+params_bcewithlogits = [
+    (
+        torch.rand(10, 3),  # Inputs
+        torch.empty(10, 3).uniform_(),  # Targets
+        torch.rand(10, 3),  # Weights
+        torch.rand(3)  # Pos Weights
+    ),
+    # Numerical stability test
+    (torch.tensor([88.0]), torch.tensor([0.5]), None, None)
+]
+
+
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+@pytest.mark.parametrize("params", params_bcewithlogits)
+def test_BCEWithLogitsLoss_direct(reduction, params):
+
+    weight = params[2]
+    pos_weight = params[3]
+
+    model = torch.nn.BCEWithLogitsLoss(weight=weight,
+                                       reduction=reduction,
+                                       pos_weight=pos_weight)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    target = params[1]
+    input = params[0]
+
+    native_out = model(input, target)
+    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
+    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+
+    torch.testing.assert_allclose(native_out, poptorch_out)
