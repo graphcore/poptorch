@@ -147,13 +147,13 @@ OP_CONVERTOR_WITH_CAST(aten::full, NONE, createExpand, {PARAM(1) COMMA HANDLE_LI
 
 // Random Sampling ops
 // aten::rand(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor
-OP_CONVERTOR(aten::rand, NONE, createRandomUniform, OUTPUT_TENSOR_SHAPE(0) COMMA 1.0f COMMA 0.0f COMMA GET_RETURN_TYPE)
+OP_CONVERTOR(aten::rand, NONE, createRandomUniform, NULL COMMA OUTPUT_TENSOR_SHAPE(0) COMMA 1.0f COMMA 0.0f COMMA GET_RETURN_TYPE)
 // aten::uniform_(Tensor self, float low, float high, Generator?) -> Tensor
-OP_CONVERTOR(aten::uniform_, NONE, createRandomUniform, TENSOR_SHAPE(0) COMMA CONSTANT_TO_FLOAT(2) COMMA CONSTANT_TO_FLOAT(1) COMMA GET_RETURN_TYPE)
+OP_CONVERTOR(aten::uniform_, NONE, createRandomUniform, PARAM(0) COMMA TENSOR_SHAPE(0) COMMA CONSTANT_TO_FLOAT(2) COMMA CONSTANT_TO_FLOAT(1))
 // aten::randn(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor
-OP_CONVERTOR(aten::randn, NONE, createRandomNormal, OUTPUT_TENSOR_SHAPE(0) COMMA 0.0f COMMA 1.0f COMMA GET_RETURN_TYPE)
+OP_CONVERTOR(aten::randn, NONE, createRandomNormal, NULL COMMA OUTPUT_TENSOR_SHAPE(0) COMMA 0.0f COMMA 1.0f COMMA GET_RETURN_TYPE)
 // aten::normal_(Tensor self, float mean, float std, Generator?) -> Tensor
-OP_CONVERTOR(aten::normal_, NONE, createRandomNormal, TENSOR_SHAPE(0) COMMA CONSTANT_TO_FLOAT(1) COMMA CONSTANT_TO_FLOAT(2) COMMA GET_RETURN_TYPE)
+OP_CONVERTOR(aten::normal_, NONE, createRandomNormal, PARAM(0) COMMA TENSOR_SHAPE(0) COMMA CONSTANT_TO_FLOAT(1) COMMA CONSTANT_TO_FLOAT(2))
 
 // aten::frobenius_norm(Tensor in) -> Tensor
 OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(1), NONE, createReducel2, {PARAM(0)} COMMA DIMENISON_LENGTH_LIST(0) COMMA 0)

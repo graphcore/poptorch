@@ -14,6 +14,9 @@ namespace poptorch {
 namespace {
 
 at::ScalarType scalarTypeFromInput(const torch::jit::Node *node, size_t num) {
+  ERROR_ON_MSG(node->inputs().size() <= num,
+               "Cannot get scalar type from input " << num
+                                                    << " as it does not exist");
   return *node->input(num)->type()->expect<c10::TensorType>()->scalarType();
 }
 } // namespace
@@ -88,8 +91,8 @@ void setNodeOutputsTypes(torch::jit::Node *node,
       return;
     }
 
-    if (node->hasAttribute(c10::Symbol::fromQualString("attr::dtype"))) {
-      const auto dtype_sym = c10::Symbol::fromQualString("attr::dtype");
+    const auto dtype_sym = c10::Symbol::fromQualString("attr::dtype");
+    if (node->hasAttribute(dtype_sym)) {
       if (node->kindOf(dtype_sym) == torch::jit::AttributeKind::i) {
         const auto onnx_dtype = node->i(dtype_sym);
         resolved_output_type =
@@ -100,6 +103,8 @@ void setNodeOutputsTypes(torch::jit::Node *node,
       }
     } else {
       resolved_output_type = scalarTypeFromInput(node, 0);
+      // This may be needed in the lower to popart stage.
+      node->s_(dtype_sym, scalarTypeToOnnxString(resolved_output_type));
     }
     break;
   }
@@ -340,37 +345,70 @@ createCustomOperation(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
+                                     torch::jit::Value *possible_input,
                                      const std::vector<int64_t> &shape,
                                      float mean, float scale,
                                      at::ScalarType dataType) {
+  std::vector<torch::jit::Value *> inputs;
+  if (possible_input) {
+    inputs.push_back(possible_input);
+  }
+
   torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::random_normal, {},
-                          ImplicitCast::None, OutputType::AsDtype);
+      createAndInsertNode(graph, symbols::poptorch::random_normal, inputs,
+                          ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::mean, mean);
   new_node->f_(c10::attr::scale, scale);
-  new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
+
+  if (dataType != at::ScalarType::Undefined) {
+    new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
+  }
+
   new_node->output()->setType(c10::TensorType::create(
       dataType, c10::nullopt, c10::nullopt, c10::nullopt));
-  setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
+  setNodeOutputsTypes(new_node, ImplicitCast::None,
+                      OutputType::AsDtypeOrFirstInput);
+
+  // At this point, the input is no longer needed
+  if (possible_input) {
+    new_node->removeInput(0);
+  }
 
   return new_node;
 }
 
 torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
+                                      torch::jit::Value *possible_input,
                                       const std::vector<int64_t> &shape,
                                       float high, float low,
                                       at::ScalarType dataType) {
+  std::vector<torch::jit::Value *> inputs;
+  if (possible_input) {
+    inputs.push_back(possible_input);
+  }
+
   torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::random_uniform, {},
-                          ImplicitCast::None, OutputType::AsDtype);
+      createAndInsertNode(graph, symbols::poptorch::random_uniform, inputs,
+                          ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::high, high);
   new_node->f_(c10::attr::low, low);
-  new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
+
+  if (dataType != at::ScalarType::Undefined) {
+    new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
+  }
+
   new_node->output()->setType(c10::TensorType::create(
       dataType, c10::nullopt, c10::nullopt, c10::nullopt));
-  setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
+  setNodeOutputsTypes(new_node, ImplicitCast::None,
+                      OutputType::AsDtypeOrFirstInput);
+
+  // At this point, the input is no longer needed
+  if (possible_input) {
+    new_node->removeInput(0);
+  }
+
   return new_node;
 }
 

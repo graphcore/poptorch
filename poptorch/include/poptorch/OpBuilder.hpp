@@ -154,15 +154,15 @@ torch::jit::Node *castToType(torch::jit::Graph *graph,
   return CreateCast<T>{}(graph, value);
 }
 
-torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
-                                     const std::vector<int64_t> &shape,
-                                     float mean, float scale,
-                                     at::ScalarType dataType);
+torch::jit::Node *
+createRandomNormal(torch::jit::Graph *graph, torch::jit::Value *possible_input,
+                   const std::vector<int64_t> &shape, float mean, float scale,
+                   at::ScalarType dataType = at::ScalarType::Undefined);
 
-torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
-                                      const std::vector<int64_t> &shape,
-                                      float high, float low,
-                                      at::ScalarType dataType);
+torch::jit::Node *
+createRandomUniform(torch::jit::Graph *graph, torch::jit::Value *possible_input,
+                    const std::vector<int64_t> &shape, float high, float low,
+                    at::ScalarType dataType = at::ScalarType::Undefined);
 
 torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
                                        torch::jit::Value *value);
