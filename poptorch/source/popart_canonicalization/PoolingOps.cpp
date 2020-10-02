@@ -37,14 +37,14 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
 
     return createMaxpool(graph, {node->input(0)}, 1, kernel_size, ceil_mode,
                          dilations, padding, 0, stride);
-  } else {
-    // countIncludePad, divisor_override are ignored for now due
-    // to not being supported directly in popart.
-    auto ceil_mode = constantToLong(node->input(4)->node());
-    return createAveragepool(graph, {node->input(0)}, kernel_size, ceil_mode,
-                             0, padding, stride);
   }
-}
+
+  // countIncludePad, divisor_override are ignored for now due
+  // to not being supported directly in popart.
+  auto ceil_mode = constantToLong(node->input(4)->node());
+  return createAveragepool(graph, {node->input(0)}, kernel_size, ceil_mode, 0,
+                           padding, stride);
+} // namespace anonymous
 
 torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
                                          torch::jit::Node *node) {

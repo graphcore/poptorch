@@ -968,7 +968,8 @@ void Compiler::initSession(const Optimizer &opt) {
                  "not supported for the IPU model");
     device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
         model_options);
-    logging::debug("Instantiated device, running on IPU model with {} tiles.", num_tiles_per_ipu);
+    logging::debug("Instantiated device, running on IPU model with {} tiles.",
+                   num_tiles_per_ipu);
   } else {
     if (_impl->options.connection_type == popart::DeviceConnectionType::Never) {
       // Offline compilation path: create an offline device regardless of what's

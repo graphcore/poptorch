@@ -18,7 +18,7 @@ enum class OutputType {
   FirstAsFirstInputSecondAlwaysInt,
   AsImplicitCastPromoted,
   AsDtype,
-  AsDtypeOrFirstInput,
+  AsDtypeOrAsPromoted,
   AlwaysBool,
   AlwaysFloat,
   AlwaysInt,
@@ -155,7 +155,8 @@ torch::jit::Node *castToType(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *
-createRandomNormal(torch::jit::Graph *graph, torch::jit::Value *possible_input,
+createRandomNormal(torch::jit::Graph *graph,
+                   const std::vector<torch::jit::Value *> &possible_inputs,
                    const std::vector<int64_t> &shape, float mean, float scale,
                    at::ScalarType dataType = at::ScalarType::Undefined);
 

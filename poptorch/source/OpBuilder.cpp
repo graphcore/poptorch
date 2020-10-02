@@ -43,7 +43,7 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
   }
 
   if (output_type != OutputType::AsDtype &&
-      output_type != OutputType::AsDtypeOrFirstInput) {
+      output_type != OutputType::AsDtypeOrAsPromoted) {
     setNodeOutputsTypes(new_node, implicit_cast, output_type);
   }
 
@@ -84,7 +84,7 @@ void setNodeOutputsTypes(torch::jit::Node *node,
   }
   case OutputType::AsDtype:
     [[fallthrough]];
-  case OutputType::AsDtypeOrFirstInput: {
+  case OutputType::AsDtypeOrAsPromoted: {
     // Cast uses "to" not "dtype" and a string
     if (node->kind() == symbols::popart::cast) {
       // Type is handled in OpBuilder.cpp
@@ -101,7 +101,15 @@ void setNodeOutputsTypes(torch::jit::Node *node,
         const auto &onnx_dtype = node->s(dtype_sym);
         resolved_output_type = onnxStrToScalarType(onnx_dtype.c_str());
       }
+
+      if (resolved_output_type == at::ScalarType::Float) {
+        // Due to tracing not supporting Float16, the original type could be
+        // either half or float 16.
+        resolved_output_type = HALF_OR_FLOAT;
+      }
     } else {
+      // Without dtype, the input will be the correct type (or possibly
+      // HALF_OR_FLOAT)
       resolved_output_type = scalarTypeFromInput(node, 0);
       // This may be needed in the lower to popart stage.
       node->s_(dtype_sym, scalarTypeToOnnxString(resolved_output_type));
@@ -344,19 +352,14 @@ createCustomOperation(torch::jit::Graph *graph,
   return new_node;
 }
 
-torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
-                                     torch::jit::Value *possible_input,
-                                     const std::vector<int64_t> &shape,
-                                     float mean, float scale,
-                                     at::ScalarType dataType) {
-  std::vector<torch::jit::Value *> inputs;
-  if (possible_input) {
-    inputs.push_back(possible_input);
-  }
-
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::random_normal, inputs,
-                          ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
+torch::jit::Node *
+createRandomNormal(torch::jit::Graph *graph,
+                   const std::vector<torch::jit::Value *> &possible_inputs,
+                   const std::vector<int64_t> &shape, float mean, float scale,
+                   at::ScalarType dataType) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::random_normal, possible_inputs,
+      ImplicitCast::All, OutputType::AsDtypeOrAsPromoted);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::mean, mean);
   new_node->f_(c10::attr::scale, scale);
@@ -368,11 +371,11 @@ torch::jit::Node *createRandomNormal(torch::jit::Graph *graph,
   new_node->output()->setType(c10::TensorType::create(
       dataType, c10::nullopt, c10::nullopt, c10::nullopt));
   setNodeOutputsTypes(new_node, ImplicitCast::None,
-                      OutputType::AsDtypeOrFirstInput);
+                      OutputType::AsDtypeOrAsPromoted);
 
   // At this point, the input is no longer needed
-  if (possible_input) {
-    new_node->removeInput(0);
+  for (size_t i = 0; i < possible_inputs.size(); i++) {
+    new_node->removeInput(0); // input 1 and input 0
   }
 
   return new_node;
@@ -390,7 +393,7 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
 
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::random_uniform, inputs,
-                          ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
+                          ImplicitCast::None, OutputType::AsDtypeOrAsPromoted);
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::high, high);
   new_node->f_(c10::attr::low, low);
@@ -402,7 +405,7 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
   new_node->output()->setType(c10::TensorType::create(
       dataType, c10::nullopt, c10::nullopt, c10::nullopt));
   setNodeOutputsTypes(new_node, ImplicitCast::None,
-                      OutputType::AsDtypeOrFirstInput);
+                      OutputType::AsDtypeOrAsPromoted);
 
   // At this point, the input is no longer needed
   if (possible_input) {

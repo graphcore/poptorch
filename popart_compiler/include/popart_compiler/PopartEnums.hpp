@@ -60,6 +60,9 @@ inline std::string toPopartTypeStr(const PopartType &type) {
 }
 #undef DEFINE_CASE
 
+// Returns the dtype int corresponding to the onnx type string
+int64_t dtypeIntFromOnnxStr(const char *onnx_type);
+
 // Returns the Onnx datatype as string corresponding the dtype int used in Onnx
 // and Popart ops which take an int64_t dtype argument, a.g. "randomnormal"
 const char *onnxStrFromDtypeInt(int64_t dtype);

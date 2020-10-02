@@ -39,13 +39,14 @@ void canonicalizeLists(torch::jit::Graph *graph);
 void warnOnUnsupportedAten(torch::jit::Graph *graph);
 
 /*
- * Convert all float tensors to half if they actually are half. The trace will
- * only ever see float so if they "actually" are half we need to convert them
- * back.
+ * Convert all float input tensors to half if they actually are half.
  */
-void canonicaliseHalf(torch::jit::Graph *graph,
-                      const std::vector<at::Tensor> &in_tensors,
-                      const std::vector<at::Tensor> &parameters);
+void canonicaliseHalfInputs(torch::jit::Graph *graph,
+                            const std::vector<at::Tensor> &in_tensors,
+                            const std::vector<at::Tensor> &parameters);
+
+// Resolve types which are ambiguiously between half or float
+void resolveHalfOrFloat(torch::jit::Graph *graph);
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_TRANSFORM_ATEN_TO_POPART_HPP_

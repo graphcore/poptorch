@@ -36,6 +36,23 @@ c10::ScalarType highestTypeOf(const std::vector<c10::ScalarType> &types) {
 
   auto new_type = types[0];
   for (size_t i = 1; i < types.size(); i++) {
+    // If using a "half or float" with a specified type, resolve it here
+    // except for bool which is even lower in the priority and an int type
+    if (types[i] == HALF_OR_FLOAT) {
+      if (new_type == c10::ScalarType::Bool || !c10::isFloatingType(new_type)) {
+        new_type = HALF_OR_FLOAT;
+      }
+      continue;
+    }
+
+    if (new_type == HALF_OR_FLOAT) {
+      if (types[i] == c10::ScalarType::Bool || !c10::isFloatingType(new_type)) {
+        continue;
+      }
+
+      new_type = types[i];
+    }
+
     new_type = c10::promoteTypes(new_type, types[i]);
   }
 

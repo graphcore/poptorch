@@ -564,21 +564,21 @@ new_node->f_(c10::Symbol::fromQualString("attr::value"),value);
 return new_node;
 }
 torch::jit::Node* createRandomnormallike(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t dtype,float mean,float scale,float seed) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::randomnormallike, args, ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::randomnormallike, args, ImplicitCast::None, OutputType::AsDtypeOrAsPromoted);
 new_node->i_(c10::Symbol::fromQualString("attr::dtype"),dtype);
 new_node->f_(c10::Symbol::fromQualString("attr::mean"),mean);
 new_node->f_(c10::Symbol::fromQualString("attr::scale"),scale);
 new_node->f_(c10::Symbol::fromQualString("attr::seed"),seed);
-setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
+setNodeOutputsTypes(new_node, ImplicitCast::All, OutputType::AsDtypeOrAsPromoted);
 return new_node;
 }
 torch::jit::Node* createRandomuniformlike(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t dtype,float high,float low,float seed) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::randomuniformlike, args, ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::randomuniformlike, args, ImplicitCast::None, OutputType::AsDtypeOrAsPromoted);
 new_node->i_(c10::Symbol::fromQualString("attr::dtype"),dtype);
 new_node->f_(c10::Symbol::fromQualString("attr::high"),high);
 new_node->f_(c10::Symbol::fromQualString("attr::low"),low);
 new_node->f_(c10::Symbol::fromQualString("attr::seed"),seed);
-setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtypeOrFirstInput);
+setNodeOutputsTypes(new_node, ImplicitCast::All, OutputType::AsDtypeOrAsPromoted);
 return new_node;
 }
 torch::jit::Node* createReciprocal(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {

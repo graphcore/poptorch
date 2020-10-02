@@ -21,6 +21,10 @@ at::ScalarType onnxStrToScalarType(const char *type_str);
 void searchAndPossiblyDestroy(
     const std::unordered_set<torch::jit::Node *> &to_test);
 
+// Use unused type BFLOAT16 to indicate ambiguity between FLOAT16 and FLOAT32
+// NOLINTNEXTLINE
+const auto HALF_OR_FLOAT = at::ScalarType::BFloat16;
+
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_UTILS_HPP

@@ -284,6 +284,23 @@ void logGraph(const char *intro_str, const torch::jit::Graph &graph,
   logging::trace("{}", graph_str.str());
 }
 
+// Prints the graph but substitutes BFloat16 for Float16/Float32
+void printGraphBeforeHalfFloatResolution(const torch::jit::Graph &graph) {
+  std::ostringstream graph_oss;
+  graph_oss << graph;
+  std::string graph_str = graph_oss.str();
+
+  size_t start = 0;
+  const std::string from = "BFloat16";
+  const std::string to = "Float16/Float32";
+  while ((start = graph_str.find(from, start)) != std::string::npos) {
+    graph_str.replace(start, from.length(), to);
+    start += to.length();
+  }
+
+  logging::debug("Graph before right half/float resolution:\n{}", graph_str);
+}
+
 } // namespace
 
 void copyWeightsToHostImpl(
@@ -492,7 +509,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
 
     // Convert the IR to half to match the inputs/actual usage.
     logGraph("Graph before canonicalising half:", *graph, trace_input_str);
-    poptorch::canonicaliseHalf(graph.get(), input_tensors, traced_tensors);
+    poptorch::canonicaliseHalfInputs(graph.get(), input_tensors,
+                                     traced_tensors);
 
     logging::debug("Graph right before canonicalization:\n{}", *graph);
 
@@ -501,6 +519,14 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     // Convert any unsupported ATEN nodes in the graph to a popart
     // representation.
     poptorch::canonicalize(graph.get());
+
+    printGraphBeforeHalfFloatResolution(*graph);
+
+    // Resolve
+    poptorch::resolveHalfOrFloat(graph.get());
+
+    // Enforce any constraints that aren't enforced by popart.
+    poptorch::canonicalizeLate(graph.get());
 
     // Enforce any constraints that aren't enforced by popart.
     poptorch::canonicalizeLate(graph.get());

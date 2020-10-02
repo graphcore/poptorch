@@ -214,7 +214,7 @@ OutputTypeAsDtype = [
     "cast", "eyelike", "multinomial", "randomnormal", "randomuniform"
 ]
 
-OutputTypeAsDtypeOrFirstInput = ["randomnormallike", "randomuniformlike"]
+OutputTypeAsDtypeOrAsPromoted = ["randomnormallike", "randomuniformlike"]
 
 OutputTypeVariable = [
     "concatfromsequence", "constant", "constantofshape", "loop", "multinomial",
@@ -336,8 +336,8 @@ def addOutputTypeStr(name):
         return "OutputType::AlwaysUint8"
     if name in OutputTypeAsDtype:
         return "OutputType::AsDtype"
-    if name in OutputTypeAsDtypeOrFirstInput:
-        return "OutputType::AsDtypeOrFirstInput"
+    if name in OutputTypeAsDtypeOrAsPromoted:
+        return "OutputType::AsDtypeOrAsPromoted"
     if name in OutputTypeVariable:
         return "OutputType::Unknown"
     print(f"Missing type spec for: {name}")
@@ -440,9 +440,9 @@ for opset in classes:
         if name in OutputTypeAsDtype:
             cppFile += "setNodeOutputsTypes(new_node, ImplicitCast::None, "
             cppFile += "OutputType::AsDtype);\n"
-        if name in OutputTypeAsDtypeOrFirstInput:
-            cppFile += "setNodeOutputsTypes(new_node, ImplicitCast::None, "
-            cppFile += "OutputType::AsDtypeOrFirstInput);\n"
+        if name in OutputTypeAsDtypeOrAsPromoted:
+            cppFile += "setNodeOutputsTypes(new_node, ImplicitCast::All, "
+            cppFile += "OutputType::AsDtypeOrAsPromoted);\n"
 
         cppFile += "return new_node;\n"
 

@@ -2,10 +2,11 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include "popart_compiler/PopartEnums.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
-#include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
 #include "../PoptorchSymbols.hpp"
@@ -13,15 +14,6 @@
 namespace poptorch {
 
 namespace {
-/*
- * 1. Convert any input to half if the provided tensor is half.
- * 2. Look at uses of that value and change the return type of that tensor to
- * half if it was previously float.
- * 3. Check if any of other the incoming operands are cast or constant and
- * change them to half if they were float.
- * 4. Repeat from 2. with the updated ops until there is nothing left to
- * convert.
- */
 class ConvertHalfImpl {
 public:
   explicit ConvertHalfImpl(torch::jit::Graph *g) : _graph(g) {}
@@ -30,21 +22,28 @@ public:
   void convertGraphInputs(const std::vector<at::Tensor> &in_tensors,
                           const std::vector<at::Tensor> &parameters);
 
-  // Convert the uses of those inputs recursively.
-  void convertUses();
+  // Resolve types which are ambiguiously between half or float
+  void resolveHalfOrFloat();
 
 private:
-  c10::TypePtr convertTensorIfNeeded(const at::Tensor &tensor,
-                                     torch::jit::Value *value);
-  c10::TypePtr
+  static c10::TypePtr
   convertValueIfNeeded(torch::jit::Value *value,
                        const std::vector<at::Tensor> &in_tensors,
                        std::vector<at::Tensor>::const_iterator *input_iterator,
                        std::int64_t input_index);
 
-  torch::jit::Graph *_graph;
+  static c10::TypePtr convertTensorIfNeeded(const at::Tensor &tensor,
+                                            torch::jit::Value *value);
 
-  std::unordered_set<torch::jit::Value *> _converted_tensors;
+  static bool atLeastOneUseHalf(const std::vector<torch::jit::Use> &uses);
+
+  static void resolveValueType(torch::jit::Value *output,
+                               at::ScalarType scalar_type);
+
+  static void resolveNodeDtype(torch::jit::Node *node,
+                               at::ScalarType scalar_type);
+
+  torch::jit::Graph *_graph;
 };
 
 c10::TypePtr ConvertHalfImpl::convertValueIfNeeded(
@@ -108,58 +107,10 @@ c10::TypePtr ConvertHalfImpl::convertTensorIfNeeded(const at::Tensor &tensor,
     c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
     new_type = as_tensor->withScalarType(c10::ScalarType::Half);
     value->setType(new_type);
-    // Add it to the list of converted tensors.
-    _converted_tensors.insert(value);
   }
   return new_type;
 }
 
-/*
- * Static helper functions.
- */
-
-bool maybeConvertTensor(torch::jit::Value *tensor) {
-  // Check if a node can be converted directly (casts and constants).
-  torch::jit::Node *node = tensor->node();
-
-  const std::string float_string{"FLOAT"};
-  const std::string half_string{"FLOAT16"};
-
-  if (node->kind() == symbols::popart::cast) {
-    if (float_string == node->s(c10::Symbol::fromQualString("attr::to"))) {
-      node->s_(c10::Symbol::fromQualString("attr::to"), "FLOAT16");
-      return true;
-    }
-    if (half_string == node->s(c10::Symbol::fromQualString("attr::to"))) {
-      // Don't propagate through half casts, implies node above is not half by
-      // design.
-      return false;
-    }
-  }
-
-  c10::TypePtr type = tensor->type();
-
-  c10::TensorTypePtr as_tensor = type->cast<c10::TensorType>();
-
-  // The general case of converting an IR tensor.
-  if (!as_tensor || !as_tensor->scalarType() ||
-      *as_tensor->scalarType() != at::ScalarType::Float) {
-    return false;
-  }
-
-  tensor->setType(as_tensor->withScalarType(c10::ScalarType::Half));
-
-  if (node->kind() == symbols::poptorch::tensor_constant) {
-    node->t_(c10::attr::value,
-             node->t(c10::attr::value).to(at::ScalarType::Half));
-  }
-
-  return true;
-}
-
-/*
- * Impl
- */
 void ConvertHalfImpl::convertGraphInputs(
     const std::vector<at::Tensor> &in_tensors,
     const std::vector<at::Tensor> &parameters) {
@@ -187,41 +138,86 @@ void ConvertHalfImpl::convertGraphInputs(
   }
 }
 
-void ConvertHalfImpl::convertUses() {
-  while (!_converted_tensors.empty()) {
-    // Pop from the work list.
-    auto itr = _converted_tensors.begin();
-    torch::jit::Value *tensor = *itr;
-    _converted_tensors.erase(itr);
-
-    // Check the users and convert if need be.
-    for (torch::jit::Use use : tensor->uses()) {
-      torch::jit::Node *node = use.user;
-
-      for (torch::jit::Value *output : node->outputs()) {
-        if (maybeConvertTensor(output)) {
-          _converted_tensors.insert(output);
-        }
+bool ConvertHalfImpl::atLeastOneUseHalf(
+    const std::vector<torch::jit::Use> &uses) {
+  for (const auto use : uses) {
+    for (auto output : use.user->outputs()) {
+      auto type = output->type()->cast<c10::TensorType>();
+      if (!type) {
+        continue;
+      }
+      if ((*type->scalarType()) == at::ScalarType::Half) {
+        return true;
       }
     }
+  }
+  return false;
+}
 
-    // Check the inputs and list them all for conversion.
-    for (torch::jit::Value *input : tensor->node()->inputs()) {
-      if (maybeConvertTensor(input)) {
-        _converted_tensors.insert(input);
+void ConvertHalfImpl::resolveValueType(torch::jit::Value *output,
+                                       const at::ScalarType scalar_type) {
+  auto output_type = output->type()->expect<c10::TensorType>();
+  ERROR_ON(*output_type->scalarType() != HALF_OR_FLOAT);
+  output->setType(output_type->withScalarType(scalar_type));
+}
+
+void ConvertHalfImpl::resolveNodeDtype(torch::jit::Node *node,
+                                       const at::ScalarType scalar_type) {
+  if (node->kindOf(c10::attr::dtype) == torch::jit::AttributeKind::i) {
+    node->i_(c10::attr::dtype,
+             dtypeIntFromOnnxStr(scalarTypeToOnnxString(scalar_type).c_str()));
+  } else {
+    node->s_(c10::attr::dtype, scalarTypeToOnnxString(scalar_type));
+  }
+}
+
+void ConvertHalfImpl::resolveHalfOrFloat() {
+  // Iterate the graph in reverse
+  for (auto node : _graph->nodes().reverse()) {
+    for (auto output : node->outputs()) {
+      auto output_type = output->type()->cast<c10::TensorType>();
+      if (!output_type) {
+        continue;
+      }
+
+      auto scalar_type = output_type->scalarType();
+
+      if (!scalar_type) {
+        continue;
+      }
+      if (*scalar_type != HALF_OR_FLOAT) {
+        continue;
+      }
+
+      // Resolve to half if at least one use is half
+      auto new_type = atLeastOneUseHalf(output->uses()) ? at::ScalarType::Half
+                                                        : at::ScalarType::Float;
+      resolveValueType(output, new_type);
+
+      // Some nodes need an attribute changing to match
+      if (node->kind() == symbols::popart::cast) {
+        node->s_(c10::Symbol::fromQualString("attr::to"),
+                 scalarTypeToOnnxString(new_type));
+      }
+
+      if (node->hasAttribute(c10::attr::dtype)) {
+        resolveNodeDtype(node, new_type);
       }
     }
   }
 }
-
 } // namespace
 
-void canonicaliseHalf(torch::jit::Graph *graph,
-                      const std::vector<at::Tensor> &in_tensors,
-                      const std::vector<at::Tensor> &parameters) {
+void canonicaliseHalfInputs(torch::jit::Graph *graph,
+                            const std::vector<at::Tensor> &in_tensors,
+                            const std::vector<at::Tensor> &parameters) {
   ConvertHalfImpl impl{graph};
   impl.convertGraphInputs(in_tensors, parameters);
-  impl.convertUses();
+}
+
+void resolveHalfOrFloat(torch::jit::Graph *graph) {
+  ConvertHalfImpl impl{graph};
+  impl.resolveHalfOrFloat();
 }
 
 } // namespace poptorch

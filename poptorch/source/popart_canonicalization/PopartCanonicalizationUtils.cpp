@@ -289,12 +289,11 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
         old_val->replaceAllUsesWith(new_val);
         return;
       }
-      if (old_type->scalarType() == at::ScalarType::Half &&
-          new_type->scalarType() == at::ScalarType::Float) {
-        // This occurs when a dtype is set to float on an op e.g. on a
-        // torch.zeros which *may* have been a half prior to tracing with
-        // floats. The current logic is to always have this as a Half.
-        new_val->setType(old_type->withScalarType(at::ScalarType::Half));
+      if (old_type->scalarType() == at::ScalarType::Float &&
+          new_type->scalarType() == HALF_OR_FLOAT) {
+        // At this stage, we do not know whether it is a float16 or float32
+        new_val->setType(old_type->withScalarType(HALF_OR_FLOAT));
+
         old_val->replaceAllUsesWith(new_val);
         return;
       }
