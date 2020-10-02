@@ -54,7 +54,6 @@ unsupported_models = [
     # Supported on IPU_MODEL but runs into stream limit on IPU.
     models.alexnet,
     models.inception_v3,  # TODO(T26199): Output mismatch
-    models.googlenet,  # TODO(T26198): popnn segfault
 ]
 
 
