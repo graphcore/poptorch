@@ -438,6 +438,59 @@ torch::jit::Node *softMarginLossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
+
+torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
+                                                  torch::jit::Node *node) {
+  // aten::multilabel_soft_margin_loss(Tensor input, Tensor target,
+  //                                   Tensor? weight, int reduction)
+
+  // Input
+  torch::jit::Value *x = node->input(0);
+  // Target
+  torch::jit::Value *y = node->input(1);
+  // Weight
+  torch::jit::Value *w = node->input(2);
+
+  std::int64_t reduction = constantToLong(node->input(3)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // -x
+  torch::jit::Node *loss = createNeg(graph, {x});
+  // σ(-x)
+  loss = createSigmoid(graph, {loss->output()});
+  // log(σ(-x))
+  loss = createLog(graph, {loss->output()});
+
+  // 1
+  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  // 1 - y
+  torch::jit::Node *one_minus_y = createSub(graph, {ones->output(), y});
+
+  // (1 - y) log(σ(-x))
+  loss = createMul(graph, {one_minus_y->output(), loss->output()});
+
+  // σ(x)
+  torch::jit::Node *sig_x = createSigmoid(graph, {x});
+  // log(σ(x))
+  torch::jit::Node *log_sig_x = createLog(graph, {sig_x->output()});
+  // y log(σ(x))
+  torch::jit::Node *y_mul_log_sig_x =
+      createMul(graph, {y, log_sig_x->output()});
+
+  // y log(σ(x)) + (1 - y) log(σ(-x))
+  loss = createAdd(graph, {y_mul_log_sig_x->output(), loss->output()});
+  // -(y log(σ(x)) + (1 - y) log(σ(-x)))
+  loss = createNeg(graph, {loss->output()});
+
+  // if weight is specified
+  if (!isNone(w)) {
+    // -w (y log(σ(x)) + (1 - y) log(σ(-x)))
+    loss = createMul(graph, {w, loss->output()});
+  }
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -453,6 +506,7 @@ static bool handlers =
         c10::aten::binary_cross_entropy_with_logits, bceWithLogitsHandler,
         c10::aten::smooth_l1_loss, smoothL1LossHandler,
         c10::aten::soft_margin_loss, softMarginLossHandler,
+        c10::aten::multilabel_soft_margin_loss, multiLabelSoftMarginLossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 

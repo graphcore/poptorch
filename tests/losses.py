@@ -484,3 +484,25 @@ def test_SoftMarginLoss_direct(reduction):
     poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+@pytest.mark.parametrize("specify_weight", {True, False})
+def test_MultiLabelSoftMarginLoss_direct(reduction, specify_weight):
+    torch.manual_seed(42)
+
+    weight = torch.randn(3, 10) if specify_weight else None
+
+    model = torch.nn.MultiLabelSoftMarginLoss(weight, reduction=reduction)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    input = torch.empty(3, 10).uniform_()
+
+    # Generate random set of 0s and 1s for labels
+    target = torch.randint(2, [3, 10])
+
+    native_out = model(input, target)
+    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
+    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+
+    torch.testing.assert_allclose(native_out, poptorch_out)

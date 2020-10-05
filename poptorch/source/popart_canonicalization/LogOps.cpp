@@ -52,6 +52,17 @@ torch::jit::Node *log2Handler(torch::jit::Graph *graph,
   // Add the divide.
   return createDiv(graph, {logx->output(), log2->output()});
 }
+
+torch::jit::Node *logSigmoidHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  // LogSigmoid(x) = log(σ(x))
+
+  // σ(x)
+  torch::jit::Node *sig_x = createSigmoid(graph, {node->input(0)});
+
+  // log(σ(x))
+  return createLog(graph, {sig_x->output()});
+}
 } // namespace
 
 // clang-format off
@@ -59,7 +70,8 @@ static bool handlers =
     registerHandlers(
         c10::aten::log10, log10Handler,
         c10::aten::log1p, log1pHandler,
-        c10::aten::log2, log2Handler);
+        c10::aten::log2, log2Handler,
+        c10::aten::log_sigmoid, logSigmoidHandler);
 // clang-format on
 
 } // namespace poptorch
