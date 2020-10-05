@@ -360,6 +360,54 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
+
+torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node) {
+  // aten::smooth_l1_loss(Tensor input, Tensor target, int reduction)
+
+  // Input
+  torch::jit::Value *x = node->input(0);
+  // Target
+  torch::jit::Value *y = node->input(1);
+
+  std::int64_t reduction = constantToLong(node->input(2)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // x - y
+  torch::jit::Node *x_minus_y = createSub(graph, {x, y});
+  // |x - y|
+  torch::jit::Node *abs_x_minus_y = createAbs(graph, {x_minus_y->output()});
+  // 1
+  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+
+  // if |x - y| < 1
+  torch::jit::Node *mask =
+      createLess(graph, {abs_x_minus_y->output(), ones->output()});
+
+  // 2
+  torch::jit::Node *twos = createConstantFloat(graph, {2}, {});
+  // (x - y)^2
+  torch::jit::Node *sqr_x_minus_y =
+      createPow(graph, {x_minus_y->output(), twos->output()});
+  // 0.5
+  torch::jit::Node *half = createConstantFloat(graph, {0.5}, {});
+  // 0.5 (x - y)^2
+  torch::jit::Node *half_sqr_x_minus_y =
+      createMul(graph, {half->output(), sqr_x_minus_y->output()});
+
+  // |x - y| - 0.5
+  torch::jit::Node *abs_minus_half =
+      createSub(graph, {abs_x_minus_y->output(), half->output()});
+
+  // 0.5 (x - y)^2  if |x - y| < 1
+  // |x - y| - 0.5  otherwise
+  torch::jit::Node *loss =
+      createWhere(graph, {mask->output(), half_sqr_x_minus_y->output(),
+                          abs_minus_half->output()});
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -373,6 +421,7 @@ static bool handlers =
         c10::aten::poisson_nll_loss, poissonNllLossHandler,
         c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler,
         c10::aten::binary_cross_entropy_with_logits, bceWithLogitsHandler,
+        c10::aten::smooth_l1_loss, smoothL1LossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 

@@ -450,3 +450,20 @@ def test_BCEWithLogitsLoss_direct(reduction, params):
     poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+def test_SmoothL1Loss_direct(reduction):
+    torch.manual_seed(42)
+
+    model = torch.nn.SmoothL1Loss(reduction=reduction)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    input = torch.randn(10)
+    target = torch.empty(10).uniform_()
+
+    native_out = model(input, target)
+    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
+    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+
+    torch.testing.assert_allclose(native_out, poptorch_out)

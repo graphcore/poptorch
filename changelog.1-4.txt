@@ -3,4 +3,4 @@ New features:
 - Fixed issue with torch.nn.GroupNorm where only 4-dimensional inputs could be used
 - Replaced Adam with AdamW optimizer.
 - Added support for the following loss functions:
-    torch.nn.KLDivLoss, torch.nn.PoissonNLLLoss, torch.nn.HingeEmbeddingLoss, torch.nn.BCEWithLogitsLoss
+    torch.nn.KLDivLoss, torch.nn.PoissonNLLLoss, torch.nn.HingeEmbeddingLoss, torch.nn.BCEWithLogitsLoss, torch.nn.SmoothL1Loss
