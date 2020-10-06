@@ -69,7 +69,8 @@ public:
   friend Compiler;
 
   CompilerImpl()
-      : op_builder(popart::Builder::create()), active_ipu(0), active_phase(-1) {
+      : op_builder(popart::Builder::create()), active_ipu(0), active_stage(0),
+        active_phase(-1) {
     ids.emplace_back(""); // None tensor
   }
 
@@ -147,7 +148,7 @@ public:
   // active IPU and all subsequent operations will be added to that IPU until
   // stopped.
   std::uint64_t active_ipu;
-
+  std::uint64_t active_stage;
   std::int64_t active_phase;
 
   std::unordered_set<std::uint64_t> used_ipus;
@@ -569,8 +570,9 @@ template <typename T> struct HandleOutput {
         _impl->losses.push_back(id);
       }
     }
-    _impl->op_builder->virtualGraph(ids, _impl->active_ipu);
+    _impl->op_builder->pipelineStage(ids, _impl->active_stage);
     _impl->used_ipus.insert(_impl->active_ipu);
+    _impl->op_builder->virtualGraph(ids, _impl->active_ipu);
 
     if (_impl->active_phase != -1) {
       _impl->op_builder->executionPhase(ids, _impl->active_phase);
@@ -593,6 +595,7 @@ template <> struct HandleOutput<popart::TensorId> {
       _impl->op_builder->setAvailableMemoryProportion(in, itr->second);
     }
 
+    _impl->op_builder->pipelineStage(in, _impl->active_stage);
     _impl->op_builder->virtualGraph(in, _impl->active_ipu);
     _impl->used_ipus.insert(_impl->active_ipu);
     _impl->ids.push_back(in);
@@ -1239,8 +1242,20 @@ std::vector<char> Compiler::getTensorDTypeString(poptorch::TensorId id) const {
   return std::vector<char>(type_str.begin(), type_str.end());
 }
 
-void Compiler::setActiveIpu(std::uint64_t id, std::int64_t phase_id) {
-  _impl->active_ipu = id;
+void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
+                            std::int64_t ipu_id) {
+  _impl->active_stage = stage_id;
+
+  // Must be in sync with IpuId from python/enums.py
+  switch (ipu_id) {
+  case -1: // SameAsStage
+    _impl->active_ipu = stage_id;
+    break;
+  case -2: // SameAsPreviousStage
+    break;
+  default:
+    _impl->active_ipu = ipu_id;
+  }
   _impl->active_phase = phase_id;
 }
 

@@ -64,8 +64,14 @@ def test_new_api_wrap():
             return x
 
     m = Model()
-    m.l1 = poptorch.BeginPhase(ipu_id=0, phase_id=0, layer_to_call=m.l1)
-    m.l2 = poptorch.BeginPhase(ipu_id=1, phase_id=1, layer_to_call=m.l1)
+    m.l1 = poptorch.BeginPhase(ipu_id=0,
+                               phase_id=0,
+                               layer_to_call=m.l1,
+                               stage_id=0)
+    m.l2 = poptorch.BeginPhase(ipu_id=1,
+                               phase_id=1,
+                               layer_to_call=m.l1,
+                               stage_id=1)
 
     opts = poptorch.Options()
     opts = poptorch.Options().deviceIterations(2)

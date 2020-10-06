@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
 from .logging import logger
+from . import enums
 
 begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 end_ipu_block = torch.ops.poptorch.end_ipu_block
@@ -54,15 +55,30 @@ class IPU(torch.nn.Module):
 
     def __enter__(self):
 
-        begin_ipu_block(self.ipu_id, -1)
+        begin_ipu_block(self.ipu_id, enums.PhaseId.Disabled.value,
+                        enums.IpuId.SameAsStage.value)
 
     def __exit__(self, type, value, traceback):
         end_ipu_block()
 
     def __call__(self, *input, **kwargs):
-        begin_ipu_block(self.ipu_id, -1)
+        begin_ipu_block(self.ipu_id, enums.PhaseId.Disabled.value,
+                        enums.IpuId.SameAsStage.value)
         out = self.layer_to_call(*input, **kwargs)
         return out
+
+
+def _assertIdIsValid(name, value, expected_type):
+    assert isinstance(value, expected_type) or \
+            (isinstance(value, int) and value >= 0), (
+                f"{name} must be either a positive integer or a "
+                f"{expected_type.__name__}")
+
+
+def _getIdValue(id):
+    if isinstance(id, int):
+        return id
+    return id.value
 
 
 class Phase(torch.nn.Module):
@@ -79,25 +95,37 @@ class Phase(torch.nn.Module):
 
     """
 
-    def __init__(self, ipu_id, phase_id=-1):
+    def __init__(self,
+                 stage_id,
+                 phase_id=enums.PhaseId.Disabled,
+                 ipu_id=enums.IpuId.SameAsStage):
         """
-        :param int ipu_id: The id of the IPU to run on. All subsequent layers
-                           of the network will run on this IPU until another
-                           layer is wrapped. By default all layers will be on
-                           IPU 0 until the first pipeline annotation is
-                           encountered. Note that the ``ipu_id`` is an index
-                           in a multi-IPU device within PopTorch, and is
-                           separate and distinct from the device ids used by
-                           ``gc-info``.
-        :param int phase_id: The PopART execution phase this code block should
-                           belong on.
+        All subsequent layers of the network will be part of this phase until
+        another layer is wrapped.
+
+        :param int stage_id: Pipeline stage this code block should belong to.
+                         All stages must have a unique, incrementing, id.
+                         By default all layers will be in stage 0 until the
+                         first pipeline annotation is encountered.
+        :param phase_id: The PopART execution phase this code block should
+                         belong on.
+        :type phase_id: int >= 0 or poptorch.PhaseId.
+        :param ipu_id: The id of the IPU to run on.
+                       Note that the ``ipu_id`` is an index
+                       in a multi-IPU device within PopTorch, and is
+                       separate and distinct from the device ids used by
+                       ``gc-info``.
+        :type ipu_id: int >= 0 or poptorch.IpuId.
         """
         super().__init__()
-        self.ipu_id = ipu_id
-        self.phase_id = phase_id
+        _assertIdIsValid("phase_id", phase_id, enums.PhaseId)
+        _assertIdIsValid("ipu_id", ipu_id, enums.IpuId)
+        self._stage_id = stage_id
+        self._phase_id = _getIdValue(phase_id)
+        self._ipu_id = _getIdValue(ipu_id)
 
     def __enter__(self):
-        begin_ipu_block(self.ipu_id, self.phase_id)
+        begin_ipu_block(self._stage_id, self._phase_id, self._ipu_id)
 
     def __exit__(self, type, value, traceback):
         end_ipu_block()
@@ -116,29 +144,41 @@ class BeginPhase(torch.nn.Module):
 
     """
 
-    def __init__(self, ipu_id, layer_to_call, phase_id=-1):
+    def __init__(self,
+                 stage_id,
+                 layer_to_call,
+                 phase_id=enums.PhaseId.Disabled,
+                 ipu_id=enums.IpuId.SameAsStage):
         """
-        :param int ipu_id: The id of the IPU to run on. All subsequent layers
-                           of the network will run on this IPU until another
-                           layer is wrapped. By default all layers will be on
-                           IPU 0 until the first pipeline annotation is
-                           encountered. Note that the ``ipu_id`` is an index
-                           in a multi-IPU device within PopTorch, and is
-                           separate and distinct from the device ids used by
-                           ``gc-info``.
-        :param int phase_id: The PopART execution phase this code block should
-                           belong on.
-        :param layer_to_call: The layer to run on the specified IPU.
-        """
+        All subsequent layers of the network will be part of this phase until
+        another layer is wrapped.
 
+        :param int stage_id: Pipeline stage this code block should belong to.
+                         All stages must have a unique, incrementing, id.
+                         By default all layers will be in stage 0 until the
+                         first pipeline annotation is encountered.
+        :param layer_to_call: The layer to run on the specified IPU.
+        :param phase_id: The PopART execution phase this code block should
+                         belong on.
+        :type phase_id: int >= 0 or poptorch.PhaseId.
+        :param ipu_id: The id of the IPU to run on.
+                       Note that the ``ipu_id`` is an index
+                       in a multi-IPU device within PopTorch, and is
+                       separate and distinct from the device ids used by
+                       ``gc-info``.
+        :type ipu_id: int >= 0 or poptorch.IpuId.
+        """
         super().__init__()
-        self.ipu_id = ipu_id
-        self.phase_id = phase_id
-        self.layer_to_call = layer_to_call
+        _assertIdIsValid("phase_id", phase_id, enums.PhaseId)
+        _assertIdIsValid("ipu_id", ipu_id, enums.IpuId)
+        self._stage_id = stage_id
+        self._phase_id = _getIdValue(phase_id)
+        self._ipu_id = _getIdValue(ipu_id)
+        self._layer_to_call = layer_to_call
 
     def __call__(self, *input, **kwargs):
-        begin_ipu_block(self.ipu_id, self.phase_id)
-        out = self.layer_to_call(*input, **kwargs)
+        begin_ipu_block(self._stage_id, self._phase_id, self._ipu_id)
+        out = self._layer_to_call(*input, **kwargs)
         return out
 
 

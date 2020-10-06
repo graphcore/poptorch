@@ -39,3 +39,12 @@ class SyncPattern(enum.IntEnum):
     Full = 0
     SinglePipeline = 1
     ReplicaAndLadder = 2
+
+
+class IpuId(enum.IntEnum):
+    SameAsStage = -1
+    SameAsPreviousStage = -2
+
+
+class PhaseId(enum.IntEnum):
+    Disabled = -1

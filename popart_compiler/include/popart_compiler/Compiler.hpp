@@ -247,7 +247,8 @@ public:
   setAvailableMemoryProportion(const std::vector<poptorch::TensorId> &inputs,
                                float availableMemoryProportion);
 
-  void setActiveIpu(std::uint64_t id, std::int64_t phase_id);
+  void setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
+                    std::int64_t ipu_id);
 
   void initSession(const Optimizer &opt);
 
