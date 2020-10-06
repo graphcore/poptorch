@@ -186,9 +186,9 @@ OutputTypeSameAsFirstInput = [
     "reducel2", "reducelogsum", "reducelogsumexp", "reducemax", "reducemean",
     "reducemin", "reduceprod", "reducesum", "reducesumsquare", "relu",
     "replicatedallreduce", "reshape", "resize", "reversesequence", "roialign",
-    "round", "scale", "scatter", "selu", "sequenceerase", "shrink", "sigmoid",
-    "sign", "sin", "sinh", "slice", "softmax", "softplus", "softsign",
-    "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
+    "round", "scale", "scatter", "selu", "sequenceerase", "shapeddropout",
+    "shrink", "sigmoid", "sign", "sin", "sinh", "slice", "softmax", "softplus",
+    "softsign", "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
     "subsample", "tan", "tanh", "thresholdedrelu", "tile", "transpose",
     "unique", "unsqueeze", "upsample"
 ]

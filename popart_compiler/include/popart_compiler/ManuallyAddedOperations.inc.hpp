@@ -3,7 +3,6 @@ OP_DECL(popart, reshape_static_shape, reshape, _impl->reshape, ARG(INT_VEC, shap
         BODY_ARG(shape))
 OP_DECL(poptorch, ipu_print_tensor, ipu_print_tensor,
         AiGraphcoreOpset1.printtensor, NONE, NONE)
-OP_DECL(poptorch, nop, nop, AiGraphcoreOpset1.nop, NONE, NONE)
 OP_DECL(poptorch, tensor_constant, tensor_constant, _impl->tensorConstant,
         POPART_CONSTANT_ARG(popartConstant), BODY_ARG(popartConstant))
 OP_DECL(poptorch, constant_pad, constant_pad, AiOnnxOpset10.pad,

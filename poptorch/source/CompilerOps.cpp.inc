@@ -14,9 +14,14 @@ torch::jit::Node* createSubsample(torch::jit::Graph *graph,  const std::vector<t
 new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
 return new_node;
 }
-torch::jit::Node* createPrinttensor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t print_gradient) {
+torch::jit::Node* createPrinttensor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t print_gradient,const std::string & title) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::printtensor, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::print_gradient"),print_gradient);
+new_node->s_(c10::Symbol::fromQualString("attr::title"),title);
+return new_node;
+}
+torch::jit::Node* createNop(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::nop, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
 torch::jit::Node* createScale(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float scale) {
@@ -46,9 +51,9 @@ torch::jit::Node* createReplicatedallreduce(torch::jit::Graph *graph,  const std
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::replicatedallreduce, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
-torch::jit::Node* createL1loss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const float lamda,std::int32_t reduction) {
+torch::jit::Node* createL1loss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const float lambda,std::int32_t reduction) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::l1loss, args, ImplicitCast::None, OutputType::AsFirstInput);
-new_node->f_(c10::Symbol::fromQualString("attr::lamda"),lamda);
+new_node->f_(c10::Symbol::fromQualString("attr::lambda"),lambda);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 return new_node;
 }
@@ -61,6 +66,12 @@ return new_node;
 torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::identityloss, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
+return new_node;
+}
+torch::jit::Node* createShapeddropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & shape,float ratio) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::shapeddropout, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->is_(c10::Symbol::fromQualString("attr::shape"),shape);
+new_node->f_(c10::Symbol::fromQualString("attr::ratio"),ratio);
 return new_node;
 }
 torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
