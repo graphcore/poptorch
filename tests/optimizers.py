@@ -43,9 +43,8 @@ def test_optimizer(opt, reduction):
     assert not torch.argmax(out, dim=1) == label
 
     # Update the optimizer and check the loss now begins to decrease.
-    optimizer = opt(model.parameters(), lr=0.01)
+    optimizer.param_groups[0]['lr'] = 0.01
     poptorch_model.setOptimizer(optimizer)
-    poptorch_model(input, label)
 
     for _ in range(0, 1000):
         out, loss = poptorch_model(input, label)
@@ -118,9 +117,9 @@ def test_velocity_scaling_copy():
     input = torch.randn(1, 10)
     label = torch.randint(0, 10, [1])
 
-    # Make sure the first run doesn't already pass the test.
     poptorch_model(input, label)
 
+    # Check copy.copy preserves optimizer Poptorch attributes
     o = copy.copy(optimizer)
     poptorch_model.setOptimizer(o)
     poptorch_model(input, label)

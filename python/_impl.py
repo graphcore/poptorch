@@ -306,7 +306,7 @@ class PoplarExecutor:
         """ Sets the optimiser for a training model. Will overwrite the
         previous one. ``optim.SGD`` and ``optim.ADAMW`` are supported.
         """
-        self._new_optimizer = optimizer
+        self._new_optimizer = convertOptimizerToDict(optimizer)
 
     def __call__(self, *args, **kwargs):
         """
@@ -495,9 +495,9 @@ class PoplarExecutor:
         # Execute the poplar executable with the full size (batch * device interations)
         if self._new_optimizer and self._new_optimizer != self._optimizer:
             self._optimizer = self._new_optimizer
-            output = poptorch_core.execute(
-                self._executable, in_tensors.asTuple(),
-                convertOptimizerToDict(self._optimizer))
+            output = poptorch_core.execute(self._executable,
+                                           in_tensors.asTuple(),
+                                           self._optimizer)
         else:
             output = poptorch_core.execute(self._executable,
                                            in_tensors.asTuple(), {})
