@@ -408,6 +408,36 @@ torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
+
+torch::jit::Node *softMarginLossHandler(torch::jit::Graph *graph,
+                                        torch::jit::Node *node) {
+  // aten::soft_margin_loss(Tensor input, Tensor target, int reduction)
+
+  // Input
+  torch::jit::Value *x = node->input(0);
+  // Target
+  torch::jit::Value *y = node->input(1);
+
+  std::int64_t reduction = constantToLong(node->input(2)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // -y
+  torch::jit::Node *loss = createNeg(graph, {y});
+  // -y * x
+  loss = createMul(graph, {loss->output(), x});
+  // exp(-y * x)
+  loss = createExp(graph, {loss->output()});
+
+  // 1
+  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  // 1 + exp(-y * x)
+  loss = createAdd(graph, {ones->output(), loss->output()});
+  // log(1 + exp(-y * x))
+  loss = createLog(graph, {loss->output()});
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -422,6 +452,7 @@ static bool handlers =
         c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler,
         c10::aten::binary_cross_entropy_with_logits, bceWithLogitsHandler,
         c10::aten::smooth_l1_loss, smoothL1LossHandler,
+        c10::aten::soft_margin_loss, softMarginLossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 

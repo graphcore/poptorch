@@ -404,9 +404,7 @@ def test_HingeEmbeddingLoss_direct(reduction):
         poptorch_model = poptorch.inferenceModel(model)
 
         # Generate random set of 1s and -1s for labels
-        exps = torch.randint(2, [10])
-        target = torch.tensor([-1]).expand(10)
-        target = torch.pow(target, exps)
+        target = torch.randint(2, [10]) * 2 - 1
 
         input = torch.empty(10).uniform_()
 
@@ -461,6 +459,25 @@ def test_SmoothL1Loss_direct(reduction):
 
     input = torch.randn(10)
     target = torch.empty(10).uniform_()
+
+    native_out = model(input, target)
+    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
+    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+
+    torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+def test_SoftMarginLoss_direct(reduction):
+    torch.manual_seed(42)
+
+    model = torch.nn.SoftMarginLoss(reduction=reduction)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    input = torch.empty(10).uniform_()
+
+    # Generate random set of 1s and -1s for labels
+    target = torch.randint(2, [10]) * 2 - 1
 
     native_out = model(input, target)
     # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
