@@ -70,7 +70,7 @@ static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
         .op("poptorch::ipu_print_tensor", &identityOp)
-        .op("poptorch::nop", &identityOp)
+        .op("popart::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss)
         .op("poptorch::set_available_memory", &setAvailableMemory);

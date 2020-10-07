@@ -1,4 +1,7 @@
 [MASTER]
+# Workaround for pylint incorrectly reporting 'has no member' for torch
+# https://github.com/pytorch/pytorch/issues/701
+extension-pkg-whitelist=torch
 
 # Specify a configuration file.
 #rcfile=
@@ -83,7 +86,10 @@ ignore-mixin-members=yes
 
 # List of classes names for which member attributes should not be checked
 # (useful for classes with attributes dynamically set).
-ignored-classes=SQLObject
+# Workaround for pylint incorrectly reporting 'has no member' for torch
+# https://github.com/pytorch/pytorch/issues/701
+ignored-classes=SQLObject,torch
+ignored-modules=torch
 
 # When zope mode is activated, add a predefined set of Zope acquired attributes
 # to generated-members.

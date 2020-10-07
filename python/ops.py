@@ -7,7 +7,7 @@ begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 end_ipu_block = torch.ops.poptorch.end_ipu_block
 ipu_print_tensor = torch.ops.poptorch.ipu_print_tensor
 set_available_memory = torch.ops.poptorch.set_available_memory
-nop = torch.ops.poptorch.nop
+nop = torch.ops.popart.nop
 
 
 class IPU(torch.nn.Module):
