@@ -314,7 +314,18 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
     index += slice_size;
   }
 
-  return createAndInsertNode(graph, at::prim::ListConstruct, slices);
+  auto list_node = createAndInsertNode(graph, at::prim::ListConstruct, slices);
+  ERROR_ON(node->output()->uses().size() != 1);
+  auto unpack = node->output()->uses()[0].user;
+  ERROR_ON(unpack->kind() != c10::prim::ListUnpack);
+  ERROR_ON(slices.size() != unpack->outputs().size());
+
+  // Propagate types
+  for (size_t i = 0; i < slices.size(); i++) {
+    unpack->output(i)->setType(slices[i]->type());
+  }
+
+  return list_node;
 }
 
 torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
