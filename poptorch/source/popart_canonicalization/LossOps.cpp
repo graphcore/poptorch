@@ -251,20 +251,18 @@ torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
   // Convert to popart reduce values
   reduction = convertReduceToPopart(reduction);
 
-  std::vector<std::int64_t> shape = shapeFromTensor(x);
-
   // Δ - x
   torch::jit::Node *delta_minus_x = createSub(graph, {delta, x});
   // 0
-  torch::jit::Node *zeros = createConstantFloat(graph, {0}, shape);
+  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
   // max(0, Δ - x)
   torch::jit::Node *max_delta_minus_x =
       createMax(graph, {zeros->output(), delta_minus_x->output()});
 
   // 1
-  torch::jit::Node *ones = createConstantInt(graph, {1}, shape);
+  torch::jit::Node *ones = createConstantInt(graph, {1}, {});
   // -1
-  torch::jit::Node *neg_ones = createConstantFloat(graph, {-1}, shape);
+  torch::jit::Node *neg_ones = createConstantFloat(graph, {-1}, {});
   // if y = 1
   torch::jit::Node *ones_mask = createEqual(graph, {y, ones->output()});
   // if y = -1
@@ -491,6 +489,94 @@ torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
+
+torch::jit::Node *cosineEmbeddingLossHandler(torch::jit::Graph *graph,
+                                             torch::jit::Node *node) {
+  // aten::cosine_embedding_loss(Tensor input1, Tensor input2, Tensor target,
+  //                             float margin, int reduction)
+
+  // Input 1
+  torch::jit::Value *x1 = node->input(0);
+  // Input 2
+  torch::jit::Value *x2 = node->input(1);
+  // Target
+  torch::jit::Value *y = node->input(2);
+  // Margin
+  torch::jit::Value *margin = node->input(3);
+
+  std::int64_t reduction = constantToLong(node->input(4)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // Epsilon
+  torch::jit::Value *epsilon =
+      createConstantFloat(graph, {1e-12}, {})->output();
+
+  // x1 * x2
+  torch::jit::Node *x1_mul_x2 = createMul(graph, {x1, x2});
+  // sum(x1 * x2)
+  torch::jit::Node *sum_x1_mul_x2 =
+      createReducesum(graph, {x1_mul_x2->output()}, {1}, 0);
+
+  // sum_sqr(x1)
+  torch::jit::Node *sum_sqr_x1 = createReducesumsquare(graph, {x1}, {1}, 0);
+  // sq1 = sum_sqr(x1) + eps
+  torch::jit::Node *sum_sqr_x1_plus_eps =
+      createAdd(graph, {sum_sqr_x1->output(), epsilon});
+
+  // sum_sqr(x2)
+  torch::jit::Node *sum_sqr_x2 = createReducesumsquare(graph, {x2}, {1}, 0);
+  // sq2 = sum_sqr(x2) + eps
+  torch::jit::Node *sum_sqr_x2_plus_eps =
+      createAdd(graph, {sum_sqr_x2->output(), epsilon});
+
+  // sq1 * sq1
+  torch::jit::Node *sq1_mul_sq2 = createMul(
+      graph, {sum_sqr_x1_plus_eps->output(), sum_sqr_x2_plus_eps->output()});
+  // sqrt(sq1 * sq2)
+  torch::jit::Node *sqrt_sq1_mul_sq2 =
+      createSqrt(graph, {sq1_mul_sq2->output()});
+
+  // cos_sim(x1, x2)
+  torch::jit::Node *cos_sim =
+      createDiv(graph, {sum_x1_mul_x2->output(), sqrt_sq1_mul_sq2->output()});
+
+  // 1
+  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  // 1 - cos_sim(x1, x2)
+  torch::jit::Node *one_minus_cos_sim =
+      createSub(graph, {ones->output(), cos_sim->output()});
+
+  // cos_sim(x1, x2) - margin
+  torch::jit::Node *cos_sim_minus_margin =
+      createSub(graph, {cos_sim->output(), margin});
+  // 0
+  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  // max(0, cos_sim(x1, x2) - margin)
+  torch::jit::Node *max_zero_cos_sim_minus_margin =
+      createMax(graph, {zeros->output(), cos_sim_minus_margin->output()});
+
+  // -1
+  torch::jit::Node *neg_ones = createConstantInt(graph, {-1}, {});
+  // if y = 1
+  torch::jit::Node *ones_mask = createEqual(graph, {y, ones->output()});
+  // if y = -1
+  torch::jit::Node *neg_ones_mask = createEqual(graph, {y, neg_ones->output()});
+
+  // l = 1 - cos(x1, x2)               if y = 1
+  torch::jit::Node *ones_masked_fill =
+      createWhere(graph, {ones_mask->output(), one_minus_cos_sim->output(),
+                          zeros->output()});
+  // l = max(0, cos(x1, x2) - margin)  if y = -1
+  torch::jit::Node *neg_ones_masked_fill = createWhere(
+      graph, {neg_ones_mask->output(), max_zero_cos_sim_minus_margin->output(),
+              zeros->output()});
+
+  torch::jit::Node *loss = createAdd(
+      graph, {ones_masked_fill->output(), neg_ones_masked_fill->output()});
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -507,6 +593,7 @@ static bool handlers =
         c10::aten::smooth_l1_loss, smoothL1LossHandler,
         c10::aten::soft_margin_loss, softMarginLossHandler,
         c10::aten::multilabel_soft_margin_loss, multiLabelSoftMarginLossHandler,
+        c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 
