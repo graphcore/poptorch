@@ -1074,7 +1074,8 @@ void Compiler::initSession(const Optimizer &opt) {
     // set a global identity loss that all other losses derive from.
     popart::TensorId loss_root =
         _impl->op_builder->aiGraphcoreOpset1().identityloss(_impl->losses);
-    _impl->op_builder->virtualGraph(loss_root, _impl->active_ipu);
+    HandleOutput<popart::TensorId>()(loss_root, false /* Not a user loss */,
+                                     _impl.get());
 
     // Transform nodes which have training/inference variants. I.E BatchNorm.
     popart::GraphTransformer transformer{_impl->op_builder->getModelProto()};
