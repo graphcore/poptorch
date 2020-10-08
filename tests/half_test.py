@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os  # pylint: disable=unused-import
+import unittest.mock
 import poptorch
 import torch
 import torchvision.models as models
 import helpers
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_resnet():
     torch.manual_seed(42)
 

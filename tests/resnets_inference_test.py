@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os  # pylint: disable=unused-import
+import unittest.mock
 import torch
 import torchvision.models as models
 import poptorch
+import helpers
 
 # Torchvision models.
 # AlexNet
@@ -85,21 +88,26 @@ def inference_harness(imagenet_model):
     torch.testing.assert_allclose(native_class.values, pop_class.values)
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_resnet18():
     inference_harness(models.resnet18)
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_resnext50_32x4d():
     inference_harness(models.resnext50_32x4d)
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_mnasnet1_0():
     inference_harness(models.mnasnet1_0)
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_mobilenet_v2():
     inference_harness(models.mobilenet_v2)
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_googlenet():
     inference_harness(models.googlenet)

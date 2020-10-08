@@ -116,6 +116,8 @@ def configurePartition(num_ipus, num_gcds, num_sync_replicas):
 # set IPUOF_CONFIG_PATH.
 @pytest.mark.skipif(int(os.environ.get("POPTORCH_IPU_MODEL", "0")) != 0,
                     reason="Hardware IPU needed")
+@pytest.mark.skipif(int(os.environ.get("POPTORCH_SMALL_IPU_MODEL", "0")) != 0,
+                    reason="Hardware IPU needed")
 def test_weight_update_replicas():
 
     # We always need to create a partition if we're on POD.
@@ -124,7 +126,11 @@ def test_weight_update_replicas():
     run_test()
 
 
+# Note: poptorch.ipuHardwareIsAvailable() cannot be used before the Options
+# set IPUOF_CONFIG_PATH.
 @pytest.mark.skipif(int(os.environ.get("POPTORCH_IPU_MODEL", "0")) != 0,
+                    reason="Hardware IPU needed")
+@pytest.mark.skipif(int(os.environ.get("POPTORCH_SMALL_IPU_MODEL", "0")) != 0,
                     reason="Hardware IPU needed")
 @pytest.mark.skipif(not vipu.isAvailable(),
                     reason="vipu-cli and 8 IPUs needed")

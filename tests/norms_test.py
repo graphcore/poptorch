@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os  # pylint: disable=unused-import
+import unittest.mock
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -44,6 +46,7 @@ def test_batchNorm1D(running_stats, training):
 
 @pytest.mark.parametrize("running_stats", {True, False})
 @pytest.mark.parametrize("training", {True, False})
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_batchNorm2D(running_stats, training):
     torch.manual_seed(42)
 
@@ -71,6 +74,7 @@ def test_batchNorm2D(running_stats, training):
 
 @pytest.mark.parametrize("running_stats", {True, False})
 @pytest.mark.parametrize("training", {True, False})
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_batchNorm3D(running_stats, training):
     torch.manual_seed(42)
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os  # pylint: disable=unused-import
+import unittest.mock
 import torch
 import torch.optim as optim
 import pytest
@@ -195,6 +197,7 @@ ops_float = [
 ]
 
 
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.parametrize("op", ops_float)
 @pytest.mark.parametrize("dim", range(-4, 3))
 def test_op_withdim_4d(op, dim):

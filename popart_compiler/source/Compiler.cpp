@@ -33,19 +33,29 @@
 #include "poptorch_logging/Logging.hpp"
 
 namespace {
+
 bool ipuModelEnvironmentVariableIsEnabled() {
-  static const bool cached_value = []() {
-    if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
-      bool model_enabled = std::stoi(env_use_model) != 0;
-      logging::info(
-          "From POPTORCH_IPU_MODEL environment variable: Ipu model: {}",
-          model_enabled ? "Enabled" : "Disabled");
-      return model_enabled;
-    }
-    return false;
-  }();
-  return cached_value;
+  if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
+    bool model_enabled = std::stoi(env_use_model) != 0;
+    logging::info("From POPTORCH_IPU_MODEL environment variable: Ipu model: {}",
+                  model_enabled ? "Enabled" : "Disabled");
+    return model_enabled;
+  }
+  return false;
 }
+
+bool ipuSmallModelEnvironmentVariableIsEnabled() {
+  // POPTORCH_IPU_MODEL takes precedence over the small model.
+  if (ipuModelEnvironmentVariableIsEnabled()) {
+    return false;
+  }
+  if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
+    bool model_enabled = std::stoi(env_use_model) != 0;
+    return model_enabled;
+  }
+  return false;
+}
+
 } // namespace
 namespace poptorch {
 
@@ -260,7 +270,8 @@ void CompilerImpl::updateUseModelConfig() {
   if (options_set.count("ipu_model")) {
     logging::info("From the user configuration: Ipu model: {}",
                   options.ipu_model ? "Enabled" : "Disabled");
-  } else if (ipuModelEnvironmentVariableIsEnabled()) {
+  } else if (ipuModelEnvironmentVariableIsEnabled() ||
+             ipuSmallModelEnvironmentVariableIsEnabled()) {
     // As a fallback the model can be enabled by the POPTORCH_IPU_MODEL
     // environment variable.
     options.ipu_model = true;
@@ -548,10 +559,8 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &inputs,
 namespace {
 bool waitIfIpuIsUnavailable() {
   bool wait = false;
-  if (const char *env_use_model = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
-    // As a fallback the model can be enabled by the POPTORCH_IPU_MODEL
-    // environment variable.
-    wait = std::stoi(env_use_model) != 0;
+  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
+    wait = std::stoi(env_wait_for_ipu) != 0;
     logging::info("From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
                   "is available: {}",
                   wait ? "Wait" : "Fail & exit");
@@ -561,6 +570,7 @@ bool waitIfIpuIsUnavailable() {
 } // namespace
 bool ipuHardwareIsAvailable(std::uint64_t num_ipus) {
   return !ipuModelEnvironmentVariableIsEnabled() &&
+         !ipuSmallModelEnvironmentVariableIsEnabled() &&
          !popart::DeviceManager::createDeviceManager()
               .enumerateDevices(popart::SyncPattern::Full, num_ipus)
               .empty();
@@ -944,16 +954,21 @@ void Compiler::initSession(const Optimizer &opt) {
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
                               "operations have been optimised out)");
   if (_impl->options.ipu_model) {
-    ERROR_ON_MSG(num_ipus > 1,
-                 "The IPU model can only be used with models running on a "
-                 "single IPU but the current model requires "
-                     << num_ipus << " IPUs");
+    std::map<std::string, std::string> model_options;
+    model_options["numIPUs"] = std::to_string(num_ipus);
+    int num_tiles_per_ipu = 1216;
+    if (ipuSmallModelEnvironmentVariableIsEnabled()) {
+      num_tiles_per_ipu = 4;
+    }
+    model_options["tilesPerIPU"] = std::to_string(num_tiles_per_ipu);
+
     ERROR_ON_MSG(_impl->options.connection_type ==
                      popart::DeviceConnectionType::Never,
                  "ConnectionType.Never / poptorch.Options.useOfflineIpuTarget "
                  "not supported for the IPU model");
-    device = popart::DeviceManager::createDeviceManager().createCpuDevice();
-    logging::debug("Instantiated Cpu device, running on IPU model.");
+    device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
+        model_options);
+    logging::debug("Instantiated device, running on IPU model with {} tiles.", num_tiles_per_ipu);
   } else {
     if (_impl->options.connection_type == popart::DeviceConnectionType::Never) {
       // Offline compilation path: create an offline device regardless of what's

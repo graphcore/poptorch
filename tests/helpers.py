@@ -3,6 +3,13 @@ import torch
 import poptorch
 
 
+def disableSmallModel():
+    # POPTORCH_IPU_MODEL takes precedence over POPTORCH_SMALL_IPU_MODEL
+    if not poptorch.ipuHardwareIsAvailable():
+        return {"POPTORCH_IPU_MODEL": "1"}
+    return {}
+
+
 def trainingModelWithLoss(model, loss, options=None, optimizer=None):
     class TrainingModelWithLoss(torch.nn.Module):
         def __init__(self, model, loss):

@@ -73,12 +73,10 @@ def test_bert_medium_result():
         input_ids, attention_mask=attention_mask)
 
     opts = poptorch.Options()
+    opts.deviceIterations(2)
 
-    # Enable pipelining if the test is run on real HW.
-    if poptorch.ipuHardwareIsAvailable():
-        opts.deviceIterations(2)
-        model.bert.embeddings.position_embeddings = poptorch.IPU(
-            1, model.bert.embeddings.position_embeddings)
+    model.bert.embeddings.position_embeddings = poptorch.IPU(
+        1, model.bert.embeddings.position_embeddings)
 
     inference_model = poptorch.inferenceModel(model, opts)
     start_score_pop, end_scores_pop = inference_model(input_ids,
