@@ -44,6 +44,8 @@ def rng_harness(rng_op, stat_funs):
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_rand():
     def rng_op():
         torch.manual_seed(42)
@@ -61,6 +63,8 @@ def test_rand():
     "ignore:Output nr 1. of the traced function does not match")
 @pytest.mark.filterwarnings(
     "ignore:torch.Tensor results are registered as constants in the trace")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_distributions_uniform():
     def rng_op():
         torch.manual_seed(42)
@@ -77,6 +81,8 @@ def test_distributions_uniform():
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_uniform_():
     def rng_op():
         torch.manual_seed(42)
@@ -92,6 +98,8 @@ def test_uniform_():
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal():
     def rng_op():
         torch.manual_seed(42)
@@ -107,6 +115,8 @@ def test_normal():
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal_():
     def rng_op():
         torch.manual_seed(42)
@@ -125,6 +135,8 @@ def test_normal_():
     "ignore:Output nr 1. of the traced function does not match")
 @pytest.mark.filterwarnings(
     "ignore:torch.Tensor results are registered as constants in the trace")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_distributions_normal():
     def rng_op():
         torch.manual_seed(42)
@@ -149,6 +161,8 @@ def test_distributions_normal():
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_randn():
     def rng_op():
         torch.manual_seed(42)
@@ -166,6 +180,8 @@ def test_randn():
     "ignore:Output nr 1. of the traced function does not match")
 @pytest.mark.filterwarnings(
     "ignore:torch.Tensor results are registered as constants in the trace")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal_tensor_mean():
     def rng_op():
         torch.manual_seed(42)
@@ -185,6 +201,8 @@ def test_normal_tensor_mean():
     "ignore:Output nr 1. of the traced function does not match")
 @pytest.mark.filterwarnings(
     "ignore:torch.Tensor results are registered as constants in the trace")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal_tensor_std():
     def rng_op():
         torch.manual_seed(42)
@@ -202,6 +220,8 @@ def test_normal_tensor_std():
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
 @pytest.mark.parametrize("t", [torch.float, torch.half])
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal_half(t):
     class Model(torch.nn.Module):
         def forward(self, x):
@@ -241,6 +261,8 @@ def test_normal_half(t):
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
 @pytest.mark.parametrize("t", [torch.float, torch.half])
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_uniform_half(t):
     class Model(torch.nn.Module):
         def forward(self, x):
@@ -278,6 +300,8 @@ def test_uniform_half(t):
 # Filter the following expected warnings
 @pytest.mark.filterwarnings(
     "ignore:Output nr 1. of the traced function does not match")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_random_seed_repeatability():
     class Model(torch.nn.Module):
         def forward(self, x):
