@@ -4,18 +4,27 @@ import argparse
 import contextlib
 import io
 import re
+import sys
 import pytest
 
 parser = argparse.ArgumentParser(description="Generate CTestTestfile.cmake")
 parser.add_argument("test_dir", help="Path to the folder containing the tests")
 parser.add_argument("output_file", help="Path to CTestTestfile.cmake")
+parser.add_argument("--add_to_sys_path", help="Path to add to sys.path")
 
 args = parser.parse_args()
+
+if args.add_to_sys_path:
+    for path in args.add_to_sys_path.split(";"):
+        print(f"Adding {path}")
+        sys.path.insert(0, path)
 
 # Collect the list of tests:
 list_tests = io.StringIO()
 with contextlib.redirect_stdout(list_tests):
-    pytest.main(["-x", args.test_dir, "--collect-only", "-q"])
+    retval = pytest.main(["-x", args.test_dir, "--collect-only", "-q"])
+
+assert retval == pytest.ExitCode.OK, f"{str(retval)}: {list_tests.getvalue()}"
 
 # Run all the tests contained in these files in a single process
 # because they're small / short to run (Under 1 minute)
