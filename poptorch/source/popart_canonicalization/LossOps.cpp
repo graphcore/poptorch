@@ -577,6 +577,41 @@ torch::jit::Node *cosineEmbeddingLossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
+
+torch::jit::Node *marginRankingLossHandler(torch::jit::Graph *graph,
+                                           torch::jit::Node *node) {
+  // aten::margin_ranking_loss(Tensor input1, Tensor input2, Tensor target,
+  //                           float margin, int reduction)
+
+  // Input 1
+  torch::jit::Value *x1 = node->input(0);
+  // Input 2
+  torch::jit::Value *x2 = node->input(1);
+  // Target
+  torch::jit::Value *y = node->input(2);
+  // Margin
+  torch::jit::Value *margin = node->input(3);
+
+  std::int64_t reduction = constantToLong(node->input(4)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // x1 - x2
+  torch::jit::Node *loss = createSub(graph, {x1, x2});
+  // -y
+  torch::jit::Node *neg_y = createNeg(graph, {y});
+  // -y (x1 - x2)
+  loss = createMul(graph, {neg_y->output(), loss->output()});
+  // -y (x1 - x2) + margin
+  loss = createAdd(graph, {loss->output(), margin});
+
+  // 0
+  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  // max(0, -y (x1 - x2) + margin)
+  loss = createMax(graph, {zeros->output(), loss->output()});
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -594,6 +629,7 @@ static bool handlers =
         c10::aten::soft_margin_loss, softMarginLossHandler,
         c10::aten::multilabel_soft_margin_loss, multiLabelSoftMarginLossHandler,
         c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler,
+        c10::aten::margin_ranking_loss, marginRankingLossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 

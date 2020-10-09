@@ -531,3 +531,28 @@ def test_CosineEmbeddingLoss_direct(reduction):
                                   target).reshape(native_out.shape)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+def test_MarginRankingLoss_direct(reduction):
+    torch.manual_seed(42)
+
+    # Margin should be between -1 and 1
+    margin = torch.rand(1) * 2 - 1
+
+    model = torch.nn.MarginRankingLoss(margin.item(), reduction=reduction)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    # As per the current PyTorch implementation, both dims must be equal
+    input1 = torch.empty(10, 10).uniform_()
+    input2 = torch.empty(10, 10).uniform_()
+
+    # Generate random set of 1s and -1s for labels
+    target = torch.randint(2, [10]) * 2 - 1
+
+    native_out = model(input1, input2, target)
+    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
+    poptorch_out = poptorch_model(input1, input2,
+                                  target).reshape(native_out.shape)
+
+    torch.testing.assert_allclose(native_out, poptorch_out)
