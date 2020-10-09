@@ -3,6 +3,7 @@
 import torch
 import poptorch
 import pytest
+import helpers
 
 # Linears
 # torch.nn.Identity, torch.nn.Linear, torch.nn.Bilinear,
@@ -125,21 +126,119 @@ def test_identity():
     assert torch.equal(nativeOut, poptorch_out)
 
 
-def test_dropout():
-    model = torch.nn.Dropout(0.1)
+dropout_ops = [torch.nn.Dropout, torch.nn.Dropout2d, torch.nn.Dropout3d]
+
+
+@pytest.mark.parametrize("dropout_op", dropout_ops)
+def test_dropout_inference(dropout_op):
+    model = dropout_op()
     model.eval()
 
+    torch.manual_seed(0)
     x = torch.randn(128, 20)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    # Dropout depends on HW for randomness so just test size for now.
-    assert nativeOut.size() == poptorch_out.size()
+    msg = f"{dropout_op.__name__} in inference session should equal identity."
+    torch.testing.assert_allclose(poptorch_out,
+                                  native_out,
+                                  rtol=0,
+                                  atol=0,
+                                  msg=msg)
+
+
+def dropout_training_harness(dropout_op, input, check_func):
+    # Create a model consisting of a single dropout operation
+    # with a dummy parameter for the optimizer
+    model = dropout_op
+    model.register_parameter('param', torch.nn.Parameter(torch.empty(10)))
+    torch.manual_seed(0)
+    native_out = model(input)
+
+    # Create a poptorch training model with a fixed random seed for deterministic runs
+    # Note that the loss is irrelevant and ignored.
+    opts = poptorch.Options().randomSeed(8)
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.L1Loss(),
+                                                   options=opts)
+    dummy_label = torch.zeros_like(input)
+    poptorch_out, _ = poptorch_model(input, dummy_label)
+    assert native_out.size() == poptorch_out.size()
+    check_func(poptorch_out)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_dropout_training():
+    drop_ratio = 0.8
+    dropout_op = torch.nn.Dropout(drop_ratio)
+
+    # Input size needs to be large enough for convergence to expected dropout ratio
+    sz = [100, 4, 3]
+    x = torch.ones(sz, dtype=torch.float)
+
+    def check_ratio(poptorch_out):
+        # Instead we test that poptorch converge to the expected dropout ratio
+        actual_ratio = x[poptorch_out == 0].sum() / x.numel()
+        torch.testing.assert_allclose(actual_ratio,
+                                      drop_ratio,
+                                      rtol=0.01,
+                                      atol=0.01)
+
+    dropout_training_harness(dropout_op, x, check_ratio)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_dropout2d_training():
+    drop_ratio = 0.8
+    dropout_op = torch.nn.Dropout2d(drop_ratio)
+
+    # Input size needs to be large enough for convergence to expected dropout ratio
+    N = 40
+    C = 50
+    num_channels = torch.as_tensor(N * C, dtype=torch.float)
+    sz = [N, C, 3, 4]
+    x = torch.ones(sz, dtype=torch.float)
+
+    def check_ratio(poptorch_out):
+        channel_mask = (poptorch_out == 0).all(-1).all(-1)
+        actual_ratio = channel_mask.sum() / num_channels
+        torch.testing.assert_allclose(actual_ratio,
+                                      drop_ratio,
+                                      rtol=0.01,
+                                      atol=0.01)
+
+    dropout_training_harness(dropout_op, x, check_ratio)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_dropout3d_training():
+    drop_ratio = 0.6
+    dropout_op = torch.nn.Dropout3d(drop_ratio)
+
+    # Input size needs to be large enough for convergence to expected dropout ratio
+    N = 40
+    C = 50
+    num_channels = torch.as_tensor(N * C, dtype=torch.float)
+    sz = [N, C, 3, 3, 3]
+    x = torch.ones(sz, dtype=torch.float)
+
+    def check_ratio(poptorch_out):
+        channel_mask = (poptorch_out == 0).all(-1).all(-1).all(-1)
+        actual_ratio = channel_mask.sum() / num_channels
+        torch.testing.assert_allclose(actual_ratio,
+                                      drop_ratio,
+                                      rtol=0.01,
+                                      atol=0.01)
+
+    dropout_training_harness(dropout_op, x, check_ratio)
 
 
 def test_embedding():
