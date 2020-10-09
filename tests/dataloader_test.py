@@ -254,3 +254,21 @@ def test_subdataset():
 
 def test_subdataset2():
     _run_dataset_test(batch_size=2, host_id=1, num_hosts=2)
+
+
+def test_interrupt_async_loader():
+    """Make sure the worker processes are stopped cleanly even when the end of
+    the dataset is not reached."""
+
+    shape = [2, 3]
+    num_tensors = 100
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               IncrementDataset(shape, num_tensors),
+                               batch_size=1,
+                               num_workers=1)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+    for _, _ in enumerate(loader):
+        break

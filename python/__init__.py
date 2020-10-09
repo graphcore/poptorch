@@ -161,6 +161,9 @@ class AsynchronousDataAccessor:
         """
         self._data_fetcher.terminate()
 
+    def __del__(self):
+        self.terminate()
+
     def fetch_data(self, queue, setup_complete):
         dataset_iterator = iter(self._training_data)
 
