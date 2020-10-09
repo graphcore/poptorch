@@ -2,6 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import argparse
 import contextlib
+import os
 import io
 import re
 import sys
@@ -68,12 +69,15 @@ with open(args.output_file, "w") as output:
     # Process the list of tests returned by pytest
     for test in list_tests.getvalue().split("\n"):
         # Extract the file name from the test name
-        m = re.match("^(.*)::.*", test)
+        m = re.match("^(.*)::(.*)", test)
         if m:
-            test_file = m.group(1)
+            # Use os.path.basename() to ensure we only have
+            # the filename
+            test_file = os.path.basename(m.group(1))
             if test_file in short_tests:
                 continue
             labels = ""
             if test in long_tests:
                 labels = "long"
-            add_test(output, test, args.test_dir, labels)
+            add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
+                     labels)
