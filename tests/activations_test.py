@@ -50,3 +50,25 @@ def test_activations(op):
                                       equal_nan=True)
     else:
         torch.testing.assert_allclose(poptorch_out, nativeOut, equal_nan=True)
+
+
+@pytest.mark.parametrize("dim", range(5))
+def test_glu(dim):
+    N, C, M, K, L = 2, 4, 6, 8, 10
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.nn.functional.glu(x, dim=dim)
+
+    model = Model()
+
+    torch.manual_seed(42)
+    input = torch.randn(N, C, M, K, L)
+    # Run on CPU.
+    nativeOut = model(input)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(input)
+
+    torch.testing.assert_allclose(nativeOut, poptorch_out)

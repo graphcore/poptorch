@@ -224,6 +224,7 @@ Activations
 * ``torch.nn.Tanh``
 * ``torch.nn.PReLU``
 * ``torch.nn.Hardtanh``
+* ``torch.nn.functional.glu``
 
 
 Normalization layers
