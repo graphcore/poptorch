@@ -232,6 +232,7 @@ CXXTypeToTypeClass = {
     "popart::ReductionType": "INT",
     "nonstd::optional<int64_t>": "INT",
     "nonstd::optional<int>": "INT",
+    "Attributes::Int": "INT",
 
     # Floats
     "float": "FLOAT",
@@ -243,6 +244,7 @@ CXXTypeToTypeClass = {
     # Non-scalar integers.
     "std::vector<int64_t>": "INT_VEC",
     "nonstd::optional<std::vector<int64_t> >": "INT_VEC",
+    "Attributes::Ints": "INT_VEC",
 
     # String
     "std::string": "STRING"
@@ -278,6 +280,12 @@ def convertCxxConvert(cxxType):
 
     if "nonstd::optional<std::vector<int64_t" in cxxType:
         return "std::vector<int64_t>"
+
+    if "Attributes::Ints" in cxxType:
+        return "std::vector<int64_t>"
+
+    if "Attributes::Int" in cxxType:
+        return "std::int32_t"
 
     # Most types won't need processing
     return cxxType
