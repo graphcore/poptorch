@@ -54,7 +54,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     torch::jit::Node *new_node = nullptr;
     torch::jit::Symbol kind = node->kind();
 
-    if (SymbolHandler handler = getHandler(node)) {
+    if (SymbolHandler handler = getHandler(kind)) {
       new_node = handler(graph, node);
     }
 

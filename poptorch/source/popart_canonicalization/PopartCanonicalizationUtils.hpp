@@ -25,7 +25,7 @@ bool registerHandlers(c10::Symbol symbol, const SymbolHandler &handler,
 
 // Return a pointer to a handler if one is registered for this kind of node or
 // an empty std::function otherwise.
-SymbolHandler getHandler(torch::jit::Node *node);
+SymbolHandler getHandler(torch::jit::NodeKind kind);
 
 // Returns true if all inputs are Bools
 bool allInputsBool(torch::jit::Node *node, int ignore_input = -1);

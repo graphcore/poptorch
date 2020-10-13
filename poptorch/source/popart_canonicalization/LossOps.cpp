@@ -453,12 +453,12 @@ torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
   // Convert to popart reduce values
   reduction = convertReduceToPopart(reduction);
 
+  auto log_sigmoid_handler = getHandler(c10::aten::log_sigmoid);
+
   // -x
   torch::jit::Node *loss = createNeg(graph, {x});
-  // σ(-x)
-  loss = createSigmoid(graph, {loss->output()});
   // log(σ(-x))
-  loss = createLog(graph, {loss->output()});
+  loss = createHandlerOperation(graph, log_sigmoid_handler, {loss->output()});
 
   // 1
   torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
@@ -468,10 +468,9 @@ torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
   // (1 - y) log(σ(-x))
   loss = createMul(graph, {one_minus_y->output(), loss->output()});
 
-  // σ(x)
-  torch::jit::Node *sig_x = createSigmoid(graph, {x});
   // log(σ(x))
-  torch::jit::Node *log_sig_x = createLog(graph, {sig_x->output()});
+  torch::jit::Node *log_sig_x =
+      createHandlerOperation(graph, log_sigmoid_handler, {x});
   // y log(σ(x))
   torch::jit::Node *y_mul_log_sig_x =
       createMul(graph, {y, log_sig_x->output()});
@@ -612,6 +611,63 @@ torch::jit::Node *marginRankingLossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
+
+torch::jit::Node *tripletMarginLossHandler(torch::jit::Graph *graph,
+                                           torch::jit::Node *node) {
+  // aten::triplet_margin_loss(Tensor anchor, Tensor positive, Tensor negative,
+  //                           float margin, float p, float eps, bool swap, int
+  //                           reduction)
+
+  // Anchor
+  torch::jit::Value *a = node->input(0);
+  // Positive
+  torch::jit::Value *pos = node->input(1);
+  // Negative
+  torch::jit::Value *neg = node->input(2);
+  // Margin
+  torch::jit::Value *margin = node->input(3);
+  // Norm degree for pairwise distance
+  torch::jit::Value *p = node->input(4);
+  // Small value to avoid division by zero
+  torch::jit::Value *eps = node->input(5);
+  // Swap
+  bool swap = constantToBool(node->input(6)->node());
+
+  // keepdim = false
+  torch::jit::Value *keepdim = createConstantInt(graph, {0}, {})->output();
+
+  std::int64_t reduction = constantToLong(node->input(7)->node());
+  // Convert to popart reduce values
+  reduction = convertReduceToPopart(reduction);
+
+  // pairwiseDistanceHandler
+  auto pairwise_dist_handler = getHandler(c10::aten::pairwise_distance);
+
+  // d(a, pos)
+  torch::jit::Node *loss = createHandlerOperation(graph, pairwise_dist_handler,
+                                                  {a, pos, p, eps, keepdim});
+  // d(a, neg)
+  torch::jit::Node *dist_neg = createHandlerOperation(
+      graph, pairwise_dist_handler, {a, neg, p, eps, keepdim});
+
+  if (swap) {
+    torch::jit::Node *dist_swap = createHandlerOperation(
+        graph, pairwise_dist_handler, {pos, neg, p, eps, keepdim});
+    // d(a, neg) = min(d(a, neg), d(pos, neg))
+    dist_neg = createMin(graph, {dist_neg->output(), dist_swap->output()});
+  }
+
+  // d(a, pos) - d(a, neg)
+  loss = createSub(graph, {loss->output(), dist_neg->output()});
+  // d(a, pos) - d(a, neg) + margin
+  loss = createAdd(graph, {loss->output(), margin});
+
+  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  // max(d(a, pos) - d(a, neg) + margin, 0)
+  loss = createMax(graph, {loss->output(), zeros->output()});
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
+}
 } // namespace
 
 // clang-format off
@@ -630,6 +686,7 @@ static bool handlers =
         c10::aten::multilabel_soft_margin_loss, multiLabelSoftMarginLossHandler,
         c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler,
         c10::aten::margin_ranking_loss, marginRankingLossHandler,
+        c10::aten::triplet_margin_loss, tripletMarginLossHandler,
         symbols::poptorch::identity_loss, identityLossHandler);
 // clang-format on
 

@@ -559,3 +559,30 @@ def test_MarginRankingLoss_direct(reduction):
                                   target).reshape(native_out.shape)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("p", {2., 3.})
+@pytest.mark.parametrize("swap", {True, False})
+@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+def test_TripletMarginLoss_direct(p, swap, reduction):
+    torch.manual_seed(42)
+
+    # Between 0 and 2
+    margin = torch.rand(1) * 2
+
+    model = torch.nn.TripletMarginLoss(margin.item(),
+                                       p,
+                                       swap=swap,
+                                       reduction=reduction)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    anchor = torch.randn(10, 5)
+    positive = torch.randn(10, 5)
+    negative = torch.randn(10, 5)
+
+    native_out = model(anchor, positive, negative)
+    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
+    poptorch_out = poptorch_model(anchor, positive,
+                                  negative).reshape(native_out.shape)
+
+    torch.testing.assert_allclose(native_out, poptorch_out)

@@ -60,6 +60,14 @@ torch::jit::Node *createConstantFloat16(torch::jit::Graph *graph,
                                         const std::vector<double> &data,
                                         const std::vector<int64_t> &new_shape);
 
+template <typename SymbolHandler>
+torch::jit::Node *
+createHandlerOperation(torch::jit::Graph *graph, SymbolHandler &&handler,
+                       torch::jit::ArrayRef<torch::jit::Value *> inputs) {
+  torch::jit::Node *inputs_node = graph->createTuple(inputs);
+  return handler(graph, inputs_node);
+}
+
 torch::jit::Node *
 createCustomOperation(torch::jit::Graph *graph,
                       const std::vector<torch::jit::Value *> &inputs,

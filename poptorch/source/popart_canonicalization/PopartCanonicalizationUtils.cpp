@@ -38,8 +38,8 @@ bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler) {
 
 // Return a pointer to a handler if one is registered for this kind of node or
 // an empty std::function otherwise.
-SymbolHandler getHandler(torch::jit::Node *node) {
-  auto it = symbolHandlers().find(node->kind());
+SymbolHandler getHandler(torch::jit::NodeKind kind) {
+  auto it = symbolHandlers().find(kind);
   if (it != symbolHandlers().end()) {
     return it->second;
   }
