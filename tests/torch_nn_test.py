@@ -14,8 +14,6 @@ torch.set_default_dtype(torch.float32)
 # yapf: disable
 # pylint: disable=line-too-long
 EXPECTED_FAILURES = {
-    "test_nn_LayerNorm_1d_empty_elementwise_affine": "Floating point exception", # TODO(T26648) Popart bug
-
     "test_nn_BatchNorm3d_not_affine": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.onnx.BatchNormalization:9, inputs=[Reshape:0], outputs=[]), but input is not optional", # TODO(T26651) Popart feature request
 
     # TODO(T26652): Popart feature request
@@ -68,6 +66,7 @@ EXPECTED_FAILURES = {
     "test_nn_BatchNorm2d": "Failing Cast",
 
     "test_nn_GroupNorm_1d_affine": "Invalid number of channels",
+    "test_nn_LayerNorm_1d_empty_elementwise_affine": "StepIO did not provide input data for tensor input",
     "test_nn_Conv1d_zero_batch": "StepIO did not provide input data for tensor input",
     "test_nn_Conv2d_zero_batch": "StepIO did not provide input data for tensor input",
     "test_nn_Conv3d_zero_batch": "StepIO did not provide input data for tensor input",
