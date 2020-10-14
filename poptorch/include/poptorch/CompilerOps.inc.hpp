@@ -10,7 +10,7 @@ torch::jit::Node* createNop(torch::jit::Graph *graph,  const std::vector<torch::
 torch::jit::Node* createScale(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float scale);
 torch::jit::Node* createLstm(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t outputFullSequence);
 torch::jit::Node* createGelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,bool pass_through_creation);
+torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDynamicslice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,std::vector<int64_t> sizes,std::int32_t noOverlap);
 torch::jit::Node* createDynamicupdate(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,std::vector<int64_t> sizes,std::int32_t noOverlap);

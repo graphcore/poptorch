@@ -38,9 +38,8 @@ torch::jit::Node* createGelu(torch::jit::Graph *graph,  const std::vector<torch:
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::gelu, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
-torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,bool pass_through_creation) {
+torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::detach, args, ImplicitCast::None, OutputType::AsFirstInput);
-new_node->i_(c10::Symbol::fromQualString("attr::pass_through_creation"),pass_through_creation);
 return new_node;
 }
 torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
