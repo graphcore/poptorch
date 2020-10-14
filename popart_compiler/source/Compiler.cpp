@@ -374,6 +374,14 @@ SessionOptionsImpl::SessionOptionsImpl() {
         static_cast<popart::DeviceConnectionType>(value);
   };
 
+  uint64_options["accumulationReductionType"] = [&](std::uint64_t value) {
+    ERROR_ON_MSG(
+        value > static_cast<std::uint64_t>(popart::ReductionType::NoReduction),
+        "Value for popart::ReductionType out of range");
+    popart_options.accumulationReductionType =
+        static_cast<popart::ReductionType>(value);
+  };
+
   uint64_options["sync_pattern"] = [&](std::uint64_t value) {
     ERROR_ON_MSG(value > static_cast<std::uint64_t>(
                              popart::SyncPattern::ReplicaAndLadder),
@@ -434,6 +442,10 @@ SessionOptionsImpl::SessionOptionsImpl() {
         popart_options.convolutionOptions.emplace(p);
       };
 
+  container_options["gclOptions"] =
+      [&](const std::pair<std::string, std::string> &p) {
+        popart_options.gclOptions.emplace(p);
+      };
 #define ADD_POPART_ENUM_OPTION(name, EnumType)                                 \
   uint64_options[#name] = [&](std::uint64_t value) {                           \
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(popart::EnumType::N),     \
@@ -461,6 +473,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_ENUM_OPTION(virtualGraphMode, VirtualGraphMode);
   ADD_POPART_ENUM_OPTION(syntheticDataMode, SyntheticDataMode);
 
+  ADD_POPART_STRING_OPTION(logDir);
   ADD_POPART_STRING_OPTION(cachePath);
   ADD_POPART_STRING_OPTION(partialsTypeMatMuls);
   ADD_POPART_STRING_OPTION(customCodeletCompileFlags);
@@ -478,6 +491,9 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_UINT64_OPTION(globalReplicationFactor);
   ADD_POPART_UINT64_OPTION(globalReplicaOffset);
 
+  ADD_POPART_BOOL_OPTION(strictOpVersions);
+  ADD_POPART_BOOL_OPTION(opxAliasChecking);
+  ADD_POPART_BOOL_OPTION(opxModifyChecking);
   ADD_POPART_BOOL_OPTION(dotOpNames);
   ADD_POPART_BOOL_OPTION(exportPoplarComputationGraph);
   ADD_POPART_BOOL_OPTION(exportPoplarVertexGraph);
@@ -511,6 +527,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableDistributedReplicatedGraphs);
   ADD_POPART_BOOL_OPTION(groupHostSync);
 
+  ADD_POPART_DOUBLE_OPTION(outlineSequenceBreakCost);
   ADD_POPART_DOUBLE_OPTION(outlineThreshold);
   ADD_POPART_DOUBLE_OPTION(timeLimitScheduler);
 

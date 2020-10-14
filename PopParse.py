@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import enum
 import argparse
 from ctypes.util import find_library
 import logging
 import os
+import re
 
 import clang.cindex
 
@@ -40,6 +42,21 @@ popart_dir = popart_include_dir_partial + "popart"
 files = [popart_dir + "/builder.hpp", popart_dir + "/builder.h.gen"]
 
 nodeBlacklist = {"DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11"}
+
+# List of SessionOptions attributes PopTorch decided to not support
+options_not_handled = [
+    "executionPhaseSettings",
+    "accumulateOuterFragmentSettings",
+    "batchSerializationSettings",
+    "activationTensorLocationSettings",
+    "weightTensorLocationSettings",
+    "optimizerStateTensorLocationSettings",
+    "accumulatorTensorLocationSettings",
+    "tensorLocationSettingsOverride",
+    # Handled by PopTorch but not detected by this parser:
+    "replicatedGraphCount",
+    "accumulationReductionType"
+]
 
 
 def find_children(node, _argNum):
@@ -94,7 +111,123 @@ def find_functions(node, namespace):
         jsonOutput[namespace][functionName] = operation
 
 
+class OptionType(enum.IntEnum):
+    Bool = 0
+    Int = 1
+    Float = 2
+    String = 3
+    Container = 4
+    Enum = 5
+    Object = 6
+
+
+# check container_options
+def parse_session_options(root_node):  # pylint: disable=too-many-statements
+    # Build the list of options handled by Poptorch:
+    handled = {}
+    checks = {
+        r" *container_options\[\"(.*)\"\] =.*": OptionType.Container,
+        r" *ADD_POPART_ENUM_OPTION\(([^,]+),.*": OptionType.Enum,
+        r" *ADD_POPART_STRING_OPTION\((.*)\).*": OptionType.String,
+        r" *ADD_POPART_UINT64_OPTION\((.*)\).*": OptionType.Int,
+        r" *ADD_POPART_BOOL_OPTION\((.*)\).*": OptionType.Bool,
+        r" *ADD_POPART_DOUBLE_OPTION\((.*)\).*": OptionType.Float
+    }
+
+    for line in open(current_dir + "/popart_compiler/source/Compiler.cpp",
+                     "r"):
+        for expr, type in checks.items():
+            m = re.match(expr, line)
+            if m:
+                handled[m.group(1)] = type
+                break
+
+    def find_session_options(node):
+        if node.kind == clang.cindex.CursorKind.STRUCT_DECL and \
+                node.spelling == "SessionOptions":
+            return node
+
+        for c in node.get_children():
+            n = find_session_options(c)
+            if n:
+                return n
+        return None
+
+    def get_child(parent, child_type):
+        child = None
+        for c in parent.get_children():
+            if c.kind == child_type:
+                assert child is None, (
+                    f"More than one child of "
+                    f"{parent.spelling} has type {str(child_type)}")
+                child = c
+        return child
+
+    opts = find_session_options(root_node)
+    expected = {}
+    # Build the list of attributes in Popart's SessionOptions
+    for c in opts.get_children():
+        if c.kind != clang.cindex.CursorKind.FIELD_DECL:
+            continue
+        children = list(c.get_children())
+        if get_child(c, clang.cindex.CursorKind.CXX_BOOL_LITERAL_EXPR):
+            expected[c.spelling] = OptionType.Bool
+        elif get_child(c, clang.cindex.CursorKind.INTEGER_LITERAL):
+            expected[c.spelling] = OptionType.Int
+        elif get_child(c, clang.cindex.CursorKind.FLOATING_LITERAL):
+            expected[c.spelling] = OptionType.Float
+        else:
+            opt_type = get_child(c, clang.cindex.CursorKind.TEMPLATE_REF)
+            if opt_type:
+                if opt_type.spelling in ["set", "vector", "map"]:
+                    expected[c.spelling] = OptionType.Container
+                else:
+                    assert False, f"Template not supported {opt_type.spelling}"
+            else:
+                opt_type = get_child(c, clang.cindex.CursorKind.TYPE_REF)
+                assert opt_type, (f"Can't find type of {c.spelling}: "
+                                  f"{[str(d.kind) for d in children]}")
+                if opt_type.spelling == "std::string":
+                    expected[c.spelling] = OptionType.String
+                elif opt_type.spelling == \
+                        "class popart::SessionOptions::NumIOTiles":
+                    expected[c.spelling] = OptionType.Int
+                elif opt_type.spelling.startswith("enum "):
+                    expected[c.spelling] = OptionType.Enum
+                elif opt_type.spelling.startswith("struct "):
+                    expected[c.spelling] = OptionType.Object
+                elif opt_type.spelling.startswith("class "):
+                    expected[c.spelling] = OptionType.Object
+                elif opt_type.spelling == "int64_t":
+                    expected[c.spelling] = OptionType.Int
+                else:
+                    assert False, f"Type not supported {opt_type.spelling}"
+
+    missing = []
+    for opt, type in expected.items():
+        if opt in options_not_handled:
+            continue
+        if opt not in handled:
+            missing.append(
+                f"Option {opt} not handled by PopTorch Type: {str(type)}")
+        elif handled[opt] != type:
+            missing.append(
+                (f"Type mismatch for option {opt}: Popart type {str(type)} "
+                 f"PopTorch: {str(handled[opt])}"))
+    assert not missing, "\n".join(missing)
+
+
 index = clang.cindex.Index.create()
+tu = index.parse(popart_dir + "/sessionoptions.hpp",
+                 args=[
+                     "-std=c++14",
+                     "-I" + popart_dir,
+                     "-I" + popart_include_dir_partial,
+                     "-DONNX_NAMESPACE=onnx",
+                     "-I/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1/",
+                 ])
+
+parse_session_options(tu.cursor)
 
 tu = index.parse(popart_dir + "/builder.hpp",
                  args=[
@@ -320,8 +453,7 @@ def addCastingOptStr(name):
     return "ImplicitCast::None"
 
 
-# pylint: disable=R0911
-def addOutputTypeStr(name):
+def addOutputTypeStr(name):  # pylint: disable=too-many-return-statements
     if name in CastingAlwaysBoolOutput or name in OutputTypeAlwaysBool:
         return "OutputType::AlwaysBool"
     if name in CastingAlwaysFloatOutput or name in OutputTypeAlwaysFloat:
