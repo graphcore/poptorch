@@ -159,7 +159,8 @@ class AsynchronousDataAccessor:
         An override function to kill the worker process manually usually used
         in conjunction with the load_indefinitely option.
         """
-        self._data_fetcher.terminate()
+        if self._data_fetcher:
+            self._data_fetcher.terminate()
 
     def __del__(self):
         self.terminate()

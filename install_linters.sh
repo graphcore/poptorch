@@ -60,6 +60,7 @@ install_clang_format() {
   fi
 }
 
+cd ${DIR}
 mkdir -p .linters
 
 VE=${DIR}/.linters/venv

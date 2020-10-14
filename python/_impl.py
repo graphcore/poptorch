@@ -509,6 +509,16 @@ class PoplarExecutor:
             return output
         return output[0]
 
+    def destroy(self):
+        """Destroy the model: release the IPUs and the executable.
+        """
+        if not self._executable:
+            return
+        if self._training:
+            self.copyWeightsToHostIfNeeded()
+        del self._executable
+        self._executable = None
+
 
 def check_constructor_match_parent(child_class, extra_args=None):
     parent = child_class.__bases__[0]
