@@ -42,6 +42,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartLateCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoplarExecutable.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/RemoveSurplusIdentityLosses.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CanonicaliseConstants.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CastUnsupportedInputs.cpp"

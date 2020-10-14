@@ -41,6 +41,8 @@ void warnOnUnsupportedAten(torch::jit::Graph *graph);
 /*
  * Convert all float input tensors to half if they actually are half.
  */
+void removeSurplusIdentityLosses(torch::jit::Graph *graph);
+
 void canonicaliseHalfInputs(torch::jit::Graph *graph,
                             const std::vector<at::Tensor> &in_tensors,
                             const std::vector<at::Tensor> &parameters);

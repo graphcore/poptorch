@@ -21,7 +21,11 @@ torch::jit::Node *l1LossHandler(torch::jit::Graph *graph,
       createSub(graph, {node->input(0), node->input(1)});
 
   const float scale = 1.0f;
-  return createL1loss(graph, {subtract->output()}, scale, reduction);
+  torch::jit::Node *l1_loss =
+      createL1loss(graph, {subtract->output()}, scale, reduction);
+
+  // Create an identity loss with no further reduction.
+  return createIdentityloss(graph, {l1_loss->output()}, 2);
 }
 
 torch::jit::Node *mseLossHandler(torch::jit::Graph *graph,
@@ -56,8 +60,11 @@ torch::jit::Node *nllLossHandler(torch::jit::Graph *graph,
   // Convert to popart reduce values.
   reduction = convertReduceToPopart(reduction);
 
-  return createNllloss(graph, {node->input(0), node->input(1)}, reduction,
-                       ignore_index);
+  torch::jit::Node *nllloss = createNllloss(
+      graph, {node->input(0), node->input(1)}, reduction, ignore_index);
+
+  // Create an identity loss with no further reduction.
+  return createIdentityloss(graph, {nllloss->output()}, 2);
 }
 
 torch::jit::Node *identityLossHandler(torch::jit::Graph *graph,

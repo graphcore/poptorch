@@ -533,6 +533,9 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
 
     logging::debug("Graph right after canonicalization:\n{}", *graph);
 
+    if (training) {
+      poptorch::removeSurplusIdentityLosses(graph.get());
+    }
     // Warn the user if any operations couldn't be canonicalised.
     poptorch::warnOnUnsupportedAten(graph.get());
 

@@ -80,8 +80,8 @@ public:
   friend Compiler;
 
   CompilerImpl()
-      : op_builder(popart::Builder::create()), active_ipu(0), active_stage(0),
-        active_phase(-1) {
+      : op_builder(popart::Builder::create()), loss(""), active_ipu(0),
+        active_stage(0), active_phase(-1) {
     ids.emplace_back(""); // None tensor
   }
 
@@ -111,9 +111,9 @@ public:
 
   bool is_training;
 
-  // Record each loss as it is used so we can make them inputs of the global
-  // identity op.
-  std::vector<popart::TensorId> losses;
+  // Record the final loss, it is guaranteed by previous passes to be just one
+  // loss.
+  popart::TensorId loss;
 
   popart::SessionOptions popart_options;
   struct Options {
@@ -582,15 +582,14 @@ bool ipuHardwareIsAvailable(std::uint64_t num_ipus) {
 // transformations).
 template <typename T> struct HandleOutput {
   poptorch::TensorId operator()(T &in, bool loss, detail::CompilerImpl *_impl) {
+    ERROR_ON_MSG(loss, "Unreachable internal error: no operation with multiple "
+                       "returns is expected to be a loss.");
+
     std::set<popart::TensorId> ids;
 
     for (const popart::TensorId &id : in) {
       ids.insert(id);
       _impl->ids.push_back(id);
-
-      if (loss) {
-        _impl->losses.push_back(id);
-      }
     }
     _impl->op_builder->pipelineStage(ids, _impl->active_stage);
     _impl->used_ipus.insert(_impl->active_ipu);
@@ -627,7 +626,7 @@ template <> struct HandleOutput<popart::TensorId> {
     }
 
     if (loss) {
-      _impl->losses.push_back(in);
+      _impl->loss = in;
     }
 
     return _impl->ids.size() - 1;
@@ -781,8 +780,7 @@ std::vector<std::int32_t> int64ToInt32(const std::vector<std::int64_t> &in) {
 // A whitelist of supported loss operations. Popart needs to know which
 // operations are losses so they can be marked by the session.
 static bool IsLoss(const std::string &operation) {
-  return operation == "popart::l1loss" || operation == "popart::nllloss" ||
-         operation == "popart::identityloss";
+  return operation == "popart::identityloss";
 }
 
 #define INT_VEC std::vector<std::int64_t>
@@ -1151,12 +1149,6 @@ void Compiler::initSession(const Optimizer &opt) {
     // Create the optimizer from user provided parameters.
     std::unique_ptr<popart::Optimizer> optimizer = getOptimizer(opt);
 
-    // set a global identity loss that all other losses derive from.
-    popart::TensorId loss_root =
-        _impl->op_builder->aiGraphcoreOpset1().identityloss(_impl->losses);
-    HandleOutput<popart::TensorId>()(loss_root, false /* Not a user loss */,
-                                     _impl.get());
-
     // Transform nodes which have training/inference variants. I.E BatchNorm.
     popart::GraphTransformer transformer{_impl->op_builder->getModelProto()};
     transformer.prepareNodesForTraining();
@@ -1165,7 +1157,7 @@ void Compiler::initSession(const Optimizer &opt) {
     logging::LogContext ctx{
         "Compiler::initSession popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
-        transformer.getModelProto(), data_flow, loss_root, *optimizer, device,
+        transformer.getModelProto(), data_flow, _impl->loss, *optimizer, device,
         {}, options, _impl->options.patterns);
   }
 
