@@ -3,8 +3,10 @@ include(GNUInstallDirs)
 find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
 
+find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
+
 # Ensure ABI matches that of PyTorch
-add_definitions("-D_GLIBCXX_USE_CXX11_ABI=${Torch_USE_CXX11_ABI}")
+add_definitions(${TORCH_CXX_FLAGS})
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 # Workaround for clang / pybind / c++17
@@ -60,7 +62,8 @@ pybind11_add_module(poptorch_core SHARED SYSTEM
   )
 
 target_link_libraries(poptorch_core PRIVATE
-  ${TORCH_LIBRARIES}
+  torch
+  ${TORCH_PYTHON_LIBRARY}
   popart_compiler
   poptorch_logging)
 
@@ -68,10 +71,6 @@ target_include_directories(poptorch_core PRIVATE
   "${PROJECT_SOURCE_DIR}/poptorch/include"
   "${PROJECT_SOURCE_DIR}/poptorch_logging/include"
   "${PROJECT_SOURCE_DIR}/popart_compiler/include")
-
-target_include_directories(poptorch_core SYSTEM PRIVATE
-  ${SPDLOG_INCLUDE_DIR}
-  ${TORCH_INCLUDE_DIRS})
 
 install(TARGETS poptorch_core
   DESTINATION ${INSTALL_PYDIR})

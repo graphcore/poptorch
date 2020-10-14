@@ -1,6 +1,49 @@
 cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
 project(poptorch)
 
+set(USE_PYTORCH_PACKAGE_HEADERS ON CACHE BOOL "Use the Torch headers distributed with the pytorch package.")
+set(USE_ONNX_PACKAGE_HEADERS ON CACHE BOOL "Use the ONNX headers distributed with the ONNX pip package.")
+set(POPART_DIR CACHE PATH "Path to a Popart install")
+
+set(TORCH_VERSION 1.6.0)
+
+set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
+# Enable IN_LIST operator
+cmake_policy(SET CMP0057 NEW)
+if(NOT CMAKE_BUILD_TYPE)
+  list(GET CMAKE_CONFIGURATION_TYPES 0 CMAKE_BUILD_TYPE)
+  message(STATUS "Setting build type to '${CMAKE_BUILD_TYPE}' as none was specified")
+endif()
+if(NOT CMAKE_BUILD_TYPE IN_LIST CMAKE_CONFIGURATION_TYPES)
+  message(FATAL_ERROR "CMAKE_BUILD_TYPE must be one of ${CMAKE_CONFIGURATION_TYPES}")
+endif()
+
+if(USE_PYTORCH_PACKAGE_HEADERS)
+  execute_process(COMMAND python3 -c "import torch; from pathlib import Path; print(Path(torch.__file__).parent, end='')"
+    OUTPUT_VARIABLE TORCH_PATH)
+  list(APPEND CMAKE_PREFIX_PATH ${TORCH_PATH})
+  if(NOT TORCH_PATH)
+    message(FATAL_ERROR "python3 -c \"import torch\" failed: check that your virtual environment is active and torch is installed")
+  endif()
+endif()
+
+if(NOT DEFINED ONNX_DIR AND USE_ONNX_PACKAGE_HEADERS)
+  execute_process(COMMAND python3 -c "import onnx; from pathlib import Path; print(Path(onnx.__file__).parent.parent, end='')"
+    OUTPUT_VARIABLE ONNX_PATH)
+  if(NOT ONNX_PATH)
+    message(FATAL_ERROR "python3 -c \"import onnx\" failed: check that your virtual environment is active and onnx is installed")
+  endif()
+endif()
+
+if( NOT EXISTS ${POPART_DIR} )
+  #TODO(T27444): Re-enable once PopTorch has its own view.
+  #message(FATAL_ERROR "You must provide a path to a Popart build using -DPOPART_DIR=/path/to/popart/build")
+else()
+  list(APPEND CMAKE_PREFIX_PATH ${POPART_DIR})
+endif()
+
+
 enable_testing()
 
 add_compile_options(
@@ -126,7 +169,7 @@ if (DEFINED SWDB_PACKAGE_NAME)
   message(STATUS "Overriding package type '${PACKAGE_OS_TYPE}'")
 endif()
 
-find_package(Torch REQUIRED)
+find_package(Torch ${TORCH_VERSION} REQUIRED)
 
 configure_file(setup.py.in
   ${PROJECT_BINARY_DIR}/setup.py
@@ -139,25 +182,21 @@ set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
 
 set(PKG_UPLOAD_DIR ../../pkg)
 
-if(BUILD_DOCS)
-add_custom_target(package_and_move
+add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND python3 setup.py sdist bdist_wheel
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
-  COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME} ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME} ${PKG_UPLOAD_DIR}"
 )
-else()
+
 add_custom_target(package_and_move
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 setup.py sdist bdist_wheel
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
   COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
+  COMMAND bash -c '[ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" ] && mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" \"${PKG_UPLOAD_DIR}\"'
+  COMMAND bash -c '[ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" ] && mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" \"${PKG_UPLOAD_DIR}\"'
+  DEPENDS poptorch_wheel
 )
-endif()
 #------ end of packaging
 
 #------ product info file

@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 project(poptorch_logging)
 
-find_package(Spdlog REQUIRED)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+find_package(spdlog REQUIRED)
 
 add_library(poptorch_logging STATIC
   "source/Error.cpp"
@@ -9,8 +11,7 @@ add_library(poptorch_logging STATIC
 
 set_property(TARGET poptorch_logging PROPERTY CXX_STANDARD 14)
 
-target_include_directories(poptorch_logging PRIVATE
-                                        "include")
-
-target_include_directories(poptorch_logging SYSTEM PRIVATE
-                                        ${SPDLOG_INCLUDE_DIR})
+target_include_directories(poptorch_logging SYSTEM PUBLIC
+                                        ${SPDLOG_INCLUDE_DIR}
+                                        include
+                                        )
