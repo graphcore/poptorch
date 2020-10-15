@@ -186,7 +186,6 @@ set(PKG_UPLOAD_DIR ../../pkg)
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND python3 setup.py sdist bdist_wheel
-  COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
 )
 
 add_custom_target(package_and_move
