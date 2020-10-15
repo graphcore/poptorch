@@ -266,8 +266,8 @@ Loss functions
 --------------
 
 This version supports a limited subset of loss functions. However, we support
-:py:func:`poptorch.identity_loss` which gives users the ability to implement any arbitrary
-loss function. 
+:py:func:`poptorch.identity_loss` which gives you the ability to implement any arbitrary
+loss function.
 
 .. seealso:: :py:func:`poptorch.identity_loss`
 
@@ -286,3 +286,66 @@ Vision Layers
 Only nearest is supported.
 
 * ``torch.nn.Upsample``
+
+
+.. _float_16_op_support:
+
+Float 16 operations
+===================
+
+Due to the limitation of PyTorch's float 16 support on the CPU (used for tracing the model), certain operations may result in the use of float 32 where float 16 would be expected, or float 16 where float 32 would be expected.
+This is because the model must always be traced with float 16 inputs converted to float 32.
+
+Casting
+-------
+The ``tensor.to(dtype)`` argument will be ignored because it may refer to one or more float 16 tensors which were converted to float 32 to allow tracing to happen, for example ``a.to(b.dtype)`` where ``b`` may be a float 16 tensor converted to a float 32 tensor.
+Once the output of the op or one of its descendants encounters a known float 16 or float 32 input, the type will be resolved to this type.
+
+The following examples show cases where the casting functionality is resolved based on context, correctly or incorrect:
+
+.. literalinclude:: half_float_casting.py
+    :language: python
+    :caption: Cases where casting resolves to the correct type
+    :linenos:
+    :lines: 8-34
+
+.. literalinclude:: half_float_casting.py
+    :language: python
+    :caption: Cases where casting resolves to an incorrect type
+    :linenos:
+    :lines: 38-58
+
+
+Creation functions
+------------------
+
+The following functions are affected:
+* torch.ones
+* torch.rand
+* torch.zeros
+* torch.distributions.uniform.Uniform
+
+The ``dtype`` arguments will be ignored because they may refer to  float 16 tensors which were converted to float 32 tensors to allow tracing to succeed.
+Once the output of the op, or its descendant, encounters a known float 16 or float 32 input, the ``dtypes`` are resolved to this type.
+
+The following examples show cases where the type output differs from PyTorch:
+
+.. literalinclude:: half_float_ops.py
+    :language: python
+    :caption: Type resolution when using torch.zeros
+    :linenos:
+    :lines: 8-28
+
+
+.. literalinclude:: half_float_ops.py
+    :language: python
+    :caption: Type resolution when using torch.rand
+    :linenos:
+    :lines: 32-52
+
+
+.. literalinclude:: half_float_ops.py
+    :language: python
+    :caption: Type resolution when using torch.distributions.uniform.Uniform
+    :linenos:
+    :lines: 56-79

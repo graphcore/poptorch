@@ -130,7 +130,7 @@ poptorch.ipu_print_tensor
 
 .. py:class:: ipu_print_tensor(tensor_to_print)
 
-    Adds a tensor to be printed on the IPU. When this is executed the tensor 
+    Adds a tensor to be printed on the IPU. When this is executed the tensor
     will be copied back to host and printed.
 
     When this operation is called in the backward pass it
@@ -158,7 +158,7 @@ poptorch.ipu_print_tensor
         poptorch.ipu_print_tensor(a)
         return a + b
 
-    The result of `ipu_print_tensor` is not used, therefore it will be optimised out by the 
+    The result of `ipu_print_tensor` is not used, therefore it will be optimised out by the
     graph optimiser and `a` will not be printed.
 
     Instead you should do:
@@ -205,7 +205,9 @@ and will backpropagate a gradient of ones through it.
 Half / float 16 support
 =======================
 
-You need to cast the model and input tensors to float 16 using ``half()``
+PopTorch supports the half-precision floating point (float 16) format.
+You can convert models to float 16 by using a Module's .half() method and by using float 16 rather than float 32 tensors for the input.
+(You can convert a tensor to float 16 using ``tensor = tensor.half()``)
 
 .. literalinclude:: inference.py
     :language: python
@@ -214,12 +216,17 @@ You need to cast the model and input tensors to float 16 using ``half()``
     :lines: 34-40
     :emphasize-lines: 1, 2
 
+Because PopTorch relies on the ``torch.jit.trace`` API, it is limited to tracing operations which run on the CPU.
+Many of these operations do not support float 16 inputs.
+To allow the full range of operations, PopTorch converts all float 16 inputs to float 32 before tracing and then restores the inputs to float 16 as part of the canonicalization process.
+Some operations may result in the model running in float 32 where float 16 would be expected, or vice versa (see :ref:`float_16_op_support` for full details).
+
 Environment variables
 =====================
 
 Logging level
 -------------
-PopTorch uses different levels of logging: 
+PopTorch uses the following levels of logging:
   * ``OFF``: No logging.
   * ``ERR``: Errors only.
   * ``WARN``: Warnings and errors only.
@@ -230,26 +237,28 @@ PopTorch uses different levels of logging:
 The ``POPTORCH_LOG_LEVEL`` environment variable can be used to set the logging level:
 
 .. code-block:: bash
-  
+
   export POPTORCH_LOG_LEVEL=DEBUG
 
 IPU Model
 ---------
 
-By default PopTorch will try to attach to a physical IPU, if instead you want
-to use the model, you can do so by setting ``POPTORCH_IPU_MODEL`` to ``1``:
+By default PopTorch will try to attach to a physical IPU.
+If instead you want to use the model, you can do so by setting ``POPTORCH_IPU_MODEL`` to ``1``:
 
 .. code-block:: bash
-  
+
   export POPTORCH_IPU_MODEL=1
+
+Please see the `Poplar and PopLibs User Guide <https://docs.graphcore.ai/projects/poplar-user-guide>`_ for the limitations of the IPU Model.
 
 Wait for an IPU to become available
 -----------------------------------
 
 By default if you try to attach to an IPU but all the IPUs in the system are
-already in use, an exception will be raised. 
+already in use, an exception will be raised.
 If you would rather wait for an IPU to become available, you can do so by setting ``POPTORCH_WAIT_FOR_IPU`` to ``1``.
 
 .. code-block:: bash
-  
+
   export POPTORCH_WAIT_FOR_IPU=1

@@ -133,7 +133,7 @@ def test_normal_std_correctly_resolved():
 ## torch.distributions.uniform.Uniform tests ##
 
 
-# The type will always resolve to float32 as it is traed to torch.rand without
+# The type will always resolve to float32 as it is traced to torch.rand without
 # the low and high input tensors (which become dead code)
 def test_distributions_uniform():
     def fw_op(input_low):
