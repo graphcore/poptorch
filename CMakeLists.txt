@@ -131,6 +131,7 @@ set(INSTALL_PYDIR poptorch)
 
 if(${OS_TYPE} STREQUAL osx)
   set(CMAKE_INSTALL_RPATH "@loader_path")
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 elseif(${OS_TYPE} STREQUAL linux)
   set(CMAKE_INSTALL_RPATH "$ORIGIN")
 endif()
