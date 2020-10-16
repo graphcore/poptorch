@@ -5,3 +5,7 @@ New features:
 - Added support for the following loss functions:
     torch.nn.KLDivLoss, torch.nn.PoissonNLLLoss, torch.nn.HingeEmbeddingLoss, torch.nn.BCEWithLogitsLoss, torch.nn.SmoothL1Loss, torch.nn.SoftMarginLoss, torch.nn.MultiLabelSoftMarginLoss, torch.nn.CosineEmbeddingLoss, torch.nn.MarginRankingLoss, torch.nn.TripletMarginLoss
 - Added support for torch.optim.RMSprop optimizer
+- Improved support for half type models and inputs.
+    Using a mix of float 16 and float 32 inputs is now supported. Please see
+    the documentation for cases in which a model might use different types
+    compared to when run natively with PyTorch.
