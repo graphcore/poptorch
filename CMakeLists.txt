@@ -186,6 +186,7 @@ set(PKG_UPLOAD_DIR ../../pkg)
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND python3 setup.py sdist bdist_wheel
+  DEPENDS poptorch_core
 )
 
 add_custom_target(package_and_move
@@ -193,8 +194,8 @@ add_custom_target(package_and_move
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv ${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
-  COMMAND bash -c '[ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" ] && mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" \"${PKG_UPLOAD_DIR}\"'
-  COMMAND bash -c '[ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" ] && mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" \"${PKG_UPLOAD_DIR}\"'
+  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" ] \;then mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
+  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" ] \;then mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
   DEPENDS poptorch_wheel
 )
 #------ end of packaging
