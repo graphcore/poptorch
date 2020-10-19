@@ -221,6 +221,12 @@ Many of these operations do not support float 16 inputs.
 To allow the full range of operations, PopTorch converts all float 16 inputs to float 32 before tracing and then restores the inputs to float 16 as part of the canonicalization process.
 Some operations may result in the model running in float 32 where float 16 would be expected, or vice versa (see :ref:`float_16_op_support` for full details).
 
+Profiling
+=========
+
+You can profile a graph produced by PopTorch for analysis using the PopVision Graph Analyser, which can be downloaded from the Graphcore support portal.
+To do this, use the :ref:`POPLAR_ENGINE_OPTIONS<profiling_env>` environment variable.
+
 Environment variables
 =====================
 
@@ -239,6 +245,26 @@ The ``POPTORCH_LOG_LEVEL`` environment variable can be used to set the logging l
 .. code-block:: bash
 
   export POPTORCH_LOG_LEVEL=DEBUG
+
+.. _profiling_env :
+
+Profiling
+---------
+
+When running programs using PopTorch, you can enable profiling by using the ``POPLAR_ENGINE_OPTIONS`` environment variable used by Poplar.
+In order to capture the reports needed for the PopVision Graph Analyser you only need to set ``POPLAR_ENGINE_OPTIONS='{"autoReport.all":"true"}'``:
+
+.. code-block:: bash
+
+  export POPLAR_ENGINE_OPTIONS='{"autoReport.all":"true"}'
+
+By default, report files are output to the current working directory. You can specify a different output directory by setting ``autoReport.directory``, for example:
+
+.. code-block:: bash
+
+  export POPLAR_ENGINE_OPTIONS='{"autoReport.all":"true", "autoReport.directory":"./tommyFlowers"}'
+
+For more options, please refer to the `PopVision Graph Analyser User Guide <https://docs.graphcore.ai/projects/graphcore-popvision-user-guide>`_.
 
 IPU Model
 ---------
