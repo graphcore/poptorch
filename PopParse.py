@@ -48,12 +48,12 @@ options_not_handled = [
     "executionPhaseSettings",
     "accumulateOuterFragmentSettings",
     "batchSerializationSettings",
+    "tensorLocationSettingsOverride",
+    # Handled by PopTorch but not detected by this parser:
     "activationTensorLocationSettings",
     "weightTensorLocationSettings",
     "optimizerStateTensorLocationSettings",
     "accumulatorTensorLocationSettings",
-    "tensorLocationSettingsOverride",
-    # Handled by PopTorch but not detected by this parser:
     "replicatedGraphCount",
     "accumulationReductionType"
 ]

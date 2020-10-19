@@ -136,6 +136,8 @@ public:
 
   void setPatternsLevel(std::uint64_t level);
   void addPattern(const char *pattern, bool enabled);
+  void setTensorLocation(const char *tensor, const char *option,
+                         std::uint64_t value);
 
   void addStringOption(const char *option, const char *value);
   void addUint64Option(const char *option, std::uint64_t value);

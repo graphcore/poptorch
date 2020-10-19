@@ -36,6 +36,10 @@ class _OptionsDict:
     def exists(self, option):
         return option in self._values
 
+    def deleteIfExists(self, option):
+        if self.exists(option):
+            del self._values[option]
+
     def __getstate__(self):
         return self._values
 
@@ -53,6 +57,9 @@ class _OptionsDict:
             other), "Can't merge dictionaries, they have some keys in common"
         other.update(self._values)
         return other
+
+    def toDict(self):
+        return self.update({})
 
     def __call__(self, option):
         assert self.exists(
@@ -256,6 +263,92 @@ class _DistributedOptions(_OptionsDict):
         return self.num_distributed_processes
 
 
+class TensorLocationSettings(_OptionsDict):
+    def minElementsForOffChip(self, min_elements):
+        """A minimum number of elements below which offloading
+        won't be considered."""
+        assert isinstance(min_elements, int)
+        self.createOrSet(minElementsForOffChip=min_elements)
+        return self
+
+    def minElementsForReplicatedTensorSharding(self, min_elements):
+        """Only enable Replicated Tensor Sharding (RTS) for tensors with more
+        than `min_elements` elements."""
+        assert isinstance(min_elements, int)
+        self.createOrSet(minElementsForReplicatedTensorSharding=min_elements)
+        return self
+
+    def useOnChipStorage(self, use=True):
+        """Permanent tensor storage
+
+        :param bool use: True: use on chip memory,
+                         False: use off chip memory.
+                         None: keep it undefined.
+        """
+        if use is None:
+            self.deleteIfExists("onChip")
+        else:
+            assert isinstance(use, bool)
+            self.createOrSet(onChip=int(use))
+        return self
+
+    def useReplicatedTensorSharding(self, use=True):
+        """Enable replicated tensor sharding
+
+        (relevant for weights and optimizer states)
+        """
+        assert isinstance(use, bool)
+        self.createOrSet(useReplicatedTensorSharding=int(use))
+        return self
+
+    def useIOTilesToLoad(self, use=True):
+        """Load tensor through IO tiles
+
+        :param bool use: Use IO tiles if True,
+                         use Compute tiles if False.
+        """
+        assert isinstance(use, bool)
+        self.createOrSet(useIOTilesToLoad=int(use))
+        return self
+
+    def useIOTilesToStore(self, use=True):
+        """Use IO tiles to store tensors.
+
+        (relevant for replicated tensor sharded tensors)
+
+        :param bool use: Use IO tiles if True,
+                         use Compute tiles if False.
+        """
+        assert isinstance(use, bool)
+        self.createOrSet(useIOTilesToStore=int(use))
+        return self
+
+
+class _TensorLocationOptions(_OptionsDict):
+    """Options controlling where tensors are stored.
+    """
+
+    def setActivationLocation(self, location):
+        assert isinstance(location, TensorLocationSettings)
+        self.createOrSet(location_activation=location.toDict())
+        return self
+
+    def setWeightLocation(self, location):
+        assert isinstance(location, TensorLocationSettings)
+        self.createOrSet(location_weight=location.toDict())
+        return self
+
+    def setOptimizerLocation(self, location):
+        assert isinstance(location, TensorLocationSettings)
+        self.createOrSet(location_optimizer=location.toDict())
+        return self
+
+    def setAccumulatorLocation(self, location):
+        assert isinstance(location, TensorLocationSettings)
+        self.createOrSet(location_accumulator=location.toDict())
+        return self
+
+
 class Options(_OptionsDict):
     """Options controlling how a model is run on the IPU.
     """
@@ -265,6 +358,7 @@ class Options(_OptionsDict):
         self._training = _TrainingOptions()
         self._popart = _PopartOptions()
         self._distributed = _DistributedOptions()
+        self._tensor_locations = _TensorLocationOptions()
 
         super().__init__(replication_factor=1,
                          device_iterations=1,
@@ -275,6 +369,13 @@ class Options(_OptionsDict):
                          connection_type=enums.ConnectionType.Always.value,
                          sync_pattern=enums.SyncPattern.Full.value,
                          available_memory_proportion={})
+
+    @property
+    def TensorLocations(self):
+        """Options related to tensor locations.
+
+        .. seealso:: :py:class:`poptorch.options._TensorLocationOptions`"""
+        return self._tensor_locations
 
     @property
     def Distributed(self):
@@ -481,6 +582,7 @@ class Options(_OptionsDict):
         out = self.update(out)
         out = self._training.update(out)
         out = self._distributed.update(out)
+        out = self._tensor_locations.update(out)
         config_file = self._distributed.getGcdConfigFile()
         if self._distributed.numProcesses > 1 or config_file:
             assert config_file, ("No IPUoF configuration file found for "

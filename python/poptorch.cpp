@@ -203,6 +203,12 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
           options.addPattern(option.first.cast<std::string>().c_str(),
                              option.second.cast<bool>());
         }
+      } else if (id.rfind("location_", 0) == 0) {
+        for (auto option : element.second.cast<py::dict>()) {
+          options.setTensorLocation(id.c_str(),
+                                    option.first.cast<std::string>().c_str(),
+                                    option.second.cast<std::uint64_t>());
+        }
       } else {
         for (auto option : element.second.cast<py::dict>()) {
           options.insertStringPairOption(

@@ -142,3 +142,29 @@ def test_offline_ipu():
 
     #ipu = inference_model(x, y)
     #assert not ipu, "Offline compilation shouldn't return anything"
+
+
+def test_tensor_location():
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = Network()
+    opts = poptorch.Options()
+    opts.TensorLocations.setActivationLocation(
+        poptorch.TensorLocationSettings().minElementsForOffChip(
+            4).useOnChipStorage(True))
+    opts.TensorLocations.setWeightLocation(
+        poptorch.TensorLocationSettings().useIOTilesToStore(
+            True).useReplicatedTensorSharding(False))
+    opts.TensorLocations.setOptimizerLocation(
+        poptorch.TensorLocationSettings().useIOTilesToLoad(
+            False).useReplicatedTensorSharding(
+                True).minElementsForReplicatedTensorSharding(4))
+    opts.TensorLocations.setAccumulatorLocation(
+        poptorch.TensorLocationSettings().useOnChipStorage(False))
+    inference_model = poptorch.inferenceModel(model, opts)
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    inference_model(x, y)

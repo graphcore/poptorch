@@ -1488,5 +1488,46 @@ void SessionOptions::addPattern(const char *pattern, bool enabled) {
   _impl->poptorch_options.patterns.enablePattern(pattern, enabled);
 }
 
+void SessionOptions::setTensorLocation(const char *tensor, const char *option,
+                                       std::uint64_t value) {
+  logging::debug("Setting {} to {} for location {}", option, value, tensor);
+  std::string location_tensor{tensor};
+  std::string opt{option};
+  popart::TensorLocationSettings *settings;
+  if (location_tensor == "location_activation") {
+    settings = &_impl->popart_options.activationTensorLocationSettings;
+  } else if (location_tensor == "location_weight") {
+    settings = &_impl->popart_options.weightTensorLocationSettings;
+  } else if (location_tensor == "location_optimizer") {
+    settings = &_impl->popart_options.optimizerStateTensorLocationSettings;
+  } else if (location_tensor == "location_accumulator") {
+    settings = &_impl->popart_options.accumulatorTensorLocationSettings;
+  } else {
+    ERROR("Unknown tensor location " << location_tensor);
+  }
+
+  if (opt == "minElementsForOffChip") {
+    settings->minElementsForOffChip = value;
+  } else if (opt == "minElementsForReplicatedTensorSharding") {
+    settings->minElementsForReplicatedTensorSharding = value;
+  } else if (opt == "onChip") {
+    settings->location.storage = value > 0 ? popart::TensorStorage::OnChip
+                                           : popart::TensorStorage::OffChip;
+  } else if (opt == "useReplicatedTensorSharding") {
+    settings->location.replicatedTensorSharding =
+        value > 0 ? popart::ReplicatedTensorSharding::On
+                  : popart::ReplicatedTensorSharding::Off;
+  } else if (opt == "useIOTilesToLoad") {
+    settings->location.loadTileSet =
+        value > 0 ? popart::TileSet::IO : popart::TileSet::Compute;
+  } else if (opt == "useIOTilesToStore") {
+    settings->location.storageTileSet =
+        value > 0 ? popart::TileSet::IO : popart::TileSet::Compute;
+  } else {
+    ERROR("Unknown option '" << opt << "' for tensor location "
+                             << location_tensor);
+  }
+}
+
 SessionOptions::~SessionOptions() = default;
 } // namespace poptorch
