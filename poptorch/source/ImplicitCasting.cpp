@@ -30,6 +30,15 @@ bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
   return false;
 }
 
+c10::ScalarType promoteTypes(c10::ScalarType t1, c10::ScalarType t2) {
+  // By default lower to half rather than promoting to float.
+  if (t1 == c10::ScalarType::Half && t2 == c10::ScalarType::Float) {
+    return c10::ScalarType::Half;
+  }
+
+  return c10::promoteTypes(t1, t2);
+}
+
 c10::ScalarType highestTypeOf(const std::vector<c10::ScalarType> &types) {
   ERROR_ON_MSG(types.empty(),
                "Unsupported node: could not identify scalar or tensor inputs.");
@@ -53,7 +62,7 @@ c10::ScalarType highestTypeOf(const std::vector<c10::ScalarType> &types) {
       new_type = types[i];
     }
 
-    new_type = c10::promoteTypes(new_type, types[i]);
+    new_type = poptorch::promoteTypes(new_type, types[i]);
   }
 
   return new_type;

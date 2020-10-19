@@ -4,6 +4,7 @@
 import poptorch
 import pytest
 import torch
+import helpers
 
 
 def type_out_harness(inputs, forward_op, expect_same_type):
@@ -58,7 +59,7 @@ def test_ones_zeros_input_resolved_always_float16(op):
     def fw_op(input):
         return op((2, 3, 4), dtype=torch.float16) + input
 
-    type_out_harness(torch.tensor([1], dtype=torch.float32), fw_op, True)
+    type_out_harness(torch.tensor([1], dtype=torch.float32), fw_op, False)
     type_out_harness(torch.tensor([1], dtype=torch.float16), fw_op, True)
 
 
@@ -104,7 +105,7 @@ def test_rand_default_input_resolved_always_float16():
         return torch.rand(3, 5, 100, dtype=torch.float16) + input
 
     type_out_harness(torch.tensor([1], dtype=torch.float16), fw_op, True)
-    type_out_harness(torch.tensor([1], dtype=torch.float32), fw_op, True)
+    type_out_harness(torch.tensor([1], dtype=torch.float32), fw_op, False)
 
 
 ## torch.normal tests ##
@@ -194,3 +195,46 @@ def test_normal_correctly_resolved():
 
     type_out_harness(torch.empty((3, 4, 10), dtype=torch.float16), fw_op, True)
     type_out_harness(torch.empty((3, 4, 19), dtype=torch.float32), fw_op, True)
+
+
+def test_float16_activations_float32_weights():
+    torch.manual_seed(42)
+
+    input = torch.ones(10)
+
+    model = torch.nn.Linear(10, 20)
+
+    # Float 32 act, float 32 weights
+    pop_model = poptorch.inferenceModel(model, poptorch.Options())
+    pop_out = pop_model(input)
+
+    assert pop_out.dtype == torch.float
+
+    # Float 16 act, float 32 weights
+    pop_model = poptorch.inferenceModel(model, poptorch.Options())
+    pop_out = pop_model(input.half())
+    assert pop_out.dtype == torch.half
+
+
+def test_MSELoss_training():
+    torch.manual_seed(42)
+
+    model = torch.nn.Linear(10, 10)
+
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss())
+
+    target = torch.randn(10)
+    input = torch.randn(10).half()
+
+    # Make sure the first run doesn't already pass the test.s
+    original, original_loss = poptorch_model(input, target.half())
+    assert original_loss > 0.1
+    assert not torch.allclose(original.float(), target, rtol=1e-02, atol=1e-02)
+
+    for _ in range(0, 2500):
+        out, loss = poptorch_model(input, target.half())
+
+    # Check we have trained the "model"
+    assert loss.float() < 0.001
+    assert torch.allclose(out.float(), target, rtol=1e-02, atol=1e-02)
