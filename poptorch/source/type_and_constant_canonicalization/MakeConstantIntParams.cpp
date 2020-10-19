@@ -31,8 +31,7 @@ void makeConstantIntParams(torch::jit::Graph *graph,
     //_parameters in Lower to popart is traced_tensors here
     auto tensor = traced_tensors[index - num_inputs];
 
-    switch (value->type()->kind()) {
-    case c10::TypeKind::TensorType: {
+    if (value->type()->kind() == c10::TypeKind::TensorType) {
       auto tensor_type = value->type()->expect<c10::TensorType>();
       auto current_type = tensor_type->scalarType().value();
 
@@ -52,12 +51,12 @@ void makeConstantIntParams(torch::jit::Graph *graph,
 
         ERROR_ON(!value->uses().empty());
       }
-
-      break;
-    }
-    default:
-      // Tuples etc coming soon
-      break;
+    } else {
+      // There is no known case of a parameter or buffer being a type other than
+      // TensorType after tracing. Log a warning to assist debugging if a case
+      // is found
+      logging::warn("Non tensor parameter/buffer identified: {}",
+                    parameter_names[index - num_inputs]);
     }
 
     index++;
