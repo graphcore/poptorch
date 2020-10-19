@@ -344,7 +344,7 @@ def trainingModel(model, options=None, optimizer=None):
     :param torch.nn.Module model: The PyTorch model to wrap.
     :param poptorch.Options options: The IPU specific options
     :param torch.optim.Optimizer: The optimizers to apply during training.
-        ``optim.SGD`` and ``optim.ADAMW`` are supported.
+        Supported optimizers: ``optim.SGD``, ``optim.AdamW``, ``optim.RMSprop``.
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """

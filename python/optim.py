@@ -40,5 +40,24 @@ class AdamW(torch.optim.AdamW):
             group.setdefault("loss_scaling", loss_scaling)
 
 
+class RMSprop(torch.optim.RMSprop):
+    def __init__(self,
+                 params,
+                 lr=1e-2,
+                 alpha=0.99,
+                 eps=1e-8,
+                 weight_decay=0,
+                 momentum=0,
+                 centered=False,
+                 loss_scaling=1.0):
+        super().__init__(params, lr, alpha, eps, weight_decay, momentum,
+                         centered)
+
+        self.defaults["loss_scaling"] = loss_scaling
+        for group in self.param_groups:
+            group.setdefault("loss_scaling", loss_scaling)
+
+
 _impl.check_constructor_match_parent(SGD, ["loss_scaling", "velocity_scaling"])
 _impl.check_constructor_match_parent(AdamW, ["loss_scaling"])
+_impl.check_constructor_match_parent(RMSprop, ["loss_scaling"])

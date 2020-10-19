@@ -12,9 +12,11 @@ import helpers
 
 
 @pytest.mark.parametrize(
-    "opt, reduction",
-    zip((optim.SGD, optim.AdamW, poptorch.optim.SGD, poptorch.optim.AdamW),
-        ("mean", "sum")))
+    "opt", {
+        optim.SGD, optim.AdamW, optim.RMSprop, poptorch.optim.SGD,
+        poptorch.optim.AdamW, poptorch.optim.RMSprop
+    })
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
 def test_optimizer(opt, reduction):
     torch.manual_seed(42)
 

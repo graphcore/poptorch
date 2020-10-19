@@ -2,6 +2,7 @@
 #pragma once
 
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -85,6 +86,12 @@ struct Optimizer {
       eps = findInMapOrDefault(opts, "eps", 1e-08);
       break;
     }
+    case OptimizerType::RMSPROP_CENTERED:
+    case OptimizerType::RMSPROP: {
+      alpha = findInMapOrDefault(opts, "alpha", 0.99);
+      eps = findInMapOrDefault(opts, "eps", 1e-08);
+      break;
+    }
     case OptimizerType::NONE:
     default:
       ERROR("UNREACHABLE: Unsupported optimizer type");
@@ -98,14 +105,21 @@ struct Optimizer {
   std::pair<float, bool> loss_scaling;
   std::pair<float, bool> velocity_scaling;
 
-  // Unique to SGD
+  // Shared by SGD and RMSprop
   std::pair<float, bool> momentum;
+
+  // Shared by AdamW and RMSprop
+  std::pair<float, bool> eps;
+
+  // Unique to SGD
   std::pair<float, bool> dampening;
 
   // Unique to AdamW
   std::pair<float, bool> beta1;
   std::pair<float, bool> beta2;
-  std::pair<float, bool> eps;
+
+  // Unique to RMSprop
+  std::pair<float, bool> alpha;
 };
 
 class Compiler;
@@ -293,6 +307,20 @@ public:
 private:
   void assertTensorIs(PopartType dataType, const poptorch::TensorId &id,
                       const char *caller) const;
+
+  void printOptimizerToDebug(const Optimizer &opt);
+
+  template <typename... Args>
+  void printOptimizerToDebug(const std::string &opt_name,
+                             const std::vector<std::string> &arg_names,
+                             Args... args) {
+    std::stringstream ss;
+    ss << "Updating graph optimizer " << opt_name << " with parameters: ";
+    for (const auto &arg_name : arg_names) {
+      ss << arg_name << " {}, ";
+    }
+    logging::debug(ss.str().c_str(), args...);
+  }
 
   std::unique_ptr<detail::CompilerImpl> _impl;
 };

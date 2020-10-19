@@ -51,6 +51,22 @@ def convertOptimizerToDict(optimizer):
             "eps": (eps, eps == 1e-08),
             "loss_scaling": (loss_scaling, loss_scaling == 1.0)
         }
+    if isinstance(optimizer, optim.RMSprop):
+        momentum = optimizer.param_groups[0]["momentum"]
+        alpha = optimizer.param_groups[0]["alpha"]
+        eps = optimizer.param_groups[0]["eps"]
+        centered = optimizer.param_groups[0]["centered"]
+        optimizerType = enums.OptimizerType.RMSPROP_CENTERED if centered \
+                        else enums.OptimizerType.RMSPROP
+        return {
+            "optimizerType": optimizerType,
+            "lr": (learning_rate, False),
+            "momentum": (momentum, momentum == 0.0),
+            "alpha": (alpha, False),
+            "eps": (eps, eps == 1e-08),
+            "weight_decay": (weight_decay, weight_decay == 0.01),
+            "loss_scaling": (loss_scaling, loss_scaling == 1.0)
+        }
 
     assert False, "Unsupported optimizer type. Types supported %s" % str(
         list(enums.OptimizerType))
@@ -303,8 +319,9 @@ class PoplarExecutor:
         self._dirty_host_weights = saved_dirty_flag
 
     def setOptimizer(self, optimizer):
-        """ Sets the optimiser for a training model. Will overwrite the
-        previous one. ``optim.SGD`` and ``optim.ADAMW`` are supported.
+        """Sets the optimiser for a training model. Will overwrite the
+        previous one. Supported optimisers: ``optim.SGD``, ``optim.AdamW``,
+        ``optim.RMSProp``.
         """
         self._new_optimizer = convertOptimizerToDict(optimizer)
 

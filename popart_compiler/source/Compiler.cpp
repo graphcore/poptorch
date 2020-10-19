@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <popart/adam.hpp>
+#include <popart/adaptive.hpp>
 #include <popart/builder.hpp>
 #include <popart/error.hpp>
 #include <popart/graphtransformer.hpp>
@@ -652,16 +653,27 @@ template <> struct HandleOutput<popart::TensorId> {
 
 static std::unique_ptr<popart::Optimizer> getOptimizer(const Optimizer &opt) {
   if (opt.type == OptimizerType::SGD) {
-    return std::unique_ptr<popart::Optimizer>(new popart::SGD(
-        {opt.learning_rate, opt.weight_decay, opt.momentum, opt.dampening,
-         opt.velocity_scaling, opt.loss_scaling}));
+    return std::make_unique<popart::SGD>(
+        opt.learning_rate, opt.weight_decay, opt.momentum, opt.dampening,
+        opt.velocity_scaling, opt.loss_scaling);
   }
   if (opt.type == OptimizerType::ADAMW) {
-    return std::unique_ptr<popart::Optimizer>(new popart::Adam(
+    return std::make_unique<popart::Adam>(
         opt.learning_rate, opt.weight_decay, opt.beta1, opt.beta2, opt.eps,
         opt.loss_scaling, popart::AdamMode::AdamNoBias,
         popart::DataType::FLOAT, // Always accumulate as float.
-        popart::DataType::FLOAT, popart::DataType::FLOAT));
+        popart::DataType::FLOAT, popart::DataType::FLOAT);
+  }
+  if (opt.type == OptimizerType::RMSPROP ||
+      opt.type == OptimizerType::RMSPROP_CENTERED) {
+    popart::AdaptiveMode mode = opt.type == OptimizerType::RMSPROP
+                                    ? popart::AdaptiveMode::RMSProp
+                                    : popart::AdaptiveMode::CenteredRMSProp;
+    return std::make_unique<popart::Adaptive>(
+        opt.learning_rate, opt.weight_decay, opt.alpha, opt.momentum, opt.eps,
+        opt.loss_scaling, mode, popart::WeightDecayMode::L2Regularization,
+        popart::DataType::FLOAT, popart::DataType::FLOAT,
+        popart::DataType::FLOAT, popart::DataType::FLOAT);
   }
 
   ERROR("Unreachable: Unsupported optimizer");
@@ -1147,21 +1159,7 @@ void Compiler::initSession(const Optimizer &opt) {
         popart::PatternsLevel::Default);
   } else {
     // Print to debug the new optimizer.
-    if (opt.type == OptimizerType::SGD) {
-      logging::debug(
-          "Adding inital graph optimizer SGD with parameters: Learning rate "
-          "{}, weight decay {}, Momentum {}, Dampening {}",
-          opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
-          opt.dampening.first);
-    } else if (opt.type == OptimizerType::ADAMW) {
-      logging::debug(
-          "Adding inital graph optimizer ADAMW with parameters: Learning rate "
-          "{}, weight decay {}, beta1 {}, beta2 {}, eps {}",
-          opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
-          opt.beta2.first, opt.eps.first);
-    } else {
-      ERROR("Unreachable: Unsupported optimizer.");
-    }
+    printOptimizerToDebug(opt);
 
     // Create the optimizer from user provided parameters.
     std::unique_ptr<popart::Optimizer> optimizer = getOptimizer(opt);
@@ -1237,21 +1235,7 @@ void Compiler::run(const Optimizer &opt) {
     std::unique_ptr<popart::Optimizer> optimizer = getOptimizer(opt);
 
     // Print to debug the new optimizer.
-    if (opt.type == OptimizerType::SGD) {
-      logging::debug(
-          "Updating graph optimizer SGD with parameters: Learning rate "
-          "{}, weight decay {}, Momentum {}, Dampening {}",
-          opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
-          opt.dampening.first);
-    } else if (opt.type == OptimizerType::ADAMW) {
-      logging::debug(
-          "Updating graph optimizer ADAMW with parameters: Learning rate "
-          "{}, weight decay {}, beta1 {}, beta2 {}, eps {}",
-          opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
-          opt.beta2.first, opt.eps.first);
-    } else {
-      ERROR("Unreachable: Unsupported optimizer.");
-    }
+    printOptimizerToDebug(opt);
 
     // Update the popart graph/poplar executable with the new optimizer.
     popart::TrainingSession &session =
@@ -1422,6 +1406,38 @@ void Compiler::assertTensorIs(PopartType dataType, const poptorch::TensorId &id,
 
   ERROR_ON_MSG(actual_type != dataType,
                "Incorrect type for tensor, " << id << " used in " << caller);
+}
+
+void Compiler::printOptimizerToDebug(const Optimizer &opt) {
+  switch (opt.type) {
+  case OptimizerType::SGD:
+    printOptimizerToDebug(
+        "SGD", {"Learning rate", "Weight decay", "Momentum", "Dampening"},
+        opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
+        opt.dampening.first);
+    break;
+
+  case OptimizerType::ADAMW:
+    printOptimizerToDebug(
+        "ADAMW", {"Learning rate", "Weight decay", "beta1", "beta2", "eps"},
+        opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
+        opt.beta2.first, opt.eps.first);
+    break;
+
+  case OptimizerType::RMSPROP_CENTERED:
+  case OptimizerType::RMSPROP:
+    printOptimizerToDebug("RMSPROP",
+                          {"Learning rate", "alpha", "eps", "Weight decay",
+                           "Momentum", "Centered"},
+                          opt.learning_rate.first, opt.alpha.first,
+                          opt.eps.first, opt.weight_decay.first,
+                          opt.momentum.first,
+                          opt.type == OptimizerType::RMSPROP_CENTERED);
+    break;
+
+  default:
+    ERROR("Unreachable: Unsupported optimizer.");
+  }
 }
 
 SessionOptions::SessionOptions()

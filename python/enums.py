@@ -5,6 +5,8 @@ import enum
 class OptimizerType(enum.IntEnum):
     SGD = 0
     ADAMW = 1
+    RMSPROP = 2
+    RMSPROP_CENTERED = 3
 
 
 class AnchorMode(enum.IntEnum):
