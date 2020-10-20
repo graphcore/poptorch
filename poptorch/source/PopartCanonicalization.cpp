@@ -74,7 +74,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 
 // Returns an integer list of dimension that a tensor has. For reduce functions.
 // A 5D tensor would return (0, 1, 2, 3, 4)
-#define DIMENISON_LENGTH_LIST(Index)                                           \
+#define DIMENSION_LENGTH_LIST(Index)                                           \
   reduceHelperDimensionCreator(node->input(Index))
 
 // Returns the shape of the tensor as a vector of ints.
@@ -95,6 +95,8 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 
 // Extract a long from the constant by casting if required
 #define CONSTANT_TO_LONG(Index) constantToLong(node->input(Index)->node())
+
+#define CONSTANT_TO_STRING(Index) constantToString(node->input(Index)->node())
 
 #define CONSTANT_TO_LONG_CONSTANT(Index)                                       \
   constantToLongConstant(node->input(Index)->node())->output()

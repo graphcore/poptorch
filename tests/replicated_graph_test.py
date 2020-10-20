@@ -97,7 +97,7 @@ def run_test(process_id=0, num_processes=1):
     out = [output, model.B.data, model.C.data]
     for idx, ref in enumerate(ref_out):
         print("Validating output %d" % idx)
-        torch.testing.assert_allclose(out[idx], ref)
+        torch.testing.assert_allclose(out[idx], ref, rtol=1e-03, atol=1e-03)
 
 
 def configurePartition(num_ipus, num_gcds, num_sync_replicas):

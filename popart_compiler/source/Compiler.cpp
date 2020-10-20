@@ -1374,6 +1374,13 @@ void Compiler::setAvailableMemoryProportion(
   }
 }
 
+void Compiler::setMatMulSerialization(poptorch::TensorId matmul,
+                                      const char *mode, std::uint64_t factor,
+                                      std::uint64_t keep_precision) {
+  _impl->op_builder->setSerializeMatMul({_impl->ids[matmul]}, mode, factor,
+                                        keep_precision);
+}
+
 Compiler::Compiler(Compiler &&compiler) { _impl = std::move(compiler._impl); }
 
 Compiler::Compiler(bool is_training, const SessionOptions &options) {

@@ -137,6 +137,44 @@ def test_available_memory():
     execute_and_check_wrapper(model, input)
 
 
+@pytest.mark.parametrize("mode", poptorch.MatMulSerializationMode)
+def test_matmul_serialization(mode):
+    torch.manual_seed(42)
+
+    input_channels = 6
+    reducing_dim = 2
+    output_channels = 4
+    lhs = torch.randn(input_channels, reducing_dim)
+    rhs = torch.randn(reducing_dim, output_channels)
+    if mode == poptorch.MatMulSerializationMode.Disabled:
+        factor = 0
+    elif mode == poptorch.MatMulSerializationMode.InputChannels:
+        factor = 2
+    elif mode == poptorch.MatMulSerializationMode.ReducingDim:
+        factor = 2
+    elif mode == poptorch.MatMulSerializationMode.OutputChannels:
+        factor = 4
+    else:
+        assert False, "Invalid mode"
+
+    class BasicNetwork(nn.Module):
+        def forward(self, x, y):
+            out = poptorch.serializedMatMul(x,
+                                            y,
+                                            mode,
+                                            factor,
+                                            keep_precision=True)
+            return out
+
+    # Just check we don't explode when the value is set.
+    model = BasicNetwork()
+    nativeOut = model(lhs, rhs)
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(lhs, rhs)
+
+    torch.testing.assert_allclose(poptorch_out, nativeOut)
+
+
 def test_available_memory_automatic():
     torch.manual_seed(42)
 

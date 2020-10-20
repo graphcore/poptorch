@@ -155,7 +155,7 @@ def test_distributions_normal_mean_correctly_resolved():
     def fw_op(input_mean):
         torch.manual_seed(42)
         ud = torch.distributions.Normal(input_mean, 10.0)
-        return ud.sample((10, 10, 1000))
+        return ud.sample((10, 10, 100))
 
     type_out_harness(torch.tensor([0.0], dtype=torch.float16), fw_op, True)
     type_out_harness(torch.tensor([0.0], dtype=torch.float32), fw_op, True)
@@ -165,7 +165,7 @@ def test_distributions_normal_std_correctly_resolved():
     def fw_op(input_std):
         torch.manual_seed(42)
         ud = torch.distributions.Normal(0.0, input_std)
-        return ud.sample((10, 10, 1000))
+        return ud.sample((10, 10, 100))
 
     type_out_harness(torch.tensor([10.0], dtype=torch.float16), fw_op, True)
     type_out_harness(torch.tensor([10.0], dtype=torch.float32), fw_op, True)

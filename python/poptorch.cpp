@@ -46,6 +46,14 @@ at::Tensor setAvailableMemory(at::Tensor t, double mem) {
   return t;
 }
 
+at::Tensor setMatMulSerialization(at::Tensor matmul, std::string mode, // NOLINT
+                                  int64_t factor, bool keep_precision) {
+  UNUSED(mode);
+  UNUSED(factor);
+  UNUSED(keep_precision);
+  return matmul;
+}
+
 at::Tensor identityOp(at::Tensor t) { return t; }
 at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   UNUSED(reduction);
@@ -73,6 +81,7 @@ static auto registry =
         .op("popart::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss)
+        .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
         .op("poptorch::set_available_memory", &setAvailableMemory);
 //.op("popart::convolution", convolution,
 // torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));

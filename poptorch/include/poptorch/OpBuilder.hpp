@@ -180,6 +180,12 @@ torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,
                                            float proportion);
 
+torch::jit::Node *createSetMatMulSerialization(torch::jit::Graph *graph,
+                                               torch::jit::Value *matmul,
+                                               const std::string &mode,
+                                               int64_t factor,
+                                               bool keep_precision);
+
 torch::jit::Node *createBeginIpuBlock(torch::jit::Graph *graph,
                                       std::uint64_t stage, std::int64_t phase,
                                       std::int64_t ipu);

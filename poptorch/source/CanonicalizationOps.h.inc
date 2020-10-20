@@ -123,8 +123,8 @@ OP_CONVERTOR(aten::max and NUM_INPUTS_EQUALS(2), NONE, createMax, {PARAM(0) COMM
 OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(2), NONE, createMin, {PARAM(0) COMMA PARAM(1)})
 
 // Max/Min reduce. Takes one tensor and reduces it.
-OP_CONVERTOR(aten::max and NUM_INPUTS_EQUALS(1), NONE, createReducemax, {PARAM(0)} COMMA DIMENISON_LENGTH_LIST(0) COMMA 0)
-OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(1), NONE, createReducemin, {PARAM(0)} COMMA DIMENISON_LENGTH_LIST(0) COMMA 0)
+OP_CONVERTOR(aten::max and NUM_INPUTS_EQUALS(1), NONE, createReducemax, {PARAM(0)} COMMA DIMENSION_LENGTH_LIST(0) COMMA 0)
+OP_CONVERTOR(aten::min and NUM_INPUTS_EQUALS(1), NONE, createReducemin, {PARAM(0)} COMMA DIMENSION_LENGTH_LIST(0) COMMA 0)
 
 // Same as above with dim and keepdim args.
 // Unsupported due to PopART/Onnx not returning the indices as well. TODO(T23333)
@@ -156,13 +156,14 @@ OP_CONVERTOR(aten::randn, NONE, createRandomNormal, {} COMMA OUTPUT_TENSOR_SHAPE
 OP_CONVERTOR(aten::normal_, NONE, createRandomNormal, {PARAM(0)} COMMA TENSOR_SHAPE(0) COMMA CONSTANT_TO_FLOAT(1) COMMA CONSTANT_TO_FLOAT(2))
 
 // aten::frobenius_norm(Tensor in) -> Tensor
-OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(1), NONE, createReducel2, {PARAM(0)} COMMA DIMENISON_LENGTH_LIST(0) COMMA 0)
+OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(1), NONE, createReducel2, {PARAM(0)} COMMA DIMENSION_LENGTH_LIST(0) COMMA 0)
 // aten::frobenius_norm(Tensor in, int[] axes, int keepdim) -> Tensor
 OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(3), NONE, createReducel2, {PARAM(0)} COMMA HANDLE_LIST(1) COMMA CONSTANT_TO_LONG(2))
 
 OP_CONVERTOR_POP(symbols::poptorch::ipu_print_tensor, NONE, createPrintIpuTensor, PARAM(0))
 OP_CONVERTOR_POP(symbols::poptorch::set_available_memory, NONE, createSetAvailableMemory, PARAM(0) COMMA CONSTANT_TO_FLOAT(1))
 OP_CONVERTOR_POP(symbols::poptorch::begin_ipu_block, NONE, createBeginIpuBlock, CONSTANT_TO_LONG(0) COMMA CONSTANT_TO_LONG(1) COMMA CONSTANT_TO_LONG(2))
+OP_CONVERTOR_POP(symbols::poptorch::set_matmul_serialization, NONE, createSetMatMulSerialization, PARAM(0) COMMA CONSTANT_TO_STRING(1) COMMA CONSTANT_TO_LONG(2) COMMA CONSTANT_TO_LONG(3))
 
 // aten::masked_fill(Tensor self, Tensor mask, Tensor other) -> Tensor
 OP_CONVERTOR(aten::masked_fill, NONE, createWhere, {PARAM(1) COMMA PARAM(2) COMMA PARAM(0)})

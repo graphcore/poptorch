@@ -423,13 +423,20 @@ void LowerToPopart::lowerBody() {
           "{} was lowered to {} [{}]", nodeToString(node),
           tensorNames(first_output_tensor, node->outputs().size()),
           tensorTypesAndShapes(first_output_tensor, node->outputs().size()));
+    } else if (kind == symbols::poptorch::end_ipu_block) {
+      // NOP for now.
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       _compiler.setActiveIpu(
           node->i(c10::Symbol::fromQualString("attr::stage")),
           node->i(c10::Symbol::fromQualString("attr::phase")),
           node->i(c10::Symbol::fromQualString("attr::ipu")));
-    } else if (kind == symbols::poptorch::end_ipu_block) {
-      // NOP for now.
+    } else if (kind == symbols::poptorch::set_matmul_serialization) {
+      poptorch::TensorId input = _valueMap.tensor(node->input());
+      _compiler.setMatMulSerialization(
+          input, node->s(c10::Symbol::fromQualString("attr::mode")).c_str(),
+          node->i(c10::Symbol::fromQualString("attr::factor")),
+          node->i(c10::Symbol::fromQualString("attr::keep_precision")));
+      _valueMap.setTensor(node->output(), input);
     } else if (kind == symbols::poptorch::set_available_memory) {
       // Get the torch jit SSA for the input/output values.
       std::vector<poptorch::TensorId> inputs;

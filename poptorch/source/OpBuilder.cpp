@@ -436,6 +436,24 @@ torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createSetMatMulSerialization(torch::jit::Graph *graph,
+                                               torch::jit::Value *matmul,
+                                               const std::string &mode,
+                                               int64_t factor,
+                                               bool keep_precision) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::set_matmul_serialization, {matmul});
+
+  new_node->s_(c10::Symbol::fromQualString("attr::mode"), mode);
+  new_node->i_(c10::Symbol::fromQualString("attr::factor"), factor);
+  new_node->i_(c10::Symbol::fromQualString("attr::keep_precision"),
+               keep_precision);
+
+  new_node->output()->setType(matmul->type());
+
+  return new_node;
+}
+
 torch::jit::Node *createBeginIpuBlock(torch::jit::Graph *graph,
                                       std::uint64_t stage_id,
                                       std::int64_t phase, std::int64_t ipu_id) {

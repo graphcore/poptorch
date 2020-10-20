@@ -10,6 +10,30 @@ set_available_memory = torch.ops.poptorch.set_available_memory
 nop = torch.ops.popart.nop
 
 
+def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
+    """ Instantiate a matmul that should be serialized.
+
+   The matrix multiplication will be split into separate smaller matmuls
+   which will be executed in serie.
+
+   :param lhs: Lhs input matrix
+   :param rhs: Rhx input matrix
+   :param poptorch.MatMulSerializationMode mode: Which dimension of the matmul
+    to serialize on.
+   :param int factor: Number of serialized matmuls. Must be a factor of the
+   dimensions to serialize on.
+   :param bool keep_precision: If True then any MatMul split along its
+    reducing dimension will have an output type of float and a cast will be
+    added after the addInplaces.
+   """
+    assert isinstance(keep_precision, bool)
+    assert isinstance(factor, int)
+    assert isinstance(mode, enums.MatMulSerializationMode)
+    out = torch.matmul(lhs, rhs)
+    return torch.ops.poptorch.set_matmul_serialization(out, mode.value, factor,
+                                                       keep_precision)
+
+
 class IPU(torch.nn.Module):
     """Runs a layer on a specified IPU.
 

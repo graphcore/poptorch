@@ -62,7 +62,12 @@ def _excepthook(*args):
         extra_info = args[1].stderr or args[1].stdout
         extra_info = "\n" + extra_info.decode("utf-8")
 
-    logger.critical("%s\n%s%s", e[-1], "".join(e), extra_info)
+    if any("[closed]" in repr(h) for h in logger.handlers):
+        # In some cases pytest has already closed the logger so use stderr
+        # as a fallback.
+        print("%s\n%s%s", e[-1], "".join(e), extra_info, file=sys.stderr)
+    else:
+        logger.critical("%s\n%s%s", e[-1], "".join(e), extra_info)
     sys.exit(1)
 
 

@@ -50,3 +50,12 @@ class IpuId(enum.IntEnum):
 
 class PhaseId(enum.IntEnum):
     Disabled = -1
+
+
+class MatMulSerializationMode(enum.Enum):
+    """Which dimension of the matrix multiplication to use for the
+    serialization"""
+    InputChannels = "input_channels"
+    ReducingDim = "reducing_dim"
+    OutputChannels = "output_channels"
+    Disabled = "none"
