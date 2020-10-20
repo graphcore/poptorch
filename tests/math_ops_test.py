@@ -268,8 +268,8 @@ binary_ops_basic_element_wise_bool = [
 
 @pytest.mark.parametrize("op", binary_ops_basic_element_wise_bool)
 def test_binary_ops_elementwise_bools(op):
-    input1 = torch.tensor([0, 1, 0, 1])
-    input2 = torch.tensor([0, 0, 1, 1])
+    input1 = torch.tensor([False, True, False, True])
+    input2 = torch.tensor([False, False, True, True])
 
     def compare(x, y):
         return torch.all(torch.eq(x, y))
@@ -280,8 +280,6 @@ def test_binary_ops_elementwise_bools(op):
             self.op = op
 
         def forward(self, x, y):
-            x = x.to(torch.bool)
-            y = y.to(torch.bool)
             return self.op(x, y)
 
     binary_op_harness(BothBools(op), input1, input2, compare)
@@ -293,7 +291,6 @@ def test_binary_ops_elementwise_bools(op):
 
         def forward(self, x, y):
             x = x.to(torch.float) + 1.0
-            y = y.to(torch.bool)
             return self.op(x, y)
 
     binary_op_harness(FloatOnLHS(op), input1, input2, compare)
@@ -304,7 +301,6 @@ def test_binary_ops_elementwise_bools(op):
             self.op = op
 
         def forward(self, x, y):
-            x = x.to(torch.bool)
             y = y.to(torch.float) + 1.0
             return self.op(x, y)
 
@@ -317,7 +313,6 @@ def test_binary_ops_elementwise_bools(op):
 
         def forward(self, x, y):
             x = x.to(torch.int) + 1
-            y = y.to(torch.bool)
             return self.op(x, y)
 
     binary_op_harness(IntOnLHS(op), input1, input2, compare)
@@ -328,7 +323,6 @@ def test_binary_ops_elementwise_bools(op):
             self.op = op
 
         def forward(self, x, y):
-            x = x.to(torch.bool)
             y = y.to(torch.int) + 1
             return self.op(x, y)
 

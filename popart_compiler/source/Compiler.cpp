@@ -914,6 +914,18 @@ void Compiler::setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
       {_impl->ids[id], *_impl->memory_manager.back().get()});
 }
 
+void Compiler::setUpInputOp(poptorch::TensorId id, bool *ptr,
+                            const std::vector<std::int64_t> &dims) {
+  assertTensorIs(PopartType::BOOL, id,
+                 static_cast<const char *>(__PRETTY_FUNCTION__));
+
+  // Popart wrapper around the tensor pointer.
+  _impl->memory_manager.push_back(
+      std::make_unique<popart::NDArrayWrapper<bool>>(ptr, dims));
+  _impl->popart_incoming.insert(
+      {_impl->ids[id], *_impl->memory_manager.back().get()});
+}
+
 void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
                             const std::vector<std::int64_t> &dims,
                             bool float16) {

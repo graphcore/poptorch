@@ -243,6 +243,9 @@ public:
   void setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
+  void setUpInputOp(poptorch::TensorId id, bool *ptr,
+                    const std::vector<std::int64_t> &dims);
+
   void setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
                     const std::vector<std::int64_t> &dims,
                     bool float16 = false);

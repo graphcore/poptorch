@@ -56,6 +56,11 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
           popart_id, static_cast<std::int32_t *>(pytorch_tensor.data_ptr()),
           popart_dims);
       break;
+    case at::ScalarType::Bool:
+      _compiler.setUpInputOp(popart_id,
+                             static_cast<bool *>(pytorch_tensor.data_ptr()),
+                             popart_dims);
+      break;
     case at::ScalarType::Long:
       _converted_inputs[i] = pytorch_tensor.toType(at::ScalarType::Int);
       _compiler.setUpInputOp(
