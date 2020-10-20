@@ -25,10 +25,10 @@ torch::jit::Node *
 createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
                     torch::jit::ArrayRef<torch::jit::Value *> inputs,
                     const ImplicitCast implicit_cast, OutputType output_type,
-                    size_t num_outputs) {
+                    size_t num_outputs, c10::optional<at::ScalarType> dtype) {
   torch::jit::Node *new_node;
 
-  if (implicit_cast != ImplicitCast::None) {
+  if (implicit_cast != ImplicitCast::None && !inputs.empty()) {
     logging::LogContext ctx(std::string("implicitly casting inputs of ") +
                             kind.toQualString());
     auto possibly_casted_inputs = implicitCastInputs(&inputs, implicit_cast);
@@ -42,11 +42,13 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
     new_node = graph->create(kind, inputs, num_outputs);
   }
 
-  if (output_type != OutputType::AsDtype &&
-      output_type != OutputType::AsDtypeOrAsPromoted) {
-    setNodeOutputsTypes(new_node, implicit_cast, output_type);
+  if (dtype) {
+    if (*dtype != at::ScalarType::Undefined) {
+      new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(*dtype));
+    }
   }
 
+  setNodeOutputsTypes(new_node, implicit_cast, output_type);
   graph->insertNode(new_node);
   return new_node;
 }
@@ -91,14 +93,13 @@ void setNodeOutputsTypes(torch::jit::Node *node,
       return;
     }
 
-    const auto dtype_sym = c10::Symbol::fromQualString("attr::dtype");
-    if (node->hasAttribute(dtype_sym)) {
-      if (node->kindOf(dtype_sym) == torch::jit::AttributeKind::i) {
-        const auto onnx_dtype = node->i(dtype_sym);
+    if (node->hasAttribute(c10::attr::dtype)) {
+      if (node->kindOf(c10::attr::dtype) == torch::jit::AttributeKind::i) {
+        const auto onnx_dtype = node->i(c10::attr::dtype);
         resolved_output_type =
             onnxStrToScalarType(onnxStrFromDtypeInt(onnx_dtype));
       } else {
-        const auto &onnx_dtype = node->s(dtype_sym);
+        const auto &onnx_dtype = node->s(c10::attr::dtype);
         resolved_output_type = onnxStrToScalarType(onnx_dtype.c_str());
       }
 
@@ -112,7 +113,7 @@ void setNodeOutputsTypes(torch::jit::Node *node,
       // HALF_OR_FLOAT)
       resolved_output_type = scalarTypeFromInput(node, 0);
       // This may be needed in the lower to popart stage.
-      node->s_(dtype_sym, scalarTypeToOnnxString(resolved_output_type));
+      node->s_(c10::attr::dtype, scalarTypeToOnnxString(resolved_output_type));
     }
     break;
   }
@@ -359,19 +360,11 @@ createRandomNormal(torch::jit::Graph *graph,
                    at::ScalarType dataType) {
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::random_normal, possible_inputs,
-      ImplicitCast::All, OutputType::AsDtypeOrAsPromoted);
+      ImplicitCast::All, OutputType::AsDtypeOrAsPromoted, 1, dataType);
+
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::mean, mean);
   new_node->f_(c10::attr::scale, scale);
-
-  if (dataType != at::ScalarType::Undefined) {
-    new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
-  }
-
-  new_node->output()->setType(c10::TensorType::create(
-      dataType, c10::nullopt, c10::nullopt, c10::nullopt));
-  setNodeOutputsTypes(new_node, ImplicitCast::None,
-                      OutputType::AsDtypeOrAsPromoted);
 
   // At this point, the input is no longer needed
   for (size_t i = 0; i < possible_inputs.size(); i++) {
@@ -391,21 +384,13 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
     inputs.push_back(possible_input);
   }
 
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::random_uniform, inputs,
-                          ImplicitCast::None, OutputType::AsDtypeOrAsPromoted);
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::random_uniform, inputs, ImplicitCast::None,
+      OutputType::AsDtypeOrAsPromoted, 1, dataType);
+
   new_node->is_(c10::attr::shape, shape);
   new_node->f_(c10::attr::high, high);
   new_node->f_(c10::attr::low, low);
-
-  if (dataType != at::ScalarType::Undefined) {
-    new_node->s_(c10::attr::dtype, scalarTypeToOnnxString(dataType));
-  }
-
-  new_node->output()->setType(c10::TensorType::create(
-      dataType, c10::nullopt, c10::nullopt, c10::nullopt));
-  setNodeOutputsTypes(new_node, ImplicitCast::None,
-                      OutputType::AsDtypeOrAsPromoted);
 
   // At this point, the input is no longer needed
   if (possible_input) {

@@ -33,13 +33,9 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
 
   auto new_node = createAndInsertNode(
       graph, is_ones ? symbols::poptorch::ones : symbols::poptorch::zeros, {},
-      ImplicitCast::None, OutputType::AsDtype);
+      ImplicitCast::None, OutputType::AsDtype, 1, *as_tensor->scalarType());
 
   new_node->is_(c10::attr::shape, shapeFromTensor(node->output()));
-  new_node->s_(c10::attr::dtype,
-               scalarTypeToOnnxString(*as_tensor->scalarType()));
-  setNodeOutputsTypes(new_node, ImplicitCast::None, OutputType::AsDtype);
-
   return new_node;
 }
 

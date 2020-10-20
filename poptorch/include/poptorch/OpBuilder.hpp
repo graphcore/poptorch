@@ -25,13 +25,17 @@ enum class OutputType {
   AlwaysUint8
 };
 
+namespace c10 {
+template <class T> class optional;
+} // namespace c10
+
 namespace poptorch {
-torch::jit::Node *
-createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
-                    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
-                    ImplicitCast implicit_cast = ImplicitCast::None,
-                    OutputType output_type = OutputType::Unknown,
-                    size_t num_outputs = 1);
+torch::jit::Node *createAndInsertNode(
+    torch::jit::Graph *graph, torch::jit::NodeKind kind,
+    torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
+    ImplicitCast implicit_cast = ImplicitCast::None,
+    OutputType output_type = OutputType::Unknown, size_t num_outputs = 1,
+    c10::optional<at::ScalarType> dtype = c10::optional<at::ScalarType>());
 
 // Called by createAndInsertNode except in the cases of OutputType::AsDtype and
 // OutputType::AsDtypeOrFirstInput where it should be called manually once the
