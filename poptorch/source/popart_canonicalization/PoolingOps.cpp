@@ -50,6 +50,8 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
   // the average pool is supposed to include the padding in its average.
   if (count_include_pad) {
     new_value = createConstantPad(graph, new_value, padding, 0.f)->output();
+    // Ensure that padding isn't added twice.
+    padding = {};
   }
 
   return createAveragepool(graph, {new_value}, kernel_size, ceil_mode, 0,
