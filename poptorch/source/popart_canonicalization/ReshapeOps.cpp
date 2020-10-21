@@ -172,7 +172,6 @@ torch::jit::Node *contiguousHandler(torch::jit::Graph *graph,
   // memory_format=contiguous_format) -> Tensor Returns a copy of the tensor but
   // in contiguous memory.
   //
-  // aten::detach(Tensor self) -> Tensor
   // Returns the tensor
   UNUSED(graph);
   node->output()->replaceAllUsesWith(node->input(0));
@@ -458,7 +457,6 @@ static bool handlers = registerHandlers(
     c10::aten::split,  splitChunkHandler,
     c10::aten::chunk,  splitChunkHandler,
     c10::aten::contiguous,  contiguousHandler,
-    c10::aten::detach,  contiguousHandler,
     c10::aten::permute,  permuteHandler,
     c10::aten::transpose, transposeHandler,
     c10::aten::to, toHandler,

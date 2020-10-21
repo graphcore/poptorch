@@ -443,3 +443,21 @@ def test_copy_(input_shapes, dtype):
         assert native.size() == pop.size()
         assert native.dtype == pop.dtype
         assert torch.equal(native, pop)
+
+
+def test_detach():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x.detach()
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    x = torch.tensor([1.0], requires_grad=True)
+
+    # Run on IPU.
+    poptorch_out = poptorch_model(x)
+
+    assert not poptorch_out.requires_grad

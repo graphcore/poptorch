@@ -45,6 +45,8 @@ OP_CONVERTOR(aten::bmm, NONE, createMatmul, {PARAM(0) COMMA PARAM(1)})
 // aten::sigmoid(Tensor t) -> Tensor
 OP_CONVERTOR(aten::sigmoid, NONE, createSigmoid, {PARAM(0)})
 
+// aten::detach(Tensor self) -> Tensor
+OP_CONVERTOR(aten::detach, NONE, createDetach, {PARAM(0)})
 
 // Pads are all in the form of:
 // aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> Tensor
