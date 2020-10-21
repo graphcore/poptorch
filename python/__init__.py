@@ -127,7 +127,7 @@ class AsynchronousDataAccessor:
                  dataset,
                  buffer_size=3,
                  miss_sleep_time_in_ms=0.1,
-                 load_indefinitely=False):
+                 load_indefinitely=True):
         """
         :param dataset: The dataset to pull data from, this can be any Python
             iterable.
@@ -136,7 +136,6 @@ class AsynchronousDataAccessor:
             we sleep the worker before checking again.
         :param load_indefinitely: If True when we hit the end of the dataset
             we will just loop round again.
-
         """
 
         self._training_data = dataset
@@ -152,12 +151,18 @@ class AsynchronousDataAccessor:
         self._ready_to_read_index = None
         self._is_single_tensor = None
         self._data_buffers = None
+
+        # Keep end of file events in a special buffer shared between worker and device. This is due to the worker reseting automatically.
+        self._eof_event_tensor = None
+
         self._ring_read_index = 0
+
+        # Start the worker process.
+        self.spin_up()
 
     def terminate(self):
         """
-        An override function to kill the worker process manually usually used
-        in conjunction with the load_indefinitely option.
+        An override function to kill the worker process manually.
         """
         if self._data_fetcher:
             self._data_fetcher.terminate()
@@ -191,6 +196,12 @@ class AsynchronousDataAccessor:
         queue.put(data_length)
         queue.put(is_single_tensor)
 
+        # Share a small buffer with host to signal EOF and where in ring buffer the event occured.
+        # -1 means no event and the worker will keep loading. We start with a dummy event so the
+        # EOF won't be hit before the first call to __init__
+        eof_tensor = torch.tensor([42], dtype=torch.int).share_memory_()
+        queue.put(eof_tensor)
+
         # Send the tensors to the host.
         for index, tensor in enumerate(data):
             assert isinstance(
@@ -217,7 +228,14 @@ class AsynchronousDataAccessor:
         any_data_sent = True
 
         while True:
+
+            # If we hit EOF sleep till re-awakened by host
+            if eof_tensor[0] != -1:
+                time.sleep(self._miss_sleep_time_in_ms)
+                continue
+
             try:
+
                 # Only pull the next iteration if we sent data the last one,
                 # otherwise try send the old one again.
                 if any_data_sent:
@@ -225,13 +243,16 @@ class AsynchronousDataAccessor:
                     if isinstance(data, torch.Tensor):
                         data = (data, )
             except StopIteration:
-                # EOF: Reset the iterator back to the start.
-                if self._load_indefinitely:
-                    dataset_iterator = iter(self._training_data)
-                    continue
+                # If we are not to load indefinitely we just kill the worker.
+                if not self._load_indefinitely:
+                    break
 
-                # Else break
-                break
+                # We always reset and will keep the worker thread running.
+                dataset_iterator = iter(self._training_data)
+
+                # Tell the host where the EOF occured.
+                eof_tensor[0] = ring_write_index
+                continue
 
             any_data_sent = False
 
@@ -260,7 +281,10 @@ class AsynchronousDataAccessor:
         # before the parent is done setting the buffers up: wait here.
         setup_complete.get()
 
-    def __iter__(self):
+    def spin_up(self):
+        # We have already spun up the worker.
+        if self._data_fetcher is not None:
+            return
         # We use a small queue to get the initial data. The latency of
         # deserialising the python data is too high to be used for the
         # actual fetch so we just use this to return the initial buffers
@@ -285,6 +309,8 @@ class AsynchronousDataAccessor:
 
         self._is_single_tensor = queue.get(block=True)
 
+        self._eof_event_tensor = queue.get(block=True)
+
         self._data_buffers = []
 
         for _ in range(0, buffer_len):
@@ -295,6 +321,8 @@ class AsynchronousDataAccessor:
         # We're all set: let the worker know.
         setup_complete.put(0)
 
+    def __iter__(self):
+        self._eof_event_tensor[0] = -1
         return self
 
     def __next__(self):
@@ -322,12 +350,20 @@ class AsynchronousDataAccessor:
                 if self._ring_read_index >= self._buffer_size:
                     self._ring_read_index = 0
 
-            # Processed all data and the process is dead, EOF.
-            process_dead = not self._data_fetcher.is_alive()
-            if self._previously_ready_element is None and process_dead:
-                assert self._data_fetcher.exitcode == 0, \
-                        "An error occurred in the data fetcher"
-                raise StopIteration
+            # We didn't fetch any data this time. Check to see if worker is dead or EOF.
+            if self._previously_ready_element is None:
+
+                # Processed all data and the process is dead, EOF.
+                process_dead = not self._data_fetcher.is_alive()
+
+                if process_dead:
+                    assert self._data_fetcher.exitcode == 0, \
+                            "An error occurred in the data fetcher"
+                    raise StopIteration
+
+                # Check if there has been an EOF event.
+                if self._eof_event_tensor[0] != -1:
+                    raise StopIteration
 
         # Return either one tensor or the list.
         if self._is_single_tensor:

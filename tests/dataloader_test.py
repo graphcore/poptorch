@@ -114,7 +114,8 @@ def _run_process_test(shape=None,
                       batch_size=1,
                       num_workers=0,
                       device_iterations=1,
-                      replication_factor=1):
+                      replication_factor=1,
+                      num_runs=1):
     shape = shape or [2, 3]
 
     opts = poptorch.Options()
@@ -130,16 +131,17 @@ def _run_process_test(shape=None,
 
     model = poptorch.inferenceModel(DoubleData(), opts)
 
-    for it, d in enumerate(loader):
-        out = model(d)
+    for _ in range(0, num_runs):
+        for it, d in enumerate(loader):
+            out = model(d)
 
-        expected = torch.stack([
-            torch.full(shape, i * 2, dtype=torch.float32)
-            for i in range(data.combinedBatchSize *
-                           it, data.combinedBatchSize * (it + 1))
-        ])
+            expected = torch.stack([
+                torch.full(shape, i * 2, dtype=torch.float32)
+                for i in range(data.combinedBatchSize *
+                               it, data.combinedBatchSize * (it + 1))
+            ])
 
-        assert torch.equal(expected, out)
+            assert torch.equal(expected, out)
 
 
 def test_multithreaded1():
@@ -193,7 +195,6 @@ def _run_process_label_test(shape=None,
     label_out = torch.zeros(1, dtype=torch.int)
     for _, (data, label) in enumerate(loader):
         out, label = model(data, label)
-
         total += torch.sum(out, dim=0)
         label_out += torch.sum(label, dim=0)
 
@@ -211,6 +212,24 @@ def test_multithreaded4():
                             device_iterations=10,
                             replication_factor=1,
                             num_workers=0)
+
+
+def test_multithreaded_resume1():
+    _run_process_test(num_tensors=100,
+                      batch_size=2,
+                      device_iterations=1,
+                      replication_factor=1,
+                      num_workers=0,
+                      num_runs=4)
+
+
+def test_multithreaded_resume2():
+    _run_process_test(num_tensors=100,
+                      batch_size=2,
+                      device_iterations=10,
+                      replication_factor=1,
+                      num_workers=0,
+                      num_runs=4)
 
 
 def _run_dataset_test(shape=None,
