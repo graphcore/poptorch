@@ -39,10 +39,20 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
                          dilations, padding, 0, stride);
   }
 
-  // countIncludePad, divisor_override are ignored for now due
-  // to not being supported directly in popart.
+  // divisor_override is ignored for now due to not being supported directly in
+  // popart.
   auto ceil_mode = constantToLong(node->input(4)->node());
-  return createAveragepool(graph, {node->input(0)}, kernel_size, ceil_mode, 0,
+
+  torch::jit::Value *new_value = node->input(0);
+
+  bool count_include_pad = constantToBool(node->input(5)->node());
+  // count_include_pad isn't supported in PopART so we check and pad manually if
+  // the average pool is supposed to include the padding in its average.
+  if (count_include_pad) {
+    new_value = createConstantPad(graph, new_value, padding, 0.f)->output();
+  }
+
+  return createAveragepool(graph, {new_value}, kernel_size, ceil_mode, 0,
                            padding, stride);
 } // namespace anonymous
 

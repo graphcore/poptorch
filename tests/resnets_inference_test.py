@@ -56,7 +56,6 @@ unsupported_models = [
     models.wide_resnet50_2,  # Supported but doesn't fit on 1 IPU.
     # Supported on IPU_MODEL but runs into stream limit on IPU.
     models.alexnet,
-    models.inception_v3,  # TODO(T26199): Output mismatch
 ]
 
 
@@ -111,3 +110,8 @@ def test_mobilenet_v2():
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_googlenet():
     inference_harness(models.googlenet)
+
+
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
+def test_inception_v3():
+    inference_harness(models.inception_v3)

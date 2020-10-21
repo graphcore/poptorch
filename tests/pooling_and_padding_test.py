@@ -63,6 +63,15 @@ def test_pool2D(op):
     model = op((3, 2), stride=(2, 1))
     execute_and_check_wrapper(model, input)
 
+    # pool of square window of size=3, stride=2, padding=1
+    model = op(3, stride=2, padding=1)
+    execute_and_check_wrapper(model, input)
+
+    if op == torch.nn.AvgPool2d:
+        # pool of square window of size=3, stride=2, padding=1, pool excludes padding
+        model = op(3, stride=2, padding=1, count_include_pad=False)
+        execute_and_check_wrapper(model, input)
+
 
 @pytest.mark.parametrize("op", adaptive_pool_2D)
 def test_adaptive_pool2D(op):
