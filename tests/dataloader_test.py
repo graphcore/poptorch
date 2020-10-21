@@ -213,25 +213,6 @@ def test_multithreaded4():
                             replication_factor=1,
                             num_workers=0)
 
-
-def test_multithreaded_resume1():
-    _run_process_test(num_tensors=100,
-                      batch_size=2,
-                      device_iterations=1,
-                      replication_factor=1,
-                      num_workers=0,
-                      num_runs=4)
-
-
-def test_multithreaded_resume2():
-    _run_process_test(num_tensors=100,
-                      batch_size=2,
-                      device_iterations=10,
-                      replication_factor=1,
-                      num_workers=0,
-                      num_runs=4)
-
-
 def _run_dataset_test(shape=None,
                       num_tensors=100,
                       batch_size=1,
