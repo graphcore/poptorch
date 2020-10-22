@@ -455,6 +455,7 @@ static bool handlers = registerHandlers(
     c10::aten::select,  selectHandler,
     c10::aten::slice,  sliceHandler,
     c10::aten::split,  splitChunkHandler,
+    c10::aten::split_with_sizes, splitChunkHandler,
     c10::aten::chunk,  splitChunkHandler,
     c10::aten::contiguous,  contiguousHandler,
     c10::aten::permute,  permuteHandler,

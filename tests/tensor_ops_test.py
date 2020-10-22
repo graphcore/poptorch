@@ -99,22 +99,25 @@ def test_reshape():
     assert torch.equal(nativeOut, poptorch_out)
 
 
-def test_split():
+@pytest.mark.parametrize("split_size_or_sections",
+                         (1, 5, 6, 20, [10, 10], [19, 1]))
+def test_split(split_size_or_sections):
     class Model(torch.nn.Module):
         def forward(self, x):
-            return torch.split(x, 5)
+            return torch.split(x, split_size_or_sections)
 
     model = Model()
     x = torch.randn(20, 10)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    for native, pop in zip(nativeOut, poptorch_out):
+    for native, pop in zip(native_out, poptorch_out):
+        assert native.size() == pop.size()
         assert torch.equal(native, pop)
 
 
