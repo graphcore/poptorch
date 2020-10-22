@@ -216,10 +216,38 @@ def test_float16_activations_float32_weights():
     assert pop_out.dtype == torch.half
 
 
-def test_MSELoss_training():
+def test_master_weight_training():
     torch.manual_seed(42)
 
     model = torch.nn.Linear(10, 10)
+
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss())
+
+    target = torch.randn(10)
+    input = torch.randn(10).half()
+
+    # Make sure the first run doesn't already pass the test.s
+    original, original_loss = poptorch_model(input, target.half())
+    assert original_loss > 0.1
+    assert not torch.allclose(original.float(), target, rtol=1e-02, atol=1e-02)
+
+    for _ in range(0, 2500):
+        out, loss = poptorch_model(input, target.half())
+
+    # Check we have trained the "model"
+    assert loss.float() < 0.001
+    assert torch.allclose(out.float(), target, rtol=1e-02, atol=1e-02)
+
+
+def test_bigger_model_training():
+    torch.manual_seed(42)
+
+    model = torch.nn.Sequential(torch.nn.Linear(10,
+                                                10), torch.nn.Linear(10, 10),
+                                torch.nn.Linear(10,
+                                                10), torch.nn.Linear(10, 10),
+                                torch.nn.Linear(10, 10))
 
     poptorch_model = helpers.trainingModelWithLoss(model,
                                                    loss=torch.nn.MSELoss())

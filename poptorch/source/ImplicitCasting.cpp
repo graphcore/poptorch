@@ -146,9 +146,7 @@ bool needToRetype(const torch::jit::Value *input,
 
 torch::jit::Value *addCast(torch::jit::Value *input,
                            const c10::ScalarType type) {
-  auto node = input->node();
-  torch::jit::WithInsertPoint insert_point(node->next());
-
+  torch::jit::Node *node = input->node();
   auto new_node = createCast(input->owningGraph(), input, type);
   auto current_type = input->type()->cast<c10::TensorType>();
 
