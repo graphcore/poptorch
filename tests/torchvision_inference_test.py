@@ -39,13 +39,15 @@ import helpers
 # Wide ResNet-101-2
 # MNASNet 1.0
 
-# Models here are hopefuly representative of their cousins (i.e test Resnet18 without testing Resnet-34/50/101/152)
+# Models here are hopefully representative of their cousins (i.e test Resnet18 without testing Resnet-34/50/101/152)
 # The others will be tested in hardware benchmark tests,
 tested_subset = [
     models.resnet18,
     models.resnext50_32x4d,
     models.mnasnet1_0,
     models.mobilenet_v2,
+    # SqueezeNet v1.0 simply has more parameters and a greater computational cost
+    models.squeezenet1_1,
 ]
 
 # Deliberately un-tested models
@@ -115,3 +117,8 @@ def test_googlenet():
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_inception_v3():
     inference_harness(models.inception_v3)
+
+
+@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
+def test_squeezenet1_1():
+    inference_harness(models.squeezenet1_1)

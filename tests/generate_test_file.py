@@ -44,11 +44,14 @@ long_tests = [
     "torch_nn_test.py::test_pytorch_nn[True-test_nn_Conv2d_circular_stride2_pad2]",
     "bert_small_and_medium_test.py::test_bert_medium_result",
     "torch_nn_test.py::test_pytorch_nn[False-test_nn_Conv2d_circular_stride2_pad2]",
-    "resnets_inference_test.py::test_mobilenet_v2",
-    "resnets_inference_test.py::test_resnet18",
-    "resnets_inference_test.py::test_mnasnet1_0",
-    "resnets_inference_test.py::test_resnext50_32x4d",
-    "half_test.py::test_resnet", "resnets_inference_test.py::test_googlenet"
+    "torchvision_inference_test.py::test_mobilenet_v2",
+    "torchvision_inference_test.py::test_resnet18",
+    "torchvision_inference_test.py::test_mnasnet1_0",
+    "torchvision_inference_test.py::test_resnext50_32x4d",
+    "torchvision_inference_test.py::test_googlenet",
+    "torchvision_inference_test.py::test_inception_v3",
+    "torchvision_inference_test.py::test_squeezenet1_1",
+    "half_test.py::test_resnet",
 ]
 #pylint: enable=line-too-long
 
