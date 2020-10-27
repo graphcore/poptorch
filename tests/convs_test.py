@@ -20,7 +20,8 @@ convolutions = [
     torch.nn.Fold,
 ]
 
-padding_modes = ['zeros', 'reflect', 'replicate', 'circular']
+# TODO(T22980):
+# padding_mode (string, optional) - 'zeros', 'reflect', 'replicate' or 'circular'. Default: 'zeros
 
 # Unsupported
 folds = []  # torch.nn.Unfold, torch.nn.Fold,
@@ -43,41 +44,39 @@ def execute_and_check_wrapper(model, input):
 
 
 @pytest.mark.parametrize("op", conv_1D)
-@pytest.mark.parametrize("padding_mode", padding_modes)
-def test_conv1D(op, padding_mode):
-    if op is torch.nn.ConvTranspose1d and padding_mode != 'zeros':
-        pytest.skip('skipping unsupported padding_mode')
+def test_conv1D(op):
+
     torch.manual_seed(42)
 
     input = torch.randn(20, 4, 10)
 
     # With square kernels and equal stride
-    model = op(4, 10, 3, stride=2, padding_mode=padding_mode)
+    model = op(4, 10, 3, stride=2)
     execute_and_check_wrapper(model, input)
 
     # Grouped convolutions.
-    model = op(4, 8, 3, stride=2, groups=2, padding_mode=padding_mode)
+    model = op(4, 8, 3, stride=2, groups=2)
     execute_and_check_wrapper(model, input)
 
     if op is not torch.nn.ConvTranspose1d:
         # # non-square kernels and unequal stride and with padding and dilation
-        model = op(4, 33, (3), stride=(2), padding=(4), dilation=(3), padding_mode=padding_mode)
+        model = op(4, 33, (3), stride=(2), padding=(4), dilation=(3))
         execute_and_check_wrapper(model, input)
 
 
 @pytest.mark.parametrize("op", conv_2D)
-@pytest.mark.parametrize("padding_mode", padding_modes)
-def test_conv2D(op, padding_mode):
+def test_conv2D(op):
+
     torch.manual_seed(42)
 
     input = torch.randn(20, 16, 50, 10)
 
     # With square kernels and equal stride
-    model = op(16, 4, 3, stride=2, padding_mode=padding_mode)
+    model = op(16, 4, 3, stride=2)
     execute_and_check_wrapper(model, input)
 
     # Grouped convolutions.
-    model = op(16, 4, (3, 5), stride=2, groups=2, padding_mode=padding_mode)
+    model = op(16, 4, (3, 5), stride=2, groups=2)
     execute_and_check_wrapper(model, input)
 
     # Rectangular padding/stride
@@ -87,27 +86,26 @@ def test_conv2D(op, padding_mode):
         execute_and_check_wrapper(model, input)
 
         # non-square kernels and unequal stride and with padding and dilation
-        model = op(16, 4, (3, 5), stride=(2, 1), padding=(4, 2), dilation=(3), padding_mode=padding_mode)
+        model = op(16, 4, (3, 5), stride=(2, 1), padding=(4, 2), dilation=(3))
         execute_and_check_wrapper(model, input)
 
 
 @pytest.mark.parametrize("op", conv_3D)
-@pytest.mark.parametrize("padding_mode", padding_modes)
-def test_conv3D(op, padding_mode):
+def test_conv3D(op):
     torch.manual_seed(42)
     input = torch.randn(2, 4, 3, 5, 10)
 
     # With square kernels and equal stride
-    model = op(4, 6, 3, stride=2, padding_mode=padding_mode)
+    model = op(4, 6, 3, stride=2)
     execute_and_check_wrapper(model, input)
 
     # Grouped convolutions.
-    model = op(4, 6, 3, stride=2, groups=2, padding_mode=padding_mode)
+    model = op(4, 6, 3, stride=2, groups=2)
     execute_and_check_wrapper(model, input)
 
     if op is not torch.nn.ConvTranspose3d:
         # non-square kernels and unequal stride and with padding
-        model = op(4, 6, (3, 2, 2), stride=(2, 1, 1), padding=(4, 2, 0), padding_mode=padding_mode)
+        model = op(4, 6, (3, 2, 2), stride=(2, 1, 1), padding=(4, 2, 0))
         execute_and_check_wrapper(model, input)
 
         # non-square kernels and unequal stride and with padding and dilation
