@@ -82,10 +82,11 @@ new_node->f_(c10::Symbol::fromQualString("attr::lambda"),lambda);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 return new_node;
 }
-torch::jit::Node* createNllloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,std::int32_t ignoreIndex) {
+torch::jit::Node* createNllloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,std::int32_t ignoreIndex,bool inputIsLogProbability) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::nllloss, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 new_node->i_(c10::Symbol::fromQualString("attr::ignoreIndex"),ignoreIndex);
+new_node->i_(c10::Symbol::fromQualString("attr::inputIsLogProbability"),inputIsLogProbability);
 return new_node;
 }
 torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction) {

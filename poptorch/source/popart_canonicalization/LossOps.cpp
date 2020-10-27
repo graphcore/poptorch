@@ -60,8 +60,9 @@ torch::jit::Node *nllLossHandler(torch::jit::Graph *graph,
   // Convert to popart reduce values.
   reduction = convertReduceToPopart(reduction);
 
-  torch::jit::Node *nllloss = createNllloss(
-      graph, {node->input(0), node->input(1)}, reduction, ignore_index);
+  torch::jit::Node *nllloss =
+      createNllloss(graph, {node->input(0), node->input(1)}, reduction,
+                    ignore_index, /*inputIsLogProbability=*/true);
 
   // Create an identity loss with no further reduction.
   return createIdentityloss(graph, {nllloss->output()}, 2);

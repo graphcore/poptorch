@@ -19,7 +19,7 @@ OP_DECL(popart, dynamiczero, dynamiczero, AiGraphcoreOpset1.dynamiczero, ARG(INT
 OP_DECL(popart, dynamicadd, dynamicadd, AiGraphcoreOpset1.dynamicadd, ARG(INT_VEC,axes) ARG(INT_VEC,sizes) , BODY_ARG(axes) BODY_ARG(sizes) )
 OP_DECL(popart, replicatedallreduce, replicatedallreduce, AiGraphcoreOpset1.replicatedallreduce, NONE, NONE)
 OP_DECL(popart, l1loss, l1loss, AiGraphcoreOpset1.l1loss, ARG(FLOAT,lambda) ARG(INT,reduction) , BODY_ARG(lambda) BODY_ARG(static_cast<popart::ReductionType>(reduction)) )
-OP_DECL(popart, nllloss, nllloss, AiGraphcoreOpset1.nllloss, ARG(INT,reduction) ARG(INT,ignoreIndex) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(ignoreIndex) )
+OP_DECL(popart, nllloss, nllloss, AiGraphcoreOpset1.nllloss, ARG(INT,reduction) ARG(INT,ignoreIndex) ARG(INT,inputIsLogProbability) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(ignoreIndex) BODY_ARG(inputIsLogProbability) )
 OP_DECL(popart, identityloss, identityloss, AiGraphcoreOpset1.identityloss, ARG(INT,reduction) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) )
 OP_DECL(popart, shapeddropout, shapeddropout, AiGraphcoreOpset1.shapeddropout, ARG(INT_VEC,shape) ARG(FLOAT,ratio) , BODY_ARG(shape) BODY_ARG(ratio) )
 // Ops from AiOnnxOpset10
