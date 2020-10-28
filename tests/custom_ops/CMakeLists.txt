@@ -6,14 +6,7 @@ project(custom_cube_op)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(POPLAR_DIR CACHE PATH "Path to a Poplar install")
 set(ONNX_DIR ${ONNX_PATH} CACHE PATH "Path to the onnx sources or build")
-
-if( NOT ${POPLAR_DIR} STREQUAL "")
-  list(APPEND CMAKE_PREFIX_PATH ${POPLAR_DIR})
-else()
-  message(FATAL_ERROR "You must provide a path to a Poplar install using -DPOPLAR_DIR=/path/to/popart/build/install")
-endif()
 
 # All C++ code in this project will be compiled as C++14
 set (CMAKE_CXX_STANDARD 14)

@@ -3,6 +3,7 @@ project(poptorch)
 
 set(USE_PYTORCH_PACKAGE_HEADERS ON CACHE BOOL "Use the Torch headers distributed with the pytorch package.")
 set(USE_ONNX_PACKAGE_HEADERS ON CACHE BOOL "Use the ONNX headers distributed with the ONNX pip package.")
+set(POPLAR_DIR CACHE PATH "Path to a Poplar install")
 set(POPART_DIR CACHE PATH "Path to a Popart install")
 
 set(TORCH_VERSION 1.6.0)
@@ -34,6 +35,12 @@ if(NOT DEFINED ONNX_DIR AND USE_ONNX_PACKAGE_HEADERS)
   if(NOT ONNX_PATH)
     message(FATAL_ERROR "python3 -c \"import onnx\" failed: check that your virtual environment is active and onnx is installed")
   endif()
+endif()
+
+if(EXISTS ${POPLAR_DIR})
+  list(APPEND CMAKE_PREFIX_PATH ${POPLAR_DIR})
+else()
+  message(FATAL_ERROR "You must provide a path to a Poplar install using -DPOPLAR_DIR=/path/to/popart/build/install")
 endif()
 
 if( NOT EXISTS ${POPART_DIR} )

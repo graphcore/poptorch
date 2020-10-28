@@ -5,6 +5,7 @@ import ctypes
 import platform
 import torch
 import torch.nn as nn
+import pytest
 import poptorch
 import helpers
 
@@ -13,9 +14,10 @@ if platform.system() == "Darwin":
 else:
     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_cube_op.so")
 
-myop = ctypes.cdll.LoadLibrary(myso)
+#myop = ctypes.cdll.LoadLibrary(myso)
 
 
+@pytest.mark.skip("Disabled until move to new view")
 def test_inference():
     class BasicNetwork(nn.Module):
         def forward(self, x, bias):
@@ -39,6 +41,7 @@ def test_inference():
     torch.testing.assert_allclose(out[1], 8.0)
 
 
+@pytest.mark.skip("Disabled until move to new view")
 def test_training():
     class TrainingNetwork(nn.Module):
         def __init__(self):
