@@ -72,3 +72,14 @@ def test_glu(dim):
     poptorch_out = poptorch_model(input)
 
     torch.testing.assert_allclose(nativeOut, poptorch_out)
+
+
+def test_logsoftmax_numerics():
+    model = torch.nn.LogSoftmax(dim=1)
+    x = torch.FloatTensor([[10., 100., 1000.]])
+    native_out = model(x)
+
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+
+    torch.testing.assert_allclose(poptorch_out, native_out)
