@@ -51,6 +51,7 @@ def test_ones_zeros_input_resolved(op):
     type_out_harness(torch.tensor([1], dtype=torch.float32), fw_op, True)
 
 
+#TODO(T29278) FIX
 # The dtype will resolve to the same as input. In the float32 case, the
 # ones/zeros will be wrongly generated as a float32, however the output type
 # will remain the same
@@ -97,6 +98,7 @@ def test_rand_default_input_resolved():
     type_out_harness(torch.tensor([1], dtype=torch.float32), fw_op, True)
 
 
+#TODO(T29278) FIX
 # The type will resolve to the same as input. In the float32, case, the ones
 # will be wrongly generated as a float32, however the output type will remain
 # the same
@@ -195,6 +197,35 @@ def test_normal_correctly_resolved():
 
     type_out_harness(torch.empty((3, 4, 10), dtype=torch.float16), fw_op, True)
     type_out_harness(torch.empty((3, 4, 19), dtype=torch.float32), fw_op, True)
+
+
+## tensor constant tests ##
+#TODO(T29278) FIX
+def test_constant_correctly_resolved():
+    def fw_op(input):
+        return torch.tensor([1, 2, 3], dtype=input.dtype) + input
+
+    type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float16), fw_op, True)
+    type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float32), fw_op, True)
+
+
+def test_constant_add_float16():
+    def fw_op(input):
+        return torch.tensor([1, 2, 3], dtype=input.dtype) + input.to(
+            torch.float16)
+
+    type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float16), fw_op, True)
+    type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float32), fw_op,
+                     False)
+
+
+def test_constant_always_float32():
+    def fw_op(input):
+        return torch.tensor([1, 2, 3], dtype=torch.float32) + input
+
+    type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float16), fw_op,
+                     False)
+    type_out_harness(torch.tensor([3, 4, 8], dtype=torch.float32), fw_op, True)
 
 
 def test_float16_activations_float32_weights():

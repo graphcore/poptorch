@@ -23,6 +23,12 @@ void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
   torch::jit::WithInsertPoint insert_point(n);
   auto new_node = tensorToConstant(graph, t);
 
+  // Due to tracing ambiguity, a float tensor here could be either float or half
+  auto new_type = new_node->output()->type()->expect<c10::TensorType>();
+  if (new_type->scalarType() == at::ScalarType::Float) {
+    new_node->output()->setType(new_type->withScalarType(HALF_OR_FLOAT));
+  }
+
   for (size_t use_idx = 0; use_idx < n->output()->uses().size(); use_idx++) {
     auto u = n->output()->uses()[use_idx];
     u.user->replaceInput(u.offset, new_node->output());

@@ -200,6 +200,12 @@ void ConvertHalfImpl::resolveHalfOrFloat() {
                  scalarTypeToOnnxString(new_type));
       }
 
+      // Tensor constants may need retyping
+      if (node->kind() == symbols::poptorch::tensor_constant) {
+        auto new_tensor = node->t(c10::attr::value).to(new_type);
+        node->t_(c10::attr::value, new_tensor);
+      }
+
       if (node->hasAttribute(c10::attr::dtype)) {
         resolveNodeDtype(node, new_type);
       }
