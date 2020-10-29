@@ -1,10 +1,13 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "poptorch_logging/Logging.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include <spdlog/fmt/fmt.h>
+#include <spdlog/sinks/ansicolor_sink.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/ostream_sink.h>
-#include <spdlog/spdlog.h>
 
 #include <iostream>
 #include <string>
@@ -74,8 +77,8 @@ void setColours(spdlog::sinks::ansicolor_sink<Mutex> &sink) {
   sink.set_color(spdlog::level::trace, bright_black);
   sink.set_color(spdlog::level::debug, sink.cyan);
   sink.set_color(spdlog::level::info, sink.white);
-  sink.set_color(spdlog::level::warn, sink.yellow + sink.bold);
-  sink.set_color(spdlog::level::err, sink.red + sink.bold);
+  sink.set_color(spdlog::level::warn, sink.yellow_bold);
+  sink.set_color(spdlog::level::err, sink.red_bold);
 }
 
 LoggingContext::LoggingContext() {

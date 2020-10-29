@@ -177,7 +177,7 @@ if (DEFINED SWDB_PACKAGE_NAME)
   message(STATUS "Overriding package type '${PACKAGE_OS_TYPE}'")
 endif()
 
-find_package(Torch ${TORCH_VERSION} REQUIRED)
+find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
 
 configure_file(setup.py.in
   ${PROJECT_BINARY_DIR}/setup.py
