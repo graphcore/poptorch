@@ -24,6 +24,8 @@ struct Node;
 namespace poptorch {
 namespace type_and_constant_canonicalization {
 
+void evaluateConstexprs(torch::jit::Graph *graph);
+
 void makeConstantIntParams(torch::jit::Graph *graph,
                            const std::vector<std::string> &parameter_names,
                            const std::vector<at::Tensor> &traced_tensors);

@@ -35,7 +35,7 @@ ones_zeros = [torch.ones, torch.zeros]
 @pytest.mark.parametrize("op", ones_zeros)
 def test_ones_zeros_default_resolved(op):
     def fw_op(input):
-        return op((2, 3, 4), dtype=input.dtype) + 1
+        return op((2, 3, 4), dtype=input.dtype) + input.to(input.dtype)
 
     type_out_harness(torch.tensor([1], dtype=torch.float16), fw_op, False)
     type_out_harness(torch.tensor([1], dtype=torch.float32), fw_op, True)
@@ -43,7 +43,7 @@ def test_ones_zeros_default_resolved(op):
 
 #The dtype will correctly resolve becuse it matches the input added
 @pytest.mark.parametrize("op", ones_zeros)
-def test_ones_zeros_input_resolved(op):
+def test_ones_zeros_input_resolved_with_input_dtype(op):
     def fw_op(input):
         return op((2, 3, 4), dtype=input.dtype) + input
 

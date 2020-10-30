@@ -52,6 +52,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CastUnsupportedInputs.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CanonicalizeHalf.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CheckAndChangeOutputTypes.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/EvaluateConstexprs.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/MakeConstantIntParams.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Peephole.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/EliminateListConstructs.cpp"

@@ -6,6 +6,10 @@ from operator import mul
 import torch
 import poptorch
 
+if not poptorch.ipuHardwareIsAvailable():
+    print("Replicated top level graphs are not supported on the IPU model")
+    exit(0)
+
 
 class ExampleModelWithLoss(torch.nn.Module):
     def __init__(self, data_shape, num_classes):
