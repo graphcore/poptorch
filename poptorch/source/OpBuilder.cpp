@@ -145,9 +145,10 @@ void setNodeOutputsTypes(torch::jit::Node *node,
 }
 
 torch::jit::Node *tensorToConstant(torch::jit::Graph *graph,
-                                   const at::Tensor &t) {
-  torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::tensor_constant);
+                                   const at::Tensor &t, bool host_side) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, host_side ? symbols::poptorch::host_side_tensor_constant
+                       : symbols::poptorch::tensor_constant);
   new_node->output()->inferTypeFrom(t);
   new_node->t_(c10::attr::value, t);
 

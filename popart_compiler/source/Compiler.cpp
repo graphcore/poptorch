@@ -278,6 +278,10 @@ public:
   popart::TensorId tensorConstant(const std::vector<popart::TensorId> &inputs,
                                   const PopartConstant &constant);
 
+  poptorch::TensorId
+  hostSideTensorConstant(const std::vector<popart::TensorId> &inputs,
+                         HostSideConstant constant);
+
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
   popart::TensorId randomNormal(const std::vector<popart::TensorId> &inputs,
@@ -333,6 +337,15 @@ public:
 
   void
   setExecutionStrategyAttributes(const std::set<popart::TensorId> &tensors);
+
+  const HostSideConstant &getHostSideConstant(poptorch::TensorId id) const;
+
+  bool isHostSideConstant(poptorch::TensorId id) const;
+
+private:
+  // Constants which are simply returned (possibly as part of a tuple/list) and
+  // do not need to be input into Popart
+  std::unordered_map<poptorch::TensorId, HostSideConstant> _host_side_constants;
 };
 
 void CompilerImpl::setExecutionStrategyAttributes(
@@ -413,6 +426,11 @@ void CompilerImpl::updateUseModelConfig() {
 
 void CompilerImpl::addMemoryToOutput(poptorch::TensorId id, void *ptr,
                                      std::unique_ptr<popart::IArray> &&memory) {
+  if (isHostSideConstant(id)) {
+    getHostSideConstant(id).copyDataTo(ptr);
+    return;
+  }
+
   memory_manager.push_back(std::move(memory));
 
   popart::TensorId popart_id = ids[id];
@@ -715,6 +733,17 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &inputs,
   return ai_onnx.constant(*constant.getPopartData());
 }
 
+poptorch::TensorId CompilerImpl::hostSideTensorConstant(
+    const std::vector<popart::TensorId> &inputs, HostSideConstant constant) {
+  UNUSED(inputs);
+  _host_side_constants.emplace(std::make_pair(ids.size(), std::move(constant)));
+
+  // Add a dummy into ids
+  ids.emplace_back("__poptorch__host_side_constant");
+
+  return ids.size() - 1;
+}
+
 } // namespace detail
 
 namespace {
@@ -781,6 +810,16 @@ template <> struct HandleOutput<popart::TensorId> {
     }
 
     return _impl->ids.size() - 1;
+  }
+};
+
+// Host side constant case
+template <> struct HandleOutput<poptorch::TensorId> {
+  poptorch::TensorId operator()(poptorch::TensorId in, bool loss,
+                                detail::CompilerImpl *_impl) {
+    UNUSED(loss);
+    ERROR_ON(!_impl->isHostSideConstant(in));
+    return in;
   }
 };
 
@@ -995,6 +1034,15 @@ CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &inputs,
   ERROR("Unsupported type " << dtype);
 }
 
+const HostSideConstant &
+CompilerImpl::getHostSideConstant(poptorch::TensorId id) const {
+  return _host_side_constants.at(id);
+}
+
+bool CompilerImpl::isHostSideConstant(poptorch::TensorId id) const {
+  return _host_side_constants.count(id);
+}
+
 } // namespace detail
 
 PopartConstant::PopartConstant(const PopartType &popart_type, const void *data,
@@ -1008,6 +1056,18 @@ PopartConstant::PopartConstant(const PopartType &popart_type, const void *data,
 }
 
 PopartConstant::~PopartConstant() = default;
+
+HostSideConstant::HostSideConstant(const PopartType &popart_type, void *data,
+                                   size_t data_size,
+                                   std::vector<std::int64_t> shape)
+    : _popart_type(popart_type), _shape(std::move(shape)) {
+  _data.resize(data_size);
+  std::memcpy(&_data[0], data, data_size);
+}
+
+void HostSideConstant::copyDataTo(void *ptr) const {
+  std::memcpy(ptr, &_data[0], _data.size());
+}
 
 poptorch::TensorId
 Compiler::addInputTensor(const char *type,
@@ -1050,7 +1110,8 @@ static bool IsLoss(const std::string &operation) {
 #define STRING const char *
 #define NONE
 #define ARG(Type, Name) , Type Name
-#define POPART_CONSTANT_ARG(Name) , const PopartConstant &Name
+#define POPART_CONST_ARG(Name) , const PopartConstant &Name
+#define HOST_SIDE_CONST_ARG(Name) , const HostSideConstant &Name
 #define BODY_ARG(Name) , Name
 
 // Create a function decl with the given call and arguments.
@@ -1072,7 +1133,8 @@ static bool IsLoss(const std::string &operation) {
 
 #undef OP_DECL
 #undef BODY_ARG
-#undef POPART_CONSTANT_ARG
+#undef POPART_CONST_ARG
+#undef HOST_SIDE_CONST_ARG
 #undef ARG
 #undef NONE
 #undef STRING
@@ -1106,6 +1168,11 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
 
 void Compiler::addOutputTensor(poptorch::TensorId output) {
   _impl->outputs.push_back(_impl->ids[output]);
+
+  if (isHostSideConstant(output)) {
+    return; // Nothing more to do
+  }
+
   const char *as_str = anchorTypeToString(_impl->options.anchor_mode);
 
   // If we are returning EveryN we need to pass in the return period.
@@ -1575,8 +1642,12 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
   _impl->memory_manager.clear();
 }
 
-poptorch::PopartType Compiler::getPopartType(poptorch::TensorId tensor) const {
-  popart::TensorInfo info = _impl->session->getInfo(_impl->ids[tensor]);
+poptorch::PopartType Compiler::getPopartType(poptorch::TensorId id) const {
+  if (isHostSideConstant(id)) {
+    return _impl->getHostSideConstant(id).popartType();
+  }
+
+  popart::TensorInfo info = _impl->session->getInfo(_impl->ids[id]);
 
 #define DEFINE_CASE(value)                                                     \
   case popart::DataType::value: {                                              \
@@ -1598,6 +1669,10 @@ bool Compiler::tensorIdIsValid(poptorch::TensorId id) const {
 }
 
 std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
+  if (isHostSideConstant(id)) {
+    return _impl->getHostSideConstant(id).shape();
+  }
+
   if (_impl->session) {
     return _impl->session->getInfo(_impl->ids[id]).shape();
   }
@@ -1658,6 +1733,10 @@ void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
   _impl->active_ipu = ipu_id;
 }
 
+bool Compiler::isHostSideConstant(poptorch::TensorId id) const {
+  return _impl->isHostSideConstant(id);
+}
+
 std::uint64_t Compiler::batchPerStep() const { return _impl->options.steps; }
 
 std::uint64_t Compiler::popartBatchDim() const {
@@ -1666,6 +1745,10 @@ std::uint64_t Compiler::popartBatchDim() const {
 }
 
 std::uint64_t Compiler::popartBatchDimForAnchor(poptorch::TensorId id) const {
+  if (isHostSideConstant(id)) {
+    return 1; // Cannot be batched as it is a constant
+  }
+
   // Get the PopART tensor from our wrapper.
   popart::TensorId popart_id = _impl->ids[id];
 
@@ -1731,7 +1814,7 @@ const std::vector<OutputType> &Compiler::outputTypes() const {
   return _impl->output_types;
 }
 
-void Compiler::assertTensorIs(PopartType dataType, const poptorch::TensorId &id,
+void Compiler::assertTensorIs(PopartType dataType, poptorch::TensorId id,
                               const char *caller) const {
   PopartType actual_type;
   try {

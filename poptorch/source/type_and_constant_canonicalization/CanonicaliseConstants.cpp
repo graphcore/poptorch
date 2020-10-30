@@ -3,6 +3,8 @@
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 
+#include <any>
+#include <iterator>
 #include <limits>
 
 #include "poptorch_logging/Error.hpp"
@@ -18,10 +20,35 @@ namespace poptorch {
 namespace type_and_constant_canonicalization {
 namespace {
 
+bool isHostSideNode(torch::jit::Node *n) {
+  std::vector<torch::jit::Node *> to_check;
+  to_check.push_back(n);
+  while (!to_check.empty()) {
+    auto cur_node = to_check.back();
+    to_check.pop_back();
+    for (auto output : cur_node->outputs()) {
+      for (auto use : output->uses()) {
+        auto use_kind = use.user->kind();
+        if (use_kind != c10::prim::Return &&
+            use_kind != symbols::poptorch::set_available_memory &&
+            use_kind != symbols::poptorch::set_matmul_serialization &&
+            use_kind != c10::prim::TupleConstruct &&
+            use_kind != c10::prim::ListConstruct &&
+            use_kind != c10::prim::TupleUnpack &&
+            use_kind != c10::prim::ListUnpack) {
+          return false;
+        }
+        to_check.push_back(use.user);
+      }
+    }
+  }
+  return true;
+}
+
 void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
                                const at::Tensor &t) {
   torch::jit::WithInsertPoint insert_point(n);
-  auto new_node = tensorToConstant(graph, t);
+  auto new_node = tensorToConstant(graph, t, isHostSideNode(n));
 
   // Due to tracing ambiguity, a float tensor here could be either float or half
   auto new_type = new_node->output()->type()->expect<c10::TensorType>();

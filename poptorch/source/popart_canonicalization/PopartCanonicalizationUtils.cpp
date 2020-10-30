@@ -152,11 +152,15 @@ std::int64_t handleDimensionParam(torch::jit::Node *node, int index) {
   return dim;
 }
 
-float constantToFloat(torch::jit::Node *node) {
-  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
-               "Cannot force a non-constant '" << node->kind().toQualString()
-                                               << "' node to a float");
+bool isTensorConstant(torch::jit::Node *node) {
+  return (node->kind() == symbols::poptorch::tensor_constant ||
+          node->kind() == symbols::poptorch::host_side_tensor_constant);
+}
 
+float constantToFloat(torch::jit::Node *node) {
+  ERROR_ON_MSG(!isTensorConstant(node), "Cannot force a non-constant '"
+                                            << node->kind().toQualString()
+                                            << "' node to a float");
   if (node->output()->type()->cast<c10::TensorType>()) {
     return node->t(c10::attr::value).to(at::ScalarType::Float).item<float>();
   }
@@ -167,9 +171,9 @@ float constantToFloat(torch::jit::Node *node) {
 }
 
 torch::jit::Node *constantToLongConstant(torch::jit::Node *node) {
-  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
-               "Cannot force a non-constant '" << node->kind().toQualString()
-                                               << "' node to a long constant");
+  ERROR_ON_MSG(!isTensorConstant(node), "Cannot force a non-constant '"
+                                            << node->kind().toQualString()
+                                            << "' node to a long constant");
 
   ERROR_ON(!node->output()->type()->cast<c10::TensorType>());
   node->t_(c10::attr::value,
@@ -179,9 +183,9 @@ torch::jit::Node *constantToLongConstant(torch::jit::Node *node) {
 }
 
 std::int32_t constantToInt(torch::jit::Node *node) {
-  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
-               "Cannot force a non-constant '" << node->kind().toQualString()
-                                               << "' node to an int");
+  ERROR_ON_MSG(!isTensorConstant(node), "Cannot force a non-constant '"
+                                            << node->kind().toQualString()
+                                            << "' node to an int");
 
   if (node->output()->type()->cast<c10::TensorType>()) {
     return node->t(c10::attr::value)
@@ -195,9 +199,9 @@ std::int32_t constantToInt(torch::jit::Node *node) {
 }
 
 std::int64_t constantToLong(torch::jit::Node *node) {
-  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
-               "Cannot force a non-constant '" << node->kind().toQualString()
-                                               << "' node to a long");
+  ERROR_ON_MSG(!isTensorConstant(node), "Cannot force a non-constant '"
+                                            << node->kind().toQualString()
+                                            << "' node to a long");
 
   if (node->output()->type()->cast<c10::TensorType>()) {
     return node->t(c10::attr::value)
@@ -227,14 +231,14 @@ std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node) {
 }
 
 bool constantToBool(torch::jit::Node *node) {
-  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+  ERROR_ON_MSG(!isTensorConstant(node),
                "Cannot force a non-constant node to a bool");
 
   return constantToInt(node);
 }
 
 std::string constantToString(torch::jit::Node *node) {
-  ERROR_ON_MSG(node->kind() != symbols::poptorch::tensor_constant,
+  ERROR_ON_MSG(!isTensorConstant(node),
                "Cannot force a non-constant node to a string");
 
   auto &&t = node->t(c10::attr::value);
