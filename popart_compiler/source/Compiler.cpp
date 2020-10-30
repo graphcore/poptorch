@@ -57,6 +57,34 @@ bool ipuSmallModelEnvironmentVariableIsEnabled() {
   return false;
 }
 
+std::string getIpuModelVersion() {
+  if (const char *env_ipu_model_version =
+          std::getenv("POPTORCH_IPU_MODEL_VERSION")) {
+    std::string str(env_ipu_model_version);
+    return str;
+  }
+  return "ipu1"; // Default to MK1 if unspecified
+}
+
+int getNumTilesPerIpu(const std::string &ipu_model_version) {
+  int num_tiles_per_ipu = 0;
+
+  if (ipu_model_version == "ipu1") {
+    num_tiles_per_ipu = 1216; // MK1
+  }
+  if (ipu_model_version == "ipu2") {
+    num_tiles_per_ipu = 1472; // MK2
+  }
+
+  if (ipuSmallModelEnvironmentVariableIsEnabled()) {
+    num_tiles_per_ipu = 4;
+  }
+
+  ERROR_ON_MSG(num_tiles_per_ipu == 0,
+               "Invalid IPU model version. Valid versions: ipu1, ipu2.");
+  return num_tiles_per_ipu;
+}
+
 } // namespace
 namespace poptorch {
 
@@ -995,10 +1023,9 @@ void Compiler::initSession(const Optimizer &opt) {
   if (_impl->options.ipu_model) {
     std::map<std::string, std::string> model_options;
     model_options["numIPUs"] = std::to_string(num_ipus);
-    int num_tiles_per_ipu = 1216;
-    if (ipuSmallModelEnvironmentVariableIsEnabled()) {
-      num_tiles_per_ipu = 4;
-    }
+    std::string env_ipu_model_version = getIpuModelVersion();
+    model_options["ipuVersion"] = env_ipu_model_version;
+    int num_tiles_per_ipu = getNumTilesPerIpu(env_ipu_model_version);
     model_options["tilesPerIPU"] = std::to_string(num_tiles_per_ipu);
 
     ERROR_ON_MSG(_impl->options.connection_type ==

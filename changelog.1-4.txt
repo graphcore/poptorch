@@ -12,3 +12,4 @@ New features:
     compared to when run natively with PyTorch.
 - Added support for serialized matrix multiplications
 (poptorch.serializedMatMul)
+- Add support for POPTORCH_IPU_MODEL_VERSION environment variable.
