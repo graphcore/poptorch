@@ -22,21 +22,21 @@ import pytest
 @pytest.mark.parametrize("dtype", (torch.float16, torch.float32, torch.int32))
 def test_zeros_and_ones(dtype):
     class Model(torch.nn.Module):
-        def forward(self):
+        def forward(self, z):
             x = torch.zeros(3, 5, 1, dtype=dtype)
             y = torch.ones(3, 5, 1, dtype=dtype)
 
-            # A stupid test to stop popart from prunning this.
-            return x * y, y + x
+            return (x * y) + z, (y + x) + z
 
     model = Model()
 
     # Run on CPU.
-    nativeOut = model()
+    tensor_in = torch.tensor([1.0], dtype=dtype)
+    nativeOut = model(tensor_in)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model()
+    poptorch_out = poptorch_model(tensor_in)
 
     assert torch.equal(nativeOut[0], poptorch_out[0])
     assert torch.equal(nativeOut[1], poptorch_out[1])

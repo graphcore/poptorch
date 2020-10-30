@@ -24,8 +24,6 @@ EXPECTED_FAILURES = {
     "test_nn_GroupNorm_2d_no_affine_IN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
     "test_nn_GroupNorm_2d_no_affine_LN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
 
-    "test_nn_MultiheadAttention": "Cannot force a non-constant node to a long", # TODO(T26654) Poptorch feature: support non-constant start/end in sliceHandler
-
     "test_nn_interpolate_nearest_1d": "Cannot force a non-constant node to a float",
     "test_nn_interpolate_nearest_1d_zero_dim": "Cannot force a non-constant node to a float",
     "test_nn_interpolate_nearest_tuple_1d": "Cannot force a non-constant node to a float",
@@ -307,7 +305,8 @@ HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
     "test_nn_Conv3d_groups": (0.05, 1e-3),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
-    "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002)
+    "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),
+    "test_nn_MultiheadAttention": (0.05, 1e-3),
     }
 
 # pylint: enable=line-too-long
@@ -351,6 +350,21 @@ for test in get_all_nn_module_tests():
     all_tests[test_name] = (module, input)
 
 
+def assert_allclose(native_out, poptorch_out, rtol, atol):
+
+    if isinstance(native_out, tuple):
+        assert isinstance(poptorch_out, tuple)
+        for idx, native_out_t in enumerate(native_out):
+            assert_allclose(native_out_t, poptorch_out[idx], rtol, atol)
+        return
+
+    assert native_out.size() == poptorch_out.size()
+    torch.testing.assert_allclose(native_out.float(),
+                                  poptorch_out.float(),
+                                  rtol=rtol,
+                                  atol=atol)
+
+
 @pytest.mark.parametrize("test_name", all_tests.keys())
 @pytest.mark.parametrize("use_half", [False, True])
 def test_pytorch_nn(test_name, use_half):
@@ -385,11 +399,7 @@ def test_pytorch_nn(test_name, use_half):
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(*inputs)
 
-    assert ref.size() == poptorch_out.size()
-    torch.testing.assert_allclose(ref.float(),
-                                  poptorch_out.float(),
-                                  rtol=rtol,
-                                  atol=atol)
+    assert_allclose(ref, poptorch_out, rtol, atol)
 
 
 if __name__ == "__main__":

@@ -531,6 +531,11 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     torch::jit::LowerSimpleTuples(graph);
     torch::jit::PeepholeOptimize(graph);
 
+    logGraph("Graph right before evaluating constant expressions:", *graph,
+             trace_input_str);
+    poptorch::type_and_constant_canonicalization::evaluateConstexprs(
+        graph.get());
+
     torch::jit::RemoveInplaceOps(graph);
 
     logGraph("Graph right before casting making integer params as constant "
