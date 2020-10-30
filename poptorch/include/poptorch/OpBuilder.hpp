@@ -43,10 +43,12 @@ torch::jit::Node *createAndInsertNode(
 void setNodeOutputsTypes(torch::jit::Node *node, ImplicitCast implicit_cast,
                          OutputType output_type);
 
-// Create a poptorch::tensor_constant node from the given tensors, setting the
-// output type accordingly
+// Create a poptorch::tensor_constant or poptorch::host_side_tensor_constant
+// node from the given tensors, setting the output type accordingly.
+// A constant which is simply returned, perhaps as a tuple or list, is labelled
+// as a host side constant to prevent it being placed in popart
 torch::jit::Node *tensorToConstant(torch::jit::Graph *graph,
-                                   const at::Tensor &t);
+                                   const at::Tensor &t, bool host_side = false);
 
 // Manually added.
 torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,

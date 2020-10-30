@@ -56,6 +56,8 @@ bool isNone(const torch::jit::Value *value);
 
 std::int64_t handleDimensionParam(torch::jit::Node *node, int index);
 
+bool isTensorConstant(torch::jit::Node *node);
+
 // Force a constant to be a float: this is appropriate if required for popart
 // (onnx); e.g. Gemm alpha and beta are always floats
 float constantToFloat(torch::jit::Node *node);

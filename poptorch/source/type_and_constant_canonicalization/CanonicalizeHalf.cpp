@@ -201,8 +201,9 @@ void ConvertHalfImpl::resolveHalfOrFloat() {
       }
 
       // Tensor constants may need retyping
-      if (node->kind() == symbols::poptorch::tensor_constant) {
-        auto new_tensor = node->t(c10::attr::value).to(new_type);
+      if (node->kind() == symbols::poptorch::tensor_constant ||
+          node->kind() == symbols::poptorch::host_side_tensor_constant) {
+        auto new_tensor = node->t(c10::attr::value).to(new_type).contiguous();
         node->t_(c10::attr::value, new_tensor);
       }
 

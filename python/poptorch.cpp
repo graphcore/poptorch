@@ -589,8 +589,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    return poptorch::lowerToPopart(graph.get(), &input_tensors,
-                                   std::move(traced_tensors),
+    return poptorch::lowerToPopart(
+        graph.get(), &input_tensors, std::move(traced_tensors),
         std::move(parameters), training, std::move(optimizers),
         parseSessionOptions(options));
   }
@@ -681,8 +681,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    return poptorch::lowerToPopart(graph.get(), &input_tensors,
-                                   std::move(parameter_data),
+    return poptorch::lowerToPopart(
+        graph.get(), &input_tensors, std::move(parameter_data),
         std::move(parameters), training, {}, parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION

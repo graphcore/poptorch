@@ -417,11 +417,13 @@ void LowerToPopart::lowerBody() {
         _valueMap.setTensor(output, output_tensor);
       }
 
-      logging::debug(
-          "{} was lowered to {} [{},{}]", nodeToString(node),
-          tensorNames(first_output_tensor, node->outputs().size()),
-          tensorTypesAndShapes(first_output_tensor, node->outputs().size()),
-          _compiler.getExecutionInfo().get());
+      if (!_compiler.isHostSideConstant(first_output_tensor)) {
+        logging::debug(
+            "{} was lowered to {} [{},{}]", nodeToString(node),
+            tensorNames(first_output_tensor, node->outputs().size()),
+            tensorTypesAndShapes(first_output_tensor, node->outputs().size()),
+            _compiler.getExecutionInfo().get());
+      }
     } else if (kind == symbols::poptorch::end_ipu_block) {
       // NOP for now.
     } else if (kind == symbols::poptorch::begin_ipu_block) {
@@ -687,6 +689,21 @@ PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
           getTensorDimensions(tensor)};
 }
 
+HostSideConstant
+convertHostSideTensorConstantNode(const torch::jit::Node *node) {
+  logging::LogContext ctx("convertHostSideTensorConstantNode processing " +
+                          nodeToString(node));
+  ERROR_ON_MSG(node->kind() != symbols::poptorch::host_side_tensor_constant,
+               "Only a poptorch::host_side_tensor_constant can be converted "
+               "into a host side constant constant");
+
+  auto tensor = node->t(c10::attr::value);
+  ERROR_ON(!tensor.is_contiguous());
+
+  return {toPopartType(tensor.scalar_type()), tensor.data_ptr(),
+          tensor.nbytes(), getTensorDimensions(tensor)};
+}
+
 } // namespace
 
 LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
@@ -728,7 +745,9 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 #define ARG(Type, Name)                                                        \
   , convertString(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
 
-#define POPART_CONSTANT_ARG(unused) , convertTensorConstantNode(node)
+#define POPART_CONST_ARG(unused) , convertTensorConstantNode(node)
+#define HOST_SIDE_CONST_ARG(unused)                                            \
+  , std::move(convertHostSideTensorConstantNode(node))
 
 #define BODY_ARG(Name) NONE
 
@@ -745,7 +764,8 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 #undef BODY_STR_ARG
 #undef STR_ARG
 #undef BODY_ARG
-#undef POPART_CONSTANT_ARG
+#undef HOST_SIDE_CONST_ARG
+#undef POPART_CONST_ARG
 #undef OP_DECL
 #undef ARG
 #undef NONE
@@ -765,8 +785,10 @@ lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
               std::vector<Optimizer> &&opt, const SessionOptions &options) {
   std::srand(std::time(nullptr));
 
-  LowerToPopart lower_impl{
-      graph,    in_tensors, std::move(parameters), std::move(parameter_names),
+  LowerToPopart lower_impl{graph,
+                           in_tensors,
+                           std::move(parameters),
+                           std::move(parameter_names),
                            training,
                            std::move(opt),
                            std::move(options)};

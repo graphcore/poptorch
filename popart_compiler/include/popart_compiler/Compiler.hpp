@@ -171,6 +171,25 @@ private:
   std::unique_ptr<popart::ConstVoidData> _data;
 };
 
+// A class to store a constant which is simply returned, (possibly in a tuple
+// or list) and is not inserted into Popart
+class HostSideConstant {
+public:
+  HostSideConstant(const PopartType &popart_type, void *data, size_t data_size,
+                   std::vector<std::int64_t> shape);
+
+  PopartType popartType() const { return _popart_type; }
+
+  const std::vector<std::int64_t> &shape() const { return _shape; }
+
+  void copyDataTo(void *ptr) const;
+
+private:
+  const PopartType _popart_type;
+  std::vector<uint8_t> _data;
+  std::vector<std::int64_t> _shape;
+};
+
 class Compiler {
 public:
   Compiler(bool is_training, const SessionOptions &options);
@@ -188,7 +207,8 @@ public:
 #define STRING const char *
 #define NONE
 #define ARG(Type, Name) , Type Name
-#define POPART_CONSTANT_ARG(Name) , const PopartConstant &Name
+#define POPART_CONST_ARG(Name) , const PopartConstant &Name
+#define HOST_SIDE_CONST_ARG(Name) , const HostSideConstant &Name
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
@@ -200,7 +220,8 @@ public:
 
 #undef OP_DECL
 #undef BODY_ARG
-#undef POPART_CONSTANT_ARG
+#undef HOST_SIDE_CONST_ARG
+#undef POPART_CONST_ARG
 #undef ARG
 #undef NONE
 #undef STRING
@@ -220,6 +241,8 @@ public:
   std::vector<std::int64_t> getSize(poptorch::TensorId id) const;
 
   std::unique_ptr<char[]> getTensorDTypeString(poptorch::TensorId id) const;
+
+  bool isHostSideConstant(poptorch::TensorId id) const;
 
   poptorch::TensorId
   customOperation(const char *op,
@@ -282,7 +305,7 @@ public:
   void copyWeightsToHost(const std::vector<void *> &host_buffers);
 
   // Return the type of the given tensor.
-  PopartType getPopartType(poptorch::TensorId tensor) const;
+  PopartType getPopartType(poptorch::TensorId id) const;
 
   /*
    * Execute the compiled popart graph using poplar. An optimizer can be
@@ -318,7 +341,7 @@ public:
   std::unique_ptr<char[]> getExecutionInfo() const;
 
 private:
-  void assertTensorIs(PopartType dataType, const poptorch::TensorId &id,
+  void assertTensorIs(PopartType dataType, poptorch::TensorId id,
                       const char *caller) const;
   std::unique_ptr<detail::CompilerImpl> _impl;
 };
