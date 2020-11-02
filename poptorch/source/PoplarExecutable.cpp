@@ -156,7 +156,7 @@ const std::vector<OutputType> &PoplarExecutable::outputTypes() const {
 }
 
 std::string PoplarExecutable::getPopartIR() const {
-  std::unique_ptr<char> managed_ptr = _compiler.getPopartIR();
+  auto managed_ptr = _compiler.getPopartIR();
   const char *raw_ptr = static_cast<const char *>(managed_ptr.get());
 
   // Convert to std::string, copying again.

@@ -219,7 +219,7 @@ public:
 
   std::vector<std::int64_t> getSize(poptorch::TensorId id) const;
 
-  std::vector<char> getTensorDTypeString(poptorch::TensorId id) const;
+  std::unique_ptr<char[]> getTensorDTypeString(poptorch::TensorId id) const;
 
   poptorch::TensorId
   customOperation(const char *op,
@@ -310,12 +310,12 @@ public:
 
   // We return this as a unique char pointer to avoid leaking memory while
   // protecting the ABI boundry.
-  std::unique_ptr<char> getPopartIR() const;
+  std::unique_ptr<char[]> getPopartIR() const;
 
   void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
                       int64_t group);
 
-  std::unique_ptr<char> getExecutionInfo() const;
+  std::unique_ptr<char[]> getExecutionInfo() const;
 
 private:
   void assertTensorIs(PopartType dataType, const poptorch::TensorId &id,

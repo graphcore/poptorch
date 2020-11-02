@@ -358,10 +358,8 @@ std::string LowerToPopart::tensorTypesAndShapes(std::int64_t first_tensor,
     try {
       auto tensor_shape = _compiler.getSize(first_tensor + i);
 
-      auto dtype_vec = _compiler.getTensorDTypeString(first_tensor + i);
-      for (auto ch : dtype_vec) {
-        shape_str << ch;
-      }
+      auto dtype_chars = _compiler.getTensorDTypeString(first_tensor + i);
+      shape_str << dtype_chars.get();
 
       if (tensor_shape.empty()) {
         shape_str << shape_inf_failed;

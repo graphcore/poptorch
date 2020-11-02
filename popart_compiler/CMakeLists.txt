@@ -9,6 +9,7 @@ add_definitions(-DONNX_NAMESPACE=onnx)
 add_library(popart_compiler SHARED
   "source/Compiler.cpp"
   "source/PopartEnums.cpp"
+  "source/Utils.cpp"
   )
 
 set_property(TARGET popart_compiler PROPERTY CXX_STANDARD 14)

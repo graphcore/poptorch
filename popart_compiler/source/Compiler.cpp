@@ -30,6 +30,7 @@
 
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/PopartEnums.hpp"
+#include "popart_compiler/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -1490,7 +1491,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   }
 }
 
-std::unique_ptr<char> Compiler::getExecutionInfo() const {
+std::unique_ptr<char[]> Compiler::getExecutionInfo() const {
   std::stringstream info;
   switch (_impl->options.execution_mode) {
   case detail::ExecutionMode::Pipelined: {
@@ -1514,23 +1515,15 @@ std::unique_ptr<char> Compiler::getExecutionInfo() const {
   const std::string as_string = info.str();
 
   // Copy into a memory managed array to get around ABI.
-  std::unique_ptr<char> ptr =
-      std::unique_ptr<char>(new char[as_string.size() + 1]);
-  std::memcpy(ptr.get(), as_string.data(), as_string.size());
-  ptr.get()[as_string.size()] = '\0';
-  return ptr;
+  return stringToUniquePtr(as_string);
 }
 
-std::unique_ptr<char> Compiler::getPopartIR() const {
+std::unique_ptr<char[]> Compiler::getPopartIR() const {
   const std::string as_string =
       _impl->session->serializeIr(popart::IrSerializationFormat::JSON);
 
   // Copy into a memory managed array to get around ABI.
-  std::unique_ptr<char> ptr =
-      std::unique_ptr<char>(new char[as_string.size() + 1]);
-  std::memcpy(ptr.get(), as_string.data(), as_string.size());
-  ptr.get()[as_string.size()] = '\0';
-  return ptr;
+  return stringToUniquePtr(as_string);
 }
 
 // Write the weights into IPU memory from the pytorch tensor buffers in the
@@ -1617,7 +1610,8 @@ std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
   }
 }
 
-std::vector<char> Compiler::getTensorDTypeString(poptorch::TensorId id) const {
+std::unique_ptr<char[]>
+Compiler::getTensorDTypeString(poptorch::TensorId id) const {
   std::string type_str;
 
   if (_impl->session) {
@@ -1631,7 +1625,7 @@ std::vector<char> Compiler::getTensorDTypeString(poptorch::TensorId id) const {
     }
   }
 
-  return std::vector<char>(type_str.begin(), type_str.end());
+  return stringToUniquePtr(type_str);
 }
 
 void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
