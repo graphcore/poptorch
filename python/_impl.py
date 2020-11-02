@@ -10,67 +10,83 @@ from .logging import logger
 from .options import Options
 
 
-def convertOptimizerToDict(optimizer):
-    assert len(optimizer.param_groups) == 1, (
-        "Poptorch currently only "
-        "supports one parameter group! (all parameters)")
-
-    learning_rate = optimizer.param_groups[0]["lr"]
-    weight_decay = optimizer.param_groups[0]["weight_decay"]
-    loss_scaling = getattr(optimizer, "loss_scaling", 1.0)
-
+def to_poptorch_optimizer(optimizer):
     if isinstance(optimizer, optim.SGD):
-        velocity_scaling = getattr(optimizer, "velocity_scaling", 1.0)
-        momentum = optimizer.param_groups[0]["momentum"]
-        dampening = optimizer.param_groups[0]["dampening"]
-        # We will default momentum, weight decay, and dampening, to be
-        # constant if they are set to zero.
-        return {
-            "optimizerType": enums.OptimizerType.SGD,
-            "lr": (learning_rate, False),
-            "momentum": (momentum, momentum == 0.0),
-            "weight_decay": (weight_decay, weight_decay == 0.0),
-            "dampening": (dampening, dampening == 0.0),
-            "loss_scaling": (loss_scaling, loss_scaling == 1.0),
-            "velocity_scaling": (velocity_scaling, velocity_scaling == 1.0)
-        }
+        return enums.OptimizerType.SGD
+
     if isinstance(optimizer, optim.AdamW):
-        beta1 = optimizer.param_groups[0]["betas"][0]
-        beta2 = optimizer.param_groups[0]["betas"][1]
-        eps = optimizer.param_groups[0]["eps"]
+        return enums.OptimizerType.ADAMW
 
-        assert not optimizer.param_groups[0]["amsgrad"], (
-            "Only non-amsgrad "
-            "AdamW optimizers are supported.")
-        return {
-            "optimizerType": enums.OptimizerType.ADAMW,
-            "lr": (learning_rate, False),
-            "beta1": (beta1, False),
-            "beta2": (beta2, False),
-            "weight_decay": (weight_decay, weight_decay == 0.01),
-            "eps": (eps, eps == 1e-08),
-            "loss_scaling": (loss_scaling, loss_scaling == 1.0)
-        }
     if isinstance(optimizer, optim.RMSprop):
-        momentum = optimizer.param_groups[0]["momentum"]
-        alpha = optimizer.param_groups[0]["alpha"]
-        eps = optimizer.param_groups[0]["eps"]
         centered = optimizer.param_groups[0]["centered"]
-        optimizerType = enums.OptimizerType.RMSPROP_CENTERED if centered \
-                        else enums.OptimizerType.RMSPROP
-        return {
-            "optimizerType": optimizerType,
-            "lr": (learning_rate, False),
-            "momentum": (momentum, momentum == 0.0),
-            "alpha": (alpha, False),
-            "eps": (eps, eps == 1e-08),
-            "weight_decay": (weight_decay, weight_decay == 0.01),
-            "loss_scaling": (loss_scaling, loss_scaling == 1.0)
-        }
 
-    assert False, "Unsupported optimizer type. Types supported %s" % str(
-        list(enums.OptimizerType))
+        if centered:
+            return enums.OptimizerType.RMSPROP_CENTERED
+        return enums.OptimizerType.RMSPROP
+
     return None
+
+
+def convertOptimizerToDict(optimizer):
+    optimizer_type = to_poptorch_optimizer(optimizer)
+
+    assert optimizer_type is not None, """Unsupported optimizer type.
+         Types supported %s""" % str(list(enums.OptimizerType))
+
+    num_groups = len(optimizer.param_groups)
+
+    the_dict = {"optimizer_type": optimizer_type, "num_groups": num_groups}
+
+    for index in range(0, num_groups):
+        learning_rate = optimizer.param_groups[index]["lr"]
+        weight_decay = optimizer.param_groups[index]["weight_decay"]
+        loss_scaling = getattr(optimizer, "loss_scaling", 1.0)
+
+        if isinstance(optimizer, optim.SGD):
+            velocity_scaling = getattr(optimizer, "velocity_scaling", 1.0)
+            momentum = optimizer.param_groups[0]["momentum"]
+            dampening = optimizer.param_groups[0]["dampening"]
+            # We will default momentum, weight decay, and dampening, to be
+            # constant if they are set to zero.
+            the_dict[index] = {
+                "lr": (learning_rate, False),
+                "momentum": (momentum, momentum == 0.0),
+                "weight_decay": (weight_decay, weight_decay == 0.0),
+                "dampening": (dampening, dampening == 0.0),
+                "loss_scaling": (loss_scaling, loss_scaling == 1.0),
+                "velocity_scaling":
+                (velocity_scaling, velocity_scaling == 1.0),
+            }
+        if isinstance(optimizer, optim.AdamW):
+            beta1 = optimizer.param_groups[index]["betas"][0]
+            beta2 = optimizer.param_groups[index]["betas"][1]
+            eps = optimizer.param_groups[index]["eps"]
+
+            assert not optimizer.param_groups[index]["amsgrad"], (
+                "Only non-amsgrad "
+                "AdamW optimizers are supported.")
+            the_dict[index] = {
+                "lr": (learning_rate, False),
+                "beta1": (beta1, False),
+                "beta2": (beta2, False),
+                "weight_decay": (weight_decay, weight_decay == 0.01),
+                "eps": (eps, eps == 1e-08),
+                "loss_scaling": (loss_scaling, loss_scaling == 1.0)
+            }
+        if isinstance(optimizer, optim.RMSprop):
+            momentum = optimizer.param_groups[index]["momentum"]
+            alpha = optimizer.param_groups[index]["alpha"]
+            eps = optimizer.param_groups[index]["eps"]
+            the_dict[index] = {
+                "lr": (learning_rate, False),
+                "momentum": (momentum, momentum == 0.0),
+                "alpha": (alpha, False),
+                "eps": (eps, eps == 1e-08),
+                "weight_decay": (weight_decay, weight_decay == 0.01),
+                "loss_scaling": (loss_scaling, loss_scaling == 1.0)
+            }
+
+    return the_dict
 
 
 class ArgsParser:
@@ -204,6 +220,7 @@ class PoplarExecutor:
                 options.anchorMode(enums.AnchorMode.Final)
             if not optimizer:
                 optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
+
             optimizer = convertOptimizerToDict(optimizer)
         else:
             if options.defaultAnchorMode():

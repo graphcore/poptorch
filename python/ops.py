@@ -10,6 +10,13 @@ set_available_memory = torch.ops.poptorch.set_available_memory
 nop = torch.ops.popart.nop
 
 
+def apply_optimizer(optimizer):
+    num_groups = len(optimizer.param_groups)
+    for index in range(0, num_groups):
+        torch.ops.poptorch.optimizer_group(
+            index, optimizer.param_groups[index]["params"])
+
+
 def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
     """ Instantiate a matmul that should be serialized.
 

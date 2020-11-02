@@ -384,10 +384,33 @@ def trainingModel(model, options=None, optimizer=None):
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
-    return PoplarExecutor(model=model,
+
+    # To understand which variable groups the user wants to apply the
+    # optimizer to we need to mark them via a wrapper. We do this because
+    # when we reference the variables in the context of the operation we
+    # get the corresponding IR value for "free" as part of the trace.
+    # Otherwise we would need a system to map the variable in the optimizer
+    # to the variable in the model to the variable in the IR.
+    class OptimizerWrapper(torch.nn.Module):
+        def __init__(self, model):
+            super().__init__()
+            self.model = model
+
+        def forward(self, *args, **kwargs):
+            out = self.model(*args, **kwargs)
+            apply_optimizer(optimizer)
+            return out
+
+    maybe_wrapped_model = model
+
+    if optimizer and len(optimizer.param_groups) > 1:
+        maybe_wrapped_model = OptimizerWrapper(model)
+
+    return PoplarExecutor(model=maybe_wrapped_model,
                           options=options,
                           training=True,
-                          optimizer=optimizer)
+                          optimizer=optimizer,
+                          user_model=model)
 
 
 def inferenceModel(model, options=None):

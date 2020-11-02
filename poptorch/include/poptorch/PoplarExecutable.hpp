@@ -35,7 +35,7 @@ public:
    * |inTensors| and return to the user the resulting tensors if any.
    */
   std::vector<at::IValue> run(std::vector<at::Tensor> *inTensors,
-                              const Optimizer &optimizer);
+                              const std::vector<Optimizer> &optimizer);
 
   // Tell popart to copy weights off the IPU and write into host memory.
   void copyWeightsToHost(const std::map<std::string, void *> &buffers);

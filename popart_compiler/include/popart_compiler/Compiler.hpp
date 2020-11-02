@@ -56,10 +56,10 @@ static std::pair<float, bool> findInMapOrDefault(
 bool ipuHardwareIsAvailable(std::uint64_t num_ipus = 1);
 
 struct Optimizer {
-  explicit Optimizer(
-      OptimizerType t,
-      const std::unordered_map<std::string, std::pair<float, bool>> &opts)
-      : type(t) {
+  using ParamType = std::pair<float, bool>;
+  using ParamList = std::unordered_map<std::string, ParamType>;
+
+  explicit Optimizer(OptimizerType t, const ParamList &opts) : type(t) {
     // It is valid to not pass in a optimizer.
     if (opts.empty() || type == OptimizerType::NONE) {
       return;
@@ -100,26 +100,26 @@ struct Optimizer {
 
   OptimizerType type;
 
-  std::pair<float, bool> learning_rate;
-  std::pair<float, bool> weight_decay;
-  std::pair<float, bool> loss_scaling;
-  std::pair<float, bool> velocity_scaling;
+  ParamType learning_rate;
+  ParamType weight_decay;
+  ParamType loss_scaling;
+  ParamType velocity_scaling;
 
   // Shared by SGD and RMSprop
-  std::pair<float, bool> momentum;
+  ParamType momentum;
 
   // Shared by AdamW and RMSprop
-  std::pair<float, bool> eps;
+  ParamType eps;
 
   // Unique to SGD
-  std::pair<float, bool> dampening;
+  ParamType dampening;
 
   // Unique to AdamW
-  std::pair<float, bool> beta1;
-  std::pair<float, bool> beta2;
+  ParamType beta1;
+  ParamType beta2;
 
   // Unique to RMSprop
-  std::pair<float, bool> alpha;
+  ParamType alpha;
 };
 
 class Compiler;
@@ -272,7 +272,7 @@ public:
   void setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
                     std::int64_t ipu_id);
 
-  void initSession(const Optimizer &opt);
+  void initSession(const std::vector<Optimizer> &opt);
 
   // Write the weights into IPU memory from the pytorch tensor buffers in the
   // model.
@@ -290,7 +290,7 @@ public:
    * is nothing to update the optimizer will be set to OptimizerType::None
    * otherwise the new optimizer will be written to device.
    */
-  void run(const Optimizer &optimizer);
+  void run(const std::vector<Optimizer> &optimizer);
 
   std::uint64_t batchPerStep() const;
 
@@ -312,24 +312,12 @@ public:
   // protecting the ABI boundry.
   std::unique_ptr<char> getPopartIR() const;
 
+  void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
+                      int64_t group);
+
 private:
   void assertTensorIs(PopartType dataType, const poptorch::TensorId &id,
                       const char *caller) const;
-
-  void printOptimizerToDebug(const Optimizer &opt);
-
-  template <typename... Args>
-  void printOptimizerToDebug(const std::string &opt_name,
-                             const std::vector<std::string> &arg_names,
-                             Args... args) {
-    std::stringstream ss;
-    ss << "Updating graph optimizer " << opt_name << " with parameters: ";
-    for (const auto &arg_name : arg_names) {
-      ss << arg_name << " {}, ";
-    }
-    logging::debug(ss.str().c_str(), args...);
-  }
-
   std::unique_ptr<detail::CompilerImpl> _impl;
 };
 

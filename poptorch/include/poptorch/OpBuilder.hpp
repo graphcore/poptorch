@@ -167,6 +167,10 @@ torch::jit::Node *castToType(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *
+createOptimizerGroup(torch::jit::Graph *graph, std::uint64_t group,
+                     const std::vector<torch::jit::Value *> &list_of_params);
+
+torch::jit::Node *
 createRandomNormal(torch::jit::Graph *graph,
                    const std::vector<torch::jit::Value *> &possible_inputs,
                    const std::vector<int64_t> &shape, float mean, float scale,

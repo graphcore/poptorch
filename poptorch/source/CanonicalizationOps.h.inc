@@ -166,6 +166,7 @@ OP_CONVERTOR_POP(symbols::poptorch::ipu_print_tensor, NONE, createPrintIpuTensor
 OP_CONVERTOR_POP(symbols::poptorch::set_available_memory, NONE, createSetAvailableMemory, PARAM(0) COMMA CONSTANT_TO_FLOAT(1))
 OP_CONVERTOR_POP(symbols::poptorch::begin_ipu_block, NONE, createBeginIpuBlock, CONSTANT_TO_LONG(0) COMMA CONSTANT_TO_LONG(1) COMMA CONSTANT_TO_LONG(2))
 OP_CONVERTOR_POP(symbols::poptorch::set_matmul_serialization, NONE, createSetMatMulSerialization, PARAM(0) COMMA CONSTANT_TO_STRING(1) COMMA CONSTANT_TO_LONG(2) COMMA CONSTANT_TO_LONG(3))
+OP_CONVERTOR_POP(symbols::poptorch::optimizer_group, NONE, createOptimizerGroup, CONSTANT_TO_LONG(0) COMMA HANDLE_TENSOR_LIST(1))
 
 // aten::masked_fill(Tensor self, Tensor mask, Tensor other) -> Tensor
 OP_CONVERTOR(aten::masked_fill, NONE, createWhere, {PARAM(1) COMMA PARAM(2) COMMA PARAM(0)})

@@ -452,6 +452,17 @@ torch::jit::Node *createBeginIpuBlock(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *
+createOptimizerGroup(torch::jit::Graph *graph, std::uint64_t group,
+                     const std::vector<torch::jit::Value *> &list_of_params) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::optimizer_group, list_of_params,
+      ImplicitCast::None, OutputType::Unknown, 0);
+  new_node->i_(c10::Symbol::fromQualString("attr::group"), group);
+
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */

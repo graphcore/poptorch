@@ -96,7 +96,7 @@ public:
   LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
                 std::vector<at::Tensor> params,
                 std::vector<std::string> parameter_names, bool training,
-                const Optimizer &opt, const SessionOptions &options);
+                std::vector<Optimizer> &&opt, const SessionOptions &options);
 
   void lower();
 
@@ -117,7 +117,7 @@ private:
   ValueMap _valueMap;
 
   // Optimizer from the user.
-  const Optimizer &_optimizer;
+  const std::vector<Optimizer> _optimizers;
 
   using FunctionType = std::function<poptorch::TensorId(
       const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
@@ -259,7 +259,7 @@ PopartType toPopartType(const at::ScalarType type) {
 std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
   logging::LogContext ctx("LowerToPopart::compiler ");
   // Init the session, this also involves compiling to poplar.
-  _compiler.initSession(_optimizer);
+  _compiler.initSession(_optimizers);
 
   std::vector<at::ScalarType> data_types;
   for (auto id : _outputTensorHooks) {
@@ -437,6 +437,16 @@ void LowerToPopart::lowerBody() {
           node->i(c10::Symbol::fromQualString("attr::factor")),
           node->i(c10::Symbol::fromQualString("attr::keep_precision")));
       _valueMap.setTensor(node->output(), input);
+    } else if (kind == symbols::poptorch::optimizer_group) {
+      std::vector<poptorch::TensorId> inputs;
+      std::transform(node->inputs().begin(), node->inputs().end(),
+                     std::back_inserter(inputs), [&](torch::jit::Value *val) {
+                       return _valueMap.tensor(val);
+                     });
+
+      std::uint64_t group = node->i(c10::Symbol::fromQualString("attr::group"));
+      _compiler.optimizerGroup(inputs, group);
+
     } else if (kind == symbols::poptorch::set_available_memory) {
       // Get the torch jit SSA for the input/output values.
       std::vector<poptorch::TensorId> inputs;
@@ -610,7 +620,6 @@ void LowerToPopart::lowerParameters() {
       std::vector<int64_t> dims = getTensorDimensions(tensor_as_param);
 
       // Unpack the elem type into its Popart type.
-
       std::string popart_type = typeToPopartStr(tensor_as_param.scalar_type());
       _valueMap.setTensor(value, _compiler.addInitializedInputTensor(
                                      name.c_str(), popart_type.c_str(), dims,
@@ -684,10 +693,10 @@ PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
 LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
                              std::vector<at::Tensor> params,
                              std::vector<std::string> parameter_names,
-                             bool training, const Optimizer &opt,
+                             bool training, std::vector<Optimizer> &&opt,
                              const SessionOptions &options)
     : _graph(*g), _in_tensors(*ins), _parameters(std::move(params)),
-      _parameter_names(std::move(parameter_names)), _optimizer(opt),
+      _parameter_names(std::move(parameter_names)), _optimizers(opt),
       _compiler({training, options}) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
@@ -754,12 +763,14 @@ std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
               std::vector<at::Tensor> parameters,
               std::vector<std::string> parameter_names, bool training,
-              const Optimizer &opt, const SessionOptions &options) {
+              std::vector<Optimizer> &&opt, const SessionOptions &options) {
   std::srand(std::time(nullptr));
 
   LowerToPopart lower_impl{
       graph,    in_tensors, std::move(parameters), std::move(parameter_names),
-      training, opt,        std::move(options)};
+                           training,
+                           std::move(opt),
+                           std::move(options)};
   lower_impl.lower();
 
   return lower_impl.compile();

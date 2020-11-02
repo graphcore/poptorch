@@ -74,6 +74,11 @@ customOperation(c10::List<at::Tensor> inputs,            // NOLINT
   return example_outputs;
 }
 
+void optimizerGroup(int64_t group, c10::List<at::Tensor> &&inputs) {
+  UNUSED(group);
+  UNUSED(inputs);
+}
+
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
@@ -81,6 +86,7 @@ static auto registry =
         .op("popart::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss)
+        .op("poptorch::optimizer_group", &optimizerGroup)
         .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
         .op("poptorch::set_available_memory", &setAvailableMemory);
 //.op("popart::convolution", convolution,
@@ -91,26 +97,47 @@ namespace {
 
 // Process the user provided dictionary and extract the relevant optimizer
 // information.
-Optimizer parseOptimizer(const py::dict &opt) {
+std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
   // optimizer is the map containing all set options.
-  std::unordered_map<std::string, std::pair<float, bool>> optimizer;
+  std::vector<Optimizer::ParamList> optimizer_params;
   OptimizerType type = OptimizerType::NONE;
+  std::uint64_t num_groups = 0;
 
   // Extract all options from the python dictionary.
   for (auto element : opt) {
     // All values are in the form of pair{float, bool} except for the optimizer
     // option.
-    if (py::isinstance<py::int_>(element.second)) {
-      // Get the optimizer type.
-      type = static_cast<OptimizerType>(element.second.cast<std::uint64_t>());
-    } else {
-      // Get the name of the optimizer option.
+    if (py::isinstance<py::str>(element.first)) {
       const std::string name = element.first.cast<std::string>();
-      optimizer[name] = element.second.cast<std::pair<float, bool>>();
+      if (name == "optimizer_type") {
+        type = static_cast<OptimizerType>(element.second.cast<std::uint64_t>());
+      } else if (name == "num_groups") {
+        num_groups = element.second.cast<std::uint64_t>();
+        optimizer_params.resize(num_groups);
+      }
+    } else if (py::isinstance<py::int_>(element.first)) {
+      const std::uint64_t group = element.first.cast<std::uint64_t>();
+      const py::dict &sub_dict = element.second.cast<py::dict>();
+
+      for (auto optimizer_field : sub_dict) {
+        std::pair<float, bool> p =
+            optimizer_field.second.cast<std::pair<float, bool>>();
+        const std::string param = optimizer_field.first.cast<std::string>();
+        optimizer_params[group][param] = p;
+      }
+
+    } else {
+      ERROR("(Internal) Unknown type.");
     }
   }
 
-  return Optimizer{type, optimizer};
+  std::vector<Optimizer> optimizers;
+  for (const Optimizer::ParamList &p : optimizer_params) {
+    Optimizer o{type, p};
+    optimizers.push_back(o);
+  }
+
+  return optimizers;
 }
 
 std::map<std::string, void *>
@@ -368,14 +395,14 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     }
 
     // Create an empty optimizer for inference, this will not be applied.
-    Optimizer optimizer{OptimizerType::NONE, {}};
+    std::vector<Optimizer> optimizers;
 
     if (optimizerDict) {
-      optimizer = parseOptimizer(*optimizerDict);
+      optimizers = parseOptimizer(*optimizerDict);
     }
 
     std::vector<at::IValue> output_tensors =
-        executable->run(&input_tensors, optimizer);
+        executable->run(&input_tensors, optimizers);
 
     std::vector<pybind11::object> returnee;
 
@@ -486,7 +513,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     std::vector<std::string> parameters =
         getParameterNames(parameter_names, parameter_tensors, traced_tensors);
 
-    Optimizer optimizer = parseOptimizer(optimizerDict);
+    std::vector<Optimizer> optimizers = parseOptimizer(optimizerDict);
 
     logGraph("Lowered graph:", *graph, trace_input_str);
 
@@ -558,8 +585,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
 
     return poptorch::lowerToPopart(graph.get(), &input_tensors,
                                    std::move(traced_tensors),
-                                   std::move(parameters), training, optimizer,
-                                   parseSessionOptions(options));
+        std::move(parameters), training, std::move(optimizers),
+        parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
@@ -648,11 +675,9 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    Optimizer optimizer{OptimizerType::NONE, {}};
     return poptorch::lowerToPopart(graph.get(), &input_tensors,
                                    std::move(parameter_data),
-                                   std::move(parameters), training, optimizer,
-                                   parseSessionOptions(options));
+        std::move(parameters), training, {}, parseSessionOptions(options));
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
