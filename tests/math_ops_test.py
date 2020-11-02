@@ -54,7 +54,7 @@ def binary_op_harness(op, input1, input2, eq):
 
 unary_ops_float = [
     torch.abs,
-    # torch.acos,
+    torch.acos,
     # torch.asin, TODO(T28003): Poplar bug: No cycle estimate for asin
     torch.atan,
     # torch.angle,
