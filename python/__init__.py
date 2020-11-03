@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.multiprocessing as multiprocessing
 
 import poptorch.poptorch_core as poptorch_core
-from poptorch.poptorch_core import ipuHardwareIsAvailable
+from poptorch.poptorch_core import ipuHardwareIsAvailable, setLogLevel
 
 from .logging import logger
 from . import _impl

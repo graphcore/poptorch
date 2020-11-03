@@ -5,70 +5,11 @@ import os
 import torch
 from . import enums
 from .logging import logger
+from . import _options_impl
+from . import ops
 
 
-class _OptionsDict:
-    """Safe dictionary to store options: only keys which have been passed to
-    the constructor can later be updated.
-    """
-
-    def __init__(self, **default_values):
-        self._values = default_values
-
-    def set(self, **kwargs):
-        for option, value in kwargs.items():
-            assert self.exists(option), ("Invalid option %s, valid options"
-                                         " are %s") % (option,
-                                                       self._values.keys())
-            assert isinstance(
-                value, type(self._values[option])
-            ), "Unexpected type %s for option %s. Expected %s" % (
-                type(value), option, type(self._values[option]))
-            self._values[option] = value
-
-    def createOrSet(self, **kwargs):
-        for option, value in kwargs.items():
-            if option in self._values:
-                self.set(**{option: value})
-            else:
-                self._values[option] = value
-
-    def exists(self, option):
-        return option in self._values
-
-    def deleteIfExists(self, option):
-        if self.exists(option):
-            del self._values[option]
-
-    def __getstate__(self):
-        return self._values
-
-    def __setstate__(self, state):
-        self._values = state
-
-    def __getattr__(self, option):
-        assert self.exists(
-            option), ("Invalid option %s, "
-                      "valid options are %s") % (option, self._values.keys())
-        return self._values[option]
-
-    def update(self, other):
-        assert not set(self._values.keys()).intersection(
-            other), "Can't merge dictionaries, they have some keys in common"
-        other.update(self._values)
-        return other
-
-    def toDict(self):
-        return self.update({})
-
-    def __call__(self, option):
-        assert self.exists(
-            option), ("Invalid option %s, "
-                      "valid options are %s") % (option, self._values.keys())
-        return self._values[option]
-
-
-class _JitOptions(_OptionsDict):
+class _JitOptions(_options_impl.OptionsDict):
     """Options related to Pytorch's JIT compiler.
 
     Can be accessed via `poptorch.Options`:
@@ -91,7 +32,7 @@ class _JitOptions(_OptionsDict):
         return self
 
 
-class _TrainingOptions(_OptionsDict):
+class _TrainingOptions(_options_impl.OptionsDict):
     """Options specific to model training.
 
     Note: You must not set these options for inference models.
@@ -155,7 +96,7 @@ class _PopartOptions:
         self.options["patterns"] = patterns
 
 
-class _DistributedOptions(_OptionsDict):
+class _DistributedOptions(_options_impl.OptionsDict):
     """Options related to distributed execution.
 
     Can be accessed via `poptorch.Options`:
@@ -263,7 +204,7 @@ class _DistributedOptions(_OptionsDict):
         return self.num_distributed_processes
 
 
-class TensorLocationSettings(_OptionsDict):
+class TensorLocationSettings(_options_impl.OptionsDict):
     def minElementsForOffChip(self, min_elements):
         """A minimum number of elements below which offloading
         won't be considered."""
@@ -324,7 +265,7 @@ class TensorLocationSettings(_OptionsDict):
         return self
 
 
-class _TensorLocationOptions(_OptionsDict):
+class _TensorLocationOptions(_options_impl.OptionsDict):
     """Options controlling where tensors are stored.
     """
 
@@ -349,7 +290,358 @@ class _TensorLocationOptions(_OptionsDict):
         return self
 
 
-class Options(_OptionsDict):
+class Stage:
+    """
+    The various execution strategies are made of `Stages`: a stage consists of
+    one of more `Blocks` running on one IPU.
+
+    .. seealso:: :py:class:`PipelinedExecution`, :py:class:`ShardedExecution`,
+        :py:class:`ParallelPhasedExecution`, :py:class:`SerialPhasedExecution`.
+    """
+
+    def __init__(self, *block_ids):
+        self._blocks = block_ids
+        self._stage_id = -1
+        self._phase_id = -1
+        self._ipu = None
+
+    @property
+    def blocks(self):
+        """List of blocks this stage is made of."""
+        return self._blocks
+
+    def ipu(self, ipu):
+        """Set the IPU on which this stage will run"""
+        assert isinstance(ipu, int)
+        self._ipu = ipu
+        return self
+
+    def _setStage(self, stage):
+        if stage is not None:
+            self._stage_id = stage
+        return self
+
+
+class _DefaultStageManager(_options_impl.IStageManager):
+    def __init__(self):
+        super().__init__()
+        self._next_id = 0
+        self._block_map = {}
+
+    def getStage(self, block_id):
+        if block_id not in self._block_map:
+            stage = Stage(block_id)
+            stage._setStage(self._default_stage or self._next_id)  # pylint: disable=protected-access
+            self._next_id += 1
+            self._block_map[block_id] = stage
+        return self._block_map[block_id]
+
+
+class _IExecutionStrategy:
+    def __init__(self, stages_manager, block_map):
+        self._block_map = block_map
+        self._stages_manager = stages_manager
+
+    def stage(self, block_id):
+        assert block_id in self._block_map, f"Unknown block {block_id}"
+        return self._block_map[block_id]
+
+    def onStartTracing(self):
+        ops.Block._stages_manager = self._stages_manager  # pylint: disable=protected-access
+
+    def onEndTracing(self):
+        ops.Block._stages_manager = None  # pylint: disable=protected-access
+
+    def backendOptions(self):
+        return {}
+
+
+class Phase:
+    def __init__(self, arg):
+        """ arg must either be one or more Stages, or one or more block_ids.
+
+        Within a Phase, the stages are executed in parallel.
+
+        >>> with poptorch.Block("A"):
+        ...     layer()
+        >>> with poptorch.Block("B"):
+        ...     layer()
+        >>> p = Phase(poptorch.Stage("A").ipu(0))
+        >>> # 2 stages made of one block each
+        >>> p = Phase(poptorch.Stage("A").ipu(0), poptorch.Stage("B").ipu(1))
+        >>> p = Phase("A","B") # One Stage made of 2 blocks
+        """
+        if isinstance(arg, (Stage, str)):
+            arg = [arg]
+
+        if all([isinstance(elt, Stage) for elt in arg]):
+            self.stages = arg
+        else:
+            assert all([isinstance(elt, str)
+                        for elt in arg]), ("All arguments"
+                                           "must either be strings or Stages")
+            self.stages = [Stage(*arg)]
+
+    def stage(self, idx):
+        return self.stages[idx]
+
+    def ipus(self, *ipus):
+        """Assign one IPU for each stage contained in this Phase.
+
+        The number of IPUs passed must match the number of stages in the Phase.
+        """
+        assert len(ipus) == len(self.stages), (
+            f"Phase contains "
+            f"{len(self.stages)} stages but you provided {len(ipus)} ipus")
+        for stage, ipu in zip(self.stages, ipus):
+            stage.ipu(ipu)
+
+
+class PipelinedExecution(_IExecutionStrategy):
+    """Will pipeline the execution of the passed Stages or if no stage is passed
+    will consider each unique Block name encountered during tracing as a
+    different stage.
+    >>> with poptorch.Block("A"):
+    ...     layer()
+    >>> with poptorch.Block("B"):
+    ...     layer()
+    >>> with poptorch.Block("C"):
+    ...     layer()
+    >>> opts = poptorch.Options()
+    >>> # Create a 3 stages pipeline
+    >>> opts.setExecutionStrategy(poptorch.PipelinedExecution("A","B","C"))
+    >>> # Create a 2 stages pipeline
+    >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
+    ...    poptorch.Stage("A","B"),
+    ...    "C"))
+    >>> # Automatically create a 3 stages pipeline based on the block names
+    >>> opts.setExecutionStrategy(poptorch.PipelinedExecution())
+    """
+
+    def __init__(self, *stages):
+        block_map = {}
+        for stage_id, arg in enumerate(stages):
+            # arg must either be a Stage, a block_id or a list of block_ids
+            if isinstance(arg, Stage):
+                stage = arg
+            elif isinstance(arg, str):
+                stage = Stage(arg)
+            else:
+                assert all([isinstance(elt, str) for elt in arg])
+                stage = Stage(*arg)
+            stage._setStage(stage_id)  # pylint: disable=protected-access
+            for block in stage.blocks:
+                assert block not in block_map, (f"{block} associated "
+                                                f"with more than one stage")
+                block_map[block] = stage
+        if stages:
+
+            class PipelineStageManager(_options_impl.IStageManager):
+                def __init__(self, block_map):
+                    super().__init__()
+                    self._block_map = block_map
+
+                def getStage(self, block_id):
+                    assert block_id in self._block_map, (
+                        f"Unknown Block "
+                        f"'{block_id}' list of expected Blocks: "
+                        f"{list(self._block_map.keys())}")
+                    return self._block_map[block_id]
+
+            stages_manager = PipelineStageManager(block_map)
+        else:
+            stages_manager = _DefaultStageManager()
+        super().__init__(stages_manager, block_map)
+
+    def backendOptions(self):
+        return {"execution_mode": 0}
+
+
+class ShardedExecution(PipelinedExecution):
+    """Will shard the execution of the passed Stages or if no stage is passed
+    will consider each unique Block name encountered during tracing as a
+    different stage.
+    >>> with poptorch.Block("A"):
+    ...     layer()
+    >>> with poptorch.Block("B"):
+    ...     layer()
+    >>> with poptorch.Block("C"):
+    ...     layer()
+    >>> opts = poptorch.Options()
+    >>> # Automatically create 3 shards based on the block names
+    >>> opts.setExecutionStrategy(poptorch.ShardedExecution())
+    """
+
+    def backendOptions(self):
+        return {"execution_mode": 1}
+
+
+class _IPhasedExecution(_IExecutionStrategy):
+    """Common interface for Phased execution strategies"""
+
+    def __init__(self, *phases):
+        self._tensors_liveness = enums.Liveness.AlwaysLive
+        self._separate_backward_phase = False
+        self._phases = []
+        block_map = {}
+        for phase_id, stages in enumerate(phases):
+            phase = Phase(stages)
+            self._phases.append(phase)
+            for _, stage in enumerate(phase.stages):
+                stage._phase_id = phase_id
+                for block in stage.blocks:
+                    assert block not in block_map, (f"{block} associated "
+                                                    "with more than one stage")
+                    block_map[block] = stage
+        if phases:
+
+            class PhaseManager(_options_impl.IStageManager):
+                def __init__(self, block_map):
+                    super().__init__()
+                    self._block_map = block_map
+
+                def getStage(self, block_id):
+                    assert block_id in self._block_map, (
+                        f"Unknown Block "
+                        f"'{block_id}' list of expected Blocks: "
+                        f"{list(self._block_map.keys())}")
+                    return self._block_map[block_id]
+
+            stages_manager = PhaseManager(block_map)
+        else:
+            stages_manager = _DefaultStageManager()
+
+        super().__init__(stages_manager, block_map)
+
+    def phase(self, phase):
+        assert isinstance(
+            phase,
+            int) and phase >= 0, "Phases are identified by positive integers"
+        return self._phases[phase]
+
+    def useSeparateBackwardPhase(self, use=True):
+        """Given a forward pass with 3 phases (0,1,2), by default the phases
+        will run as follow:
+
+        fwd:       bwd:
+        phase 0 -> phase 4
+        phase 1 -> phase 3
+        phase 2 -> phase 2
+
+        Note: The end of the forward pass and the beginning of the backward
+        pass are part of the same phase.
+
+        If ``useSeparateBackwardPhase(True)`` is used then no phase
+        will be shared between the forward and backward passes:
+
+        fwd:       bwd:
+        phase 0 -> phase 6
+        phase 1 -> phase 5
+        phase 2 -> phase 4
+        """
+        assert isinstance(use, bool)
+        self._separate_backward_phase = use
+        return self
+
+    def backendOptions(self):
+        return {
+            "execution_mode": 2,
+            "separate_backward_phase": self._separate_backward_phase,
+            "tensors_liveness": self._tensors_liveness.value
+        }
+
+
+class ParallelPhasedExecution(_IPhasedExecution):
+    """Phases are executed in parallel alternating between two groups of IPUs.
+
+    For example:
+
+    phase 0 runs on ipu 0 & 2
+    phase 1 runs on ipu 1 & 3
+    phase 2 runs on ipu 0 & 2
+
+    >>> poptorch.Block.useAutoId()
+    >>> with poptorch.Block(): # user_id = "0"
+    ...     layer()
+    >>> with poptorch.Block(): # user_id = "1"
+    ...     layer()
+    >>> with poptorch.Block(): # user_id = "2"
+    ...     layer()
+    >>> with poptorch.Block(): # user_id = "3"
+    ...     layer()
+    >>> with poptorch.Block(): # user_id = "4"
+    ...     layer()
+    >>> with poptorch.Block(): # user_id = "5"
+    ...     layer()
+    >>> opts = poptorch.Options()
+    >>> strategy = poptorch.ParalellPhasedExecution([
+    ...     poptorch.Phase(poptorch.Stage("0"), poptorch.Stage("1")),
+    ...     poptorch.Phase(poptorch.Stage("2"), poptorch.Stage("3")),
+    ...     poptorch.Phase(poptorch.Stage("4"), poptorch.Stage("5"))])
+    >>> strategy.phase(0).ipus(0,2)
+    >>> strategy.phase(1).ipus(1,3)
+    >>> strategy.phase(2).ipus(0,2)
+    >>> opts.setExecutionStrategy(strategy)
+    """
+
+    def backendOptions(self):
+        return {**super().backendOptions(), "serial_phases_execution": False}
+
+    def sendTensorsOffChipAfterFwd(self, off_chip=True):
+        assert isinstance(off_chip, bool)
+        if off_chip:
+            self._tensors_liveness = enums.Liveness.OffChipAfterFwd
+        else:
+            self._tensors_liveness = enums.Liveness.AlwaysLive
+        return self
+
+
+class SerialPhasedExecution(_IPhasedExecution):
+    """All the phases run serially on a single group of IPUs.
+
+    For example:
+
+    phase 0 runs on ipu 0 & 1
+    phase 1 runs on ipu 0 & 1
+    phase 2 runs on ipu 0 & 1
+
+    >>> with poptorch.Block("A"):
+    ...     layer()
+    >>> with poptorch.Block("A2"):
+    ...     layer()
+    >>> with poptorch.Block("B"):
+    ...     layer()
+    >>> with poptorch.Block("B2"):
+    ...     layer()
+    >>> with poptorch.Block("C"):
+    ...     layer()
+    >>> with poptorch.Block("C2"):
+    ...     layer()
+    >>> opts = poptorch.Options()
+    >>> strategy = poptorch.SerialPhasedExecution([
+    ...     poptorch.Phase(poptorch.Stage("A"), poptorch.Stage("A2")),
+    ...     poptorch.Phase(poptorch.Stage("B"), poptorch.Stage("B2")),
+    ...     poptorch.Phase(poptorch.Stage("C"), poptorch.Stage("C2"))])
+    >>> strategy.phase(0).ipus(0,1)
+    >>> strategy.phase(1).ipus(0,1)
+    >>> strategy.phase(2).ipus(0,1)
+    >>> opts.setExecutionStrategy(strategy)
+    """
+
+    def setTensorsLiveness(self, liveness):
+        """See ``Liveness`` for more information
+
+        .. seealso:: :py:class:`poptorch.Liveness`
+        """
+        assert isinstance(liveness, enums.Liveness)
+        self._tensors_liveness = liveness
+        return self
+
+    def backendOptions(self):
+        return {**super().backendOptions(), "serial_phases_execution": True}
+
+
+class Options(_options_impl.OptionsDict):
     """Options controlling how a model is run on the IPU.
     """
 
@@ -359,6 +651,7 @@ class Options(_OptionsDict):
         self._popart = _PopartOptions()
         self._distributed = _DistributedOptions()
         self._tensor_locations = _TensorLocationOptions()
+        self._execution_strategy = PipelinedExecution()
 
         super().__init__(replication_factor=1,
                          device_iterations=1,
@@ -417,10 +710,15 @@ class Options(_OptionsDict):
         self.set(device_iterations=device_iterations)
         return self
 
-    def enablePipelining(self, enable_pipelining):
-        """Enable pipelining of virtual graphs (Default: False if 1 IPU used,
-        True otherwise)"""
-        self.createOrSet(enable_pipelining=enable_pipelining)
+    def setExecutionStrategy(self, strategy):
+        """Set the execution strategy to use to partition the graph
+
+        .. seealso:: :py:class:`PipelinedExecution`,
+        :py:class:`ShardedExecution`, :py:class:`ParallelPhasedExecution`,
+        :py:class:`SerialPhasedExecution`.
+        """
+        assert isinstance(strategy, _IExecutionStrategy)
+        self._execution_strategy = strategy
         return self
 
     def setAvailableMemoryProportion(self, available_memory_proportion):
@@ -577,7 +875,7 @@ class Options(_OptionsDict):
         """
         assert not self.defaultAnchorMode(
         ), "An anchor mode must be picked before serialisation"
-        out = {}
+        out = self._execution_strategy.backendOptions()
         out.update(self._popart.options)
         out = self.update(out)
         out = self._training.update(out)

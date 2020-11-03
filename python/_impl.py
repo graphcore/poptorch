@@ -436,8 +436,10 @@ class PoplarExecutor:
                         convertedLayers.append(name)
 
                 # We will trace using the normal trace view.
+                self._options._execution_strategy.onStartTracing()
                 self._trace = torch.jit.trace(self._model,
                                               in_tensors_trace_view.asTuple())
+                self._options._execution_strategy.onEndTracing()
 
                 # Save the inputs of the traced graph printout as it will be
                 # different after getting originals back.

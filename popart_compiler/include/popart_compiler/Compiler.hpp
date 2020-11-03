@@ -315,6 +315,8 @@ public:
   void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
                       int64_t group);
 
+  std::unique_ptr<char> getExecutionInfo() const;
+
 private:
   void assertTensorIs(PopartType dataType, const poptorch::TensorId &id,
                       const char *caller) const;

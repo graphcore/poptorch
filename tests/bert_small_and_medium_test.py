@@ -75,8 +75,8 @@ def test_bert_medium_result():
     opts = poptorch.Options()
     opts.deviceIterations(2)
 
-    model.bert.embeddings.position_embeddings = poptorch.IPU(
-        1, model.bert.embeddings.position_embeddings)
+    model.bert.embeddings.position_embeddings = poptorch.BeginBlock(
+        model.bert.embeddings.position_embeddings, ipu_id=1)
 
     inference_model = poptorch.inferenceModel(model, opts)
     start_score_pop, end_scores_pop = inference_model(input_ids,

@@ -419,10 +419,11 @@ void LowerToPopart::lowerBody() {
         _valueMap.setTensor(output, output_tensor);
       }
 
-      logging::trace(
-          "{} was lowered to {} [{}]", nodeToString(node),
+      logging::debug(
+          "{} was lowered to {} [{},{}]", nodeToString(node),
           tensorNames(first_output_tensor, node->outputs().size()),
-          tensorTypesAndShapes(first_output_tensor, node->outputs().size()));
+          tensorTypesAndShapes(first_output_tensor, node->outputs().size()),
+          _compiler.getExecutionInfo().get());
     } else if (kind == symbols::poptorch::end_ipu_block) {
       // NOP for now.
     } else if (kind == symbols::poptorch::begin_ipu_block) {

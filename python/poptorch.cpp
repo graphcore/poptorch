@@ -380,6 +380,12 @@ getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   return executable->getPopartIR();
 }
 
+void setLogLevel(std::uint64_t level) {
+  ERROR_ON(level >= static_cast<std::uint64_t>(logging::Level::Off) ||
+           level == 5);
+  logging::setLogLevel(static_cast<logging::Level>(level));
+}
+
 std::vector<pybind11::object>
 execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
         const pybind11::tuple &inputs, py::dict *optimizerDict) {
@@ -754,5 +760,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("getTraceInputStr", poptorch::getTraceInputStr);
   m.def("ipuHardwareIsAvailable", poptorch::ipuHardwareIsAvailable,
         py::arg("numIpus") = 1);
+  m.def("setLogLevel", poptorch::setLogLevel, py::arg("level") = 2);
   m.def("_getPopartIR", poptorch::getPopartIR);
 }

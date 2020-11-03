@@ -43,15 +43,6 @@ class SyncPattern(enum.IntEnum):
     ReplicaAndLadder = 2
 
 
-class IpuId(enum.IntEnum):
-    SameAsStage = -1
-    SameAsPreviousStage = -2
-
-
-class PhaseId(enum.IntEnum):
-    Disabled = -1
-
-
 class MatMulSerializationMode(enum.Enum):
     """Which dimension of the matrix multiplication to use for the
     serialization"""
@@ -59,3 +50,17 @@ class MatMulSerializationMode(enum.Enum):
     ReducingDim = "reducing_dim"
     OutputChannels = "output_channels"
     Disabled = "none"
+
+
+class Liveness(enum.IntEnum):
+    """When using phased execution:
+
+    - AlwaysLive: The tensors always stay on the IPU between the phases.
+    - OffChipAfterFwd: The tensors are sent off the chip at the end of
+      the forward pass and before the beginning of the backward pass.
+    - OffChipAfterEachPhase: The tensors are sent off the chip at the end
+      of each phase.
+    """
+    AlwaysLive = 0
+    OffChipAfterFwd = 1
+    OffChipAfterEachPhase = 2

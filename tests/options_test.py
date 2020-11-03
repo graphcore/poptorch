@@ -38,8 +38,8 @@ def test_set_options():
     model = Network()
     opts = poptorch.Options()
     # Just set a bunch of options and check they're successfully parsed.
-    opts.deviceIterations(1).enablePipelining(False).replicationFactor(
-        1).logDir("/tmp")
+    opts.deviceIterations(1).setExecutionStrategy(
+        poptorch.PipelinedExecution()).replicationFactor(1).logDir("/tmp")
     inference_model = poptorch.inferenceModel(model, opts)
 
     x = torch.ones(2)

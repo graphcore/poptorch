@@ -35,6 +35,11 @@
 
 namespace {
 
+const std::string location_activation = "location_activation";
+const std::string location_weight = "location_weight";
+const std::string location_optimizer = "location_optimizer";
+const std::string location_accumulator = "location_accumulator";
+
 bool ipuModelEnvironmentVariableIsEnabled() {
   if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
     bool model_enabled = std::stoi(env_use_model) != 0;
@@ -90,6 +95,11 @@ namespace poptorch {
 
 namespace detail {
 
+enum class ExecutionMode { Pipelined, Sharded, Phased, N };
+
+// To be kept in sync with the Liveness python enum in python/enums.py
+enum class Liveness { AlwaysLive, OffChipAfterFwd, OffChipAfterEachPhase, N };
+
 class WeightsIO : public popart::IWeightsIO {
 public:
   ~WeightsIO() override = default;
@@ -108,9 +118,7 @@ struct CompilerImpl {
 public:
   friend Compiler;
 
-  CompilerImpl()
-      : op_builder(popart::Builder::create()), loss(""), active_ipu(0),
-        active_stage(0), active_phase(-1) {
+  CompilerImpl() : op_builder(popart::Builder::create()), loss("") {
     ids.emplace_back(""); // None tensor
   }
 
@@ -177,6 +185,59 @@ public:
     std::uint64_t distributed_process_id;
 
     popart::Patterns patterns{popart::PatternsLevel::Default};
+    ExecutionMode execution_mode;
+
+    // Phased execution options: see the python documentation for more
+    // information about how to use them
+    //
+    // Here is how they translate into Popart options:
+    // serial_phases_execution: True -> executionPhaseSettings.stages = 1
+    //                          False-> executionPhaseSettings.stages = 2
+    //
+    // separate_backward_phase:
+    //  False:
+    //   fwd:       bwd:
+    //   phase 0 -> phase 4
+    //   phase 1 -> phase 3
+    //   phase 2 -> phase 2
+    //
+    // (End of fwd and start of bwd are part of the same phase)
+    //  True:
+    //   fwd:       bwd:
+    //   phase 0 -> phase 6
+    //   phase 1 -> phase 5
+    //   phase 2 -> phase 4
+    //
+    //  This is done by setting options.executionPhaseSettings.phases to N+1
+    //
+    // tensors_liveness:
+    //  Note: tensors have a liveness of [phase, phase+2]
+    //  AlwaysLive:
+    //   fwd:       bwd:
+    //   phase 0 -> phase 6
+    //   phase 1 -> phase 5
+    //   phase 2 -> phase 4
+    //
+    //  OffChipAfterFwd:
+    //   fwd:       bwd:
+    //   phase 0 -> phase 8
+    //   phase 1 -> phase 7
+    //   phase 2 -> phase 6
+    // (Gap between fwd and bwd > 2)
+    //  This is done by setting options.executionPhaseSettings.phases to N+2
+    //
+    //  OffChipAfterEachPhase: (Only for stage=1)
+    //   fwd:       bwd:
+    //   phase 0 -> phase 20
+    //   phase 4 -> phase 16
+    //   phase 8 -> phase 12
+    // (Gap between each phase > 2)
+    //  This is done by setting options.executionPhaseSettings.phases to N+2
+    //  and multiplying by 4 the phase_id.
+    //
+    bool serial_phases_execution;
+    bool separate_backward_phase;
+    Liveness tensors_liveness;
   };
 
   // List of options which have been explicitely set by the user.
@@ -187,9 +248,11 @@ public:
   // We add operations using a state based system so the user would set the
   // active IPU and all subsequent operations will be added to that IPU until
   // stopped.
-  std::uint64_t active_ipu;
-  std::uint64_t active_stage;
-  std::int64_t active_phase;
+  std::uint64_t active_ipu{0};
+  std::uint64_t active_stage{0};
+  std::int64_t active_phase{0};
+  // Keep track of what the maximum phase number used is.
+  std::int64_t max_phase{0};
 
   std::unordered_set<std::uint64_t> used_ipus;
 
@@ -257,6 +320,7 @@ public:
       logging::warn("{} forced by the user from default of {}", name,
                     value_as_string);
     } else {
+      logging::debug("{} set to value {}", name, value_as_string);
       option = value;
     }
   }
@@ -265,7 +329,28 @@ public:
   void setOptionIfNotSet(T &option, U value, const std::string &name) {
     setOptionIfNotSet(option, value, name, std::to_string(value));
   }
+
+  void
+  setExecutionStrategyAttributes(const std::set<popart::TensorId> &tensors);
 };
+
+void CompilerImpl::setExecutionStrategyAttributes(
+    const std::set<popart::TensorId> &tensors) {
+  switch (options.execution_mode) {
+  case ExecutionMode::Pipelined:
+  case ExecutionMode::Sharded:
+    op_builder->pipelineStage(tensors, active_stage);
+    break;
+  case ExecutionMode::Phased:
+    ERROR_ON(active_phase < 0);
+    op_builder->executionPhase(tensors, active_phase);
+    break;
+  default:
+    ERROR("Invalid ExecutionMode active");
+  }
+  used_ipus.insert(active_ipu);
+  op_builder->virtualGraph(tensors, active_ipu);
+}
 
 bool WeightsIO::contains(popart::TensorId id) const {
   return _weights.find(id) != _weights.end();
@@ -376,10 +461,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
   bool_options["use_model"] = [&](bool value) {
     poptorch_options.ipu_model = value;
   };
-  bool_options["enable_pipelining"] = [&](bool value) {
-    popart_options.enablePipelining = value;
+  bool_options["serial_phases_execution"] = [&](bool value) {
+    poptorch_options.serial_phases_execution = value;
   };
-
+  bool_options["separate_backward_phase"] = [&](bool value) {
+    poptorch_options.separate_backward_phase = value;
+  };
   uint64_options["device_iterations"] = [&](std::uint64_t value) {
     poptorch_options.steps = value;
   };
@@ -404,7 +491,16 @@ SessionOptionsImpl::SessionOptionsImpl() {
   uint64_options["replication_factor"] = [&](std::uint64_t value) {
     popart_options.replicatedGraphCount = value;
   };
-
+  uint64_options["execution_mode"] = [&](std::uint64_t value) {
+    ERROR_ON_MSG(value >= static_cast<std::uint64_t>(ExecutionMode::N),
+                 "Value for ExecutionMode out of range");
+    poptorch_options.execution_mode = static_cast<ExecutionMode>(value);
+  };
+  uint64_options["tensors_liveness"] = [&](std::uint64_t value) {
+    ERROR_ON_MSG(value >= static_cast<std::uint64_t>(Liveness::N),
+                 "Value for Liveness out of range");
+    poptorch_options.tensors_liveness = static_cast<Liveness>(value);
+  };
   uint64_options["anchor_mode"] = [&](std::uint64_t value) {
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(PopartAnchorTypes::N),
                  "Value for PopartAnchorTypes out of range");
@@ -526,6 +622,8 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_STRING_OPTION(kahnTieBreaker);
   ADD_POPART_STRING_OPTION(ipuSystemType);
 
+  ADD_POPART_UINT64_OPTION(executionPhaseSettings.phases);
+  ADD_POPART_UINT64_OPTION(executionPhaseSettings.stages);
   ADD_POPART_UINT64_OPTION(firstDotOp);
   ADD_POPART_UINT64_OPTION(finalDotOp);
   ADD_POPART_UINT64_OPTION(numIOTiles);
@@ -653,13 +751,9 @@ template <typename T> struct HandleOutput {
       ids.insert(id);
       _impl->ids.push_back(id);
     }
-    _impl->op_builder->pipelineStage(ids, _impl->active_stage);
-    _impl->used_ipus.insert(_impl->active_ipu);
-    _impl->op_builder->virtualGraph(ids, _impl->active_ipu);
 
-    if (_impl->active_phase != -1) {
-      _impl->op_builder->executionPhase(ids, _impl->active_phase);
-    }
+    _impl->setExecutionStrategyAttributes(ids);
+
     // Return the first added tensor as the sole return of this IR op.
     return _impl->ids.size() - in.size();
   }
@@ -678,14 +772,8 @@ template <> struct HandleOutput<popart::TensorId> {
       _impl->op_builder->setAvailableMemoryProportion(in, itr->second);
     }
 
-    _impl->op_builder->pipelineStage(in, _impl->active_stage);
-    _impl->op_builder->virtualGraph(in, _impl->active_ipu);
-    _impl->used_ipus.insert(_impl->active_ipu);
     _impl->ids.push_back(in);
-
-    if (_impl->active_phase != -1) {
-      _impl->op_builder->executionPhase(in, _impl->active_phase);
-    }
+    _impl->setExecutionStrategyAttributes({in});
 
     if (loss) {
       _impl->loss = in;
@@ -1232,8 +1320,74 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   }
 
   // If Pipelining wasn't set: enable it if more than 1 IPU is used.
-  _impl->setOptionIfNotSet(options.enablePipelining,
-                           _impl->used_ipus.size() > 1, "enablePipelining");
+  switch (_impl->options.execution_mode) {
+  case detail::ExecutionMode::Pipelined: {
+    _impl->setOptionIfNotSet(options.enablePipelining,
+                             _impl->used_ipus.size() > 1, "enablePipelining");
+    _impl->setOptionIfNotSet(
+        options.virtualGraphMode, popart::VirtualGraphMode::Manual,
+        "virtualGraphMode", popart::toString(options.virtualGraphMode));
+    // If we are pipelining we want to turn on recompute by default.
+    if (_impl->used_ipus.size() > 1) {
+      _impl->setOptionIfNotSet(
+          options.autoRecomputation, popart::RecomputationType::Pipeline,
+          "autoRecomputation",
+          popart::toString(popart::RecomputationType::Pipeline));
+    }
+
+    break;
+  }
+  case detail::ExecutionMode::Sharded: {
+    _impl->setOptionIfNotSet(options.enablePipelining, false,
+                             "enablePipelining");
+    break;
+  }
+  case detail::ExecutionMode::Phased: {
+    _impl->setOptionIfNotSet(options.enablePipelining, false,
+                             "enablePipelining");
+    _impl->setOptionIfNotSet(
+        options.virtualGraphMode, popart::VirtualGraphMode::ExecutionPhases,
+        "virtualGraphMode", popart::toString(options.virtualGraphMode));
+    std::uint64_t num_phases = _impl->max_phase + 1;
+    std::uint64_t num_stages;
+    if (_impl->options.tensors_liveness != detail::Liveness::AlwaysLive) {
+      // We want to send the tensors off chip: we need to have a gap of N+2
+      // before the backward pass.
+      num_phases += 2;
+    } else if (_impl->options.separate_backward_phase) {
+      // Make sure the backward pass will start with a new phase.
+      num_phases += 1;
+    }
+    if (_impl->options.serial_phases_execution) {
+      num_stages = 1;
+    } else {
+      num_stages = 2;
+    }
+    _impl->setOptionIfNotSet(options.executionPhaseSettings.phases, num_phases,
+                             "executionPhaseSettings.phases");
+    _impl->setOptionIfNotSet(options.executionPhaseSettings.stages, num_stages,
+                             "executionPhaseSettings.stages");
+    _impl->setOptionIfNotSet(
+        options.activationTensorLocationSettings.location.storage,
+        popart::TensorStorage::OffChip, location_activation,
+        "useOnChipStorage(False)");
+    _impl->setOptionIfNotSet(
+        options.weightTensorLocationSettings.location.storage,
+        popart::TensorStorage::OffChip, location_weight,
+        "useOnChipStorage(False)");
+    _impl->setOptionIfNotSet(
+        options.optimizerStateTensorLocationSettings.location.storage,
+        popart::TensorStorage::OffChip, location_optimizer,
+        "useOnChipStorage(False)");
+    _impl->setOptionIfNotSet(
+        options.accumulatorTensorLocationSettings.location.storage,
+        popart::TensorStorage::OffChip, location_accumulator,
+        "useOnChipStorage(False)");
+    break;
+  }
+  default:
+    ERROR("ExecutionMode not supported");
+  }
 
   _impl->setOptionIfNotSet(options.enableDistributedReplicatedGraphs,
                            _impl->options.num_distributed_processes > 1,
@@ -1258,34 +1412,18 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   // Disable constant_weights by default: causes problems with Popart
   _impl->setOptionIfNotSet(options.constantWeights, false, "constantWeights");
 
-  if (_impl->used_ipus.size() > 1) {
-    if (!options.enablePipelining) {
-      logging::warn("Using {} IPUs but "
-                    "poptorch.Options.enablePipelining() is False",
-                    _impl->used_ipus.size());
-    }
-    _impl->setOptionIfNotSet(
-        options.virtualGraphMode, popart::VirtualGraphMode::Manual,
-        "virtualGraphMode", popart::toString(options.virtualGraphMode));
-  }
-  ERROR_ON_MSG(_impl->used_ipus.size() > popartBatchDim(),
-               "poptorch.Options.deviceIterations("
-                   << _impl->options.steps
-                   << ") * poptorch.Options.gradientAccumulation("
-                   << _impl->popart_options.accumulationFactor
-                   << ") * poptorch.Options.replicationFactor("
-                   << _impl->popart_options.replicatedGraphCount
-                   << ") = " << popartBatchDim()
-                   << " must be greater or equal than the number of IPUs used "
-                      "by the model: "
-                   << _impl->used_ipus.size());
-
-  // If we are pipelining we want to turn on recompute by default.
-  if (options.enablePipelining) {
-    _impl->setOptionIfNotSet(
-        options.autoRecomputation, popart::RecomputationType::Pipeline,
-        "autoRecomputation",
-        popart::toString(popart::RecomputationType::Pipeline));
+  if (_impl->options.execution_mode == detail::ExecutionMode::Pipelined) {
+    ERROR_ON_MSG(_impl->used_ipus.size() > popartBatchDim(),
+                 "poptorch.Options.deviceIterations("
+                     << _impl->options.steps
+                     << ") * poptorch.Options.gradientAccumulation("
+                     << _impl->popart_options.accumulationFactor
+                     << ") * poptorch.Options.replicationFactor("
+                     << _impl->popart_options.replicatedGraphCount
+                     << ") = " << popartBatchDim()
+                     << " must be greater or equal than the number of IPUs used"
+                        " by the model: "
+                     << _impl->used_ipus.size());
   }
 
   _impl->setOptionIfNotSet(options.enableGradientAccumulation,
@@ -1350,6 +1488,37 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
     logging::trace("Setting random seed to: {}", _impl->options.random_seed);
     _impl->session->setRandomSeed(_impl->options.random_seed);
   }
+}
+
+std::unique_ptr<char> Compiler::getExecutionInfo() const {
+  std::stringstream info;
+  switch (_impl->options.execution_mode) {
+  case detail::ExecutionMode::Pipelined: {
+    info << " mode(Pipelined), ipu(" << _impl->active_ipu << "), stage("
+         << _impl->active_stage << ")";
+    break;
+  }
+  case detail::ExecutionMode::Sharded: {
+    info << " mode(Sharded), ipu(" << _impl->active_ipu << "), stage("
+         << _impl->active_stage << ")";
+    break;
+  }
+  case detail::ExecutionMode::Phased: {
+    info << " mode(Phased), ipu(" << _impl->active_ipu << "), phase("
+         << _impl->active_phase << ")";
+    break;
+  }
+  default:
+    ERROR("Invalid ExecutionMode active");
+  }
+  const std::string as_string = info.str();
+
+  // Copy into a memory managed array to get around ABI.
+  std::unique_ptr<char> ptr =
+      std::unique_ptr<char>(new char[as_string.size() + 1]);
+  std::memcpy(ptr.get(), as_string.data(), as_string.size());
+  ptr.get()[as_string.size()] = '\0';
+  return ptr;
 }
 
 std::unique_ptr<char> Compiler::getPopartIR() const {
@@ -1467,19 +1636,32 @@ std::vector<char> Compiler::getTensorDTypeString(poptorch::TensorId id) const {
 
 void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
                             std::int64_t ipu_id) {
-  _impl->active_stage = stage_id;
-
-  // Must be in sync with IpuId from python/enums.py
-  switch (ipu_id) {
-  case -1: // SameAsStage
-    _impl->active_ipu = stage_id;
+  switch (_impl->options.execution_mode) {
+  case detail::ExecutionMode::Phased:
+    ERROR_ON_MSG(phase_id < 0, "Invalid phase for ExecutionMode::Phased");
+    if (_impl->options.tensors_liveness ==
+        detail::Liveness::OffChipAfterEachPhase) {
+      ERROR_ON_MSG(!_impl->options.serial_phases_execution,
+                   "This is only supported for serial phase execution");
+      _impl->active_phase = phase_id * 4;
+    } else {
+      _impl->active_phase = phase_id;
+      _impl->max_phase = std::max(phase_id, _impl->max_phase);
+    }
+    if (!_impl->options.serial_phases_execution) {
+      ERROR_ON_MSG(_impl->active_phase % 2 != ipu_id % 2,
+                   "When phases are executed in parallel: even phases must run "
+                   "on even IPUs and odd phases on odd IPUs");
+    }
     break;
-  case -2: // SameAsPreviousStage
+  case detail::ExecutionMode::Pipelined:
+  case detail::ExecutionMode::Sharded:
+    _impl->active_stage = stage_id;
     break;
   default:
-    _impl->active_ipu = ipu_id;
+    ERROR("Unsupported ExecutionMode");
   }
-  _impl->active_phase = phase_id;
+  _impl->active_ipu = ipu_id;
 }
 
 std::uint64_t Compiler::batchPerStep() const { return _impl->options.steps; }
@@ -1623,13 +1805,14 @@ void SessionOptions::setTensorLocation(const char *tensor, const char *option,
   std::string location_tensor{tensor};
   std::string opt{option};
   popart::TensorLocationSettings *settings;
-  if (location_tensor == "location_activation") {
+  _impl->options_set.insert(location_tensor);
+  if (location_tensor == location_activation) {
     settings = &_impl->popart_options.activationTensorLocationSettings;
-  } else if (location_tensor == "location_weight") {
+  } else if (location_tensor == location_weight) {
     settings = &_impl->popart_options.weightTensorLocationSettings;
-  } else if (location_tensor == "location_optimizer") {
+  } else if (location_tensor == location_optimizer) {
     settings = &_impl->popart_options.optimizerStateTensorLocationSettings;
-  } else if (location_tensor == "location_accumulator") {
+  } else if (location_tensor == location_accumulator) {
     settings = &_impl->popart_options.accumulatorTensorLocationSettings;
   } else {
     ERROR("Unknown tensor location " << location_tensor);

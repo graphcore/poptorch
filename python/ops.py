@@ -41,64 +41,6 @@ def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
                                                        keep_precision)
 
 
-class IPU(torch.nn.Module):
-    """Runs a layer on a specified IPU.
-
-    All layers after this layer will also run on
-    the same IPU until another IPU wrapper is encountered.
-
-    The execution will be "pipelined" where each IPU is executing one stage
-    of the operation, as the previous IPU is executing a previous stage on
-    the next batch and subsequent IPUs are executing subsequent stages on
-    previous batches.
-
-    Can be used as either a scope variable:
-
-    >>> with poptorch.IPU(1):
-    ...     self.layer = MyLayer(x)
-
-    Or as a wrapper:
-
-    >>> self.layer = poptorch.IPU(1, MyLayer(x))
-    """
-
-    def __init__(self, ipu_id, layer_to_call=None):
-        """
-        :param int ipu_id: The id of the IPU to run on. All subsequent layers
-                           of the network will run on this IPU until another
-                           layer is wrapped. By default all layers will be on
-                           IPU 0 until the first pipeline annotation is
-                           encountered. Note that the ``ipu_id`` is an index
-                           in a multi-IPU device within PopTorch, and is
-                           separate and distinct from the device ids used by
-                           ``gc-info``.
-
-        :param layer_to_call: The layer to run on the specified IPU.
-        """
-
-        super().__init__()
-        logger.warning(
-            """IPU annotations are going to be deprecated in favour of
-                        beginPhase annotations.""")
-
-        self.ipu_id = ipu_id
-        self.layer_to_call = layer_to_call
-
-    def __enter__(self):
-
-        begin_ipu_block(self.ipu_id, enums.PhaseId.Disabled.value,
-                        enums.IpuId.SameAsStage.value)
-
-    def __exit__(self, type, value, traceback):
-        end_ipu_block()
-
-    def __call__(self, *input, **kwargs):
-        begin_ipu_block(self.ipu_id, enums.PhaseId.Disabled.value,
-                        enums.IpuId.SameAsStage.value)
-        out = self.layer_to_call(*input, **kwargs)
-        return out
-
-
 def _assertIdIsValid(name, value, expected_type):
     assert isinstance(value, expected_type) or \
             (isinstance(value, int) and value >= 0), (
@@ -106,80 +48,77 @@ def _assertIdIsValid(name, value, expected_type):
                 f"{expected_type.__name__}")
 
 
-def _getIdValue(id):
-    if isinstance(id, int):
-        return id
-    return id.value
+class Block(torch.nn.Module):
+    """Runs all layers called inside this scope on a specified IPU.
 
 
-class Phase(torch.nn.Module):
-    """Runs a layer on a specified IPU.
-
-    All layers after this layer will also run on
-    the same IPU and Phase until another Phase is encountered.
-
-    By default this will be "pipelined" execution, however this
-    can be overridden by the popart session option.
-
-    >>> with poptorch.Phase(1):
+    >>> with poptorch.Block("IPU0"):
     ...     self.layer = MyLayer(x)
 
     """
+    # Will be set by the ExecutionStrategy before the graph is traced.
+    # If it's None then it means it's a CPU execution of the graph so
+    # turn the whole class into a no-op.
+    _stages_manager = None
 
-    def __init__(self,
-                 stage_id,
-                 phase_id=enums.PhaseId.Disabled,
-                 ipu_id=enums.IpuId.SameAsStage):
+    @staticmethod
+    def useAutoId():
+        """Call this method at the beginning of your forward() method to
+        enable automatic Block Ids.
+
+        Blocks with a None ``user_id`` will be assigned an automatic id
+        which will be the index of this block in the list of id-less Blocks.
+
+        >>> poptorch.Block.useAutoId()
+        >>> with poptorch.Block(): # user_id = "0"
+        ...     layer()
+        >>> with poptorch.Block("special_block"): # user_id = "special_block"
+        ...     layer()
+        >>> with poptorch.Block(): # user_id = "1"
+        ...     layer()
         """
-        All subsequent layers of the network will be part of this phase until
-        another layer is wrapped.
+        if Block._stages_manager is not None:
+            Block._stages_manager.resetAutoId()
 
-        :param int stage_id: Pipeline stage this code block should belong to.
+    def __init__(self, user_id=None, ipu_id=None):
+        """
+
+        :param user_id: Pipeline stage this code block should belong to.
                          All stages must have a unique, incrementing, id.
                          By default all layers will be in stage 0 until the
                          first pipeline annotation is encountered.
-        :param phase_id: The PopART execution phase this code block should
-                         belong on.
-        :type phase_id: int >= 0 or poptorch.PhaseId.
-        :param ipu_id: The id of the IPU to run on.
+        :param int ipu_id: The id of the IPU to run on.
                        Note that the ``ipu_id`` is an index
                        in a multi-IPU device within PopTorch, and is
                        separate and distinct from the device ids used by
                        ``gc-info``.
-        :type ipu_id: int >= 0 or poptorch.IpuId.
         """
         super().__init__()
-        _assertIdIsValid("phase_id", phase_id, enums.PhaseId)
-        _assertIdIsValid("ipu_id", ipu_id, enums.IpuId)
-        self._stage_id = stage_id
-        self._phase_id = _getIdValue(phase_id)
-        self._ipu_id = _getIdValue(ipu_id)
+        self._user_id = user_id
+        self._ipu_id = ipu_id
 
     def __enter__(self):
-        begin_ipu_block(self._stage_id, self._phase_id, self._ipu_id)
+        if Block._stages_manager is not None:
+            Block._stages_manager.beginStage(self._user_id, self._ipu_id)
 
     def __exit__(self, type, value, traceback):
         end_ipu_block()
 
 
-class BeginPhase(torch.nn.Module):
+class BeginBlock(torch.nn.Module):
     """Runs a layer on a specified Phase mapped to a specific API.
 
     All layers after this layer will also run on
     the same IPU until another IPU wrapper is encountered.
 
     By default this will be "pipelined" execution, however this
-    can be overridden by the popart session option.
+    can be overridden by the `poptorch.Options`.
 
-    >>> self.layer = poptorch.Phase(1, MyLayer(x), phase_id=1)
+    >>> self.layer = poptorch.BeginBlock(1, MyLayer(x))
 
     """
 
-    def __init__(self,
-                 stage_id,
-                 layer_to_call,
-                 phase_id=enums.PhaseId.Disabled,
-                 ipu_id=enums.IpuId.SameAsStage):
+    def __init__(self, layer_to_call, user_id=None, ipu_id=None):
         """
         All subsequent layers of the network will be part of this phase until
         another layer is wrapped.
@@ -200,15 +139,16 @@ class BeginPhase(torch.nn.Module):
         :type ipu_id: int >= 0 or poptorch.IpuId.
         """
         super().__init__()
-        _assertIdIsValid("phase_id", phase_id, enums.PhaseId)
-        _assertIdIsValid("ipu_id", ipu_id, enums.IpuId)
-        self._stage_id = stage_id
-        self._phase_id = _getIdValue(phase_id)
-        self._ipu_id = _getIdValue(ipu_id)
+        self._user_id = user_id
         self._layer_to_call = layer_to_call
+        self._ipu_id = ipu_id
 
     def __call__(self, *input, **kwargs):
-        begin_ipu_block(self._stage_id, self._phase_id, self._ipu_id)
+        if Block._stages_manager is not None:
+            if self._user_id is None:
+                self._user_id = Block._stages_manager.nextAutoId()
+            Block._stages_manager.beginStage(self._user_id, self._ipu_id)
+
         out = self._layer_to_call(*input, **kwargs)
         return out
 
