@@ -61,7 +61,10 @@ unary_ops_float = [
     torch.ceil,
     torch.cos,
     torch.cosh,
-    # torch.conj, torch.digamma, torch.erf, torch.erfc, torch.erfinv
+    # torch.conj, torch.digamma
+    torch.erf,
+    torch.erfc,
+    #torch.erfinv,
     torch.exp,
     torch.expm1,
     torch.floor,
