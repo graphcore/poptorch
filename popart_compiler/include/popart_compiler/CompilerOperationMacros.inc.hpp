@@ -9,6 +9,7 @@ OP_DECL(popart, subsample, subsample, AiGraphcoreOpset1.subsample, ARG(INT_VEC,s
 OP_DECL(popart, printtensor, printtensor, AiGraphcoreOpset1.printtensor, ARG(INT,print_gradient) ARG(STRING,title) , BODY_ARG(print_gradient) BODY_ARG(title) )
 OP_DECL(popart, nop, nop, AiGraphcoreOpset1.nop, NONE, NONE)
 OP_DECL(popart, scale, scale, AiGraphcoreOpset1.scale, ARG(FLOAT,scale) , BODY_ARG(scale) )
+OP_DECL(popart, scaledadd, scaledadd, AiGraphcoreOpset1.scaledadd, ARG(FLOAT,scale0) ARG(FLOAT,scale1) , BODY_ARG(scale0) BODY_ARG(scale1) )
 OP_DECL(popart, lstm, lstm, AiGraphcoreOpset1.lstm, ARG(INT,outputFullSequence) , BODY_ARG(outputFullSequence) )
 OP_DECL(popart, gelu, gelu, AiGraphcoreOpset1.gelu, NONE, NONE)
 OP_DECL(popart, detach, detach, AiGraphcoreOpset1.detach, NONE, NONE)
@@ -22,6 +23,8 @@ OP_DECL(popart, l1loss, l1loss, AiGraphcoreOpset1.l1loss, ARG(FLOAT,lambda) ARG(
 OP_DECL(popart, nllloss, nllloss, AiGraphcoreOpset1.nllloss, ARG(INT,reduction) ARG(INT,ignoreIndex) ARG(INT,inputIsLogProbability) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(ignoreIndex) BODY_ARG(inputIsLogProbability) )
 OP_DECL(popart, identityloss, identityloss, AiGraphcoreOpset1.identityloss, ARG(INT,reduction) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) )
 OP_DECL(popart, shapeddropout, shapeddropout, AiGraphcoreOpset1.shapeddropout, ARG(INT_VEC,shape) ARG(FLOAT,ratio) , BODY_ARG(shape) BODY_ARG(ratio) )
+OP_DECL(popart, expm1, expm1, AiGraphcoreOpset1.expm1, NONE, NONE)
+OP_DECL(popart, log1p, log1p, AiGraphcoreOpset1.log1p, NONE, NONE)
 // Ops from AiOnnxOpset10
 OP_DECL(popart, averagepool, averagepool, AiOnnxOpset10.averagepool, ARG(INT_VEC,kernel_shape) ARG(INT,ceil_mode) ARG(INT,count_include_pad) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(kernel_shape) BODY_ARG(ceil_mode) BODY_ARG(count_include_pad) BODY_ARG(pads) BODY_ARG(strides) )
 OP_DECL(popart, convinteger, convinteger, AiOnnxOpset10.convinteger, ARG(INT_VEC,dilations) ARG(INT,group) ARG(INT_VEC,kernel_shape) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(dilations) BODY_ARG(group) BODY_ARG(kernel_shape) BODY_ARG(pads) BODY_ARG(strides) )

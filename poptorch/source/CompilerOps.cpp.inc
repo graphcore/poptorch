@@ -29,6 +29,12 @@ torch::jit::Node* createScale(torch::jit::Graph *graph,  const std::vector<torch
 new_node->f_(c10::Symbol::fromQualString("attr::scale"),scale);
 return new_node;
 }
+torch::jit::Node* createScaledadd(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float scale0,float scale1) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::scaledadd, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->f_(c10::Symbol::fromQualString("attr::scale0"),scale0);
+new_node->f_(c10::Symbol::fromQualString("attr::scale1"),scale1);
+return new_node;
+}
 torch::jit::Node* createLstm(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t outputFullSequence) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::lstm, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted, 2);
 new_node->i_(c10::Symbol::fromQualString("attr::outputFullSequence"),outputFullSequence);
@@ -98,6 +104,14 @@ torch::jit::Node* createShapeddropout(torch::jit::Graph *graph,  const std::vect
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::shapeddropout, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::shape"),shape);
 new_node->f_(c10::Symbol::fromQualString("attr::ratio"),ratio);
+return new_node;
+}
+torch::jit::Node* createExpm1(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::expm1, args, ImplicitCast::None, OutputType::AsFirstInput);
+return new_node;
+}
+torch::jit::Node* createLog1p(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::log1p, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
 torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {

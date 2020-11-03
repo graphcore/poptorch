@@ -8,6 +8,7 @@ torch::jit::Node* createSubsample(torch::jit::Graph *graph,  const std::vector<t
 torch::jit::Node* createPrinttensor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t print_gradient,const std::string & title);
 torch::jit::Node* createNop(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createScale(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float scale);
+torch::jit::Node* createScaledadd(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float scale0,float scale1);
 torch::jit::Node* createLstm(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t outputFullSequence);
 torch::jit::Node* createGelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
@@ -21,6 +22,8 @@ torch::jit::Node* createL1loss(torch::jit::Graph *graph,  const std::vector<torc
 torch::jit::Node* createNllloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,std::int32_t ignoreIndex,bool inputIsLogProbability);
 torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction);
 torch::jit::Node* createShapeddropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & shape,float ratio);
+torch::jit::Node* createExpm1(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createLog1p(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
 torch::jit::Node* createConvinteger(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
 torch::jit::Node* createDequantizelinear(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
