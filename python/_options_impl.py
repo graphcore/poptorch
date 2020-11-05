@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import abc
 from . import ops
+from .logging import logger
 
 
 class OptionsDict:
@@ -86,7 +87,12 @@ class IStageManager(abc.ABC):
         # If the user specified an ipu_id in the option use that one
         ipu = stage._ipu if stage._ipu is not None else ipu_id_from_block  # pylint: disable=protected-access
         if ipu is None:
+            logger.debug(
+                "No IPU specified for block %s: default to stage_id %d",
+                user_id, stage._stage_id)  # pylint: disable=protected-access
             ipu = stage._stage_id  # pylint: disable=protected-access
+        logger.debug("Starting block id=%s stage=%d phase=%d ipu=%d", user_id,
+                     stage._stage_id, stage._phase_id, ipu)  # pylint: disable=protected-access
         ops.begin_ipu_block(stage._stage_id, stage._phase_id, ipu)  # pylint: disable=protected-access
 
     def resetAutoId(self):

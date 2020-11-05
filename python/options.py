@@ -433,6 +433,10 @@ class PipelinedExecution(_IExecutionStrategy):
             for block in stage.blocks:
                 assert block not in block_map, (f"{block} associated "
                                                 f"with more than one stage")
+                logger.debug(
+                    "block %s added to stage %d%s", block, stage_id,
+                    " on IPU %d" %
+                    stage._ipu if stage._ipu is not None else '')
                 block_map[block] = stage
         if stages:
 
@@ -492,6 +496,10 @@ class _IPhasedExecution(_IExecutionStrategy):
                 for block in stage.blocks:
                     assert block not in block_map, (f"{block} associated "
                                                     "with more than one stage")
+                    logger.debug(
+                        "block %s added to phase %d%s", block, phase_id,
+                        " on IPU %d" %
+                        stage._ipu if stage._ipu is not None else '')
                     block_map[block] = stage
         if phases:
 
