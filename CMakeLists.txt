@@ -6,7 +6,6 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 set(USE_PYTORCH_PACKAGE_HEADERS ON CACHE BOOL "Use the Torch headers distributed with the pytorch package.")
-set(USE_ONNX_PACKAGE_HEADERS ON CACHE BOOL "Use the ONNX headers distributed with the ONNX pip package.")
 set(POPLAR_DIR CACHE PATH "Path to a Poplar install")
 set(POPART_DIR CACHE PATH "Path to a Popart install")
 set(SNAPSHOT "" CACHE STRING "Snapshot ID to use for the documentation")
@@ -39,15 +38,6 @@ endif()
 if(USE_PROTOC_PROTOBUF)
   execute_process(COMMAND bash -c "dirname `which protoc`" OUTPUT_VARIABLE PROTOC_PATH)
   list(PREPEND CMAKE_PREFIX_PATH ${PROTOC_PATH}/..)
-endif()
-
-if(USE_ONNX_PACKAGE_HEADERS)
-  execute_process(COMMAND python3 -c "import onnx; from pathlib import Path; print(Path(onnx.__file__).parent.parent, end='')"
-    OUTPUT_VARIABLE ONNX_PATH)
-  if(NOT ONNX_PATH)
-    message(FATAL_ERROR "python3 -c \"import onnx\" failed: check that your virtual environment is active and onnx is installed")
-  endif()
-  list(APPEND CMAKE_PREFIX_PATH ${ONNX_PATH})
 endif()
 
 if(EXISTS ${SDK_DIR})
