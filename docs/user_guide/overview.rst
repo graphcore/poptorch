@@ -29,6 +29,9 @@ explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation
 .. autoclass:: poptorch.options._PopartOptions
    :members:
 
+.. autoclass:: poptorch.options._TensorLocationOptions
+   :members:
+
 Model wrapping functions
 ========================
 
@@ -52,7 +55,7 @@ poptorch.inferenceModel
 
 .. autofunction:: poptorch.inferenceModel
 
-.. literalinclude:: inference.py
+.. literalinclude:: inferenceModel.py
     :language: python
     :caption: An example of the use of :py:func:`poptorch.inferenceModel`
     :linenos:
@@ -92,7 +95,7 @@ poptorch.PoplarExecutor
 Pipeline annotator
 ==================
 
-You can use the ``BeginPhase`` or ``Phase`` wrapper class to define model parallelism
+You can use the ``BeginBlock`` or ``Block`` wrapper class to define model parallelism
 in a PopTorch multi-IPU device. Conceptually this is collecting the layers of a model
 into a phase which can be mapped onto a specific IPU. By default, these will execute
 using a pipelined model parallel execution strategy.
@@ -101,7 +104,19 @@ We expose an additional argument `phase_id` through this API. This will be passe
 PopART and when used in conjunction with PopART session options can override the default
 pipeline execution strategy. Refer to the PopART user guide to enable other execution modes.
 
-.. autoclass:: poptorch.IPU
+.. autoclass:: poptorch.Block
+   :special-members: __init__
+
+.. autoclass:: poptorch.PipelinedExecution
+   :special-members: __init__
+
+.. autoclass:: poptorch.ShardedExecution
+   :special-members: __init__
+
+.. autoclass:: poptorch.ParallelPhasedExecution
+   :special-members: __init__
+
+.. autoclass:: poptorch.SerialPhasedExecution
    :special-members: __init__
 
 .. literalinclude:: pipeline_simple.py
@@ -209,7 +224,7 @@ PopTorch supports the half-precision floating point (float 16) format.
 You can convert models to float 16 by using a Module's .half() method and by using float 16 rather than float 32 tensors for the input.
 (You can convert a tensor to float 16 using ``tensor = tensor.half()``)
 
-.. literalinclude:: inference.py
+.. literalinclude:: inferenceModel.py
     :language: python
     :caption: How to run a model using half precision
     :linenos:

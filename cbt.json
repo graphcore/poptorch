@@ -1,6 +1,5 @@
 {
   "dependencies" : [
-    "gcdoc",
     "pybind11",
     "popart",
     "spdlog"

@@ -11,11 +11,11 @@ class OptimizerType(enum.IntEnum):
 
 class AnchorMode(enum.IntEnum):
     """
-    All: Return a result for each batch.
-    Sum: Return the sum of all the batches
-    Final: Return the last batch.
-    EveryN: Return every N batches. N is passed in as |anchor_return_period|
-    Default: "All" for inference, "Final" for training.
+    - All: Return a result for each batch.
+    - Sum: Return the sum of all the batches
+    - Final: Return the last batch.
+    - EveryN: Return every N batches. N is passed in as `anchor_return_period`
+    - Default: "All" for inference, "Final" for training.
     """
     Final = 0
     EveryN = 1
@@ -38,6 +38,11 @@ class ConnectionType(enum.IntEnum):
 
 
 class SyncPattern(enum.IntEnum):
+    """
+    - Full
+    - SinglePipeline
+    - ReplicaAndLadder
+    """
     Full = 0
     SinglePipeline = 1
     ReplicaAndLadder = 2

@@ -1,0 +1,182 @@
+/* Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+   Override the sphinx-readthedocs-theme settings */
+
+/*  improve table layout, allowing cells to wrap */
+.rst-content table.docutils col {
+  width: auto;
+}
+
+.wy-table-responsive table td, .wy-table-responsive table th,
+.rst-content .wy-table-responsive table td, .rst-content .wy-table-responsive table th {
+  white-space: normal;
+  word-wrap: break-word;
+  border: solid 2px #e1e4e5;
+}
+
+th.head p {
+  margin-bottom: 0;
+}
+
+/* make inline code/literal text less ugly */
+/*
+.rst-content tt.literal, .rst-content tt.literal, .rst-content code.literal {
+  color: #565656;
+  font-size: 90%;
+  padding: 0;
+  background: #ffffff;
+  border: none;
+}
+*/
+/* make image captions a sensible size and format */
+
+.rst-content .toctree-wrapper p.caption {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: "Graphik", "Lato", "Helvetica Neue", Arial, sans-serif;
+  text-align: center;
+  margin-top: 14px;
+}
+
+/* change background colour for code samples */
+
+div.highlight,
+.rst-content pre.literal-block,
+.rst-content pre.literal-block div[class^='highlight'],
+.rst-content div[class^='highlight'],
+.rst-content div[class^='highlight'] pre,
+.rst-content div[class^='highlight'] div[class^='highlight'],
+.rst-content div[class^='highlight'] td.code {
+  background-color: white ;
+  color: #292c31;
+}
+
+/* remove ugly top border from definition lists */
+
+.rst-content dl:not(.docutils) dt {
+  border-top: none;
+}
+
+/* Style nav menu in Graphcore colours and fonts */
+
+.wy-menu-vertical li.toctree-l1 span.toctree-expand,
+.wy-menu-vertical li span.toctree-expand,
+.wy-menu-vertical li.on a span.toctree-expand,
+.wy-menu-vertical li a.current span.toctree-expand {
+  color: white;
+  visibility: visible;
+  display: inline-block;
+  mix-blend-mode: difference;
+}
+
+.fa-home:before, .icon-home:before {
+  display: none;
+}
+
+a.icon,
+a.icon:visited,
+a.icon:hover,
+a.icon-home,
+a.icon-home:hover,
+a.icon-home:visited {
+  color: white;
+  font-weight: bold;
+}
+
+.btn {
+  font-family: "Graphik", "Lato", "proxima-nova", "Helvetica Neue", Arial, sans-serif;
+}
+
+input[type="button"], input[type="reset"], input[type="submit"],
+input[type="text"], input[type="password"], input[type="email"], input[type="url"], input[type="date"], input[type="month"], input[type="time"], input[type="datetime"], input[type="datetime-local"], input[type="week"], input[type="number"], input[type="search"], input[type="tel"], input[type="color"] {
+  font-family: "Graphik", "Lato", "proxima-nova", "Helvetica Neue", Arial, sans-serif;
+}
+
+textarea {
+  font-family: "Graphik", "Lato", "proxima-nova", "Helvetica Neue", Arial, sans-serif;
+}
+
+a:link {
+  color: #ff6f79;
+}
+
+a:visited {
+  color: #ff6f79;
+}
+
+a:hover {
+  color: #fbc3aa;
+}
+
+body {
+  font-family: "Graphik", "Lato", "Helvetica Neue", Arial, sans-serif;
+  color: #565656;
+}
+
+h1, h2, h3, h4, h5, h6, legend {
+  font-family: "Graphik", "Lato", "Helvetica Neue", Arial, sans-serif;
+  color: #292c31;
+}
+
+h1 {
+  text-transform: uppercase;
+  font-family: "GC Quantized", "Roboto Slab", "ff-tisa-web-pro", "Georgia", Arial, sans-serif;
+}
+
+.rst-content tt.literal, .rst-content tt.literal, .rst-content code.literal,
+.rst-content pre.literal-block, .rst-content .linenodiv pre,
+.rst-content div[class^='highlight'] pre,
+code, .rst-content tt, .rst-content code,
+.rst-content pre, .rst-content kbd, .rst-content samp,
+footer span.commit code, footer span.commit .rst-content tt, .rst-content footer span.commit tt {
+  font-family: Consolas, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Courier New", Courier, monospace;
+  color: #292c31;
+}
+
+.wy-menu-vertical li.toctree-l1 >a,
+.wy-menu-vertical li.toctree-l1 >a:visited {
+    color: #e9e9e9 !important;
+}
+
+.wy-menu-vertical li.toctree-l1.current a,
+.wy-menu-vertical li a {
+    color: #292c31 !important;
+}
+
+.wy-menu-vertical a:hover {
+  background: #ff6f79 !important;
+  color: #fff  !important;
+}
+
+.wy-menu,
+.wy-menu-vertical,
+.wy-nav-side,
+.wy-side-nav-search {
+  background-color: #292c31;
+}
+
+.wy-side-nav-search>div.version {
+  color: #fff;
+  text-align: left;
+  padding: 0 .75em;
+}
+
+.rst-content .sidebar .sidebar-title {
+  font-family: "GC Quantized", "Roboto Slab", "ff-tisa-web-pro", "Georgia", Arial, sans-serif;
+}
+
+.rst-content .footnote-reference, .rst-content .citation-reference {
+  vertical-align: super;
+}
+
+.rst-content table.docutils.citation, .rst-content table.docutils.footnote {
+  color: #999;
+}
+
+.wy-breadcrumbs {
+  display: none;
+}
+
+footer p {
+  color: #565656;
+  font-size: 15px;
+}

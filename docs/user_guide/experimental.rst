@@ -60,6 +60,9 @@ Distributed execution using Python
 .. autoclass:: poptorch.distributed.VirtualIpuManager
    :members:
 
+.. autoclass:: poptorch.distributed.Partition
+   :members:
+
 .. literalinclude:: device_iterations.py
   :caption: How to start the processes from python
   :lines: 202-232

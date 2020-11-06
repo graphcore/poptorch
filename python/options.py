@@ -722,8 +722,8 @@ class Options(_options_impl.OptionsDict):
         """Set the execution strategy to use to partition the graph
 
         .. seealso:: :py:class:`PipelinedExecution`,
-        :py:class:`ShardedExecution`, :py:class:`ParallelPhasedExecution`,
-        :py:class:`SerialPhasedExecution`.
+            :py:class:`ShardedExecution`, :py:class:`ParallelPhasedExecution`,
+            :py:class:`SerialPhasedExecution`.
         """
         assert isinstance(strategy, _IExecutionStrategy)
         self._execution_strategy = strategy
@@ -838,12 +838,12 @@ class Options(_options_impl.OptionsDict):
         """ How much data to return from a model
 
         :param poptorch.AnchorMode anchor_mode:
-                * All: Return a result for each batch.
-                * Sum: Return the sum of all the batches
-                * Final: Return the last batch.
-                * EveryN: Return every N batches. N is passed in
-                  as ``anchor_return_period``.
-                * Default: `All` for inference, `Final` for training.
+            * All: Return a result for each batch.
+            * Sum: Return the sum of all the batches
+            * Final: Return the last batch.
+            * EveryN: Return every N batches. N is passed in
+              as ``anchor_return_period``.
+            * Default: `All` for inference, `Final` for training.
         """
         assert isinstance(anchor_mode, enums.AnchorMode)
 

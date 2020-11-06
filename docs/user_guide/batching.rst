@@ -91,7 +91,7 @@ when training with pipelined models because the weights are shared across
 pipeline batches so gradients will be both updated and used by subsequent batches
 out of order.
 
-.. seealso:: :py:class:`poptorch.IPU`
+.. seealso:: :py:class:`poptorch.Block`
 
 .. literalinclude:: device_iterations.py
   :caption: Use of gradient accumulation

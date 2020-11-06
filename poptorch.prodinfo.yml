@@ -8,4 +8,3 @@ elements:
   - name: PopTorch framework (@OS_TYPE@)
     file: @PACKAGE_FILE_NAME@
     type: @PACKAGE_OS_TYPE@_installer
-@PKG_ELEMENTS@

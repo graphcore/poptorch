@@ -5,6 +5,7 @@ set(USE_PYTORCH_PACKAGE_HEADERS ON CACHE BOOL "Use the Torch headers distributed
 set(USE_ONNX_PACKAGE_HEADERS ON CACHE BOOL "Use the ONNX headers distributed with the ONNX pip package.")
 set(POPLAR_DIR CACHE PATH "Path to a Poplar install")
 set(POPART_DIR CACHE PATH "Path to a Popart install")
+set(SNAPSHOT "" CACHE STRING "Snapshot ID to use for the documentation")
 
 set(TORCH_VERSION 1.6.0)
 
@@ -90,7 +91,6 @@ set(VERSION ${CPACK_PACKAGE_VERSION_MAJOR})
 set(VERSION ${VERSION}.${CPACK_PACKAGE_VERSION_MINOR})
 set(VERSION ${VERSION}.${CPACK_PACKAGE_VERSION_PATCH})
 
-set(DOCS_VERSION "${VERSION}")
 if (DEFINED BUILD_NUMBER)
   set(VERSION "${VERSION}+${BUILD_NUMBER}")
 endif()
@@ -113,25 +113,19 @@ endif()
 add_definitions(-DONNX_NAMESPACE=onnx)
 
 #------ git information
-execute_process(
-  COMMAND git rev-parse HEAD
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
-  OUTPUT_VARIABLE VIEW_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-if("${VIEW_HASH}" STREQUAL "")
-  set(VIEW_SHORT_HASH "0000000000")
-else()
-  string(SUBSTRING ${VIEW_HASH} 0 10 VIEW_SHORT_HASH)
+if("${SNAPSHOT}" STREQUAL "")
+  execute_process(
+    COMMAND git rev-parse --short=10 HEAD
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE SNAPSHOT
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
-message(STATUS "View hash is " ${VIEW_SHORT_HASH})
 
-set(SNAPSHOT ${VIEW_SHORT_HASH})
+if("${SNAPSHOT}" STREQUAL "")
+  set(SHAPSHOT "0000000000")
+endif()
+message(STATUS "Snapshot is " ${SNAPSHOT})
 
-execute_process(COMMAND
-  git rev-parse --short=10 HEAD
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-  OUTPUT_VARIABLE GIT_COMMIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
 #------ end of git information
 
 set(INSTALL_PYDIR poptorch)
@@ -155,8 +149,6 @@ set(USER_GUIDE_PDF_NAME poptorch-user-guide-${VERSION}-${SNAPSHOT}.pdf)
 set(USER_GUIDE_HTML_NAME poptorch-user-guide-html-${VERSION}-${SNAPSHOT}.zip)
 set(PYTHON_API_PDF_NAME poptorch-python-api-${VERSION}-${SNAPSHOT}.pdf)
 set(PYTHON_API_HTML_NAME poptorch-python-api-html-${VERSION}-${SNAPSHOT}.zip)
-
-add_subdirectory(docs)
 
 #------ packaging
 if(${OS_TYPE} STREQUAL osx)
@@ -208,15 +200,6 @@ add_custom_target(package_and_move
 #------ end of packaging
 
 #------ product info file
-if(BUILD_DOCS)
-  string(APPEND PKG_ELEMENTS "  - name: PopTorch user guide (PDF)\n"
-                             "    file: ${USER_GUIDE_PDF_NAME}\n"
-                             "    type: pdf\n")
-
-  string(APPEND PKG_ELEMENTS "  - name: PopTorch user guide (HTML)\n"
-                             "    file: ${USER_GUIDE_HTML_NAME}\n"
-                             "    type: html_zip\n")
-endif()
 
 execute_process(
   COMMAND git config --get remote.origin.url

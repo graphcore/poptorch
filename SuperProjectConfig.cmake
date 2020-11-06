@@ -27,11 +27,18 @@ else()
   endif()
 endif()
 
+execute_process(
+  COMMAND git rev-parse --short=10 HEAD
+  WORKING_DIRECTORY ${CBT_DIR}/..
+  OUTPUT_VARIABLE SNAPSHOT
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 list(APPEND POPTORCH_CMAKE_ARGS -DPOPLAR_DIR=${POPLAR_INSTALL_DIR})
 list(APPEND POPTORCH_CMAKE_ARGS -DPOPART_DIR=${POPART_DIR})
 list(APPEND POPTORCH_CMAKE_ARGS -DENABLE_WERROR=${ENABLE_WERROR})
 #TODO(T27444): Remove ONNX_DIR
 list(APPEND POPTORCH_CMAKE_ARGS -DONNX_DIR=${ONNX_DIR})
+list(APPEND POPTORCH_CMAKE_ARGS -DSNAPSHOT=${SNAPSHOT})
 
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
@@ -48,5 +55,8 @@ endif()
 add_custom_target(poptorch_wheel COMMAND
   ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/build/poptorch --target poptorch_wheel DEPENDS poptorch)
 
-add_custom_target(package_poptorch COMMAND
-  ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/build/poptorch --target package_and_move DEPENDS poptorch)
+add_custom_target(package_poptorch
+  COMMAND bash -c '${CBT_DIR}/../poptorch/docs_build.sh'
+  COMMAND ${CMAKE_COMMAND} --build . --target package_and_move
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
+  DEPENDS poptorch)

@@ -1,9 +1,6 @@
 PyTorch for the IPU (Preview): User Guide
 =========================================
 
-.. gcdoc::
-    :verb-borders:
-
 .. toctree::
     :maxdepth: 4
 
