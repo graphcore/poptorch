@@ -1,4 +1,4 @@
 #!/bin/bash
-POPTORCH_ROOT=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
-export @LD_PATH_VARNAME@=${POPTORCH_ROOT}/@INSTALL_PYDIR@${@LD_PATH_VARNAME@:+:${@LD_PATH_VARNAME@}}
-export PYTHONPATH=${POPTORCH_ROOT}:$PYTHONPATH
+export PYTHONPATH=@CMAKE_INSTALL_PREFIX@:$PYTHONPATH
+source @POPART_DIR@/enable.sh
+source @POPLAR_DIR@/enable.sh

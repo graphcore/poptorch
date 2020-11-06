@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
 project(poptorch)
 
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Default to local install prefix" FORCE)
+endif()
+
 set(USE_PYTORCH_PACKAGE_HEADERS ON CACHE BOOL "Use the Torch headers distributed with the pytorch package.")
 set(USE_ONNX_PACKAGE_HEADERS ON CACHE BOOL "Use the ONNX headers distributed with the ONNX pip package.")
 set(POPLAR_DIR CACHE PATH "Path to a Poplar install")
 set(POPART_DIR CACHE PATH "Path to a Popart install")
 set(SNAPSHOT "" CACHE STRING "Snapshot ID to use for the documentation")
+set(SDK_DIR CACHE PATH "Path to an extracted SDK archive or to a Poplar & Popart install directory (Will populate POPLAR_DIR and POPART_DIR)")
+set(USE_PROTOC_PROTOBUF ON CACHE BOOL "Use libprotobuf shipped with protoc instead of searching for it in the system path.")
 
 set(TORCH_VERSION 1.6.0)
 
@@ -30,11 +36,30 @@ if(USE_PYTORCH_PACKAGE_HEADERS)
   endif()
 endif()
 
-if(NOT DEFINED ONNX_DIR AND USE_ONNX_PACKAGE_HEADERS)
+if(USE_PROTOC_PROTOBUF)
+  execute_process(COMMAND bash -c "dirname `which protoc`" OUTPUT_VARIABLE PROTOC_PATH)
+  list(PREPEND CMAKE_PREFIX_PATH ${PROTOC_PATH}/..)
+endif()
+
+if(USE_ONNX_PACKAGE_HEADERS)
   execute_process(COMMAND python3 -c "import onnx; from pathlib import Path; print(Path(onnx.__file__).parent.parent, end='')"
     OUTPUT_VARIABLE ONNX_PATH)
   if(NOT ONNX_PATH)
     message(FATAL_ERROR "python3 -c \"import onnx\" failed: check that your virtual environment is active and onnx is installed")
+  endif()
+  list(APPEND CMAKE_PREFIX_PATH ${ONNX_PATH})
+endif()
+
+if(EXISTS ${SDK_DIR})
+  execute_process(COMMAND find ${SDK_DIR} -maxdepth 1 -type d -name "popart*"
+    OUTPUT_VARIABLE POPART_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND find ${SDK_DIR} -maxdepth 1 -type d -name "poplar-*" -o -name "poplar"
+    OUTPUT_VARIABLE POPLAR_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT IS_DIRECTORY "${POPLAR_DIR}")
+    message(FATAL_ERROR "Couldn't find a \"poplar\" or \"poplar-*\" folder in '${SDK_DIR}'")
+  endif()
+  if(NOT IS_DIRECTORY "${POPART_DIR}")
+    message(FATAL_ERROR "Couldn't find a \"popart*\" folder in '${SDK_DIR}'")
   endif()
 endif()
 
@@ -45,12 +70,24 @@ else()
 endif()
 
 if( NOT EXISTS ${POPART_DIR} )
-  #TODO(T27444): Re-enable once PopTorch has its own view.
-  #message(FATAL_ERROR "You must provide a path to a Popart build using -DPOPART_DIR=/path/to/popart/build")
+  message(FATAL_ERROR "You must provide a path to a Popart build using -DPOPART_DIR=/path/to/popart/build")
 else()
   list(APPEND CMAKE_PREFIX_PATH ${POPART_DIR})
 endif()
 
+if( NOT EXISTS ${POPLAR_DIR} )
+  message(FATAL_ERROR "You must provide a path to a Poplar build using -DPOPLAR_DIR=/path/to/poplar/build")
+else()
+  list(APPEND CMAKE_PREFIX_PATH ${POPLAR_DIR})
+endif()
+
+file(WRITE ${CMAKE_BINARY_DIR}/tmp/test.sh "
+  source ${CMAKE_BINARY_DIR}/enable.sh
+  ctest --output-on-failure $@
+  ")
+file(COPY ${CMAKE_BINARY_DIR}/tmp/test.sh
+  DESTINATION ${CMAKE_BINARY_DIR}
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
 enable_testing()
 

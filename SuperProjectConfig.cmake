@@ -1,7 +1,5 @@
 set(SDK_DIR CACHE PATH "Path to an extracted SDK archive or to a Poplar & Popart install directory")
 set(ENABLE_WERROR TRUE CACHE BOOL "Stop compilation on warning (-Werror)")
-#TODO(T27444): Remove ONNX_DIR
-set(ONNX_DIR "${CBT_DIR}/../onnx" CACHE PATH "Path to an onnx build")
 set(POPLAR_INSTALL_DIR CACHE PATH "Path to a Poplar install")
 
 #TODO(T27444): Remove popart from cbt.json
@@ -14,6 +12,7 @@ if(NOT EXISTS ${SDK_DIR})
     on its own or -DPOPLAR_INSTALL_DIR=/path/to/poplar_view/build/install if you\
     are building the POPONNX view.")
   endif()
+  set(POPART_DIR ${CMAKE_BINARY_DIR}/install/ CACHE PATH "Path to a Popart install")
 else()
   execute_process(COMMAND find ${SDK_DIR} -maxdepth 1 -type d -name "popart*"
     OUTPUT_VARIABLE POPART_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -36,9 +35,9 @@ execute_process(
 list(APPEND POPTORCH_CMAKE_ARGS -DPOPLAR_DIR=${POPLAR_INSTALL_DIR})
 list(APPEND POPTORCH_CMAKE_ARGS -DPOPART_DIR=${POPART_DIR})
 list(APPEND POPTORCH_CMAKE_ARGS -DENABLE_WERROR=${ENABLE_WERROR})
-#TODO(T27444): Remove ONNX_DIR
-list(APPEND POPTORCH_CMAKE_ARGS -DONNX_DIR=${ONNX_DIR})
 list(APPEND POPTORCH_CMAKE_ARGS -DSNAPSHOT=${SNAPSHOT})
+list(APPEND POPTORCH_CMAKE_ARGS -DUSE_ENV_PROTOBUF=OFF)
+list(APPEND POPTORCH_CMAKE_ARGS -DProtobuf_ROOT=${CMAKE_BINARY_DIR}/install/protobuf)
 
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})

@@ -6,7 +6,19 @@ project(custom_cube_op)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(ONNX_DIR ${ONNX_PATH} CACHE PATH "Path to the onnx sources or build")
+set(POPART_DIR CACHE PATH "Path to a Popart install")
+set(POPLAR_DIR CACHE PATH "Path to a Poplar install")
+
+if( NOT ${POPLAR_DIR} STREQUAL "")
+  list(APPEND CMAKE_PREFIX_PATH ${POPLAR_DIR})
+else()
+  message(FATAL_ERROR "You must provide a path to a Poplar install using -DPOPLAR_DIR=/path/to/popart/build/install")
+endif()
+if( NOT EXISTS ${POPART_DIR} )
+  message(FATAL_ERROR "You must provide a path to a Popart build using -DPOPART_DIR=/path/to/popart/build")
+else()
+  list(APPEND CMAKE_PREFIX_PATH ${POPART_DIR})
+endif()
 
 # All C++ code in this project will be compiled as C++14
 set (CMAKE_CXX_STANDARD 14)
@@ -17,21 +29,12 @@ add_definitions(-DONNX_NAMESPACE=onnx)
 
 find_package(popart REQUIRED)
 find_package(poplar REQUIRED)
-
-find_path(ONNX_SCHEMA_INCLUDE_DIR
-  NAMES onnx/defs/schema.h
-  HINTS ${ONNX_DIR}
-  DOC "directory containing the header with functions \
-  for checking opset:version mapping, schema.h")
-
-if(NOT ONNX_SCHEMA_INCLUDE_DIR)
-message(FATAL_ERROR "Could not find 'onnx/defs/schema.h' in '${ONNX_DIR}', Try setting \
-ONNX_DIR if not already done, something like \
--DONNX_DIR=/path/to/onnx/ ${ONNX_SCHEMA_INCLUDE_DIR}")
-endif()
+cmake_policy(SET CMP0074 NEW) # Check Protobuf_ROOT
+find_package(Protobuf 3.6.0 REQUIRED)
+find_package(ONNX REQUIRED)
 
 add_library(custom_cube_op SHARED "custom_cube_op.cpp")
 
-target_include_directories(custom_cube_op SYSTEM PRIVATE ${ONNX_SCHEMA_INCLUDE_DIR})
-
-target_link_libraries(custom_cube_op popart poplar)
+# For some reason protobuf::libprotobuf doesn't work
+target_include_directories(custom_cube_op SYSTEM PRIVATE ${Protobuf_INCLUDE_DIR})
+target_link_libraries(custom_cube_op popart poplar onnx ${Protobuf_LIBRARY} )
