@@ -140,7 +140,7 @@ void ConvertHalfImpl::convertGraphInputs(
 
 bool ConvertHalfImpl::atLeastOneUseHalf(
     const std::vector<torch::jit::Use> &uses) {
-  for (const auto use : uses) {
+  for (const auto &use : uses) {
     for (auto output : use.user->outputs()) {
       auto type = output->type()->cast<c10::TensorType>();
       if (!type) {
