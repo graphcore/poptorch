@@ -1,4 +1,6 @@
-add_subdirectory(custom_ops)
+# Temporarily disabled due to a problem in popart:
+# The exported `popart` target does not contain all its dependencies, like onnx.
+# add_subdirectory(custom_ops)
 
 find_package(popart REQUIRED)
 
