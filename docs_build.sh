@@ -65,9 +65,9 @@ cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_
 if ! grep -q "${DOC}" "${PACKAGE_INFO_FILE}"; then
     # Append to package info
     echo "  - name: PopTorch user guide (PDF)
-    file: ${USER_GUIDE_PDF_NAME}
+    file: ${USER_GUIDE_PDF_NAME}.pdf
     type: pdf
   - name: PopTorch user guide (HTML)
-    file: ${USER_GUIDE_HTML_NAME}
+    file: ${USER_GUIDE_HTML_NAME}.zip
     type: html_zip" >> ${PACKAGE_INFO_FILE}
 fi
