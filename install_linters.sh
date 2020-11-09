@@ -1,6 +1,11 @@
 #!/bin/bash
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+# realpath doesn't exist on osx
+realpath() {
+  python3 -c "import os.path; print(os.path.realpath('$1'))"
+}
+
 DIR=$(realpath $(dirname $0))
 
 print_usage_and_exit() {

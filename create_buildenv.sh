@@ -1,5 +1,10 @@
 #!/bin/bash
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+
+# realpath doesn't exist on osx
+realpath() {
+  python3 -c "import os.path; print(os.path.realpath('$1'))"
+}
 set -e # Stop on error
 SRC=$(realpath $(dirname $0))
 if [ ${SRC} = $(realpath $(pwd)) ]
