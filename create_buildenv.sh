@@ -41,7 +41,7 @@ then
   . $BUILD/activate_buildenv.sh
 fi
 cd $BUILD
-conda create --prefix $BUILD/buildenv -c conda-forge -y python=3.6.9 pybind11 pytest spdlog=1.8.0 ninja cmake=3.18.2 protobuf=3.7.1
+conda create --prefix $BUILD/buildenv -c conda-forge -y python=3.6.9 pybind11 pytest spdlog=1.8.0 ninja cmake=3.18.2 protobuf=3.7.1 latexmk
 conda activate $BUILD/buildenv
 echo "conda activate $BUILD/buildenv" >> $BUILD/activate_buildenv.sh
 pip install -r ${SRC}/requirements.txt

@@ -1,5 +1,9 @@
 #!/bin/bash -eu
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+# realpath doesn't exist on osx
+realpath() {
+  python3 -c "import os.path; print(os.path.realpath('$1'))"
+}
 SRC=$(realpath $(dirname $0))
 
 POPTORCH_BUILD_DIR=$(pwd)
@@ -54,9 +58,8 @@ cp "${DOCS_BUILD_DIR}/html/${DOC}/html.zip" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_
 
 # Build PDF
 DOC_TITLE="${TITLE}" sphinx-build $common_flags -b latex -c ${SPHINX_CONF_DIR} -D "project=${DOC}" -D "version=v${VERSION}" -D "release=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/latex/${DOC}"
-set +e # was getting failures because image files not available
-( cd "${DOCS_BUILD_DIR}/latex/${DOC}" && make LATEXMKOPTS="-silent" ) && cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_PDF_NAME}.pdf"
-set -e # Stop on error
+( cd "${DOCS_BUILD_DIR}/latex/${DOC}" && make LATEXMKOPTS="-silent" )
+cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_PDF_NAME}.pdf"
 
 # Ensure we don't append package info multiple times
 if ! grep -q "${DOC}" "${PACKAGE_INFO_FILE}"; then
