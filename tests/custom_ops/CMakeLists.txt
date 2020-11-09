@@ -37,6 +37,8 @@ add_definitions(-DONNX_NAMESPACE=onnx)
 
 find_package(popart REQUIRED)
 find_package(poplar REQUIRED)
+# Provides poprand and popops
+find_package(poplibs REQUIRED)
 cmake_policy(SET CMP0074 NEW) # Check Protobuf_ROOT
 find_package(Protobuf 3.6.0 REQUIRED)
 find_package(ONNX REQUIRED)
@@ -45,4 +47,4 @@ add_library(custom_cube_op SHARED "custom_cube_op.cpp")
 
 # For some reason protobuf::libprotobuf doesn't work
 target_include_directories(custom_cube_op SYSTEM PRIVATE ${Protobuf_INCLUDE_DIR})
-target_link_libraries(custom_cube_op popart poplar onnx ${Protobuf_LIBRARY} )
+target_link_libraries(custom_cube_op popart poplar onnx ${Protobuf_LIBRARY} popops poprand )
