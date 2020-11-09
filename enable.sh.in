@@ -1,4 +1,4 @@
 #!/bin/bash
 export PYTHONPATH=@CMAKE_INSTALL_PREFIX@:$PYTHONPATH
-source @POPART_DIR@/enable.sh
-source @POPLAR_DIR@/enable.sh
+@ENABLE_POPLAR_CMD@
+@ENABLE_POPART_CMD@

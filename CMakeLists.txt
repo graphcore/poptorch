@@ -55,6 +55,7 @@ endif()
 
 if(EXISTS ${POPLAR_DIR})
   list(APPEND CMAKE_PREFIX_PATH ${POPLAR_DIR})
+  set(ENABLE_POPLAR_CMD "source ${POPART_DIR}/enable.sh")
 else()
   # Check the package is not already in the path
   find_package(poplar)
@@ -65,6 +66,7 @@ endif()
 
 if( EXISTS ${POPART_DIR} )
   list(APPEND CMAKE_PREFIX_PATH ${POPART_DIR})
+  set(ENABLE_POPART_CMD "source ${POPART_DIR}/enable.sh")
 else()
   find_package(popart)
   if(NOT popart_FOUND)
