@@ -6,6 +6,8 @@ sphinx
 sphinx_rtd_theme==0.5.0
 breathe
 scipy
-torch==1.6.0+cpu
-torchvision==0.7.0+cpu
+torch==1.6.0+cpu; sys_platform != "darwin"
+torchvision==0.7.0+cpu; sys_platform != "darwin"
+torch==1.6.0; sys_platform == "darwin"
+torchvision==0.7.0; sys_platform == "darwin"
 onnx
