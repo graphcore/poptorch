@@ -15,7 +15,7 @@ def test_custom_loss():
     class CustomLoss(torch.nn.Module):
         # Mean squared error scaled.
         def forward(self, x, target):
-            loss = poptorch.identity_loss(x - target)
+            loss = poptorch.identity_loss(x - target, reduction="none")
             loss = loss * loss * 5.0
             return poptorch.identity_loss(loss, reduction="mean")
 

@@ -168,7 +168,7 @@ def custom_op(inputs, name, domain, domain_version, example_outputs):
                                                transformed_outputs)
 
 
-def identity_loss(x, reduction="none"):
+def identity_loss(x, reduction):
     """Marks this operation as being part of the loss calculation and, as such,
     will back-propagate through it in the PopTorch autograd. This enables
     multiple losses and custom losses.
