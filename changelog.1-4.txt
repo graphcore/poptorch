@@ -4,6 +4,7 @@ New features:
 - Replaced Adam with AdamW optimizer.
 - Added support for the following loss functions:
     torch.nn.KLDivLoss, torch.nn.PoissonNLLLoss, torch.nn.HingeEmbeddingLoss, torch.nn.BCEWithLogitsLoss, torch.nn.SmoothL1Loss, torch.nn.SoftMarginLoss, torch.nn.MultiLabelSoftMarginLoss, torch.nn.CosineEmbeddingLoss, torch.nn.MarginRankingLoss, torch.nn.TripletMarginLoss
+    torch.nn.NLLLoss for aten::nll_loss2d
 - Added support for torch.optim.RMSprop optimizer
 - Added support for bool inputs to models§
 - Improved support for half type models and inputs.

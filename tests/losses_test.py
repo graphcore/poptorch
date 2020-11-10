@@ -220,84 +220,143 @@ def test_op_withdim_2d(op, dim):
 
 
 # Test NLL loss by using it to match a target label.
-def test_NLLLoss_training():
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_NLLLoss_training(reduction):
 
-    reductions = ["mean", "sum"]
     torch.manual_seed(42)
 
-    for reduction in reductions:
+    class Net(torch.nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.softmax = torch.nn.LogSoftmax(dim=1)
 
-        class Net(torch.nn.Module):
-            def __init__(self):
-                super(Net, self).__init__()
-                self.linear = torch.nn.Linear(10, 10)
-                self.softmax = torch.nn.LogSoftmax(dim=1)
+        def forward(self, x):
+            x = self.linear(x)
+            return self.softmax(x)
 
-            def forward(self, x):
-                x = self.linear(x)
-                return self.softmax(x)
+    model = Net()
 
-        model = Net()
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.NLLLoss(reduction=reduction))
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
 
-        poptorch_model = helpers.trainingModelWithLoss(
-            model, loss=torch.nn.NLLLoss(reduction=reduction))
-        input = torch.randn(1, 10)
-        label = torch.randint(0, 10, [1])
+    # Make sure the first run doesn't already pass the test.
+    _, original_loss = poptorch_model(input, label)
 
-        # Make sure the first run doesn't already pass the test.
-        _, original_loss = poptorch_model(input, label)
+    for _ in range(0, 1000):
+        out, loss = poptorch_model(input, label)
 
-        for _ in range(0, 1000):
-            out, loss = poptorch_model(input, label)
+    # # Check we have trained the "model"
+    assert loss < original_loss
+    assert torch.argmax(out, dim=1) == label
 
-        # # Check we have trained the "model"
-        assert loss < original_loss
-        assert torch.argmax(out, dim=1) == label
+
+# Test NLL loss 2d by using it to match a target label.
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_NLLLoss2d_training(reduction):
+
+    torch.manual_seed(42)
+    N, C, M = 3, 2, 5
+
+    class Net(torch.nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.linear = torch.nn.Linear(M * M, M * M * C)
+            self.softmax = torch.nn.LogSoftmax(dim=1)
+
+        def forward(self, x):
+            x = x.reshape(N, M * M)
+            x = self.linear(x).reshape(N, C, M, M)
+            return self.softmax(x)
+
+    model = Net()
+
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.NLLLoss(reduction=reduction))
+    x = torch.randn(N, M, M)
+    y = torch.empty(N, M, M, dtype=torch.long).random_(0, C)
+
+    _, original_loss = poptorch_model(x, y)
+
+    for _ in range(0, 1000):
+        out, loss = poptorch_model(x, y)
+
+    # # Check we have trained the "model"
+    assert loss < original_loss
+    torch.testing.assert_allclose(torch.argmax(out, dim=1), y)
+
+
+# Tell loss 2d in an inference model, comparing against pytorch
+@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
+def test_NLLLoss2d_inference(reduction):
+    N, C, M = 11, 7, 13
+    torch.manual_seed(42)
+
+    class Net(torch.nn.Module):
+        def __init__(self, reduction):
+            super(Net, self).__init__()
+            self.softmax = torch.nn.LogSoftmax(dim=1)
+            self.loss = torch.nn.NLLLoss(reduction=reduction)
+
+        def forward(self, x, y):
+            x = self.softmax(x)
+            return self.loss(x, y)
+
+    model = Net(reduction)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    x = torch.randn(N, C, M, M)
+    y = torch.empty(N, M, M, dtype=torch.long).random_(0, C)
+
+    native_out = model(x, y)
+    poptorch_out = poptorch_model(x, y)
+
+    torch.testing.assert_allclose(poptorch_out, native_out)
 
 
 # Test CrossEntropyLoss loss by using it to match a target label.
-def test_CrossEntropyLoss_training():
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_CrossEntropyLoss_training(reduction):
     torch.manual_seed(42)
 
-    reductions = ["mean", "sum"]
     torch.manual_seed(42)
 
-    for reduction in reductions:
-        model = torch.nn.Linear(10, 10)
+    model = torch.nn.Linear(10, 10)
 
-        poptorch_model = helpers.trainingModelWithLoss(
-            model, loss=torch.nn.CrossEntropyLoss(reduction=reduction))
-        input = torch.randn(1, 10)
-        label = torch.randint(0, 10, [1])
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.CrossEntropyLoss(reduction=reduction))
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
 
-        # Make sure the first run doesn't already pass the test.
-        _, original_loss = poptorch_model(input, label)
+    # Make sure the first run doesn't already pass the test.
+    _, original_loss = poptorch_model(input, label)
 
-        for _ in range(0, 1000):
-            out, loss = poptorch_model(input, label)
+    for _ in range(0, 1000):
+        out, loss = poptorch_model(input, label)
 
-        # # Check we have trained the "model"
-        assert loss < original_loss
-        assert torch.argmax(out, dim=1) == label
+    # # Check we have trained the "model"
+    assert loss < original_loss
+    assert torch.argmax(out, dim=1) == label
 
 
 # This also servees as the NLL loss test as it uses NLL under the hood.
-def test_BCE_direct():
-    reductions = ["mean", "sum"]
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_BCE_direct(reduction):
     torch.manual_seed(42)
 
-    for reduction in reductions:
-        model = torch.nn.BCELoss(reduction=reduction)
+    model = torch.nn.BCELoss(reduction=reduction)
 
-        poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model = poptorch.inferenceModel(model)
 
-        for _ in range(0, 10):
-            target = torch.empty(10).random_(2)
-            input = torch.empty(10).uniform_()
+    for _ in range(0, 10):
+        target = torch.empty(10).random_(2)
+        input = torch.empty(10).uniform_()
 
-            groundTruth = model(input, target)
-            poptorch_out = poptorch_model(input, target)
-            assert torch.allclose(groundTruth, poptorch_out)
+        groundTruth = model(input, target)
+        poptorch_out = poptorch_model(input, target)
+        assert torch.allclose(groundTruth, poptorch_out)
 
 
 # TODO(T22975)
@@ -323,38 +382,36 @@ def test_BCE_direct():
 #             assert torch.allclose(groundTruth, poptorch_out)
 
 
-def test_BCE_training():
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_BCE_training(reduction):
     torch.manual_seed(42)
 
-    reductions = ["mean", "sum"]
     torch.manual_seed(42)
 
-    for reduction in reductions:
-        model = torch.nn.Sequential(torch.nn.Linear(10, 10),
-                                    torch.nn.Sigmoid())
+    model = torch.nn.Sequential(torch.nn.Linear(10, 10), torch.nn.Sigmoid())
 
-        poptorch_model = helpers.trainingModelWithLoss(
-            model,
-            loss=torch.nn.BCELoss(reduction=reduction),
-            optimizer=optim.SGD(model.parameters(), lr=0.1))
+    poptorch_model = helpers.trainingModelWithLoss(
+        model,
+        loss=torch.nn.BCELoss(reduction=reduction),
+        optimizer=optim.SGD(model.parameters(), lr=0.1))
 
-        target = torch.empty(10).uniform_()
-        input = torch.randn(10)
+    target = torch.empty(10).uniform_()
+    input = torch.randn(10)
 
-        # Make sure the first run doesn't already pass the test.
-        _, original_loss = poptorch_model(input, target)
+    # Make sure the first run doesn't already pass the test.
+    _, original_loss = poptorch_model(input, target)
 
-        for _ in range(0, 1000):
-            out, loss = poptorch_model(input, target)
+    for _ in range(0, 1000):
+        out, loss = poptorch_model(input, target)
 
-        print(out)
-        print(target)
-        print(loss)
-        print("\n")
+    print(out)
+    print(target)
+    print(loss)
+    print("\n")
 
-        # # Check we have trained the "model"
-        assert loss < original_loss
-        torch.testing.assert_allclose(target, out, rtol=1e-03, atol=1e-03)
+    # # Check we have trained the "model"
+    assert loss < original_loss
+    torch.testing.assert_allclose(target, out, rtol=1e-03, atol=1e-03)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum", "batchmean"})
