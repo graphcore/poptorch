@@ -60,6 +60,9 @@ if("-DBUILD_DOCS=ON" IN_LIST POPTORCH_CMAKE_ARGS)
     COMMAND bash -c '${CBT_DIR}/../poptorch/docs_build.sh'
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
     DEPENDS poptorch)
+else()
+  add_custom_target(poptorch_docs
+    DEPENDS poptorch)
 endif()
 
 add_custom_target(package_poptorch

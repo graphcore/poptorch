@@ -219,10 +219,10 @@ add_custom_target(poptorch_wheel
 add_custom_target(package_and_move
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "mv dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
-  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" ] \;then mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
-  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" ] \;then mv \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
+  COMMAND bash -c "cp ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
+  COMMAND bash -c "cp dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
+  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" ] \;then cp \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
+  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" ] \;then cp \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
   DEPENDS poptorch_wheel
 )
 #------ end of packaging
