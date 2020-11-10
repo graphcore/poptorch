@@ -292,14 +292,13 @@ def test_2x2_parallel_phased_execution_inline(capfd):
     target = torch.rand(size, 1)
 
     model = Model()
-    model(input, target)
     opts = poptorch.Options()
 
     phases = []
     phases = [f"{n}" for n in range(2 * N)]
     opts.setExecutionStrategy(poptorch.ParallelPhasedExecution(*phases))
     poptorch_model = poptorch.trainingModel(model, opts)
-    poptorch_model(input, target)
+    poptorch_model.compile(input, target)
 
     out, err = capfd.readouterr()
     testlog = LogChecker(out + err)
@@ -346,7 +345,6 @@ def test_2x2_parallel_phased_execution_opts(capfd):
     input = torch.rand(size * 2, 1)
     target = torch.rand(size, 1)
     model = Model()
-    model(input, target)
     opts = poptorch.Options()
     phases = []
     # Alternate between 0-2 and 1-3
@@ -361,7 +359,7 @@ def test_2x2_parallel_phased_execution_opts(capfd):
         ])
     opts.setExecutionStrategy(poptorch.ParallelPhasedExecution(*phases))
     poptorch_model = poptorch.trainingModel(model, opts)
-    poptorch_model(input, target)
+    poptorch_model.compile(input, target)
 
     out, err = capfd.readouterr()
     testlog = LogChecker(out + err)
@@ -428,7 +426,6 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
     input = torch.rand(size * 2, 1)
     target = torch.rand(size, 1)
     model = Model()
-    model(input, target)
     opts = poptorch.Options()
     strategy = poptorch.ParallelPhasedExecution(
         [poptorch.Stage("0"), poptorch.Stage("1")],
@@ -440,7 +437,7 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
 
     opts.setExecutionStrategy(strategy)
     poptorch_model = poptorch.trainingModel(model, opts)
-    poptorch_model(input, target)
+    poptorch_model.compile(input, target)
 
     out, err = capfd.readouterr()
     testlog = LogChecker(out + err)

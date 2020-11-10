@@ -15,3 +15,7 @@ New features:
 (poptorch.serializedMatMul)
 - Add support for POPTORCH_IPU_MODEL_VERSION environment variable.
 - Added support for torch.cumsum
+- Add support for pipelined / phased / sharded execution.
+- Add PoplarExecutor.compile() to compile the model without executing it.
+- Use sphinx-build to generate the documentation.
+- Use Miniconda as build environment.

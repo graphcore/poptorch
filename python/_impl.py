@@ -342,14 +342,7 @@ class PoplarExecutor:
         """
         self._new_optimizer = convertOptimizerToDict(optimizer)
 
-    def __call__(self, *args, **kwargs):
-        """
-        Takes the same arguments as the wrapped PyTorch `model.__call__`.
-
-        .. note:: The first time the PoplarExecutor wrapper is called, the
-            wrapped model will be traced and compiled.
-
-        """
+    def _parseArgsAndCompile(self, args, kwargs):
         # Convert single tensor to tuple.
         in_tensors = self._args_parser(args, kwargs)
 
@@ -499,12 +492,29 @@ class PoplarExecutor:
 
             # Upload the weights to the IPU
             self.copyWeightsToDevice()
+        return in_tensors
 
-        if self._options.connectionType == enums.ConnectionType.Never:
-            logger.info(
-                "Compilation complete and ConnectionType.Never selected:"
-                " returning")
-            return None
+    def compile(self, *args, **kwargs):
+        """Takes the same arguments as the wrapped PyTorch `model.__call__`.
+
+        Trace and compile the wrapped model if no executable has been
+        created yet.
+        """
+        self._parseArgsAndCompile(args, kwargs)
+
+    def __call__(self, *args, **kwargs):
+        """
+        Takes the same arguments as the wrapped PyTorch `model.__call__`.
+
+        .. note:: The first time the PoplarExecutor wrapper is called, the
+            wrapped model will be traced and compiled.
+
+        """
+        assert self._options.connectionType != enums.ConnectionType.Never, (
+            "Trying to run a model on an offline device "
+            " (ConnectionType.Never): use model.compile(inputs) instead of"
+            " model(inputs)")
+        in_tensors = self._parseArgsAndCompile(args, kwargs)
 
         # If this is an inference model: check if the same model is not being
         # trained on a different IPU.
