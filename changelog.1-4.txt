@@ -37,3 +37,6 @@ New features:
   poptorch.Options.autoRoundNumIPUs(True) NB, this will reserve but not use IPUs
   and so it is preferable to specify the model to use a number of IPUs which is
   a power of two
+- Optimized torch.matmul implementation with limitations
+    Fused its input 0's batch dimensions with the row dimension
+    to avoid ReduceSum in its backward pass, for performance purpose
