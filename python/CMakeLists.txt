@@ -22,6 +22,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ActivationOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ArithmeticOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/BilinearOps.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/BlasOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ComparisonOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ConstantOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ConvolutionOps.cpp"
