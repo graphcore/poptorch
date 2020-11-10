@@ -57,7 +57,7 @@ add_custom_target(poptorch_wheel COMMAND
 
 if("-DBUILD_DOCS=ON" IN_LIST POPTORCH_CMAKE_ARGS)
   add_custom_target(poptorch_docs
-    COMMAND bash -c 'bash ${CBT_DIR}/../poptorch/create_buildenv.sh; source activate_buildenv.sh; source ${CMAKE_BINARY_DIR}/activate.sh; source ${CMAKE_BINARY_DIR}/activate_poplar.sh; ${CBT_DIR}/../poptorch/docs_build.sh'
+    COMMAND bash -c 'bash ${CBT_DIR}/../poptorch/create_buildenv.sh && source activate_buildenv.sh && source ${CMAKE_BINARY_DIR}/activate.sh && source ${CMAKE_BINARY_DIR}/activate_poplar.sh && ${CBT_DIR}/../poptorch/docs_build.sh'
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
     DEPENDS poptorch)
 else()
