@@ -14,16 +14,16 @@ print(model)
 
 # All layers before "model.bert.encoder.layer[0]" will be on IPU 0 and all layers from
 # "model.bert.encoder.layer[0]" onwards (inclusive) will be on IPU 1.
-model.bert.encoder.layer[0] = poptorch.BeginPhase(1,
-                                                  model.bert.encoder.layer[0])
+model.bert.encoder.layer[0] = poptorch.BeginBlock(model.bert.encoder.layer[0],
+                                                  ipu_id=1)
 
 # Now all layers before layer are on IPU 1 and this layer onward is on IPU 2
-model.bert.encoder.layer[2] = poptorch.BeginPhase(2,
-                                                  model.bert.encoder.layer[2])
+model.bert.encoder.layer[2] = poptorch.BeginBlock(model.bert.encoder.layer[2],
+                                                  ipu_id=2)
 
 # Finally all layers from this layer till the end of the network are on IPU 3.
-model.bert.encoder.layer[4] = poptorch.BeginPhase(3,
-                                                  model.bert.encoder.layer[4])
+model.bert.encoder.layer[4] = poptorch.BeginBlock(model.bert.encoder.layer[4],
+                                                  ipu_id=3)
 
 # We must batch the data by at least the number of IPUs. Each IPU will still execute
 # whatever the model batch size is.
@@ -86,21 +86,23 @@ class Network(torch.nn.Module):
         self.layer4 = torch.nn.Linear(5, 5)
 
         self.act = torch.nn.ReLU()
-        self.softmax = torch.nn.Softmax()
+        self.softmax = torch.nn.Softmax(dim=1)
 
     def forward(self, x):
 
-        # Implicitly layers are on IPU 0 until a with IPU annotation is encountered.
-        x = self.act(self.layer1(x))
+        # Explicit layers on a certain IPU
+        poptorch.Block.useAutoId()
+        with poptorch.Block(ipu_id=0):
+            x = self.act(self.layer1(x))
 
-        with poptorch.Phase(1):
+        with poptorch.Block(ipu_id=1):
             x = self.act(self.layer2(x))
 
-        with poptorch.Phase(2):
+        with poptorch.Block(ipu_id=2):
             x = self.act(self.layer3(x))
             x = self.act(self.layer4(x))
 
-        with poptorch.Phase(3):
+        with poptorch.Block(ipu_id=3):
             x = self.softmax(x)
         return x
 
