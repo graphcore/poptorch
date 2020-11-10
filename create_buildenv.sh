@@ -41,7 +41,7 @@ then
   . $BUILD/activate_buildenv.sh
 fi
 cd $BUILD
-conda create --prefix $BUILD/buildenv -c conda-forge -y python=3.6.9 pybind11 pytest spdlog=1.8.0 ninja cmake=3.18.2 protobuf=3.7.1 latexmk
+conda create --prefix $BUILD/buildenv -c conda-forge -y python=3.6.9 pybind11 pytest spdlog=1.8.0 ninja cmake=3.18.2 protobuf=3.7.1 latexmk zip make
 conda activate $BUILD/buildenv
 echo "conda activate $BUILD/buildenv" >> $BUILD/activate_buildenv.sh
 pip install -r ${SRC}/requirements.txt
@@ -51,5 +51,5 @@ mkdir $BUILD/onnx
 cd $BUILD/onnx
 curl -L https://github.com/onnx/onnx/archive/v1.7.0.tar.gz | tar zx --strip-components=1
 mkdir build && cd build
-cmake ../ -GNinja -DONNX_ML=0 -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX}
+cmake ../ -GNinja -DONNX_ML=0 -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
 ninja install

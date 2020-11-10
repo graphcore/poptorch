@@ -34,8 +34,8 @@ else
   echo "ERROR: Failed to extract version and snapshot from filename $PACKAGE_INFO_FILE"
   exit -1
 fi
-USER_GUIDE_PDF_NAME="${DOC}-${VERSION}-${SNAPSHOT}"
-USER_GUIDE_HTML_NAME="${DOC}-html-${VERSION}-${SNAPSHOT}"
+USER_GUIDE_PDF_NAME="${DOC}-${VERSION}-${SNAPSHOT}.pdf"
+USER_GUIDE_HTML_NAME="${DOC}-html-${VERSION}-${SNAPSHOT}.zip"
 PACKAGE_INFO_FILE="${POPTORCH_BUILD_DIR}/poptorch-${VERSION}-${SNAPSHOT}.yml"
 
 rm -rf ${DOCS_BUILD_DIR}
@@ -54,20 +54,20 @@ common_flags="-a -E -n -W --keep-going -j auto"
 sphinx-build $common_flags -b html -c ${SPHINX_CONF_DIR} -D "project=${TITLE}" -D "html_title=${TITLE}" -D "version=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/html/${DOC}"
 # And a zip file of the html
 ( cd "${DOCS_BUILD_DIR}/html/${DOC}" && zip -q -r html.zip ./*.html ./*.js _images _static )
-cp "${DOCS_BUILD_DIR}/html/${DOC}/html.zip" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_HTML_NAME}.zip"
+cp "${DOCS_BUILD_DIR}/html/${DOC}/html.zip" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_HTML_NAME}"
 
 # Build PDF
 DOC_TITLE="${TITLE}" sphinx-build $common_flags -b latex -c ${SPHINX_CONF_DIR} -D "project=${DOC}" -D "version=v${VERSION}" -D "release=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/latex/${DOC}"
 ( cd "${DOCS_BUILD_DIR}/latex/${DOC}" && make LATEXMKOPTS="-silent" )
-cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_PDF_NAME}.pdf"
+cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_PDF_NAME}"
 
 # Ensure we don't append package info multiple times
 if ! grep -q "${DOC}" "${PACKAGE_INFO_FILE}"; then
     # Append to package info
     echo "  - name: PopTorch user guide (PDF)
-    file: ${USER_GUIDE_PDF_NAME}.pdf
+    file: ${USER_GUIDE_PDF_NAME}
     type: pdf
   - name: PopTorch user guide (HTML)
-    file: ${USER_GUIDE_HTML_NAME}.zip
+    file: ${USER_GUIDE_HTML_NAME}
     type: html_zip" >> ${PACKAGE_INFO_FILE}
 fi

@@ -54,8 +54,15 @@ endif()
 add_custom_target(poptorch_wheel COMMAND
   ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/build/poptorch --target poptorch_wheel DEPENDS poptorch)
 
+
+if("-DBUILD_DOCS=ON" IN_LIST POPTORCH_CMAKE_ARGS)
+  add_custom_target(poptorch_docs
+    COMMAND bash -c '${CBT_DIR}/../poptorch/docs_build.sh'
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
+    DEPENDS poptorch)
+endif()
+
 add_custom_target(package_poptorch
-  COMMAND bash -c '${CBT_DIR}/../poptorch/docs_build.sh'
   COMMAND ${CMAKE_COMMAND} --build . --target package_and_move
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
-  DEPENDS poptorch)
+  DEPENDS poptorch poptorch_docs)
