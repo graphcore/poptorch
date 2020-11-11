@@ -75,7 +75,12 @@ target_include_directories(poptorch_core PRIVATE
 install(TARGETS poptorch_core
   DESTINATION ${INSTALL_PYDIR})
 
-install(FILES __init__.py distributed.py _impl.py _options_impl.py logging.py enums.py optim.py ops.py options.py testing.py DESTINATION "${INSTALL_PYDIR}")
+configure_file(__init__.py
+  ${CMAKE_CURRENT_BINARY_DIR}/__init__.py
+  @ONLY)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py DESTINATION "${INSTALL_PYDIR}")
+install(FILES distributed.py _impl.py _options_impl.py logging.py enums.py optim.py ops.py options.py testing.py DESTINATION "${INSTALL_PYDIR}")
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.15.0")
   # Building poptorch without installing it doesn't make sense: the python

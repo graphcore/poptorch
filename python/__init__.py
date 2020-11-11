@@ -18,6 +18,8 @@ from . import distributed
 from ._impl import PoplarExecutor
 from . import optim
 
+__version__ = "@VERSION@-@SNAPSHOT@"
+
 
 class DataLoader(torch.utils.data.DataLoader):
     """ Thin wrapper around the traditional `torch.utils.data.DataLoader` to
