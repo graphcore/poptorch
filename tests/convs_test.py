@@ -61,7 +61,11 @@ def test_conv1D(op, padding_mode):
 
     if op is not torch.nn.ConvTranspose1d:
         # # non-square kernels and unequal stride and with padding and dilation
-        model = op(4, 33, (3), stride=(2), padding=(4), dilation=(3),
+        model = op(4,
+                   33, (3),
+                   stride=(2),
+                   padding=(4),
+                   dilation=(3),
                    padding_mode=padding_mode)
         execute_and_check_wrapper(model, input)
 
@@ -90,7 +94,11 @@ def test_conv2D(op, padding_mode):
         execute_and_check_wrapper(model, input)
 
         # non-square kernels and unequal stride and with padding and dilation
-        model = op(16, 4, (3, 5), stride=(2, 1), padding=(4, 2), dilation=(3),
+        model = op(16,
+                   4, (3, 5),
+                   stride=(2, 1),
+                   padding=(4, 2),
+                   dilation=(3),
                    padding_mode=padding_mode)
         execute_and_check_wrapper(model, input)
 
@@ -115,7 +123,10 @@ def test_conv3D(op, padding_mode):
 
     if op is not torch.nn.ConvTranspose3d:
         # non-square kernels and unequal stride and with padding
-        model = op(4, 6, (3, 2, 2), stride=(2, 1, 1), padding=(4, 2, 0),
+        model = op(4,
+                   6, (3, 2, 2),
+                   stride=(2, 1, 1),
+                   padding=(4, 2, 0),
                    padding_mode=padding_mode)
         execute_and_check_wrapper(model, input)
 
@@ -230,3 +241,16 @@ def test_available_memory_automatic():
     poptorch_out = poptorch_model(input)
 
     torch.testing.assert_allclose(poptorch_out, nativeOut)
+
+
+@pytest.mark.parametrize("dim", range(-3, 3))
+def test_cumsum(dim):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.cumsum(x, dim=dim)
+
+    model = Model()
+    torch.manual_seed(0)
+    input = torch.randn(1, 5, 6, dtype=torch.float32)
+
+    execute_and_check_wrapper(model, input)

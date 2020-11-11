@@ -6,7 +6,7 @@ New features:
     torch.nn.KLDivLoss, torch.nn.PoissonNLLLoss, torch.nn.HingeEmbeddingLoss, torch.nn.BCEWithLogitsLoss, torch.nn.SmoothL1Loss, torch.nn.SoftMarginLoss, torch.nn.MultiLabelSoftMarginLoss, torch.nn.CosineEmbeddingLoss, torch.nn.MarginRankingLoss, torch.nn.TripletMarginLoss
     torch.nn.NLLLoss for aten::nll_loss2d
 - Added support for torch.optim.RMSprop optimizer
-- Added support for bool inputs to models§
+- Added support for bool inputs to models
 - Improved support for half type models and inputs.
     Using a mix of float 16 and float 32 inputs is now supported. Please see
     the documentation for cases in which a model might use different types
@@ -14,3 +14,4 @@ New features:
 - Added support for serialized matrix multiplications
 (poptorch.serializedMatMul)
 - Add support for POPTORCH_IPU_MODEL_VERSION environment variable.
+- Added support for torch.cumsum
