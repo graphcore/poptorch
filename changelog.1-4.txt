@@ -14,7 +14,6 @@ New features:
 - Added support for serialized matrix multiplications
 (poptorch.serializedMatMul)
 - Add support for POPTORCH_IPU_MODEL_VERSION environment variable.
-<<<<<<< HEAD
 - Added support for torch.cumsum
 - Add support for pipelined / phased / sharded execution.
 - Add PoplarExecutor.compile() to compile the model without executing it.
