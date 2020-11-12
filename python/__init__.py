@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import atexit
 import time
 
 import torch
@@ -140,6 +141,8 @@ class AsynchronousDataAccessor:
             we will just loop round again.
         """
 
+        # To avoid hangs when the application exits: implicitly call terminate().
+        atexit.register(self.terminate)
         self._training_data = dataset
         self._buffer_size = buffer_size
         self._miss_sleep_time_in_ms = miss_sleep_time_in_ms
@@ -292,17 +295,17 @@ class AsynchronousDataAccessor:
         # actual fetch so we just use this to return the initial buffers
         # in shared memory which will be used for the actual read/write
         # in the hot loop.
-        queue = multiprocessing.Queue()
+        ctx = multiprocessing.get_context('spawn')
+        queue = ctx.Queue()
 
         # If the worker exits before the parent process is done
         # setting up the _data_buffers then the queue will get freed
         # and bad things will happen.
-        setup_complete = multiprocessing.Queue()
+        setup_complete = ctx.Queue()
 
         # Fetch the data on a seperate process.
-        self._data_fetcher = multiprocessing.Process(target=self.fetch_data,
-                                                     args=(queue,
-                                                           setup_complete))
+        self._data_fetcher = ctx.Process(target=self.fetch_data,
+                                         args=(queue, setup_complete))
         self._data_fetcher.start()
 
         self._ready_to_read_index = queue.get(block=True)
