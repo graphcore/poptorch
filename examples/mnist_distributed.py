@@ -15,10 +15,15 @@
 # vipu-cli reset partition validation
 # mpirun --tag-output -np 2  python ../poptorch/examples/mnist.py
 
+import sys
 import torch
 import torch.nn as nn
 import torchvision
 import poptorch
+
+if not poptorch.ipuHardwareIsAvailable():
+    poptorch.logger.warn("This examples requires IPU hardware to run")
+    sys.exit(0)
 
 # Normal pytorch batch size
 training_batch_size = 20

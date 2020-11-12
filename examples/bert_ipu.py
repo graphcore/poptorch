@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os
 import transformers
 import torch
 import poptorch
+
+if not poptorch.ipuHardwareIsAvailable():
+    os.environ["POPTORCH_IPU_MODEL"] = "1"
 
 tokenizer = transformers.BertTokenizer.from_pretrained(
     'mrm8488/bert-medium-finetuned-squadv2', return_token_type_ids=True)
@@ -26,9 +30,8 @@ questions = [
 batches = len(questions)
 
 # Pipeline the model over two IPUs. You must have at least as many batches (questions) as you have IPUs.
-if poptorch.ipuHardwareIsAvailable():
-    model.bert.embeddings.position_embeddings = poptorch.BeginBlock(
-        layer_to_call=model.bert.embeddings.position_embeddings, ipu_id=1)
+model.bert.embeddings.position_embeddings = poptorch.BeginBlock(
+    model.bert.embeddings.position_embeddings, ipu_id=1)
 
 # Mark model for inference.
 opts = poptorch.Options().deviceIterations(batches)
