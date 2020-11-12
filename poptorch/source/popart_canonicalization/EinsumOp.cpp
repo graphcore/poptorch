@@ -2,8 +2,6 @@
 #include "EinsumOp.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
-#include <boost/algorithm/string.hpp>
-
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch_logging/Error.hpp"
 
@@ -23,7 +21,11 @@ EinsumOp::EinsumOp(std::string eq,
     _rhs = eq.substr(pos + 2);
   }
 
-  boost::split(_labels, _lhs, [](char c) { return c == ','; });
+  std::stringstream ss(_lhs);
+  std::string s;
+  while (std::getline(ss, s, ',')) {
+    _labels.push_back(s);
+  }
   ERROR_ON(_labels.size() != _tensors.size());
 
   for (const auto &label : _labels) {
