@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import sys
 import torch
 import torch.nn as nn
 import torchvision
 import poptorch
+
+if not poptorch.ipuHardwareIsAvailable():
+    poptorch.logger.warn("This examples requires IPU hardware to run")
+    sys.exit(0)
 
 # Normal pytorch batch size
 training_batch_size = 20
