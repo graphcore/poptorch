@@ -4,6 +4,7 @@ import re
 import torch
 import torch.nn.functional as F
 import poptorch
+import helpers
 
 # Model: 2x2 S1 ExecutionPhase, repeated N times:
 # _____________________________________________________________________________
@@ -58,17 +59,7 @@ import poptorch
 #______________________________________|_______________________________________
 
 
-class LogChecker:
-    def __init__(self, log):
-        self._log = log
-
-    def assert_contains(self, string):
-        assert string in self._log, f"{self._log}\ndoes not contain '{string}'"
-
-    def assert_contains_regexp(self, exp):
-        assert re.match(exp, self._log,
-                        re.MULTILINE), f"{self._log}\ndoes not contain '{exp}'"
-
+class LogChecker(helpers.LogChecker):
     def validate_2x2_parallel_phased_execution(self):
         # pylint: disable=line-too-long
         self.assert_contains("enablePipelining set to value 0")
@@ -300,8 +291,7 @@ def test_2x2_parallel_phased_execution_inline(capfd):
     poptorch_model = poptorch.trainingModel(model, opts)
     poptorch_model.compile(input, target)
 
-    out, err = capfd.readouterr()
-    testlog = LogChecker(out + err)
+    testlog = LogChecker(capfd)
     testlog.validate_2x2_parallel_phased_execution()
 
 
@@ -361,8 +351,7 @@ def test_2x2_parallel_phased_execution_opts(capfd):
     poptorch_model = poptorch.trainingModel(model, opts)
     poptorch_model.compile(input, target)
 
-    out, err = capfd.readouterr()
-    testlog = LogChecker(out + err)
+    testlog = LogChecker(capfd)
     testlog.validate_2x2_parallel_phased_execution()
 
 
@@ -439,6 +428,5 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
     poptorch_model = poptorch.trainingModel(model, opts)
     poptorch_model.compile(input, target)
 
-    out, err = capfd.readouterr()
-    testlog = LogChecker(out + err)
+    testlog = LogChecker(capfd)
     testlog.validate_2x2_parallel_phased_execution_small()

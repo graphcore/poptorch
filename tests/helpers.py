@@ -37,3 +37,24 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
         training=True,
         optimizer=optimizer,
         user_model=model)
+
+
+class LogChecker:
+    def __init__(self, capfd):
+        out, err = capfd.readouterr()
+        self._log = out + err
+        self._lines = self._log.split('\n')
+
+    def assert_contains(self, *strings):
+        """Assert there is a line in the log matching all the strings provided
+        """
+        if len(strings) == 1:
+            assert strings[0] in self._log, (f"{self._log}"
+                                             "\ndoes not contain "
+                                             f"'{strings[0]}'")
+        else:
+            assert any([
+                all([s in line for s in strings]) for line in self._lines
+            ]), (f"{self._log}"
+                 "\n No line in the above log contains all of the strings "
+                 f"{strings}")
