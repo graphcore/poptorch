@@ -49,6 +49,8 @@ nitpick_ignore = [
     ('py:class', 'poptorch.AnchorMode'),
     ('py:class', 'poptorch.ConnectionType'),
     ('py:class', 'poptorch.SyncPattern'),
+    ('py:class', 'poptorch.AutoStage'),
+    ('py:class', 'poptorch.Stage'),
 ]
 
 # -- Options for HTML output -------------------------------------------------
