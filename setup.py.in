@@ -1,13 +1,24 @@
 from setuptools import setup
+from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
+import distutils.util
 
 VERSION='@VERSION@'
 
 with open("README.md", "r") as fh:
     LONG_DESCRIPTION = fh.read()
 
-REQUIRES = [
-    'torch==@TORCH_VERSION@',
-],
+# https://www.python.org/dev/peps/pep-0425/
+# The platform tag is simply distutils.util.get_platform() with all hyphens - and periods . replaced with underscore _.
+platform = distutils.util.get_platform().replace(".","_").replace("-","_")
+
+if "macosx" in platform:
+    REQUIRES = [ 'torch==@TORCH_VERSION@' ]
+    LIBS = ["*.dylib", "*.so"]
+else:
+    REQUIRES = [
+        f'torch @ https://download.pytorch.org/whl/cpu/torch-@TORCH_VERSION@%2Bcpu-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{platform}.whl',
+    ]
+    LIBS = ["*.so"]
 
 setup(
     name='poptorch',
@@ -20,8 +31,8 @@ setup(
     author_email='contact@graphcore.ai',
     license='Apache 2.0',
     packages=['poptorch'],
-    package_data={'poptorch': ['*.so']},
-    platforms="linux_x86_64",
+    package_data={'poptorch': LIBS},
+    platforms=platform,
     install_requires=REQUIRES,
     zip_safe=False,
     classifiers=[

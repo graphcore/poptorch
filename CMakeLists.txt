@@ -207,7 +207,9 @@ configure_file(setup.py.in
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/setup.py DESTINATION .)
 
-set(PACKAGE_FILE_NAME poptorch-${VERSION}+${SNAPSHOT}+${PACKAGE_OS_TYPE}-py3-none-linux_x86_64.whl)
+execute_process(COMMAND python3 -c "import distutils.util;print(distutils.util.get_platform().replace('.','_').replace('-','_'), end='')"
+  OUTPUT_VARIABLE PYTHON_PLATFORM)
+set(PACKAGE_FILE_NAME poptorch-${VERSION}+${SNAPSHOT}+${PACKAGE_OS_TYPE}-py3-none-${PYTHON_PLATFORM}.whl)
 set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
 
 set(PKG_UPLOAD_DIR ../../pkg)

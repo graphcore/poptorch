@@ -1,8 +1,9 @@
 add_subdirectory(custom_ops)
 
 find_package(popart REQUIRED)
+find_package(poplar REQUIRED)
 
-find_library(POPLAR_LIB NAMES poplar HINTS ${POPLAR_DIR}/lib ${POPLAR_DIR}/lib64 REQUIRED)
+get_target_property(POPLAR_LIB poplar LOCATION)
 get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)
 install(CODE
   "set(ENV{LD_LIBRARY_PATH} ${popart_LIB_DIR}:${POPLAR_DIR}:$ENV{LD_LIBRARY_PATH})
