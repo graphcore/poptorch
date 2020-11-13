@@ -823,6 +823,14 @@ class Options(_options_impl.OptionsDict):
         self.set(log_dir=log_dir)
         return self
 
+    def enableExecutableCaching(self, path):
+        if path is None:
+            self.Popart.set("enableEngineCaching", False)
+        else:
+            self.Popart.set("cachePath", path)
+            self.Popart.set("enableEngineCaching", True)
+        return self
+
     def useIpuModel(self, use_model):
         """Use the IPU model or physical hardware.
 

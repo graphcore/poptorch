@@ -26,3 +26,4 @@ New features:
     to avoid ReduceSum in its backward pass, for performance purpose
 - Added partial support for torch.einsum
     Diagonals and ellipsis notation is unsupported
+- Add support for executable caching: poptorch.Options.enableExecutableCaching()

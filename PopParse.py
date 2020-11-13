@@ -128,7 +128,7 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
     # Build the list of options handled by Poptorch:
     handled = {}
     checks = {
-        r" *container_options\[\"(.*)\"\] =.*": OptionType.Container,
+        r".*container_options, \"(.*)\",.*": OptionType.Container,
         r" *ADD_POPART_ENUM_OPTION\(([^,]+),.*": OptionType.Enum,
         r" *ADD_POPART_STRING_OPTION\((.*)\).*": OptionType.String,
         r" *ADD_POPART_UINT64_OPTION\((.*)\).*": OptionType.Int,
