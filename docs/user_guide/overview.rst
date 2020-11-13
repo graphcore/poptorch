@@ -152,6 +152,12 @@ pipeline execution strategy. Refer to the PopART user guide to enable other exec
     :emphasize-lines: 19, 22, 26
     :caption: PopTorch also supports annotating the model directly. Both forms can be used interchangeably.
 
+Please note that PopTorch needs to reserve IPUs in powers of 2 or multiples of
+64. You are advised to configure your model accordingly to take full advantage
+of the IPUs available. However, if you need to run with a different number of
+IPUs, you can use ``poptorch.Options().autoRoundNumIPUs(True)`` to allow
+PopTorch to reserve more IPUs than the model specifies.
+
 
 Custom ops
 ==========

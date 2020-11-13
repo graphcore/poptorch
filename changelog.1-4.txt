@@ -32,3 +32,8 @@ New features:
 - Added support for LAMB optimizer
 - Add support for recomputationCheckpoint()
 - Added support for torch.tensordot
+- Add support for rounding up the number of IPU used to allow models which
+  specify of number of IPUs which is not a power of 2:
+  poptorch.Options.autoRoundNumIPUs(True) NB, this will reserve but not use IPUs
+  and so it is preferable to specify the model to use a number of IPUs which is
+  a power of two

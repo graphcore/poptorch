@@ -6,6 +6,9 @@ import poptorch
 if not poptorch.ipuHardwareIsAvailable():
     os.environ["POPTORCH_IPU_MODEL"] = "1"
 
+# pylint: disable=reimported
+# pylint: disable=wrong-import-position
+
 # inference_model_start
 import poptorch
 import torch

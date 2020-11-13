@@ -3,12 +3,13 @@
 from functools import reduce
 from operator import mul
 
+import sys
 import torch
 import poptorch
 
 if not poptorch.ipuHardwareIsAvailable():
     print("Replicated top level graphs are not supported on the IPU model")
-    exit(0)
+    sys.exit(0)
 
 
 class ExampleModelWithLoss(torch.nn.Module):

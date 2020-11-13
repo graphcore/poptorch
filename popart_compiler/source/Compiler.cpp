@@ -196,6 +196,9 @@ public:
     std::uint64_t anchor_return_period;
     // True if running on the model, False otherwise.
     bool ipu_model;
+    // Automatically round up the number of IPUs, if required, to the minimum
+    // number required to be reserved
+    bool auto_round_num_ipus;
     // Only used for offline compilation (DeviceConnectionType.Never): version
     // of the IPU should the Poplar compiler be targeting.
     std::uint64_t ipu_version;
@@ -378,6 +381,10 @@ public:
 
   bool isHostSideConstant(poptorch::TensorId id) const;
 
+  // R ound up the number of IPUs, if required, to the minimum number which need
+  // to be reservered
+  static std::uint64_t roundUpNumIPUs(std::uint64_t num_ipu);
+
 private:
   // Constants which are simply returned (possibly as part of a tuple/list) and
   // do not need to be input into Popart
@@ -515,6 +522,11 @@ struct SessionOptionsImpl {
 SessionOptionsImpl::SessionOptionsImpl() {
   // The keys must match the name and type of the attributes of SessionOptions
   // in python/__init__.py
+
+  registerSetter(bool_options, "auto_round_num_ipus", [&](bool value) {
+    poptorch_options.auto_round_num_ipus = value;
+  });
+
   registerSetter(bool_options, "use_model",
                  [&](bool value) { poptorch_options.ipu_model = value; });
 
@@ -1112,6 +1124,23 @@ bool CompilerImpl::isHostSideConstant(poptorch::TensorId id) const {
   return _host_side_constants.count(id);
 }
 
+std::uint64_t CompilerImpl::roundUpNumIPUs(std::uint64_t num_ipus) {
+  std::uint64_t rounded_num_ipus;
+
+  if (num_ipus < 64) {
+    // If fewer than 64, find the next power of 2
+    rounded_num_ipus = 1;
+    while (rounded_num_ipus < num_ipus) {
+      rounded_num_ipus *= 2;
+    }
+  } else {
+    // Otherwise, find the next multiple of 64
+    rounded_num_ipus = ((num_ipus - 1) / 64 + 1) * 64;
+  }
+
+  return rounded_num_ipus;
+}
+
 } // namespace detail
 
 PopartConstant::PopartConstant(const PopartType &popart_type, const void *data,
@@ -1354,7 +1383,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   _impl->updateUseModelConfig();
 
   std::shared_ptr<popart::DeviceInfo> device;
-  const std::uint64_t num_ipus =
+  std::uint64_t num_ipus =
       _impl->used_ipus.size() * options.replicatedGraphCount;
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
                               "operations have been optimised out)");
@@ -1394,6 +1423,32 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
               device_options);
       ERROR_ON_MSG(!device, "Failed to create offline IPU device");
     } else {
+      // Round up number of ipus to a power of 2
+      // or a multiple of 64 (number of POD-64s)
+      auto rounded_num_ipus = _impl->roundUpNumIPUs(num_ipus);
+
+      if (rounded_num_ipus != num_ipus) {
+        std::string common_msg(", because PopTorch must reserve a power of 2 or"
+                               " a multiple of 64 IPUs.");
+        if (_impl->options.auto_round_num_ipus) {
+          logging::warn("Reserving {} IPUs when the model specifices the use "
+                        "of only {}{}. {} will be reserved but not used.",
+                        rounded_num_ipus, num_ipus, common_msg,
+                        rounded_num_ipus - num_ipus);
+          num_ipus = rounded_num_ipus;
+        } else {
+          ERROR("The model specifies the use of "
+                << num_ipus
+                << " IPUs, "
+                   "however PopTorch must reserve a minimum of "
+                << rounded_num_ipus << " in order to allow the model to run"
+                << common_msg
+                << " Please reconfigure your model to use a "
+                   "different number of IPUs or set "
+                   "poptorch.Options().autoRoundNumIPUs(True).");
+        }
+      }
+
       // Use a lambda to cache the value.
       auto wait_if_unavailable = [this]() {
         // Force disable the wait if the system doesn't contain an IPU that

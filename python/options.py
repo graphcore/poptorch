@@ -706,6 +706,7 @@ class SerialPhasedExecution(_IPhasedExecution):
         return {**super().backendOptions(), "serial_phases_execution": True}
 
 
+# pylint: disable=too-many-public-methods
 class Options(_options_impl.OptionsDict):
     """Options controlling how a model is run on the IPU.
     """
@@ -721,6 +722,7 @@ class Options(_options_impl.OptionsDict):
         super().__init__(replication_factor=1,
                          device_iterations=1,
                          log_dir=".",
+                         auto_round_num_ipus=False,
                          anchor_mode=enums.AnchorMode.Default.value,
                          anchor_return_period=1,
                          use_model=False,
@@ -763,6 +765,21 @@ class Options(_options_impl.OptionsDict):
 
         .. seealso:: :py:class:`poptorch.options._PopartOptions`"""
         return self._popart
+
+    def autoRoundNumIPUs(self, auto_round_num_ipus):
+        """Whether or not to round up the number of IPUs used automatically: the
+        number of IPUs requested must be a power of 2 or mutliple of 64. By
+        default, an error occurs if an unsupport number of IPUs is used by the
+        model to prevent unintentional overbooking of IPUs
+
+        :param bool auto_round_num_ipus:
+            * True: round up the number of IPUs to a power of 2 or multiple of
+              64 automatically
+            * False: error if the number of IPUs is not supported
+
+        """
+        self.set(auto_round_num_ipus=auto_round_num_ipus)
+        return self
 
     def deviceIterations(self, device_iterations):
         """Number of iterations the device should run over the data before
