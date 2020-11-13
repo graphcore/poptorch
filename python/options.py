@@ -323,25 +323,16 @@ class Stage:
 
 
 class _DefaultStageManager(_options_impl.IStageManager):
-    def __init__(self, auto_stage):
+    def __init__(self):
         super().__init__()
-        self._next_id = 1
+        self._next_id = 0
         self._block_map = {}
-        self._auto_stage = auto_stage
 
     def getStage(self, block_id):
         if block_id not in self._block_map:
             stage = Stage(block_id)
-            if self._auto_stage == enums.AutoStage.SameAsIpu:
-                assert self._current_ipu is not None, (
-                    f"poptorch.AutoStage.SameAsIpu was selected but no "
-                    f"IPU was specified for block {block_id}")
-                stage_id = self._current_ipu
-            else:
-                stage_id = self._next_id
-                self._next_id += 1
-
-            stage._setStage(stage_id)  # pylint: disable=protected-access
+            stage._setStage(self._default_stage or self._next_id)  # pylint: disable=protected-access
+            self._next_id += 1
             self._block_map[block_id] = stage
         return self._block_map[block_id]
 
@@ -425,40 +416,29 @@ class PipelinedExecution(_IExecutionStrategy):
     ...    "C"))
     >>> # Automatically create a 3 stages pipeline based on the block names
     >>> opts.setExecutionStrategy(poptorch.PipelinedExecution())
-
-    :param args: Either a ``poptorch.AutoStage`` strategy or an explicit list
-        of stages.
-    :type args: poptorch.AutoStage, [str], [poptorch.Stage]
-
     """
 
-    def __init__(self, *args):
+    def __init__(self, *stages):
         block_map = {}
-        auto_stage = enums.AutoStage.SameAsIpu
-        if len(args) == 1 and isinstance(args[0], enums.AutoStage):
-            auto_stage = args[0]
-        else:
-            for stage_id, arg in enumerate(args):
-                # arg must either be a Stage, a block_id or a list of block_ids
-                if isinstance(arg, Stage):
-                    stage = arg
-                elif isinstance(arg, str):
-                    stage = Stage(arg)
-                else:
-                    assert all([isinstance(elt, str) for elt in arg])
-                    stage = Stage(*arg)
-                stage._setStage(stage_id)  # pylint: disable=protected-access
-                for block in stage.blocks:
-                    assert block not in block_map, (
-                        f"{block} associated "
-                        f"with more than one stage")
-                    logger.debug(
-                        "block %s added to stage %d%s", block, stage_id,
-                        " on IPU %d" %
-                        stage._ipu if stage._ipu is not None else '')
-                    block_map[block] = stage
-
-        if block_map:
+        for stage_id, arg in enumerate(stages):
+            # arg must either be a Stage, a block_id or a list of block_ids
+            if isinstance(arg, Stage):
+                stage = arg
+            elif isinstance(arg, str):
+                stage = Stage(arg)
+            else:
+                assert all([isinstance(elt, str) for elt in arg])
+                stage = Stage(*arg)
+            stage._setStage(stage_id)  # pylint: disable=protected-access
+            for block in stage.blocks:
+                assert block not in block_map, (f"{block} associated "
+                                                f"with more than one stage")
+                logger.debug(
+                    "block %s added to stage %d%s", block, stage_id,
+                    " on IPU %d" %
+                    stage._ipu if stage._ipu is not None else '')
+                block_map[block] = stage
+        if stages:
 
             class PipelineStageManager(_options_impl.IStageManager):
                 def __init__(self, block_map):
@@ -474,7 +454,7 @@ class PipelinedExecution(_IExecutionStrategy):
 
             stages_manager = PipelineStageManager(block_map)
         else:
-            stages_manager = _DefaultStageManager(auto_stage)
+            stages_manager = _DefaultStageManager()
         super().__init__(stages_manager, block_map)
 
     def backendOptions(self):
@@ -537,7 +517,7 @@ class _IPhasedExecution(_IExecutionStrategy):
 
             stages_manager = PhaseManager(block_map)
         else:
-            stages_manager = _DefaultStageManager(enums.AutoStage.SameAsIpu)
+            stages_manager = _DefaultStageManager()
 
         super().__init__(stages_manager, block_map)
 

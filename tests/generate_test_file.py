@@ -46,7 +46,7 @@ short_tests = [
     "optimizers_test.py",
     "options_test.py",
     "outputs_test.py",
-    "pipelining_test.py",
+    "pipeline_tests_test.py",
     "poplar_executor_test.py",
     "random_sampling_test.py",
     "replicated_graph_test.py",

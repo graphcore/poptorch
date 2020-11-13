@@ -68,7 +68,7 @@ class OptionsDict:
 class IStageManager(abc.ABC):
     def __init__(self):
         self._next_auto_id = 0
-        self._current_ipu = None
+        self._default_stage = None
 
     def nextAutoId(self):
         id = self._next_auto_id
@@ -82,7 +82,7 @@ class IStageManager(abc.ABC):
 
     def beginStage(self, user_id, ipu_id_from_block):
         user_id = user_id or self.nextAutoId()
-        self._current_ipu = ipu_id_from_block
+        self._default_stage = ipu_id_from_block
         stage = self.getStage(user_id)
         # If the user specified an ipu_id in the option use that one
         ipu = stage._ipu if stage._ipu is not None else ipu_id_from_block  # pylint: disable=protected-access
