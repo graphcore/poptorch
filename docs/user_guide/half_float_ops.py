@@ -78,4 +78,4 @@ poptorch_model = poptorch.inferenceModel(native_model)
 assert poptorch_model(float16_tensor).dtype == torch.float16
 
 poptorch_model = poptorch.inferenceModel(native_model)
-assert poptorch_model(float32_tensor).dtype == torch.float32
+assert poptorch_model(float32_tensor).dtype == torch.float16

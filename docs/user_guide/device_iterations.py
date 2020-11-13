@@ -135,7 +135,7 @@ for batch_number, (data, labels) in enumerate(training_data):
     print(f"{labels[-1]}, {output}, {loss}")
 
 # Not displayed: just to keep the linter happy
-shape = None
+shape = [3, 2]
 num_tensors = 100
 batch_size = 1
 num_workers = 0
@@ -156,8 +156,8 @@ loader = poptorch.AsynchronousDataAccessor(data)
 
 poptorch_model = poptorch.inferenceModel(model, opts)
 
-for it, d in enumerate(loader):
-    out = poptorch_model(d)
+for it, (data, _) in enumerate(loader):
+    out = poptorch_model(data)
 
 
 def process(process_id=0, num_processes=1):
