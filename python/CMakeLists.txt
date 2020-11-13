@@ -83,13 +83,3 @@ configure_file(__init__.py
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py DESTINATION "${INSTALL_PYDIR}")
 install(FILES distributed.py _impl.py _options_impl.py logging.py enums.py optim.py ops.py options.py testing.py DESTINATION "${INSTALL_PYDIR}")
-
-if(${CMAKE_VERSION} VERSION_GREATER "3.15.0")
-  # Building poptorch without installing it doesn't make sense: the python
-  # module cannot be used so always install after a build.
-  add_custom_command(
-      TARGET poptorch_core
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
-  )
-endif()

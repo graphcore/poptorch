@@ -268,3 +268,11 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/enable.sh
         DESTINATION .)
 #------ end of enable script
 
+if(${CMAKE_VERSION} VERSION_GREATER "3.15.0")
+  # Building poptorch without installing it doesn't make sense: the python
+  # module cannot be used so always install after a build.
+  add_custom_target(install_poptorch ALL
+      COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
+      DEPENDS poptorch_core
+  )
+endif()
