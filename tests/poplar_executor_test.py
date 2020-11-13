@@ -1,9 +1,37 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os
+import tempfile
 import pytest
 import poptorch
 import torch
+import helpers
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_ExecutableCaching(capfd):
+    poptorch.setLogLevel(1)  # Force debug logging
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x * 6
+
+    with tempfile.TemporaryDirectory() as cache:
+        opts = poptorch.Options()
+        opts.enableExecutableCaching(cache)
+        m = poptorch.inferenceModel(Model(), opts)
+        m.compile(torch.rand(2, 3))
+        m.destroy()
+        log = helpers.LogChecker(capfd)
+        log.assert_contains("set enableEngineCaching to value true")
+        assert os.listdir(), "No executable saved in the cache"
+
+        n = poptorch.inferenceModel(Model(), opts)
+        n.compile(torch.rand(2, 3))
+        log = helpers.LogChecker(capfd)
+        log.assert_contains("set enableEngineCaching to value true")
 
 
 def test_inference_attributes():

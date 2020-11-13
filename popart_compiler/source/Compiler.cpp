@@ -91,6 +91,39 @@ int getNumTilesPerIpu(const std::string &ipu_model_version) {
   return num_tiles_per_ipu;
 }
 
+// Wrapper functor used to print to the debug channel the value
+// of the options set by poptorch.Options
+template <typename Value> class Setter {
+public:
+  Setter(std::function<void(Value)> fn, std::string name)
+      : _fn(std::move(fn)), _name(std::move(name)) {}
+  void operator()(Value value);
+
+private:
+  std::function<void(Value)> _fn;
+  const std::string _name;
+};
+
+template <>
+void Setter<std::pair<std::string, std::string>>::operator()(
+    std::pair<std::string, std::string> value) { // NOLINT
+  _fn(value);
+  logging::debug("poptorch.Options set {}[{}] to {}", _name, value.first,
+                 value.second);
+}
+
+template <typename Value> void Setter<Value>::operator()(Value value) {
+  _fn(value);
+  logging::debug("poptorch.Options set {} to value {}", _name, value);
+}
+
+template <typename Value, typename Lambda>
+void registerSetter(std::map<std::string, std::function<void(Value)>> &options,
+                    const std::string &name, Lambda setter) {
+  std::function<void(Value)> fn = setter;
+  options[name] = Setter<Value>(fn, name);
+}
+
 } // namespace
 namespace poptorch {
 
@@ -477,85 +510,88 @@ struct SessionOptionsImpl {
 SessionOptionsImpl::SessionOptionsImpl() {
   // The keys must match the name and type of the attributes of SessionOptions
   // in python/__init__.py
-  bool_options["use_model"] = [&](bool value) {
-    poptorch_options.ipu_model = value;
-  };
-  bool_options["serial_phases_execution"] = [&](bool value) {
+  registerSetter(bool_options, "use_model",
+                 [&](bool value) { poptorch_options.ipu_model = value; });
+
+  registerSetter(bool_options, "serial_phases_execution", [&](bool value) {
     poptorch_options.serial_phases_execution = value;
-  };
-  bool_options["separate_backward_phase"] = [&](bool value) {
+  });
+  registerSetter(bool_options, "separate_backward_phase", [&](bool value) {
     poptorch_options.separate_backward_phase = value;
-  };
-  uint64_options["device_iterations"] = [&](std::uint64_t value) {
-    poptorch_options.steps = value;
-  };
-  uint64_options["num_distributed_processes"] = [&](std::uint64_t value) {
-    poptorch_options.num_distributed_processes = value;
-  };
-  uint64_options["distributed_process_id"] = [&](std::uint64_t value) {
-    poptorch_options.distributed_process_id = value;
-  };
-  uint64_options["ipu_version"] = [&](std::uint64_t value) {
+  });
+  registerSetter(uint64_options, "device_iterations",
+                 [&](std::uint64_t value) { poptorch_options.steps = value; });
+  registerSetter(uint64_options, "num_distributed_processes",
+                 [&](std::uint64_t value) {
+                   poptorch_options.num_distributed_processes = value;
+                 });
+  registerSetter(uint64_options, "distributed_process_id",
+                 [&](std::uint64_t value) {
+                   poptorch_options.distributed_process_id = value;
+                 });
+  registerSetter(uint64_options, "ipu_version", [&](std::uint64_t value) {
     poptorch_options.ipu_version = value;
-  };
-  uint64_options["ipu_id"] = [&](std::uint64_t value) {
-    poptorch_options.ipu_id = value;
-  };
-  uint64_options["gradient_accumulation"] = [&](std::uint64_t value) {
-    popart_options.accumulationFactor = value;
-  };
-  uint64_options["anchor_return_period"] = [&](std::uint64_t value) {
-    poptorch_options.anchor_return_period = value;
-  };
-  uint64_options["replication_factor"] = [&](std::uint64_t value) {
-    popart_options.replicatedGraphCount = value;
-  };
-  uint64_options["execution_mode"] = [&](std::uint64_t value) {
+  });
+  registerSetter(uint64_options, "ipu_id",
+                 [&](std::uint64_t value) { poptorch_options.ipu_id = value; });
+  registerSetter(
+      uint64_options, "gradient_accumulation",
+      [&](std::uint64_t value) { popart_options.accumulationFactor = value; });
+  registerSetter(uint64_options, "anchor_return_period",
+                 [&](std::uint64_t value) {
+                   poptorch_options.anchor_return_period = value;
+                 });
+  registerSetter(uint64_options, "replication_factor",
+                 [&](std::uint64_t value) {
+                   popart_options.replicatedGraphCount = value;
+                 });
+  registerSetter(uint64_options, "execution_mode", [&](std::uint64_t value) {
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(ExecutionMode::N),
                  "Value for ExecutionMode out of range");
     poptorch_options.execution_mode = static_cast<ExecutionMode>(value);
-  };
-  uint64_options["tensors_liveness"] = [&](std::uint64_t value) {
+  });
+  registerSetter(uint64_options, "tensors_liveness", [&](std::uint64_t value) {
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(Liveness::N),
                  "Value for Liveness out of range");
     poptorch_options.tensors_liveness = static_cast<Liveness>(value);
-  };
-  uint64_options["anchor_mode"] = [&](std::uint64_t value) {
+  });
+  registerSetter(uint64_options, "anchor_mode", [&](std::uint64_t value) {
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(PopartAnchorTypes::N),
                  "Value for PopartAnchorTypes out of range");
     poptorch_options.anchor_mode = static_cast<PopartAnchorTypes>(value);
-  };
+  });
 
-  uint64_options["connection_type"] = [&](std::uint64_t value) {
+  registerSetter(uint64_options, "connection_type", [&](std::uint64_t value) {
     ERROR_ON_MSG(
         value > static_cast<std::uint64_t>(popart::DeviceConnectionType::Never),
         "Value for DeviceConnectionType out of range");
     poptorch_options.connection_type =
         static_cast<popart::DeviceConnectionType>(value);
-  };
+  });
 
-  uint64_options["accumulationReductionType"] = [&](std::uint64_t value) {
-    ERROR_ON_MSG(
-        value > static_cast<std::uint64_t>(popart::ReductionType::NoReduction),
-        "Value for popart::ReductionType out of range");
-    popart_options.accumulationReductionType =
-        static_cast<popart::ReductionType>(value);
-  };
+  registerSetter(uint64_options, "accumulationReductionType",
+                 [&](std::uint64_t value) {
+                   ERROR_ON_MSG(value > static_cast<std::uint64_t>(
+                                            popart::ReductionType::NoReduction),
+                                "Value for popart::ReductionType out of range");
+                   popart_options.accumulationReductionType =
+                       static_cast<popart::ReductionType>(value);
+                 });
 
-  uint64_options["sync_pattern"] = [&](std::uint64_t value) {
+  registerSetter(uint64_options, "sync_pattern", [&](std::uint64_t value) {
     ERROR_ON_MSG(value > static_cast<std::uint64_t>(
                              popart::SyncPattern::ReplicaAndLadder),
                  "Value for SyncPattern out of range");
     poptorch_options.sync_pattern = static_cast<popart::SyncPattern>(value);
-  };
+  });
 
-  uint64_options["random_seed"] = [&](std::uint64_t value) {
+  registerSetter(uint64_options, "random_seed", [&](std::uint64_t value) {
     poptorch_options.random_seed = value;
-  };
+  });
 
-  string_options["log_dir"] = [&](const std::string &value) {
+  registerSetter(string_options, "log_dir", [&](const std::string &value) {
     popart_options.logDir = value;
-  };
+  });
 
   string_options["logDir"] = [&](const std::string &log_dir) {
     UNUSED(log_dir);
@@ -564,69 +600,75 @@ SessionOptionsImpl::SessionOptionsImpl() {
         "poptorch.Options.logDir() instead");
   };
 
-  container_options["dotChecks"] =
+  registerSetter(
+      container_options, "dotChecks",
       [&](const std::pair<std::string, std::string> &p) {
         std::uint64_t value = std::stoul(p.first);
         ERROR_ON_MSG(value >= static_cast<std::uint64_t>(popart::DotCheck::N),
                      "Value for DotCheck out of range");
         popart_options.dotChecks.insert(static_cast<popart::DotCheck>(value));
-      };
+      });
 
-  container_options["hardwareInstrumentations"] =
-      [&](const std::pair<std::string, std::string> &p) {
-        std::uint64_t value = std::stoul(p.first);
-        ERROR_ON_MSG(value >=
-                         static_cast<std::uint64_t>(popart::Instrumentation::N),
-                     "Value for Instrumentation out of range");
-        popart_options.hardwareInstrumentations.insert(
-            static_cast<popart::Instrumentation>(value));
-      };
+  registerSetter(container_options, "hardwareInstrumentations",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   std::uint64_t value = std::stoul(p.first);
+                   ERROR_ON_MSG(value >= static_cast<std::uint64_t>(
+                                             popart::Instrumentation::N),
+                                "Value for Instrumentation out of range");
+                   // clang-format off
+                   popart_options.hardwareInstrumentations.insert(
+                       static_cast<popart::Instrumentation>(value));
+                   // clang-format on
+                 });
 
-  container_options["customCodelets"] =
-      [&](const std::pair<std::string, std::string> &p) {
-        popart_options.customCodelets.push_back(p.first);
-      };
+  registerSetter(container_options, "customCodelets",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.customCodelets.push_back(p.first);
+                 });
 
-  container_options["engineOptions"] =
-      [&](const std::pair<std::string, std::string> &p) {
-        popart_options.engineOptions.emplace(p);
-      };
+  registerSetter(container_options, "engineOptions",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.engineOptions.emplace(p);
+                 });
 
-  container_options["reportOptions"] =
-      [&](const std::pair<std::string, std::string> &p) {
-        popart_options.reportOptions.emplace(p);
-      };
+  registerSetter(container_options, "reportOptions",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.reportOptions.emplace(p);
+                 });
 
-  container_options["convolutionOptions"] =
-      [&](const std::pair<std::string, std::string> &p) {
-        popart_options.convolutionOptions.emplace(p);
-      };
+  registerSetter(container_options, "convolutionOptions",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.convolutionOptions.emplace(p);
+                 });
 
-  container_options["gclOptions"] =
-      [&](const std::pair<std::string, std::string> &p) {
-        popart_options.gclOptions.emplace(p);
-      };
+  registerSetter(container_options, "gclOptions",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.gclOptions.emplace(p);
+                 });
+
 #define ADD_POPART_ENUM_OPTION(name, EnumType)                                 \
-  uint64_options[#name] = [&](std::uint64_t value) {                           \
+  registerSetter(uint64_options, #name, [&](std::uint64_t value) {             \
     ERROR_ON_MSG(value >= static_cast<std::uint64_t>(popart::EnumType::N),     \
                  "Value for " << #EnumType << " out of range");                \
     popart_options.name = static_cast<popart::EnumType>(value);                \
-  }
+  })
 
 #define ADD_POPART_BOOL_OPTION(name)                                           \
-  bool_options[#name] = [&](bool value) { popart_options.name = value; }
+  registerSetter(bool_options, #name,                                          \
+                 [&](bool value) { popart_options.name = value; })
+
 #define ADD_POPART_UINT64_OPTION(name)                                         \
-  uint64_options[#name] = [&](std::uint64_t value) {                           \
-    popart_options.name = value;                                               \
-  }
+  registerSetter(uint64_options, #name,                                        \
+                 [&](std::uint64_t value) { popart_options.name = value; })
 
 #define ADD_POPART_DOUBLE_OPTION(name)                                         \
-  double_options[#name] = [&](double value) { popart_options.name = value; }
+  registerSetter(double_options, #name,                                        \
+                 [&](double value) { popart_options.name = value; })
 
 #define ADD_POPART_STRING_OPTION(name)                                         \
-  string_options[#name] = [&](const std::string &value) {                      \
+  registerSetter(string_options, #name, [&](const std::string &value) {        \
     popart_options.name = value;                                               \
-  }
+  })
 
   ADD_POPART_ENUM_OPTION(autoRecomputation, RecomputationType);
   ADD_POPART_ENUM_OPTION(mergeVarUpdate, MergeVarUpdateType);
@@ -1290,6 +1332,9 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
                               "operations have been optimised out)");
   if (_impl->options.ipu_model) {
+    if (_impl->popart_options.enableEngineCaching) {
+      logging::warn("enableExecutableCaching doesn't work with the IPU model");
+    }
     std::map<std::string, std::string> model_options;
     model_options["numIPUs"] = std::to_string(num_ipus);
     std::string env_ipu_model_version = getIpuModelVersion();
@@ -1313,9 +1358,9 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
                    "Offline compilation targeting a specific id not supported");
       std::map<std::string, std::string> device_options;
       device_options["numIPUs"] = std::to_string(num_ipus);
-      device_options["ipu_version"] =
+      device_options["ipuVersion"] =
           "ipu" + std::to_string(_impl->options.ipu_version);
-      device_options["sync_pattern"] =
+      device_options["syncPattern"] =
           popart::syncPatternToString(_impl->options.sync_pattern);
       device =
           popart::DeviceManager::createDeviceManager().createOfflineIPUDevice(
