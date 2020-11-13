@@ -212,30 +212,31 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
   SessionOptions options;
 
   for (auto element : opt) {
+    auto option_name = element.first.cast<std::string>();
+    logging::LogContext ctx("parseSessionOptions option: " + option_name);
     // Exception patterns_level is handled at the same time as "patterns"
-    if (element.first.cast<std::string>() == "patterns_level") {
+    if (option_name == "patterns_level") {
       continue;
     }
     if (py::isinstance<py::bool_>(element.second)) {
-      options.addBoolOption(element.first.cast<std::string>().c_str(),
-                            element.second.cast<bool>());
+      options.addBoolOption(option_name.c_str(), element.second.cast<bool>());
     } else if (py::isinstance<py::float_>(element.second)) {
-      options.addDoubleOption(element.first.cast<std::string>().c_str(),
+      options.addDoubleOption(option_name.c_str(),
                               element.second.cast<double>());
     } else if (py::isinstance<py::int_>(element.second)) {
-      options.addUint64Option(element.first.cast<std::string>().c_str(),
+      options.addUint64Option(option_name.c_str(),
                               element.second.cast<std::uint64_t>());
     } else if (py::isinstance<py::str>(element.second)) {
-      options.addStringOption(element.first.cast<std::string>().c_str(),
+      options.addStringOption(option_name.c_str(),
                               element.second.cast<std::string>().c_str());
     } else if (py::isinstance<py::set>(element.second) ||
                py::isinstance<py::list>(element.second)) {
       for (auto option : element.second.cast<py::list>()) {
-        options.insertStringOption(element.first.cast<std::string>().c_str(),
+        options.insertStringOption(option_name.c_str(),
                                    castToString(option).c_str());
       }
     } else if (py::isinstance<py::dict>(element.second)) {
-      const std::string id = element.first.cast<std::string>();
+      const std::string &id = option_name;
 
       if (id == "available_memory_proportion") {
         for (auto option : element.second.cast<py::dict>()) {

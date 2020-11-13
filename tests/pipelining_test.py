@@ -200,8 +200,7 @@ def test_inline_AutoIncrement(capfd):
 
     m = Model()
 
-    opts = poptorch.Options()
-    opts = poptorch.Options().deviceIterations(4)
+    opts = poptorch.Options().deviceIterations(4).autoRoundNumIPUs(True)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
 
@@ -243,8 +242,7 @@ def test_api_AutoIncrement(capfd):
     m.l3 = poptorch.BeginBlock(m.l3, ipu_id=2)
     m.l4 = poptorch.BeginBlock(m.l4, ipu_id=1)
 
-    opts = poptorch.Options()
-    opts = poptorch.Options().deviceIterations(4)
+    opts = poptorch.Options().deviceIterations(4).autoRoundNumIPUs(True)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
 
@@ -257,3 +255,45 @@ def test_api_AutoIncrement(capfd):
     log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
     log.assert_contains(" Mul:0/2 ", " mode(Pipelined), ipu(2), stage(2)")
     log.assert_contains(" Mul:0/3 ", " mode(Pipelined), ipu(1), stage(3)")
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Round up only needed for IPU Hardware")
+def test_ipu_round_up_error():
+    class Block(torch.nn.Module):
+        def forward(self, x):
+            return x * 6
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.l1 = Block()
+            self.l2 = Block()
+            self.l3 = Block()
+
+        def forward(self, x):
+            x = self.l1(x)
+            x = self.l2(x)
+            x = self.l3(x)
+            return x
+
+    m = Model()
+    m.l1 = poptorch.BeginBlock(m.l2, ipu_id=0)
+    m.l2 = poptorch.BeginBlock(m.l2, ipu_id=1)
+    m.l3 = poptorch.BeginBlock(m.l3, ipu_id=2)
+
+    opts = poptorch.Options()
+    opts.setExecutionStrategy(
+        poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
+
+    m = poptorch.inferenceModel(m, opts)
+
+    error_msg = (
+        ".+The model specifies the use of 3 IPUs, however PopTorch must "
+        "reserve a minimum of 4 in order to allow the model to run, "
+        "because PopTorch must reserve a power of 2 or a multiple of 64"
+        r" IPUs\. Please reconfigure your model to use a different "
+        r"number of IPUs or set poptorch\.Options\(\)\."
+        r"autoRoundNumIPUs\(True\)\.")
+    with pytest.raises(RuntimeError, match=error_msg):
+        m(torch.randn(4, 5))
