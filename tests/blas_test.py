@@ -3,7 +3,6 @@
 
 import pytest
 import torch
-import torch.optim as optim
 import poptorch
 
 
@@ -58,47 +57,3 @@ def test_bmm(optional_out):
     out = torch.randn([12, 10, 33]) if optional_out else None
 
     blas_op(torch.bmm, input1, input2, out)
-
-
-def test_matmul_training():
-    N, M, K, C = 100, 9, 7, 5
-
-    class Net(torch.nn.Module):
-        def __init__(self):
-            super(Net, self).__init__()
-            torch.manual_seed(42)
-            self.linear = torch.nn.Linear(K, K)
-            self.softmax = torch.nn.LogSoftmax(dim=1)
-            self.loss = torch.nn.L1Loss(reduction="mean")
-
-        def forward(self, x, y, target):
-            x = self.linear(x)
-            x = torch.matmul(x, y)
-            return x, self.loss(x, target)
-
-    torch.manual_seed(42)
-    model = Net()
-    opts = poptorch.Options()
-
-    optimizer = optim.SGD(model.parameters(), lr=0.01)
-    torch.manual_seed(42)
-    poptorch_model = poptorch.trainingModel(model, opts, optimizer)
-    x = torch.randn(N, M, K)
-    y = torch.randn(K, K)
-    target = torch.empty(N, M, K, dtype=torch.long).random_(0, C)
-
-    for _ in range(0, 400):
-        optimizer.zero_grad()
-        poptorch_output, poptorch_loss = poptorch_model(x, y, target)
-        native_output, native_loss = model(x, y, target)
-        native_loss.backward(retain_graph=True)
-        optimizer.step()
-
-    torch.testing.assert_allclose(poptorch_output,
-                                  native_output,
-                                  rtol=1e-02,
-                                  atol=1e-02)
-    torch.testing.assert_allclose(poptorch_loss[0],
-                                  native_loss,
-                                  rtol=1e-03,
-                                  atol=1e-03)

@@ -20,6 +20,3 @@ New features:
 - Add PoplarExecutor.compile() to compile the model without executing it.
 - Use sphinx-build to generate the documentation.
 - Use Miniconda as build environment.
-- Optimized torch.matmul implementation with limitations
-    Fused its input 0's batch dimensions with the row dimension
-    to avoid ReduceSum in its backward pass, for performance purpose
