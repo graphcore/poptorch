@@ -307,13 +307,15 @@ The following examples show cases where the casting functionality is resolved ba
     :language: python
     :caption: Cases where casting resolves to the correct type
     :linenos:
-    :lines: 8-34
+    :start-after: correct_cast_start
+    :end-before: correct_cast_end
 
 .. literalinclude:: half_float_casting.py
     :language: python
     :caption: Cases where casting resolves to an incorrect type
     :linenos:
-    :lines: 38-58
+    :start-after: incorrect_cast_start
+    :end-before: incorrect_cast_end
 
 
 Creation functions
@@ -334,18 +336,21 @@ The following examples show cases where the type output differs from PyTorch:
     :language: python
     :caption: Type resolution when using torch.zeros
     :linenos:
-    :lines: 8-28
+    :start-after: zero_res_start
+    :end-before: zero_res_end
 
 
 .. literalinclude:: half_float_ops.py
     :language: python
     :caption: Type resolution when using torch.rand
     :linenos:
-    :lines: 32-52
+    :start-after: rand_res_start
+    :end-before: rand_res_end
 
 
 .. literalinclude:: half_float_ops.py
     :language: python
     :caption: Type resolution when using torch.distributions.uniform.Uniform
     :linenos:
-    :lines: 56-79
+    :start-after: uniform_res_start
+    :end-before: uniform_res_end

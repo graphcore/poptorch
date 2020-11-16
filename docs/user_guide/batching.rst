@@ -47,7 +47,8 @@ Example
 
 .. literalinclude:: device_iterations.py
   :caption: Use of AsynchronousDataAccessor
-  :lines: 146-160
+  :start-after: data_accessor_start
+  :end-before: data_accessor_end
   :emphasize-lines: 10
   :linenos:
 
@@ -66,7 +67,8 @@ Example
 
 .. literalinclude:: device_iterations.py
   :caption: Use of device iterations and batch size
-  :lines: 3-78
+  :start-after: iterations_start
+  :end-before: iterations_end
   :emphasize-lines: 55, 61
   :linenos:
 
@@ -78,13 +80,14 @@ IPUs to allow automatic data parallelism across many IPUs.
 
 .. literalinclude:: device_iterations.py
   :caption: Use of replication factor
-  :lines: 82-108
+  :start-after: replication_start
+  :end-before: replication_end
   :emphasize-lines: 8
   :linenos:
 
 
-poptorch.Options.Traning.gradientAccumulation
-=============================================
+poptorch.Options.Training.gradientAccumulation
+==============================================
 
 You need to use :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
 when training with pipelined models because the weights are shared across
@@ -95,6 +98,7 @@ out of order.
 
 .. literalinclude:: device_iterations.py
   :caption: Use of gradient accumulation
-  :lines: 110-135
+  :start-after: gradient_acc_start
+  :end-before: gradient_acc_end
   :emphasize-lines: 8
   :linenos:

@@ -1,5 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-
+# annotations_start
 import transformers
 import torch
 import poptorch
@@ -32,6 +32,7 @@ data_batch_size = 4
 # Create a poptorch.Options instance to override default options
 opts = poptorch.Options()
 opts.deviceIterations(data_batch_size)
+# annotations_end
 
 # Model is now passed to the wrapper as usual.
 inference_model = poptorch.inferenceModel(model, opts)
@@ -77,6 +78,7 @@ assert answer_string[2] == '19'
 assert answer_string[3] == 'to check the status of a coffee pot'
 
 
+# annotations_inline_start
 class Network(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -112,3 +114,4 @@ opts = poptorch.Options()
 opts.deviceIterations(4)
 poptorch_model = poptorch.inferenceModel(model, options=opts)
 print(poptorch_model(torch.rand((4, 5))))
+# annotations_inline_end

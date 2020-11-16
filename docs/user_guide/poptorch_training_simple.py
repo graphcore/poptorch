@@ -51,6 +51,7 @@ class ExampleDataset(torch.utils.data.Dataset):
         return self._all_data[index], self._all_labels[index]
 
 
+# simple_ipu_start
 # Set up the PyTorch DataLoader to load that much data at each iteration
 opts = poptorch.Options()
 opts.deviceIterations(10)
@@ -87,12 +88,12 @@ for batch, target in training_data:
     if momentum_loss < 0.1:
         poptorch_model.setOptimizer(
             torch.optim.AdamW(model.parameters(), lr=0.0001))
+# simple_ipu_end
 
 print(model.model.bias)
 assert (model.model.bias > 0.4 and model.model.bias < 0.6)
 
-# Host equivalent
-
+# simple_cpu_start
 training_data = torch.utils.data.DataLoader(ExampleDataset(shape=[1],
                                                            length=20000),
                                             batch_size=10,
@@ -126,6 +127,7 @@ for batch, target in training_data:
 
     if momentum_loss < 0.1:
         optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
+# simple_cpu_end
 
 print(model.model.bias)
 assert (model.model.bias > 0.4 and model.model.bias < 0.6)

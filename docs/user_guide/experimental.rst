@@ -14,12 +14,13 @@ python wrapper in your script.
 
 The only change to your code needed is to set the id of the current process and
 the total number of processes the execution is distributed across using
-:py:meth:`~poptorch.options._DistributedOptions.configureProcessId` 
+:py:meth:`~poptorch.options._DistributedOptions.configureProcessId`
 
 .. literalinclude:: device_iterations.py
   :caption: Changes required for distributed execution
-  :lines: 163-198
-  :emphasize-lines: 9, 12, 18 
+  :start-after: distributed_execution_start
+  :end-before: distributed_execution_end
+  :emphasize-lines: 9, 12, 18
   :linenos:
 
 .. note:: The ``DataLoader`` will automatically select a different subset of the
@@ -65,6 +66,7 @@ Distributed execution using Python
 
 .. literalinclude:: device_iterations.py
   :caption: How to start the processes from python
-  :lines: 202-232
   :linenos:
+  :start-after: distributed_python_start
+  :end-before: distributed_python_end
 
