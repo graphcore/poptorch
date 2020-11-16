@@ -141,3 +141,104 @@ def test_unused_tuple():
     t2 = torch.tensor([2.])
     z = (torch.tensor([1.]), torch.tensor([1.]))
     inference_model(t1, t2, z)
+
+
+def test_input_plain_list():
+    model = torch.nn.ReLU()
+    inference_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(TypeError) as excinfo:
+        inference_model([torch.tensor([1])])
+
+    assert (str(
+        excinfo.value) == "Lists are not supported as input arguments, "
+            "including when nested in tuples.\n"
+            "Received list input = [tensor([1])]")
+
+
+def test_input_nested_list():
+    model = torch.nn.ReLU()
+    inference_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(TypeError) as excinfo:
+        inference_model((torch.tensor([1]), torch.tensor([2]),
+                         (torch.tensor([3]), [torch.tensor([4])],
+                          torch.tensor([5])), torch.tensor([6])))
+
+    assert (str(
+        excinfo.value) == "Lists are not supported as input arguments, "
+            "including when nested in tuples.\n"
+            "Received list input[2][1] = [tensor([4])]")
+
+
+def test_input_three_agg_nested_list():
+    class ThreeIdentity(nn.Module):
+        def forward(self, x, y, z):
+            return x, y, z
+
+    model = ThreeIdentity()
+    inference_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(TypeError) as excinfo:
+        inference_model(torch.tensor([0]),
+                        (torch.tensor([1]), torch.tensor([2]),
+                         (torch.tensor([3]), [torch.tensor(
+                             [4])], torch.tensor([5])), torch.tensor([6])),
+                        torch.tensor([7]))
+
+    assert (str(
+        excinfo.value) == "Lists are not supported as input arguments, "
+            "including when nested in tuples.\n"
+            "Received list y[2][1] = [tensor([4])]")
+
+
+def test_input_plain_dict():
+    model = torch.nn.ReLU()
+    inference_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(TypeError) as excinfo:
+        inference_model({'a': torch.tensor([1])})
+
+    assert (str(
+        excinfo.value) == "Dictionaries are not supported as input arguments, "
+            "including when nested in tuples.\n"
+            "Received dict input = {'a': tensor([1])}")
+
+
+def test_input_nested_dict():
+    model = torch.nn.ReLU()
+    inference_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(TypeError) as excinfo:
+        inference_model(
+            (torch.tensor([1]), torch.tensor([2]), (torch.tensor([3]), {
+                'b': torch.tensor([4])
+            }, torch.tensor([5])), torch.tensor([6])))
+
+    assert (str(excinfo.value) == "Dictionaries are not supported as input "
+            "arguments, including when nested in tuples."
+            "\nReceived dict input[2][1] = "
+            "{'b': tensor([4])}")
+
+
+def test_input_three_agg_nested_dict():
+    class ThreeIdentity(nn.Module):
+        def forward(self, x, y, z):
+            return x, y, z
+
+    model = ThreeIdentity()
+
+    inference_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(TypeError) as excinfo:
+        inference_model(torch.tensor([0]),
+                        (torch.tensor([1]), torch.tensor([2]),
+                         (torch.tensor([3]), {
+                             'c': torch.tensor([4])
+                         }, torch.tensor([5])), torch.tensor([6])),
+                        torch.tensor([7]))
+
+    assert (str(excinfo.value) == "Dictionaries are not supported as input "
+            "arguments, including when nested in tuples."
+            "\nReceived dict y[2][1] = "
+            "{'c': tensor([4])}")

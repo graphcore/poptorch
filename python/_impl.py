@@ -174,6 +174,7 @@ class ArgsParser:
 
         for i, name in enumerate(self._varnames):
             if i < len(args):
+                self._errorOnListOrDict(args[i], name, [])
                 a._args.append(args[i])
                 assert name not in kwargs, ("Parameter %s was passed more "
                                             "than once") % name
@@ -182,6 +183,7 @@ class ArgsParser:
                     "Torch doesn't support passing tensors (%s)"
                     " after the following parameters have defaulted to None."
                     " %s") % (name, ", ".join(none_passed))
+                self._errorOnListOrDict(kwargs[name], name, [])
                 a._args.append(kwargs[name])
             else:
                 assert i >= first_optional, ("Mandatory parameter %s "
@@ -195,7 +197,32 @@ class ArgsParser:
                     a._args.append(value)
         if a.first_none is None:
             a.first_none = len(self._varnames)
+
         return a
+
+    def _errorOnListOrDict(self, data, arg_name, stack_list):
+        if isinstance(data, (tuple)):
+            for idx, d in enumerate(data):
+                stack_list.append(idx)
+                self._errorOnListOrDict(d, arg_name, stack_list)
+                stack_list.pop()
+
+        if isinstance(data, (dict, list)):
+            stack_list = [str(s) for s in stack_list]
+            end_msg = arg_name
+            if stack_list:
+                end_msg += "[" + "][".join(stack_list) + "]"
+            end_msg += " = " + str(data)
+
+        if isinstance(data, dict):
+            raise TypeError(
+                "Dictionaries are not supported as input arguments,"
+                " including when nested in tuples.\nReceived dict " + end_msg)
+
+        if isinstance(data, list):
+            raise TypeError(
+                "Lists are not supported as input arguments,"
+                " including when nested in tuples.\nReceived list " + end_msg)
 
 
 class PoplarExecutor:
