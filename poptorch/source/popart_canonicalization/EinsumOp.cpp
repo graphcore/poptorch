@@ -21,6 +21,7 @@ EinsumOp::EinsumOp(std::string eq,
     _rhs = eq.substr(pos + 2);
   }
 
+  // Split lhs into labels using ',' delimiter
   std::stringstream ss(_lhs);
   std::string s;
   while (std::getline(ss, s, ',')) {
@@ -69,42 +70,31 @@ EinsumOp::EinsumOp(std::string eq,
 torch::jit::Node *EinsumOp::create(torch::jit::Graph *graph) {
   canonicalizeTensors(graph);
 
-  auto fn_update_char_counts = [&](const std::string &label) {
-    for (char c : label) {
-      _char_counts_seen[c]++;
-      _char_counts_remaining[c]--;
-    }
-  };
+  torch::jit::Node *output = nullptr;
 
-  auto fn_product = [&](torch::jit::Value *current_product, std::size_t p) {
-    fn_update_char_counts(_labels[p + 1]);
+  // One tensor means only a summation is applied
+  if (_tensors.size() == 1) {
+    std::vector<std::int64_t> axes;
 
     for (std::size_t i = 0; i < _n_dims; i++) {
-      char c = _ordered_chars[i];
-      // if dim appears in rhs, don't reduce
-      // if dim appears in future operands, don't reduce yet
-      _rdims_bs[i] =
-          !_rhs_bs[i] && _char_counts_remaining[_ordered_chars[i]] == 0;
-      _bdims_bs[i] = !_rdims_bs[i] && _char_counts_seen[c] > 1;
+      if (!_rhs_bs[i]) {
+        axes.push_back(static_cast<std::int64_t>(i));
+      }
     }
-
-    return tensordotBmm(graph, current_product, _tensors[p + 1]);
-  };
-
-  fn_update_char_counts(_labels[0]);
-  // Base product
-  torch::jit::Node *td_bmm_chain = fn_product(_tensors[0], 0);
-  // Build product from left to right
-  for (std::size_t i = 1; i < _tensors.size() - 1; i++) {
-    td_bmm_chain = fn_product(td_bmm_chain->output(), i);
+    output = createReducesum(graph, {_tensors[0]}, axes, 1);
+  } else {
+    updateCharCounts(_labels[0]);
+    // Base output
+    output = _tensors[0]->node();
+    // Build product from left to right
+    for (std::size_t i = 1; i < _tensors.size(); i++) {
+      output = createProduct(graph, output->output(), _tensors[i], _labels[i]);
+    }
+    output = permuteOutput(graph, output->output());
   }
 
-  std::vector<std::int64_t> p_out = getOutputPermutation();
-
-  td_bmm_chain = createTranspose(graph, {td_bmm_chain->output()}, p_out);
-
   // Remove single dimensions
-  return createSqueeze(graph, {td_bmm_chain->output()}, {});
+  return createSqueeze(graph, {output->output()}, {});
 }
 
 torch::jit::Node *EinsumOp::tensordotBmm(torch::jit::Graph *graph,
@@ -200,29 +190,33 @@ void EinsumOp::canonicalizeTensors(torch::jit::Graph *graph) {
     torch::jit::Value *t = _tensors[i];
     std::vector<std::int64_t> shape = shapeFromTensor(t);
 
-    // Get permute indices
+    // Get permute indices of lhs
     std::vector<std::int64_t> p_lhs =
         sortedPermutation(_lhs_char_indices, _labels[i]);
 
-    // Calculate permuted shape
-    std::vector<std::int64_t> p_shape;
-    std::transform(p_lhs.begin(), p_lhs.end(), std::back_inserter(p_shape),
+    // Calculate permuted shape and label
+    std::vector<std::int64_t> shape_p;
+    std::transform(p_lhs.begin(), p_lhs.end(), std::back_inserter(shape_p),
                    [&](auto d) { return shape[d]; });
+
+    // TODO(T6451): Implement diagonals whenever ai.onnx.EyeLike is implemented
+    //              in PopART
 
     // Insert missing dims
     for (std::size_t j = 0; j < _ordered_chars.size(); j++) {
       if (_labels[i].find(_ordered_chars[j]) == std::string::npos) {
-        p_shape.insert(p_shape.begin() + j, 1);
+        shape_p.insert(shape_p.begin() + j, 1);
       }
     }
 
     // Permute and reshape
     t = createTranspose(graph, {t}, p_lhs)->output();
-    _tensors[i] = createReshape(graph, t, p_shape)->output();
+    _tensors[i] = createReshape(graph, t, shape_p)->output();
   }
 }
 
-std::vector<std::int64_t> EinsumOp::getOutputPermutation() const {
+torch::jit::Node *EinsumOp::permuteOutput(torch::jit::Graph *graph,
+                                          torch::jit::Value *output) const {
   std::vector<char> out_chars = _ordered_chars;
   std::stable_partition(out_chars.begin(), out_chars.end(), [&](char c) {
     return _bdims_bs[_lhs_char_indices.at(c)];
@@ -240,6 +234,32 @@ std::vector<std::int64_t> EinsumOp::getOutputPermutation() const {
   std::vector<std::int64_t> p_combined;
   std::transform(p_rhs.begin(), p_rhs.end(), std::back_inserter(p_combined),
                  [&](auto d) { return p_lhs[d]; });
-  return p_combined;
+
+  return createTranspose(graph, {output}, p_combined);
+}
+
+void EinsumOp::updateCharCounts(const std::string &label) {
+  for (char c : label) {
+    _char_counts_seen[c]++;
+    _char_counts_remaining[c]--;
+  }
+}
+
+torch::jit::Node *EinsumOp::createProduct(torch::jit::Graph *graph,
+                                          torch::jit::Value *lhs,
+                                          torch::jit::Value *rhs,
+                                          const std::string &rhs_label) {
+  updateCharCounts(rhs_label);
+
+  for (std::size_t i = 0; i < _n_dims; i++) {
+    char c = _ordered_chars[i];
+    // if dim appears in rhs, don't reduce
+    // if dim appears in future operands, don't reduce yet
+    _rdims_bs[i] =
+        !_rhs_bs[i] && _char_counts_remaining[_ordered_chars[i]] == 0;
+    _bdims_bs[i] = !_rdims_bs[i] && _char_counts_seen[c] > 1;
+  }
+
+  return tensordotBmm(graph, lhs, rhs);
 }
 } // namespace poptorch

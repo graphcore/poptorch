@@ -7,6 +7,7 @@ import pytest
 
 torch.manual_seed(42)
 params_einsum = [
+    ('ij->i', [torch.randn(5, 4)]),
     ('i,j->j', [torch.randn(5), torch.randn(4)]),
     ('i,j->ji', [torch.randn(5), torch.randn(4)]),
     ('bij,bjk->bik', [torch.randn(3, 2, 5),
@@ -18,7 +19,7 @@ params_einsum = [
     ('bfnd,ndh->bfh', [torch.randn(2, 3, 4, 5),
                        torch.randn(4, 5, 6)]),
     ('nmku,buvm->bnkv', [torch.randn(2, 3, 4, 5),
-                         torch.randn(6, 5, 7, 3)])
+                         torch.randn(6, 5, 7, 3)]),
 ]
 
 
