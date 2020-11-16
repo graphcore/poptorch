@@ -52,15 +52,16 @@ void processInput(torch::jit::Graph *graph, torch::jit::Value *input) {
   case c10::TypeKind::TensorType:
     processInputTensor(graph, input);
     break;
-  case c10::TypeKind::ListType:
   case c10::TypeKind::TupleType: {
     // Find the [List/Tuple]Unpack node
     if (input->hasUses()) {
       auto unpack = input->uses()[0].user;
       ERROR_ON((unpack->kind() != c10::prim::TupleUnpack) &&
                (unpack->kind() != c10::prim::ListUnpack));
-
+      unsigned int idx = 0;
       for (auto element : unpack->outputs()) {
+        logging::LogContext ctx(std::string("element: ") + std::to_string(idx));
+        idx++;
         // Recurse for nested tuple support
         processInput(graph, element);
       }
