@@ -358,8 +358,9 @@ class PoplarExecutor:
         if self._executable is None:
             self._first_none_arg = in_tensors.first_none
             logger.info(
-                "First time call to model will invoke poplar compilation."
-                " %s %s", str(self._options.device_iterations),
+                "First time call to model will invoke poplar compilation.\n"
+                "Number of device itrations: %s\n "
+                "Training: %s", str(self._options.device_iterations),
                 str(self._training))
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we
