@@ -25,12 +25,14 @@ on IPU. However, it does have some differences from native PyTorch execution.
 .. literalinclude:: poptorch_training_simple.py
   :caption: A simple example of training using PyTorch on the CPU
   :linenos:
-  :lines: 96-128
+  :start-after: simple_cpu_start
+  :end-before: simple_cpu_end
 
 .. literalinclude:: poptorch_training_simple.py
   :caption: Equivalent code using PopTorch to train on the IPU
   :linenos:
-  :lines: 54-89
+  :start-after: simple_ipu_start
+  :end-before: simple_ipu_end
 
 * Under the hood PopTorch uses the ``torch.jit.trace`` API. That means it
   inherits the constraints of that API. These include:

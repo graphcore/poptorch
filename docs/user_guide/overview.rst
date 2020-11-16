@@ -47,8 +47,8 @@ poptorch.trainingModel
     :language: python
     :caption: An example of the use of :py:func:`poptorch.trainingModel`
     :linenos:
-    :lines: 3-
     :emphasize-lines: 21
+    :start-after: training_model_start
 
 poptorch.inferenceModel
 -----------------------
@@ -59,7 +59,7 @@ poptorch.inferenceModel
     :language: python
     :caption: An example of the use of :py:func:`poptorch.inferenceModel`
     :linenos:
-    :lines: 3-32
+    :start-after: inference_model_start
     :emphasize-lines: 14
 
 
@@ -95,7 +95,7 @@ poptorch.PoplarExecutor
 Pipeline annotator
 ==================
 
-You can use the ``BeginBlock`` or ``Block`` wrapper class to define model parallelism
+You can use the :py:class:`poptorch.BeginBlock` or :py:class:`poptorch.Block` wrapper class to define model parallelism
 in a PopTorch multi-IPU device. Conceptually this is collecting the layers of a model
 into a phase which can be mapped onto a specific IPU. By default, these will execute
 using a pipelined model parallel execution strategy.
@@ -105,24 +105,41 @@ PopART and when used in conjunction with PopART session options can override the
 pipeline execution strategy. Refer to the PopART user guide to enable other execution modes.
 
 .. autoclass:: poptorch.Block
+   :special-members: __init__, useAutoId
+
+.. autoclass:: poptorch.BeginBlock
    :special-members: __init__
 
 .. autoclass:: poptorch.PipelinedExecution
    :special-members: __init__
+   :inherited-members:
+
+.. autoclass:: poptorch.AutoStage
+
+.. autoclass:: poptorch.Stage
+   :special-members: __init__
 
 .. autoclass:: poptorch.ShardedExecution
+   :inherited-members:
+
+.. autoclass:: poptorch.Phase
    :special-members: __init__
 
 .. autoclass:: poptorch.ParallelPhasedExecution
    :special-members: __init__
+   :inherited-members:
 
 .. autoclass:: poptorch.SerialPhasedExecution
    :special-members: __init__
+   :inherited-members:
+
+.. autoclass:: poptorch.Liveness
 
 .. literalinclude:: pipeline_simple.py
     :language: python
     :linenos:
-    :lines: 3-34
+    :start-after: annotations_start
+    :end-before: annotations_end
     :emphasize-lines: 15-16, 19-20, 23-24
     :caption: Annotations can be attached to layers in existing models.
 
@@ -130,8 +147,9 @@ pipeline execution strategy. Refer to the PopART user guide to enable other exec
 .. literalinclude:: pipeline_simple.py
     :language: python
     :linenos:
-    :lines: 77-
-    :emphasize-lines: 20, 23, 27
+    :start-after: annotations_inline_start
+    :end-before: annotations_inline_end
+    :emphasize-lines: 19, 22, 26
     :caption: PopTorch also supports annotating the model directly. Both forms can be used interchangeably.
 
 
@@ -195,7 +213,8 @@ poptorch.ipu_print_tensor
 .. literalinclude:: api.py
     :language: python
     :linenos:
-    :lines: 7-18
+    :start-after: print_tensor_start
+    :end-before: print_tensor_end
     :emphasize-lines: 10
 
 
@@ -214,7 +233,8 @@ and will backpropagate a gradient of ones through it.
 .. literalinclude:: api.py
   :language: python
   :linenos:
-  :lines: 25-43
+  :start-after: identity_start
+  :end-before: identity_end
   :emphasize-lines: 5
 
 Half / float 16 support
@@ -228,7 +248,8 @@ You can convert models to float 16 by using a Module's .half() method and by usi
     :language: python
     :caption: How to run a model using half precision
     :linenos:
-    :lines: 34-40
+    :start-after: inference_half_start
+    :end-before: inference_half_end
     :emphasize-lines: 1, 2
 
 Because PopTorch relies on the ``torch.jit.trace`` API, it is limited to tracing operations which run on the CPU.

@@ -6,6 +6,7 @@ import torch
 # pragma pylint: disable=function-redefined
 
 
+# zero_res_start
 ## torch.ones and zeros
 class Model(torch.nn.Module):
     def forward(self, x):
@@ -29,7 +30,10 @@ assert poptorch_model(float16_tensor).dtype == torch.float16
 poptorch_model = poptorch.inferenceModel(native_model)
 assert poptorch_model(float32_tensor).dtype == torch.float32
 
+# zero_res_end
 
+
+# rand_res_start
 ## torch.rand
 class Model(torch.nn.Module):
     def forward(self, x):
@@ -53,7 +57,10 @@ assert poptorch_model(float16_tensor).dtype == torch.float16
 poptorch_model = poptorch.inferenceModel(native_model)
 assert poptorch_model(float32_tensor).dtype == torch.float32
 
+# rand_res_end
 
+
+# uniform_res_start
 ## torch.distributions.uniform.Uniform
 class Model(torch.nn.Module):
     def forward(self, x):
@@ -79,3 +86,4 @@ assert poptorch_model(float16_tensor).dtype == torch.float16
 
 poptorch_model = poptorch.inferenceModel(native_model)
 assert poptorch_model(float32_tensor).dtype == torch.float16
+# uniform_res_end

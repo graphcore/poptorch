@@ -4,6 +4,7 @@ import poptorch
 import torch
 
 
+# print_tensor_start
 class ExampleModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -18,10 +19,13 @@ class ExampleModel(torch.nn.Module):
         return x + self.bias
 
 
+# print_tensor_end
+
 model = poptorch.inferenceModel(ExampleModel())
 model(torch.tensor([1.0, 2.0, 3.0]))
 
 
+# identity_start
 def custom_loss(output, target):
     # Mean squared error with a scale
     loss = output - target
@@ -38,6 +42,8 @@ class ExampleModelWithCustomLoss(torch.nn.Module):
         out = self.model(input)
         return out, custom_loss(out, target)
 
+
+# identity_end
 
 model_with_loss = ExampleModelWithCustomLoss()
 poptorch_model = poptorch.trainingModel(model_with_loss)

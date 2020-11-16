@@ -35,7 +35,7 @@ class _JitOptions(_options_impl.OptionsDict):
 class _TrainingOptions(_options_impl.OptionsDict):
     """Options specific to model training.
 
-    Note: You must not set these options for inference models.
+    .. note:: You must not set these options for inference models.
 
     Can be accessed via `poptorch.Options`:
 
@@ -66,7 +66,7 @@ class _PopartOptions:
     Only for advanced users.
 
     Any option from `popart.SessionOptions` can be set using this class.
-    Note: there is no mapping for the various PopART enums so integers need
+    .. note:: there is no mapping for the various PopART enums so integers need
     to be used instead.
 
     Can be accessed via `poptorch.Options`:
@@ -128,7 +128,7 @@ class _DistributedOptions(_options_impl.OptionsDict):
 
         :param files: one or more glob compatible expressions
 
-        By default: `~/.ipuof.conf.d/*.conf`
+        By default: ``~/.ipuof.conf.d/*.conf``
 
         The default value will work if you only own one partition.
 
@@ -136,7 +136,7 @@ class _DistributedOptions(_options_impl.OptionsDict):
         configuration files so that only the configuration files corresponding
         to the partition to use are selected.
 
-        For example: `~/.ipuof.conf.d/partitionA_*.conf`
+        For example: ``~/.ipuof.conf.d/partitionA_*.conf``
         """
         if isinstance(files, str):
             files = [files]
@@ -164,10 +164,10 @@ class _DistributedOptions(_options_impl.OptionsDict):
         Useful if you use a third party library to manage the processes used for
         the distributed execution such as mpirun.
 
-        For example: mpirun -np 4 myscript.py
+        For example: ``mpirun -np 4 myscript.py``
 
-        By default the OpenMPI "OMPI_COMM_WORLD_SIZE" and "OMPI_COMM_WORLD_RANK"
-        variables are used.
+        By default the OpenMPI ``OMPI_COMM_WORLD_SIZE`` and
+        ``OMPI_COMM_WORLD_RANK`` variables are used.
         """
         return self.configureProcessId(
             int(os.environ.get(var_process_id, "0")),
@@ -352,6 +352,10 @@ class _IExecutionStrategy:
         self._stages_manager = stages_manager
 
     def stage(self, block_id):
+        """Return the :py:class:`poptorch.Stage` the given block is belongs to.
+
+        :param str block_id: A block id.
+        """
         assert block_id in self._block_map, f"Unknown block {block_id}"
         return self._block_map[block_id]
 
@@ -367,9 +371,17 @@ class _IExecutionStrategy:
 
 class Phase:
     def __init__(self, arg):
-        """ arg must either be one or more Stages, or one or more block_ids.
+        """ Create a phase.
 
-        Within a Phase, the stages are executed in parallel.
+        :param arg: must either be one or more
+            :py:class:`Stages<poptorch.Stage>`, or one or more
+            blocks ``user_id``.
+        :type arg: str, poptorch.Stage, [poptorch.Stage], [str]
+
+        If one or more strings are passed they will be interpreted as
+        :py:class:`Block` ids representing a single :py:class:`Stage`.
+
+        Within a ``Phase``, the stages will be executed in parallel.
 
         >>> with poptorch.Block("A"):
         ...     layer()
@@ -407,32 +419,32 @@ class Phase:
 
 
 class PipelinedExecution(_IExecutionStrategy):
-    """Will pipeline the execution of the passed Stages or if no stage is passed
-    will consider each unique Block name encountered during tracing as a
-    different stage.
-    >>> with poptorch.Block("A"):
-    ...     layer()
-    >>> with poptorch.Block("B"):
-    ...     layer()
-    >>> with poptorch.Block("C"):
-    ...     layer()
-    >>> opts = poptorch.Options()
-    >>> # Create a 3 stages pipeline
-    >>> opts.setExecutionStrategy(poptorch.PipelinedExecution("A","B","C"))
-    >>> # Create a 2 stages pipeline
-    >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
-    ...    poptorch.Stage("A","B"),
-    ...    "C"))
-    >>> # Automatically create a 3 stages pipeline based on the block names
-    >>> opts.setExecutionStrategy(poptorch.PipelinedExecution())
-
-    :param args: Either a ``poptorch.AutoStage`` strategy or an explicit list
-        of stages.
-    :type args: poptorch.AutoStage, [str], [poptorch.Stage]
-
-    """
-
     def __init__(self, *args):
+        """Pipeline the execution of the passed :py:class:`Stages<poptorch.Stage>` or if no stage is passed
+        consider each unique :py:class:`Block<poptorch.Block>` name
+        encountered during tracing as a different stage.
+
+        >>> with poptorch.Block("A"):
+        ...     layer()
+        >>> with poptorch.Block("B"):
+        ...     layer()
+        >>> with poptorch.Block("C"):
+        ...     layer()
+        >>> opts = poptorch.Options()
+        >>> # Create a 3 stages pipeline
+        >>> opts.setExecutionStrategy(poptorch.PipelinedExecution("A","B","C"))
+        >>> # Create a 2 stages pipeline
+        >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
+        ...    poptorch.Stage("A","B"),
+        ...    "C"))
+        >>> # Automatically create a 3 stages pipeline based on the block names
+        >>> opts.setExecutionStrategy(poptorch.PipelinedExecution())
+
+        :param args: Either a :py:class:`poptorch.AutoStage` strategy or an
+            explicit list of stages or block ids.
+        :type args: poptorch.AutoStage, [str], [poptorch.Stage]
+
+        """
         block_map = {}
         auto_stage = enums.AutoStage.SameAsIpu
         if len(args) == 1 and isinstance(args[0], enums.AutoStage):
@@ -485,6 +497,7 @@ class ShardedExecution(PipelinedExecution):
     """Will shard the execution of the passed Stages or if no stage is passed
     will consider each unique Block name encountered during tracing as a
     different stage.
+
     >>> with poptorch.Block("A"):
     ...     layer()
     >>> with poptorch.Block("B"):
@@ -494,6 +507,11 @@ class ShardedExecution(PipelinedExecution):
     >>> opts = poptorch.Options()
     >>> # Automatically create 3 shards based on the block names
     >>> opts.setExecutionStrategy(poptorch.ShardedExecution())
+
+    :param args: Either a :py:class:`poptorch.AutoStage` strategy or an
+        explicit list of stages or block ids.
+    :type args: poptorch.AutoStage, [str], [poptorch.Stage]
+
     """
 
     def backendOptions(self):
@@ -504,6 +522,18 @@ class _IPhasedExecution(_IExecutionStrategy):
     """Common interface for Phased execution strategies"""
 
     def __init__(self, *phases):
+        """Execute the model's blocks in phases
+
+        :param phases: Definition of phases must be either:
+
+            - a list of :py:class:`poptorch.Phase`
+            - a list of list of :py:class:`poptorch.Stage`
+            - a list of list of :py:class:`poptorch.Block` ids (Each list of
+              blocks will be considered as a single :py:class:`poptorch.Stage` )
+        :type phases: [:py:class:`poptorch.Phase`],
+            [[:py:class:`poptorch.Stage`]], [[str]]
+
+        """
         self._tensors_liveness = enums.Liveness.AlwaysLive
         self._separate_backward_phase = False
         self._phases = []
@@ -537,11 +567,19 @@ class _IPhasedExecution(_IExecutionStrategy):
 
             stages_manager = PhaseManager(block_map)
         else:
-            stages_manager = _DefaultStageManager(enums.AutoStage.SameAsIpu)
+            # TODO(T30127): Define what the default strategy should be.
+            # stages_manager = _DefaultStageManager(enums.AutoStage.SameAsIpu)
+            assert phases, (
+                "There is currently no AutoStage for "
+                "PhasedExecution, please explicitly specify the phases")
 
         super().__init__(stages_manager, block_map)
 
     def phase(self, phase):
+        """Return the requested :py:class:`poptorch.Phase`
+
+        :param int phase: Index of the phase
+        """
         assert isinstance(
             phase,
             int) and phase >= 0, "Phases are identified by positive integers"
@@ -549,23 +587,24 @@ class _IPhasedExecution(_IExecutionStrategy):
 
     def useSeparateBackwardPhase(self, use=True):
         """Given a forward pass with 3 phases (0,1,2), by default the phases
-        will run as follow:
+        will run as follows: ::
 
-        fwd:       bwd:
-        phase 0 -> phase 4
-        phase 1 -> phase 3
-        phase 2 -> phase 2
+            fwd:       bwd:
+            phase 0 -> phase 4
+            phase 1 -> phase 3
+            phase 2 -> phase 2
 
-        Note: The end of the forward pass and the beginning of the backward
-        pass are part of the same phase.
+        .. note:: The end of the forward pass and the beginning of the backward
+            pass are part of the same phase.
 
         If ``useSeparateBackwardPhase(True)`` is used then no phase
-        will be shared between the forward and backward passes:
+        will be shared between the forward and backward passes: ::
 
-        fwd:       bwd:
-        phase 0 -> phase 6
-        phase 1 -> phase 5
-        phase 2 -> phase 4
+            fwd:       bwd:
+            phase 0 -> phase 6
+            phase 1 -> phase 5
+            phase 2 -> phase 4
+
         """
         assert isinstance(use, bool)
         self._separate_backward_phase = use
@@ -584,9 +623,9 @@ class ParallelPhasedExecution(_IPhasedExecution):
 
     For example:
 
-    phase 0 runs on ipu 0 & 2
-    phase 1 runs on ipu 1 & 3
-    phase 2 runs on ipu 0 & 2
+    - phase 0 runs on ipu 0 & 2
+    - phase 1 runs on ipu 1 & 3
+    - phase 2 runs on ipu 0 & 2
 
     >>> poptorch.Block.useAutoId()
     >>> with poptorch.Block(): # user_id = "0"
@@ -629,9 +668,9 @@ class SerialPhasedExecution(_IPhasedExecution):
 
     For example:
 
-    phase 0 runs on ipu 0 & 1
-    phase 1 runs on ipu 0 & 1
-    phase 2 runs on ipu 0 & 1
+    - phase 0 runs on ipu 0 & 1
+    - phase 1 runs on ipu 0 & 1
+    - phase 2 runs on ipu 0 & 1
 
     >>> with poptorch.Block("A"):
     ...     layer()
@@ -657,9 +696,7 @@ class SerialPhasedExecution(_IPhasedExecution):
     """
 
     def setTensorsLiveness(self, liveness):
-        """See ``Liveness`` for more information
-
-        .. seealso:: :py:class:`poptorch.Liveness`
+        """See :py:class:`poptorch.Liveness` for more information
         """
         assert isinstance(liveness, enums.Liveness)
         self._tensors_liveness = liveness
@@ -753,7 +790,7 @@ class Options(_options_impl.OptionsDict):
         """Memory is set on a per IPU basis, this should be a dictionary
         of IPU ids and float values between 0 and 1.
 
-        For example: {"IPU0": 0.5}
+        For example: ``{"IPU0": 0.5}``
         """
         actual_memory = {}
 
@@ -791,8 +828,8 @@ class Options(_options_impl.OptionsDict):
 
         Default: False (Real Hardware).
 
-        This setting takes precedence over the `POPTORCH_IPU_MODEL` environment
-        variable.
+        This setting takes precedence over the ``POPTORCH_IPU_MODEL``
+        environment variable.
         """
         self.set(use_model=use_model)
         return self
@@ -816,9 +853,9 @@ class Options(_options_impl.OptionsDict):
         """Set the IPU SyncPattern.
 
         :param poptorch.SyncPattern sync_pattern:
-            * Full
-            * SinglePipeline
-            * ReplicaAndLadder
+            * ``Full``
+            * ``SinglePipeline``
+            * ``ReplicaAndLadder``
         """
         assert isinstance(sync_pattern, enums.SyncPattern)
         self.set(sync_pattern=sync_pattern.value)
@@ -845,7 +882,8 @@ class Options(_options_impl.OptionsDict):
     def useOfflineIpuTarget(self, ipu_version=1):
         """Create an offline IPU target that can only be used for offline compilation.
 
-        Note: the offline IPU target cannot be used if the IPU model is enabled.
+        .. note:: the offline IPU target cannot be used if the IPU model is
+            enabled.
 
         :param int ipu_version: IPU version to target (1 for mk1, 2 for mk2).
             Default: 1.

@@ -63,8 +63,8 @@ class Block(torch.nn.Module):
 
     @staticmethod
     def useAutoId():
-        """Call this method at the beginning of your forward() method to
-        enable automatic Block Ids.
+        """Call this method at the beginning of your ``forward()`` method to
+        enable automatic block id generation.
 
         Blocks with a None ``user_id`` will be assigned an automatic id
         which will be the index of this block in the list of id-less Blocks.
@@ -83,11 +83,12 @@ class Block(torch.nn.Module):
     def __init__(self, user_id=None, ipu_id=None):
         """
 
-        :param user_id: Pipeline stage this code block should belong to.
-                         All stages must have a unique, incrementing, id.
-                         By default all layers will be in stage 0 until the
-                         first pipeline annotation is encountered.
-        :param int ipu_id: The id of the IPU to run on.
+        :param user_id: A user defined identifier for the block.
+            Blocks with the same id are considered as being a single block.
+            Block identifiers are also used to manually specify pipelines or
+            phases.
+        :type user_id: str, optional
+        :param int, optional ipu_id: The id of the IPU to run on.
                        Note that the ``ipu_id`` is an index
                        in a multi-IPU device within PopTorch, and is
                        separate and distinct from the device ids used by
@@ -106,13 +107,16 @@ class Block(torch.nn.Module):
 
 
 class BeginBlock(torch.nn.Module):
-    """Runs a layer on a specified Phase mapped to a specific API.
+    """Runs all layers from the given layer until the beginning of the next
+    block on a specified IPU.
 
     All layers after this layer will also run on
-    the same IPU until another IPU wrapper is encountered.
+    the same IPU until another ``BeginBlock`` is encountered.
 
-    By default this will be "pipelined" execution, however this
-    can be overridden by the `poptorch.Options`.
+    By default :py:class:`PipelinedExecution` will be used, however this
+    can be overridden in the `poptorch.Options`.
+
+    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
 
     >>> self.layer = poptorch.BeginBlock(1, MyLayer(x))
 
@@ -120,23 +124,22 @@ class BeginBlock(torch.nn.Module):
 
     def __init__(self, layer_to_call, user_id=None, ipu_id=None):
         """
-        All subsequent layers of the network will be part of this phase until
+        All subsequent layers of the network will be part of this block until
         another layer is wrapped.
 
-        :param int stage_id: Pipeline stage this code block should belong to.
-                         All stages must have a unique, incrementing, id.
-                         By default all layers will be in stage 0 until the
-                         first pipeline annotation is encountered.
-        :param layer_to_call: The layer to run on the specified IPU.
-        :param phase_id: The PopART execution phase this code block should
-                         belong on.
-        :type phase_id: int >= 0 or poptorch.PhaseId.
-        :param ipu_id: The id of the IPU to run on.
+        :param torch.nn.Module layer_to_call: The layer to run on the
+            specified IPU.
+        :param user_id: A user defined identifier for the block.
+            Blocks with the same id are considered as being a single block.
+            Block identifiers are also used to manually create
+            :py:class:`Stages<poptorch.Stage>` and
+            :py:class:`Phases<poptorch.Phase>`.
+        :type user_id: str, optional
+        :param int, optional ipu_id: The id of the IPU to run on.
                        Note that the ``ipu_id`` is an index
                        in a multi-IPU device within PopTorch, and is
                        separate and distinct from the device ids used by
                        ``gc-info``.
-        :type ipu_id: int >= 0 or poptorch.IpuId.
         """
         super().__init__()
         self._user_id = user_id
@@ -176,9 +179,10 @@ def identity_loss(x, reduction):
     :param torch.Tensor loss: The calculated loss.
     :param str reduction: Reduce the loss output as per PyTorch loss
         semantics. Supported values are:
-        * "none": Don't reduce
-        * "sum": Sum the losses.
-        * "mean": Take the mean of the losses.
+
+        * ``"none"``: Don't reduce
+        * ``"sum"``: Sum the losses.
+        * ``"mean"``: Take the mean of the losses.
 
     :returns: An identity loss custom op.
     """
