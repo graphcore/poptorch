@@ -124,6 +124,12 @@ class AsynchronousDataAccessor:
     won't be freed until the next batch is requested. Behind the scenes
     the worker thread will be filling the unready elements of the ring
     buffer.
+
+    .. important:: In order to avoid hanging issues related to ``OpenMP`` and
+        ``fork()`` the ``AsynchronousDataAccessor`` uses the ``spawn`` start
+        method which means your dataset must be serializable by ``pickle``.
+        For more information see
+        https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
     """
 
     def __init__(self,
