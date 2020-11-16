@@ -243,4 +243,5 @@ def run_data_loader_example():
 
 
 if __name__ == "__main__":
-    run_data_loader_example()
+    if poptorch.ipuHardwareIsAvailable():
+        run_data_loader_example()
