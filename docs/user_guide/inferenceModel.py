@@ -1,4 +1,11 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import os
+import poptorch
+# If running on the model then make sure to run on the full size model to
+# avoid running out of memory.
+if not poptorch.ipuHardwareIsAvailable():
+    os.environ["POPTORCH_IPU_MODEL"] = "1"
+
 # inference_model_start
 import poptorch
 import torch
