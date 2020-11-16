@@ -22,3 +22,8 @@ New features:
 - Use Miniconda as build environment.
 - Added support for torch.meshgrid
 - Added support for torch.cartesian_prod
+- Optimized torch.matmul implementation with limitations
+    Fused its input 0's batch dimensions with the row dimension
+    to avoid ReduceSum in its backward pass, for performance purpose
+- Added partial support for torch.einsum
+    Diagonals and ellipsis notation is unsupported

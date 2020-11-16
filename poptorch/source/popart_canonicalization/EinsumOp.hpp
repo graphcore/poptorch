@@ -39,9 +39,19 @@ private:
   // The order in which they appear in the lhs
   void canonicalizeTensors(torch::jit::Graph *graph);
 
-  // This combines permuting batch dims to their original locations, and
-  // then permuting to the order specified by the rhs
-  std::vector<std::int64_t> getOutputPermutation() const;
+  // Combines the following permutations into a single permutation:
+  // 1) Permuting batch dims to their original locations
+  // 2) Permuting to the order specified by the rhs
+  torch::jit::Node *permuteOutput(torch::jit::Graph *graph,
+                                  torch::jit::Value *output) const;
+
+  // Updates char counts used to calculate reduce dims and batch dims
+  void updateCharCounts(const std::string &label);
+
+  torch::jit::Node *createProduct(torch::jit::Graph *graph,
+                                  torch::jit::Value *lhs,
+                                  torch::jit::Value *rhs,
+                                  const std::string &rhs_label);
 
   std::vector<torch::jit::Value *> _tensors;
   std::string _lhs, _rhs;
