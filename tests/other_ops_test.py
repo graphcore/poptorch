@@ -26,18 +26,21 @@ params_einsum = [
 @pytest.mark.parametrize("implicit_rhs", {True, False})
 def test_einsum(params, implicit_rhs):
     class Model(torch.nn.Module):
-        def forward(self):
+        def forward(self, xs):
             eq = params[0].split('->')[0] if implicit_rhs else params[0]
-            return torch.einsum(eq, params[1])
+            return torch.einsum(eq, xs)
 
     model = Model()
     poptorch_model = poptorch.inferenceModel(model)
 
+    # TODO(T26908): Passing in list causes compiler assert
+    xs = tuple(params[1])
+
     # Run on CPU
-    native_out = model()
+    native_out = model(xs)
 
     # Run on IPU
-    poptorch_out = poptorch_model()
+    poptorch_out = poptorch_model(xs)
 
     assert native_out.size() == poptorch_out.size()
     torch.testing.assert_allclose(native_out, poptorch_out)
@@ -49,19 +52,20 @@ def test_meshgrid(arr_lengths):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
-        def forward(self):
+        def forward(self, xs):
             return torch.meshgrid(xs)
 
     model = Model()
     poptorch_model = poptorch.inferenceModel(model)
 
-    xs = [torch.randn(arr_length) for arr_length in arr_lengths]
+    # TODO(T26908): Passing in list causes compiler assert
+    xs = tuple([torch.randn(arr_length) for arr_length in arr_lengths])
 
     # Run on CPU
-    native_out = model()
+    native_out = model(xs)
 
     # Run on IPU
-    poptorch_out = poptorch_model()
+    poptorch_out = poptorch_model(xs)
 
     for native, pop in zip(native_out, poptorch_out):
         assert native.size() == pop.size()
