@@ -1,8 +1,20 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import subprocess
 import numpy
 import poptorch
 import pytest
 import torch
+
+
+class BrokenDataset(torch.utils.data.Dataset):
+    def __init__(self, length):
+        self._length = length
+
+    def __len__(self):
+        return self._length
+
+    def __getitem__(self, index):
+        assert False, "Broken dataset"
 
 
 class IncrementDataset(torch.utils.data.Dataset):
@@ -273,3 +285,49 @@ def test_interrupt_async_loader():
     loader = poptorch.AsynchronousDataAccessor(data)
     for _, _ in enumerate(loader):
         break
+
+
+def test_single_epoch():
+    shape = [2, 3]
+    num_tensors = 100
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               IncrementDataset(shape, num_tensors),
+                               batch_size=1,
+                               num_workers=32)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+    for _, _ in enumerate(loader):
+        continue
+
+
+def test_broken_dataset():
+    num_tensors = 100
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               BrokenDataset(num_tensors),
+                               batch_size=1,
+                               num_workers=32)
+
+    with pytest.raises(EOFError):
+        poptorch.AsynchronousDataAccessor(data)
+
+
+def test_subprocess_async_loader():
+    print(subprocess.check_output(
+        ["python3", "-m", "pytest", __file__, "-k", "test_single_epoch"],
+        stderr=subprocess.STDOUT).decode('utf-8'),
+          flush=True)
+
+
+def test_subprocess_broken_dataset():
+    stdout = subprocess.check_output([
+        "python3", "-m", "pytest", __file__, "-k", "test_broken_dataset", "-s"
+    ],
+                                     stderr=subprocess.STDOUT).decode('utf-8')
+    print(stdout)
+    assert "AssertionError: Broken dataset" in stdout, (
+        "Couldn't find failure "
+        "reason in stdout")
