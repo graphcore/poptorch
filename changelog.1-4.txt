@@ -21,3 +21,4 @@ New features:
 - Use sphinx-build to generate the documentation.
 - Use Miniconda as build environment.
 - Added support for torch.meshgrid
+- Added support for torch.cartesian_prod
