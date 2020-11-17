@@ -282,7 +282,7 @@ public:
   // We add operations using a state based system so the user would set the
   // active IPU and all subsequent operations will be added to that IPU until
   // stopped.
-  std::uint64_t active_ipu{0};
+  std::int64_t active_ipu{0};
   std::uint64_t active_stage{0};
   std::int64_t active_phase{0};
   // Keep track of what the maximum phase number used is.
@@ -383,6 +383,8 @@ private:
 
 void CompilerImpl::setExecutionStrategyAttributes(
     const std::set<popart::TensorId> &tensors) {
+  ERROR_ON_MSG(active_ipu < 0,
+               "No active Block, all the ops must belong to a Block");
   switch (options.execution_mode) {
   case ExecutionMode::Pipelined:
   case ExecutionMode::Sharded:
@@ -1747,6 +1749,8 @@ Compiler::getTensorDTypeString(poptorch::TensorId id) const {
 
   return stringToUniquePtr(type_str);
 }
+
+void Compiler::clearActiveIpu() { _impl->active_ipu = -1; }
 
 void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
                             std::int64_t ipu_id) {

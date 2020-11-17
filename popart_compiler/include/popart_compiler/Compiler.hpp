@@ -292,6 +292,7 @@ public:
   void setMatMulSerialization(poptorch::TensorId matmul, const char *mode,
                               std::uint64_t factor,
                               std::uint64_t keep_precision);
+  void clearActiveIpu();
   void setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
                     std::int64_t ipu_id);
 
