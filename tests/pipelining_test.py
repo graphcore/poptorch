@@ -2,7 +2,31 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
 import poptorch
+import pytest
 import helpers
+
+
+def test_missing_block():
+    poptorch.setLogLevel(1)  # Force debug logging
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            poptorch.Block.useAutoId()
+            with poptorch.Block(ipu_id=0):
+                x = x * 4
+            x = x * 4
+            return x
+
+    m = Model()
+
+    opts = poptorch.Options()
+    opts = poptorch.Options().deviceIterations(2)
+    opts.setExecutionStrategy(
+        poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
+
+    m = poptorch.inferenceModel(m, opts)
+    with pytest.raises(RuntimeError, match="No active Block"):
+        m.compile(torch.randn(2, 5))
 
 
 def test_api_inline(capfd):

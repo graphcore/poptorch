@@ -425,7 +425,7 @@ void LowerToPopart::lowerBody() {
             _compiler.getExecutionInfo().get());
       }
     } else if (kind == symbols::poptorch::end_ipu_block) {
-      // NOP for now.
+      _compiler.clearActiveIpu();
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       _compiler.setActiveIpu(
           node->i(c10::Symbol::fromQualString("attr::stage")),
