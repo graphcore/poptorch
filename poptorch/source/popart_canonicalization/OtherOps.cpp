@@ -51,12 +51,48 @@ torch::jit::Node *meshgridHandler(torch::jit::Graph *graph,
 
   return createAndInsertNode(graph, at::prim::ListConstruct, grids);
 }
+
+torch::jit::Node *cartesianProdHandler(torch::jit::Graph *graph,
+                                       torch::jit::Node *node) {
+  // aten::cartesian_prod(Tensor[] tensors) -> Tensor
+
+  std::vector<torch::jit::Value *> tensors =
+      handleTensorList(node->input(0)->node());
+
+  if (tensors.size() == 1) {
+    return tensors[0]->node();
+  }
+
+  auto meshgrid_handler = getHandler(c10::aten::meshgrid);
+  auto stack_handler = getHandler(c10::aten::stack);
+
+  torch::jit::Node *grids =
+      createHandlerOperation(graph, meshgridHandler, {node->input(0)});
+
+  std::vector<torch::jit::Value *> grids_vector = handleTensorList(grids);
+
+  for (torch::jit::Value *&grid : grids_vector) {
+    // Flatten into 1 x N
+    torch::jit::Node *flatten = createFlatten(graph, {grid}, 0);
+    // Squeeze the first dimension
+    flatten = createSqueeze(graph, {flatten->output()}, {0});
+    grid = flatten->output();
+  }
+
+  torch::jit::Node *grid_list =
+      createAndInsertNode(graph, at::prim::ListConstruct, grids_vector);
+
+  // Stack 1D tensors along dimension 1
+  return createHandlerOperation(
+      graph, stack_handler, {grid_list->output(), wrapInConstant1D(graph, 1)});
+}
 } // namespace
 
 // clang-format off
 static bool handlers = registerHandlers(
     c10::aten::einsum, einsumHandler,
-    c10::aten::meshgrid, meshgridHandler);
+    c10::aten::meshgrid, meshgridHandler,
+    c10::aten::cartesian_prod, cartesianProdHandler);
 // clang-format on
 
 } // namespace poptorch
