@@ -30,11 +30,11 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
   if (implicit_cast != ImplicitCast::None && !inputs.empty()) {
     logging::LogContext ctx(std::string("implicitly casting inputs of ") +
                             kind.toQualString());
-    auto possibly_casted_inputs = implicitCastInputs(&inputs, implicit_cast);
+    auto possibly_cast_inputs = implicitCastInputs(&inputs, implicit_cast);
     ctx.clear();
 
     new_node = graph->create(kind, num_outputs);
-    for (auto input : possibly_casted_inputs) {
+    for (auto input : possibly_cast_inputs) {
       new_node->addInput(input);
     }
   } else {
@@ -111,7 +111,7 @@ void setNodeOutputsTypes(torch::jit::Node *node,
       // Without dtype, the input will be the correct type (or possibly
       // HALF_OR_FLOAT)
       resolved_output_type = scalarTypeFromInput(node, 0);
-      // This may be needed in the lower to popart stage.
+      // This may be needed in the lower to popart stage
       node->s_(c10::attr::dtype, scalarTypeToOnnxString(resolved_output_type));
     }
     break;

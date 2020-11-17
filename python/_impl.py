@@ -524,6 +524,10 @@ class PoplarExecutor:
 
             in_tensors_trace_view.forEach(possiblyConvertFromHalf)
 
+            assert hasattr(self._options.GraphProcessing, "_values")
+            poptorch_core.processGraphProcessingOptions(
+                self._options.GraphProcessing)
+
             # Compile the poplar executable based on the batchsize.
             if self._options.Jit.trace_model:
                 self._compile_using_tracing(args, kwargs,

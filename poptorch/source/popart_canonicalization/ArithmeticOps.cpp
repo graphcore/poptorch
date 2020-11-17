@@ -74,10 +74,10 @@ torch::jit::Node *floorDivideHandler(torch::jit::Graph *graph,
   torch::jit::Node *quotient =
       createDiv(graph, {node->input(0), node->input(1)});
 
-  torch::jit::Node *casted = createCast(graph, quotient->output(), c10::kInt);
+  torch::jit::Node *cast = createCast(graph, quotient->output(), c10::kInt);
 
   return createCast(
-      graph, casted->output(),
+      graph, cast->output(),
       *quotient->output()->type()->expect<c10::TensorType>()->scalarType());
 }
 

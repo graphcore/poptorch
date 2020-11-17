@@ -8,7 +8,8 @@ import poptorch
 # correct_cast_start
 class Model(torch.nn.Module):
     def forward(self, x, y):
-        # y.dtype is ignored, however the type is resolved to be the type of y
+        # In spite of "y.dtype" being ignored if it is float32, the dtype used
+        # for the cast resolves to be the type of y because of the "+ y"
         return x.to(y.dtype) + y
 
 
@@ -53,11 +54,15 @@ float32_tensor = torch.tensor([1.0], dtype=torch.float32)
 assert native_model(float16_tensor, float16_tensor).dtype == torch.float32
 assert native_model(float32_tensor, float16_tensor).dtype == torch.float32
 
+opts = poptorch.Options()
+opts.GraphProcessing.halfFloatCasting(
+    poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
+
 # This incorrectly results in a float 16 tensor
-poptorch_model = poptorch.inferenceModel(native_model)
+poptorch_model = poptorch.inferenceModel(native_model, opts)
 assert poptorch_model(float16_tensor, float16_tensor).dtype == torch.float16
 
 # This incorrectly results in a float 16 tensor
-poptorch_model = poptorch.inferenceModel(native_model)
+poptorch_model = poptorch.inferenceModel(native_model, opts)
 assert poptorch_model(float32_tensor, float16_tensor).dtype == torch.float16
 # incorrect_cast_end

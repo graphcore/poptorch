@@ -16,6 +16,12 @@ struct Value;
 
 namespace poptorch {
 
+enum class HalfFloatCasting { FloatDowncastToHalf = 0, HalfUpcastToFloat };
+
+void setHalfFloatCastingBehavior(HalfFloatCasting behavior);
+
+HalfFloatCasting halfFloatCastingBehavior();
+
 enum class ImplicitCast { None, All, ExceptFirst, ExceptSecond, ExceptThird };
 
 enum class ImplicitCastOutput { None, AsPromoted, AlwaysBool, AlwaysFloat };

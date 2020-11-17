@@ -31,9 +31,21 @@ class ConnectionType(enum.IntEnum):
     Never = 2
 
 
+class HalfFloatCastingBehavior(enum.IntEnum):
+    """
+    - ``FloatDowncastToHalf`` Any op with operands (inputs) which are a
+        mix of float32 and float16 (half) will cast all operands to half.
+    - ``HalfUpcastToFloat``: Implicit casting will follow Pytorch's rules,
+            promoting float16 (half) inputs to float32 if another input is
+            float32.
+    """
+    FloatDowncastToHalf = 0
+    HalfUpcastToFloat = 1
+
+
 class ReductionType(enum.IntEnum):
     """
-    - ``Sum``: Calcuulate the sum of all values
+    - ``Sum``: Calculate the sum of all values
     - ``Mean``: Calculate the mean of all values
     - ``NoReduction``: Do not reduce
     """

@@ -24,6 +24,9 @@ via :py:class:`poptorch.Options.useIpuModel`.
 .. autoclass:: poptorch.options._DistributedOptions
    :members:
 
+.. autoclass:: poptorch.options._GraphProcessingOptions
+   :members:
+
 .. autoclass:: poptorch.options._JitOptions
    :members:
 
@@ -739,7 +742,7 @@ This is more memory efficient than using float 32 tensors (inputs) but less memo
 
 .. note::  When PyTorch encounters a mix of float 16 and float 32 inputs for a given operation, it will usually cast all inputs and float 32.
     PopTorch differs and will cast all inputs to float 16.
-    This makes it easier to build models with float 32 weights which take float 16 tensors.
+    This makes it easier to build models with float 32 weights which take float 16 tensors. However, if you wish to follow PyTorch behavior, you can use  ``opts.GraphProcessing.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` where ``opts`` is the ``poptorch.Options`` object passed to the model wrapping function.
 
 .. literalinclude:: inferenceModel.py
     :language: python

@@ -536,7 +536,7 @@ void LowerToPopart::lowerBody() {
       }
       ERROR_ON_MSG(tensor_it != tensors.end(), "Didn't unpack all the tensors");
     } else if (kind == symbols::poptorch::host_side_cast) {
-      // Map to the input value since the type will be casted host side
+      // Map to the input value since the type will be cast host side
       ERROR_ON_MSG(!_valueMap.hasTensor(node->input()),
                    "Input to host side cast has not been registered");
 

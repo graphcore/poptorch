@@ -26,6 +26,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "poptorch/EliminateListConstructs.hpp"
+#include "poptorch/ImplicitCasting.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
@@ -498,6 +499,13 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+void processGraphProcessingOptions(py::handle h) {
+  auto values_dict = h.attr("_values").cast<py::dict>();
+
+  poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
+      values_dict["half_float_casting"].cast<uint64_t>()));
+}
+
 torch::jit::script::Module *asModule(py::handle h) {
   return reinterpret_cast<torch::jit::script::Module *>(
       pybind11::detail::values_and_holders(
@@ -784,6 +792,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
              std::shared_ptr<poptorch::PoplarExecutable>>
       give_me_a_name(m, "InternalPoplarExecutable");
 
+  m.def("processGraphProcessingOptions",
+        poptorch::processGraphProcessingOptions);
   m.def("compileWithTrace", poptorch::compileWithTrace);
   m.def("compileWithScript", poptorch::compileWithScript);
   m.def("execute", poptorch::execute);

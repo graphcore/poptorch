@@ -23,10 +23,9 @@ are no constraints on the memory format of how operations should be called
 other than the constraint that all graph inputs should be contiguous.
 
 We will also create tensor views. However, the aliasing property of views
-with respect to in-place operations should not be relied on as we may have slightly different
-view behaviour.
+with respect to in-place operations should not be relied on as we may have slightly different view behaviour.
 
-Additionally some PyTorch operations may be implemented by composition of
+Additionally, some PyTorch operations may be implemented by composition of
 the listed ops but may not be explicitly listed but are in fact supported.
 
 
@@ -40,7 +39,7 @@ Creation ops
 * ``torch.ones``
 * ``torch.zeros``
 
-Indexing, Slicing, Joining, Mutating Ops
+Indexing, slicing, joining and mutating ops
 ''''''''''''''''''''''''''''''''''''''''
 
 PyTorch functions
@@ -62,9 +61,9 @@ Tensor methods
 * ``tensor.expand_as``
 * ``tensor.masked_fill``
 
-Random Samplers
+Random samplers
 '''''''''''''''
-To set the random state use poptorch.Options.randomSeed
+To set the random state, use ``poptorch.Options.randomSeed``
 
 * ``torch.bernoulli``
 * ``torch.distributions.Bernoulli``
@@ -78,7 +77,7 @@ To set the random state use poptorch.Options.randomSeed
 Math operations
 ---------------
 
-Pointwise Ops
+Pointwise ops
 '''''''''''''
 
 * ``torch.abs``
@@ -119,7 +118,7 @@ Pointwise Ops
 * ``torch.trunc``
 
 
-Reduction Ops
+Reduction ops
 '''''''''''''
 
 * ``torch.argmax``
@@ -130,7 +129,7 @@ Reduction Ops
 * ``torch.sum``
 
 
-Comparison Ops
+Comparison ops
 ''''''''''''''
 
 * ``torch.eq``
@@ -139,20 +138,21 @@ Comparison Ops
 * ``torch.le``
 * ``torch.lt``
 
-    torch.min and torch.max only support (tensor, tensor) and (tensor) overloads. They do
-    not support the (tensor, dim=.*, keepdim=.*) overload.
+    ``torch.min`` and ``torch.max`` only support ``(tensor, tensor)`` and
+    ``(tensor)`` overloads. They do not support the
+    ``(tensor, dim=.*, keepdim=.*)`` overload.
 
 * ``torch.max``
 * ``torch.min``
 * ``torch.ne``
 * ``torch.isnan``
 
-    torch.topk only supports sorted=True and Largest=True arguments.
+    ``torch.topk`` only supports ``sorted=True`` and ``largest=True`` arguments.
 
 * ``torch.topk``
 
 
-Other Ops
+Other ops
 '''''''''
 
 * ``torch.cumsum``
@@ -329,12 +329,15 @@ Float 16 operations
 Due to the limitation of PyTorch's float 16 support on the CPU (used for tracing the model), certain operations may result in the use of float 32 where float 16 would be expected, or float 16 where float 32 would be expected.
 This is because the model must always be traced with float 16 inputs converted to float 32.
 
+This limitation is much less noticeable when ``opts.GraphProcessing.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` has not been set because PopTorch's default casting functionality is to output a float 16 if any input of the op is float 16.
+In such situations, any dtype which incorrectly resolves to a float 16 would have been cast to a float 16 in any case.
+
 Casting
 -------
-The ``tensor.to(dtype)`` argument will be ignored because it may refer to one or more float 16 tensors which were converted to float 32 to allow tracing to happen, for example ``a.to(b.dtype)`` where ``b`` may be a float 16 tensor converted to a float 32 tensor.
+The ``tensor.to(dtype)`` argument will be ignored if it is ``torch.float32`` because it may refer to one or more float 16 tensors which were converted to float 32 to allow tracing to happen, for example ``a.to(b.dtype)`` where ``b`` may be a float 16 tensor converted to a float 32 tensor.
 Once the output of the op or one of its descendants encounters a known float 16 or float 32 input, the type will be resolved to this type.
 
-The following examples show cases where the casting functionality is resolved based on context, correctly or incorrect:
+The following examples show cases where the casting functionality is resolved based on context, correctly or incorrectly:
 
 .. literalinclude:: half_float_casting.py
     :language: python
@@ -361,7 +364,7 @@ The following functions are affected:
 * torch.distributions.uniform.Uniform
 
 The ``dtype`` arguments will be ignored because they may refer to  float 16 tensors which were converted to float 32 tensors to allow tracing to succeed.
-Once the output of the op, or its descendant, encounters a known float 16 or float 32 input, the ``dtypes`` are resolved to this type.
+Once the output of the op, or its descendant, encounters a known float 16 or float 32 input, the ``dtype`` values are resolved to this type.
 
 The following examples show cases where the type output differs from PyTorch:
 

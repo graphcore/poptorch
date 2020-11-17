@@ -43,10 +43,18 @@ native_top_five_classes = torch.topk(torch.softmax(native_out, 1), 5)
 # numerically different and floating point differences can accumulate.
 assert any(top_five_classes[1][0] == native_top_five_classes[1][0])
 # inference_half_start
-model = torch.nn.Linear(1, 10).half()
+model = torch.nn.Linear(1, 10)
+
+# Convert the parameters (weights) to halfs. Without doing so,
+# the Linear parameters will automatically be cast to half, which allows
+# training with float32 parameters but half tensors.
+model.half()
+
 t1 = torch.tensor([1.]).half()
 
-inference_model = poptorch.inferenceModel(model)
+opts = poptorch.Options()
+
+inference_model = poptorch.inferenceModel(model, opts)
 out = inference_model(t1)
 
 assert out.dtype == torch.half

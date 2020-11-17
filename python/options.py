@@ -31,6 +31,50 @@ class _JitOptions(_options_impl.OptionsDict):
         return self
 
 
+class _GraphProcessingOptions(_options_impl.OptionsDict):
+    """ Options related to processing the Pytorch JIT graph prior to lowering to
+        Popart
+
+    Can be accessed via `poptorch.Options`:
+
+    >>> opts = poptorch.Options()
+    >>> opts.GraphProcessing.halfFloatCasting(
+          poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
+    """
+
+    def __init__(self):
+        super().__init__(half_float_casting=enums.HalfFloatCastingBehavior.
+                         FloatDowncastToHalf)
+
+    def halfFloatCasting(self, half_float_casting):
+        """ Changes the casting behavior for ops involving a float16 (half) and
+            a float32
+
+        By default, option "FloatDowncastToHalf" is specified. This allows
+        parameters (weights) to be stored as and updated as float32 but cast
+        to float16 when used in an operation with a float16 input. The benefit
+        of this is higher efficiency and reduced memory footprint without the
+        same loss of precision of parameters during the optimizer update step.
+        However, you can change the behavior to match PyTorch using option
+        "HalfUpcastToFloat".
+
+        :param poptorch.HalfFloatCastingBehavior half_float_casting:
+            * FloatDowncastToHalf:  Any op with operands (inputs) which are a
+              mix of float32 and float16 (half) will cast all operands to half.
+            * HalfUpcastToFloat: Implicit casting will follow PyTorch's rules,
+              promoting float16 (half) inputs to float32 if another input is
+              float32.
+        """
+        if not isinstance(half_float_casting, enums.HalfFloatCastingBehavior):
+            raise ValueError(
+                "halfFloatCasting must be set to "
+                "poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf or "
+                "poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat")
+
+        self.set(half_float_casting=half_float_casting)
+        return self
+
+
 class _TrainingOptions(_options_impl.OptionsDict):
     """Options specific to model training.
 
@@ -739,6 +783,7 @@ class Options(_options_impl.OptionsDict):
 
     def __init__(self):
         self._jit = _JitOptions()
+        self._graphProcessing = _GraphProcessingOptions()
         self._training = _TrainingOptions()
         self._popart = _PopartOptions()
         self._distributed = _DistributedOptions()
@@ -776,6 +821,14 @@ class Options(_options_impl.OptionsDict):
 
         .. seealso:: :py:class:`poptorch.options._JitOptions`"""
         return self._jit
+
+    @property
+    def GraphProcessing(self):
+        """Options specific to the processing of the JIT graph prior to
+           lowering to Popart.
+
+        .. seealso:: :py:class:`poptorch.options._GraphProcessingOptions`"""
+        return self._graphProcessing
 
     @property
     def Training(self):
@@ -1004,8 +1057,9 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def toDict(self):
-        """ Merge all the options, except for the Jit ones, into a single
-        dictionary to be serialised and passed to the C++ backend.
+        """ Merge all the options, except for the Jit and Graph Processing
+        options, into a single dictionary to be serialised and passed to the C++
+        backend.
 
         At this stage, any warnings are printed based on options set e.g. if
         a default option changes.
