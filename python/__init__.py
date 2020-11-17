@@ -1,6 +1,10 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import atexit
+import io
+import os
+import signal
+import sys
 import time
 
 import torch
@@ -177,11 +181,29 @@ class AsynchronousDataAccessor:
         """
         if self._data_fetcher:
             self._data_fetcher.terminate()
+            self._data_fetcher.join()
+            self._data_fetcher = None
 
     def __del__(self):
         self.terminate()
 
-    def fetch_data(self, queue, setup_complete):
+    def fetch_data(self, conn, setup_complete):  # pylint: disable=too-many-statements
+        # Make sure this process's output gets printed (In case of error)
+        sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0),
+                                      write_through=True)
+        sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0),
+                                      write_through=True)
+
+        # Register our own handler to exit cleanly when SIGTERM is received.
+        def handler(_signum, _frame):
+            sys.stdout.close()
+            sys.stderr.close()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, handler)
+
+        logger.debug("AsynchronousDataAccessor worker process: %d",
+                     os.getpid())
         dataset_iterator = iter(self._training_data)
 
         data = next(dataset_iterator)
@@ -197,21 +219,21 @@ class AsynchronousDataAccessor:
         # lock approaches.
         ready_to_read_index = torch.tensor([False] * self._buffer_size,
                                            dtype=torch.bool).share_memory_()
-        queue.put(ready_to_read_index)
+        conn.send(ready_to_read_index)
 
         data_buffers = []
 
         # Tell the host how many tensors we will be sending.
         data_length = len(data)
 
-        queue.put(data_length)
-        queue.put(is_single_tensor)
+        conn.send(data_length)
+        conn.send(is_single_tensor)
 
         # Share a small buffer with host to signal EOF and where in ring buffer the event occured.
         # -1 means no event and the worker will keep loading. We start with a dummy event so the
         # EOF won't be hit before the first call to __init__
         eof_tensor = torch.tensor([42], dtype=torch.int).share_memory_()
-        queue.put(eof_tensor)
+        conn.send(eof_tensor)
 
         # Send the tensors to the host.
         for index, tensor in enumerate(data):
@@ -229,7 +251,7 @@ class AsynchronousDataAccessor:
             data_buffers.append(memory)
 
             # Send it to the host.
-            queue.put(memory)
+            conn.send(memory)
 
         # We've loaded the first element as part of the spin up process.
         ready_to_read_index[0] = True
@@ -256,13 +278,21 @@ class AsynchronousDataAccessor:
             except StopIteration:
                 # If we are not to load indefinitely we just kill the worker.
                 if not self._load_indefinitely:
+                    logger.debug(
+                        "AsynchronousDataAccessor worker: end of dataset"
+                        " reached")
                     break
 
+                logger.debug(
+                    "AsynchronousDataAccessor worker: end of dataset reached."
+                    " Creating a new iterator")
                 # We always reset and will keep the worker thread running.
                 dataset_iterator = iter(self._training_data)
 
                 # Tell the host where the EOF occured.
                 eof_tensor[0] = ring_write_index
+                logger.debug(
+                    "AsynchronousDataAccessor worker: new iterator ready")
                 continue
 
             any_data_sent = False
@@ -288,9 +318,13 @@ class AsynchronousDataAccessor:
             if not any_data_sent:
                 time.sleep(self._miss_sleep_time_in_ms)
 
+        logger.debug(
+            "AsynchronousDataAccessor worker: ready to exit: checking parent"
+            " is ready")
         # In the unlikely event the worker is done reading the dataset
         # before the parent is done setting the buffers up: wait here.
-        setup_complete.get()
+        setup_complete.recv()
+        logger.debug("AsynchronousDataAccessor worker: clean exit")
 
     def spin_up(self):
         # We have already spun up the worker.
@@ -302,35 +336,40 @@ class AsynchronousDataAccessor:
         # in shared memory which will be used for the actual read/write
         # in the hot loop.
         ctx = multiprocessing.get_context('spawn')
-        queue = ctx.Queue()
+        queue, child_queue = ctx.Pipe()
 
         # If the worker exits before the parent process is done
         # setting up the _data_buffers then the queue will get freed
         # and bad things will happen.
-        setup_complete = ctx.Queue()
+        setup_complete, child_setup_complete = ctx.Pipe()
 
         # Fetch the data on a seperate process.
+        logger.debug("AsynchronousDataAccessor parent process: %d",
+                     os.getpid())
         self._data_fetcher = ctx.Process(target=self.fetch_data,
-                                         args=(queue, setup_complete))
+                                         args=(child_queue,
+                                               child_setup_complete))
         self._data_fetcher.start()
+        child_queue.close()
+        child_setup_complete.close()
 
-        self._ready_to_read_index = queue.get(block=True)
+        self._ready_to_read_index = queue.recv()
 
-        buffer_len = queue.get(block=True)
+        buffer_len = queue.recv()
 
-        self._is_single_tensor = queue.get(block=True)
+        self._is_single_tensor = queue.recv()
 
-        self._eof_event_tensor = queue.get(block=True)
+        self._eof_event_tensor = queue.recv()
 
         self._data_buffers = []
 
         for _ in range(0, buffer_len):
             # Get the buffer from the host.
-            buffer = queue.get(block=True)
+            buffer = queue.recv()
             self._data_buffers.append(buffer)
 
         # We're all set: let the worker know.
-        setup_complete.put(0)
+        setup_complete.send(0)
 
     def __iter__(self):
         self._eof_event_tensor[0] = -1
