@@ -221,13 +221,29 @@ add_custom_target(poptorch_wheel
   DEPENDS poptorch_core
 )
 
+set( COPY_PDF_IF_EXISTS
+import os, shutil$<SEMICOLON>
+yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
+os.path.exists('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}')
+and shutil.copyfile('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}', '${PKG_UPLOAD_DIR}/${USER_GUIDE_PDF_NAME}')
+and yml.write(' ' * 2 + '- name: PopTorch user guide (PDF)\\n'+' ' * 4 + 'file: ${USER_GUIDE_PDF_NAME}\\n' + ' ' * 4 + 'type: pdf\\n')
+)
+
+set( COPY_HTML_IF_EXISTS
+import os, shutil$<SEMICOLON>
+yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
+os.path.exists('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}')
+and shutil.copyfile('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}', '${PKG_UPLOAD_DIR}/${USER_GUIDE_HTML_NAME}')
+and yml.write(' ' * 2 + '- name: PopTorch user guide (HTML)\\n'+' ' * 4 + 'file: ${USER_GUIDE_HTML_NAME}\\n' + ' ' * 4 + 'type: html_zip\\n')
+)
+
 add_custom_target(package_and_move
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "cp ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "cp dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
-  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" ] \;then cp \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
-  COMMAND bash -c 'if [ -f \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" ] \;then cp \"${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}\" \"${PKG_UPLOAD_DIR}\" \; fi'
+  COMMAND python3 -c \"${COPY_PDF_IF_EXISTS}\"
+  COMMAND python3 -c \"${COPY_HTML_IF_EXISTS}\"
   DEPENDS poptorch_wheel
 )
 #------ end of packaging
