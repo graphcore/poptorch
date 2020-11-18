@@ -61,13 +61,3 @@ DOC_TITLE="${TITLE}" sphinx-build $common_flags -b latex -c ${SPHINX_CONF_DIR} -
 ( cd "${DOCS_BUILD_DIR}/latex/${DOC}" && make LATEXMKOPTS="-silent" )
 cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_PDF_NAME}"
 
-# Ensure we don't append package info multiple times
-if ! grep -q "${DOC}" "${PACKAGE_INFO_FILE}"; then
-    # Append to package info
-    echo "  - name: PopTorch user guide (PDF)
-    file: ${USER_GUIDE_PDF_NAME}
-    type: pdf
-  - name: PopTorch user guide (HTML)
-    file: ${USER_GUIDE_HTML_NAME}
-    type: html_zip" >> ${PACKAGE_INFO_FILE}
-fi
