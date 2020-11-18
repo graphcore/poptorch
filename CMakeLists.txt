@@ -226,7 +226,7 @@ import os, shutil$<SEMICOLON>
 yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
 os.path.exists('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}')
 and shutil.copyfile('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}', '${PKG_UPLOAD_DIR}/${USER_GUIDE_PDF_NAME}')
-and yml.write(' ' * 2 + '- name: PopTorch user guide (PDF)\\n'+' ' * 4 + 'file: ${USER_GUIDE_PDF_NAME}\\n' + ' ' * 4 + 'type: pdf\\n')
+and yml.write(' ' * 2 + '- name: PopTorch user guide \(PDF\)\\n'+' ' * 4 + 'file: ${USER_GUIDE_PDF_NAME}\\n' + ' ' * 4 + 'type: pdf\\n')
 )
 
 set( COPY_HTML_IF_EXISTS
@@ -234,7 +234,7 @@ import os, shutil$<SEMICOLON>
 yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
 os.path.exists('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}')
 and shutil.copyfile('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}', '${PKG_UPLOAD_DIR}/${USER_GUIDE_HTML_NAME}')
-and yml.write(' ' * 2 + '- name: PopTorch user guide (HTML)\\n'+' ' * 4 + 'file: ${USER_GUIDE_HTML_NAME}\\n' + ' ' * 4 + 'type: html_zip\\n')
+and yml.write(' ' * 2 + '- name: PopTorch user guide \(HTML\)\\n'+' ' * 4 + 'file: ${USER_GUIDE_HTML_NAME}\\n' + ' ' * 4 + 'type: html_zip\\n')
 )
 
 add_custom_target(package_and_move
