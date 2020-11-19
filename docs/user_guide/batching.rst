@@ -39,7 +39,7 @@ CPU. This means when the IPU is finished executing and returns to host
 the data will be ready for it to pull in again.
 
 .. autoclass:: poptorch.AsynchronousDataAccessor
-   :special-members: __init__
+   :special-members: __init__, __len__
    :members: terminate
 
 Example
