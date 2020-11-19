@@ -140,6 +140,8 @@ def _run_process_test(shape=None,
                                num_workers=num_workers)
 
     loader = poptorch.AsynchronousDataAccessor(data)
+    assert len(loader) == num_tensors // (device_iterations * batch_size *
+                                          replication_factor)
 
     model = poptorch.inferenceModel(DoubleData(), opts)
 
@@ -200,6 +202,8 @@ def _run_process_label_test(shape=None,
                                num_workers=num_workers)
 
     loader = poptorch.AsynchronousDataAccessor(data)
+    assert len(loader) == num_tensors // (device_iterations * batch_size *
+                                          replication_factor)
 
     model = poptorch.inferenceModel(DoubleDataLabel(), opts)
 
@@ -283,6 +287,8 @@ def test_interrupt_async_loader():
                                num_workers=1)
 
     loader = poptorch.AsynchronousDataAccessor(data)
+    assert len(loader) == num_tensors
+
     for _, _ in enumerate(loader):
         break
 
@@ -298,6 +304,8 @@ def test_single_epoch():
                                num_workers=32)
 
     loader = poptorch.AsynchronousDataAccessor(data)
+    assert len(loader) == num_tensors
+
     for _, _ in enumerate(loader):
         continue
 

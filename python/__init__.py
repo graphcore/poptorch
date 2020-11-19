@@ -192,6 +192,9 @@ class AsynchronousDataAccessor:
     def __del__(self):
         self.terminate()
 
+    def __len__(self):
+        return len(self._training_data)
+
     def fetch_data(self, conn, setup_complete):  # pylint: disable=too-many-statements
         # Make sure this process's output gets printed (In case of error)
         sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0),

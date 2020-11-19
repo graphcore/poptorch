@@ -29,4 +29,5 @@ New features:
     Diagonals and ellipsis notation is unsupported
 - Add support for executable caching: poptorch.Options.enableExecutableCaching()
 - Add optional title argument to poptorch.ipu_print_tensor
+- Add len() method to poptorch.AsynchronousDataLoader
 
