@@ -10,12 +10,16 @@ SRC=$(realpath $(dirname $0))
 CACHE=${SRC}/.cache
 print_usage_and_exit() {
   cat << EOM
-Usage: $0 [--create-template|-c] [--help|-h]
+Usage: $0 [--create-template|-c] [--python-version|-p] [--help|-h]
 
   -h, --help
     Print this help message
   -c, --create-template
     Create a poptorch template environment
+  -p, --python-version
+    Override the default python version used in the build environment.
+    By default the build environment will use the same python version as the
+    host os.
 
 If no argument is provided: create a poptorch build environment.
 If a template environment matching the required config exists: clone it instead of creating an environment from scratch.
@@ -29,6 +33,7 @@ find_env() {
   conda env list | grep $1 || true
 }
 
+PYTHON_VERSION=$(python3 -c "import platform;print(platform.python_version(),end='')")
 while [[ $# -gt 0 ]]
 do
   case "$1" in
@@ -38,6 +43,11 @@ do
       ;;
     -h|--help)
       print_usage_and_exit
+      shift
+      ;;
+    -p|--python-version)
+      shift
+      PYTHON_VERSION=$1
       shift
       ;;
   *)
@@ -99,7 +109,7 @@ if [ ! -f "${template_name}" ]
 then
   echo "Didn't find template $template_name"
 
-  conda create --prefix $BUILDENV -c conda-forge -y python=3.6.9 pybind11 pytest spdlog=1.8.0 ninja cmake=3.18.2 protobuf=3.7.1 latexmk zip make conda-pack
+  conda create --prefix $BUILDENV -c conda-forge -y python=${PYTHON_VERSION} pybind11 pytest spdlog=1.8.0 ninja cmake=3.18.2 protobuf=3.7.1 latexmk zip make conda-pack
   conda activate $BUILDENV
   pip install -r ${SRC}/requirements.txt
 
