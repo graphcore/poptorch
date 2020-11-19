@@ -33,7 +33,7 @@ setup(
     license='Apache 2.0',
     packages=['poptorch'],
     package_data={'poptorch': LIBS},
-    python_requires=f"{sys.version_info.major}.{sys.version_info.minor}.*",
+    python_requires=f"=={sys.version_info.major}.{sys.version_info.minor}.*",
     platforms=platform,
     install_requires=REQUIRES,
     zip_safe=False,
