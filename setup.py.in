@@ -1,5 +1,6 @@
 from setuptools import setup
 from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
+import sys
 import distutils.util
 
 VERSION='@VERSION@'
@@ -32,6 +33,7 @@ setup(
     license='Apache 2.0',
     packages=['poptorch'],
     package_data={'poptorch': LIBS},
+    python_requires=f"{sys.version_info.major}.{sys.version_info.minor}.*",
     platforms=platform,
     install_requires=REQUIRES,
     zip_safe=False,

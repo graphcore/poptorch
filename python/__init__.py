@@ -11,10 +11,15 @@ import torch
 import torch.nn as nn
 import torch.multiprocessing as multiprocessing
 
+from .logging import logger
+
+assert torch.__version__.startswith("@TORCH_VERSION@"), (
+    "This version"
+    " of PopTorch only works with torch==@TORCH_VERSION@ but the version "
+    f"installed is {torch.__version__}")
 import poptorch.poptorch_core as poptorch_core
 from poptorch.poptorch_core import ipuHardwareIsAvailable, setLogLevel
 
-from .logging import logger
 from . import _impl
 from .enums import *
 from .ops import *
