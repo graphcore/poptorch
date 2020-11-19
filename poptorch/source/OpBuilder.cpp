@@ -402,10 +402,17 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
-                                       torch::jit::Value *value) {
+                                       torch::jit::Value *value,
+                                       const std::string &title) {
   torch::jit::Node *new_node =
-      createAndInsertNode(graph, symbols::poptorch::ipu_print_tensor, {value},
-                          ImplicitCast::None, OutputType::AsFirstInput);
+      createAndInsertNode(graph, symbols::poptorch::ipu_print_tensor, {value});
+
+  new_node->i_(c10::Symbol::fromQualString("attr::print_gradient"), true);
+  new_node->s_(c10::Symbol::fromQualString("attr::name"), "");
+  new_node->s_(c10::Symbol::fromQualString("attr::title"), title);
+
+  new_node->output()->setType(value->type());
+
   return new_node;
 }
 

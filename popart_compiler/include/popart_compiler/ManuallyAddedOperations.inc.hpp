@@ -2,7 +2,8 @@
 OP_DECL(popart, reshape_static_shape, reshape, _impl->reshape, ARG(INT_VEC, shape),
         BODY_ARG(shape))
 OP_DECL(poptorch, ipu_print_tensor, ipu_print_tensor,
-        AiGraphcoreOpset1.printtensor, NONE, NONE)
+        AiGraphcoreOpset1.printtensor, ARG(INT, print_gradient) ARG(STRING, name)
+        ARG(STRING, title), BODY_ARG(print_gradient) BODY_ARG(name) BODY_ARG(title))
 OP_DECL(poptorch, tensor_constant, tensor_constant, _impl->tensorConstant,
         POPART_CONST_ARG(popartConstant), BODY_ARG(popartConstant))
 OP_DECL(poptorch, host_side_tensor_constant, host_side_tensor_constant,

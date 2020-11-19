@@ -161,7 +161,7 @@ Helper operations to be used within a model.
 poptorch.ipu_print_tensor
 -------------------------
 
-.. py:class:: ipu_print_tensor(tensor_to_print)
+.. py:class:: ipu_print_tensor(tensor_to_print, optional_title)
 
     Adds a tensor to be printed on the IPU. When this is executed the tensor
     will be copied back to host and printed.
@@ -189,6 +189,15 @@ poptorch.ipu_print_tensor
       def forward(self, c, d, b)
         a = c + d
         poptorch.ipu_print_tensor(a)
+        return a + b
+
+    Optionally, you may add a second string parameter to be used as a title.
+
+    .. code-block:: python
+
+    def forward(self, c, d, b)
+        a = c + d
+        poptorch.ipu_print_tensor(a, "summation"))
         return a + b
 
     The result of `ipu_print_tensor` is not used, therefore it will be optimised out by the

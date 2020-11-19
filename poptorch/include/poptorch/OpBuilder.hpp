@@ -184,7 +184,8 @@ createRandomUniform(torch::jit::Graph *graph, torch::jit::Value *possible_input,
                     at::ScalarType dataType = at::ScalarType::Undefined);
 
 torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
-                                       torch::jit::Value *value);
+                                       torch::jit::Value *value,
+                                       const std::string &title);
 
 torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,

@@ -162,7 +162,7 @@ OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(1), NONE, createReducel2
 // aten::frobenius_norm(Tensor in, int[] axes, int keepdim) -> Tensor
 OP_CONVERTOR(aten::frobenius_norm and NUM_INPUTS_EQUALS(3), NONE, createReducel2, {PARAM(0)} COMMA HANDLE_LIST(1) COMMA CONSTANT_TO_LONG(2))
 
-OP_CONVERTOR_POP(symbols::poptorch::ipu_print_tensor, NONE, createPrintIpuTensor, PARAM(0))
+OP_CONVERTOR_POP(symbols::poptorch::ipu_print_tensor, NONE, createPrintIpuTensor, PARAM(0) COMMA CONSTANT_TO_STRING(1))
 OP_CONVERTOR_POP(symbols::poptorch::set_available_memory, NONE, createSetAvailableMemory, PARAM(0) COMMA CONSTANT_TO_FLOAT(1))
 OP_CONVERTOR_POP(symbols::poptorch::begin_ipu_block, NONE, createBeginIpuBlock, CONSTANT_TO_LONG(0) COMMA CONSTANT_TO_LONG(1) COMMA CONSTANT_TO_LONG(2))
 OP_CONVERTOR_POP(symbols::poptorch::set_matmul_serialization, NONE, createSetMatMulSerialization, PARAM(0) COMMA CONSTANT_TO_STRING(1) COMMA CONSTANT_TO_LONG(2) COMMA CONSTANT_TO_LONG(3))
