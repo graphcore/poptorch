@@ -8,10 +8,21 @@ import traceback
 
 # Create a poptorch logger which outputs to the console INFO messages and above
 logger = logging.getLogger("poptorch::python")
-if os.environ.get("POPTORCH_LOG_LEVEL") in ["DEBUG", "TRACE", "TRACE_ALL"]:
+log_level = os.environ.get("POPTORCH_LOG_LEVEL", "INFO")
+if log_level in ["DEBUG", "TRACE", "TRACE_ALL"]:
     logger.setLevel(logging.DEBUG)
-else:
+elif log_level == "INFO":
     logger.setLevel(logging.INFO)
+elif log_level == "WARN":
+    logger.setLevel(logging.WARNING)
+elif log_level == "ERR":
+    logger.setLevel(logging.ERROR)
+elif log_level == "OFF":
+    # We don't use CRITICAL so that's
+    # essentially OFF
+    logger.setLevel(logging.CRITICAL)
+else:
+    raise RuntimeError(f"Unknown POPTORCH_LOG_LEVEL {log_level}")
 
 
 class _PoptorchFormatter(logging.Formatter):

@@ -47,7 +47,7 @@ poptorch.trainingModel
     :language: python
     :caption: An example of the use of :py:func:`poptorch.trainingModel`
     :linenos:
-    :emphasize-lines: 21
+    :emphasize-lines: 22
     :start-after: training_model_start
 
 poptorch.inferenceModel
