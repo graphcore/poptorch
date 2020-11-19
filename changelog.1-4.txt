@@ -28,3 +28,5 @@ New features:
 - Added partial support for torch.einsum
     Diagonals and ellipsis notation is unsupported
 - Add support for executable caching: poptorch.Options.enableExecutableCaching()
+- Add optional title argument to poptorch.ipu_print_tensor
+

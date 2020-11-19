@@ -54,6 +54,11 @@ at::Tensor setMatMulSerialization(at::Tensor matmul, std::string mode, // NOLINT
   return matmul;
 }
 
+at::Tensor ipuPrintTensor(at::Tensor t, std::string &&title) {
+  UNUSED(title);
+  return t;
+}
+
 at::Tensor identityOp(at::Tensor t) { return t; }
 at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   UNUSED(reduction);
@@ -82,7 +87,7 @@ void optimizerGroup(int64_t group, c10::List<at::Tensor> &&inputs) {
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
-        .op("poptorch::ipu_print_tensor", &identityOp)
+        .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
         .op("popart::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss)
