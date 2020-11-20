@@ -66,6 +66,13 @@ long_tests = [
     "torchvision_inference_test.py::test_squeezenet1_1",
     "half_test.py::test_resnet",
 ]
+
+# Tests depending on external data being downloaded to run.
+external_data_tests = [
+    "bert_small_and_medium_test.py::test_bert_small",
+    "bert_small_and_medium_test.py::test_bert_small_half",
+    "bert_small_and_medium_test.py::test_bert_medium_result",
+]
 #pylint: enable=line-too-long
 
 
@@ -92,8 +99,10 @@ with open(args.output_file, "w") as output:
             test_file = os.path.basename(m.group(1))
             if test_file in short_tests:
                 continue
-            labels = ""
+            labels = []
             if test in long_tests:
-                labels = "long"
+                labels.append("long")
+            if test in external_data_tests:
+                labels.append("external_data")
             add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
-                     labels)
+                     ";".join(labels))
