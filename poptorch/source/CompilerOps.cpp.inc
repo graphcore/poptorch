@@ -106,6 +106,10 @@ new_node->is_(c10::Symbol::fromQualString("attr::shape"),shape);
 new_node->f_(c10::Symbol::fromQualString("attr::ratio"),ratio);
 return new_node;
 }
+torch::jit::Node* createAtan2(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::atan2, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+return new_node;
+}
 torch::jit::Node* createExpm1(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::expm1, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;

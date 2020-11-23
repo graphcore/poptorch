@@ -189,7 +189,8 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
                 opt_type = get_child(c, clang.cindex.CursorKind.TYPE_REF)
                 assert opt_type, (f"Can't find type of {c.spelling}: "
                                   f"{[str(d.kind) for d in children]}")
-                if opt_type.spelling == "std::string":
+                if opt_type.spelling in ("std::string",
+                                         "std::__cxx11::string"):
                     expected[c.spelling] = OptionType.String
                 elif opt_type.spelling == \
                         "class popart::SessionOptions::NumIOTiles":
@@ -274,12 +275,13 @@ logger.debug("addedFunctions: %s", sorted(addedFunctions))
 ## Implicit cast support
 # Casting on all args
 CastingOps = [
-    "add", "batchnormalization", "bitshift", "clip", "conv", "convtranspose",
-    "div", "equal", "gru", "gemm", "greater", "instancenormalization", "less",
-    "lstm", "logical_and", "logical_or", "logical_xor", "matmul", "max",
-    "maxroipool", "mean", "min", "mod", "mul", "pow", "prelu", "range", "rnn",
-    "scan", "sequenceconstruct", "sub", "sum", "groupnormalization", "call",
-    "dynamicadd", "dynamicupdate", "dynamicslice", "dynamiczero"
+    "add", "atan2", "batchnormalization", "bitshift", "clip", "conv",
+    "convtranspose", "div", "equal", "gru", "gemm", "greater",
+    "instancenormalization", "less", "lstm", "logical_and", "logical_or",
+    "logical_xor", "matmul", "max", "maxroipool", "mean", "min", "mod", "mul",
+    "pow", "prelu", "range", "rnn", "scan", "sequenceconstruct", "sub", "sum",
+    "groupnormalization", "call", "dynamicadd", "dynamicupdate",
+    "dynamicslice", "dynamiczero"
 ]
 # Also Einsum, GreaterOrEqual, LessOrEqual
 

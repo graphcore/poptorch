@@ -169,7 +169,7 @@ def test_clamp_():
 
 binary_ops_float = [
     torch.add,
-    # torch.atan2,
+    torch.atan2,
     torch.div,
     torch.sub,
     # torch.fmod,
