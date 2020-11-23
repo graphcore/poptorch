@@ -218,13 +218,13 @@ class AsynchronousDataAccessor:
         An override function to kill the worker process manually.
         """
         if self._data_fetcher:
-            self._pipe.send(0)
-            self._data_fetcher.join(timeout=5)
             if self._data_fetcher.exitcode is None:
-                logger.warning("AsynchronousDataAccessor worker process didn't"
-                               " exit cleanly: terminating")
-                self._data_fetcher.terminate()
-                self._data_fetcher.join()
+                # Send the exit signal if the worker is still alive.
+                self._pipe.send(0)
+            self._data_fetcher.join(timeout=5)
+            # In case it didn't exit cleanly: terminate() it
+            self._data_fetcher.terminate()
+            self._data_fetcher.join()
             self._data_fetcher = None
 
     def __del__(self):
@@ -301,18 +301,19 @@ class AsynchronousDataAccessor:
         any_data_sent = True
 
         while not shutdown_now:
+            # Check for messages from the parent process:
+            if pipe.poll():
+                pipe.recv()  # remove the data
+                # First message is to indicate the setup is complete
+                # the second message is to request shutdown.
+                if setup_complete:
+                    shutdown_now = True
+                    continue
+                else:
+                    setup_complete = True
             # If we hit EOF sleep till re-awakened by host
             if eof_tensor[0] != -1:
                 time.sleep(self._miss_sleep_time_in_ms)
-                # Check for messages from the parent process:
-                if pipe.poll():
-                    pipe.recv()  # remove the data
-                    # First message is to indicate the setup is complete
-                    # the second message is to request shutdown.
-                    if setup_complete:
-                        shutdown_now = True
-                    else:
-                        setup_complete = True
                 continue
 
             try:

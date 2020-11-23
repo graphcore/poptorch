@@ -1603,6 +1603,9 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
 
   // Poplar compilation.
   try {
+    logging::LogContext ctx{
+        "Compiler::initSession popart::Session::prepareDevice: Poplar "
+        "compilation"};
     logging::trace("Begining Poplar compilation.");
     _impl->session->prepareDevice();
     logging::trace("Finished Poplar compilation.");
