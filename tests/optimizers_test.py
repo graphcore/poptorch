@@ -87,7 +87,7 @@ def test_sgd_IR(opt):
             elif op['type'] == "SGD0VarUpdate":
                 SGD0VarUpdate += 1
 
-    if opt == optim.SGD:
+    if opt in (optim.SGD, poptorch.optim.SGD):
         assert SGD0VarUpdate == 2
         assert AdamVarUpdate == 0 and AdamUpdater == 0
     else:
