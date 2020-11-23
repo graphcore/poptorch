@@ -1,7 +1,7 @@
 # PopTorch. PyTorch integration for the GraphCore IPU
 
 PopTorch is a set of extensions for PyTorch enabling models
-to be training, evaluated and used on the GraphCore IPU.
+to be trained, evaluated and used on the GraphCore IPU.
 
 More information can be found in the [PopTorch User Guide](https://docs.graphcore.ai/projects/poptorch-user-guide/en/latest/)
 
@@ -105,7 +105,7 @@ cd build
 5. Configure the build
 
 ```sh
-cmake ../poptorch -DSDK_DIR=${SDK_DIR} -GNinja
+cmake ../poptorch -DSDK_DIR=${SDK_PATH} -GNinja
 ```
 
 By default PopTorch will be built in release mode, to build in debug mode add `-DCMAKE_BUILD_TYPE=Debug`
