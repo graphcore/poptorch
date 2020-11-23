@@ -3,7 +3,6 @@
 import atexit
 import io
 import os
-import signal
 import sys
 import time
 
@@ -29,6 +28,21 @@ from ._impl import PoplarExecutor
 from . import optim
 
 __version__ = "@VERSION@-@SNAPSHOT@"
+
+
+class _RepeatSampler:
+    """ Sampler that repeats forever.
+
+    Args:
+        real_sampler (Sampler)
+    """
+
+    def __init__(self, real_sampler):
+        self.real_sampler = real_sampler
+
+    def __iter__(self):
+        while True:
+            yield from iter(self.real_sampler)
 
 
 class DataLoader(torch.utils.data.DataLoader):
@@ -107,6 +121,25 @@ class DataLoader(torch.utils.data.DataLoader):
                          num_workers=num_workers,
                          drop_last=drop_last,
                          **kwargs)
+        # PyTorch's sampler creates / deletes workers for each iteration through
+        # the dataset.
+        # In order to reuse the workers between epochs we use our own infinite
+        # sampler.
+        object.__setattr__(self, "batch_sampler",
+                           _RepeatSampler(self.batch_sampler))
+        # The iterator cannot be pickled, so create it in __iter__()
+        self._infinite_iterator = None
+
+    def __len__(self):
+        # Return the length of the real sampler
+        return len(self.batch_sampler.real_sampler)
+
+    def __iter__(self):
+        if self._infinite_iterator is None:
+            self._infinite_iterator = super().__iter__()
+        # Return a single epoch long iterator
+        for _ in range(len(self)):
+            yield next(self._infinite_iterator)  # pylint: disable=stop-iteration-return
 
     @property
     def combinedBatchSize(self):
@@ -185,8 +218,13 @@ class AsynchronousDataAccessor:
         An override function to kill the worker process manually.
         """
         if self._data_fetcher:
-            self._data_fetcher.terminate()
-            self._data_fetcher.join()
+            self._pipe.send(0)
+            self._data_fetcher.join(timeout=5)
+            if self._data_fetcher.exitcode is None:
+                logger.warning("AsynchronousDataAccessor worker process didn't"
+                               " exit cleanly: terminating")
+                self._data_fetcher.terminate()
+                self._data_fetcher.join()
             self._data_fetcher = None
 
     def __del__(self):
@@ -195,20 +233,14 @@ class AsynchronousDataAccessor:
     def __len__(self):
         return len(self._training_data)
 
-    def fetch_data(self, conn, setup_complete):  # pylint: disable=too-many-statements
+    def fetch_data(self, conn, pipe):  # pylint: disable=too-many-statements
         # Make sure this process's output gets printed (In case of error)
         sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0),
                                       write_through=True)
         sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0),
                                       write_through=True)
-
-        # Register our own handler to exit cleanly when SIGTERM is received.
-        def handler(_signum, _frame):
-            sys.stdout.close()
-            sys.stderr.close()
-            sys.exit(0)
-
-        signal.signal(signal.SIGTERM, handler)
+        shutdown_now = False
+        setup_complete = False
 
         logger.debug("AsynchronousDataAccessor worker process: %d",
                      os.getpid())
@@ -268,11 +300,19 @@ class AsynchronousDataAccessor:
 
         any_data_sent = True
 
-        while True:
-
+        while not shutdown_now:
             # If we hit EOF sleep till re-awakened by host
             if eof_tensor[0] != -1:
                 time.sleep(self._miss_sleep_time_in_ms)
+                # Check for messages from the parent process:
+                if pipe.poll():
+                    pipe.recv()  # remove the data
+                    # First message is to indicate the setup is complete
+                    # the second message is to request shutdown.
+                    if setup_complete:
+                        shutdown_now = True
+                    else:
+                        setup_complete = True
                 continue
 
             try:
@@ -331,7 +371,8 @@ class AsynchronousDataAccessor:
             " is ready")
         # In the unlikely event the worker is done reading the dataset
         # before the parent is done setting the buffers up: wait here.
-        setup_complete.recv()
+        if not setup_complete:
+            pipe.recv()
         logger.debug("AsynchronousDataAccessor worker: clean exit")
 
     def spin_up(self):
@@ -349,7 +390,7 @@ class AsynchronousDataAccessor:
         # If the worker exits before the parent process is done
         # setting up the _data_buffers then the queue will get freed
         # and bad things will happen.
-        setup_complete, child_setup_complete = ctx.Pipe()
+        self._pipe, child_setup_complete = ctx.Pipe()
 
         # Fetch the data on a seperate process.
         logger.debug("AsynchronousDataAccessor parent process: %d",
@@ -377,7 +418,7 @@ class AsynchronousDataAccessor:
             self._data_buffers.append(buffer)
 
         # We're all set: let the worker know.
-        setup_complete.send(0)
+        self._pipe.send(0)
 
     def __iter__(self):
         self._eof_event_tensor[0] = -1
