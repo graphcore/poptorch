@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import subprocess
+import time
 import numpy
 import poptorch
 import pytest
@@ -339,3 +340,38 @@ def test_subprocess_broken_dataset():
     assert "AssertionError: Broken dataset" in stdout, (
         "Couldn't find failure "
         "reason in stdout")
+
+
+def test_reuse_workers():
+    shape = [2, 3]
+    num_tensors = 200
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               IncrementDataset(shape, num_tensors),
+                               batch_size=1,
+                               num_workers=32)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+    assert len(loader) == num_tensors
+
+    start = None
+    # Workers will be created while fetching the first element
+    # so start the timer after the first element is fetched.
+    for _ in loader:
+        if start is None:
+            start = time.perf_counter()
+        continue
+    end = time.perf_counter()
+    print(f"First epoch {end - start}")
+
+    for _ in range(10):
+        start = time.perf_counter()
+        for _ in loader:
+            continue
+        end = time.perf_counter()
+        print(f"Other epoch {end - start}")
+
+    # Not adding asserts because a lot depends on when the CPU
+    # governor kicks in. (The first iteration tends to be a lot slower
+    # but that might be machine dependent).
