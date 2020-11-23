@@ -80,6 +80,8 @@ struct Optimizer {
       dampening = findInMapOrDefault(opts, "dampening");
       break;
     }
+    case OptimizerType::LAMB:
+    case OptimizerType::LAMB_NO_BIAS:
     case OptimizerType::ADAMW: {
       beta1 = findInMapOrDefault(opts, "beta1", 0.9);
       beta2 = findInMapOrDefault(opts, "beta2", 0.999);
@@ -108,15 +110,15 @@ struct Optimizer {
   // Shared by SGD and RMSprop
   ParamType momentum;
 
-  // Shared by AdamW and RMSprop
+  // Shared by AdamW, RMSprop and LAMB
   ParamType eps;
+
+  // Shared by AdamW and LAMB
+  ParamType beta1;
+  ParamType beta2;
 
   // Unique to SGD
   ParamType dampening;
-
-  // Unique to AdamW
-  ParamType beta1;
-  ParamType beta2;
 
   // Unique to RMSprop
   ParamType alpha;

@@ -4,6 +4,7 @@ import inspect
 import torch
 import torch.optim as optim
 import poptorch.poptorch_core as poptorch_core
+import poptorch.optim
 
 from . import enums
 from .logging import logger
@@ -24,6 +25,11 @@ def to_poptorch_optimizer(optimizer):
             return enums.OptimizerType.RMSPROP_CENTERED
         return enums.OptimizerType.RMSPROP
 
+    if isinstance(optimizer, poptorch.optim.LAMB):
+        bias_correction = optimizer.param_groups[0]["biasCorrection"]
+
+        return enums.OptimizerType.LAMB if bias_correction \
+            else enums.OptimizerType.LAMB_NO_BIAS
     return None
 
 
@@ -57,14 +63,15 @@ def convertOptimizerToDict(optimizer):
                 "velocity_scaling":
                 (velocity_scaling, velocity_scaling == 1.0),
             }
-        if isinstance(optimizer, optim.AdamW):
+        if isinstance(optimizer, (optim.AdamW, poptorch.optim.LAMB)):
             beta1 = optimizer.param_groups[index]["betas"][0]
             beta2 = optimizer.param_groups[index]["betas"][1]
             eps = optimizer.param_groups[index]["eps"]
 
-            assert not optimizer.param_groups[index]["amsgrad"], (
-                "Only non-amsgrad "
-                "AdamW optimizers are supported.")
+            if isinstance(optimizer, optim.AdamW):
+                assert not optimizer.param_groups[index]["amsgrad"], (
+                    "Only non-amsgrad "
+                    "AdamW optimizers are supported.")
             the_dict[index] = {
                 "lr": (learning_rate, False),
                 "beta1": (beta1, False),
@@ -592,24 +599,3 @@ class PoplarExecutor:
             self.copyWeightsToHostIfNeeded()
         del self._executable
         self._executable = None
-
-
-def check_constructor_match_parent(child_class, extra_args=None):
-    parent = child_class.__bases__[0]
-    parent_params = inspect.signature(parent.__init__).parameters
-    child_params = inspect.signature(child_class.__init__).parameters
-    extra_args = extra_args or []
-    assert len(parent_params) + len(extra_args) == len(child_params), (
-        f"Expected {len(parent_params) + len(extra_args)} parameters but got "
-        f"{len(child_params)}")
-
-    child_params = iter(child_params.items())
-    for idx, (_, param) in enumerate(parent_params.items()):
-        _, child_param = next(child_params)
-        assert child_param == param, (f"Mismatch for parameter {idx}: expected"
-                                      f"'{param}' but got '{child_param}'")
-
-    for extra_arg in extra_args:
-        name, _ = next(child_params)
-        assert name == extra_arg, (f"Expected an extra argument named "
-                                   f"'{extra_arg}' but got '{name}'")

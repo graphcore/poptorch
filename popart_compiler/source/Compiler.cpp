@@ -877,7 +877,9 @@ static void insertValuesForTensor(popart::Optimizer *popart_optimizer,
                          py_opt.velocity_scaling);
   }
 
-  if (py_opt.type == OptimizerType::ADAMW) {
+  if (py_opt.type == OptimizerType::ADAMW ||
+      py_opt.type == OptimizerType::LAMB ||
+      py_opt.type == OptimizerType::LAMB_NO_BIAS) {
     dynamic_cast<popart::Adam *>(popart_optimizer)
         ->insertSpecific(tensor, py_opt.learning_rate, py_opt.weight_decay,
                          py_opt.beta1, py_opt.beta2, py_opt.eps);
@@ -911,12 +913,18 @@ static void printOptimizerToDebug(const Optimizer &opt) {
         opt.dampening.first);
     break;
 
-  case OptimizerType::ADAMW:
-    printOptimizerToDebug(
-        "ADAMW", {"Learning rate", "Weight decay", "beta1", "beta2", "eps"},
-        opt.learning_rate.first, opt.weight_decay.first, opt.beta1.first,
-        opt.beta2.first, opt.eps.first);
+  case OptimizerType::LAMB:
+  case OptimizerType::LAMB_NO_BIAS:
+  case OptimizerType::ADAMW: {
+    std::string name = opt.type == OptimizerType::ADAMW ? "ADAMW" : "LAMB";
+    printOptimizerToDebug(name,
+                          {"Learning rate", "Weight decay", "beta1", "beta2",
+                           "eps", "Bias correction"},
+                          opt.learning_rate.first, opt.weight_decay.first,
+                          opt.beta1.first, opt.beta2.first, opt.eps.first,
+                          opt.type == OptimizerType::LAMB);
     break;
+  }
 
   case OptimizerType::RMSPROP_CENTERED:
   case OptimizerType::RMSPROP:
@@ -956,10 +964,19 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
         opt.velocity_scaling, opt.loss_scaling);
   }
 
-  if (opt.type == OptimizerType::ADAMW) {
+  if (opt.type == OptimizerType::ADAMW || opt.type == OptimizerType::LAMB ||
+      opt.type == OptimizerType::LAMB_NO_BIAS) {
+    popart::AdamMode mode;
+    if (opt.type == OptimizerType::ADAMW) {
+      mode = popart::AdamMode::AdamNoBias;
+    } else if (opt.type == OptimizerType::LAMB) {
+      mode = popart::AdamMode::Lamb;
+    } else if (opt.type == OptimizerType::LAMB_NO_BIAS) {
+      mode = popart::AdamMode::LambNoBias;
+    }
     optimizer = std::make_unique<popart::Adam>(
         opt.learning_rate, opt.weight_decay, opt.beta1, opt.beta2, opt.eps,
-        opt.loss_scaling, popart::AdamMode::AdamNoBias,
+        opt.loss_scaling, mode,
         popart::DataType::FLOAT, // Always accumulate as float.
         popart::DataType::FLOAT, popart::DataType::FLOAT);
   }
