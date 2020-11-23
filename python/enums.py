@@ -7,6 +7,8 @@ class OptimizerType(enum.IntEnum):
     ADAMW = 1
     RMSPROP = 2
     RMSPROP_CENTERED = 3
+    LAMB = 4
+    LAMB_NO_BIAS = 5
 
 
 class AnchorMode(enum.IntEnum):

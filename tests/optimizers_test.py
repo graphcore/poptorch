@@ -14,10 +14,10 @@ import helpers
 @pytest.mark.parametrize(
     "opt", {
         optim.SGD, optim.AdamW, optim.RMSprop, poptorch.optim.SGD,
-        poptorch.optim.AdamW, poptorch.optim.RMSprop
+        poptorch.optim.AdamW, poptorch.optim.RMSprop, poptorch.optim.LAMB,
+        poptorch.optim.LAMBNoBias
     })
-@pytest.mark.parametrize("reduction", {"mean", "sum"})
-def test_optimizer(opt, reduction):
+def test_optimizer(opt):
     torch.manual_seed(42)
 
     model = torch.nn.Linear(10, 10)
@@ -26,9 +26,7 @@ def test_optimizer(opt, reduction):
     optimizer = opt(model.parameters(), lr=0.00)
 
     poptorch_model = helpers.trainingModelWithLoss(
-        model,
-        loss=torch.nn.CrossEntropyLoss(reduction=reduction),
-        optimizer=optimizer)
+        model, loss=torch.nn.CrossEntropyLoss(), optimizer=optimizer)
 
     input = torch.randn(1, 10)
     label = torch.randint(0, 10, [1])
@@ -58,10 +56,8 @@ def test_optimizer(opt, reduction):
 
 
 @pytest.mark.parametrize(
-    "opt, reduction",
-    zip((optim.SGD, optim.AdamW, poptorch.optim.SGD, poptorch.optim.AdamW),
-        ("mean", "sum")))
-def test_sgd_IR(opt, reduction):
+    "opt", {optim.SGD, optim.AdamW, poptorch.optim.SGD, poptorch.optim.AdamW})
+def test_sgd_IR(opt):
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
@@ -69,9 +65,7 @@ def test_sgd_IR(opt, reduction):
     optimizer = opt(model.parameters(), lr=0.01)
 
     poptorch_model = helpers.trainingModelWithLoss(
-        model,
-        loss=torch.nn.CrossEntropyLoss(reduction=reduction),
-        optimizer=optimizer)
+        model, loss=torch.nn.CrossEntropyLoss(), optimizer=optimizer)
 
     input = torch.randn(1, 10)
     label = torch.randint(0, 10, [1])
@@ -217,23 +211,22 @@ def optimizer_groups_harness(opt, model, input, target):
     optim.SGD,
     poptorch.optim.SGD,
 })
-@pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_optimizer_groups(opt, reduction):
+def test_optimizer_groups_sgd(opt):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
-        def __init__(self, reduction):
+        def __init__(self):
             super().__init__()
             self.model = torch.nn.Sequential(torch.nn.Linear(10, 10),
                                              torch.nn.Linear(10, 10),
                                              torch.nn.Sigmoid())
-            self.loss = torch.nn.BCELoss(reduction=reduction)
+            self.loss = torch.nn.BCELoss()
 
         def forward(self, X, Y):
             fwd = self.model(X)
             return fwd, self.loss(fwd, Y)
 
-    model = Model(reduction)
+    model = Model()
 
     target = torch.empty(10).uniform_()
     input = torch.randn(10)
@@ -245,25 +238,26 @@ def test_optimizer_groups(opt, reduction):
 
 
 @pytest.mark.parametrize(
-    "opt",
-    {optim.AdamW, optim.RMSprop, poptorch.optim.AdamW, poptorch.optim.RMSprop})
-@pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_optimizer_groups_adamw(opt, reduction):
+    "opt", {
+        optim.AdamW, optim.RMSprop, poptorch.optim.AdamW,
+        poptorch.optim.RMSprop, poptorch.optim.LAMB, poptorch.optim.LAMBNoBias
+    })
+def test_optimizer_groups(opt):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
-        def __init__(self, reduction):
+        def __init__(self):
             super().__init__()
             self.model = torch.nn.Sequential(torch.nn.Linear(10, 10),
                                              torch.nn.Linear(10, 10))
             #torch.nn.Sigmoid())
-            self.loss = torch.nn.CrossEntropyLoss(reduction=reduction)
+            self.loss = torch.nn.CrossEntropyLoss()
 
         def forward(self, X, Y):
             fwd = self.model(X)
             return fwd, self.loss(fwd, Y)
 
-    model = Model(reduction)
+    model = Model()
 
     input = torch.randn(1, 10)
     target = torch.randint(0, 10, [1])

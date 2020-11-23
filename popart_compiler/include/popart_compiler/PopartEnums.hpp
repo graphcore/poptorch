@@ -20,6 +20,7 @@ enum class OptimizerType : std::uint8_t {
   RMSPROP,
   RMSPROP_CENTERED,
   LAMB,
+  LAMB_NO_BIAS,
   NONE
 };
 
