@@ -21,7 +21,7 @@ def test_missing_block():
     m = Model()
 
     opts = poptorch.Options()
-    opts = poptorch.Options().deviceIterations(2)
+    opts.deviceIterations(2)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
 
@@ -45,7 +45,7 @@ def test_api_inline(capfd):
     m = Model()
 
     opts = poptorch.Options()
-    opts = poptorch.Options().deviceIterations(2)
+    opts.deviceIterations(2)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(2, 5))
@@ -83,7 +83,7 @@ def test_recomputation_checkpoint():
     m = Model()
 
     opts = poptorch.Options()
-    opts = poptorch.Options().deviceIterations(6)
+    opts.deviceIterations(6)
     opts.Popart.set("autoRecomputation", 3)  # All forward pipeline stages.
 
     m = poptorch.trainingModel(Model(), opts)
@@ -130,7 +130,7 @@ def test_api_wrap(capfd):
     m.l2 = poptorch.BeginBlock(m.l2, ipu_id=0)
 
     opts = poptorch.Options()
-    opts = poptorch.Options().deviceIterations(2)
+    opts.deviceIterations(2)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(2, 5))
@@ -170,7 +170,7 @@ def test_api_wrap_2stages(capfd):
     m.l2 = poptorch.BeginBlock(m.l2, ipu_id=1)
 
     opts = poptorch.Options()
-    opts = poptorch.Options().deviceIterations(2)
+    opts.deviceIterations(2)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(2, 5))
@@ -200,7 +200,8 @@ def test_inline_AutoIncrement(capfd):
 
     m = Model()
 
-    opts = poptorch.Options().deviceIterations(4).autoRoundNumIPUs(True)
+    opts = poptorch.Options()
+    opts.deviceIterations(4).autoRoundNumIPUs(True)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
 
@@ -242,7 +243,8 @@ def test_api_AutoIncrement(capfd):
     m.l3 = poptorch.BeginBlock(m.l3, ipu_id=2)
     m.l4 = poptorch.BeginBlock(m.l4, ipu_id=1)
 
-    opts = poptorch.Options().deviceIterations(4).autoRoundNumIPUs(True)
+    opts = poptorch.Options()
+    opts.deviceIterations(4).autoRoundNumIPUs(True)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
 

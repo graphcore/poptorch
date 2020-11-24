@@ -351,7 +351,7 @@ void printGraphBeforeHalfFloatResolution(const torch::jit::Graph &graph) {
     start += to.length();
   }
 
-  logging::debug("Graph before right half/float resolution:\n{}", graph_str);
+  logging::trace("Graph before right half/float resolution:\n{}", graph_str);
 }
 
 } // namespace
@@ -576,7 +576,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     poptorch::canonicaliseHalfInputs(graph.get(), input_tensors,
                                      traced_tensors);
 
-    logging::debug("Graph right before canonicalization:\n{}", *graph);
+    logging::trace("Graph right before canonicalization:\n{}", *graph);
 
     poptorch::canonicalizeLists(graph.get());
 
@@ -595,7 +595,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     // Enforce any constraints that aren't enforced by popart.
     poptorch::canonicalizeLate(graph.get());
 
-    logging::debug("Graph right after canonicalization:\n{}", *graph);
+    logging::trace("Graph right after canonicalization:\n{}", *graph);
 
     if (training) {
       poptorch::removeSurplusIdentityLosses(graph.get());
@@ -603,7 +603,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     // Warn the user if any operations couldn't be canonicalised.
     poptorch::warnOnUnsupportedAten(graph.get());
 
-    logging::debug("Graph right before popart:\n{}", *graph);
+    logging::trace("Graph right before popart:\n{}", *graph);
 
     return poptorch::lowerToPopart(
         graph.get(), &input_tensors, std::move(traced_tensors),

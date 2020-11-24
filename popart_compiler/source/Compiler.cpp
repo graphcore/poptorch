@@ -1601,9 +1601,6 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
                            options.replicatedGraphCount > 1,
                            "enableReplicatedGraphs");
 
-  logging::info("Popart replication enabled: {} with factor set to {}",
-                options.enableReplicatedGraphs, options.replicatedGraphCount);
-
   // Disable constant_weights by default: causes problems with Popart
   _impl->setOptionIfNotSet(options.constantWeights, false, "constantWeights");
 
@@ -1628,12 +1625,6 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   // Create the anchors, these are used to copy to the host.
   auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
 
-  logging::info("enableReplicatedGraphs {} replicatedGraphCount {} "
-                "enableDistributedReplicatedGraphs {} globalReplicaOffset {} "
-                "globalReplicationFactor {}",
-                options.enableReplicatedGraphs, options.replicatedGraphCount,
-                options.enableDistributedReplicatedGraphs,
-                options.globalReplicaOffset, options.globalReplicationFactor);
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.

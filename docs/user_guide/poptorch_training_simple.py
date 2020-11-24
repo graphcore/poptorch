@@ -114,7 +114,7 @@ for batch, target in training_data:
     # Run model.
     _, loss = model(batch, target)
 
-    # Back probagate the gradients.
+    # Back propagate the gradients.
     loss.backward()
 
     # Update the weights.
