@@ -360,9 +360,11 @@ class _IExecutionStrategy:
         return self._block_map[block_id]
 
     def onStartTracing(self):
+        self._stages_manager.clearDebug()
         ops.Block._stages_manager = self._stages_manager  # pylint: disable=protected-access
 
     def onEndTracing(self):
+        self._stages_manager.printDebug()
         ops.Block._stages_manager = None  # pylint: disable=protected-access
 
     def backendOptions(self):

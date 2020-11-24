@@ -385,6 +385,7 @@ std::string LowerToPopart::tensorTypesAndShapes(std::int64_t first_tensor,
 
 // Lower the main body of the _graph.
 void LowerToPopart::lowerBody() {
+  logging::debug("Graph lowered to Popart {");
   for (torch::jit::Node *node : _graph.nodes()) {
     logging::LogContext ctx("LowerToPopart::lowerBody Processing " +
                             nodeToString(node));
@@ -548,6 +549,7 @@ void LowerToPopart::lowerBody() {
       ERROR("Couldn't find a registered operation for node");
     }
   }
+  logging::debug("}");
 }
 
 void LowerToPopart::lowerParameters() {
