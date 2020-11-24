@@ -20,6 +20,21 @@ def apply_optimizer(optimizer):
             index, optimizer.param_groups[index]["params"])
 
 
+def recomputationCheckpoint(*tensors):
+    """Operation for checkpointing values in a computational pipeline stage.
+
+    When recomputation is enabled, these values will not be recomputed and they
+    will be stored in memory between forward and backwards passes instead.
+
+    :param tensors: one or more tensors which should be checkpointed
+    :return: Tensors (same number and shape as the input tensors)
+    """
+    out = torch.ops.poptorch.recomputation_checkpoint(tensors)
+    if len(tensors) == 1:
+        return out[0]
+    return out
+
+
 def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
     """ Instantiate a matmul that should be serialized.
 
