@@ -412,7 +412,8 @@ class PoplarExecutor:
             def narrowTensor(tensor):
                 if not isinstance(tensor, torch.Tensor):
                     return tensor
-                assert tensor.size()[0] % extra_poplar_batch_dims == 0, (
+                b_size = 1 if not tensor.size() else tensor.size()[0]
+                assert b_size % extra_poplar_batch_dims == 0, (
                     "Invalid batch dimension: In the input %s, the batch "
                     "dimension (%d) must be a multiple of "
                     "Options.deviceIterations(%d) * "
@@ -422,14 +423,11 @@ class PoplarExecutor:
                     "be executed on the device in any given iteration. For a "
                     "full explanation see the batching semantics page of the "
                     "documentation.") % (
-                        tensor.shape, tensor.size()[0],
-                        self._options.device_iterations,
+                        tensor.shape, b_size, self._options.device_iterations,
                         self._options.replication_factor,
                         self._options.Training.gradient_accumulation,
                         extra_poplar_batch_dims)
-                return tensor.narrow(
-                    0, 0,
-                    tensor.size()[0] // extra_poplar_batch_dims)
+                return tensor.narrow(0, 0, b_size // extra_poplar_batch_dims)
 
             in_tensors_trace_view.forEach(narrowTensor)
 

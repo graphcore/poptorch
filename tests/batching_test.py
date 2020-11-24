@@ -55,8 +55,7 @@ def test_trainingBatching():
         _, loss = poptorch_model(input, label)
 
         # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
-        assert len(loss.size()) == 1
-        assert loss.size()[0] == 1
+        assert len(loss.size()) == 0
 
     # Run with trained weights.
     out = model(input)
@@ -171,8 +170,7 @@ def test_trainingAnchors(anchor):
         assert len(poptorchOut.size()) == 2
         assert poptorchOut.size()[0] == 1
 
-        assert len(loss.size()) == 1
-        assert loss.size()[0] == 1
+        assert len(loss.size()) == 0
 
         if anchor in [poptorch.AnchorMode.Final, poptorch.AnchorMode.Default]:
             # We just have to check the loss is small.
