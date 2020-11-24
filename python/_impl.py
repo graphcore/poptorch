@@ -393,7 +393,7 @@ class PoplarExecutor:
             self._first_none_arg = in_tensors.first_none
             logger.info(
                 "First time call to model will invoke poplar compilation.\n"
-                "Number of device itrations: %s\n "
+                "Number of device iterations: %s\n"
                 "Training: %s", str(self._options.device_iterations),
                 str(self._training))
 
