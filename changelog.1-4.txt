@@ -31,3 +31,4 @@ New features:
 - Add len() method to poptorch.AsynchronousDataLoader
 - Added support for LAMB optimizer
 - Add support for recomputationCheckpoint()
+- Added support for torch.tensordot

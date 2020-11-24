@@ -86,13 +86,105 @@ torch::jit::Node *cartesianProdHandler(torch::jit::Graph *graph,
   return createHandlerOperation(
       graph, stack_handler, {grid_list->output(), wrapInConstant1D(graph, 1)});
 }
+
+torch::jit::Node *tensordotHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  // aten::tensordot(Tensor self, Tensor other, int[] dims_self,
+  //                 int[] dims_other) -> Tensor
+
+  torch::jit::Value *x1 = node->input(0);
+  torch::jit::Value *x2 = node->input(1);
+  std::vector<std::int64_t> rdims_x1 =
+      constantToLongVec(node->input(2)->node());
+  std::vector<std::int64_t> rdims_x2 =
+      constantToLongVec(node->input(3)->node());
+
+  // rdims_prod (default = 1 with no reduction)
+  std::int64_t rdims_prod = 1;
+
+  std::vector<std::int64_t> shape_x1 = shapeFromTensor(x1);
+  std::vector<std::int64_t> shape_x2 = shapeFromTensor(x2);
+
+  // Original permutation
+  std::vector<std::int64_t> p1 = shape_x1;
+  std::iota(p1.begin(), p1.end(), 0);
+  std::vector<std::int64_t> p2 = shape_x2;
+  std::iota(p2.begin(), p2.end(), 0);
+
+  std::size_t n_dims_x1 = p1.size();
+  std::size_t n_dims_x2 = p2.size();
+  std::size_t n_rdims = rdims_x1.size();
+
+  // Negative (relative) indexing -> absolute indexing
+  for (std::int64_t &rdim : rdims_x1) {
+    if (rdim < 0) {
+      rdim += n_dims_x1;
+    }
+  }
+
+  std::vector<bool> rdims_x1_bs(n_dims_x1);
+  std::vector<bool> rdims_x2_bs(n_dims_x2);
+  for (std::size_t i = 0; i < n_rdims; i++) {
+    rdims_x1_bs[rdims_x1[i]] = true;
+    rdims_x2_bs[rdims_x2[i]] = true;
+    // prod(rdims_x1) == prod(rdims_x2) so just use x1
+    rdims_prod *= shape_x1[rdims_x1[i]];
+  }
+
+  // Permutes x according to existing permutation vector p and bitset bs. If
+  // should_partition_front == true, elements of p are moved to the front
+  // if the corresponding bool in bs == true. Otherwise, they are moved to
+  // the back. The relative order of other elements must not change.
+  auto fn_partition_permute = [&](torch::jit::Value *x, auto &p, const auto &bs,
+                                  bool should_partition_front) {
+    std::stable_partition(p.begin(), p.end(), [&](std::int64_t n) {
+      return bs[n] == should_partition_front;
+    });
+    return createTranspose(graph, {x}, p);
+  };
+
+  // Permute x1 so that rdims_x1 are the last dims
+  torch::jit::Node *p_x1 = fn_partition_permute(x1, p1, rdims_x1_bs, false);
+
+  // Reshape to (-1, rdims_prod(rdims))
+  torch::jit::Node *p_x1_mat =
+      createReshape(graph, p_x1->output(), {-1, rdims_prod});
+
+  // Permute x2 so that rdims_x2 are the first dims
+  torch::jit::Node *p_x2 = fn_partition_permute(x2, p2, rdims_x2_bs, true);
+
+  // Reshape to (rdims_prod(rdims), -1)
+  torch::jit::Node *p_x2_mat =
+      createReshape(graph, p_x2->output(), {rdims_prod, -1});
+
+  // Matmul -> (unreduced_x1, unreduced_x2)
+  torch::jit::Node *mm =
+      createMatmul(graph, {p_x1_mat->output(), p_x2_mat->output()});
+
+  std::vector<std::int64_t> new_shape;
+  new_shape.reserve(n_dims_x1 + n_dims_x2);
+  for (std::size_t i = 0; i < n_dims_x1; i++) {
+    if (!rdims_x1_bs[i]) {
+      new_shape.push_back(shape_x1[i]);
+    }
+  }
+  for (std::size_t i = 0; i < n_dims_x2; i++) {
+    if (!rdims_x2_bs[i]) {
+      new_shape.push_back(shape_x2[i]);
+    }
+  }
+
+  // Restore flattened dims
+  return createReshape(graph, mm->output(), new_shape);
+}
 } // namespace
 
 // clang-format off
 static bool handlers = registerHandlers(
     c10::aten::einsum, einsumHandler,
     c10::aten::meshgrid, meshgridHandler,
-    c10::aten::cartesian_prod, cartesianProdHandler);
+    c10::aten::cartesian_prod, cartesianProdHandler,
+    c10::aten::tensordot, tensordotHandler);
 // clang-format on
 
 } // namespace poptorch
