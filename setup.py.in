@@ -1,4 +1,5 @@
 from setuptools import setup
+from setuptools.dist import Distribution
 from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
 import sys
 import distutils.util
@@ -21,6 +22,11 @@ else:
     ]
     LIBS = ["*.so"]
 
+class BinaryDistribution(Distribution):
+    """Distribution which always forces a binary package with platform name"""
+    def has_ext_modules(foo):
+        return True
+
 setup(
     name='poptorch',
     version=VERSION,
@@ -37,6 +43,7 @@ setup(
     platforms=platform,
     install_requires=REQUIRES,
     zip_safe=False,
+    distclass=BinaryDistribution,
     classifiers=[
         'Intended Audience :: Developers',
         'Intended Audience :: Education',

@@ -210,7 +210,6 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/setup.py DESTINATION .)
 
 execute_process(COMMAND python3 -c "import distutils.util;print(distutils.util.get_platform().replace('.','_').replace('-','_'), end='')"
   OUTPUT_VARIABLE PYTHON_PLATFORM)
-set(PACKAGE_FILE_NAME poptorch-${VERSION}+${SNAPSHOT}+${PACKAGE_OS_TYPE}-py3-none-${PYTHON_PLATFORM}.whl)
 set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
 
 set(PKG_UPLOAD_DIR ../../pkg)
@@ -237,11 +236,21 @@ and shutil.copyfile('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}', '${PK
 and yml.write(' ' * 2 + '- name: PopTorch user guide \(HTML\)\\n'+' ' * 4 + 'file: ${USER_GUIDE_HTML_NAME}\\n' + ' ' * 4 + 'type: html_zip\\n')
 )
 
+set( COPY_WHEEL
+import os, shutil, glob$<SEMICOLON>
+src = glob.glob('dist/*.whl')[0]$<SEMICOLON>
+dst = os.path.basename(src).replace('-${VERSION}-','-${VERSION}+${SNAPSHOT}+${PACKAGE_OS_TYPE}-')$<SEMICOLON>
+yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
+shutil.copyfile(src, os.path.join('${PKG_UPLOAD_DIR}', dst))
+and yml.write(' ' * 4 + 'file: '+ dst +'\\n')
+)
+
+
 add_custom_target(package_and_move
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
   COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
   COMMAND bash -c "cp ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "cp dist/*.whl  ${PKG_UPLOAD_DIR}/${PACKAGE_FILE_NAME}"
+  COMMAND python3 -c \"${COPY_WHEEL}\"
   COMMAND python3 -c \"${COPY_PDF_IF_EXISTS}\"
   COMMAND python3 -c \"${COPY_HTML_IF_EXISTS}\"
   DEPENDS poptorch_wheel
