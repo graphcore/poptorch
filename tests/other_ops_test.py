@@ -97,3 +97,27 @@ def test_cartesian_prod(arr_lengths):
 
     assert native_out.size() == poptorch_out.size()
     torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("dims",
+                         (0, 2, ([], []), ([2], [0]), ([2, 3], [0, 1])))
+def test_tensordot(dims):
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            return torch.tensordot(x, y, dims)
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    x = torch.randn(2, 3, 5, 4)
+    y = torch.randn(5, 4, 1)
+
+    # Run on CPU
+    native_out = model(x, y)
+
+    # Run on IPU
+    poptorch_out = poptorch_model(x, y)
+
+    torch.testing.assert_allclose(native_out, poptorch_out)
