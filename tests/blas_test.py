@@ -98,7 +98,7 @@ def test_matmul_training():
                                   native_output,
                                   rtol=1e-02,
                                   atol=1e-02)
-    torch.testing.assert_allclose(poptorch_loss[0],
+    torch.testing.assert_allclose(poptorch_loss,
                                   native_loss,
                                   rtol=1e-03,
                                   atol=1e-03)
