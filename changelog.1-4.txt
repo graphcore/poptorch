@@ -31,3 +31,4 @@ New features:
 - Add optional title argument to poptorch.ipu_print_tensor
 - Add len() method to poptorch.AsynchronousDataLoader
 - Added support for LAMB optimizer
+- Add support for recomputationCheckpoint()

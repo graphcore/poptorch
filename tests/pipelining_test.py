@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import json
 import torch
 import poptorch
 import pytest
@@ -53,6 +54,54 @@ def test_api_inline(capfd):
     log.assert_contains("enablePipelining set to value 1")
     log.assert_contains(" Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
     log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
+
+
+def test_recomputation_checkpoint():
+    poptorch.setLogLevel(1)  # Force debug logging
+    size = 3
+
+    class Model(torch.nn.Module):
+        def __init__(self, checkpoint=False):
+            super().__init__()
+            self.checkpoint = checkpoint
+            weight = torch.nn.Parameter(torch.rand(size, size),
+                                        requires_grad=True)
+            self.register_parameter("weight", weight)
+
+        def forward(self, x, target):
+            poptorch.Block.useAutoId()
+            with poptorch.Block(ipu_id=0):
+                x = torch.matmul(self.weight, x)
+                if self.checkpoint:
+                    x = poptorch.recomputationCheckpoint(x)
+                x = torch.matmul(self.weight, x)
+
+            with poptorch.Block(ipu_id=1):
+                x = x * 2
+                return x, torch.nn.functional.l1_loss(x, target)
+
+    m = Model()
+
+    opts = poptorch.Options()
+    opts = poptorch.Options().deviceIterations(6)
+    opts.Popart.set("autoRecomputation", 3)  # All forward pipeline stages.
+
+    m = poptorch.trainingModel(Model(), opts)
+    m.compile(torch.randn(size * 6, 1), torch.randn(size * 6, 1))
+    ir = json.loads(m._debugGetPopartIR())  # pylint: disable=protected-access
+    assert not any(["Checkpoint" in node["name"] for node in ir["maingraph"]
+                    ]), ("Popart IR shouldn't contain any checkpoint")
+    assert sum(["Stash" in node["type"] for node in ir["maingraph"]
+                ]) == 1, ("Only the graph input should be stashed")
+
+    m = poptorch.trainingModel(Model(True), opts)
+    m.compile(torch.randn(size * 6, 1), torch.randn(size * 6, 1))
+    ir = json.loads(m._debugGetPopartIR())  # pylint: disable=protected-access
+    assert any(["Checkpoint" in node["name"] for node in ir["maingraph"]
+                ]), ("Popart IR should contain a checkpoint")
+    assert sum([
+        "Stash" in node["type"] for node in ir["maingraph"]
+    ]) == 2, ("Both the graph input and the checkpoint should be stashed")
 
 
 def test_api_wrap(capfd):

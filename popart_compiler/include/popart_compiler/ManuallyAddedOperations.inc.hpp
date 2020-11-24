@@ -40,3 +40,5 @@ OP_DECL(poptorch, ones, ones, _impl->ones,
 OP_DECL(poptorch, zeros, zeros, _impl->zeros,
         ARG(INT_VEC, shape) ARG(STRING, dtype),
         BODY_ARG(shape) BODY_ARG(dtype))
+
+OP_DECL(poptorch, recomputation_checkpoint, recomputation_checkpoint, _impl->recomputationCheckpoint, NONE, NONE)

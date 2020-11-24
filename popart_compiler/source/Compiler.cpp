@@ -308,6 +308,9 @@ public:
                   const std::string &op, const std::string &domain,
                   std::int64_t version, std::int64_t num_outputs);
 
+  std::vector<popart::TensorId>
+  recomputationCheckpoint(const std::vector<popart::TensorId> &arg);
+
   popart::TensorId tensorConstant(const std::vector<popart::TensorId> &inputs,
                                   const PopartConstant &constant);
 
@@ -766,6 +769,11 @@ CompilerImpl::customOperation(const std::vector<popart::TensorId> &args,
   popart::OperatorIdentifier id = {domain, op, 1, num_inputs};
 
   return op_builder->customOp(id, version, args, num_outputs, {});
+}
+
+std::vector<popart::TensorId> CompilerImpl::recomputationCheckpoint(
+    const std::vector<popart::TensorId> &arg) {
+  return op_builder->checkpointOutput(arg);
 }
 
 popart::TensorId
