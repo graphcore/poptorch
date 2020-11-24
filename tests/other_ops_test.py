@@ -7,6 +7,7 @@ import pytest
 
 torch.manual_seed(42)
 params_einsum = [
+    ('i->', [torch.randn(5)]),
     ('ij->i', [torch.randn(5, 4)]),
     ('i,j->j', [torch.randn(5), torch.randn(4)]),
     ('i,j->ji', [torch.randn(5), torch.randn(4)]),

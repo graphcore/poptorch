@@ -422,16 +422,14 @@ def test_KLDiv_direct(reduction, log_target):
     model = torch.nn.KLDivLoss(reduction=reduction, log_target=log_target)
     poptorch_model = poptorch.inferenceModel(model)
 
-    for _ in range(3):
-        # 2D Tensors to test batchmean
-        target = torch.empty(3, 10).uniform_()
-        input = torch.randn(3, 10)
+    # 2D Tensors to test batchmean
+    target = torch.empty(3, 10).uniform_()
+    input = torch.randn(3, 10)
 
-        native_out = model(input, target)
-        # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-        poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+    native_out = model(input, target)
+    poptorch_out = poptorch_model(input, target)
 
-        torch.testing.assert_allclose(native_out, poptorch_out)
+    torch.testing.assert_allclose(native_out, poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
@@ -443,36 +441,32 @@ def test_PoissonNLLLoss_direct(reduction, log_input, full):
     model = torch.nn.PoissonNLLLoss(log_input, full, reduction=reduction)
     poptorch_model = poptorch.inferenceModel(model)
 
-    for _ in range(3):
-        target = torch.poisson(torch.rand(10) * 5)
-        input = torch.empty(10).uniform_()
+    target = torch.poisson(torch.rand(10) * 5)
+    input = torch.empty(10).uniform_()
 
-        native_out = model(input, target)
-        # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-        poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+    native_out = model(input, target)
+    poptorch_out = poptorch_model(input, target)
 
-        torch.testing.assert_allclose(native_out, poptorch_out)
+    torch.testing.assert_allclose(native_out, poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
 def test_HingeEmbeddingLoss_direct(reduction):
     torch.manual_seed(42)
 
-    for _ in range(3):
-        delta = torch.rand(1) + 0.5
-        model = torch.nn.HingeEmbeddingLoss(delta.item(), reduction=reduction)
-        poptorch_model = poptorch.inferenceModel(model)
+    delta = torch.rand(1) + 0.5
+    model = torch.nn.HingeEmbeddingLoss(delta.item(), reduction=reduction)
+    poptorch_model = poptorch.inferenceModel(model)
 
-        # Generate random set of 1s and -1s for labels
-        target = torch.randint(2, [10]) * 2 - 1
+    # Generate random set of 1s and -1s for labels
+    target = torch.randint(2, [10]) * 2 - 1
 
-        input = torch.empty(10).uniform_()
+    input = torch.empty(10).uniform_()
 
-        native_out = model(input, target)
-        # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-        poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+    native_out = model(input, target)
+    poptorch_out = poptorch_model(input, target)
 
-        torch.testing.assert_allclose(native_out, poptorch_out)
+    torch.testing.assert_allclose(native_out, poptorch_out)
 
 
 torch.manual_seed(42)
@@ -504,8 +498,7 @@ def test_BCEWithLogitsLoss_direct(reduction, params):
     input = params[0]
 
     native_out = model(input, target)
-    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+    poptorch_out = poptorch_model(input, target)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
 
@@ -521,8 +514,7 @@ def test_SmoothL1Loss_direct(reduction):
     target = torch.empty(10).uniform_()
 
     native_out = model(input, target)
-    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+    poptorch_out = poptorch_model(input, target)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
 
@@ -540,12 +532,13 @@ def test_SoftMarginLoss_direct(reduction):
     target = torch.randint(2, [10]) * 2 - 1
 
     native_out = model(input, target)
-    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+    poptorch_out = poptorch_model(input, target)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
 
 
+# TODO(T30688): Support MultiLabelSoftMarginLoss
+@pytest.mark.skip()
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
 @pytest.mark.parametrize("specify_weight", {True, False})
 def test_MultiLabelSoftMarginLoss_direct(reduction, specify_weight):
@@ -562,9 +555,9 @@ def test_MultiLabelSoftMarginLoss_direct(reduction, specify_weight):
     target = torch.randint(2, [3, 10])
 
     native_out = model(input, target)
-    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-    poptorch_out = poptorch_model(input, target).reshape(native_out.shape)
+    poptorch_out = poptorch_model(input, target)
 
+    assert native_out.size() == poptorch_out.size()
     torch.testing.assert_allclose(native_out, poptorch_out)
 
 
@@ -586,9 +579,7 @@ def test_CosineEmbeddingLoss_direct(reduction):
     target = torch.randint(2, [10, 10, 3]) * 2 - 1
 
     native_out = model(input1, input2, target)
-    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-    poptorch_out = poptorch_model(input1, input2,
-                                  target).reshape(native_out.shape)
+    poptorch_out = poptorch_model(input1, input2, target)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
 
@@ -611,9 +602,7 @@ def test_MarginRankingLoss_direct(reduction):
     target = torch.randint(2, [10]) * 2 - 1
 
     native_out = model(input1, input2, target)
-    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-    poptorch_out = poptorch_model(input1, input2,
-                                  target).reshape(native_out.shape)
+    poptorch_out = poptorch_model(input1, input2, target)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
 
@@ -638,8 +627,6 @@ def test_TripletMarginLoss_direct(p, swap, reduction):
     negative = torch.randn(10, 5)
 
     native_out = model(anchor, positive, negative)
-    # TODO(T27727): Must reshape since reduced losses are returned as 1D tensors rather than 0D
-    poptorch_out = poptorch_model(anchor, positive,
-                                  negative).reshape(native_out.shape)
+    poptorch_out = poptorch_model(anchor, positive, negative)
 
     torch.testing.assert_allclose(native_out, poptorch_out)

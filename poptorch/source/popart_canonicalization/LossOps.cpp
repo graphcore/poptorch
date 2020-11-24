@@ -517,6 +517,8 @@ torch::jit::Node *softMarginLossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
 
+// TODO(T30688): Unsupported since the PyTorch implementation doesn't
+//               currently use this aten function
 torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
                                                   torch::jit::Node *node) {
   // aten::multilabel_soft_margin_loss(Tensor input, Tensor target,

@@ -89,13 +89,16 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
   for (size_t i = 0; i < _popart_outputs.size(); i++) {
     poptorch::TensorId &popart_id(_popart_outputs[i]);
     std::vector<std::int64_t> dims = _compiler.getSize(popart_id);
-    // Treat scalars as 1D tensors.
-    if (dims.empty()) {
-      dims.push_back(1);
-    }
 
-    // Adjust by the popart batch dim, accounting for the anchor.
-    dims[0] *= _compiler.popartBatchDimForAnchor(popart_id);
+    std::uint64_t b_dim = _compiler.popartBatchDimForAnchor(popart_id);
+    if (b_dim > 1) {
+      // Treat scalars as 1D tensors if necessary for batching.
+      if (dims.empty()) {
+        dims.push_back(1);
+      }
+      // Adjust by the popart batch dim, accounting for the anchor.
+      dims[0] *= b_dim;
+    }
 
     // Create the torch tensor and use its memory for the popart tensor.
     at::ScalarType type = _popart_output_types[i];
