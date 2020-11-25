@@ -25,7 +25,7 @@ def to_poptorch_optimizer(optimizer):
             return enums.OptimizerType.RMSPROP_CENTERED
         return enums.OptimizerType.RMSPROP
 
-    if isinstance(optimizer, poptorch.optim.LAMB):
+    if isinstance(optimizer, poptorch.optim.LAMB):  # pylint: disable=no-member
         bias_correction = optimizer.param_groups[0]["biasCorrection"]
 
         return enums.OptimizerType.LAMB if bias_correction \
@@ -63,7 +63,7 @@ def convertOptimizerToDict(optimizer):
                 "velocity_scaling":
                 (velocity_scaling, velocity_scaling == 1.0),
             }
-        if isinstance(optimizer, (optim.AdamW, poptorch.optim.LAMB)):
+        if isinstance(optimizer, (optim.AdamW, poptorch.optim.LAMB)):  # pylint: disable=no-member
             beta1 = optimizer.param_groups[index]["betas"][0]
             beta2 = optimizer.param_groups[index]["betas"][1]
             eps = optimizer.param_groups[index]["eps"]
@@ -391,11 +391,6 @@ class PoplarExecutor:
 
         if self._executable is None:
             self._first_none_arg = in_tensors.first_none
-            logger.info(
-                "First time call to model will invoke poplar compilation.\n"
-                "Number of device iterations: %s\n"
-                "Training: %s", str(self._options.device_iterations),
-                str(self._training))
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we
             # should slice it up so we compile by the batch size alone.
