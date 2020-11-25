@@ -37,12 +37,15 @@ class _RepeatSampler:
         real_sampler (Sampler)
     """
 
-    def __init__(self, real_sampler):
+    def __init__(self, real_sampler, is_iterable):
         self.real_sampler = real_sampler
+        self.is_iterable = is_iterable
 
     def __iter__(self):
         while True:
             yield from iter(self.real_sampler)
+            if self.is_iterable:
+                yield self  # Indicate the end of the dataset
 
 
 class DataLoader(torch.utils.data.DataLoader):
@@ -84,36 +87,47 @@ class DataLoader(torch.utils.data.DataLoader):
             options.Training.gradient_accumulation
         self._options = options
 
-        num_elts = len(dataset)
-        assert drop_last or num_elts % (
-            self._combined_batch_size * options.Distributed.numProcesses
-        ) == 0, (
-            f"The number of elements in the dataset ({num_elts}) is not "
-            "divisible by the number of elements processed per step "
-            f"({self._combined_batch_size * options.Distributed.numProcesses})"
-            " and drop_last=False. Switch to drop_last=True.")
+        # Iterable datasets need to be handled differently: they don't have __getitem__ and __len__
+        self._is_iterable = isinstance(dataset,
+                                       torch.utils.data.IterableDataset)
 
-        if options.Distributed.numProcesses > 1:
-            assert not shuffle or options.exists("random_seed"), (
-                "When using distributed execution you must set "
-                "poptorch.Options.randomSeed()")
+        if self._is_iterable:
+            assert options.Distributed.numProcesses == 1, (
+                "IterableDatasets "
+                "not supported for distributed execution")
+        else:
+            num_elts = len(dataset)
+            assert drop_last or num_elts % (
+                self._combined_batch_size * options.Distributed.numProcesses
+            ) == 0, (
+                f"The number of elements in the dataset ({num_elts}) is not "
+                "divisible by the number of elements processed per step "
+                f'''({self._combined_batch_size *
+                        options.Distributed.numProcesses})'''
+                " and drop_last=False. Switch to drop_last=True.")
 
-            class _SubDataset:
-                def __init__(self, dataset, opts, step):
-                    num_elts = len(dataset)
-                    per_proc = step * (num_elts //
-                                       (step * opts.Distributed.numProcesses))
-                    self._offset = opts.Distributed.processId * per_proc
-                    self._length = min(per_proc, num_elts - self._offset)
-                    self._dataset = dataset
+            if options.Distributed.numProcesses > 1:
+                assert not shuffle or options.exists("random_seed"), (
+                    "When using distributed execution you must set "
+                    "poptorch.Options.randomSeed()")
 
-                def __len__(self):
-                    return self._length
+                class _SubDataset:
+                    def __init__(self, dataset, opts, step):
+                        num_elts = len(dataset)
+                        per_proc = step * (
+                            num_elts // (step * opts.Distributed.numProcesses))
+                        self._offset = opts.Distributed.processId * per_proc
+                        self._length = min(per_proc, num_elts - self._offset)
+                        self._dataset = dataset
 
-                def __getitem__(self, index):
-                    return self._dataset[index + self._offset]
+                    def __len__(self):
+                        return self._length
 
-            dataset = _SubDataset(dataset, options, self._combined_batch_size)
+                    def __getitem__(self, index):
+                        return self._dataset[index + self._offset]
+
+                dataset = _SubDataset(dataset, options,
+                                      self._combined_batch_size)
 
         super().__init__(dataset,
                          batch_size=self._combined_batch_size,
@@ -125,21 +139,34 @@ class DataLoader(torch.utils.data.DataLoader):
         # the dataset.
         # In order to reuse the workers between epochs we use our own infinite
         # sampler.
-        object.__setattr__(self, "batch_sampler",
-                           _RepeatSampler(self.batch_sampler))
+        object.__setattr__(
+            self, "batch_sampler",
+            _RepeatSampler(self.batch_sampler, self._is_iterable))
         # The iterator cannot be pickled, so create it in __iter__()
         self._infinite_iterator = None
 
     def __len__(self):
+        assert not self._is_iterable, ("Calling len() on an IterableDataset "
+                                       "is not supported")
         # Return the length of the real sampler
         return len(self.batch_sampler.real_sampler)
 
     def __iter__(self):
         if self._infinite_iterator is None:
             self._infinite_iterator = super().__iter__()
-        # Return a single epoch long iterator
-        for _ in range(len(self)):
-            yield next(self._infinite_iterator)  # pylint: disable=stop-iteration-return
+
+        if self._is_iterable:
+            # Return a single epoch long iterator
+            while True:
+                value = next(self._infinite_iterator)  # pylint: disable=stop-iteration-return
+                if value == self.batch_sampler:
+                    # The sampler returns itself to indicate the end of the dataset
+                    # See class _RepeatSampler
+                    break
+                yield value
+        else:
+            for _ in range(len(self)):
+                yield next(self._infinite_iterator)  # pylint: disable=stop-iteration-return
 
     @property
     def combinedBatchSize(self):

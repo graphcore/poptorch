@@ -30,6 +30,16 @@ class IncrementDataset(torch.utils.data.Dataset):
         return torch.full(self._shape, index, dtype=torch.float32)
 
 
+class IncrementIterableDataset(torch.utils.data.IterableDataset):
+    def __init__(self, shape, length):
+        self._shape = shape
+        self._length = length
+
+    def __iter__(self):
+        for index in range(self._length):
+            yield torch.full(self._shape, index, dtype=torch.float32)
+
+
 class IncrementDatasetWithLabels(torch.utils.data.Dataset):
     def __init__(self, shape, length):
         self._shape = shape
@@ -307,6 +317,41 @@ def test_single_epoch():
     loader = poptorch.AsynchronousDataAccessor(data)
     assert len(loader) == num_tensors
 
+    for _, _ in enumerate(loader):
+        continue
+
+
+def test_iterable_dataset():
+    shape = [2, 3]
+    num_tensors = 100
+
+    loader = poptorch.AsynchronousDataAccessor(
+        IncrementIterableDataset(shape, num_tensors))
+
+    for _, _ in enumerate(loader):
+        continue
+
+    # Make sure it works for more than 1 epoch
+    for _, _ in enumerate(loader):
+        continue
+
+
+def test_iterable_dataloader():
+    shape = [2, 3]
+    num_tensors = 100
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               IncrementIterableDataset(shape, num_tensors),
+                               batch_size=1,
+                               num_workers=32)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+
+    for _, _ in enumerate(loader):
+        continue
+
+    # Make sure it works for more than 1 epoch
     for _, _ in enumerate(loader):
         continue
 
