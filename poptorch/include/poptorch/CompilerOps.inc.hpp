@@ -12,6 +12,7 @@ torch::jit::Node* createScaledadd(torch::jit::Graph *graph,  const std::vector<t
 torch::jit::Node* createLstm(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t outputFullSequence);
 torch::jit::Node* createGelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createDepthtospace(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t blocksize,const std::string & mode);
 torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDynamicslice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,std::vector<int64_t> sizes,std::int32_t noOverlap);
 torch::jit::Node* createDynamicupdate(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,std::vector<int64_t> sizes,std::int32_t noOverlap);
@@ -98,7 +99,6 @@ torch::jit::Node* createClip(torch::jit::Graph *graph,  const std::vector<torch:
 torch::jit::Node* createConcat(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis);
 torch::jit::Node* createConv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
 torch::jit::Node* createConvtranspose(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & output_padding,const std::vector<int64_t> & output_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
-torch::jit::Node* createDepthtospace(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t blocksize);
 torch::jit::Node* createElu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float alpha);
 torch::jit::Node* createExp(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createFloor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

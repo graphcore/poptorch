@@ -254,3 +254,18 @@ def test_embedding():
 
     assert nativeOut.size() == poptorch_out.size()
     assert torch.equal(nativeOut, poptorch_out)
+
+
+def test_pixel_shuffle():
+    model = torch.nn.PixelShuffle(3)
+    x = torch.randn(2, 18, 4, 4)
+
+    # Run on CPU.
+    nativeOut = model(x)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+
+    assert nativeOut.size() == poptorch_out.size()
+    assert torch.equal(nativeOut, poptorch_out)

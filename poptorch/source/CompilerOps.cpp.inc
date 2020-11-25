@@ -48,6 +48,12 @@ torch::jit::Node* createDetach(torch::jit::Graph *graph,  const std::vector<torc
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::detach, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
+torch::jit::Node* createDepthtospace(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t blocksize,const std::string & mode) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::depthtospace, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->i_(c10::Symbol::fromQualString("attr::blocksize"),blocksize);
+new_node->s_(c10::Symbol::fromQualString("attr::mode"),mode);
+return new_node;
+}
 torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::round, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
@@ -492,11 +498,6 @@ new_node->is_(c10::Symbol::fromQualString("attr::output_padding"),output_padding
 new_node->is_(c10::Symbol::fromQualString("attr::output_shape"),output_shape);
 new_node->is_(c10::Symbol::fromQualString("attr::pads"),pads);
 new_node->is_(c10::Symbol::fromQualString("attr::strides"),strides);
-return new_node;
-}
-torch::jit::Node* createDepthtospace(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t blocksize) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::depthtospace, args, ImplicitCast::None, OutputType::AsFirstInput);
-new_node->i_(c10::Symbol::fromQualString("attr::blocksize"),blocksize);
 return new_node;
 }
 torch::jit::Node* createElu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float alpha) {
