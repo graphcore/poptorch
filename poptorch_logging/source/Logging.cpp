@@ -115,12 +115,14 @@ LoggingContext::LoggingContext() {
 
   logger->set_pattern("%^[%T.%e] [poptorch:cpp] [%l] %v%$");
   logger->set_level(translate(default_level));
-  output_popart_ir = log_level == "DEBUG_IR" || shouldLog(Level::Trace);
+  output_popart_ir = log_level == "DEBUG_IR";
 }
 
 } // namespace
 
-bool outputPopartIR() { return context().output_popart_ir; }
+bool outputPopartIR() {
+  return context().output_popart_ir || shouldLog(Level::Trace);
+}
 
 void log(Level l, const char *msg) { context().logger->log(translate(l), msg); }
 
