@@ -422,6 +422,7 @@ static bool handlers = registerHandlers(
     c10::aten::permute,  permuteHandler,
     c10::aten::transpose, transposeHandler,
     c10::aten::to, toHandler,
+    c10::aten::type_as, toHandler,
     c10::aten::upsample_nearest1d, upsampleHandler,
     c10::aten::upsample_nearest2d, upsampleHandler,
     c10::aten::upsample_nearest3d, upsampleHandler,
