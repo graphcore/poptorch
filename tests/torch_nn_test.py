@@ -35,36 +35,21 @@ EXPECTED_FAILURES = {
     "test_nn_interpolate_nearest_3d_zero_dim": "Cannot force a non-constant node to a float",
     "test_nn_interpolate_nearest_tuple_3d": "Cannot force a non-constant node to a float",
 
-    "test_nn_Softshrink_lambda": "LowerToPopart no registered op",
-    "test_nn_LeakyReLU": "LowerToPopart no registered op",
+    "test_nn_Softshrink_lambda": "T30552",
+    "test_nn_Hardshrink": "T30560",
 
-    "test_nn_PReLU_1d": "Broadcasting failed",
-    "test_nn_PReLU_2d": "Broadcasting failed",
-    "test_nn_PReLU_3d": "Broadcasting failed",
     "test_nn_CrossMapLRN2d": "Broadcasting failed",
     "test_nn_PReLU_1d_multiparam": "Broadcasting failed",
     "test_nn_PReLU_2d_multiparam": "Broadcasting failed",
-    "test_nn_Hardshrink": "Broadcasting failed",
-    "test_nn_Softmax": "Broadcasting failed",
-    "test_nn_Flatten": "Broadcasting failed",
     "test_nn_PReLU_3d_multiparam": "Broadcasting failed",
 
-    "test_nn_BatchNorm1d_affine_simple_average": "Failing Cast",
-    "test_nn_BatchNorm1d_not_tracking_stats": "Failing Cast",
-    "test_nn_BatchNorm1d_3d_input_not_affine": "Failing Cast",
-    "test_nn_BatchNorm2d_momentum": "Failing Cast",
-    "test_nn_BatchNorm2d_not_tracking_stats": "Failing Cast",
-    "test_nn_BatchNorm3d_momentum": "Failing Cast",
-    "test_nn_BatchNorm3d_not_tracking_stats": "Failing Cast",
-    "test_nn_BatchNorm1d_3d_input": "Failing Cast",
-    "test_nn_BatchNorm1d_not_affine": "Failing Cast",
-    "test_nn_BatchNorm2d_2d_simple_average": "Failing Cast",
-    "test_nn_BatchNorm2d_not_affine": "Failing Cast",
-    "test_nn_BatchNorm1d_affine": "Failing Cast",
-    "test_nn_BatchNorm2d": "Failing Cast",
+    "test_nn_BatchNorm1d_3d_input_not_affine": "No input found for input 1 of ai.onnx.BatchNormalization",
+    "test_nn_BatchNorm1d_not_affine": "No input found for input 1 of ai.onnx.BatchNormalization",
+    "test_nn_BatchNorm2d_not_affine": "No input found for input 1 of ai.onnx.BatchNormalization",
 
-    "test_nn_GroupNorm_1d_affine": "Invalid number of channels",
-    "test_nn_LayerNorm_1d_empty_elementwise_affine": "StepIO did not provide input data for tensor input",
+    "test_nn_GroupNorm_1d_affine": "margin of error",
+    "test_nn_LayerNorm_1d_empty_elementwise_affine": "std::out_of_range exception",
+
     "test_nn_Conv1d_zero_batch": "StepIO did not provide input data for tensor input",
     "test_nn_Conv2d_zero_batch": "StepIO did not provide input data for tensor input",
     "test_nn_Conv3d_zero_batch": "StepIO did not provide input data for tensor input",
@@ -74,13 +59,13 @@ EXPECTED_FAILURES = {
     "test_nn_MaxPool2d_3d_input": "Invalid length of strides vector",
     "test_nn_LPPool2d_norm": "Invalid length of padding vector",
 
-    "test_nn_AdaptiveMaxPool2d_single": "std::vector out of bounds access",
-    "test_nn_AdaptiveMaxPool2d_tuple": "std::vector out of bounds access",
-    "test_nn_AdaptiveMaxPool2d_tuple_none": "std::vector out of bounds access",
-    "test_nn_AdaptiveAvgPool2d_single": "std::vector out of bounds access",
-    "test_nn_AdaptiveAvgPool2d_single_1x1output": "std::vector out of bounds access",
-    "test_nn_AdaptiveAvgPool2d_tuple": "std::vector out of bounds access",
-    "test_nn_AdaptiveAvgPool2d_tuple_none": "std::vector out of bounds access",
+    "test_nn_AdaptiveMaxPool2d_single": "T30564",
+    "test_nn_AdaptiveMaxPool2d_tuple": "T30564",
+    "test_nn_AdaptiveMaxPool2d_tuple_none": "T30564",
+
+    "test_nn_AdaptiveAvgPool2d_single": "margin of error",
+    "test_nn_AdaptiveAvgPool2d_tuple": "margin of error",
+    "test_nn_AdaptiveAvgPool2d_tuple_none": "margin of error",
 
     "test_nn_Conv3d_circular_stride2_pad2": "hangs ? really slow ?",
     "test_nn_Padding122112_3dcircular": "hangs ? really slow ?",
@@ -130,10 +115,6 @@ EXPECTED_FAILURES = {
     "test_nn_Bilinear": "TypeError: bilinear(): argument 'input2' (position 2) must be Tensor, not tuple",
     "test_nn_Embedding": "RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got torch.FloatTensor instead (while checking arguments for embedding)",
 
-    "test_nn_BatchNorm2d_zero_batch": "ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:20, 5:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
-    "test_nn_BatchNorm1d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:45, 5:9, 9:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
-    "test_nn_BatchNorm3d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:40, 5:8, 2:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
-
     "test_nn_BCELoss_weights_no_reduce_scalar": "IndexError: tuple index out of range",
     "test_nn_BCEWithLogitsLoss_no_reduce_scalar": "IndexError: tuple index out of range",
     "test_nn_KLDivLoss_no_reduce_scalar": "IndexError: tuple index out of range",
@@ -168,73 +149,83 @@ EXPECTED_FAILURES = {
     "test_nn_Softmin_scalar": "IndexError: tuple index out of range",
     "test_nn_Tanhshrink_scalar": "IndexError: tuple index out of range",
 
-    "test_nn_InstanceNorm3d_tracking_stats": "Unsupported op(s): aten::instance_norm",
-    "test_nn_FractionalMaxPool2d_ratio": "Unsupported op(s): aten::fractional_max_pool2d",
-    "test_nn_FractionalMaxPool2d_size": "Unsupported op(s): aten::fractional_max_pool2d",
-    "test_nn_FractionalMaxPool3d_ratio": "Unsupported op(s): aten::fractional_max_pool3d",
-    "test_nn_FractionalMaxPool3d_size": "Unsupported op(s): aten::fractional_max_pool3d",
-    "test_nn_FractionalMaxPool3d_asymsize": "Unsupported op(s): aten::fractional_max_pool3d",
-    "test_nn_Threshold_threshold_value": "Unsupported op(s): aten::threshold",
-    "test_nn_Threshold_large_value": "Unsupported op(s): aten::threshold",
-    "test_nn_RReLU": "Unsupported op(s): aten::rrelu",
-    "test_nn_RReLU_with_up_down": "Unsupported op(s): aten::rrelu",
-    "test_nn_LogSigmoid": "Unsupported op(s): aten::log_sigmoid",
-    "test_nn_Softplus": "Unsupported op(s): aten::softplus",
-    "test_nn_Softplus_beta": "Unsupported op(s): aten::softplus",
-    "test_nn_Softplus_beta_threshold": "Unsupported op(s): aten::softplus",
-    "test_nn_Softshrink": "Unsupported op(s): aten::softshrink",
-    "test_nn_PoissonNLLLoss_no_reduce": "Unsupported op(s): aten::poisson_nll_loss",
-    "test_nn_KLDivLoss_no_reduce": "Unsupported op(s): aten::kl_div aten::kl_div",
-    "test_nn_KLDivLoss_no_reduce_log_target": "Unsupported op(s): aten::kl_div aten::type_as",
-    "test_nn_NLLLoss_no_reduce_weights": "Unsupported op(s): aten::type_as",
-    "test_nn_NLLLoss_no_reduce_weights_ignore_index": "Unsupported op(s): aten::type_as",
-    "test_nn_NLLLoss_no_reduce_weights_ignore_index_neg": "Unsupported op(s): aten::type_as",
-    "test_nn_NLLLoss2d_no_reduce_weights": "Unsupported op(s): aten::type_as aten::nll_loss2d",
-    "test_nn_NLLLoss2d_no_reduce_ignore_index": "Unsupported op(s): aten::type_as aten::nll_loss2d",
-    "test_nn_NLLLossNd_no_reduce_weights": "Unsupported op(s): aten::type_as aten::nll_loss2d",
-    "test_nn_NLLLossNd_no_reduce_ignore_index": "Unsupported op(s): aten::type_as aten::nll_loss2d",
-    "test_nn_SmoothL1Loss_no_reduce": "Unsupported op(s): aten::smooth_l1_loss aten::type_as aten::multilabel_margin_loss",
-    "test_nn_MultiLabelMarginLoss_index_neg": "Unsupported op(s): aten::type_as aten::multilabel_margin_loss ",
-    "test_nn_MultiLabelMarginLoss_no_reduce": "Unsupported op(s): aten::type_as aten::multilabel_margin_loss",
-    "test_nn_HingeEmbeddingLoss_no_reduce": "Unsupported op(s): aten::type_as aten::hinge_embedding_loss",
-    "test_nn_HingeEmbeddingLoss_margin_no_reduce": "Unsupported op(s): aten::type_as aten::hinge_embedding_loss",
-    "test_nn_SoftMarginLoss_no_reduce": "Unsupported op(s): aten::soft_margin_loss",
-    "test_nn_MultiLabelSoftMarginLoss_no_reduce": "Unsupported op(s): aten::log_sigmoid",
-    "test_nn_MultiLabelSoftMarginLoss_weights_no_reduce": "Unsupported op(s): aten::log_sigmoid",
-    "test_nn_MultiMarginLoss_no_reduce": "Unsupported op(s): aten::type_as aten::multi_margin_loss",
-    "test_nn_MultiMarginLoss_1d_no_reduce": "Unsupported op(s): aten::type_as aten::multi_margin_loss",
-    "test_nn_multimarginloss_1d_input_0d_target_no_reduce": "Unsupported op(s): aten::type_as aten::multi_margin_loss",
-    "test_nn_MultiMarginLoss_p_no_reduce": "Unsupported op(s): aten::type_as aten::multi_margin_loss",
-    "test_nn_MultiMarginLoss_margin_no_reduce": "Unsupported op(s): aten::type_as aten::multi_margin_loss",
-    "test_nn_MultiMarginLoss_weights_no_reduce": "Unsupported op(s): aten::type_as aten::multi_margin_loss",
-    "test_nn_InstanceNorm1d": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm1d_tracking_stats": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm2d": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm2d_tracking_stats": "Unsupported op(s): aten::instance_norm",
-    "test_nn_InstanceNorm3d": "Unsupported op(s): aten::instance_norm",
-    "test_nn_PixelShuffle": "Unsupported op(s): aten::pixel_shuffle",
-    "test_nn_AdaptiveMaxPool1d": "Unsupported op(s): aten::adaptive_max_pool1d aten::adaptive_max_pool3d ",
-    "test_nn_AdaptiveMaxPool3d_tuple": "Unsupported op(s): aten::adaptive_max_pool3d",
-    "test_nn_AdaptiveMaxPool3d_tuple_none": "Unsupported op(s): aten::adaptive_max_pool3d",
-    "test_nn_AdaptiveMaxPool3d_single_nonatomic": "Unsupported op(s): aten::adaptive_max_pool3d",
-    "test_nn_AdaptiveMaxPool3d_tuple_nonatomic": "Unsupported op(s): aten::adaptive_max_pool3d",
-    "test_nn_AdaptiveAvgPool1d": "Unsupported op(s): aten::adaptive_avg_pool1d",
-    "test_nn_AdaptiveAvgPool1d_one_output": "Unsupported op(s): aten::adaptive_avg_pool1d aten::adaptive_avg_pool3d",
-    "test_nn_AdaptiveAvgPool3d_tuple": "Unsupported op(s): aten::adaptive_avg_pool3d",
-    "test_nn_AdaptiveAvgPool3d_tuple_none": "Unsupported op(s): aten::adaptive_avg_pool3d aten::celu aten::glu",
-    "test_nn_GLU_dim": "Unsupported op(s): aten::glu aten::im2col",
-    "test_nn_Fold": "Unsupported op(s): aten::col2im",
-    "test_nn_Unfold_int_input": "Unsupported op(s): aten::im2col",
-    "test_nn_Fold_int_input": "Unsupported op(s): aten::col2im",
-    "test_nn_LSTMCell": "Unsupported op(s): aten::sigmoid_ aten::tanh_",
-    "test_nn_GRUCell": "Unsupported op(s): aten::sigmoid_ aten::tanh_",
-    "test_nn_MultiLabelMarginLoss_1d_no_reduce": "Unsupported op(s): aten::type_as aten::multilabel_margin_loss",
-    "test_nn_AdaptiveMaxPool3d_single": "Unsupported op(s): aten::adaptive_max_pool3d",
-    "test_nn_AdaptiveAvgPool3d_single": "Unsupported op(s): aten::adaptive_avg_pool3d",
-    "test_nn_CELU": "Unsupported op(s): aten::celu",
-    "test_nn_GLU": "Unsupported op(s): aten::glu",
-    "test_nn_Unfold": "Unsupported op(s): aten::im2col",
+    # input 1 for ai.graphcore.BatchNormalization
+    "test_nn_BatchNorm2d_zero_batch": "ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:20, 5:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
+    "test_nn_BatchNorm1d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:45, 5:9, 9:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
+    "test_nn_BatchNorm3d_zero_batch": "RuntimeError: ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:40, 5:8, 2:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
 
+    # input 1 for ai.graphcore.GroupNormalization
+    "test_nn_InstanceNorm3d_tracking_stats": "Unsupported op(s): aten::instance_norm",
+    "test_nn_InstanceNorm1d": "Unsupported op(s): aten::instance_norm",
+    "test_nn_InstanceNorm2d": "Unsupported op(s): aten::instance_norm",
+    "test_nn_InstanceNorm3d": "Unsupported op(s): aten::instance_norm",
+
+    # margin of error
+    "test_nn_KLDivLoss_no_reduce": "Unsupported op(s): aten::kl_div aten::kl_div",
+
+    # half/float type mismatch
+    "test_nn_InstanceNorm1d_tracking_stats": "Unsupported op(s): aten::instance_norm",
+    "test_nn_InstanceNorm2d_tracking_stats": "Unsupported op(s): aten::instance_norm",
+
+    "test_nn_FractionalMaxPool2d_ratio": "T30594",
+    "test_nn_FractionalMaxPool2d_size": "T30594",
+    "test_nn_FractionalMaxPool3d_ratio": "T30594",
+    "test_nn_FractionalMaxPool3d_size": "T30594",
+    "test_nn_FractionalMaxPool3d_asymsize": "T30594",
+    "test_nn_Threshold_threshold_value": "T30611",
+    "test_nn_Threshold_large_value": "T30611",
+    "test_nn_RReLU": "T30598",
+    "test_nn_RReLU_with_up_down": "T30598",
+    "test_nn_Softplus": "T30599",
+    "test_nn_Softplus_beta": "T30599",
+    "test_nn_Softplus_beta_threshold": "T30599",
+    "test_nn_Softshrink": "T30599",
+    "test_nn_BCELoss_no_reduce": "T30603",
+    "test_nn_BCEWithLogitsLoss_no_reduce": "T30603",
+    "test_nn_NLLLoss_no_reduce_ignore_index": "T30603",
+    "test_nn_NLLLoss_no_reduce_weights": "T30603",
+    "test_nn_NLLLoss_no_reduce_weights_ignore_index": "T30603",
+    "test_nn_NLLLoss_no_reduce_weights_ignore_index_neg": "T30603",
+    "test_nn_NLLLoss2d_no_reduce": "T30603",
+    "test_nn_NLLLoss2d_no_reduce_weights": "T30603",
+    "test_nn_NLLLoss2d_no_reduce_ignore_index": "T30603",
+    "test_nn_NLLLossNd_no_reduce": "T30603",
+    "test_nn_NLLLossNd_no_reduce_weights": "T30603",
+    "test_nn_NLLLossNd_no_reduce_ignore_index": "T30603",
+    "test_nn_MultiLabelMarginLoss_index_neg": "T30603",
+    "test_nn_MultiLabelMarginLoss_no_reduce": "T30603",
+    "test_nn_HingeEmbeddingLoss_no_reduce": "T30603",
+    "test_nn_HingeEmbeddingLoss_margin_no_reduce": "T30603",
+    "test_nn_MultiMarginLoss_no_reduce": "T30603",
+    "test_nn_MultiMarginLoss_1d_no_reduce": "T30603",
+    "test_nn_multimarginloss_1d_input_0d_target_no_reduce": "T30603",
+    "test_nn_MultiMarginLoss_p_no_reduce": "T30603",
+    "test_nn_MultiMarginLoss_margin_no_reduce": "T30603",
+    "test_nn_MultiMarginLoss_weights_no_reduce": "T30603",
+    "test_nn_PixelShuffle": "T30611",
+    "test_nn_AdaptiveMaxPool1d": "T30564",
+    "test_nn_AdaptiveMaxPool3d_tuple": "T30564",
+    "test_nn_AdaptiveMaxPool3d_tuple_none": "T30564",
+    "test_nn_AdaptiveMaxPool3d_single_nonatomic": "T30564",
+    "test_nn_AdaptiveMaxPool3d_tuple_nonatomic": "T30564",
+    "test_nn_AdaptiveAvgPool1d": "T30591",
+    "test_nn_AdaptiveAvgPool1d_one_output": "T30591",
+    "test_nn_AdaptiveAvgPool3d_tuple": "T30591",
+    "test_nn_AdaptiveAvgPool3d_tuple_none": "T30591",
+    "test_nn_GLU_dim": "T30606",
+    "test_nn_Fold": "T30606",
+    "test_nn_Unfold_int_input": "T30606",
+    "test_nn_Fold_int_input": "T30606",
+    "test_nn_LSTMCell": "T30600",
+    "test_nn_GRUCell": "T30600",
+    "test_nn_MultiLabelMarginLoss_1d_no_reduce": "T30603",
+    "test_nn_AdaptiveMaxPool3d_single": "T30564",
+    "test_nn_AdaptiveAvgPool3d_single": "T30591",
+    "test_nn_CELU": "T30598",
+    "test_nn_GLU": "T30598",
+    "test_nn_Unfold": "T30606",
+
+    # unsupported upsamplig modes downstream
     "test_nn_interpolate_linear_1d": "Upsample mode not supported",
     "test_nn_interpolate_linear_tuple_1d": "Upsample mode not supported",
     "test_nn_interpolate_linear_scale_1d": "Upsample mode not supported",
@@ -264,18 +255,17 @@ EXPECTED_FAILURES = {
     "test_nn_interpolate_trilinear_tuple_3d_align_corners": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_scale_3d_align_corners": "Upsample mode not supported",
 
-    "test_nn_EmbeddingBag_mean": "PopartCanonicalization: Unsupported arrange op",
-    "test_nn_EmbeddingBag_sum": "PopartCanonicalization: Unsupported arrange op",
-    "test_nn_EmbeddingBag_max": "PopartCanonicalization: Unsupported arrange op",
-    "test_nn_EmbeddingBag_sparse": "PopartCanonicalization: Unsupported arrange op",
-    "test_nn_Embedding_sparse": "PopartCanonicalization: Unsupported aten::embedding operation",
+    "test_nn_EmbeddingBag_mean": "T30611",
+    "test_nn_EmbeddingBag_sum": "T30611",
+    "test_nn_EmbeddingBag_max": "T30611",
+    "test_nn_EmbeddingBag_sparse": "T30611",
+    "test_nn_Embedding_sparse": "T30611",
 
-    "test_nn_Padding1221_2dcircular": "Takes too long",
-    "test_nn_Padding2322_2dcircular": "Takes too long",
-    "test_nn_Padding3331_2dcircular": "Takes too long",
+    "test_nn_MultiheadAttention": "ai.onnx.Dropout:10 ratio value 0 is not valid",
     }
 
 HALF_EXPECTED_FAILURES = {
+    # T30734
     "test_nn_AvgPool1d": "Trying to connect tensor of type 'float' to field of type half",
     "test_nn_AvgPool1d_stride": "Trying to connect tensor of type 'float' to field of type half",
     "test_nn_AvgPool2d": "Trying to connect tensor of type 'float' to field of type half",
@@ -287,9 +277,22 @@ HALF_EXPECTED_FAILURES = {
     "test_nn_AvgPool3d": "Trying to connect tensor of type 'float' to field of type half",
     "test_nn_AvgPool3d_stride": "Trying to connect tensor of type 'float' to field of type half",
     "test_nn_AvgPool3d_stride1_pad0_gpu_input": "Trying to connect tensor of type 'float' to field of type half",
-    "test_nn_BatchNorm3d_3d_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 30.140776455402374 (0.9842235445976257 vs. 31.125), which occurred at index (1, 0, 2, 2, 3).",
-    "test_nn_BatchNorm3d": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 312.5105660557747 (0.9894339442253113 vs. 313.5), which occurred at index (1, 2, 2, 1, 1).",
 
+    # T30731 - tests failing with very large error
+    "test_nn_BatchNorm1d_affine_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm2d_momentum": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm3d_momentum": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm1d_3d_input": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm2d_2d_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm1d_affine": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm2d": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm3d": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 312.5105660557747 (0.9894339442253113 vs. 313.5), which occurred at index (1, 2, 2, 1, 1).",
+    "test_nn_BatchNorm3d_3d_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 30.140776455402374 (0.9842235445976257 vs. 31.125), which occurred at index (1, 0, 2, 2, 3).",
+
+    # T30732 - half/float output type mismatch
+    "test_nn_BatchNorm1d_not_tracking_stats": "Type mismatch for tensor_constant",
+    "test_nn_BatchNorm3d_not_tracking_stats": "Type mismatch for tensor_constant",
+    "test_nn_BatchNorm2d_not_tracking_stats": "Type mismatch for tensor_constant",
     }
 
 HALF_PRECISION_EXCEPTIONS = {
@@ -297,7 +300,6 @@ HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv3d_groups": (0.05, 1e-3),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),
-    "test_nn_MultiheadAttention": (0.05, 1e-3),
     }
 
 # pylint: enable=line-too-long
@@ -349,6 +351,9 @@ def assert_allclose(native_out, poptorch_out, rtol, atol):
             assert_allclose(native_out_t, poptorch_out[idx], rtol, atol)
         return
 
+    if native_out.size() == tuple():
+        native_out = torch.tensor(native_out.float())
+
     assert native_out.size() == poptorch_out.size()
     torch.testing.assert_allclose(native_out.float(),
                                   poptorch_out.float(),
@@ -394,10 +399,26 @@ def test_pytorch_nn(test_name, use_half):
 
 
 if __name__ == "__main__":
-    assert len(sys.argv) == 2, f"Usage {sys.argv[0]} test_name"
+    assert len(sys.argv) >= 2, f"Usage {sys.argv[0]} (test_name)+"
 
     # Disable expected failures:
     EXPECTED_FAILURES.clear()
     HALF_EXPECTED_FAILURES.clear()
 
-    test_pytorch_nn(sys.argv[1], os.environ.get("HALF", "0") == "1")
+    if len(sys.argv) == 2:
+        test_pytorch_nn(sys.argv[1], os.environ.get("HALF", "0") == "1")
+        sys.exit(0)
+
+    fails = []
+    for testname in sys.argv[1:]:
+        try:
+            test_pytorch_nn(testname, os.environ.get("HALF", "0") == "1")
+        except (RuntimeError, AssertionError):
+            fails.append(testname)
+
+    if len(fails) > 0:
+        print("\nFailed Tests:")
+    for fail in fails:
+        print("\t" + fail)
+
+    sys.exit(len(fails))
