@@ -45,6 +45,9 @@ void setLogLevel(Level l);
 // Return true if the passed log level is currently enabled.
 bool shouldLog(Level l);
 
+// Return true if the Popart IR should be dumped.
+bool outputPopartIR();
+
 // Flush the log. By default it is only flushed when the underlying libc
 // decides to.
 void flush();

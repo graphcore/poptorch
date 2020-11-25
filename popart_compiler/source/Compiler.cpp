@@ -58,6 +58,9 @@ bool ipuSmallModelEnvironmentVariableIsEnabled() {
   }
   if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
     bool model_enabled = std::stoi(env_use_model) != 0;
+    logging::info("From POPTORCH_SMALL_IPU_MODEL environment variable: small "
+                  "Ipu model: {}",
+                  model_enabled ? "Enabled" : "Disabled");
     return model_enabled;
   }
   return false;

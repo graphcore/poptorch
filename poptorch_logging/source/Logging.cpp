@@ -33,6 +33,7 @@ spdlog::level::level_enum translate(Level l) {
 struct LoggingContext {
   LoggingContext();
   std::shared_ptr<spdlog::logger> logger;
+  bool output_popart_ir{false};
 };
 
 LoggingContext &context() {
@@ -46,7 +47,7 @@ Level logLevelFromString(const std::string &level) {
   if (level == "TRACE" || level == "TRACE_ALL") {
     return Level::Trace;
   }
-  if (level == "DEBUG") {
+  if (level == "DEBUG" || level == "DEBUG_IR") {
     return Level::Debug;
   }
   if (level == "INFO") {
@@ -64,7 +65,7 @@ Level logLevelFromString(const std::string &level) {
 
   throw std::runtime_error(fmt::format(
       "Unknown POPTORCH_LOG_LEVEL '{}'. Valid values are TRACE_ALL, TRACE, "
-      "DEBUG, INFO, WARN, ERR and OFF.",
+      "DEBUG, DEBUG_IR, INFO, WARN, ERR and OFF.",
       level));
 }
 
@@ -88,11 +89,12 @@ LoggingContext::LoggingContext() {
   // Get logging output from the POPTORCH_LOG_DEST environment variable.
   // The valid options are "stdout", "stderr", or if it is neither
   // of those it is treated as a filename. The default is stderr.
-  std::string log_dest = poptorch_log_dest ? poptorch_log_dest : "stderr";
+  const std::string log_dest = poptorch_log_dest ? poptorch_log_dest : "stderr";
+  const std::string log_level =
+      poptorch_log_level ? poptorch_log_level : "WARN";
 
   // Get logging level from OS ENV. The default level is off.
-  Level default_level =
-      logLevelFromString(poptorch_log_level ? poptorch_log_level : "WARN");
+  Level default_level = logLevelFromString(log_level);
 
   if (log_dest == "stdout") {
     auto sink = std::shared_ptr<spdlog::sinks::ansicolor_stdout_sink_mt>();
@@ -113,9 +115,12 @@ LoggingContext::LoggingContext() {
 
   logger->set_pattern("%^[%T.%e] [poptorch:cpp] [%l] %v%$");
   logger->set_level(translate(default_level));
+  output_popart_ir = log_level == "DEBUG_IR" || shouldLog(Level::Trace);
 }
 
 } // namespace
+
+bool outputPopartIR() { return context().output_popart_ir; }
 
 void log(Level l, const char *msg) { context().logger->log(translate(l), msg); }
 

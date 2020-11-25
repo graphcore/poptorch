@@ -796,7 +796,11 @@ lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
                            std::move(options)};
   lower_impl.lower();
 
-  return lower_impl.compile();
+  auto executable = lower_impl.compile();
+  if (logging::outputPopartIR()) {
+    logging::debug("Popart IR: {}", executable->getPopartIR());
+  }
+  return executable;
 }
 
 } // namespace poptorch
