@@ -47,6 +47,9 @@ class _RepeatSampler:
             if self.is_iterable:
                 yield self  # Indicate the end of the dataset
 
+    def __len__(self):
+        return len(self.real_sampler)
+
 
 class DataLoader(torch.utils.data.DataLoader):
     """ Thin wrapper around the traditional `torch.utils.data.DataLoader` to
@@ -63,6 +66,7 @@ class DataLoader(torch.utils.data.DataLoader):
                  shuffle=False,
                  num_workers=0,
                  drop_last=True,
+                 persistent_workers=None,
                  **kwargs):
         """
         :param poptorch.Options options: Options that will be used to compile
@@ -77,15 +81,24 @@ class DataLoader(torch.utils.data.DataLoader):
         :param bool drop_last: If True and the number of elements in the
             dataset is not a multiple of the combined batch size then the
             incomplete batch at the end will be dropped.
+        :param bool persistent_workers: Re-use workers between
+            iterations if True.
+            If None (default): enabled if num_workers > 0, disabled otherwise.
         :param kwargs: Other options to pass to the Torch's DataLoader's
             constructor.
         """
         assert isinstance(options, Options)
-        self._combined_batch_size = batch_size * \
-            options.device_iterations * \
-            options.replication_factor * \
-            options.Training.gradient_accumulation
-        self._options = options
+        if persistent_workers is None:
+            persistent_workers = num_workers > 0
+
+        if batch_size is None:
+            self._combined_batch_size = None
+        else:
+            self._combined_batch_size = batch_size * \
+                options.device_iterations * \
+                options.replication_factor * \
+                options.Training.gradient_accumulation
+            self._options = options
 
         # Iterable datasets need to be handled differently: they don't have __getitem__ and __len__
         self._is_iterable = isinstance(dataset,
@@ -97,9 +110,9 @@ class DataLoader(torch.utils.data.DataLoader):
                 "not supported for distributed execution")
         else:
             num_elts = len(dataset)
-            assert drop_last or num_elts % (
-                self._combined_batch_size * options.Distributed.numProcesses
-            ) == 0, (
+            assert drop_last or self._combined_batch_size is None or \
+                num_elts % (self._combined_batch_size *
+                            options.Distributed.numProcesses) == 0, (
                 f"The number of elements in the dataset ({num_elts}) is not "
                 "divisible by the number of elements processed per step "
                 f'''({self._combined_batch_size *
@@ -110,6 +123,9 @@ class DataLoader(torch.utils.data.DataLoader):
                 assert not shuffle or options.exists("random_seed"), (
                     "When using distributed execution you must set "
                     "poptorch.Options.randomSeed()")
+                assert self._combined_batch_size is not None, (
+                    "batch_size=None not allowed for distributed"
+                    " execution.")
 
                 class _SubDataset:
                     def __init__(self, dataset, opts, step):
@@ -139,19 +155,23 @@ class DataLoader(torch.utils.data.DataLoader):
         # the dataset.
         # In order to reuse the workers between epochs we use our own infinite
         # sampler.
-        object.__setattr__(
-            self, "batch_sampler",
-            _RepeatSampler(self.batch_sampler, self._is_iterable))
-        # The iterator cannot be pickled, so create it in __iter__()
+        if persistent_workers:
+            if self.batch_sampler is not None:
+                object.__setattr__(
+                    self, "batch_sampler",
+                    _RepeatSampler(self.batch_sampler, self._is_iterable))
+            if self.sampler is not None:
+                object.__setattr__(
+                    self, "sampler",
+                    _RepeatSampler(self.sampler, self._is_iterable))
+            # The iterator cannot be pickled, so create it in __iter__()
         self._infinite_iterator = None
-
-    def __len__(self):
-        assert not self._is_iterable, ("Calling len() on an IterableDataset "
-                                       "is not supported")
-        # Return the length of the real sampler
-        return len(self.batch_sampler.real_sampler)
+        self._persistent_workers = persistent_workers
 
     def __iter__(self):
+        if not self._persistent_workers:
+            yield from super().__iter__()
+            return
         if self._infinite_iterator is None:
             self._infinite_iterator = super().__iter__()
 
@@ -247,7 +267,10 @@ class AsynchronousDataAccessor:
         if self._data_fetcher:
             if self._data_fetcher.exitcode is None:
                 # Send the exit signal if the worker is still alive.
-                self._pipe.send(0)
+                try:
+                    self._pipe.send(0)
+                except BrokenPipeError:
+                    pass
             self._data_fetcher.join(timeout=5)
             # In case it didn't exit cleanly: terminate() it
             self._data_fetcher.terminate()
@@ -273,7 +296,13 @@ class AsynchronousDataAccessor:
                      os.getpid())
         dataset_iterator = iter(self._training_data)
 
-        data = next(dataset_iterator)
+        data = None
+        try:
+            data = next(dataset_iterator)
+        except StopIteration:
+            pass
+        if data is None:
+            raise RuntimeError("The Dataset is empty")
 
         # We support either a single tensor or a flat 1D iterable of tensors.
         is_single_tensor = False
@@ -429,24 +458,27 @@ class AsynchronousDataAccessor:
         self._data_fetcher.start()
         child_queue.close()
         child_setup_complete.close()
+        try:
+            self._ready_to_read_index = queue.recv()
+            buffer_len = queue.recv()
+            self._is_single_tensor = queue.recv()
+            self._eof_event_tensor = queue.recv()
+            self._data_buffers = []
 
-        self._ready_to_read_index = queue.recv()
+            for _ in range(0, buffer_len):
+                # Get the buffer from the host.
+                buffer = queue.recv()
+                self._data_buffers.append(buffer)
 
-        buffer_len = queue.recv()
-
-        self._is_single_tensor = queue.recv()
-
-        self._eof_event_tensor = queue.recv()
-
-        self._data_buffers = []
-
-        for _ in range(0, buffer_len):
-            # Get the buffer from the host.
-            buffer = queue.recv()
-            self._data_buffers.append(buffer)
-
-        # We're all set: let the worker know.
-        self._pipe.send(0)
+            # We're all set: let the worker know.
+            self._pipe.send(0)
+            return
+        except EOFError:
+            pass
+        # Exit the except block before raising a cleaner exception otherwise the previous one will not be cleared.
+        raise RuntimeError(
+            "AsynchronousDataAccessor worker thread failed to start "
+            "(Check above for details)")
 
     def __iter__(self):
         self._eof_event_tensor[0] = -1

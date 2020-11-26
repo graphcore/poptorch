@@ -40,6 +40,11 @@ class IncrementIterableDataset(torch.utils.data.IterableDataset):
             yield torch.full(self._shape, index, dtype=torch.float32)
 
 
+class IncrementIterableDatasetWithLen(IncrementIterableDataset):
+    def __len__(self):
+        return self._length
+
+
 class IncrementDatasetWithLabels(torch.utils.data.Dataset):
     def __init__(self, shape, length):
         self._shape = shape
@@ -348,12 +353,61 @@ def test_iterable_dataloader():
 
     loader = poptorch.AsynchronousDataAccessor(data)
 
-    for _, _ in enumerate(loader):
+    for _, t in enumerate(loader):
+        assert t.shape == torch.Size([1, 2, 3])
         continue
 
     # Make sure it works for more than 1 epoch
     for _, _ in enumerate(loader):
         continue
+
+
+def test_batch_size_None():
+    shape = [2, 3]
+    num_tensors = 10
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               IncrementIterableDataset(shape, num_tensors),
+                               batch_size=None,
+                               drop_last=False,
+                               num_workers=2)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+
+    for _, t in enumerate(loader):
+        assert t.shape == torch.Size([2, 3])
+        continue
+
+    # Make sure it works for more than 1 epoch
+    for _, _ in enumerate(loader):
+        continue
+
+
+def test_len():
+    shape = [2, 3]
+    num_tensors = 10
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               IncrementIterableDataset(shape, num_tensors),
+                               batch_size=None,
+                               drop_last=False,
+                               num_workers=2)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+    with pytest.raises(TypeError,
+                       match="'IncrementIterableDataset' has no len()"):
+        len(loader)
+    data = poptorch.DataLoader(opts,
+                               IncrementIterableDatasetWithLen(
+                                   shape, num_tensors),
+                               batch_size=None,
+                               drop_last=False,
+                               num_workers=2)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+    len(loader)
 
 
 def test_broken_dataset():
@@ -365,7 +419,7 @@ def test_broken_dataset():
                                batch_size=1,
                                num_workers=32)
 
-    with pytest.raises(EOFError):
+    with pytest.raises(RuntimeError, match="worker thread failed to start"):
         poptorch.AsynchronousDataAccessor(data)
 
 
@@ -396,27 +450,54 @@ def test_reuse_workers():
                                IncrementDataset(shape, num_tensors),
                                batch_size=1,
                                num_workers=32)
+    data_no_reuse = poptorch.DataLoader(opts,
+                                        IncrementDataset(shape, num_tensors),
+                                        batch_size=1,
+                                        persistent_workers=False,
+                                        num_workers=32)
 
     loader = poptorch.AsynchronousDataAccessor(data)
+    loader_no_reuse = poptorch.AsynchronousDataAccessor(data_no_reuse)
     assert len(loader) == num_tensors
 
     start = None
     # Workers will be created while fetching the first element
     # so start the timer after the first element is fetched.
-    for _ in loader:
+    num_tensors = 0
+    for _ in loader_no_reuse:
+        num_tensors += 1
         if start is None:
             start = time.perf_counter()
-        continue
-    end = time.perf_counter()
-    print(f"First epoch {end - start}")
 
-    for _ in range(10):
+    end = time.perf_counter()
+    print(f"First epoch no reuse: {end - start} {num_tensors}")
+
+    for _ in range(3):
+        start = time.perf_counter()
+        for _ in loader_no_reuse:
+            num_tensors += 1
+        end = time.perf_counter()
+        print(f"Other epoch no reuse: {end - start}  {num_tensors}")
+
+    start = None
+    # Workers will be created while fetching the first element
+    # so start the timer after the first element is fetched.
+    num_tensors_reuse = 0
+    for _ in loader:
+        num_tensors_reuse += 1
+        if start is None:
+            start = time.perf_counter()
+    end = time.perf_counter()
+    print(f"First epoch: {end - start} {num_tensors_reuse}")
+
+    for _ in range(3):
         start = time.perf_counter()
         for _ in loader:
-            continue
+            num_tensors_reuse += 1
         end = time.perf_counter()
-        print(f"Other epoch {end - start}")
+        print(f"Other epoch: {end - start} {num_tensors_reuse}")
 
-    # Not adding asserts because a lot depends on when the CPU
+    assert num_tensors == num_tensors_reuse
+    # Not adding time related asserts because a lot depends on when the CPU
     # governor kicks in. (The first iteration tends to be a lot slower
     # but that might be machine dependent).
