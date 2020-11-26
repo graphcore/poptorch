@@ -120,3 +120,24 @@ class AutoStage(enum.IntEnum):
     """
     SameAsIpu = 0
     AutoIncrement = 1
+
+
+class MultiConvPartialsType(enum.IntEnum):
+    """Type for the partials of each convolution of a ``poptorch.MultiConv``
+
+    - ``Float``
+    - ``Half``
+    """
+    Float = 0
+    Half = 1
+
+
+class MultiConvPlanType(enum.IntEnum):
+    """Selects the execution strategy for a ``poptorch.MultiConv``
+
+    - ``Parallel``: Execute multiple convolutions in parallel (Default).
+    - ``Serial``: Execute each convolution independently. This is
+        equivalent to using the independent convolution API.
+    """
+    Parallel = 0
+    Serial = 1

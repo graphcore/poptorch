@@ -180,7 +180,7 @@ def custom_op(inputs, name, domain, domain_version, example_outputs):
     for output in example_outputs:
         # Dead code which will get eliminated but will safely allow the same
         # input to be provided to example_output (since it is only supposed
-        # to be a template). Otherwise the compiler may recognise th alias.
+        # to be a template). Otherwise the compiler may recognise the alias.
         transformed_outputs.append(torch.zeros_like(output))
 
     return torch.ops.poptorch.custom_operation(inputs, name, domain,
@@ -212,3 +212,136 @@ def identity_loss(x, reduction):
 
     assert reduction == "none", "Unsupported reduction type!"
     return torch.ops.poptorch.identity_loss(x, 2)
+
+
+class MultiConv():
+    """
+    Combines all convolution layers evaluated inside this scope into a single
+    multi-convolution.
+
+    Multi-convolutions allow for a set of data-independent convolutions to be
+    executed in parallel. Executing convolutions in parallel can lead to an
+    increase in the data throughput.
+
+    For example:
+
+    >>> with poptorch.MultiConv():
+    ...     y = self.convA(x)
+    ...     v = self.convB(u)
+
+    Combines the two data-independent convolutions into a single
+    multi-convolution.
+
+    Refer to the PopLibs documentation for further information on
+    multi-convolutions.
+    """
+
+    def __init__(self):
+        self._available_memory_proportions = None
+        self._partials_types = None
+        self._plan_type = None
+        self._per_conv_reserved_tiles = None
+        self._cycle_back_off = None
+
+    @staticmethod
+    def _validatePerConvProperty(name, value, expected_scalar_type):
+        if value is None:
+            return value
+
+        if isinstance(value, expected_scalar_type):
+            # Wrap as tuple
+            return (value, )
+
+        if isinstance(value, (list, tuple)) and len(value) > 0 and all(
+                isinstance(x, expected_scalar_type) for x in value):
+            return value
+
+        raise AssertionError(f"Invalid {name}!")
+
+    def availableMemoryProportions(self, value):
+        """The available memory proportion per convolution, each [0, 1).
+
+        :param value: Can be a ``float`` value in which case the same value is
+            used for all of the convolutions. Otherwise, can be a ``tuple`` or
+            ``list`` containing as many ``float`` values as the number of
+            convolutions.
+        :type value: float, [float]
+        :returns: self, to support method chaining
+        """
+        name = "available memory proportion"
+        value = self._validatePerConvProperty(name, value, float)
+        self._available_memory_proportions = value
+        return self
+
+    def partialsTypes(self, value):
+        """The partials type used for each convolution.
+
+        :param value: Can be a single instance of
+            ``poptorch.MultiConvPartialsType`` in which case the same value is
+            used for all of the convolutions. Otherwise, can be a ``tuple`` or
+            ``list`` containing as many ``poptorch.MultiConvPartialsType``
+            values as the number of convolutions.
+        :type value: :py:class:`MultiConvPartialsType`,
+            [:py:class:`MultiConvPartialsType`]
+        :returns: self, to support method chaining
+        """
+        name = "partials types"
+        value = self._validatePerConvProperty(name, value,
+                                              enums.MultiConvPartialsType)
+        self._partials_types = value
+        return self
+
+    def planType(self, value):
+        """Select the multi-convolution execution strategy.
+
+        :param value: An instance of :py:class:`MultiConvPlanType`.
+        :returns: self, to support method chaining
+        """
+        if value is None:
+            self._plan_type = value
+        elif isinstance(value, enums.MultiConvPlanType):
+            self._plan_type = value
+        else:
+            raise AssertionError("Invalid plan type!")
+
+        return self
+
+    def perConvReservedTiles(self, value):
+        """Tiles to reserve for each convolution.
+
+        :param value: Number of tiles
+        :type value: int
+        :returns: self, to support method chaining
+        """
+        assert isinstance(value, int)
+        self._per_conv_reserved_tiles = value
+        return self
+
+    def cycleBackOff(self, value):
+        """Cycle back off proportion.
+
+        :param value: Number between 0 and 1
+        :type value: float
+        :returns: self, to support method chaining
+        """
+        assert isinstance(value, float)
+        self._cycle_back_off = value
+        return self
+
+    def __enter__(self):
+        torch.ops.poptorch.begin_multi_conv()
+
+    def __exit__(self, type, value, traceback):
+        # Convert enums to ints if set
+        partials_types = self._partials_types
+        if partials_types is not None:
+            partials_types = [pt.value for pt in partials_types]
+
+        plan_type = self._plan_type
+        if plan_type is not None:
+            plan_type = plan_type.value
+
+        torch.ops.poptorch.end_multi_conv(self._available_memory_proportions,
+                                          partials_types, plan_type,
+                                          self._per_conv_reserved_tiles,
+                                          self._cycle_back_off)

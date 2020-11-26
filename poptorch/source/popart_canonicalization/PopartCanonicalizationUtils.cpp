@@ -220,14 +220,7 @@ std::int64_t constantToLong(torch::jit::Node *node) {
 }
 
 std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node) {
-  ERROR_ON(node->kind() != c10::prim::ListConstruct);
-
-  std::vector<std::int64_t> result;
-  for (torch::jit::Value *value : node->inputs()) {
-    result.push_back(constantToLong(value->node()));
-  }
-
-  return result;
+  return constantListToVec<std::int64_t>(node, constantToLong);
 }
 
 bool constantToBool(torch::jit::Node *node) {

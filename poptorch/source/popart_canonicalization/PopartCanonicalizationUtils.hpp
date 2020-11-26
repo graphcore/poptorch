@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "poptorch_logging/Error.hpp"
+
 namespace poptorch {
 
 using SymbolHandler =
@@ -83,6 +85,22 @@ bool constantToBool(torch::jit::Node *node);
 
 // Extracts a string from a constant containing a string
 std::string constantToString(torch::jit::Node *node);
+
+// Forces a ListConstuct into a vector of the given type
+template <typename T, typename ExtractFunc>
+std::vector<T> constantListToVec(torch::jit::Node *node,
+                                 ExtractFunc &&constantExtractFunc) {
+  ERROR_ON(node->kind() != c10::prim::ListConstruct);
+
+  auto node_inputs = node->inputs();
+  std::vector<T> result;
+  result.reserve(node_inputs.size());
+  for (torch::jit::Value *value : node_inputs) {
+    result.push_back(constantExtractFunc(value->node()));
+  }
+
+  return result;
+}
 
 // Both pytorch and popart represent reduce as an enum but with different
 // values.

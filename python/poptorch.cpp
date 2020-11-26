@@ -89,6 +89,21 @@ c10::List<at::Tensor> recomputationCheckpoint(c10::List<at::Tensor> inputs) {
   return inputs;
 }
 
+void beginMultiConv() {}
+
+void endMultiConv(
+    c10::optional<c10::List<double>> &&available_memory_proportions,
+    c10::optional<c10::List<int64_t>> &&partials_types,
+    c10::optional<int64_t> &&plan_type,
+    c10::optional<int64_t> &&per_conv_reserved_tiles,
+    c10::optional<double> &&cycle_back_off) {
+  UNUSED(available_memory_proportions);
+  UNUSED(partials_types);
+  UNUSED(plan_type);
+  UNUSED(per_conv_reserved_tiles);
+  UNUSED(cycle_back_off);
+}
+
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
@@ -99,9 +114,9 @@ static auto registry =
         .op("poptorch::optimizer_group", &optimizerGroup)
         .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
         .op("poptorch::recomputation_checkpoint", &recomputationCheckpoint)
-        .op("poptorch::set_available_memory", &setAvailableMemory);
-//.op("popart::convolution", convolution,
-// torch::RegisterOperators::options().aliasAnalysis(c10::AliasAnalysisKind::INTERNAL_SPECIAL_CASE));
+        .op("poptorch::set_available_memory", &setAvailableMemory)
+        .op("poptorch::begin_multi_conv", &beginMultiConv)
+        .op("poptorch::end_multi_conv", &endMultiConv);
 
 namespace poptorch {
 namespace {
@@ -601,9 +616,6 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
 
     // Resolve
     poptorch::resolveHalfOrFloat(graph.get());
-
-    // Enforce any constraints that aren't enforced by popart.
-    poptorch::canonicalizeLate(graph.get());
 
     // Enforce any constraints that aren't enforced by popart.
     poptorch::canonicalizeLate(graph.get());
