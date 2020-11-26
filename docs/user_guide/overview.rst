@@ -252,6 +252,18 @@ and will backpropagate a gradient of ones through it.
   :end-before: identity_end
   :emphasize-lines: 5
 
+poptorch.MultiConv
+----------------------
+
+Use :py:class:`poptorch.MultiConv` wrapper class to define multi-convolutions.
+
+.. autoclass:: poptorch.MultiConv
+   :members:
+
+.. autoclass:: poptorch.MultiConvPartialsType
+
+.. autoclass:: poptorch.MultiConvPlanType
+
 Half / float 16 support
 =======================
 

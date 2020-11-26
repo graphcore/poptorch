@@ -545,6 +545,60 @@ void LowerToPopart::lowerBody() {
 
       _valueMap.setTensor(node->output(), _valueMap.tensor(node->input()));
 
+    } else if (kind == symbols::poptorch::multi_conv_part) {
+      std::vector<poptorch::TensorId> inputs;
+      std::transform(node->inputs().begin(), node->inputs().end(),
+                     std::back_inserter(inputs), [&](torch::jit::Value *val) {
+                       return _valueMap.tensor(val);
+                     });
+
+      _compiler.addMultiConvPart(inputs,
+                                 node->is(c10::Symbol::attr("dilations")),
+                                 node->is(c10::Symbol::attr("kernel_shape")),
+                                 node->is(c10::Symbol::attr("pads")),
+                                 node->is(c10::Symbol::attr("strides")));
+
+    } else if (kind == symbols::poptorch::end_multi_conv) {
+      // Extract multiconv options that are set as attributes on the
+      // end_multi_conv instruction
+      auto amp = c10::Symbol::attr("available_memory_proportions");
+      if (node->hasAttribute(amp)) {
+        _compiler.setMultiConvAvailableMemoryProportions(node->fs(amp));
+      }
+
+      auto partials_types = c10::Symbol::attr("partials_types");
+      if (node->hasAttribute(partials_types)) {
+        _compiler.setMultiConvPartialsTypes(node->is(partials_types));
+      }
+
+      auto plan_type = c10::Symbol::attr("plan_type");
+      if (node->hasAttribute(plan_type)) {
+        _compiler.setMultiConvPlanType(node->i(plan_type));
+      }
+
+      auto per_conv_reserved_tiles =
+          c10::Symbol::attr("per_conv_reserved_tiles");
+      if (node->hasAttribute(per_conv_reserved_tiles)) {
+        _compiler.setMultiConvPerConvReservedTiles(
+            node->i(per_conv_reserved_tiles));
+      }
+
+      auto cycle_back_off = c10::Symbol::attr("cycle_back_off");
+      if (node->hasAttribute(cycle_back_off)) {
+        _compiler.setMultiConvCycleBackOff(node->f(cycle_back_off));
+      }
+
+      torch::jit::ArrayRef<torch::jit::Value *> node_outputs = node->outputs();
+      std::vector<poptorch::TensorId> outputs = _compiler.endMultiConv();
+      ERROR_ON_MSG(outputs.size() != node_outputs.size(),
+                   "Wrong number of outputs for MultiConv. Expected "
+                       << node_outputs.size() << " outputs but only received "
+                       << outputs.size() << " outputs.");
+
+      for (size_t i = 0; i < outputs.size(); i++) {
+        _valueMap.setTensor(node_outputs[i], outputs[i]);
+      }
+
     } else {
       ERROR("Couldn't find a registered operation for node");
     }

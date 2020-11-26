@@ -19,6 +19,7 @@
 #include <popart/half.hpp>
 #include <popart/ir.hpp>
 #include <popart/ndarraywrapper.hpp>
+#include <popart/op/convbase.hpp>
 #include <popart/op/identity.hpp>
 #include <popart/op/matmul.hpp>
 #include <popart/op/nll.hpp>
@@ -149,6 +150,74 @@ public:
 private:
   std::map<popart::TensorId, popart::MutableVoidData> _weights;
   std::vector<popart::TensorId> _weights_order;
+};
+
+class MultiConvBuilder {
+public:
+  void addConv(const std::vector<popart::TensorId> &inputs,
+               const std::vector<int64_t> &dilations,
+               const std::vector<int64_t> &kernel_shape,
+               const std::vector<int64_t> &pads,
+               const std::vector<int64_t> &strides) {
+    // Record the inputs and attributes for this single conv
+    _inputs.push_back(inputs);
+    _dilations.push_back(dilations);
+    _kernel_shape.push_back(kernel_shape);
+    _pads.push_back(pads);
+    _strides.push_back(strides);
+  }
+
+  void setAvailableMemoryProportions(const std::vector<float> &v) {
+    _options.availableMemoryProportions = v;
+  }
+
+  void setPartialsTypes(const std::vector<int64_t> &partials_types) {
+    std::vector<std::string> type_strs;
+
+    for (int64_t t : partials_types) {
+      if (t == 0) {
+        type_strs.emplace_back("float");
+      } else if (t == 1) {
+        type_strs.emplace_back("half");
+      } else {
+        ERROR("Invalid MultiConv partials_types");
+      }
+    }
+
+    _options.partialsTypes = type_strs;
+  }
+
+  void setPlanType(int64_t plan_type) {
+    if (plan_type == 0) {
+      _options.planType = "parallel";
+    } else if (plan_type == 1) {
+      _options.planType = "serial";
+    } else {
+      ERROR("Invalid MultiConv plan_type");
+    }
+  }
+
+  void setPerConvReservedTiles(int n) { _options.perConvReservedTiles = n; }
+
+  void setCycleBackOff(float v) { _options.cycleBackOff = v; }
+
+  std::vector<popart::TensorId> build(popart::Builder *builder) const {
+    auto opset = builder->aiGraphcoreOpset1();
+    return opset.multiconv(_inputs, _dilations, _pads, _strides,
+                           _options.availableMemoryProportions,
+                           _options.partialsTypes, _options.planType,
+                           _options.perConvReservedTiles,
+                           _options.cycleBackOff);
+  }
+
+private:
+  // Aggregated inputs for all the convs that are fused as a multiconv
+  std::vector<std::vector<popart::TensorId>> _inputs;
+  std::vector<std::vector<int64_t>> _dilations;
+  std::vector<std::vector<int64_t>> _kernel_shape;
+  std::vector<std::vector<int64_t>> _pads;
+  std::vector<std::vector<int64_t>> _strides;
+  popart::MultiConvOptions _options = {{}, {}};
 };
 
 struct CompilerImpl {
@@ -299,6 +368,8 @@ public:
   // Map of the pytorch variable update group to the popart weight.
   std::map<std::uint64_t, std::vector<popart::TensorId>> grad_update_groups;
 
+  std::unique_ptr<MultiConvBuilder> multi_conv_builder;
+
   // General helpers.
 
   // Inserts memory into the list of tensors being output by the model.
@@ -345,6 +416,14 @@ public:
   popart::TensorId zerosOrOnes(const std::vector<popart::TensorId> &inputs,
                                const std::vector<int64_t> &shape,
                                const std::string &dtype, bool zeros);
+
+  void addMultiConvPart(const std::vector<popart::TensorId> &inputs,
+                        const std::vector<int64_t> &dilations,
+                        const std::vector<int64_t> &kernel_shape,
+                        const std::vector<int64_t> &pads,
+                        const std::vector<int64_t> &strides);
+
+  std::vector<popart::TensorId> endMultiConv();
 
   void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
                       int64_t group) {
@@ -1146,6 +1225,25 @@ std::uint64_t CompilerImpl::roundUpNumIPUs(std::uint64_t num_ipus) {
   }
 
   return rounded_num_ipus;
+}
+
+void CompilerImpl::addMultiConvPart(const std::vector<popart::TensorId> &inputs,
+                                    const std::vector<int64_t> &dilations,
+                                    const std::vector<int64_t> &kernel_shape,
+                                    const std::vector<int64_t> &pads,
+                                    const std::vector<int64_t> &strides) {
+  if (multi_conv_builder == nullptr) {
+    multi_conv_builder = std::make_unique<MultiConvBuilder>();
+  }
+
+  multi_conv_builder->addConv(inputs, dilations, kernel_shape, pads, strides);
+}
+
+std::vector<popart::TensorId> CompilerImpl::endMultiConv() {
+  ERROR_ON_MSG(multi_conv_builder == nullptr, "Unexpected end_multi_conv.");
+  auto outs = multi_conv_builder->build(op_builder.get());
+  multi_conv_builder.reset();
+  return outs;
 }
 
 } // namespace detail
@@ -1956,6 +2054,60 @@ void Compiler::assertTensorIs(PopartType dataType, poptorch::TensorId id,
 
   ERROR_ON_MSG(actual_type != dataType,
                "Incorrect type for tensor, " << id << " used in " << caller);
+}
+
+void Compiler::addMultiConvPart(const std::vector<poptorch::TensorId> &inputs,
+                                const std::vector<int64_t> &dilations,
+                                const std::vector<int64_t> &kernel_shape,
+                                const std::vector<int64_t> &pads,
+                                const std::vector<int64_t> &strides) {
+  std::vector<popart::TensorId> args;
+  std::transform(inputs.begin(), inputs.end(), std::back_inserter(args),
+                 [&](poptorch::TensorId index) { return _impl->ids[index]; });
+  _impl->addMultiConvPart(args, dilations, kernel_shape, pads, strides);
+}
+
+void Compiler::setMultiConvAvailableMemoryProportions(
+    const std::vector<double> &v) {
+  ERROR_ON_MSG(
+      _impl->multi_conv_builder == nullptr,
+      "Unexpected poptorch.MultiConv option: available_memory_proportions");
+  _impl->multi_conv_builder->setAvailableMemoryProportions(
+      popart::vXtoY<double, float>(v));
+}
+
+void Compiler::setMultiConvPartialsTypes(
+    const std::vector<int64_t> &partials_types) {
+  ERROR_ON_MSG(_impl->multi_conv_builder == nullptr,
+               "Unexpected poptorch.MultiConv option: partials_types");
+  _impl->multi_conv_builder->setPartialsTypes(partials_types);
+}
+
+void Compiler::setMultiConvPlanType(int64_t plan_type) {
+  ERROR_ON_MSG(_impl->multi_conv_builder == nullptr,
+               "Unexpected poptorch.MultiConv option: plan_type");
+  _impl->multi_conv_builder->setPlanType(plan_type);
+}
+
+void Compiler::setMultiConvPerConvReservedTiles(int64_t v) {
+  ERROR_ON_MSG(_impl->multi_conv_builder == nullptr,
+               "Unexpected poptorch.MultiConv option: per_conv_reserved_tiles");
+  _impl->multi_conv_builder->setPerConvReservedTiles(static_cast<int>(v));
+}
+
+void Compiler::setMultiConvCycleBackOff(double c) {
+  ERROR_ON_MSG(_impl->multi_conv_builder == nullptr,
+               "Unexpected poptorch.MultiConv option: cycle_back_off");
+  _impl->multi_conv_builder->setCycleBackOff(static_cast<float>(c));
+}
+
+std::vector<poptorch::TensorId> Compiler::endMultiConv() {
+  auto outputs = _impl->endMultiConv();
+  poptorch::TensorId first =
+      HandleOutput<decltype(outputs)>{}(outputs, false, _impl.get());
+  std::vector<poptorch::TensorId> out_ids(outputs.size());
+  std::iota(out_ids.begin(), out_ids.end(), first);
+  return out_ids;
 }
 
 SessionOptions::SessionOptions()

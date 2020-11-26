@@ -46,6 +46,9 @@ SYMBOL_DECL(poptorch, identity_loss)
 SYMBOL_DECL(poptorch, set_available_memory)
 SYMBOL_DECL(poptorch, set_matmul_serialization)
 SYMBOL_DECL(poptorch, optimizer_group)
+SYMBOL_DECL(poptorch, begin_multi_conv)
+SYMBOL_DECL(poptorch, multi_conv_part)
+SYMBOL_DECL(poptorch, end_multi_conv)
 
 // Casting is done before passing the input to the IPU: the op is used so that
 // so that that input types match those received from pytorch but that the input

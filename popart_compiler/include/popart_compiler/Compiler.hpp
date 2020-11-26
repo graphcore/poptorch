@@ -356,6 +356,24 @@ public:
 
   std::unique_ptr<char[]> getExecutionInfo() const;
 
+  void addMultiConvPart(const std::vector<poptorch::TensorId> &inputs,
+                        const std::vector<int64_t> &dilations,
+                        const std::vector<int64_t> &kernel_shape,
+                        const std::vector<int64_t> &pads,
+                        const std::vector<int64_t> &strides);
+
+  void setMultiConvAvailableMemoryProportions(const std::vector<double> &v);
+
+  void setMultiConvPartialsTypes(const std::vector<int64_t> &partials_types);
+
+  void setMultiConvPlanType(int64_t plan_type);
+
+  void setMultiConvPerConvReservedTiles(int64_t v);
+
+  void setMultiConvCycleBackOff(double c);
+
+  std::vector<poptorch::TensorId> endMultiConv();
+
 private:
   void assertTensorIs(PopartType dataType, poptorch::TensorId id,
                       const char *caller) const;

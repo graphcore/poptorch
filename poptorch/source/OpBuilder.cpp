@@ -482,6 +482,20 @@ torch::jit::Node *createRecomputationCheckpoint(
                              new_node->outputs());
 }
 
+torch::jit::Node *createMultiConvPart(torch::jit::Graph *graph,
+                                      torch::jit::Node *conv_node) {
+  ERROR_ON_MSG(conv_node->kind() != symbols::popart::conv,
+               "Can only create multi_conv_part from conv node");
+
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::multi_conv_part, conv_node->inputs(),
+      ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+
+  new_node = new_node->copyAttributes(*conv_node);
+  new_node->output()->setType(conv_node->output()->type());
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */
