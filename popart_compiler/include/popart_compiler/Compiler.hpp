@@ -59,7 +59,14 @@ struct Optimizer {
   using ParamType = std::pair<float, bool>;
   using ParamList = std::unordered_map<std::string, ParamType>;
 
-  explicit Optimizer(OptimizerType t, const ParamList &opts) : type(t) {
+  explicit Optimizer(OptimizerType t, const ParamList &opts)
+      : Optimizer(t, opts, false, false, false) {}
+
+  Optimizer(OptimizerType t, const ParamList &opts, bool accumType,
+            bool firstOrderType, bool secondOrderType)
+      : type(t), accum_type_is_half(accumType),
+        first_order_momentum_accum_type_is_half(firstOrderType),
+        second_order_momentum_accum_type_is_half(secondOrderType) {
     // It is valid to not pass in a optimizer.
     if (opts.empty() || type == OptimizerType::NONE) {
       return;
@@ -122,6 +129,12 @@ struct Optimizer {
 
   // Unique to RMSprop
   ParamType alpha;
+
+  // Special parameters for adam/lamb. If true accumulations will be half
+  // otherwise will be float.
+  bool accum_type_is_half;
+  bool first_order_momentum_accum_type_is_half;
+  bool second_order_momentum_accum_type_is_half;
 };
 
 class Compiler;

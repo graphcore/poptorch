@@ -32,10 +32,27 @@ class AdamW(torch.optim.AdamW):
                  eps=1e-8,
                  weight_decay=0.01,
                  amsgrad=False,
-                 loss_scaling=1.0):
+                 loss_scaling=1.0,
+                 accumType=torch.float32,
+                 firstOrderMomentumAccumType=torch.float32,
+                 secondOrderMomentumAccumType=torch.float32):
         super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
 
         self.defaults["loss_scaling"] = loss_scaling
+
+        supportedTypes = [torch.float16, torch.float32]
+        errString = """Accumulation types must be either torch.float32
+                or torch.float16"""
+        assert accumType in supportedTypes, errString
+        assert firstOrderMomentumAccumType in supportedTypes, errString
+        assert secondOrderMomentumAccumType in supportedTypes, errString
+
+        self.accumType = accumType == torch.float16
+        self.firstOrderMomentumAccumType = \
+             firstOrderMomentumAccumType == torch.float16
+        self.secondOrderMomentumAccumType = \
+             secondOrderMomentumAccumType == torch.float16
+
         for group in self.param_groups:
             group.setdefault("loss_scaling", loss_scaling)
 
@@ -66,7 +83,10 @@ class LAMB(torch.optim.Optimizer):
                  eps=1e-8,
                  weight_decay=1e-2,
                  biasCorrection=True,
-                 loss_scaling=1.0):
+                 loss_scaling=1.0,
+                 accumType=torch.float32,
+                 firstOrderMomentumAccumType=torch.float32,
+                 secondOrderMomentumAccumType=torch.float32):
         defaults = dict(lr=lr,
                         betas=betas,
                         eps=eps,
@@ -74,6 +94,19 @@ class LAMB(torch.optim.Optimizer):
                         biasCorrection=biasCorrection,
                         loss_scaling=loss_scaling)
         super(LAMB, self).__init__(params, defaults)
+
+        supportedTypes = [torch.float16, torch.float32]
+        errString = """Accumulation types must be either torch.float32
+                or torch.float16"""
+        assert accumType in supportedTypes, errString
+        assert firstOrderMomentumAccumType in supportedTypes, errString
+        assert secondOrderMomentumAccumType in supportedTypes, errString
+
+        self.accumType = accumType == torch.float16
+        self.firstOrderMomentumAccumType = \
+             firstOrderMomentumAccumType == torch.float16
+        self.secondOrderMomentumAccumType = \
+             secondOrderMomentumAccumType == torch.float16
 
     def __setstate__(self, state):
         super(LAMB, self).__setstate__(state)
@@ -141,9 +174,14 @@ class LAMBNoBias(LAMB):
                  betas=(0.9, 0.999),
                  eps=1e-8,
                  weight_decay=1e-2,
-                 loss_scaling=1.0):
+                 loss_scaling=1.0,
+                 accumType=torch.float32,
+                 firstOrderMomentumAccumType=torch.float32,
+                 secondOrderMomentumAccumType=torch.float32):
         super(LAMBNoBias, self).__init__(params, lr, betas, eps, weight_decay,
-                                         False, loss_scaling)
+                                         False, loss_scaling, accumType,
+                                         firstOrderMomentumAccumType,
+                                         secondOrderMomentumAccumType)
 
 
 def _check_constructor_match_parent(child_class, extra_args=None):
@@ -168,5 +206,8 @@ def _check_constructor_match_parent(child_class, extra_args=None):
 
 
 _check_constructor_match_parent(SGD, ["loss_scaling", "velocity_scaling"])
-_check_constructor_match_parent(AdamW, ["loss_scaling"])
+_check_constructor_match_parent(AdamW, [
+    "loss_scaling", "accumType", "firstOrderMomentumAccumType",
+    "secondOrderMomentumAccumType"
+])
 _check_constructor_match_parent(RMSprop, ["loss_scaling"])

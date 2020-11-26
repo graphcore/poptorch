@@ -95,6 +95,37 @@ def test_sgd_IR(opt):
         assert AdamVarUpdate == 2 and AdamUpdater == 2
 
 
+@pytest.mark.parametrize(
+    "opt",
+    (poptorch.optim.AdamW, poptorch.optim.LAMB, poptorch.optim.LAMBNoBias))
+@pytest.mark.parametrize("accType", (torch.float16, torch.float))
+def test_sgd_IR_accum_type(opt, accType):
+    torch.manual_seed(42)
+    model = torch.nn.Linear(10, 10).half()
+
+    # "Train" with learning rate of zero and check the loss remains the same.
+    optimizer = opt(model.parameters(), lr=0.01, accumType=accType)
+    # These two should also be tested but they don't appear to work in popart yet.
+    #firstOrderMomentumAccumType=torch.float16,
+    #secondOrderMomentumAccumType=torch.float16 )
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.CrossEntropyLoss().half(), optimizer=optimizer)
+
+    input = torch.randn(1, 10).half()
+    label = torch.randint(0, 10, [1])
+
+    poptorch_model(input, label)
+
+    as_json = json.load(StringIO(poptorch_model._debugGetPopartIR()))  # pylint: disable=protected-access
+
+    numCastsFound = sum([op["type"] == "Cast" for op in as_json["maingraph"]])
+
+    if accType == torch.float16:
+        assert numCastsFound == 2
+    else:
+        assert numCastsFound == 0
+
+
 def test_velocity_scaling_copy():
     torch.manual_seed(42)
 
