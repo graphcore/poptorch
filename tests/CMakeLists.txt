@@ -1,7 +1,13 @@
 add_subdirectory(custom_ops)
 
-find_package(popart REQUIRED)
 find_package(poplar REQUIRED)
+
+# Temporary until the popart-config change is landed and then poptorch uses
+# COMPONENTS popart-only.
+cmake_policy(PUSH)
+cmake_policy(SET CMP0074 NEW) # Check Protobuf_ROOT
+find_package(popart REQUIRED)
+cmake_policy(POP)
 
 get_target_property(POPLAR_LIB poplar LOCATION)
 get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)

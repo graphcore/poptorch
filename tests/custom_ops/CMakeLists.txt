@@ -35,11 +35,11 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 add_definitions(-DONNX_NAMESPACE=onnx)
 
+cmake_policy(SET CMP0074 NEW) # Check Protobuf_ROOT
 find_package(popart REQUIRED)
 find_package(poplar REQUIRED)
 # Provides poprand and popops
 find_package(poplibs REQUIRED)
-cmake_policy(SET CMP0074 NEW) # Check Protobuf_ROOT
 find_package(Protobuf 3.6.0 REQUIRED)
 find_package(ONNX REQUIRED)
 
