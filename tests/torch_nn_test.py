@@ -265,6 +265,19 @@ EXPECTED_FAILURES = {
     }
 
 HALF_EXPECTED_FAILURES = {
+    # T30734
+    "test_nn_AvgPool1d": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_AvgPool1d_stride": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_AvgPool2d": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_AvgPool2d_stride": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_LPPool2d": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_LPPool1d": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_LocalResponseNorm_1d": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_LocalResponseNorm_2d_uneven_pad": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_AvgPool3d": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_AvgPool3d_stride": "Trying to connect tensor of type 'float' to field of type half",
+    "test_nn_AvgPool3d_stride1_pad0_gpu_input": "Trying to connect tensor of type 'float' to field of type half",
+
     # T30731 - tests failing with very large error
     "test_nn_BatchNorm1d_affine_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001",
     "test_nn_BatchNorm2d_momentum": "AssertionError: With rtol=0.05 and atol=0.0001",
