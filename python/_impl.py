@@ -41,7 +41,17 @@ def convertOptimizerToDict(optimizer):
 
     num_groups = len(optimizer.param_groups)
 
-    the_dict = {"optimizer_type": optimizer_type, "num_groups": num_groups}
+    accumType = getattr(optimizer, "accumType", False)
+    firstOrderTy = getattr(optimizer, "firstOrderMomentumAccumType", False)
+    secondOrderTy = getattr(optimizer, "secondOrderMomentumAccumType", False)
+
+    the_dict = {
+        "optimizer_type": optimizer_type,
+        "num_groups": num_groups,
+        "accumType": accumType,
+        "firstOrderMomentumAccumType": firstOrderTy,
+        "secondOrderMomentumAccumType": secondOrderTy
+    }
 
     for index in range(0, num_groups):
         learning_rate = optimizer.param_groups[index]["lr"]
@@ -80,6 +90,7 @@ def convertOptimizerToDict(optimizer):
                 "eps": (eps, eps == 1e-08),
                 "loss_scaling": (loss_scaling, loss_scaling == 1.0)
             }
+
         if isinstance(optimizer, optim.RMSprop):
             momentum = optimizer.param_groups[index]["momentum"]
             alpha = optimizer.param_groups[index]["alpha"]

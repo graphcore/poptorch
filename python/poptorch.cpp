@@ -46,6 +46,11 @@ at::Tensor setAvailableMemory(at::Tensor t, double mem) {
   return t;
 }
 
+at::Tensor ipuPrintTensor(at::Tensor t, std::string &&title) {
+  UNUSED(title);
+  return t;
+}
+
 at::Tensor setMatMulSerialization(at::Tensor matmul, std::string mode, // NOLINT
                                   int64_t factor, bool keep_precision) {
   UNUSED(mode);
@@ -54,12 +59,8 @@ at::Tensor setMatMulSerialization(at::Tensor matmul, std::string mode, // NOLINT
   return matmul;
 }
 
-at::Tensor ipuPrintTensor(at::Tensor t, std::string &&title) {
-  UNUSED(title);
-  return t;
-}
-
 at::Tensor identityOp(at::Tensor t) { return t; }
+
 at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
   UNUSED(reduction);
   return t;
@@ -113,10 +114,15 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
   OptimizerType type = OptimizerType::NONE;
   std::uint64_t num_groups = 0;
 
+  // Accumulation types for adam.
+  bool accum_type = false;
+  bool first_order_momentum_accum_type = false;
+  bool second_order_momentum_accum_type = false;
+
   // Extract all options from the python dictionary.
   for (auto element : opt) {
     // All values are in the form of pair{float, bool} except for the optimizer
-    // option.
+    // option, num groups, and the accumulation types.
     if (py::isinstance<py::str>(element.first)) {
       const std::string name = element.first.cast<std::string>();
       if (name == "optimizer_type") {
@@ -124,6 +130,12 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
       } else if (name == "num_groups") {
         num_groups = element.second.cast<std::uint64_t>();
         optimizer_params.resize(num_groups);
+      } else if (name == "accumType") {
+        accum_type = element.second.cast<bool>();
+      } else if (name == "firstOrderMomentumAccumType") {
+        first_order_momentum_accum_type = element.second.cast<bool>();
+      } else if (name == "secondOrderMomentumAccumType") {
+        second_order_momentum_accum_type = element.second.cast<bool>();
       }
     } else if (py::isinstance<py::int_>(element.first)) {
       const std::uint64_t group = element.first.cast<std::uint64_t>();
@@ -143,7 +155,8 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
 
   std::vector<Optimizer> optimizers;
   for (const Optimizer::ParamList &p : optimizer_params) {
-    Optimizer o{type, p};
+    Optimizer o{type, p, accum_type, first_order_momentum_accum_type,
+                second_order_momentum_accum_type};
     optimizers.push_back(o);
   }
 
