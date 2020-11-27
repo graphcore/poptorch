@@ -6,18 +6,22 @@ import torch
 import poptorch
 import helpers
 import pytest
-from poptorch.distributed import VirtualIpuManager as vipu
 
 partition_name = "poptorch_tests"
 
 
-def run_test(process_id=0, num_processes=1):
+# Note: poptorch.ipuHardwareIsAvailable() cannot be used before the Options
+# set IPUOF_CONFIG_PATH.
+@pytest.mark.skipif(int(os.environ.get("POPTORCH_IPU_MODEL", "0")) != 0,
+                    reason="Hardware IPU needed")
+@pytest.mark.skipif(int(os.environ.get("POPTORCH_SMALL_IPU_MODEL", "0")) != 0,
+                    reason="Hardware IPU needed")
+def test_weight_update_replicas(process_id=0, num_processes=1):
     localReplicationFactor = 2
 
     opts = poptorch.Options()
     opts.replicationFactor(localReplicationFactor)
     opts.Distributed.configureProcessId(process_id, num_processes)
-    opts.Distributed.IPUoFConfigFiles(f"~/.ipuof.conf.d/{partition_name}_*")
 
     replicationFactor = localReplicationFactor * opts.Distributed.numProcesses
 
@@ -98,60 +102,3 @@ def run_test(process_id=0, num_processes=1):
     for idx, ref in enumerate(ref_out):
         print("Validating output %d" % idx)
         torch.testing.assert_allclose(out[idx], ref, rtol=1e-03, atol=1e-03)
-
-
-def configurePartition(num_ipus, num_gcds, num_sync_replicas):
-    partitions = vipu.listPartitions()
-    print(str({n: str(p) for n, p in partitions.items()}))
-    if partition_name in partitions:
-        vipu.deletePartition(partition_name)
-
-    vipu.createPartition(
-        partition_name,
-        poptorch.distributed.Partition(num_ipus, num_gcds, num_sync_replicas))
-    vipu.resetPartition(partition_name)
-
-
-# Note: poptorch.ipuHardwareIsAvailable() cannot be used before the Options
-# set IPUOF_CONFIG_PATH.
-@pytest.mark.skipif(int(os.environ.get("POPTORCH_IPU_MODEL", "0")) != 0,
-                    reason="Hardware IPU needed")
-@pytest.mark.skipif(int(os.environ.get("POPTORCH_SMALL_IPU_MODEL", "0")) != 0,
-                    reason="Hardware IPU needed")
-def test_weight_update_replicas():
-
-    # We always need to create a partition if we're on POD.
-    if vipu.isAvailable():
-        configurePartition(2, 1, 2)
-    run_test()
-
-
-# Note: poptorch.ipuHardwareIsAvailable() cannot be used before the Options
-# set IPUOF_CONFIG_PATH.
-@pytest.mark.skipif(int(os.environ.get("POPTORCH_IPU_MODEL", "0")) != 0,
-                    reason="Hardware IPU needed")
-@pytest.mark.skipif(int(os.environ.get("POPTORCH_SMALL_IPU_MODEL", "0")) != 0,
-                    reason="Hardware IPU needed")
-@pytest.mark.skipif(not vipu.isAvailable(),
-                    reason="vipu-cli and 8 IPUs needed")
-def test_weight_update_distributed():
-
-    # To avoid: "RuntimeError: Unable to handle autograd's threading in
-    # combination with fork-based multiprocessing.
-    # See https://github.com/pytorch/pytorch/wiki/Autograd-and-Fork"
-    ctx = multiprocessing.get_context("spawn")
-    # Create a partition equivalent to
-    # vipu-cli create partition poptorch_tests --size 4 --num-gcds 2 --gcd-sync-replicas 4
-    num_gcds = 2
-    configurePartition(4, num_gcds, 4)
-
-    processes = []
-    for i in range(num_gcds):
-        p = ctx.Process(target=run_test, args=(i, num_gcds))
-        p.start()
-        processes.append(p)
-
-    for p in processes:
-        p.join()
-
-    assert all(p.exitcode == 0 for p in processes)

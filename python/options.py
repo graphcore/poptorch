@@ -119,44 +119,6 @@ class _DistributedOptions(_options_impl.OptionsDict):
         self.set(num_distributed_processes=1, distributed_process_id=0)
         return self
 
-    def IPUoFConfigFiles(self, files):
-        """ List of IPUoF configuration files to use for the different
-        GCDs.
-
-        Important: One and exactly one configuration file must be provided
-        for each GCD.
-
-        :param files: one or more glob compatible expressions
-
-        By default: ``~/.ipuof.conf.d/*.conf``
-
-        The default value will work if you only own one partition.
-
-        If you own several then you will need to narrow down the number of
-        configuration files so that only the configuration files corresponding
-        to the partition to use are selected.
-
-        For example: ``~/.ipuof.conf.d/partitionA_*.conf``
-        """
-        if isinstance(files, str):
-            files = [files]
-        # Find all the config files
-        all_files = []
-        for f in files:
-            all_files += glob.glob(os.path.expanduser(f))
-        # remove duplicates
-        all_files = set(all_files)
-        self._gcd_mappings = {}
-        for f in all_files:
-            id = json.load(open(f))["attributes"].get("GCD Id")
-            gcd = int(id) if id else 0
-            assert gcd not in self._gcd_mappings, (
-                f"Multiple config files "
-                f"are registered to handle GCD {gcd}: {self._gcd_mappings[gcd]}"
-                f" and {f}")
-            self._gcd_mappings[gcd] = f
-        return self
-
     def setEnvVarNames(self, var_num_processes, var_process_id):
         """Utility to read and set `processId` and `numProcesses` from
         environment variables.
@@ -183,15 +145,6 @@ class _DistributedOptions(_options_impl.OptionsDict):
         self.set(distributed_process_id=process_id)
         self.set(num_distributed_processes=num_processes)
         return self
-
-    def getGcdConfigFile(self):
-        """Return all the GCD ids <-> file mappings.
-
-        :meta private:
-        """
-        if not self._gcd_mappings:
-            self.IPUoFConfigFiles("~/.ipuof.conf.d/*.conf")
-        return self._gcd_mappings.get(self.processId)
 
     @property
     def processId(self):
@@ -974,12 +927,5 @@ class Options(_options_impl.OptionsDict):
         out = self._training.update(out)
         out = self._distributed.update(out)
         out = self._tensor_locations.update(out)
-        config_file = self._distributed.getGcdConfigFile()
-        if self._distributed.numProcesses > 1 or config_file:
-            assert config_file, ("No IPUoF configuration file found for "
-                                 "processId %d" % self._distributed.processId)
-            os.environ["IPUOF_CONFIG_PATH"] = config_file
-            logger.debug("'IPUOF_CONFIG_PATH' set to %s for processId %d",
-                         config_file, self._distributed.processId)
 
         return out

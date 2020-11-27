@@ -211,41 +211,6 @@ def run_data_loader_example():
 
     # distributed_execution_end
 
-    #pylint: disable=C0413,C0411
-    # distributed_python_start
-    import multiprocessing
-    from poptorch.distributed import VirtualIpuManager as vipu
-
-    partition_name = "my_partition"
-
-    if vipu.isAvailable():
-        # To avoid: "RuntimeError: Unable to handle autograd's threading in
-        # combination with fork-based multiprocessing.
-        # See https://github.com/pytorch/pytorch/wiki/Autograd-and-Fork"
-        ctx = multiprocessing.get_context("spawn")
-
-        # Number of processes to synchronise
-        num_gcds = 2
-
-        vipu.createPartition(
-            partition_name,
-            poptorch.distributed.Partition(num_ipus=4,
-                                           num_gcds=num_gcds,
-                                           num_sync_replicas=4))
-        vipu.resetPartition(partition_name)
-
-        processes = []
-        for i in range(num_gcds):
-            p = ctx.Process(target=process, args=(i, num_gcds))
-            p.start()
-            processes.append(p)
-
-        for p in processes:
-            p.join()
-
-        assert all(p.exitcode == 0 for p in processes)
-    # distributed_python_end
-
 
 if __name__ == "__main__":
     if poptorch.ipuHardwareIsAvailable():
