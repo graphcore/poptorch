@@ -558,6 +558,9 @@ void LowerToPopart::lowerBody() {
                                  node->is(c10::Symbol::attr("pads")),
                                  node->is(c10::Symbol::attr("strides")));
 
+      logging::debug("{} was lowered as component of MultiConv",
+                     nodeToString(node));
+
     } else if (kind == symbols::poptorch::end_multi_conv) {
       // Extract multiconv options that are set as attributes on the
       // end_multi_conv instruction
@@ -598,6 +601,11 @@ void LowerToPopart::lowerBody() {
       for (size_t i = 0; i < outputs.size(); i++) {
         _valueMap.setTensor(node_outputs[i], outputs[i]);
       }
+
+      logging::debug("{} was lowered to {} [{},{}]", nodeToString(node),
+                     tensorNames(outputs[0], outputs.size()),
+                     tensorTypesAndShapes(outputs[0], outputs.size()),
+                     _compiler.getExecutionInfo().get());
 
     } else {
       ERROR("Couldn't find a registered operation for node");
