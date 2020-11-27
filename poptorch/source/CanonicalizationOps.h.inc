@@ -99,6 +99,7 @@ OP_CONVERTOR(aten::topk, NONE, createTopk, {PARAM(0) COMMA CONSTANT_TO_LONG_CONS
 // Opset 10
 //OP_CONVERTOR(aten::isinf, NONE, createIsinf, {PARAM(0)} COMMA 1 COMMA 1)
 OP_CONVERTOR(aten::isnan, NONE, createIsnan, {PARAM(0)})
+OP_CONVERTOR(aten::fmod, NONE, createMod, {PARAM(0) COMMA PARAM(1)} COMMA 1)
 
 // full_like(Tensor self, Scalar fill_value, *, MemoryFormat? memory_format=None) -> Tensor
 // full_like.dtype(Tensor self, Scalar fill_value, *, ScalarType dtype, Layout layout, Device device, bool pin_memory=False, MemoryFormat? memory_format=None) -> Tensor

@@ -172,7 +172,7 @@ binary_ops_float = [
     torch.atan2,
     torch.div,
     torch.sub,
-    # torch.fmod,
+    torch.fmod,
     torch.floor_divide,
     torch.mul,
     # torch.remainder,
