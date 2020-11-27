@@ -66,6 +66,16 @@ def test_set_popart_options():
     opts.Popart.set("autoRecomputation", 1)
     opts.Popart.set("cachePath", "/tmp")
     opts.Popart.set("enableOutlining", True)
+    opts.Popart.set("batchSerializationSettings.factor", 1)
+    opts.Popart.set("batchSerializationSettings.concatOnVirtualGraphChange",
+                    True)
+    opts.Popart.set("batchSerializationSettings.concatOnExecutionPhaseChange",
+                    True)
+    opts.Popart.set("batchSerializationSettings.concatOnPipelineStageChange",
+                    True)
+    opts.Popart.set("batchSerializationSettings.transformContext", 0)
+    opts.Popart.set("batchSerializationSettings.method", 0)
+    opts.Popart.set("batchSerializationSettings.batchSchedule", 1)
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
     y = torch.zeros(2)
