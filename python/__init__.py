@@ -29,7 +29,7 @@ from . import optim
 __version__ = "@VERSION@-@SNAPSHOT@"
 
 
-class _RepeatSampler:
+class _RepeatSampler(torch.utils.data.IterableDataset):
     """ Sampler that repeats forever.
 
     Args:
@@ -44,7 +44,9 @@ class _RepeatSampler:
         while True:
             yield from iter(self.real_sampler)
             if self.is_iterable:
-                yield self  # Indicate the end of the dataset
+                yield {
+                    "StopIteration": True
+                }  # Indicate the end of the dataset
 
     def __len__(self):
         return len(self.real_sampler)
@@ -99,7 +101,8 @@ class DataLoader(torch.utils.data.DataLoader):
                 options.Training.gradient_accumulation
             self._options = options
 
-        # Iterable datasets need to be handled differently: they don't have __getitem__ and __len__
+        # Iterable datasets need to be handled differently: they don't have
+        # __getitem__ and __len__
         self._is_iterable = isinstance(dataset,
                                        torch.utils.data.IterableDataset)
 
@@ -143,6 +146,10 @@ class DataLoader(torch.utils.data.DataLoader):
 
                 dataset = _SubDataset(dataset, options,
                                       self._combined_batch_size)
+        # IterableDatasets don't use indices so wrap the dataset in a
+        # _RepeatSampler instead.
+        if self._is_iterable and persistent_workers:
+            dataset = _RepeatSampler(dataset, self._is_iterable)
 
         super().__init__(dataset,
                          batch_size=self._combined_batch_size,
@@ -154,7 +161,9 @@ class DataLoader(torch.utils.data.DataLoader):
         # the dataset.
         # In order to reuse the workers between epochs we use our own infinite
         # sampler.
-        if persistent_workers:
+        # Note: PyTorch already uses an infinite sampler for iterable datasets
+        # so don't touch it.
+        if persistent_workers and not self._is_iterable:
             if self.batch_sampler is not None:
                 object.__setattr__(
                     self, "batch_sampler",
@@ -163,7 +172,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 object.__setattr__(
                     self, "sampler",
                     _RepeatSampler(self.sampler, self._is_iterable))
-            # The iterator cannot be pickled, so create it in __iter__()
+        # The iterator cannot be pickled, so create it in __iter__()
         self._infinite_iterator = None
         self._persistent_workers = persistent_workers
 
@@ -178,9 +187,9 @@ class DataLoader(torch.utils.data.DataLoader):
             # Return a single epoch long iterator
             while True:
                 value = next(self._infinite_iterator)  # pylint: disable=stop-iteration-return
-                if value == self.batch_sampler:
-                    # The sampler returns itself to indicate the end of the dataset
-                    # See class _RepeatSampler
+                if isinstance(value, dict) and "StopIteration" in value:
+                    # The sampler returns { "StopIteration":True} to indicate
+                    # the end of the dataset. See class _RepeatSampler
                     break
                 yield value
         else:
