@@ -47,9 +47,7 @@ nodeBlacklist = {"DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11"}
 options_not_handled = [
     "enableLoadAndOffloadRNGState",
     "prefetchBufferingDepthMap",
-    "executionPhaseSettings",
     "accumulateOuterFragmentSettings",
-    "batchSerializationSettings",
     "tensorLocationSettingsOverride",
     # Handled by PopTorch but not detected by this parser:
     "activationTensorLocationSettings",
@@ -57,7 +55,9 @@ options_not_handled = [
     "optimizerStateTensorLocationSettings",
     "accumulatorTensorLocationSettings",
     "replicatedGraphCount",
-    "accumulationReductionType"
+    "accumulationReductionType",
+    "executionPhaseSettings",
+    "batchSerializationSettings",
 ]
 
 

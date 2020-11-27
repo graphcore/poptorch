@@ -769,6 +769,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
     popart_options.name = value;                                               \
   })
 
+  ADD_POPART_ENUM_OPTION(batchSerializationSettings.transformContext,
+                         BatchSerializationTransformContext);
+  ADD_POPART_ENUM_OPTION(batchSerializationSettings.method,
+                         BatchSerializationMethod);
+  ADD_POPART_ENUM_OPTION(batchSerializationSettings.batchSchedule,
+                         BatchSerializationBatchSchedule);
   ADD_POPART_ENUM_OPTION(autoRecomputation, RecomputationType);
   ADD_POPART_ENUM_OPTION(mergeVarUpdate, MergeVarUpdateType);
   ADD_POPART_ENUM_OPTION(virtualGraphMode, VirtualGraphMode);
@@ -784,6 +790,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
 
   ADD_POPART_UINT64_OPTION(executionPhaseSettings.phases);
   ADD_POPART_UINT64_OPTION(executionPhaseSettings.stages);
+  ADD_POPART_UINT64_OPTION(batchSerializationSettings.factor);
   ADD_POPART_UINT64_OPTION(firstDotOp);
   ADD_POPART_UINT64_OPTION(finalDotOp);
   ADD_POPART_UINT64_OPTION(numIOTiles);
@@ -794,6 +801,11 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_UINT64_OPTION(globalReplicationFactor);
   ADD_POPART_UINT64_OPTION(globalReplicaOffset);
 
+  ADD_POPART_BOOL_OPTION(batchSerializationSettings.concatOnVirtualGraphChange);
+  ADD_POPART_BOOL_OPTION(
+      batchSerializationSettings.concatOnExecutionPhaseChange);
+  ADD_POPART_BOOL_OPTION(
+      batchSerializationSettings.concatOnPipelineStageChange);
   ADD_POPART_BOOL_OPTION(strictOpVersions);
   ADD_POPART_BOOL_OPTION(opxAliasChecking);
   ADD_POPART_BOOL_OPTION(opxModifyChecking);

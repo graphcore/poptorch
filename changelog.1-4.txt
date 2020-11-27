@@ -42,3 +42,5 @@ New features:
     Fused its input 0's batch dimensions with the row dimension
     to avoid ReduceSum in its backward pass, for performance purpose
 - Added support for multi-convolutions with poptorch.MultiConv
+- Added support for PopART batch serialization settings
+    These can be set via poptorch.Options().Popart.set()
