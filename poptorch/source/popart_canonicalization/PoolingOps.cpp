@@ -54,9 +54,20 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
     padding = {};
   }
 
-  return createAveragepool(graph, {new_value}, kernel_size, ceil_mode, 0,
-                           padding, stride);
-} // namespace anonymous
+  // popart only supports float types for avgpool
+  auto input_type = getNodeScalarType(new_value);
+
+  if (input_type == c10::kFloat) {
+    return createAveragepool(graph, {new_value}, kernel_size, ceil_mode, 0,
+                             padding, stride);
+  }
+
+  // all ather types require casting via float
+  auto new_node = createCast(graph, new_value, c10::kFloat);
+  new_node = createAveragepool(graph, {new_node->output()}, kernel_size,
+                               ceil_mode, 0, padding, stride);
+  return createCast(graph, new_node->output(), input_type);
+}
 
 torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
                                          torch::jit::Node *node) {
