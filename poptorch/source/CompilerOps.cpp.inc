@@ -125,7 +125,7 @@ torch::jit::Node* createLog1p(torch::jit::Graph *graph,  const std::vector<torch
 return new_node;
 }
 torch::jit::Node* createFmod(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::fmod, args, ImplicitCast::None, OutputType::Unknown);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::fmod, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
 return new_node;
 }
 torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {

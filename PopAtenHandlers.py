@@ -33,7 +33,6 @@ for oper in opers:
 
 convert("t", 1, "transpose")
 
-expand("fmod", lambda x: op.mod(x, cint(1)))
 expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), cint(0)))
 expand("max", lambda x: op.reducemax(x, dimension_list(x), cint(0)))
 expand("min", lambda x: op.reducemin(x, dimension_list(x), cint(0)))
@@ -51,7 +50,7 @@ forward("relu_", "relu")
 forward("selu_", "selu")
 
 # binary operators
-opers = ["atan2", "div", "max", "min", "pow", "prelu"]
+opers = ["atan2", "div", "fmod", "max", "min", "pow", "prelu"]
 
 for oper in opers:
     convert(oper, 2)
