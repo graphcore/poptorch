@@ -786,7 +786,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_STRING_OPTION(customCodeletCompileFlags);
   ADD_POPART_STRING_OPTION(serializedPoprithmsAnnealGraphsDir);
   ADD_POPART_STRING_OPTION(kahnTieBreaker);
-  ADD_POPART_STRING_OPTION(ipuSystemType);
 
   ADD_POPART_UINT64_OPTION(executionPhaseSettings.phases);
   ADD_POPART_UINT64_OPTION(executionPhaseSettings.stages);
