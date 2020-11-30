@@ -349,7 +349,7 @@ def test_iterable_dataloader():
     data = poptorch.DataLoader(opts,
                                IncrementIterableDataset(shape, num_tensors),
                                batch_size=1,
-                               num_workers=32)
+                               num_workers=1)
 
     loader = poptorch.AsynchronousDataAccessor(data)
 
@@ -371,7 +371,7 @@ def test_batch_size_None():
                                IncrementIterableDataset(shape, num_tensors),
                                batch_size=None,
                                drop_last=False,
-                               num_workers=2)
+                               num_workers=1)
 
     loader = poptorch.AsynchronousDataAccessor(data)
 
@@ -393,7 +393,7 @@ def test_len():
                                IncrementIterableDataset(shape, num_tensors),
                                batch_size=None,
                                drop_last=False,
-                               num_workers=2)
+                               num_workers=1)
 
     loader = poptorch.AsynchronousDataAccessor(data)
     with pytest.raises(TypeError,
@@ -404,7 +404,7 @@ def test_len():
                                    shape, num_tensors),
                                batch_size=None,
                                drop_last=False,
-                               num_workers=2)
+                               num_workers=1)
 
     loader = poptorch.AsynchronousDataAccessor(data)
     len(loader)
