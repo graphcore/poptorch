@@ -148,6 +148,16 @@ Comparison Ops
 
 * ``torch.topk``
 
+
+Other Ops
+'''''''''
+
+* ``torch.cumsum``
+* ``torch.meshgrid``
+* ``torch.cartesian_prod``
+* ``torch.tensordot``
+
+
 BLAS and LAPACK Operations
 ''''''''''''''''''''''''''
 
@@ -238,6 +248,9 @@ Currently only ``affine=True`` is supported as a parameter. That is to say, only
 * ``torch.nn.BatchNorm3d``
 * ``torch.nn.LayerNorm``
 * ``torch.nn.GroupNorm``
+* ``torch.nn.InstanceNorm1d``
+* ``torch.nn.InstanceNorm2d``
+* ``torch.nn.InstanceNorm3d``
 
 Recurrent layers
 ----------------
@@ -280,7 +293,15 @@ normal PyTorch operations, where they have to opt in to the gradient pass.
 * ``torch.nn.MSELoss``
 * ``torch.nn.CrossEntropyLoss``
 * ``torch.nn.NLLLoss``
-* ``torch.nn.BCELoss``
+* ``torch.nn.KLDivLoss``
+* ``torch.nn.PoissonNLLLoss``
+* ``torch.nn.HingeEmbeddingLoss``
+* ``torch.nn.BCEWithLogitsLoss``
+* ``torch.nn.SmoothL1Loss``
+* ``torch.nn.SoftMarginLoss``
+* ``torch.nn.CosineEmbeddingLoss``
+* ``torch.nn.MarginRankingLoss``
+* ``torch.nn.TripletMarginLoss``
 
 Vision Layers
 -------------
