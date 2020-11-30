@@ -162,7 +162,11 @@ class ArgsParser:
 
     def __init__(self, model):
         # Combine args and kwargs:
-        sig = inspect.signature(model.forward)
+        if isinstance(model, poptorch._OptimizerWrapper):
+            sig = inspect.signature(model.model.forward)
+        else:
+            sig = inspect.signature(model.forward)
+
         self._has_variadic_arguments = any([
             p.kind in [p.VAR_POSITIONAL, p.VAR_KEYWORD]
             for p in sig.parameters.values()

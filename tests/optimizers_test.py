@@ -297,3 +297,56 @@ def test_optimizer_groups(opt):
 
     # Check we've trained the model.
     assert torch.argmax(out) == target
+
+
+def test_optimizer_groups_none_args():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                             torch.nn.Linear(10, 10))
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, X, Y, Z, B=None):  # pylint: disable=unused-argument
+            fwd = self.model(X)
+            return fwd, self.loss(fwd, Y)
+
+    model = Model()
+
+    input = torch.randn(1, 10)
+    target = torch.randint(0, 10, [1])
+
+    # Start the optimizer as zero for both groups.
+    poptorch_model = poptorch.trainingModel(
+        model,
+        optimizer=optim.AdamW([{
+            'params': model.model[0].parameters(),
+            "lr": 0.0
+        }, {
+            'params': model.model[1].parameters(),
+            "lr": 0.0
+        }],
+                              lr=0.1))
+
+    poptorch_model.compile(input, target, target)
+
+    # Parameter is a soft copy by default oddly.
+    weight1 = model.model[0].weight.clone()
+    bias1 = model.model[0].bias.clone()
+    weight2 = model.model[1].weight.clone()
+    bias2 = model.model[1].bias.clone()
+
+    _, _ = poptorch_model(input, target, target)
+    for _ in range(0, 100):
+        _, _ = poptorch_model(input, target, target)
+
+    weight1_post, bias1_post = model.model[0].parameters()
+    weight2_post, bias2_post = model.model[1].parameters()
+
+    # Nothing should have changed.
+    assert torch.equal(weight1, weight1_post)
+    assert torch.equal(weight2, weight2_post)
+    assert torch.equal(bias1, bias1_post)
+    assert torch.equal(bias2, bias2_post)
