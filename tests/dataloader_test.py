@@ -441,24 +441,26 @@ def test_subprocess_broken_dataset():
         "reason in stdout")
 
 
-def test_reuse_workers():
+# TODO(T30952): Enable for IncrementIterableDataset
+# @pytest.mark.parametrize("DatasetType", [IncrementDataset, IncrementIterableDataset])
+@pytest.mark.parametrize("DatasetType", [IncrementDataset])
+def test_reuse_workers(DatasetType):
     shape = [2, 3]
-    num_tensors = 200
+    num_tensors = 10
 
     opts = poptorch.Options()
     data = poptorch.DataLoader(opts,
-                               IncrementDataset(shape, num_tensors),
+                               DatasetType(shape, num_tensors),
                                batch_size=1,
-                               num_workers=32)
+                               num_workers=2)
     data_no_reuse = poptorch.DataLoader(opts,
-                                        IncrementDataset(shape, num_tensors),
+                                        DatasetType(shape, num_tensors),
                                         batch_size=1,
                                         persistent_workers=False,
-                                        num_workers=32)
+                                        num_workers=2)
 
     loader = poptorch.AsynchronousDataAccessor(data)
     loader_no_reuse = poptorch.AsynchronousDataAccessor(data_no_reuse)
-    assert len(loader) == num_tensors
 
     start = None
     # Workers will be created while fetching the first element
@@ -497,8 +499,7 @@ def test_reuse_workers():
         end = time.perf_counter()
         print(f"Other epoch: {end - start} {num_tensors_reuse}")
 
-    # There is something undeterministic about the way PyTorch handles the Dataloader's workers
-    #assert num_tensors == num_tensors_reuse
+    assert num_tensors == num_tensors_reuse
     # Not adding time related asserts because a lot depends on when the CPU
     # governor kicks in. (The first iteration tends to be a lot slower
     # but that might be machine dependent).

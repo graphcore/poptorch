@@ -110,6 +110,19 @@ class DataLoader(torch.utils.data.DataLoader):
             assert options.Distributed.numProcesses == 1, (
                 "IterableDatasets "
                 "not supported for distributed execution")
+            # TODO(T30952: Remove assert once persistent_workers is handled
+            # by upstream Torch.
+            assert num_workers < 2 or not persistent_workers, (
+                "Currently IterableDatasets do not support num_workers > 1 "
+                "and persistent_workers=True")
+            if num_workers > 1 and "worker_init_fn" not in kwargs:
+                logger.warning(
+                    "IterableDataset used with num_workers="
+                    "%d but no worker_init_fn specified: as a result"
+                    " the DataLoader will return %d times each element"
+                    " in the dataset (See torch.utils.data.IterableDataset's"
+                    " documentation for more information)", num_workers,
+                    num_workers)
         else:
             num_elts = len(dataset)
             assert drop_last or self._combined_batch_size is None or \
