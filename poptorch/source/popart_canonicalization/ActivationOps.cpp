@@ -61,13 +61,37 @@ torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
   torch::jit::Value *mask = createGreater(graph, {beta_x, threshold})->output();
   return createWhere(graph, {mask, x, softplus});
 }
+
+torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  // softshrink(x) = x - lambda, if x > lambda
+  //               = x + lambda, if x < -lambda
+  //               =          0, otherwise
+  torch::jit::Value *x = node->input(0);
+  torch::jit::Value *lambda = node->input(1);
+  torch::jit::Value *neg_lambda = createNeg(graph, {lambda})->output();
+
+  torch::jit::Value *x_plus_lambda = createAdd(graph, {x, lambda})->output();
+  torch::jit::Value *x_minus_lambda = createSub(graph, {x, lambda})->output();
+  torch::jit::Value *zero = createConstantFloat(graph, {0.0}, {})->output();
+
+  torch::jit::Value *x_gt_lambda = createGreater(graph, {x, lambda})->output();
+  torch::jit::Value *shrink =
+      createWhere(graph, {x_gt_lambda, x_minus_lambda, zero})->output();
+
+  torch::jit::Value *x_lt_neg_lambda =
+      createLess(graph, {x, neg_lambda})->output();
+
+  return createWhere(graph, {x_lt_neg_lambda, x_plus_lambda, shrink});
+}
 } // namespace
 
 // clang-format off
 static bool handlers =
     registerHandlers(
         c10::aten::glu, gluHandler,
-        c10::aten::softplus, softplusHandler);
+        c10::aten::softplus, softplusHandler,
+        c10::aten::softshrink, softshrinkHandler);
 // clang-format on
 
 } // namespace poptorch

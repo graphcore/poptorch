@@ -232,6 +232,7 @@ Activations
 * ``torch.nn.Softmax``
 * ``torch.nn.Softplus``
 * ``torch.nn.Softsign``
+* ``torch.nn.Softshrink``
 * ``torch.nn.Tanh``
 * ``torch.nn.PReLU``
 * ``torch.nn.Hardtanh``
