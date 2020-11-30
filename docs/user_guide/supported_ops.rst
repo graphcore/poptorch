@@ -292,6 +292,7 @@ normal PyTorch operations, where they have to opt in to the gradient pass.
 * ``torch.nn.MSELoss``
 * ``torch.nn.CrossEntropyLoss``
 * ``torch.nn.NLLLoss``
+* ``torch.nn.BCELoss``
 * ``torch.nn.KLDivLoss``
 * ``torch.nn.PoissonNLLLoss``
 * ``torch.nn.HingeEmbeddingLoss``
