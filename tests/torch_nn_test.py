@@ -34,7 +34,6 @@ EXPECTED_FAILURES = {
     "test_nn_interpolate_nearest_3d": "Cannot force a non-constant node to a float",
     "test_nn_interpolate_nearest_3d_zero_dim": "Cannot force a non-constant node to a float",
     "test_nn_interpolate_nearest_tuple_3d": "Cannot force a non-constant node to a float",
-    "test_nn_Hardshrink": "T30560",
 
     "test_nn_CrossMapLRN2d": "Broadcasting failed",
     "test_nn_PReLU_1d_multiparam": "Broadcasting failed",

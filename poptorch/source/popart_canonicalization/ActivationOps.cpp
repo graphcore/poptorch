@@ -45,6 +45,26 @@ torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createMul(graph, {split->output(0), sigmoid->output()});
 }
 
+torch::jit::Node *hardshrinkHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  // hardshrink(x) = x, if x > lambda
+  //               = x, if x < -lambda
+  //               = 0, otherwise
+  torch::jit::Value *x = node->input(0);
+  torch::jit::Value *lambda = node->input(1);
+  torch::jit::Value *neg_lambda = createNeg(graph, {lambda})->output();
+
+  torch::jit::Value *x_gt_lambda = createGreater(graph, {x, lambda})->output();
+  torch::jit::Value *x_lt_neg_lambda =
+      createLess(graph, {x, neg_lambda})->output();
+
+  torch::jit::Value *mask =
+      createLogical_or(graph, {x_gt_lambda, x_lt_neg_lambda})->output();
+
+  torch::jit::Value *zero = createConstantFloat(graph, {0.0}, {})->output();
+  return createWhere(graph, {mask, x, zero});
+}
+
 torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   torch::jit::Value *x = node->input(0);
@@ -90,6 +110,7 @@ torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
 static bool handlers =
     registerHandlers(
         c10::aten::glu, gluHandler,
+        c10::aten::hardshrink, hardshrinkHandler,
         c10::aten::softplus, softplusHandler,
         c10::aten::softshrink, softshrinkHandler);
 // clang-format on

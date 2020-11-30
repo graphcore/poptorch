@@ -1,2 +1,2 @@
 New features:
-- Added support for torch.nn.Softplus, torch.nn.Softshrink
+- Added support for torch.nn.Hardshrink torch.nn.Softplus, torch.nn.Softshrink

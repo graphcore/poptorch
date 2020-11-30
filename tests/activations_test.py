@@ -19,7 +19,8 @@ activation_functions = [
     torch.nn.ReLU, torch.nn.Tanh, torch.nn.Sigmoid, torch.nn.PReLU,
     torch.nn.SELU, torch.nn.ELU, torch.nn.GELU, torch.nn.Softmax,
     torch.nn.LogSoftmax, torch.nn.Softsign, torch.nn.LeakyReLU,
-    torch.nn.Hardtanh, torch.nn.Softplus, torch.nn.Softshrink
+    torch.nn.Hardtanh, torch.nn.Softplus, torch.nn.Softshrink,
+    torch.nn.Hardshrink
 ]
 
 
