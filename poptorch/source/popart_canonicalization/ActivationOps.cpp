@@ -44,12 +44,30 @@ torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
 
   return createMul(graph, {split->output(0), sigmoid->output()});
 }
+
+torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
+                                  torch::jit::Node *node) {
+  torch::jit::Value *x = node->input(0);
+  torch::jit::Value *beta = node->input(1);
+  torch::jit::Value *threshold = node->input(2);
+
+  // softplus = 1/beta * log(1 + exp(beta * x))
+  torch::jit::Value *beta_x = createMul(graph, {x, beta})->output();
+  torch::jit::Value *exp_betax = createExp(graph, {beta_x})->output();
+  torch::jit::Value *log1p_exp = createLog1p(graph, {exp_betax})->output();
+  torch::jit::Value *softplus = createDiv(graph, {log1p_exp, beta})->output();
+
+  // For numerical stability, revert to identity when beta * x > threshold
+  torch::jit::Value *mask = createGreater(graph, {beta_x, threshold})->output();
+  return createWhere(graph, {mask, x, softplus});
+}
 } // namespace
 
 // clang-format off
 static bool handlers =
     registerHandlers(
-        c10::aten::glu, gluHandler);
+        c10::aten::glu, gluHandler,
+        c10::aten::softplus, softplusHandler);
 // clang-format on
 
 } // namespace poptorch

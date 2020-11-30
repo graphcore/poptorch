@@ -220,6 +220,7 @@ Activations
 * ``torch.nn.SELU``
 * ``torch.nn.Sigmoid``
 * ``torch.nn.Softmax``
+* ``torch.nn.Softplus``
 * ``torch.nn.Softsign``
 * ``torch.nn.Tanh``
 * ``torch.nn.PReLU``
