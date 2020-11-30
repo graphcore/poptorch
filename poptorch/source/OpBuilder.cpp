@@ -228,9 +228,9 @@ torch::jit::Node *createConstantFloat16(torch::jit::Graph *graph,
                                         const std::vector<double> &data,
                                         const std::vector<int64_t> &new_shape) {
   torch::jit::Node *new_node = createConstantFloat(graph, data, new_shape);
-  new_node->t_(c10::attr::value,
-               new_node->t(c10::attr::value).to(at::ScalarType::Half));
-
+  auto new_tensor = new_node->t(c10::attr::value).to(at::ScalarType::Half);
+  new_node->t_(c10::attr::value, new_tensor);
+  new_node->output()->inferTypeFrom(new_tensor);
   return new_node;
 }
 

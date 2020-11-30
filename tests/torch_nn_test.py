@@ -275,11 +275,6 @@ HALF_EXPECTED_FAILURES = {
     "test_nn_BatchNorm2d": "AssertionError: With rtol=0.05 and atol=0.0001",
     "test_nn_BatchNorm3d": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 312.5105660557747 (0.9894339442253113 vs. 313.5), which occurred at index (1, 2, 2, 1, 1).",
     "test_nn_BatchNorm3d_3d_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 30.140776455402374 (0.9842235445976257 vs. 31.125), which occurred at index (1, 0, 2, 2, 3).",
-
-    # T30732 - half/float output type mismatch
-    "test_nn_BatchNorm1d_not_tracking_stats": "Type mismatch for tensor_constant",
-    "test_nn_BatchNorm3d_not_tracking_stats": "Type mismatch for tensor_constant",
-    "test_nn_BatchNorm2d_not_tracking_stats": "Type mismatch for tensor_constant",
     }
 
 HALF_PRECISION_EXCEPTIONS = {
@@ -287,6 +282,7 @@ HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv3d_groups": (0.05, 1e-3),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),
+    "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-3),
     }
 
 # pylint: enable=line-too-long

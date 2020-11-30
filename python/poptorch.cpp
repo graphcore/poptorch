@@ -379,7 +379,7 @@ void printGraphBeforeHalfFloatResolution(const torch::jit::Graph &graph) {
     start += to.length();
   }
 
-  logging::trace("Graph before right half/float resolution:\n{}", graph_str);
+  logging::trace("Graph right before half/float resolution:\n{}", graph_str);
 }
 
 } // namespace
