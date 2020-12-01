@@ -1,14 +1,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-
 import atexit
-import io
-import os
-import sys
-import time
 
 import torch
 import torch.nn as nn
-import torch.multiprocessing as multiprocessing
 
 from .logging import logger
 
@@ -277,298 +271,43 @@ class AsynchronousDataAccessor:
 
         # To avoid hangs when the application exits: implicitly call terminate().
         atexit.register(self.terminate)
-        self._training_data = dataset
-        self._buffer_size = buffer_size
-        self._miss_sleep_time_in_ms = miss_sleep_time_in_ms
-        self._load_indefinitely = load_indefinitely
+        self._dataset = dataset
 
-        # We return shared memory to the user so we can't tell the worker to
-        # refill it until the next item is requested.
-        self._previously_ready_element = None
-
-        self._data_fetcher = None
-        self._ready_to_read_index = None
-        self._is_single_tensor = None
-        self._data_buffers = None
-
-        # Keep end of file events in a special buffer shared between worker and device. This is due to the worker reseting automatically.
-        self._eof_event_tensor = None
-
-        self._ring_read_index = 0
-
-        # Start the worker process.
-        self.spin_up()
+        # Set _worker to None  in case something goes wrong in the AsynchronousWorker constructor
+        self._worker = None
+        self._worker = _impl.AsynchronousWorker(buffer_size,
+                                                miss_sleep_time_in_ms, dataset,
+                                                load_indefinitely)
 
     def terminate(self):
         """
         An override function to kill the worker process manually.
         """
-        if self._data_fetcher:
-            if self._data_fetcher.exitcode is None:
-                # Send the exit signal if the worker is still alive.
-                try:
-                    self._pipe.send(0)
-                except BrokenPipeError:
-                    pass
-            self._data_fetcher.join(timeout=5)
-            # In case it didn't exit cleanly: terminate() it
-            self._data_fetcher.terminate()
-            self._data_fetcher.join()
-            self._data_fetcher = None
+        if self._worker:
+            self._worker.terminate()
 
     def __del__(self):
         self.terminate()
 
     def __len__(self):
-        return len(self._training_data)
-
-    def fetch_data(self, conn, pipe):  # pylint: disable=too-many-statements
-        # Make sure this process's output gets printed (In case of error)
-        sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0),
-                                      write_through=True)
-        sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0),
-                                      write_through=True)
-        shutdown_now = False
-        setup_complete = False
-
-        logger.debug("AsynchronousDataAccessor worker process: %d",
-                     os.getpid())
-        dataset_iterator = iter(self._training_data)
-
-        data = None
-        try:
-            data = next(dataset_iterator)
-        except StopIteration:
-            pass
-        if data is None:
-            raise RuntimeError("The Dataset is empty")
-
-        # We support either a single tensor or a flat 1D iterable of tensors.
-        is_single_tensor = False
-        if isinstance(data, torch.Tensor):
-            is_single_tensor = True
-            data = (data, )
-
-        # We communicate with the host via an array of sentinel values to say
-        # if the data is ready as this has much better latency than queue or
-        # lock approaches.
-        ready_to_read_index = torch.tensor([False] * self._buffer_size,
-                                           dtype=torch.bool).share_memory_()
-        conn.send(ready_to_read_index)
-
-        data_buffers = []
-
-        # Tell the host how many tensors we will be sending.
-        data_length = len(data)
-
-        conn.send(data_length)
-        conn.send(is_single_tensor)
-
-        # Share a small buffer with host to signal EOF and where in ring buffer the event occured.
-        # -1 means no event and the worker will keep loading. We start with a dummy event so the
-        # EOF won't be hit before the first call to __init__
-        eof_tensor = torch.tensor([42], dtype=torch.int).share_memory_()
-        conn.send(eof_tensor)
-
-        # Send the tensors to the host.
-        for index, tensor in enumerate(data):
-            assert isinstance(
-                tensor,
-                torch.Tensor), """Tensor at index %d is not a torch tensor.
-                    AsynchronousDataAccessor expects data to
-                    be organised as a flat 1D container of
-                    tensors.""" % index
-
-            # Shared with parent process.
-            memory = tensor.expand(
-                self._buffer_size,
-                *tensor.size()).clone().contiguous().share_memory_()
-            data_buffers.append(memory)
-
-            # Send it to the host.
-            conn.send(memory)
-
-        # We've loaded the first element as part of the spin up process.
-        ready_to_read_index[0] = True
-
-        ring_write_index = 1
-
-        any_data_sent = True
-
-        while not shutdown_now:
-            # Check for messages from the parent process:
-            if pipe.poll():
-                pipe.recv()  # remove the data
-                # First message is to indicate the setup is complete
-                # the second message is to request shutdown.
-                if setup_complete:
-                    shutdown_now = True
-                    continue
-                else:
-                    setup_complete = True
-            # If we hit EOF sleep till re-awakened by host
-            if eof_tensor[0] != -1:
-                time.sleep(self._miss_sleep_time_in_ms)
-                continue
-
-            try:
-
-                # Only pull the next iteration if we sent data the last one,
-                # otherwise try send the old one again.
-                if any_data_sent:
-                    data = next(dataset_iterator)
-                    if isinstance(data, torch.Tensor):
-                        data = (data, )
-            except StopIteration:
-                # If we are not to load indefinitely we just kill the worker.
-                if not self._load_indefinitely:
-                    logger.debug(
-                        "AsynchronousDataAccessor worker: end of dataset"
-                        " reached")
-                    break
-
-                logger.debug(
-                    "AsynchronousDataAccessor worker: end of dataset reached."
-                    " Creating a new iterator")
-                # We always reset and will keep the worker thread running.
-                dataset_iterator = iter(self._training_data)
-
-                # Tell the host where the EOF occured.
-                eof_tensor[0] = ring_write_index
-                logger.debug(
-                    "AsynchronousDataAccessor worker: new iterator ready")
-                continue
-
-            any_data_sent = False
-
-            if not ready_to_read_index[ring_write_index]:
-                # Copy the tensor into the preallocated shared memory.
-                for index, tensor in enumerate(data):
-                    data_buffers[index][ring_write_index].copy_(tensor)
-
-                # Tell the host this data is ready.
-                ready_to_read_index[ring_write_index] = True
-
-                # Quit the loop
-                any_data_sent = True
-
-                ring_write_index += 1
-
-                # Ring back around.
-                if ring_write_index >= self._buffer_size:
-                    ring_write_index = 0
-
-            # (Briefly) sleep the thread if we didn't fetch any data.
-            if not any_data_sent:
-                time.sleep(self._miss_sleep_time_in_ms)
-
-        logger.debug(
-            "AsynchronousDataAccessor worker: ready to exit: checking parent"
-            " is ready")
-        # In the unlikely event the worker is done reading the dataset
-        # before the parent is done setting the buffers up: wait here.
-        if not setup_complete:
-            pipe.recv()
-        logger.debug("AsynchronousDataAccessor worker: clean exit")
-
-    def spin_up(self):
-        # We have already spun up the worker.
-        if self._data_fetcher is not None:
-            return
-        # We use a small queue to get the initial data. The latency of
-        # deserialising the python data is too high to be used for the
-        # actual fetch so we just use this to return the initial buffers
-        # in shared memory which will be used for the actual read/write
-        # in the hot loop.
-        ctx = multiprocessing.get_context('spawn')
-        queue, child_queue = ctx.Pipe()
-
-        # If the worker exits before the parent process is done
-        # setting up the _data_buffers then the queue will get freed
-        # and bad things will happen.
-        self._pipe, child_setup_complete = ctx.Pipe()
-
-        # Fetch the data on a seperate process.
-        logger.debug("AsynchronousDataAccessor parent process: %d",
-                     os.getpid())
-        self._data_fetcher = ctx.Process(target=self.fetch_data,
-                                         args=(child_queue,
-                                               child_setup_complete))
-        self._data_fetcher.start()
-        child_queue.close()
-        child_setup_complete.close()
-        try:
-            self._ready_to_read_index = queue.recv()
-            buffer_len = queue.recv()
-            self._is_single_tensor = queue.recv()
-            self._eof_event_tensor = queue.recv()
-            self._data_buffers = []
-
-            for _ in range(0, buffer_len):
-                # Get the buffer from the host.
-                buffer = queue.recv()
-                self._data_buffers.append(buffer)
-
-            # We're all set: let the worker know.
-            self._pipe.send(0)
-            return
-        except EOFError:
-            pass
-        # Exit the except block before raising a cleaner exception otherwise the previous one will not be cleared.
-        raise RuntimeError(
-            "AsynchronousDataAccessor worker thread failed to start "
-            "(Check above for details)")
+        return len(self._dataset)
 
     def __iter__(self):
-        self._eof_event_tensor[0] = -1
+        self._worker.resetIterator()
         return self
 
     def __next__(self):
-        data = []
+        # We return shared memory to the user so we can't tell the worker to
+        # refill it until the next item is requested.
+        self._worker.releaseElement()
+        while not self._worker.endOfFile():
+            data = self._worker.acquireElementIfAvailable()
+            if data is not None:
+                return data
 
-        # Set the previous iteration to false so it can be pulled in now
-        # avoiding any data races.
-        if self._previously_ready_element is not None:
-            self._ready_to_read_index[self._previously_ready_element] = False
-
-        self._previously_ready_element = None
-        # We block until the element is ready.
-        while self._previously_ready_element is None:
-
-            # Grab the data waiting in the ring buffer.
-            if self._ready_to_read_index[self._ring_read_index]:
-                # Pull the ready buffer.
-                for _, buffer in enumerate(self._data_buffers):
-                    data.append(buffer[self._ring_read_index])
-
-                self._previously_ready_element = self._ring_read_index
-
-                self._ring_read_index += 1
-                # Ring back around.
-                if self._ring_read_index >= self._buffer_size:
-                    self._ring_read_index = 0
-
-            # We didn't fetch any data this time. Check to see if worker is dead or EOF.
-            if self._previously_ready_element is None:
-
-                # Processed all data and the process is dead, EOF.
-                process_dead = not self._data_fetcher.is_alive()
-
-                if process_dead:
-                    assert self._data_fetcher.exitcode == 0, \
-                            "An error occurred in the data fetcher"
-                    raise StopIteration
-
-                # Check if there has been an EOF event.
-                if self._eof_event_tensor[0] != -1:
-                    raise StopIteration
-
-        # Return either one tensor or the list.
-        if self._is_single_tensor:
-            return data[0]
-
-        # Else return the list.
-        return data
+        self._worker.assertNoError()
+        # EOF event
+        raise StopIteration
 
 
 def trainingModel(model, options=None, optimizer=None):
