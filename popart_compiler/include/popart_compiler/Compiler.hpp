@@ -89,7 +89,8 @@ struct Optimizer {
     }
     case OptimizerType::LAMB:
     case OptimizerType::LAMB_NO_BIAS:
-    case OptimizerType::ADAMW: {
+    case OptimizerType::ADAMW:
+    case OptimizerType::ADAMW_NO_BIAS: {
       beta1 = findInMapOrDefault(opts, "beta1", 0.9);
       beta2 = findInMapOrDefault(opts, "beta2", 0.999);
       eps = findInMapOrDefault(opts, "eps", 1e-08);

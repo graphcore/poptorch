@@ -17,6 +17,7 @@ namespace poptorch {
 enum class OptimizerType : std::uint8_t {
   SGD = 0,
   ADAMW,
+  ADAMW_NO_BIAS,
   RMSPROP,
   RMSPROP_CENTERED,
   LAMB,
