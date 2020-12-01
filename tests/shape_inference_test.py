@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import helpers
 import torch
 import torch.nn as nn
 import poptorch
@@ -45,7 +46,7 @@ def test_conv2d():
     assert _getOutputShape(graph) is None
 
     # Run shape analysis on the graph
-    poptorch.propagateInputShapes(graph, (dummyInput, ))
+    helpers.propagateInputShapes(graph, (dummyInput, ))
     inferedOutputShape = _getOutputShape(graph)
 
     assert _has_node(graph, 'aten::conv2d')
@@ -80,7 +81,7 @@ def test_batchnorm():
     assert _getOutputShape(graph) is None
 
     # Run shape analysis on the graph
-    poptorch.propagateInputShapes(graph, (dummyInput, ))
+    helpers.propagateInputShapes(graph, (dummyInput, ))
     inferedOutputShape = _getOutputShape(graph)
 
     assert _has_node(graph, 'aten::batch_norm')
@@ -114,7 +115,7 @@ def test_maxpool2d():
     assert _getOutputShape(graph) is None
 
     # Run shape analysis on the graph
-    poptorch.propagateInputShapes(graph, (dummyInput, ))
+    helpers.propagateInputShapes(graph, (dummyInput, ))
     inferedOutputShape = _getOutputShape(graph)
 
     assert _has_node(graph, 'aten::max_pool2d')
@@ -139,7 +140,7 @@ def test_view():
     # pylint: enable=protected-access
     assert _getOutputShape(graph) is None
 
-    poptorch.propagateInputShapes(graph, (dummyInput, ))
+    helpers.propagateInputShapes(graph, (dummyInput, ))
     inferedOutputShape = _getOutputShape(graph)
 
     assert _has_node(graph, 'aten::view')
@@ -163,7 +164,7 @@ def test_addmm():
     # pylint: enable=protected-access
     assert _getOutputShape(graph) is None
 
-    poptorch.propagateInputShapes(graph, dummyInputs)
+    helpers.propagateInputShapes(graph, dummyInputs)
     inferedOutputShape = _getOutputShape(graph)
 
     assert _has_node(graph, 'aten::addmm')
@@ -189,7 +190,7 @@ def test_add():
         # pylint: enable=protected-access
         assert _getOutputShape(graph) is None
 
-        poptorch.propagateInputShapes(graph, dummyInputs)
+        helpers.propagateInputShapes(graph, dummyInputs)
         inferedOutputShape = _getOutputShape(graph)
         print(graph)
 
@@ -230,7 +231,7 @@ def test_adaptive_average_pool2d():
 
         assert _getOutputShape(graph) is None
 
-        poptorch.propagateInputShapes(graph, dummyInputs)
+        helpers.propagateInputShapes(graph, dummyInputs)
         inferedOutputShape = _getOutputShape(graph)
         print(graph)
 
@@ -261,7 +262,7 @@ def test_flatten():
         # pylint: enable=protected-access
         assert _getOutputShape(graph) is None
 
-        poptorch.propagateInputShapes(graph, dummyInputs)
+        helpers.propagateInputShapes(graph, dummyInputs)
         inferedOutputShape = _getOutputShape(graph)
         print(graph)
 

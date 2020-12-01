@@ -1109,6 +1109,9 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
                                                     : popart::DataType::FLOAT,
         opt.second_order_momentum_accum_type_is_half ? popart::DataType::FLOAT16
                                                      : popart::DataType::FLOAT);
+
+    // NB WeightDecayMode set to default WeightDecayMode::Decay meaning true
+    // weight decay rather than L2
   }
 
   if (opt.type == OptimizerType::RMSPROP ||

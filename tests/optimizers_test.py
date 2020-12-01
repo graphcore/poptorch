@@ -351,3 +351,28 @@ def test_optimizer_groups_none_args():
     assert torch.equal(weight2, weight2_post)
     assert torch.equal(bias1, bias1_post)
     assert torch.equal(bias2, bias2_post)
+
+
+def test_optimizer_SGD_nesterov():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                             torch.nn.Linear(10, 10))
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, X, Y):
+            fwd = self.model(X)
+            return fwd, self.loss(fwd, Y)
+
+    model = Model()
+
+    with pytest.raises(ValueError,
+                       match="Nesterov momentum is currently not supported"):
+        poptorch.trainingModel(model,
+                               optimizer=optim.SGD(model.parameters(),
+                                                   nesterov=True,
+                                                   momentum=0.1,
+                                                   lr=0.001))

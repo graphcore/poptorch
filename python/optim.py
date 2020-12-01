@@ -6,6 +6,14 @@ from torch.optim.optimizer import required
 
 
 class SGD(torch.optim.SGD):
+    """ Stochastic gradient descent with optional momentum.
+
+    The optimizer matches PyTorch's implementation (torch.optim.SGD) with
+    optional loss and velocity scaling.
+
+    Nesterov momentum is not currently supported.
+    """
+
     def __init__(self,
                  params,
                  lr=required,
@@ -15,8 +23,28 @@ class SGD(torch.optim.SGD):
                  nesterov=False,
                  loss_scaling=1.0,
                  velocity_scaling=1.0):
+        """
+
+        :param iterable params: parameters to optimize.
+        :param float lr: learning rate.
+        :param float, optional momentum: momentum factor.
+        :type momentum: float, optional
+        :param dampening: damperning term for momentum.
+        :type dampening: float, optional
+        :param weight_decay: Weight decay (L2 penalty) factor.
+        :type weight_decay: float, optional
+        :param nesterov: Not supported (must be False).
+        :type nesterov: bool, optional
+        :param loss_scaling: Factor by which to scale the loss and hence
+            gradients to assist numerical stability when using float16.
+        :type loss_scaling: float, optional
+        :param velocity_scaling: Factor by which to scale the velocity values
+            to assist numerical stability when using float16.
+        :type velocity_scaling: float, optional
+        """
         super().__init__(params, lr, momentum, dampening, weight_decay,
                          nesterov)
+
         self.defaults["loss_scaling"] = loss_scaling
         self.defaults["velocity_scaling"] = velocity_scaling
         for group in self.param_groups:
@@ -25,6 +53,13 @@ class SGD(torch.optim.SGD):
 
 
 class AdamW(torch.optim.AdamW):
+    """ Adam optimizer with true weight decay.
+
+    This optimizer matches PyTorch's implementation (torch.optim.AdamW) with
+    optional loss scaling.
+
+    AMSGrad is currently not supported."""
+
     def __init__(self,
                  params,
                  lr=1e-3,
@@ -37,6 +72,28 @@ class AdamW(torch.optim.AdamW):
                  accumType=torch.float32,
                  firstOrderMomentumAccumType=torch.float32,
                  secondOrderMomentumAccumType=torch.float32):
+        """
+        :param iterable params: parameters to optimize.
+        :param lr: learning rate
+        :type lr: float, optional
+        :param eps: term added to the demoninator to ensure numerical stability.
+        :type eps: float, optional
+        :param weight_decay: Weight decay factor.
+        :type weight_decay: float, optional
+        :param amsgrad: Not supported (must be False).
+        :type amsgrad: bool, optional
+        :param loss_scaling: Factor by which to scale the loss and hence
+            gradients to assist numerical stability when using float16.
+        :type loss_scaling: float, optional
+        :param accumType: data type used for gradients.
+        :type accumType: torch.dtype, optional
+        :param firstOrderMomentumAccumType: data type used to store
+            the first order momentum values for each parameter.
+        :type firstOrderMomentumAccumType: torch.dtype, optional
+        :param secondOrderMomentumAccumType: data type used to store
+            the second order momentum values for each parameter.
+        :type secondOrderMomentumAccumType: torch.dtype, optional
+        """
         super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
 
         self.defaults["loss_scaling"] = loss_scaling
@@ -61,6 +118,11 @@ class AdamW(torch.optim.AdamW):
 
 
 class RMSprop(torch.optim.RMSprop):
+    """ RMSprop optimizer with optional L2 penalty.
+
+    This optimizer matches PyTorch's implementation (torch.optim.RMSprop) with
+    optional loss scaling."""
+
     def __init__(self,
                  params,
                  lr=1e-2,
@@ -70,6 +132,26 @@ class RMSprop(torch.optim.RMSprop):
                  momentum=0,
                  centered=False,
                  loss_scaling=1.0):
+        """
+        :param iterable params: parameters to optimize.
+        :param lr: learning rate.
+        :type lr: float, optional
+        :param alpha: smoothing constant.
+        :type alpha: float, optional
+        :param eps: term added to the demoninator to ensure numerical
+           stability.
+        :type eps: float, optional
+        :param weight_decay: L2 penalty coeffecient.
+        :type weight_decay: float, optional
+        :param momentum: momentum factor.
+        :type momentum: float, optional
+        :param centered: True: compute centred RMSProp in which the
+            gradient is normalized by an estimate of its variance.
+        :type centered: bool, optional
+        :param loss_scaling: Factor by which to scale the loss and hence
+            gradients to assist numerical stability when using float16.
+        :type loss_scaling: float, optional
+        """
         super().__init__(params, lr, alpha, eps, weight_decay, momentum,
                          centered)
 
@@ -79,6 +161,15 @@ class RMSprop(torch.optim.RMSprop):
 
 
 class LAMB(torch.optim.Optimizer):
+    """ Layer-wise Adaptive Moments (LAMB) optimizer (biased version).
+
+        Based on "Large Batch Optimization for Deep Learning: Training BERT
+        in 76 minutes" (https://arxiv.org/abs/1904.00962).
+
+        The scaling function phi(z) is fixed as min(z, mwn);
+        mwn is fixed at 10.0.
+    """
+
     def __init__(self,
                  params,
                  lr=1e-3,
@@ -90,6 +181,26 @@ class LAMB(torch.optim.Optimizer):
                  accumType=torch.float32,
                  firstOrderMomentumAccumType=torch.float32,
                  secondOrderMomentumAccumType=torch.float32):
+        """
+        :param iterable params: parameters to optimize.
+        :param lr: learning rate
+        :type lr: float, optional
+        :param betas: (beta1, beta2) parameters used in LAMB.
+        :type betas: tuple, optional
+        :param eps: term added to the denominator to ensure numerical
+           stability/
+        :type eps: float, optional
+        :param weight_decay: (AdamW) weight decay factor.
+        :type weight_decay: float, optional
+        :param accumType: data type used for gradients.
+        :type accumType: torch.dtype, optional
+        :param firstOrderMomentumAccumType: data type used to store
+            the first order momentum values for each parameter.
+        :type firstOrderMomentumAccumType: torch.dtype, optional
+        :param secondOrderMomentumAccumType: data type used to store
+           the second order momentum values for each parameter.
+        :type secondOrderMomentumAccumType: torch.dtype, optional
+        """
         defaults = dict(lr=lr,
                         betas=betas,
                         eps=eps,
@@ -189,7 +300,11 @@ class AdamWNoBias(AdamW):
                              secondOrderMomentumAccumType)
 
 
+# Convenience classes for testing
 class LAMBNoBias(LAMB):
+    """ Layer-wise Adaptive Moments (LAMB) optimizer (non-biased version).
+    """
+
     def __init__(self,
                  params,
                  lr=1e-3,
