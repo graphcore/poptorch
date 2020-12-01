@@ -81,8 +81,10 @@ std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
 
   // Convert that IR type into a C++ vector of ints.
   std::vector<std::int64_t> shape;
-  for (auto optional_int : *dims.sizes()) {
-    shape.push_back(*optional_int);
+  if (dims.sizes()) {
+    for (auto optional_int : *dims.sizes()) {
+      shape.push_back(*optional_int);
+    }
   }
   return shape;
 }

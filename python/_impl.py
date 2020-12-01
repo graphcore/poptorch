@@ -6,35 +6,60 @@ import sys
 import time
 import inspect
 import torch
-import torch.optim as optim
 import torch.multiprocessing as multiprocessing
-import poptorch.poptorch_core as poptorch_core
-import poptorch.optim
 
+# Do not import any poptorch.* here: it will break the poptorch module
 from . import enums
+from . import optim
+from . import poptorch_core
 from .logging import logger
 from .options import Options
 
 
+def apply_optimizer(optimizer):
+    num_groups = len(optimizer.param_groups)
+    for index in range(0, num_groups):
+        torch.ops.poptorch.optimizer_group(
+            index, optimizer.param_groups[index]["params"])
+
+
+# To understand which variable groups the user wants to apply the
+# optimizer to we need to mark them via a wrapper. We do this because
+# when we reference the variables in the context of the operation we
+# get the corresponding IR value for "free" as part of the trace.
+# Otherwise we would need a system to map the variable in the optimizer
+# to the variable in the model to the variable in the IR.
+class OptimizerWrapper(torch.nn.Module):
+    def __init__(self, model, optimizer):
+        super().__init__()
+        self.model = model
+        self.optimizer = optimizer
+
+    def forward(self, *args, **kwargs):
+        out = self.model(*args, **kwargs)
+        apply_optimizer(self.optimizer)
+        return out
+
+
 def to_poptorch_optimizer(optimizer):
-    if isinstance(optimizer, optim.SGD):
+    if isinstance(optimizer, torch.optim.SGD):
         return enums.OptimizerType.SGD
 
-    if isinstance(optimizer, optim.AdamW):
-        if isinstance(optimizer, poptorch.optim.AdamW):
+    if isinstance(optimizer, torch.optim.AdamW):
+        if isinstance(optimizer, optim.AdamW):
             bias_correction = optimizer.param_groups[0]["biasCorrection"]
             if not bias_correction:
                 return enums.OptimizerType.ADAMW_NO_BIAS
 
         return enums.OptimizerType.ADAMW
 
-    if isinstance(optimizer, optim.RMSprop):
+    if isinstance(optimizer, torch.optim.RMSprop):
         centered = optimizer.param_groups[0]["centered"]
 
         return enums.OptimizerType.RMSPROP_CENTERED if centered \
             else enums.OptimizerType.RMSPROP
 
-    if isinstance(optimizer, poptorch.optim.LAMB):  # pylint: disable=no-member
+    if isinstance(optimizer, optim.LAMB):
         bias_correction = optimizer.param_groups[0]["biasCorrection"]
 
         return enums.OptimizerType.LAMB if bias_correction \
@@ -67,7 +92,7 @@ def convertOptimizerToDict(optimizer):
         weight_decay = optimizer.param_groups[index]["weight_decay"]
         loss_scaling = getattr(optimizer, "loss_scaling", 1.0)
 
-        if isinstance(optimizer, optim.SGD):
+        if isinstance(optimizer, torch.optim.SGD):
             velocity_scaling = getattr(optimizer, "velocity_scaling", 1.0)
             momentum = optimizer.param_groups[0]["momentum"]
             dampening = optimizer.param_groups[0]["dampening"]
@@ -82,12 +107,12 @@ def convertOptimizerToDict(optimizer):
                 "velocity_scaling":
                 (velocity_scaling, velocity_scaling == 1.0),
             }
-        if isinstance(optimizer, (optim.AdamW, poptorch.optim.LAMB)):  # pylint: disable=no-member
+        if isinstance(optimizer, (torch.optim.AdamW, optim.LAMB)):  # pylint: disable=no-member
             beta1 = optimizer.param_groups[index]["betas"][0]
             beta2 = optimizer.param_groups[index]["betas"][1]
             eps = optimizer.param_groups[index]["eps"]
 
-            if isinstance(optimizer, optim.AdamW):
+            if isinstance(optimizer, torch.optim.AdamW):
                 assert not optimizer.param_groups[index]["amsgrad"], (
                     "Only non-amsgrad "
                     "AdamW optimizers are supported.")
@@ -100,7 +125,7 @@ def convertOptimizerToDict(optimizer):
                 "loss_scaling": (loss_scaling, loss_scaling == 1.0)
             }
 
-        if isinstance(optimizer, optim.RMSprop):
+        if isinstance(optimizer, torch.optim.RMSprop):
             momentum = optimizer.param_groups[index]["momentum"]
             alpha = optimizer.param_groups[index]["alpha"]
             eps = optimizer.param_groups[index]["eps"]
@@ -171,7 +196,7 @@ class ArgsParser:
 
     def __init__(self, model):
         # Combine args and kwargs:
-        if isinstance(model, poptorch._OptimizerWrapper):
+        if isinstance(model, OptimizerWrapper):
             sig = inspect.signature(model.model.forward)
         else:
             sig = inspect.signature(model.forward)
@@ -277,7 +302,8 @@ class PoplarExecutor:
                 # In training it makes sense to see only the last result, by default.
                 options.anchorMode(enums.AnchorMode.Final)
             if not optimizer:
-                optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
+                optimizer = torch.optim.SGD(self._user_model.parameters(),
+                                            lr=0.01)
 
             optimizer = convertOptimizerToDict(optimizer)
         else:
