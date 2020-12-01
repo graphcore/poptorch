@@ -5,10 +5,11 @@ import enum
 class OptimizerType(enum.IntEnum):
     SGD = 0
     ADAMW = 1
-    RMSPROP = 2
-    RMSPROP_CENTERED = 3
-    LAMB = 4
-    LAMB_NO_BIAS = 5
+    ADAMW_NO_BIAS = 2
+    RMSPROP = 3
+    RMSPROP_CENTERED = 4
+    LAMB = 5
+    LAMB_NO_BIAS = 6
 
 
 class AnchorMode(enum.IntEnum):

@@ -33,12 +33,14 @@ class AdamW(torch.optim.AdamW):
                  weight_decay=0.01,
                  amsgrad=False,
                  loss_scaling=1.0,
+                 biasCorrection=True,
                  accumType=torch.float32,
                  firstOrderMomentumAccumType=torch.float32,
                  secondOrderMomentumAccumType=torch.float32):
         super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
 
         self.defaults["loss_scaling"] = loss_scaling
+        self.defaults["biasCorrection"] = biasCorrection
 
         supportedTypes = [torch.float16, torch.float32]
         errString = """Accumulation types must be either torch.float32
@@ -55,6 +57,7 @@ class AdamW(torch.optim.AdamW):
 
         for group in self.param_groups:
             group.setdefault("loss_scaling", loss_scaling)
+            group.setdefault("biasCorrection", biasCorrection)
 
 
 class RMSprop(torch.optim.RMSprop):
@@ -166,7 +169,26 @@ class LAMB(torch.optim.Optimizer):
         return loss
 
 
-# Convenience class for testing
+# Convenience classes for testing
+class AdamWNoBias(AdamW):
+    def __init__(self,
+                 params,
+                 lr=1e-3,
+                 betas=(0.9, 0.999),
+                 eps=1e-8,
+                 weight_decay=0.01,
+                 amsgrad=False,
+                 loss_scaling=1.0,
+                 accumType=torch.float32,
+                 firstOrderMomentumAccumType=torch.float32,
+                 secondOrderMomentumAccumType=torch.float32):
+        super(AdamWNoBias,
+              self).__init__(params, lr, betas, eps, weight_decay, amsgrad,
+                             loss_scaling, False, accumType,
+                             firstOrderMomentumAccumType,
+                             secondOrderMomentumAccumType)
+
+
 class LAMBNoBias(LAMB):
     def __init__(self,
                  params,
@@ -207,7 +229,7 @@ def _check_constructor_match_parent(child_class, extra_args=None):
 
 _check_constructor_match_parent(SGD, ["loss_scaling", "velocity_scaling"])
 _check_constructor_match_parent(AdamW, [
-    "loss_scaling", "accumType", "firstOrderMomentumAccumType",
-    "secondOrderMomentumAccumType"
+    "loss_scaling", "biasCorrection", "accumType",
+    "firstOrderMomentumAccumType", "secondOrderMomentumAccumType"
 ])
 _check_constructor_match_parent(RMSprop, ["loss_scaling"])

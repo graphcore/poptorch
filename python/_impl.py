@@ -16,14 +16,18 @@ def to_poptorch_optimizer(optimizer):
         return enums.OptimizerType.SGD
 
     if isinstance(optimizer, optim.AdamW):
+        if isinstance(optimizer, poptorch.optim.AdamW):
+            bias_correction = optimizer.param_groups[0]["biasCorrection"]
+            if not bias_correction:
+                return enums.OptimizerType.ADAMW_NO_BIAS
+
         return enums.OptimizerType.ADAMW
 
     if isinstance(optimizer, optim.RMSprop):
         centered = optimizer.param_groups[0]["centered"]
 
-        if centered:
-            return enums.OptimizerType.RMSPROP_CENTERED
-        return enums.OptimizerType.RMSPROP
+        return enums.OptimizerType.RMSPROP_CENTERED if centered \
+            else enums.OptimizerType.RMSPROP
 
     if isinstance(optimizer, poptorch.optim.LAMB):  # pylint: disable=no-member
         bias_correction = optimizer.param_groups[0]["biasCorrection"]

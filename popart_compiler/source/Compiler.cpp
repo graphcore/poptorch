@@ -991,6 +991,7 @@ static void insertValuesForTensor(popart::Optimizer *popart_optimizer,
   }
 
   if (py_opt.type == OptimizerType::ADAMW ||
+      py_opt.type == OptimizerType::ADAMW_NO_BIAS ||
       py_opt.type == OptimizerType::LAMB ||
       py_opt.type == OptimizerType::LAMB_NO_BIAS) {
     dynamic_cast<popart::Adam *>(popart_optimizer)
@@ -1017,6 +1018,17 @@ static void printOptimizerToDebug(const std::string &opt_name,
   logging::debug(ss.str().c_str(), args...);
 }
 
+static void printAdamLambOptimizers(const std::string &name,
+                                    const Optimizer &opt) {
+  printOptimizerToDebug(name,
+                        {"Learning rate", "Weight decay", "beta1", "beta2",
+                         "eps", "Bias correction"},
+                        opt.learning_rate.first, opt.weight_decay.first,
+                        opt.beta1.first, opt.beta2.first, opt.eps.first,
+                        opt.type == OptimizerType::ADAMW ||
+                            opt.type == OptimizerType::LAMB);
+}
+
 static void printOptimizerToDebug(const Optimizer &opt) {
   switch (opt.type) {
   case OptimizerType::SGD:
@@ -1028,16 +1040,13 @@ static void printOptimizerToDebug(const Optimizer &opt) {
 
   case OptimizerType::LAMB:
   case OptimizerType::LAMB_NO_BIAS:
-  case OptimizerType::ADAMW: {
-    std::string name = opt.type == OptimizerType::ADAMW ? "ADAMW" : "LAMB";
-    printOptimizerToDebug(name,
-                          {"Learning rate", "Weight decay", "beta1", "beta2",
-                           "eps", "Bias correction"},
-                          opt.learning_rate.first, opt.weight_decay.first,
-                          opt.beta1.first, opt.beta2.first, opt.eps.first,
-                          opt.type == OptimizerType::LAMB);
+    printAdamLambOptimizers("LAMB", opt);
     break;
-  }
+
+  case OptimizerType::ADAMW:
+  case OptimizerType::ADAMW_NO_BIAS:
+    printAdamLambOptimizers("ADAMW", opt);
+    break;
 
   case OptimizerType::RMSPROP_CENTERED:
   case OptimizerType::RMSPROP:
@@ -1077,10 +1086,14 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
         opt.velocity_scaling, opt.loss_scaling);
   }
 
-  if (opt.type == OptimizerType::ADAMW || opt.type == OptimizerType::LAMB ||
+  if (opt.type == OptimizerType::ADAMW ||
+      opt.type == OptimizerType::ADAMW_NO_BIAS ||
+      opt.type == OptimizerType::LAMB ||
       opt.type == OptimizerType::LAMB_NO_BIAS) {
     popart::AdamMode mode;
     if (opt.type == OptimizerType::ADAMW) {
+      mode = popart::AdamMode::Adam;
+    } else if (opt.type == OptimizerType::ADAMW_NO_BIAS) {
       mode = popart::AdamMode::AdamNoBias;
     } else if (opt.type == OptimizerType::LAMB) {
       mode = popart::AdamMode::Lamb;
