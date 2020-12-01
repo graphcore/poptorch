@@ -13,13 +13,6 @@ def ipu_print_tensor(tensor, title=""):
     return torch.ops.poptorch.ipu_print_tensor(tensor, title)
 
 
-def apply_optimizer(optimizer):
-    num_groups = len(optimizer.param_groups)
-    for index in range(0, num_groups):
-        torch.ops.poptorch.optimizer_group(
-            index, optimizer.param_groups[index]["params"])
-
-
 def recomputationCheckpoint(*tensors):
     """Operation for checkpointing values in a computational pipeline stage.
 

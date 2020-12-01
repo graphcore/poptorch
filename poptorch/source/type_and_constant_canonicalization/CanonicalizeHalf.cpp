@@ -143,7 +143,7 @@ bool ConvertHalfImpl::atLeastOneUseHalf(
   for (const auto &use : uses) {
     for (auto output : use.user->outputs()) {
       auto type = output->type()->cast<c10::TensorType>();
-      if (!type) {
+      if (!type || !type->scalarType()) {
         continue;
       }
       if ((*type->scalarType()) == at::ScalarType::Half) {

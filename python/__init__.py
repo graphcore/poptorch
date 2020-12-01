@@ -46,24 +46,6 @@ class _RepeatSampler(torch.utils.data.IterableDataset):
         return len(self.real_sampler)
 
 
-# To understand which variable groups the user wants to apply the
-# optimizer to we need to mark them via a wrapper. We do this because
-# when we reference the variables in the context of the operation we
-# get the corresponding IR value for "free" as part of the trace.
-# Otherwise we would need a system to map the variable in the optimizer
-# to the variable in the model to the variable in the IR.
-class _OptimizerWrapper(torch.nn.Module):
-    def __init__(self, model, optimizer):
-        super().__init__()
-        self.model = model
-        self.optimizer = optimizer
-
-    def forward(self, *args, **kwargs):
-        out = self.model(*args, **kwargs)
-        apply_optimizer(self.optimizer)
-        return out
-
-
 class DataLoader(torch.utils.data.DataLoader):
     """ Thin wrapper around the traditional `torch.utils.data.DataLoader` to
     abstract away some of the batch sizes calculations.
@@ -327,7 +309,7 @@ def trainingModel(model, options=None, optimizer=None):
     maybe_wrapped_model = model
 
     if optimizer and len(optimizer.param_groups) > 1:
-        maybe_wrapped_model = _OptimizerWrapper(model, optimizer)
+        maybe_wrapped_model = _impl.OptimizerWrapper(model, optimizer)
 
     return PoplarExecutor(model=maybe_wrapped_model,
                           options=options,
