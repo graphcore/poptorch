@@ -43,9 +43,11 @@ nitpick_ignore = [
     ('py:class', 'bool'),
     ('py:class', 'str'),
     ('py:class', 'dict'),
+    ('py:class', 'iterable'),
+    ('py:class', 'optional'),
     ('py:class', 'torch.Tensor'),
     ('py:class', 'torch.nn.Module'),
-    ('py:class', 'optional'),
+    ('py:class', 'torch.dtype'),
     ('py:class', 'torch.optim.Optimizer'),
     # Enums already described in functions that use them
     ('py:class', 'poptorch.AnchorMode'),

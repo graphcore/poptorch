@@ -328,9 +328,3 @@ def inferenceModel(model, options=None):
         of ``model``.
     """
     return PoplarExecutor(model=model, options=options, training=False)
-
-
-def propagateInputShapes(graph, dummyInputs):
-    for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
-        graphInput.inferTypeFrom(dummyInput)
-    poptorch_core.propagateInputShapes(graph)

@@ -2,16 +2,6 @@
 import enum
 
 
-class OptimizerType(enum.IntEnum):
-    SGD = 0
-    ADAMW = 1
-    ADAMW_NO_BIAS = 2
-    RMSPROP = 3
-    RMSPROP_CENTERED = 4
-    LAMB = 5
-    LAMB_NO_BIAS = 6
-
-
 class AnchorMode(enum.IntEnum):
     """
     - ``All``: Return a result for each batch.

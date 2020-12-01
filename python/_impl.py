@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import enum
 import io
 import os
 import sys
@@ -41,37 +42,48 @@ class OptimizerWrapper(torch.nn.Module):
         return out
 
 
-def to_poptorch_optimizer(optimizer):
+class _OptimizerType(enum.IntEnum):
+    SGD = 0
+    ADAMW = 1
+    ADAMW_NO_BIAS = 2
+    RMSPROP = 3
+    RMSPROP_CENTERED = 4
+    LAMB = 5
+    LAMB_NO_BIAS = 6
+
+
+# pylint: disable=too-many-return-statements
+def _to_poptorch_optimizer(optimizer):
     if isinstance(optimizer, torch.optim.SGD):
-        return enums.OptimizerType.SGD
+        return _OptimizerType.SGD
 
     if isinstance(optimizer, torch.optim.AdamW):
         if isinstance(optimizer, optim.AdamW):
             bias_correction = optimizer.param_groups[0]["biasCorrection"]
             if not bias_correction:
-                return enums.OptimizerType.ADAMW_NO_BIAS
-
-        return enums.OptimizerType.ADAMW
+                return _OptimizerType.ADAMW_NO_BIAS
+        return _OptimizerType.ADAMW
 
     if isinstance(optimizer, torch.optim.RMSprop):
         centered = optimizer.param_groups[0]["centered"]
 
-        return enums.OptimizerType.RMSPROP_CENTERED if centered \
-            else enums.OptimizerType.RMSPROP
+        if centered:
+            return _OptimizerType.RMSPROP_CENTERED
+        return _OptimizerType.RMSPROP
 
     if isinstance(optimizer, optim.LAMB):
         bias_correction = optimizer.param_groups[0]["biasCorrection"]
 
-        return enums.OptimizerType.LAMB if bias_correction \
-            else enums.OptimizerType.LAMB_NO_BIAS
+        return _OptimizerType.LAMB if bias_correction \
+            else _OptimizerType.LAMB_NO_BIAS
     return None
 
 
-def convertOptimizerToDict(optimizer):
-    optimizer_type = to_poptorch_optimizer(optimizer)
+def _convertOptimizerToDict(optimizer):
+    optimizer_type = _to_poptorch_optimizer(optimizer)
 
     assert optimizer_type is not None, """Unsupported optimizer type.
-         Types supported %s""" % str(list(enums.OptimizerType))
+         Types supported %s""" % str(list(_OptimizerType))
 
     num_groups = len(optimizer.param_groups)
 
@@ -93,6 +105,10 @@ def convertOptimizerToDict(optimizer):
         loss_scaling = getattr(optimizer, "loss_scaling", 1.0)
 
         if isinstance(optimizer, torch.optim.SGD):
+            if optimizer.param_groups[index]["nesterov"]:
+                raise ValueError(
+                    "Nesterov momentum is currently not supported.")
+
             velocity_scaling = getattr(optimizer, "velocity_scaling", 1.0)
             momentum = optimizer.param_groups[0]["momentum"]
             dampening = optimizer.param_groups[0]["dampening"]
@@ -305,7 +321,7 @@ class PoplarExecutor:
                 optimizer = torch.optim.SGD(self._user_model.parameters(),
                                             lr=0.01)
 
-            optimizer = convertOptimizerToDict(optimizer)
+            optimizer = _convertOptimizerToDict(optimizer)
         else:
             if options.defaultAnchorMode():
                 # In inference it makes sense to see all the results, by default.
@@ -424,7 +440,7 @@ class PoplarExecutor:
         previous one. Supported optimisers: ``optim.SGD``, ``optim.AdamW``,
         ``optim.RMSProp``.
         """
-        self._new_optimizer = convertOptimizerToDict(optimizer)
+        self._new_optimizer = _convertOptimizerToDict(optimizer)
 
     def _parseArgsAndCompile(self, args, kwargs):
         # Convert single tensor to tuple.

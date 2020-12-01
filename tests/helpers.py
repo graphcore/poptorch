@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
 import poptorch
+import poptorch.poptorch_core as poptorch_core
 
 
 def disableSmallModel():
@@ -8,6 +9,12 @@ def disableSmallModel():
     if not poptorch.ipuHardwareIsAvailable():
         return {"POPTORCH_IPU_MODEL": "1"}
     return {}
+
+
+def propagateInputShapes(graph, dummyInputs):
+    for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
+        graphInput.inferTypeFrom(dummyInput)
+    poptorch_core.propagateInputShapes(graph)
 
 
 def trainingModelWithLoss(model, loss, options=None, optimizer=None):

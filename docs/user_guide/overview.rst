@@ -159,6 +159,53 @@ IPUs, you can use ``poptorch.Options().autoRoundNumIPUs(True)`` to allow
 PopTorch to reserve more IPUs than the model specifies.
 
 
+Optimizers
+==========
+
+You can use a number of optimizers with PopTorch.
+In addition, PopTorch has additional features to support float16 models such as loss scaling.
+
+.. autoclass:: poptorch.optim.SGD
+   :special-members: __init__
+   :members:
+
+.. autoclass:: poptorch.optim.AdamW
+   :special-members: __init__
+   :members:
+
+.. autoclass:: poptorch.optim.RMSprop
+   :special-members: __init__
+   :members:
+
+.. autoclass:: poptorch.optim.LAMB
+   :special-members: __init__
+   :members:
+
+
+Loss scaling
+------------
+
+When training models which use half/float16 values, you can use loss scaling  to prevent the gradients from becoming too small and underflowing.
+Before calculating the gradients, PopTorch will scale the loss by the value of the ``loss_scaling`` parameter.
+PopTorch will multiply the gradients by the inverse scale prior to updating the optimizer state.
+Therefore, beyond improving numerical stability, neither the training nor the hyper-parameters are affected.
+
+ Higher ``loss_scaling`` values can improve numerical stability by minimising underflow.
+ However, too high a value can result in overflow.
+ The optimal loss scaling factor depends on the model.
+
+
+Velocity scaling (SGD only)
+---------------------------
+
+The SGD optimizer, when used with momentum, updates weights based on the velocity values.
+At each update step, the new velocity is a combination of the gradients derived from the loss function and the previous velocity value.
+Similar to loss scaling, the ``velocity_scaling`` parameter allows the velocity values to be scaled to improve numerical precision when using half/float16 values.
+(Note that the gradients are, in effect, scaled by ``velocity_scaling/loss_scaling`` so the ``loss_scaling`` has no impact on the effective scaling of velocity parameters.)
+
+As with loss scaling, higher values can minimise underflow of the velocity values but may result in overflow.
+
+
 Custom ops
 ==========
 
