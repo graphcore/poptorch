@@ -73,6 +73,8 @@ class _PopartOptions:
 
     >>> opts = poptorch.Options()
     >>> opts.Popart.set("autoRecomputation", 3) # RecomputationType::Pipeline
+    >>> opts.Popart.set("syntheticDataMode",
+    >>>                  int(popart.SyntheticDataMode.RandomNormal))
     """
 
     def __init__(self):
