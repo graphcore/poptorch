@@ -171,8 +171,6 @@ EXPECTED_FAILURES = {
     "test_nn_FractionalMaxPool3d_asymsize": "T30594",
     "test_nn_Threshold_threshold_value": "T30611",
     "test_nn_Threshold_large_value": "T30611",
-    "test_nn_RReLU": "T30598",
-    "test_nn_RReLU_with_up_down": "T30598",
     "test_nn_BCELoss_no_reduce": "T30603",
     "test_nn_BCEWithLogitsLoss_no_reduce": "T30603",
     "test_nn_NLLLoss_no_reduce_ignore_index": "T30603",
@@ -205,7 +203,6 @@ EXPECTED_FAILURES = {
     "test_nn_AdaptiveAvgPool1d_one_output": "T30591",
     "test_nn_AdaptiveAvgPool3d_tuple": "T30591",
     "test_nn_AdaptiveAvgPool3d_tuple_none": "T30591",
-    "test_nn_GLU_dim": "T30606",
     "test_nn_Fold": "T30606",
     "test_nn_Unfold_int_input": "T30606",
     "test_nn_Fold_int_input": "T30606",
@@ -214,8 +211,6 @@ EXPECTED_FAILURES = {
     "test_nn_MultiLabelMarginLoss_1d_no_reduce": "T30603",
     "test_nn_AdaptiveMaxPool3d_single": "T30564",
     "test_nn_AdaptiveAvgPool3d_single": "T30591",
-    "test_nn_CELU": "T30598",
-    "test_nn_GLU": "T30598",
     "test_nn_Unfold": "T30606",
 
     # unsupported upsamplig modes downstream

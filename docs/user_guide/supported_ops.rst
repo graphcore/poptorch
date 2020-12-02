@@ -223,8 +223,9 @@ Activations
 -----------
 
 * ``torch.nn.ELU``
-* ``torch.nn.Hardshrink``
+* ``torch.nn.CELU``
 * ``torch.nn.GELU``
+* ``torch.nn.Hardshrink``
 * ``torch.nn.LeakyReLU``
 * ``torch.nn.LogSoftmax``
 * ``torch.nn.ReLU``
@@ -236,6 +237,7 @@ Activations
 * ``torch.nn.Softshrink``
 * ``torch.nn.Tanh``
 * ``torch.nn.PReLU``
+* ``torch.nn.RReLU``
 * ``torch.nn.Hardtanh``
 * ``torch.nn.functional.glu``
 

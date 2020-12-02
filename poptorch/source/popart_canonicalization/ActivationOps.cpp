@@ -8,6 +8,24 @@
 namespace poptorch {
 namespace {
 
+torch::jit::Node *celuHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  // CELU(x) = max(x, 0) + min(0, a * (exp(x/a)-1))
+  auto x = node->input(0);
+  auto a = node->input(1);
+  auto zero = createConstantFloat(graph, {0}, {})->output();
+  auto one = createConstantFloat(graph, {1}, {})->output();
+
+  auto max = createMax(graph, {x, zero})->output();
+  auto div = createDiv(graph, {x, a})->output();
+  auto exp = createExp(graph, {div})->output();
+  auto expm1 = createSub(graph, {exp, one})->output();
+  auto mul = createMul(graph, {a, expm1})->output();
+  auto min = createMin(graph, {zero, mul})->output();
+
+  return createAdd(graph, {max, min});
+}
+
 torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   // "aten::glu(Tensor self, int dim) -> Tensor"
   // The input IR before canonicalization:
@@ -27,6 +45,12 @@ torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   std::int64_t axis = constantToLong(node->input(1)->node());
   std::vector<std::int64_t> shape_input = shapeFromTensor(input);
   std::int64_t size = shape_input.size();
+
+  // handle python's negative indices
+  if (axis < 0) {
+    axis += size;
+  }
+
   ERROR_ON_MSG(!(axis >= 0 && axis < size),
                "The second input argument of glu is not in the legal range");
 
@@ -63,6 +87,32 @@ torch::jit::Node *hardshrinkHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *zero = createConstantFloat(graph, {0.0}, {})->output();
   return createWhere(graph, {mask, x, zero});
+}
+
+torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  // training: rrelu(x)  = x if x >= 0
+  //                     = a * x if x < 0, where a uniformly random value
+  //                                       from [lower, upper]
+  // inference: rrelu(x) = x if x >= 0
+  //                     = x / ((lower + upper) / 2)
+  auto x = node->input(0);
+  auto lower = constantToFloat(node->input(1)->node());
+  auto upper = constantToFloat(node->input(2)->node());
+  auto is_training = node->input(3);
+  auto zero = createConstantFloat(graph, {0}, {})->output();
+  auto a = createRandomUniform(graph, x, {1}, upper, lower)->output();
+
+  auto mul = createMul(graph, {a, x})->output();
+  auto val = createConstantFloat(graph, {(lower + upper) / 2}, {})->output();
+  auto div = createDiv(graph, {x, val})->output();
+
+  auto izero = createConstantInt(graph, {0}, {})->output();
+  auto not_training = createEqual(graph, {is_training, izero})->output();
+  auto xtrain = createWhere(graph, {not_training, div, mul})->output();
+
+  auto xgt0 = createGreater(graph, {x, zero})->output();
+  return createWhere(graph, {xgt0, x, xtrain});
 }
 
 torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
@@ -109,8 +159,10 @@ torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
 // clang-format off
 static bool handlers =
     registerHandlers(
+        c10::aten::celu, celuHandler,
         c10::aten::glu, gluHandler,
         c10::aten::hardshrink, hardshrinkHandler,
+        c10::aten::rrelu, rreluHandler,
         c10::aten::softplus, softplusHandler,
         c10::aten::softshrink, softshrinkHandler);
 // clang-format on
