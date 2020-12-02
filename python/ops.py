@@ -129,7 +129,7 @@ class BeginBlock(torch.nn.Module):
 
     .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
 
-    >>> self.layer = poptorch.BeginBlock(1, MyLayer(x))
+    >>> self.layer = poptorch.BeginBlock(MyLayer(x))
 
     """
 
