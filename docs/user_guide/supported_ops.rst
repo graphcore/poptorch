@@ -66,11 +66,14 @@ Random Samplers
 '''''''''''''''
 To set the random state use poptorch.Options.randomSeed
 
-* ``torch.distributions.Uniform``
-* ``torch.normal``
-* ``torch.rand``
+* ``torch.bernoulli``
+* ``torch.distributions.Bernoulli``
 * ``torch.randn``
+* ``torch.normal``
+* ``torch.distributions.Normal``
+* ``torch.rand``
 * ``torch.uniform``
+* ``torch.distributions.Uniform``
 
 Math operations
 ---------------

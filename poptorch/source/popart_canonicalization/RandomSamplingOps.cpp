@@ -62,8 +62,31 @@ torch::jit::Node *normalHandler(torch::jit::Graph *graph,
   return poptorch::createAdd(graph, {mul->output(), mean});
 }
 
+torch::jit::Node *bernoulliHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  // aten::bernoulli(Tensor self, float? probability)
+  // Check for scalar probability
+  torch::jit::Value *prob = node->input(1);
+
+  if (isNone(prob)) {
+    // probabilities passed as input tensor
+    prob = node->input(0);
+  }
+
+  std::vector<int64_t> shape = shapeFromTensor(node->output());
+  c10::ScalarType dtype = getNodeScalarType(node->input(0));
+
+  torch::jit::Value *uniform =
+      createRandomUniform(graph, nullptr, shape, 1.0, 0.0, dtype)->output();
+
+  torch::jit::Value *lt = createLess(graph, {uniform, prob})->output();
+  return createCast(graph, lt, dtype);
+}
+
 } // namespace
 
-static bool handler = registerHandlers(c10::aten::normal, normalHandler);
+static bool handler =
+    registerHandlers(c10::aten::normal, normalHandler, c10::aten::bernoulli,
+                     bernoulliHandler, c10::aten::bernoulli_, bernoulliHandler);
 
 } // namespace poptorch

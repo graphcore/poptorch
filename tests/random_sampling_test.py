@@ -6,26 +6,34 @@ import poptorch
 
 
 # Random Number Generation Harness
-# Checks that the IPU generated data with roughly the same summary statistics as the CPU version
-def rng_harness(rng_op, stat_funs):
+# Checks that the IPU generated data with roughly the same summary
+# statistics as the CPU version.
+def rng_harness(rng_op, input, stat_funs, expected_dtype=torch.float):
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
             self.rng_op = rng_op
 
-        def forward(self):
-            return self.rng_op()
+        def forward(self, x):
+            torch.manual_seed(42)
+            return self.rng_op(x)
 
     model = Model()
 
-    # Run on CPU
-    native_out = model()
-
-    # Run on IPU
+    # Run on IPU and check that the result has the correct type
     opts = poptorch.Options().randomSeed(8)
     pop_model = poptorch.inferenceModel(model, opts)
-    pop_out = pop_model()
+    pop_out = pop_model(input)
+    assert pop_out.dtype == expected_dtype
 
+    if expected_dtype is torch.half:
+        # Promote CPU model and input
+        model = model.float()
+        input = input.float()
+        # promote IPU result to allow summary stat comparison
+        pop_out = pop_out.float()
+
+    native_out = model(input)
     assert native_out.size() == pop_out.size()
 
     # PRNG depends on HW implementation so we just check
@@ -39,112 +47,95 @@ def rng_harness(rng_op, stat_funs):
                                       rtol=0.1)
 
 
+def rng_requirements(func):
+    # Filter the following expected warnings for RNG tests
+    warnings = [
+        "ignore:Trace had nondeterministic nodes",
+        "ignore:Output nr 1. of the traced function does not match",
+        "ignore:torch.tensor results are registered as constants in the trace"
+    ]
+
+    markers = [pytest.mark.filterwarnings(w) for w in warnings]
+
+    # PRNG requires IPU hardware so skip if not available
+    skip = pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                              reason="Hardware IPU needed")
+    markers.append(skip)
+
+    for m in markers:
+        func = m(func)
+
+    return func
+
+
 # torch.rand
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@rng_requirements
 def test_rand():
-    def rng_op():
-        torch.manual_seed(42)
-        return torch.rand(3, 5, 100)
+    def rng_op(x):
+        return torch.rand(x.size())
 
     stat_funs = [torch.min, torch.max, torch.mean, torch.var]
+    input = torch.empty(size=(3, 5, 100))
+    rng_harness(rng_op, input, stat_funs)
 
-    rng_harness(rng_op, stat_funs)
 
-
-# torch.distributions.uniform.Uniform
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.filterwarnings(
-    "ignore:torch.Tensor results are registered as constants in the trace")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+# torch.distributions.Uniform
+@rng_requirements
 def test_distributions_uniform():
-    def rng_op():
-        torch.manual_seed(42)
-        ud = torch.distributions.uniform.Uniform(0.0, 10.0)
-        return ud.sample((10, 10, 1000))
+    def rng_op(x):
+        ud = torch.distributions.Uniform(0.0, 10.0)
+        return ud.sample(x.size())
 
+    sample_like = torch.empty(10, 10, 1000)
     stat_funs = [torch.min, torch.max, torch.mean, torch.var]
-
-    rng_harness(rng_op, stat_funs)
+    rng_harness(rng_op, sample_like, stat_funs)
 
 
 # torch.uniform_
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
-def test_uniform_():
-    def rng_op():
-        torch.manual_seed(42)
-        return torch.empty((3, 4, 1000)).uniform_()
+@rng_requirements
+@pytest.mark.parametrize("dt", [torch.float, torch.half])
+def test_uniform_(dt):
+    def rng_op(x):
+        return x.uniform_()
 
+    input = torch.empty(size=(3, 4, 1000), dtype=dt)
     stat_funs = [torch.min, torch.max, torch.mean, torch.var]
-
-    rng_harness(rng_op, stat_funs)
+    rng_harness(rng_op, input, stat_funs, expected_dtype=dt)
 
 
 # torch.normal
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@rng_requirements
 def test_normal():
-    def rng_op():
-        torch.manual_seed(42)
-        return torch.normal(mean=0.0, std=1.0, size=(6, 10, 1000))
+    def rng_op(x):
+        return torch.normal(mean=0.0, std=1.0, size=x.size())
 
+    input = torch.empty(6, 10, 1000)
     stat_funs = [torch.mean, torch.var]
-
-    rng_harness(rng_op, stat_funs)
+    rng_harness(rng_op, input, stat_funs)
 
 
 # torch.normal_
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
-def test_normal_():
-    def rng_op():
-        torch.manual_seed(42)
-        return torch.empty(3, 5, 1000).normal_(mean=1.0, std=2.0)
+@rng_requirements
+@pytest.mark.parametrize("dt", [torch.float, torch.half])
+def test_normal_(dt):
+    def rng_op(x):
+        return x.normal_(mean=1.0, std=2.0)
 
+    input = torch.empty(size=(3, 5, 1000), dtype=dt)
     stat_funs = [torch.mean, torch.var]
-
-    rng_harness(rng_op, stat_funs)
+    rng_harness(rng_op, input, stat_funs, expected_dtype=dt)
 
 
 # torch.distributions.Normal
 # The sample method uses torch.normal(Tensor mean, Tensor std)
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.filterwarnings(
-    "ignore:torch.Tensor results are registered as constants in the trace")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@rng_requirements
 def test_distributions_normal():
-    def rng_op():
-        torch.manual_seed(42)
+    def rng_op(x):
         h = torch.tensor([234.0, 100.0])
         nd = torch.distributions.Normal(loc=h, scale=torch.sqrt(h))
-        return nd.sample((10000, 5))
+        return nd.sample(x.size())
 
-    # Generates (10000, 5, 2) tensor
+    input = torch.empty(10000, 5)
     mean = lambda x: torch.mean(x, dim=[0, 1])
     mean.__name__ = "torch.mean(x, dim=[0, 1])"
 
@@ -152,156 +143,85 @@ def test_distributions_normal():
     std.__name__ = "torch.std(x, dim=[0, 1])"
 
     stat_funs = [mean, std]
-
-    rng_harness(rng_op, stat_funs)
+    rng_harness(rng_op, input, stat_funs)
 
 
 # torch.randn
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@rng_requirements
 def test_randn():
-    def rng_op():
-        torch.manual_seed(42)
-        return torch.randn(3, 5, 10000)
+    def rng_op(x):
+        return torch.randn(x.size())
 
+    input = torch.empty(3, 5, 10000)
     stat_funs = [torch.mean, torch.var]
-
-    rng_harness(rng_op, stat_funs)
+    rng_harness(rng_op, input, stat_funs)
 
 
 # torch.normal(Tensor mean, float std)
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.filterwarnings(
-    "ignore:torch.Tensor results are registered as constants in the trace")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@rng_requirements
 def test_normal_tensor_mean():
-    def rng_op():
-        torch.manual_seed(42)
-        mean = torch.full(size=(10000, 2), fill_value=4.0)
-        std = 3.0
-        return torch.normal(mean=mean, std=std)
+    def rng_op(x):
+        return torch.normal(mean=x, std=3.0)
 
+    mean = torch.full(size=(10000, 2), fill_value=4.0)
     stat_funs = [torch.mean, torch.std]
-
-    rng_harness(rng_op, stat_funs)
+    rng_harness(rng_op, mean, stat_funs)
 
 
 # torch.normal(float mean, Tensor std)
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.filterwarnings(
-    "ignore:torch.Tensor results are registered as constants in the trace")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@rng_requirements
 def test_normal_tensor_std():
-    def rng_op():
-        torch.manual_seed(42)
-        mean = 3.0
-        std = torch.full(size=(10000, 2), fill_value=9.0)
-        return torch.normal(mean=mean, std=std)
+    def rng_op(x):
+        return torch.normal(mean=3.0, std=x)
 
+    std = torch.full(size=(10000, 2), fill_value=9.0)
     stat_funs = [torch.mean, torch.std]
+    rng_harness(rng_op, std, stat_funs)
 
-    rng_harness(rng_op, stat_funs)
 
-
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
+# torch.bernoulli - test with both float and half types
+@rng_requirements
 @pytest.mark.parametrize("t", [torch.float, torch.half])
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
-def test_normal_half(t):
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            torch.manual_seed(42)
-            x.normal_(mean=20.0, std=8.0)
-            return x
-
-    model = Model()
-    input_data = torch.ones(3, 5, 1000, dtype=t)
-
-    # Run on IPU and check that the result has the correct dtype
-    opts = poptorch.Options().randomSeed(8)
-    pop_model = poptorch.inferenceModel(model, opts)
-    pop_out = pop_model(input_data)
-    assert pop_out.dtype == t
-
-    if t is not torch.half:
-        # Run on CPU
-        native_out = model(input_data)
-        assert native_out.size() == pop_out.size()
-
-    # Test summary stats - promoting half to float to workaround
-    # torch limitations with half
-    torch.testing.assert_allclose(20.0,
-                                  torch.mean(pop_out.float()),
-                                  atol=1e-2,
-                                  rtol=0.1)
-
-    torch.testing.assert_allclose(8.0,
-                                  torch.std(pop_out.float()),
-                                  atol=1e-2,
-                                  rtol=0.1)
+def test_bernoulli(t):
+    prob = torch.full(size=(3, 5, 100), dtype=t, fill_value=0.5)
+    stat_funs = [torch.min, torch.max, torch.mean]
+    rng_harness(torch.bernoulli, prob, stat_funs, expected_dtype=t)
 
 
-# Filter the following expected warnings
-@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.parametrize("t", [torch.float, torch.half])
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
-def test_uniform_half(t):
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            torch.manual_seed(42)
-            x.uniform_(-1, 1)
-            return x
-
-    model = Model()
-    input_data = torch.ones(3, 5, 1000, dtype=t)
-
-    # Run on IPU and check that the result has the correct dtype
-    opts = poptorch.Options().randomSeed(8)
-    pop_model = poptorch.inferenceModel(model, opts)
-    pop_out = pop_model(input_data)
-    assert pop_out.dtype == t
-
-    if t is not torch.half:
-        # Run on CPU
-        native_out = model(input_data)
-        assert native_out.size() == pop_out.size()
-
-    # Test summary stats - promoting half to float to workaround
-    # torch limitations with half
-    torch.testing.assert_allclose(-1.0,
-                                  torch.min(pop_out.float()),
-                                  atol=1e-2,
-                                  rtol=0.1)
-
-    torch.testing.assert_allclose(1.0,
-                                  torch.max(pop_out.float()),
-                                  atol=1e-2,
-                                  rtol=0.1)
+# torch.bernoulli - check expected output for probability limits.
+@rng_requirements
+@pytest.mark.parametrize("p", [0.0, 1.0])
+def test_bernoulli_limits(p):
+    prob = torch.full(size=(3, 5, 1000), fill_value=p)
+    func = lambda x: torch.all(x == p)
+    func.__name__ = f"torch.all(x == {p})"
+    rng_harness(torch.bernoulli, prob, [func])
 
 
-# Filter the following expected warnings
-@pytest.mark.filterwarnings(
-    "ignore:Output nr 1. of the traced function does not match")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+# torch.bernoulli_
+@rng_requirements
+def test_bernoulli_():
+    def rng_op(x):
+        return x.bernoulli_(p=0.5)
+
+    input = torch.empty(3, 5, 100)
+    stat_funs = [torch.min, torch.max, torch.mean]
+    rng_harness(rng_op, input, stat_funs)
+
+
+# torch.distributions.Bernoulli
+@rng_requirements
+def test_distributions_bernoulli():
+    def rng_op(x):
+        bd = torch.distributions.Bernoulli(0.5)
+        return bd.sample(x.size())
+
+    input = torch.empty(10, 10, 1000)
+    stat_funs = [torch.min, torch.max, torch.mean]
+    rng_harness(rng_op, input, stat_funs)
+
+
+@rng_requirements
 def test_random_seed_repeatability():
     class Model(torch.nn.Module):
         def forward(self, x):

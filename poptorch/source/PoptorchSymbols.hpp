@@ -31,6 +31,7 @@ SYMBOL_DECL(aten, masked_fill_)
 SYMBOL_DECL(aten, where_)
 SYMBOL_DECL(aten, poisson_nll_loss)
 SYMBOL_DECL(aten, multilabel_soft_margin_loss)
+SYMBOL_DECL(aten, bernoulli_)
 } // namespace c10
 
 namespace poptorch {
