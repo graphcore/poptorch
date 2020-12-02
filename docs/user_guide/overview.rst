@@ -661,6 +661,7 @@ Profiling
 ---------
 
 When running programs using PopTorch, you can enable profiling by using the ``POPLAR_ENGINE_OPTIONS`` environment variable used by Poplar.
+
 In order to capture the reports needed for the PopVision Graph Analyser you only need to set ``POPLAR_ENGINE_OPTIONS='{"autoReport.all":"true"}'``:
 
 .. code-block:: bash
@@ -674,6 +675,13 @@ By default, report files are output to the current working directory. You can sp
   export POPLAR_ENGINE_OPTIONS='{"autoReport.all":"true", "autoReport.directory":"./tommyFlowers"}'
 
 For more options, please refer to the `PopVision Graph Analyser User Guide <https://docs.graphcore.ai/projects/graphcore-popvision-user-guide>`_.
+
+In order to capture the ``pvti`` reports needed for the PopVision System Analyser you only need to set ``PVTI_OPTIONS='{"enable":"true"}'``
+
+You can also add extra tracepoints in your own code by using
+
+.. autoclass:: poptorch.profiling.Channel
+   :members:
 
 IPU Model
 ---------

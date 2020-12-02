@@ -19,6 +19,7 @@ from .ops import *
 from .options import *
 from ._impl import PoplarExecutor
 from . import optim
+from . import profiling
 
 __version__ = "@VERSION@-@SNAPSHOT@"
 
@@ -157,6 +158,9 @@ class DataLoader(torch.utils.data.DataLoader):
         # _RepeatSampler instead.
         if self._is_iterable and persistent_workers:
             dataset = _RepeatSampler(dataset, self._is_iterable)
+        if not self._is_iterable:
+            dataset = profiling.Channel("dataset").instrument(
+                dataset, "__getitem__")
 
         super().__init__(dataset,
                          batch_size=self._combined_batch_size,
@@ -164,6 +168,7 @@ class DataLoader(torch.utils.data.DataLoader):
                          num_workers=num_workers,
                          drop_last=drop_last,
                          **kwargs)
+
         # PyTorch's sampler creates / deletes workers for each iteration through
         # the dataset.
         # In order to reuse the workers between epochs we use our own infinite
@@ -183,12 +188,18 @@ class DataLoader(torch.utils.data.DataLoader):
         self._infinite_iterator = None
         self._persistent_workers = persistent_workers
 
+    @property
+    def _profiling(self):
+        return profiling.Channel("poptorch.DataLoader")
+
     def __iter__(self):
         if not self._persistent_workers:
-            yield from super().__iter__()
+            yield from self._profiling.instrument(super().__iter__(),
+                                                  "__next__")
             return
         if self._infinite_iterator is None:
-            self._infinite_iterator = super().__iter__()
+            self._infinite_iterator = self._profiling.instrument(
+                super().__iter__(), "__next__")
 
         if self._is_iterable:
             # Return a single epoch long iterator

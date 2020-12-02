@@ -12,6 +12,7 @@ import torch.multiprocessing as multiprocessing
 # Do not import any poptorch.* here: it will break the poptorch module
 from . import enums
 from . import optim
+from . import profiling
 from . import poptorch_core
 from .logging import logger
 from .options import Options
@@ -345,6 +346,13 @@ class PoplarExecutor:
         self._dirty_host_weights = False
         self._trace = None
 
+        self._profiling = profiling.Channel(
+            "poptorch.trainingModel" if self.
+            training else "poptorch.inferenceModel")
+        self._profiling.instrument(self, "copyWeightsToHost",
+                                   "copyWeightsToDevice", "setOptimizer",
+                                   "compile", "destroy")
+
         if self._training:
             parent = self
 
@@ -455,7 +463,10 @@ class PoplarExecutor:
                                "non-contiguous tensors will be converted.")
                 self._warned_not_contiguous_input = True
 
-        if self._executable is None:
+        if self._executable is not None:
+            return in_tensors
+
+        with self._profiling.tracepoint("modelCompilation"):
             self._first_none_arg = in_tensors.first_none
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we
@@ -633,14 +644,15 @@ class PoplarExecutor:
             f"arguments used to compile the model and "
             f"{in_tensors.first_none} provided this time")
         # Execute the poplar executable with the full size (batch * device interations)
-        if self._new_optimizer and self._new_optimizer != self._optimizer:
-            self._optimizer = self._new_optimizer
-            output = poptorch_core.execute(self._executable,
-                                           in_tensors.asTuple(),
-                                           self._optimizer)
-        else:
-            output = poptorch_core.execute(self._executable,
-                                           in_tensors.asTuple(), {})
+        with self._profiling.tracepoint("modelExecution"):
+            if self._new_optimizer and self._new_optimizer != self._optimizer:
+                self._optimizer = self._new_optimizer
+                output = poptorch_core.execute(self._executable,
+                                               in_tensors.asTuple(),
+                                               self._optimizer)
+            else:
+                output = poptorch_core.execute(self._executable,
+                                               in_tensors.asTuple(), {})
 
         if self._training:
             self._dirty_host_weights = True

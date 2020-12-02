@@ -85,4 +85,4 @@ configure_file(__init__.py
   @ONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py DESTINATION "${INSTALL_PYDIR}")
-install(FILES _impl.py _options_impl.py logging.py enums.py optim.py ops.py options.py testing.py DESTINATION "${INSTALL_PYDIR}")
+install(FILES _impl.py _options_impl.py logging.py enums.py optim.py ops.py options.py profiling.py testing.py DESTINATION "${INSTALL_PYDIR}")
