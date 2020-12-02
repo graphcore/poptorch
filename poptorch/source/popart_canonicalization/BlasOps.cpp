@@ -5,6 +5,8 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "../PoptorchSymbols.hpp"
+
 namespace poptorch {
 namespace {
 
@@ -76,6 +78,12 @@ torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
     // Add the trace to ease debugging for before and after IRs
     logging::trace("Replacing matmul {} with {} {} {}", *node, *merge_mat, *mul,
                    *result);
+
+    for (const torch::jit::Use &use : node->output()->uses()) {
+      if (use.user->kind() == symbols::poptorch::set_matmul_serialization) {
+        use.user->replaceInput(0, mul->output());
+      }
+    }
   } else {
     // The "normal" matmul will follow the original path
     result = createMatmul(graph, {matrix_a, matrix_b});
