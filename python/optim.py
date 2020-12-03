@@ -280,47 +280,6 @@ class LAMB(torch.optim.Optimizer):
         return loss
 
 
-# Convenience classes for testing
-class AdamWNoBias(AdamW):
-    def __init__(self,
-                 params,
-                 lr=1e-3,
-                 betas=(0.9, 0.999),
-                 eps=1e-8,
-                 weight_decay=0.01,
-                 amsgrad=False,
-                 loss_scaling=1.0,
-                 accumType=torch.float32,
-                 firstOrderMomentumAccumType=torch.float32,
-                 secondOrderMomentumAccumType=torch.float32):
-        super(AdamWNoBias,
-              self).__init__(params, lr, betas, eps, weight_decay, amsgrad,
-                             loss_scaling, False, accumType,
-                             firstOrderMomentumAccumType,
-                             secondOrderMomentumAccumType)
-
-
-# Convenience classes for testing
-class LAMBNoBias(LAMB):
-    """ Layer-wise Adaptive Moments (LAMB) optimizer (non-biased version).
-    """
-
-    def __init__(self,
-                 params,
-                 lr=1e-3,
-                 betas=(0.9, 0.999),
-                 eps=1e-8,
-                 weight_decay=1e-2,
-                 loss_scaling=1.0,
-                 accumType=torch.float32,
-                 firstOrderMomentumAccumType=torch.float32,
-                 secondOrderMomentumAccumType=torch.float32):
-        super(LAMBNoBias, self).__init__(params, lr, betas, eps, weight_decay,
-                                         False, loss_scaling, accumType,
-                                         firstOrderMomentumAccumType,
-                                         secondOrderMomentumAccumType)
-
-
 def _check_constructor_match_parent(child_class, extra_args=None):
     parent = child_class.__bases__[0]
     parent_params = inspect.signature(parent.__init__).parameters

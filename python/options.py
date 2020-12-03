@@ -12,7 +12,7 @@ from . import ops
 class _JitOptions(_options_impl.OptionsDict):
     """Options related to Pytorch's JIT compiler.
 
-    Can be accessed via `poptorch.Options`:
+    Can be accessed via :py:attr:`poptorch.Options.Jit`:
 
     >>> opts = poptorch.Options()
     >>> opts.Jit.traceModel(True)
@@ -24,6 +24,7 @@ class _JitOptions(_options_impl.OptionsDict):
     def traceModel(self, trace_model):
         """
         If True: use torch.jit.trace
+
         If False: use torch.jit.script (Experimental)
 
         Trace model is enabled by default.
@@ -37,7 +38,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
     .. note:: You must not set these options for inference models.
 
-    Can be accessed via `poptorch.Options`:
+    Can be accessed via :py:attr:`poptorch.Options.Training`:
 
     >>> opts = poptorch.Options()
     >>> opts.Training.gradientAccumulation(4)
@@ -69,7 +70,7 @@ class _PopartOptions:
     .. note:: there is no mapping for the various PopART enums so integers need
     to be used instead.
 
-    Can be accessed via `poptorch.Options`:
+    Can be accessed via :py:attr:`poptorch.Options.Popart`:
 
     >>> opts = poptorch.Options()
     >>> opts.Popart.set("autoRecomputation", 3) # RecomputationType::Pipeline
@@ -101,7 +102,7 @@ class _PopartOptions:
 class _DistributedOptions(_options_impl.OptionsDict):
     """Options related to distributed execution.
 
-    Can be accessed via `poptorch.Options`:
+    Can be accessed via :py:attr:`poptorch.Options.Distributed`:
 
     >>> opts = poptorch.Options()
     >>> opts.Distributed.configureProcessId(0, 2)
@@ -160,6 +161,13 @@ class _DistributedOptions(_options_impl.OptionsDict):
 
 
 class TensorLocationSettings(_options_impl.OptionsDict):
+    """Define where a tensor is stored
+
+    >>> opts = poptorch.Options()
+    >>> opts.TensorLocations.setActivationLocation(
+    ...     poptorch.TensorLocationSettings().useOnChipStorage(False))
+    """
+
     def minElementsForOffChip(self, min_elements):
         """A minimum number of elements below which offloading
         won't be considered."""
@@ -222,24 +230,46 @@ class TensorLocationSettings(_options_impl.OptionsDict):
 
 class _TensorLocationOptions(_options_impl.OptionsDict):
     """Options controlling where tensors are stored.
+
+    Can be accessed via :py:attr:`poptorch.Options.TensorLocations`:
+
+    >>> opts = poptorch.Options()
+    >>> opts.TensorLocations.setActivationLocation(
+    ...     poptorch.TensorLocationSettings().useOnChipStorage(False))
     """
 
     def setActivationLocation(self, location):
+        """
+        :param location: Where to store the activations.
+        :type location: poptorch.TensorLocationSettings
+        """
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_activation=location.toDict())
         return self
 
     def setWeightLocation(self, location):
+        """
+        :param location: Where to store the weights.
+        :type location: poptorch.TensorLocationSettings
+        """
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_weight=location.toDict())
         return self
 
     def setOptimizerLocation(self, location):
+        """
+        :param location: Where to store the optimizer states.
+        :type location: poptorch.TensorLocationSettings
+        """
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_optimizer=location.toDict())
         return self
 
     def setAccumulatorLocation(self, location):
+        """
+        :param location: Where to store the accumulators.
+        :type location: poptorch.TensorLocationSettings
+        """
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_accumulator=location.toDict())
         return self
@@ -798,6 +828,10 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def enableExecutableCaching(self, path):
+        """If ``path`` is ``None``: disable executable caching.
+
+        Otherwise use ``path`` as a cache to save / load Poplar executables.
+        """
         if path is None:
             self.Popart.set("enableEngineCaching", False)
         else:
