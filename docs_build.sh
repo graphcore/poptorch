@@ -38,7 +38,7 @@ USER_GUIDE_PDF_NAME="${DOC}-${VERSION}-${SNAPSHOT}.pdf"
 USER_GUIDE_HTML_NAME="${DOC}-html-${VERSION}-${SNAPSHOT}.zip"
 PACKAGE_INFO_FILE="${POPTORCH_BUILD_DIR}/poptorch-${VERSION}-${SNAPSHOT}.yml"
 
-rm -rf ${DOCS_BUILD_DIR}
+rm -rf ${DOCS_BUILD_DIR}/html ${DOCS_BUILD_DIR}/latex
 mkdir -p "${DOCS_BUILD_DIR}/html/${DOC}"
 
 TITLE=$(grep -m 1 . "${DOCS_SOURCE_DIR}/index.rst")
@@ -51,13 +51,13 @@ set -e # Stop on error
 # -W turn warnings into errors
 common_flags="-a -E -n -W --keep-going -j auto"
 
-sphinx-build $common_flags -b html -c ${SPHINX_CONF_DIR} -D "project=${TITLE}" -D "html_title=${TITLE}" -D "version=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/html/${DOC}"
+python3 -m sphinx $common_flags -b html -c ${SPHINX_CONF_DIR} -D "project=${TITLE}" -D "html_title=${TITLE}" -D "version=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/html/${DOC}"
 # And a zip file of the html
 ( cd "${DOCS_BUILD_DIR}/html/${DOC}" && zip -q -r html.zip ./*.html ./*.js _images _static )
 cp "${DOCS_BUILD_DIR}/html/${DOC}/html.zip" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_HTML_NAME}"
 
 # Build PDF
-DOC_TITLE="${TITLE}" sphinx-build $common_flags -b latex -c ${SPHINX_CONF_DIR} -D "project=${DOC}" -D "version=v${VERSION}" -D "release=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/latex/${DOC}"
+DOC_TITLE="${TITLE}" python3 -m sphinx  $common_flags -b latex -c ${SPHINX_CONF_DIR} -D "project=${DOC}" -D "version=v${VERSION}" -D "release=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/latex/${DOC}"
 ( cd "${DOCS_BUILD_DIR}/latex/${DOC}" && make LATEXMKOPTS="-silent" )
 cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_PDF_NAME}"
 

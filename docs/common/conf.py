@@ -309,3 +309,9 @@ latex_show_pagerefs = False
 
 # If false, no module index is generated.
 latex_domain_indices = False
+
+# https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
+autodoc_default_options = {
+    'undoc-members': True,
+}
+autodoc_inherit_docstrings = True

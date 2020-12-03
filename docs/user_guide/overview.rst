@@ -36,6 +36,9 @@ via :py:class:`poptorch.Options.useIpuModel`.
 .. autoclass:: poptorch.options._TensorLocationOptions
    :members:
 
+.. autoclass:: poptorch.TensorLocationSettings
+   :members:
+
 Model wrapping functions
 ========================
 
@@ -307,13 +310,13 @@ respectively.
 So all these 12 f-strings are defined in :py:class:`poptorch.BeginBlock`,
 and used in :py:class:`poptorch.Stage` dynamically. They match exactly.
 
-.. literalinclude:: phased_execution_test.py
+.. literalinclude:: phased_execution.py
   :caption: An example of parallel phased execution
   :language: python
   :linenos:
   :start-after: annotations_start
   :end-before: annotations_end
-  :emphasize-lines: 25, 32, 46-47, 50-51
+  :emphasize-lines: 24, 31, 45-46, 49-50
 
 
 Parallel execution strategies

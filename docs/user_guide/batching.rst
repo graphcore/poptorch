@@ -121,7 +121,7 @@ These blocks can be shared among multiple parallel execution strategies.
   :start-after: annotations_start
   :end-before: annotations_end
   :emphasize-lines: 12, 14, 16, 18, 34
-  :caption: A training model of with :py:class:`poptorch.Block`
+  :caption: A training model making use of :py:class:`poptorch.Block`
 
 You can see the code examples of :py:class:`poptorch.SerialPhasedExecution`,
 :py:class:`poptorch.PipelinedExecution`, and
