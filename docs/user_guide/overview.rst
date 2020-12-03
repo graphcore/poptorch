@@ -122,6 +122,18 @@ we first introduce the general APIs that will be applied to all four
 parallel execution strategies.
 Finally, we explain the four strategies with examples.
 
+By default, PopTorch will not let you run the model if the number of IPUs is
+not a power of 2.
+For this reason, it is preferable to annotate the model so that the number of
+IPUs used is a power of 2.
+However, you can also enable :func:`poptorch.Options.autoRoundNumIPUs` to
+automatically round up the number of IPUs reserved to a power of 2, with the
+excess being reserved but idle.
+This option is not enabled by default to prevent unintentional overbooking of
+IPUs.
+
+
+
 Annotation tools
 ----------------
 
