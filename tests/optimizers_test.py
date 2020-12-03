@@ -24,9 +24,9 @@ class AdamWNoBias(poptorch.optim.AdamW):
 
 @pytest.mark.parametrize(
     "opt", {
-        optim.SGD, optim.AdamW, optim.RMSprop, poptorch.optim.SGD,
-        poptorch.optim.AdamW, poptorch.optim.RMSprop, poptorch.optim.LAMB,
-        AdamWNoBias, LAMBNoBias
+        optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop, poptorch.optim.SGD,
+        poptorch.optim.Adam, poptorch.optim.AdamW, poptorch.optim.RMSprop,
+        poptorch.optim.LAMB, AdamWNoBias, LAMBNoBias
     })
 def test_optimizer(opt):
     torch.manual_seed(42)
@@ -106,9 +106,8 @@ def test_sgd_IR(opt):
         assert AdamVarUpdate == 2 and AdamUpdater == 2
 
 
-@pytest.mark.parametrize(
-    "opt",
-    (poptorch.optim.AdamW, AdamWNoBias, poptorch.optim.LAMB, LAMBNoBias))
+@pytest.mark.parametrize("opt", (poptorch.optim.Adam, poptorch.optim.AdamW,
+                                 AdamWNoBias, poptorch.optim.LAMB, LAMBNoBias))
 @pytest.mark.parametrize("accType", (torch.float16, torch.float))
 def test_sgd_IR_accum_type(opt, accType):
     torch.manual_seed(42)
@@ -281,8 +280,9 @@ def test_optimizer_groups_sgd(opt):
 
 @pytest.mark.parametrize(
     "opt", {
-        optim.AdamW, optim.RMSprop, poptorch.optim.AdamW, AdamWNoBias,
-        poptorch.optim.RMSprop, poptorch.optim.LAMB, LAMBNoBias
+        optim.Adam, optim.AdamW, optim.RMSprop, poptorch.optim.Adam,
+        poptorch.optim.AdamW, AdamWNoBias, poptorch.optim.RMSprop,
+        poptorch.optim.LAMB, LAMBNoBias
     })
 def test_optimizer_groups(opt):
     torch.manual_seed(42)

@@ -45,18 +45,22 @@ class OptimizerWrapper(torch.nn.Module):
 
 class _OptimizerType(enum.IntEnum):
     SGD = 0
-    ADAMW = 1
-    ADAMW_NO_BIAS = 2
-    RMSPROP = 3
-    RMSPROP_CENTERED = 4
-    LAMB = 5
-    LAMB_NO_BIAS = 6
+    ADAM = 1
+    ADAMW = 2
+    ADAMW_NO_BIAS = 3
+    RMSPROP = 4
+    RMSPROP_CENTERED = 5
+    LAMB = 6
+    LAMB_NO_BIAS = 7
 
 
 # pylint: disable=too-many-return-statements
 def _to_poptorch_optimizer(optimizer):
     if isinstance(optimizer, torch.optim.SGD):
         return _OptimizerType.SGD
+
+    if isinstance(optimizer, torch.optim.Adam):
+        return _OptimizerType.ADAM
 
     if isinstance(optimizer, torch.optim.AdamW):
         if isinstance(optimizer, optim.AdamW):
@@ -124,15 +128,16 @@ def _convertOptimizerToDict(optimizer):
                 "velocity_scaling":
                 (velocity_scaling, velocity_scaling == 1.0),
             }
-        if isinstance(optimizer, (torch.optim.AdamW, optim.LAMB)):  # pylint: disable=no-member
+        if isinstance(optimizer,
+                      (torch.optim.Adam, torch.optim.AdamW, optim.LAMB)):
             beta1 = optimizer.param_groups[index]["betas"][0]
             beta2 = optimizer.param_groups[index]["betas"][1]
             eps = optimizer.param_groups[index]["eps"]
 
-            if isinstance(optimizer, torch.optim.AdamW):
+            if isinstance(optimizer, (torch.optim.Adam, torch.optim.AdamW)):
                 assert not optimizer.param_groups[index]["amsgrad"], (
                     "Only non-amsgrad "
-                    "AdamW optimizers are supported.")
+                    "Adam/AdamW optimizers are supported.")
             the_dict[index] = {
                 "lr": (learning_rate, False),
                 "beta1": (beta1, False),
@@ -445,8 +450,8 @@ class PoplarExecutor:
 
     def setOptimizer(self, optimizer):
         """Sets the optimiser for a training model. Will overwrite the
-        previous one. Supported optimisers: ``optim.SGD``, ``optim.AdamW``,
-        ``optim.RMSProp``.
+        previous one. Supported optimisers: ``optim.SGD``, ``optim.Adam``,
+        ``optim.AdamW``, ``optim.RMSProp``, ``optim.LAMB``.
         """
         self._new_optimizer = _convertOptimizerToDict(optimizer)
 

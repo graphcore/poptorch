@@ -312,10 +312,11 @@ def trainingModel(model, options=None, optimizer=None):
     :param torch.optim.Optimizer optimizer: The optimizers to apply during \
         training.
 
-        Supported PyTorch optimizers: ``optim.SGD``, ``optim.AdamW``, \
-            ``optim.RMSprop``.
+        Supported PyTorch optimizers: ``optim.SGD``, ``optim.Adam``, \
+             ``optim.AdamW``, ``optim.RMSprop``.
 
         Supported PopTorch optimizers: :py:class:`poptorch.optim.SGD`, \
+            :py:class:`poptorch.optim.Adam`, \
             :py:class:`poptorch.optim.AdamW`, \
             :py:class:`poptorch.optim.RMSprop`. \
             :py:class:`poptorch.optim.LAMB`.

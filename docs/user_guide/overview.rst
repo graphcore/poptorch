@@ -467,6 +467,10 @@ In addition, PopTorch has additional features to support float16 models such as 
    :special-members: __init__
    :members:
 
+.. autoclass:: poptorch.optim.Adam
+   :special-members: __init__
+   :members:
+
 .. autoclass:: poptorch.optim.AdamW
    :special-members: __init__
    :members:

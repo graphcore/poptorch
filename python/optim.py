@@ -52,6 +52,70 @@ class SGD(torch.optim.SGD):
             group.setdefault("velocity_scaling", velocity_scaling)
 
 
+class Adam(torch.optim.Adam):
+    """ Adam optimizer.
+
+    This optimizer matches PyTorch's implementation (torch.optim.Adam) with
+    optional loss scaling.
+
+    AMSGrad is currently not supported."""
+
+    def __init__(self,
+                 params,
+                 lr=1e-3,
+                 betas=(0.9, 0.999),
+                 eps=1e-8,
+                 weight_decay=0,
+                 amsgrad=False,
+                 loss_scaling=1.0,
+                 accumType=torch.float32,
+                 firstOrderMomentumAccumType=torch.float32,
+                 secondOrderMomentumAccumType=torch.float32):
+        """
+        :param iterable params: parameters to optimize.
+        :param lr: learning rate
+        :type lr: float, optional
+        :param betas: (beta1, beta2) parameters used in Adam.
+        :type betas: tuple, optional
+        :param eps: term added to the demoninator to ensure numerical stability.
+        :type eps: float, optional
+        :param weight_decay: Weight decay factor.
+        :type weight_decay: float, optional
+        :param amsgrad: Not supported (must be False).
+        :type amsgrad: bool, optional
+        :param loss_scaling: Factor by which to scale the loss and hence
+            gradients to assist numerical stability when using float16.
+        :type loss_scaling: float, optional
+        :param accumType: data type used for gradients.
+        :type accumType: torch.dtype, optional
+        :param firstOrderMomentumAccumType: data type used to store
+            the first order momentum values for each parameter.
+        :type firstOrderMomentumAccumType: torch.dtype, optional
+        :param secondOrderMomentumAccumType: data type used to store
+            the second order momentum values for each parameter.
+        :type secondOrderMomentumAccumType: torch.dtype, optional
+        """
+        super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
+
+        self.defaults["loss_scaling"] = loss_scaling
+
+        supportedTypes = [torch.float16, torch.float32]
+        errString = ("Accumulation types must be either torch.float32"
+                     " or torch.float16")
+        assert accumType in supportedTypes, errString
+        assert firstOrderMomentumAccumType in supportedTypes, errString
+        assert secondOrderMomentumAccumType in supportedTypes, errString
+
+        self.accumType = accumType == torch.float16
+        self.firstOrderMomentumAccumType = \
+             firstOrderMomentumAccumType == torch.float16
+        self.secondOrderMomentumAccumType = \
+             secondOrderMomentumAccumType == torch.float16
+
+        for group in self.param_groups:
+            group.setdefault("loss_scaling", loss_scaling)
+
+
 class AdamW(torch.optim.AdamW):
     """ Adam optimizer with true weight decay.
 
@@ -76,6 +140,8 @@ class AdamW(torch.optim.AdamW):
         :param iterable params: parameters to optimize.
         :param lr: learning rate
         :type lr: float, optional
+        :param betas: (beta1, beta2) parameters used in AdamW.
+        :type betas: tuple, optional
         :param eps: term added to the demoninator to ensure numerical stability.
         :type eps: float, optional
         :param weight_decay: Weight decay factor.
@@ -100,8 +166,8 @@ class AdamW(torch.optim.AdamW):
         self.defaults["biasCorrection"] = biasCorrection
 
         supportedTypes = [torch.float16, torch.float32]
-        errString = """Accumulation types must be either torch.float32
-                or torch.float16"""
+        errString = ("Accumulation types must be either torch.float32"
+                     " or torch.float16")
         assert accumType in supportedTypes, errString
         assert firstOrderMomentumAccumType in supportedTypes, errString
         assert secondOrderMomentumAccumType in supportedTypes, errString
@@ -192,6 +258,11 @@ class LAMB(torch.optim.Optimizer):
         :type eps: float, optional
         :param weight_decay: (AdamW) weight decay factor.
         :type weight_decay: float, optional
+        :param biasCorrection: True: compute LAMB with bias correction.
+        :type biasCorrection: bool, optional
+        :param loss_scaling: Factor by which to scale the loss and hence
+            gradients to assist numerical stability when using float16.
+        :type loss_scaling: float, optional
         :param accumType: data type used for gradients.
         :type accumType: torch.dtype, optional
         :param firstOrderMomentumAccumType: data type used to store
@@ -302,6 +373,10 @@ def _check_constructor_match_parent(child_class, extra_args=None):
 
 
 _check_constructor_match_parent(SGD, ["loss_scaling", "velocity_scaling"])
+_check_constructor_match_parent(Adam, [
+    "loss_scaling", "accumType", "firstOrderMomentumAccumType",
+    "secondOrderMomentumAccumType"
+])
 _check_constructor_match_parent(AdamW, [
     "loss_scaling", "biasCorrection", "accumType",
     "firstOrderMomentumAccumType", "secondOrderMomentumAccumType"

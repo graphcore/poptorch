@@ -990,7 +990,8 @@ static void insertValuesForTensor(popart::Optimizer *popart_optimizer,
                          py_opt.velocity_scaling);
   }
 
-  if (py_opt.type == OptimizerType::ADAMW ||
+  if (py_opt.type == OptimizerType::ADAM ||
+      py_opt.type == OptimizerType::ADAMW ||
       py_opt.type == OptimizerType::ADAMW_NO_BIAS ||
       py_opt.type == OptimizerType::LAMB ||
       py_opt.type == OptimizerType::LAMB_NO_BIAS) {
@@ -1043,6 +1044,10 @@ static void printOptimizerToDebug(const Optimizer &opt) {
     printAdamLambOptimizers("LAMB", opt);
     break;
 
+  case OptimizerType::ADAM:
+    printAdamLambOptimizers("ADAM", opt);
+    break;
+
   case OptimizerType::ADAMW:
   case OptimizerType::ADAMW_NO_BIAS:
     printAdamLambOptimizers("ADAMW", opt);
@@ -1086,23 +1091,24 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
         opt.velocity_scaling, opt.loss_scaling);
   }
 
-  if (opt.type == OptimizerType::ADAMW ||
+  if (opt.type == OptimizerType::ADAM || opt.type == OptimizerType::ADAMW ||
       opt.type == OptimizerType::ADAMW_NO_BIAS ||
       opt.type == OptimizerType::LAMB ||
       opt.type == OptimizerType::LAMB_NO_BIAS) {
-    popart::AdamMode mode;
-    if (opt.type == OptimizerType::ADAMW) {
-      mode = popart::AdamMode::Adam;
-    } else if (opt.type == OptimizerType::ADAMW_NO_BIAS) {
-      mode = popart::AdamMode::AdamNoBias;
+    auto adam_mode = popart::AdamMode::AdamNoBias;
+    auto decay_mode = popart::WeightDecayMode::Decay;
+    if (opt.type == OptimizerType::ADAM) {
+      decay_mode = popart::WeightDecayMode::L2Regularization;
+    } else if (opt.type == OptimizerType::ADAMW) {
+      adam_mode = popart::AdamMode::Adam;
     } else if (opt.type == OptimizerType::LAMB) {
-      mode = popart::AdamMode::Lamb;
+      adam_mode = popart::AdamMode::Lamb;
     } else if (opt.type == OptimizerType::LAMB_NO_BIAS) {
-      mode = popart::AdamMode::LambNoBias;
+      adam_mode = popart::AdamMode::LambNoBias;
     }
     optimizer = std::make_unique<popart::Adam>(
         opt.learning_rate, opt.weight_decay, opt.beta1, opt.beta2, opt.eps,
-        opt.loss_scaling, mode,
+        opt.loss_scaling, adam_mode, decay_mode,
         opt.accum_type_is_half ? popart::DataType::FLOAT16
                                : popart::DataType::FLOAT,
         opt.first_order_momentum_accum_type_is_half ? popart::DataType::FLOAT16

@@ -89,6 +89,7 @@ struct Optimizer {
     }
     case OptimizerType::LAMB:
     case OptimizerType::LAMB_NO_BIAS:
+    case OptimizerType::ADAM:
     case OptimizerType::ADAMW:
     case OptimizerType::ADAMW_NO_BIAS: {
       beta1 = findInMapOrDefault(opts, "beta1", 0.9);
@@ -118,10 +119,10 @@ struct Optimizer {
   // Shared by SGD and RMSprop
   ParamType momentum;
 
-  // Shared by AdamW, RMSprop and LAMB
+  // Shared by Adam, AdamW, RMSprop and LAMB
   ParamType eps;
 
-  // Shared by AdamW and LAMB
+  // Shared by Adam, AdamW and LAMB
   ParamType beta1;
   ParamType beta2;
 
