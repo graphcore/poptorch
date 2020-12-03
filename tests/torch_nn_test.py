@@ -275,6 +275,7 @@ HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv3d_groups": (0.05, 1e-3),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),
+    "test_nn_BatchNorm2d_not_tracking_stats": (0.05, 1e-3),
     "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-3),
     }
 
