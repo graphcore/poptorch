@@ -420,7 +420,7 @@ getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
 }
 
 void setLogLevel(std::uint64_t level) {
-  ERROR_ON(level >= static_cast<std::uint64_t>(logging::Level::Off) ||
+  ERROR_ON(level > static_cast<std::uint64_t>(logging::Level::Off) ||
            level == 5);
   logging::setLogLevel(static_cast<logging::Level>(level));
 }

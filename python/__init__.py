@@ -366,5 +366,6 @@ def setLogLevel(level):
         * INFO: Print info messages and above.
         * WARN: Print warings and errors.
         * ERR:  Print errors only.
+        * OFF:  Print nothing.
     """
     _logging.setLogLevel(level)

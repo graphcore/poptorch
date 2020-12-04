@@ -21,6 +21,8 @@ _LOG_LEVEL_MAPPING = {
     "OFF": (6, logging.CRITICAL)
 }
 
+_INTERNAL_ONLY = ("TRACE_ALL", "DEBUG_IR")
+
 
 def setLogLevel(level):
     if isinstance(level, int):
@@ -44,12 +46,13 @@ def setLogLevel(level):
         error_str = "Unknown log level: " + str(level) + ". Valid values are "
 
         all_keys = sorted(list(_LOG_LEVEL_MAPPING.keys()))
+        public_keys = [k for k in all_keys if k not in _INTERNAL_ONLY]
 
-        for key in all_keys:
+        for key in public_keys:
             error_str += key
-            if key == all_keys[-2]:
+            if key == public_keys[-2]:
                 error_str += " and "
-            elif key != all_keys[-1]:
+            elif key != public_keys[-1]:
                 error_str += ", "
 
         raise ValueError(error_str)
