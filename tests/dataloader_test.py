@@ -265,11 +265,12 @@ def _run_dataset_test(shape=None,
                                IncrementDataset(shape, num_tensors),
                                batch_size=batch_size,
                                num_workers=num_workers)
+    loader = poptorch.AsynchronousDataAccessor(data)
 
     offset = host_id * (num_tensors // num_hosts)
     assert len(data) == num_tensors // (device_iterations * batch_size *
                                         replication_factor * num_hosts)
-    for it, d in enumerate(data):
+    for it, d in enumerate(loader):
         expected = torch.from_numpy(
             numpy.stack([
                 numpy.full(shape, offset + i, dtype=numpy.float32)
@@ -286,7 +287,7 @@ def test_subdataset():
 
 
 def test_subdataset2():
-    _run_dataset_test(batch_size=2, host_id=1, num_hosts=2)
+    _run_dataset_test(batch_size=2, host_id=1, num_hosts=2, num_workers=2)
 
 
 def test_interrupt_async_loader():
@@ -498,4 +499,3 @@ def test_reuse_workers(DatasetType):
             num_tensors_reuse += 1
         end = time.perf_counter()
         print(f"Other epoch: {end - start} {num_tensors_reuse}")
-
