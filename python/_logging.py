@@ -9,28 +9,16 @@ import poptorch.poptorch_core as poptorch_core
 
 # Create a poptorch logger which outputs to the console INFO messages and above
 logger = logging.getLogger("poptorch::python")
-log_level = os.environ.get("POPTORCH_LOG_LEVEL", "WARN")
-if log_level in ["DEBUG", "DEBUG_IR", "TRACE", "TRACE_ALL"]:
-    logger.setLevel(logging.DEBUG)
-elif log_level == "INFO":
-    logger.setLevel(logging.INFO)
-elif log_level == "WARN":
-    logger.setLevel(logging.WARNING)
-elif log_level == "ERR":
-    logger.setLevel(logging.ERROR)
-elif log_level == "OFF":
-    # We don't use CRITICAL so that's
-    # essentially OFF
-    logger.setLevel(logging.CRITICAL)
-else:
-    raise RuntimeError(f"Unknown POPTORCH_LOG_LEVEL {log_level}")
 
 _LOG_LEVEL_MAPPING = {
     "TRACE": (0, logging.DEBUG),
+    "TRACE_ALL": (0, logging.DEBUG),
     "DEBUG": (1, logging.DEBUG),
+    "DEBUG_IR": (1, logging.DEBUG),
     "INFO": (2, logging.INFO),
     "WARN": (3, logging.WARN),
-    "ERR": (4, logging.ERROR)
+    "ERR": (4, logging.ERROR),
+    "OFF": (6, logging.CRITICAL)
 }
 
 
@@ -65,6 +53,9 @@ def setLogLevel(level):
                 error_str += ", "
 
         raise ValueError(error_str)
+
+
+setLogLevel(os.environ.get("POPTORCH_LOG_LEVEL", "WARN"))
 
 
 class _PoptorchFormatter(logging.Formatter):

@@ -111,7 +111,7 @@ Example with parallel execution
 -------------------------------
 
 In the code example below, :py:class:`poptorch.Block` introduced in
-:numref:`parallel_execution` is used to divide up
+:ref:`parallel_execution` is used to divide up
 a different model into disjoint subsets of layers.
 These blocks can be shared among multiple parallel execution strategies.
 

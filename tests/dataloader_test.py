@@ -499,7 +499,3 @@ def test_reuse_workers(DatasetType):
         end = time.perf_counter()
         print(f"Other epoch: {end - start} {num_tensors_reuse}")
 
-    assert num_tensors == num_tensors_reuse
-    # Not adding time related asserts because a lot depends on when the CPU
-    # governor kicks in. (The first iteration tends to be a lot slower
-    # but that might be machine dependent).
