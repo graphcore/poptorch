@@ -217,31 +217,17 @@ class BeginBlock(torch.nn.Module):
 
 
 def custom_op(inputs, name, domain, domain_version, example_outputs):
-    """Applies a custom operation, implemented within Popart, to the inputs.
+    """Applies a custom operation, implemented within PopART, to the inputs.
 
-    :param iterable inputs: input tensors for the operation.
-    :param str name: name for the op (should match Popart implementation).
-    :param str domain: domain for the op (should match Popart implementation).
-    :param int domain_version: version of the domain to use (should match Popart
-        implementation).
-    :param iterable example_outputs: a tuple/list of tensors with the same type
+    :param tuple inputs: A tuple of input tensors, for example, (x, y).
+    :param str name: unique name of the PopART custom
+    :param str domain: domain for the op
+    :param int domain_version: version of the domain to use
+    :param iterable example_outputs: a tuple of tensors with the same type
         and shape of the outputs; the value does not matter as all values will
         be set to zero for tracing purposes.
 
-    You will need to dynamically load the library containing the custom op
-    Popart implementaton e.g.
-
-    >>> import cytypes
-    ... import os
-    ... import platform
-    ...
-    ... if platform.system() == "Darwin":
-    ...     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_op.dylib")
-    ...  else:
-    ...     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_op.so")
-    ...
-    ... myop = ctypes.cdll.LoadLibrary(myso)
-
+    :returns: The outputs of the forward op of the custom op.
     """
     transformed_outputs = []
     for output in example_outputs:
