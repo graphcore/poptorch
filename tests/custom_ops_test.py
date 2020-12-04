@@ -9,6 +9,7 @@ import pytest
 import poptorch
 import helpers
 
+#loading_library_start
 if platform.system() == "Darwin":
     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_cube_op.dylib")
 else:
@@ -16,7 +17,10 @@ else:
 
 myop = ctypes.cdll.LoadLibrary(myso)
 
+#loading_library_end
 
+
+#inference_start
 def test_inference():
     class BasicNetwork(nn.Module):
         def forward(self, x, bias):
@@ -26,6 +30,8 @@ def test_inference():
                                       1,
                                       example_outputs=[x, x])
             return x, y
+
+    #inference_end
 
     model = BasicNetwork()
 

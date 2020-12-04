@@ -10,7 +10,7 @@ Options
 
 The compilation and execution on the IPU can be controlled using :class:`poptorch.Options`:
 
-See :ref:`efficient_data_batching`  for a full
+See :numref:`efficient_data_batching`  for a full
 explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
 ``replication_factor`` interact with the output and input sizes.
 
@@ -209,7 +209,7 @@ poptorch.Stage
 :py:class:`poptorch.Stage` defines some layers of model to run on one IPU.
 It can be made of one or more blocks created using
 :py:class:`poptorch.BeginBlock` or :py:class:`poptorch.Block`
-and identified by their `user_id`.
+and identified by their ``user_id``.
 Consecutive layers in a model can be defined either in the same
 :py:class:`poptorch.Stage` or consecutive stages.
 Whether stages run in parallel or sequentially depends on specific
@@ -218,7 +218,7 @@ parallel execution strategies.
 .. autoclass:: poptorch.Stage
    :special-members: __init__
 
-Internally, each operation in a model is assigned a `stage_id`
+Internally, each operation in a model is assigned a ``stage_id``
 through :py:class:`poptorch.Stage`.
 
 poptorch.AutoStage
@@ -232,7 +232,7 @@ per :py:class:`poptorch.BeginBlock` or :py:class:`poptorch.Block`.
 .. autoclass:: poptorch.AutoStage
 
 By default ``poptorch.AutoStage.SameAsIpu`` is in use, which means the
-`stage_id` of :py:class:`poptorch.Stage` will be set to the `ipu_id`
+`stage_id` of :py:class:`poptorch.Stage` will be set to the ``ipu_id``
 specified for the :py:class:`poptorch.BeginBlock` or
 :py:class:`poptorch.Block`.
 Please note that `stage_id` must be ascending in
@@ -240,7 +240,7 @@ Please note that `stage_id` must be ascending in
 Let's use the code example above.
 If your blocks "0", "1", and "2" are assigned to IPU 0, 1, and 0.
 Then the :py:class:`poptorch.Block`
-"2" will be assigned `stage_id` 0. This will make
+"2" will be assigned ``stage_id`` 0. This will make
 the compiler fail to
 schedule the last two stages "1" and "2" due to a conflict:
 
@@ -250,8 +250,8 @@ schedule the last two stages "1" and "2" due to a conflict:
 When ``poptorch.AutoStage.AutoIncrement`` is in use, each new
 :py:class:`poptorch.BeginBlock` or
 :py:class:`poptorch.Block` will be assigned an automatically incremented
-`stage_id`.
-In the previous example the last stage would be assigned `stage_id` 2 and
+``stage_id``.
+In the previous example the last stage would be assigned ``stage_id`` 2 and
 the compilation would succeed.
 
 poptorch.Phase
@@ -360,13 +360,13 @@ poptorch.PipelinedExecution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This is the default execution strategy.
-It extends :ref:`sharded_execution` with parallel execution on multiple
+It extends :numref:`sharded_execution` with parallel execution on multiple
 IPUs.
 
 Parallelisation in :py:class:`poptorch.PipelinedExecution`
 requires :py:meth:`~poptorch.Options.deviceIterations`
 and :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`.
-as explained in :ref:`efficient_data_batching`.
+as explained in :numref:`efficient_data_batching`.
 After one :py:class:`poptorch.Stage` is finished with processing a batch
 on one IPU, it starts immediately processing the next batch.
 This creates a pipeline where multiple batches are processed in parallel.
@@ -609,6 +609,67 @@ Use :py:class:`poptorch.MultiConv` wrapper class to define multi-convolutions.
 
 .. autoclass:: poptorch.MultiConvPlanType
 
+poptorch.custom_op
+------------------
+
+This is for the users who are familiar with PopART.
+If you need some special features that are not
+supported in PopART, you may write a PopART custom op.
+For more information about
+how to create Popart custom ops see
+`Creating custom operations
+<https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`_
+and
+`Building custom operators using PopART
+<https://github.com/graphcore/examples/tree/master/code_examples/popart/custom_operators>`_.
+You can call such a PopART custom op using
+:py:class:`poptorch.custom_op`
+in PopTorch.
+
+It takes three steps to enable a PopART custom op in PopTorch.
+
+First, set Poplar and PopART environment varibles as shown in
+:numref:`setting_env` and compile the PopART custom op.
+You can compile your custom op C++ code and link with Poplar and PopART to
+generate a dynamic library.
+Please refer to the custom op code custom_cube_op.cpp
+and its CMakeLists.txt under
+poptorch/tests/custom_ops$.
+
+Second, load the dynamic library.
+
+.. literalinclude:: ../../tests/custom_ops_test.py
+    :language: python
+    :caption: Loading the library for the PopART custom op
+    :linenos:
+    :start-after: loading_library_start
+    :end-before: loading_library_end
+
+Finally, use :py:class:`poptorch.custom_op` to finish the call.
+Its wrapper class is specified below.
+
+.. autoclass:: poptorch.custom_op
+
+In the PopART custom op, both forward op and backward op are implemented.
+In the PopTorch inference model, only the forward op will be called.
+
+.. literalinclude:: ../../tests/custom_ops_test.py
+    :language: python
+    :caption: Calling a PopART custom op in a Poptorch inference model
+    :linenos:
+    :emphasize-lines: 3-7
+    :start-after: inference_start
+    :end-before: inference_end
+
+In the code example above, ``example_outputs`` is assigned as
+[``x``, ``x``], where ``x`` is one of the input tensors and used as
+a template to provide the right number of output tensors.
+The real outputs will be allocated memory, calculated and
+returned by the custom op.
+You can also call this custom op inside a training model
+using exactly the same interface of :py:class:`poptorch.custom_op`,
+and the backward op will be called automatically.
+
 Half / float 16 support
 =======================
 
@@ -628,7 +689,7 @@ Because PopTorch relies on the ``torch.jit.trace`` API, it is limited to tracing
 Many of these operations do not support float 16 inputs.
 To allow the full range of operations, PopTorch converts all float 16 inputs to float 32 before tracing and then restores the inputs to float 16 as part of the canonicalization process.
 Some operations may result in the model running in float 32 where float 16 would
-be expected, or vice versa (see :ref:`float_16_op_support` for full details).
+be expected, or vice versa (see :numref:`float_16_op_support` for full details).
 
 Profiling
 =========

@@ -72,7 +72,7 @@ class AutoStage(enum.IntEnum):
 
     - ``SameAsIpu``: The stage id will be set to the selected ipu number.
     - ``AutoIncrement``: The stage id for new blocks is automatically
-        incremented.
+      incremented.
 
     Examples:
 
@@ -128,7 +128,7 @@ class MultiConvPlanType(enum.IntEnum):
 
     - ``Parallel``: Execute multiple convolutions in parallel (Default).
     - ``Serial``: Execute each convolution independently. This is
-        equivalent to using the independent convolution API.
+      equivalent to using the independent convolution API.
     """
     Parallel = 0
     Serial = 1

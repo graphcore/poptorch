@@ -24,6 +24,7 @@ for this. You can create a virtual environment and install PopTorch as shown bel
     $ source poptorch_test/bin/activate
     $ pip install <sdk_path>/poptorch_x.x.x.whl
 
+.. _setting_env:
 
 Setting the environment variables
 =================================
