@@ -12,3 +12,4 @@ PyTorch for the IPU (Preview): User Guide
     example
     experimental
     legal
+    changelog

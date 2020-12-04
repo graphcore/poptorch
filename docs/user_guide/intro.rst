@@ -44,4 +44,4 @@ on IPU. However, it does have some differences from native PyTorch execution.
 
 * PopTorch follows PopART's data batching semantics. By default this means you will just pass in data
   of the normal batch size. However, there are a number of options provided in PopTorch which will enable
-  more efficient data loading. See :numref:`efficient_data_batching` for more information.
+  more efficient data loading. See :ref:`efficient_data_batching` for more information.
