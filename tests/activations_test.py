@@ -20,7 +20,7 @@ activation_functions = [
     torch.nn.SELU, torch.nn.ELU, torch.nn.GELU, torch.nn.Softmax,
     torch.nn.LogSoftmax, torch.nn.Softsign, torch.nn.LeakyReLU,
     torch.nn.Hardtanh, torch.nn.Softplus, torch.nn.Softshrink,
-    torch.nn.Hardshrink
+    torch.nn.Hardshrink, torch.nn.CELU
 ]
 
 
@@ -84,3 +84,44 @@ def test_logsoftmax_numerics():
     poptorch_out = poptorch_model(x)
 
     torch.testing.assert_allclose(poptorch_out, native_out)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+@pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
+@pytest.mark.filterwarnings("ignore:Output nr 1. of the traced function")
+def test_rrelu_training():
+    torch.manual_seed(42)
+    input = torch.randn([200])
+
+    model = torch.nn.RReLU()
+
+    # in training negative inputs are multiplied by a random parameter
+    # we'll check positive outputs and distribution of negative outputs
+    nativeOut = model(input)
+    opts = poptorch.Options().randomSeed(0)
+    poptorch_model = poptorch.inferenceModel(model, options=opts)
+    poptorch_out = poptorch_model(input)
+
+    ref = nativeOut[nativeOut >= 0]
+    out = poptorch_out[poptorch_out >= 0]
+    torch.testing.assert_allclose(out, ref)
+
+    ref = nativeOut[nativeOut < 0]
+    out = poptorch_out[poptorch_out < 0]
+    for stat in [torch.min, torch.max, torch.mean]:
+        torch.testing.assert_allclose(stat(out), stat(ref), atol=0.1, rtol=0.1)
+
+
+def test_rrelu_inference():
+    torch.manual_seed(42)
+    input = torch.randn([200])
+
+    model = torch.nn.RReLU()
+
+    # in inference there is no randomness - check results directly
+    model.eval()
+    nativeOut = model(input)
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(input)
+    torch.testing.assert_allclose(poptorch_out, nativeOut)
