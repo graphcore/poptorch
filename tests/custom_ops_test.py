@@ -5,7 +5,6 @@ import ctypes
 import platform
 import torch
 import torch.nn as nn
-import pytest
 import poptorch
 import helpers
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import re
 import torch
 import torch.nn.functional as F
 import poptorch

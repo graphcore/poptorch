@@ -24,7 +24,6 @@ class SGD(torch.optim.SGD):
                  loss_scaling=1.0,
                  velocity_scaling=1.0):
         """
-
         :param iterable params: parameters to optimize.
         :param float lr: learning rate.
         :param float, optional momentum: momentum factor.
