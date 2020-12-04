@@ -245,7 +245,7 @@ the compiler fail to
 schedule the last two stages "1" and "2" due to a conflict:
 
 * The model implies "1" should run earlier than "2".
-* their `stage_id` values suggest "2" should run earier than "1".
+* their `stage_id` values suggest "2" should run earlier than "1".
 
 When ``poptorch.AutoStage.AutoIncrement`` is in use, each new
 :py:class:`poptorch.BeginBlock` or
@@ -347,7 +347,7 @@ the other IPUs are idle.
 If an IPU is allocated to run consecutive stages,
 PopART will merge consecutive stages into one on the same IPU.
 Weights and activations will use the on-chip memory of the IPUs.
-Layers sharing weights need be placed on the same IPU.
+Layers sharing weights need to be placed on the same IPU.
 
 :py:class:`poptorch.ShardedExecution` can be useful
 for processing a single sample or debugging.
@@ -463,6 +463,7 @@ Optimizers
 You can use a number of optimizers with PopTorch.
 In addition, PopTorch has additional features to support float16 models such as loss scaling.
 
+
 .. autoclass:: poptorch.optim.SGD
    :special-members: __init__
    :members:
@@ -492,9 +493,9 @@ Before calculating the gradients, PopTorch will scale the loss by the value of t
 PopTorch will multiply the gradients by the inverse scale prior to updating the optimizer state.
 Therefore, beyond improving numerical stability, neither the training nor the hyper-parameters are affected.
 
- Higher ``loss_scaling`` values can improve numerical stability by minimising underflow.
- However, too high a value can result in overflow.
- The optimal loss scaling factor depends on the model.
+Higher ``loss_scaling`` values can improve numerical stability by minimising underflow.
+However, too high a value can result in overflow.
+The optimal loss scaling factor depends on the model.
 
 
 Velocity scaling (SGD only)
@@ -601,8 +602,9 @@ and will backpropagate a gradient of ones through it.
   :end-before: identity_end
   :emphasize-lines: 5
 
+
 poptorch.MultiConv
-----------------------
+------------------
 
 Use :py:class:`poptorch.MultiConv` wrapper class to define multi-convolutions.
 
@@ -673,6 +675,42 @@ returned by the custom op.
 You can also call this custom op inside a training model
 using exactly the same interface of :py:class:`poptorch.custom_op`,
 and the backward op will be called automatically.
+
+poptorch.nop
+------------
+
+Poptorch includes a "no-op" function for debugging purposes.
+
+.. autofunction:: poptorch.nop
+
+
+poptorch.serializedMatMul
+-------------------------
+
+Use this function to create a serialized matrix multiplication, which splits
+a larger matrix multiplication into smaller matrix multiplications to reduce
+memory requirements.
+
+.. autofunction:: poptorch.serializedMatMul
+
+
+poptorch.set_available_memory
+-----------------------------
+
+Use this function to override the proportion of tile memory for available to be used as temporary memory by a convolution or matrix multiplication.
+
+.. autofunction:: poptorch.set_available_memory
+
+
+Miscellaneous functions
+=======================
+
+These PopTorch functions, not related to model creation, are available:
+
+.. autofunction:: poptorch.ipuHardwareIsAvailable
+
+.. autofunction:: poptorch.setLogLevel
+
 
 Half / float 16 support
 =======================

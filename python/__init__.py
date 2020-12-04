@@ -3,15 +3,15 @@ import atexit
 
 import torch
 import torch.nn as nn
+from . import _logging
 
-from .logging import logger
+from ._logging import logger
 
 assert torch.__version__.startswith("@TORCH_VERSION@"), (
     "This version"
     " of PopTorch only works with torch==@TORCH_VERSION@ but the version "
     f"installed is {torch.__version__}")
 import poptorch.poptorch_core as poptorch_core
-from poptorch.poptorch_core import ipuHardwareIsAvailable, setLogLevel
 
 from . import _impl
 from .enums import *
@@ -338,7 +338,7 @@ def trainingModel(model, options=None, optimizer=None):
 
 
 def inferenceModel(model, options=None):
-    """ Create a PopTorch inference model, from a PyTorch model, to run on IPU
+    """Create a PopTorch inference model, from a PyTorch model, to run on IPU
     hardware in inference mode.
 
     :param torch.nn.Module model: The PyTorch model to wrap.
@@ -347,3 +347,25 @@ def inferenceModel(model, options=None):
         of ``model``.
     """
     return PoplarExecutor(model=model, options=options, training=False)
+
+
+def ipuHardwareIsAvailable():
+    """Indicates whether IPU hardware is available to use.
+
+    :returns: True if physical IPUs are available, False otherwise.
+    :rtype: bool
+    """
+    return poptorch_core.ipuHardwareIsAvailable()
+
+
+def setLogLevel(level):
+    """Changes the volume of messages printed in the console (stdout)
+
+    :param str level:
+        * TRACE: Print all messages.
+        * DEBUG: Print debug messages and above.
+        * INFO: Print info messages and above.
+        * WARN: Print warings and errors.
+        * ERR:  Print errors only.
+    """
+    _logging.setLogLevel(level)

@@ -1,10 +1,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import glob
-import json
 import os
 import torch
 from . import enums
-from .logging import logger
+from ._logging import logger
 from . import _options_impl
 from . import ops
 
@@ -357,6 +355,8 @@ class _IExecutionStrategy:
 
 
 class Phase:
+    """Represents an execution phase"""
+
     def __init__(self, arg):
         """ Create a phase.
 
@@ -851,7 +851,7 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def connectionType(self, connection_type):
-        """set the IPU connection type to one of:
+        """When to connect to the IPU (if at all)
 
         :param poptorch.ConnectionType connection_type:
             * Always: Attach to the IPU from the start (Default).
@@ -860,6 +860,11 @@ class Options(_options_impl.OptionsDict):
             * Never: Never try to attach to an IPU. (Useful for offline
               compilation, but trying to run an executable will raise
               an exception).
+
+        For example:
+
+        >>> opts = poptorch.Options()
+        ... opts.connectionType(poptorch.ConnectionType.OnDemand)
         """
         assert isinstance(connection_type, enums.ConnectionType)
         self.set(connection_type=connection_type.value)
@@ -909,15 +914,22 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def anchorMode(self, anchor_mode, anchor_return_period=None):
-        """ How much data to return from a model
+        """ Specify which data to return from a model
 
         :param poptorch.AnchorMode anchor_mode:
             * All: Return a result for each batch.
-            * Sum: Return the sum of all the batches
+            * Sum: Return the sum of all the batches.
             * Final: Return the last batch.
-            * EveryN: Return every N batches. N is passed in
+            * EveryN: Return every N batches: N is passed in
               as ``anchor_return_period``.
             * Default: `All` for inference, `Final` for training.
+
+        For example:
+
+        >>> opts = poptorch.Options()
+        ... opts.anchorMode(poptorch.AnchorMode.All)
+        ... # or
+        ... opts.anchorMode(poptorch.AnchorMode.EveryN, 10)
         """
         assert isinstance(anchor_mode, enums.AnchorMode)
 
@@ -937,8 +949,11 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def defaultAnchorMode(self):
-        """Return True if the anchor_mode is currently set to Default,
-        False otherwise."""
+        """
+        :return: True if the anchorMode is currently set to Default;
+            False otherwise
+        :rtype: bool
+        """
         return self.anchor_mode == enums.AnchorMode.Default
 
     def randomSeed(self, random_seed):

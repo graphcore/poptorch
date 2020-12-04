@@ -16,7 +16,7 @@ then
   echo "poptorch must be in your PYTHONPATH to generate the documentation: did you enable your build environment?"
   exit -1
 fi
-if ! PACKAGE_INFO_FILES=($(ls ${POPTORCH_BUILD_DIR}/poptorch-*.yml)) 
+if ! PACKAGE_INFO_FILES=($(ls ${POPTORCH_BUILD_DIR}/poptorch-*.yml))
 then
   echo "ERROR: You need to call $0 from the folder containing the package YAML info file"
   exit -1
@@ -57,7 +57,7 @@ python3 -m sphinx $common_flags -b html -c ${SPHINX_CONF_DIR} -D "project=${TITL
 cp "${DOCS_BUILD_DIR}/html/${DOC}/html.zip" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_HTML_NAME}"
 
 # Build PDF
-DOC_TITLE="${TITLE}" python3 -m sphinx  $common_flags -b latex -c ${SPHINX_CONF_DIR} -D "project=${DOC}" -D "version=v${VERSION}" -D "release=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/latex/${DOC}"
+DOC_TITLE="${TITLE}" python3 -m sphinx $common_flags -b latex -c ${SPHINX_CONF_DIR} -D "project=${DOC}" -D "version=v${VERSION}" -D "release=v${VERSION}" "${DOCS_SOURCE_DIR}" "${DOCS_BUILD_DIR}/latex/${DOC}"
 ( cd "${DOCS_BUILD_DIR}/latex/${DOC}" && make LATEXMKOPTS="-silent" )
 cp "${DOCS_BUILD_DIR}/latex/${DOC}/doc.pdf" "${POPTORCH_BUILD_DIR}/${USER_GUIDE_PDF_NAME}"
 

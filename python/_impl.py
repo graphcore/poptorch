@@ -14,7 +14,7 @@ from . import enums
 from . import optim
 from . import profiling
 from . import poptorch_core
-from .logging import logger
+from ._logging import logger
 from .options import Options
 
 

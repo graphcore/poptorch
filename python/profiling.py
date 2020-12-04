@@ -1,7 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import os
-from .logging import logger
+from ._logging import logger
 
 if os.environ.get("PVTI_OPTIONS") is None:
     _pvti_available = False

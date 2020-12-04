@@ -1,8 +1,11 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import abc
 import logging
-from . import ops
-from .logging import logger
+import torch
+
+from ._logging import logger
+
+_begin_ipu_block = torch.ops.poptorch.begin_ipu_block
 
 
 class OptionsDict:
@@ -121,7 +124,7 @@ class IStageManager(abc.ABC):
             ipu = stage._stage_id  # pylint: disable=protected-access
         self._debug("Starting block id=%s stage=%d phase=%d ipu=%d", user_id,
                     stage._stage_id, stage._phase_id, ipu)  # pylint: disable=protected-access
-        ops.begin_ipu_block(stage._stage_id, stage._phase_id, ipu)  # pylint: disable=protected-access
+        _begin_ipu_block(stage._stage_id, stage._phase_id, ipu)  # pylint: disable=protected-access
 
     def resetAutoId(self):
         self._next_auto_id = 0

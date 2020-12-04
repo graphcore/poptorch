@@ -1,16 +1,23 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
-from .logging import logger
 from . import enums
 
-begin_ipu_block = torch.ops.poptorch.begin_ipu_block
-end_ipu_block = torch.ops.poptorch.end_ipu_block
-set_available_memory = torch.ops.poptorch.set_available_memory
-nop = torch.ops.popart.nop
+_end_ipu_block = torch.ops.poptorch.end_ipu_block
 
 
 def ipu_print_tensor(tensor, title=""):
     return torch.ops.poptorch.ipu_print_tensor(tensor, title)
+
+
+def nop(tensor):
+    """ A no-operation: it is functionally the same as an identity but is never
+    elimated by PopART patterns or inlining, so it is useful for debugging.
+
+    :param torch.Tensor tensor: the tensor to simply return by the no-op.
+    :returns: The same tensor which was input.
+    :rtype: torch.Tensor
+    """
+    return torch.ops.popart.nop(tensor)
 
 
 def recomputationCheckpoint(*tensors):
@@ -19,8 +26,8 @@ def recomputationCheckpoint(*tensors):
     When recomputation is enabled, these values will not be recomputed and they
     will be stored in memory between forward and backwards passes instead.
 
-    :param tensors: one or more tensors which should be checkpointed
-    :return: Tensors (same number and shape as the input tensors)
+    :param tensors: one or more tensors which should be checkpointed.
+    :return: Tensors (same number and shape as the input tensors).
     """
     out = torch.ops.poptorch.recomputation_checkpoint(tensors)
     if len(tensors) == 1:
@@ -29,20 +36,27 @@ def recomputationCheckpoint(*tensors):
 
 
 def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
-    """ Instantiate a matmul that should be serialized.
+    """ Calculates a matrix product using a serialized matrix multiplication.
 
-   The matrix multiplication will be split into separate smaller matmuls
-   which will be executed in serie.
+    The matrix multiplication, lhs*rhs, is split into separate smaller
+    multiplications, calculated one after the other, to reduce the memory
+    requirements of the multiplication and its gradient calculation.
 
-   :param lhs: Lhs input matrix
-   :param rhs: Rhx input matrix
-   :param poptorch.MatMulSerializationMode mode: Which dimension of the matmul
-    to serialize on.
-   :param int factor: Number of serialized matmuls. Must be a factor of the
-   dimensions to serialize on.
-   :param bool keep_precision: If True then any MatMul split along its
-    reducing dimension will have an output type of float and a cast will be
-    added after the addInplaces.
+    :param torch.Tensor lhs: Left-hand size input matrix.
+    :param torch.Tensor rhs: Right-hand side input matrix.
+    :param poptorch.MatMulSerializationMode mode: Which dimension of the matmul
+        to serialize on: for matrix A (m by n) multiplied by matrix B (n by p).
+        * InputChannels: Split across the input channels (dimension m).
+        * ReducingDim: Split aross the reducing dimension (n).
+        * OutputChannels: Split across the output channels (dimenion p).
+        * Disabled: Same as an ordinary matrix multiplication.
+    :param int factor: Number of serialized multiplications. Must be a factor of
+        the dimension to serialize on.
+    :param bool keep_precision: (Half/float16 inputs only) The forward op when
+        serializing over ReducingDim and the backwards ops when serializing over
+        InputChannels involve an addition step. If ``keep_precision`` is True,
+        these additions will occur using float32 rather than half precision
+        partials, matching those used for the individual matrix multiplications.
    """
     assert isinstance(keep_precision, bool)
     assert isinstance(factor, int)
@@ -50,6 +64,41 @@ def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
     out = torch.matmul(lhs, rhs)
     return torch.ops.poptorch.set_matmul_serialization(out, mode.value, factor,
                                                        keep_precision)
+
+
+def set_available_memory(tensor, available_memory_proportion):
+    """ Sets the available memory for a convolution or matrix multiplication.
+
+    When called on the on the output of a convolution or a matrix
+    multiplication, it sets the proportion of tile memory (between 0 and 1) to
+    be made available as temporary memory for the convolution/matrix
+    multipication. Less temporary memory will reduce the time performance but
+    may use less memory overall. Lower memory proportions result in the use of
+    more live (not tempoerary) memory, and so the overall memory may increase
+    for too low values, possibly resulting in out of memory errors.
+
+    In the event that the value is too low, the planner will replan for the
+    smaller memory usage possible.
+
+    >>> class BasicNetwork(nn.Module):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         self.conv = nn.Conv2d(4, 4, 3, stride=2)
+    ...
+    ...     def forward(self, x):
+    ...         out = self.conv(x)
+    ...         out = poptorch.set_available_memory(out, 0.2)
+    ...         return out
+
+    :param torch.Tensor tensor: output tensor of a convolution or matrix
+        multiplication (otherwise the statement will be an identity).
+    :param float available_memory_proportion: proportion between 0.0 and 1.0
+        of tile memory to be made available for temporary memory (default 0.6).
+    :returns: input tensor, as if calling an identity function.
+    :rtype: torch.Tensor
+     """
+    return torch.ops.poptorch.set_available_memory(
+        tensor, available_memory_proportion)
 
 
 def _assertIdIsValid(name, value, expected_type):
@@ -114,7 +163,7 @@ class Block(torch.nn.Module):
             Block._stages_manager.beginStage(self._user_id, self._ipu_id)
 
     def __exit__(self, type, value, traceback):
-        end_ipu_block()
+        _end_ipu_block()
 
 
 class BeginBlock(torch.nn.Module):
@@ -168,25 +217,31 @@ class BeginBlock(torch.nn.Module):
 
 
 def custom_op(inputs, name, domain, domain_version, example_outputs):
-    """
-    A PopART custom op can be called through this API.
+    """Applies a custom operation, implemented within Popart, to the inputs.
 
-    :param torch.Tensor inputs: A list of input tensors, for example, [x, y].
-    :param str name: The unique name of the PopART custom op, for example,
-        "Cube".
-    :param str domain: The domain name, for example, com.acme.
-    :param int domain_version: The domain version number,
-                           for example, 1.
-    :param torch.Tensor example_outputs:
-        A list of the output tensors, for example, [x, x].
+    :param iterable inputs: input tensors for the operation.
+    :param str name: name for the op (should match Popart implementation).
+    :param str domain: domain for the op (should match Popart implementation).
+    :param int domain_version: version of the domain to use (should match Popart
+        implementation).
+    :param iterable example_outputs: a tuple/list of tensors with the same type
+        and shape of the outputs; the value does not matter as all values will
+        be set to zero for tracing purposes.
 
-        Note that the ``inputs`` must match those input tensors defined
-        in the forward op of the PopART custom op. But the ``example_output``
-        doesn't need to. The number of tensors listed in ``example_output``
-        must match the number of output tensors specified in the forward op of
-        the PopART custom op.
+    You will need to dynamically load the library containing the custom op
+    Popart implementaton e.g.
 
-    :returns: The outputs of the forward op of the custom op.
+    >>> import cytypes
+    ... import os
+    ... import platform
+    ...
+    ... if platform.system() == "Darwin":
+    ...     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_op.dylib")
+    ...  else:
+    ...     myso = os.path.join(os.getcwd(), "custom_ops/libcustom_op.so")
+    ...
+    ... myop = ctypes.cdll.LoadLibrary(myso)
+
     """
     transformed_outputs = []
     for output in example_outputs:

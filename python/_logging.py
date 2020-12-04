@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import traceback
+import poptorch.poptorch_core as poptorch_core
 
 # Create a poptorch logger which outputs to the console INFO messages and above
 logger = logging.getLogger("poptorch::python")
@@ -23,6 +24,47 @@ elif log_level == "OFF":
     logger.setLevel(logging.CRITICAL)
 else:
     raise RuntimeError(f"Unknown POPTORCH_LOG_LEVEL {log_level}")
+
+_LOG_LEVEL_MAPPING = {
+    "TRACE": (0, logging.DEBUG),
+    "DEBUG": (1, logging.DEBUG),
+    "INFO": (2, logging.INFO),
+    "WARN": (3, logging.WARN),
+    "ERR": (4, logging.ERROR)
+}
+
+
+def setLogLevel(level):
+    if isinstance(level, int):
+        # Legacy usage
+        for key in _LOG_LEVEL_MAPPING:
+            if _LOG_LEVEL_MAPPING[key][0] == level:
+                setLogLevel(key)
+                return
+
+        raise ValueError("Invalid log level integer")
+
+    try:
+        # Change it in C++ first
+        level_int = _LOG_LEVEL_MAPPING[level][0]
+        poptorch_core.setLogLevel(level_int)
+
+        # Then in python
+        level_py = _LOG_LEVEL_MAPPING[level][1]
+        logger.setLevel(level_py)
+    except KeyError:
+        error_str = "Unknown log level: " + str(level) + ". Valid values are "
+
+        all_keys = sorted(list(_LOG_LEVEL_MAPPING.keys()))
+
+        for key in all_keys:
+            error_str += key
+            if key == all_keys[-2]:
+                error_str += " and "
+            elif key != all_keys[-1]:
+                error_str += ", "
+
+        raise ValueError(error_str)
 
 
 class _PoptorchFormatter(logging.Formatter):
