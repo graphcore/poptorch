@@ -101,7 +101,8 @@ torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
 
   auto val =
       is_training
-          ? createRandomUniform(graph, x, {1}, upper, lower)->output()
+          ? createRandomUniform(graph, x, shapeFromTensor(x), upper, lower)
+                ->output()
           : createConstantFloat(graph, {(lower + upper) / 2}, {})->output();
 
   auto zero = createConstantFloat(graph, {0}, {})->output();
