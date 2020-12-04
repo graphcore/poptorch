@@ -47,6 +47,21 @@ class _RepeatSampler(torch.utils.data.IterableDataset):
         return len(self.real_sampler)
 
 
+class _SubDataset:
+    def __init__(self, dataset, opts, step):
+        num_elts = len(dataset)
+        per_proc = step * (num_elts // (step * opts.Distributed.numProcesses))
+        self._offset = opts.Distributed.processId * per_proc
+        self._length = min(per_proc, num_elts - self._offset)
+        self._dataset = dataset
+
+    def __len__(self):
+        return self._length
+
+    def __getitem__(self, index):
+        return self._dataset[index + self._offset]
+
+
 class DataLoader(torch.utils.data.DataLoader):
     """ Thin wrapper around the traditional `torch.utils.data.DataLoader` to
     abstract away some of the batch sizes calculations.
@@ -136,21 +151,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 assert self._combined_batch_size is not None, (
                     "batch_size=None not allowed for distributed"
                     " execution.")
-
-                class _SubDataset:
-                    def __init__(self, dataset, opts, step):
-                        num_elts = len(dataset)
-                        per_proc = step * (
-                            num_elts // (step * opts.Distributed.numProcesses))
-                        self._offset = opts.Distributed.processId * per_proc
-                        self._length = min(per_proc, num_elts - self._offset)
-                        self._dataset = dataset
-
-                    def __len__(self):
-                        return self._length
-
-                    def __getitem__(self, index):
-                        return self._dataset[index + self._offset]
 
                 dataset = _SubDataset(dataset, options,
                                       self._combined_batch_size)
