@@ -168,7 +168,26 @@ class BeginBlock(torch.nn.Module):
 
 
 def custom_op(inputs, name, domain, domain_version, example_outputs):
+    """
+    A PopART custom op can be called through this API.
 
+    :param torch.Tensor inputs: A list of input tensors, for example, [x, y].
+    :param str name: The unique name of the PopART custom op, for example,
+        "Cube".
+    :param str domain: The domain name, for example, com.acme.
+    :param int domain_version: The domain version number,
+                           for example, 1.
+    :param torch.Tensor example_outputs:
+        A list of the output tensors, for example, [x, x].
+
+        Note that the ``inputs`` must match those input tensors defined
+        in the forward op of the PopART custom op. But the ``example_output``
+        doesn't need to. The number of tensors listed in ``example_output``
+        must match the number of output tensors specified in the forward op of
+        the PopART custom op.
+
+    :returns: The outputs of the forward op of the custom op.
+    """
     transformed_outputs = []
     for output in example_outputs:
         # Dead code which will get eliminated but will safely allow the same
@@ -191,9 +210,9 @@ def identity_loss(x, reduction):
     :param str reduction: Reduce the loss output as per PyTorch loss
         semantics. Supported values are:
 
-        * ``"none"``: Don't reduce
         * ``"sum"``: Sum the losses.
         * ``"mean"``: Take the mean of the losses.
+        * ``"none"``: Don't reduce the losses.
 
     :returns: An identity loss custom op.
     """
@@ -288,6 +307,7 @@ class MultiConv():
         """Select the multi-convolution execution strategy.
 
         :param value: An instance of :py:class:`MultiConvPlanType`.
+
         :returns: self, to support method chaining
         """
         if value is None:
