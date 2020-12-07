@@ -5,7 +5,8 @@ Changelog
 v1.0 (Poplar SDK 1.4)
 =====================
 
-New features:
+New features
+------------
 
 - Added support for torch.nn.InstanceNorm1d, torch.nn.InstanceNorm2d and torch.nn.InstanceNorm3d
 - Fixed issue with torch.nn.GroupNorm where only 4-dimensional inputs could be used
@@ -73,10 +74,35 @@ New features:
 
 - Support for PopVision System Analyser added: tracing can be enabled by setting ``PVTI_OPTIONS='{"enable":"true"}'``
 
+Known issues
+------------
+
+- Race condition in ``poptorch.DataLoader`` when using several workers resulting in the iteration sometimes finishing one element early.
+
+  * Workaround: set ``num_workers`` to 0 or 1.
+
+- ``poptorch.custom_op()`` doesn't allow the user to set attributes.
+
+  * Workaround: hardcode the attributes in the custom operation or pass them as regular inputs.
+
+- Graphs containing block annotations (``poptorch.Block`` or ``poptorch.BeginBlock``) cannot be exported using ``torch.save()``
+
+  * Workaround: Make a soft copy of the model that doesn't contain Blocks and use it to save /load the weights. (The weights should be shared between the two models).
+
+- Lists of tensors are not supported as inputs.
+
+  * Workaround: Use tuples instead.
+
+    .. code-block:: python
+
+      # Use a tuple
+      assert inference_model((t1, t2)) # instead of [t1, t2]
+
 v0.1 (Poplar SDK 1.3)
 =====================
 
-New features:
+New features
+------------
 
 - PopTorch now exposes PopART anchor options to choose how much data to return from a model. These
   are passed into the model wrapper via anchor_mode. options are Sum, All, Final and EveryN.
