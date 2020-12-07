@@ -6,8 +6,8 @@ import distutils.util
 
 VERSION='@VERSION@'
 
-with open("README.md", "r") as fh:
-    LONG_DESCRIPTION = fh.read()
+LONG_DESCRIPTION = ("PopTorch is a set of extensions for PyTorch enabling "
+    "models to be trained, evaluated and used on the GraphCore IPU.")
 
 # https://www.python.org/dev/peps/pep-0425/
 # The platform tag is simply distutils.util.get_platform() with all hyphens - and periods . replaced with underscore _.
