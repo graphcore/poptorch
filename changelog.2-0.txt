@@ -3,3 +3,8 @@ New features:
 - Add support for the following random sampling operations:
     torch.bernoulli, torch.distributions.Bernoulli
 - Added Adam optimizer
+
+Known issues:
+
+Bug fixes:
+
