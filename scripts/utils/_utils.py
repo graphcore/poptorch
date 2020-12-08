@@ -91,13 +91,17 @@ class JenkinsPkgInfo(PkgInfo):
     def __init__(self):
         build_number = os.environ.get("GC_BUILD_NUMBER")
         logger.debug("Env: GC_BUILD_NUMBER=%s", build_number)
-        package_os_type = os.environ.get("SWDB_PACKAGE_NAME")
-        logger.debug("Env: SWDB_PACKAGE_NAME=%s", package_os_type)
-        if package_os_type:
-            package_os_type = package_os_type.replace("_installer", "")
+        os_type = os.environ.get("GCCI_OS")
+        os_version = os.environ.get("GCCI_OS_VERSION")
+
+        logger.debug("Env: GCCI_OS=%s GCCI_OS_VERSION=%s", os_type, os_version)
+        package_os_type = None
+        if os_type and os_version:
+            os_version = os_version.replace(".", "_")
+            package_os_type = f"{os_type}_{os_version}"
             logger.info(
-                "Package OS type overridden by 'SWDB_PACKAGE_NAME' "
-                "environment variable with '%s'", package_os_type)
+                "Package OS type set by 'GCCI_OS' / 'GCCI_OS_VERSION' "
+                "to '%s'", package_os_type)
         super().__init__(build_number=build_number,
                          package_os_type=package_os_type)
 
@@ -126,6 +130,7 @@ def _get_package_os_type():
     for line in open("/etc/os-release", "r"):
         if line.startswith("ID="):
             distrib = line.split("=")[1].rstrip()
+            distrib = distrib.replace('"', "")
         elif line.startswith("VERSION_ID="):
             version = line.split("=")[1]
             version = version.replace(".", "_")
