@@ -54,12 +54,14 @@ endif()
 add_custom_target(poptorch_wheel COMMAND
   ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/build/poptorch --target poptorch_wheel DEPENDS poptorch)
 
-
 if("-DBUILD_DOCS=ON" IN_LIST POPTORCH_CMAKE_ARGS)
   add_custom_target(poptorch_docs
-    COMMAND bash -c 'pip3 install -r ${CBT_DIR}/../poptorch/requirements.txt && ${CBT_DIR}/../poptorch/docs_build.sh'
+    COMMAND bash -c 'pip3 install -r ${CBT_DIR}/../poptorch/requirements.txt && python3 ${CBT_DIR}/../poptorch/scripts/docs_build.py --install-dir ${CMAKE_BINARY_DIR}/install/poptorch'
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
     DEPENDS poptorch)
+  #TODO(T27444): Use BUILD_DOCS=ON once we have a virtual environment with sphinx > 3
+  # (At the moment Popart relies on an old version of sphinx so we can't update it)
+  list(REMOVE_ITEM POPTORCH_CMAKE_ARGS "-DBUILD_DOCS=ON")
 else()
   add_custom_target(poptorch_docs
     DEPENDS poptorch)

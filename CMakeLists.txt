@@ -11,7 +11,9 @@ set(POPART_DIR CACHE PATH "Path to a Popart install")
 set(SNAPSHOT "" CACHE STRING "Snapshot ID to use for the documentation")
 set(SDK_DIR CACHE PATH "Path to an extracted SDK archive or to a Poplar & Popart install directory (Will populate POPLAR_DIR and POPART_DIR)")
 set(USE_PROTOC_PROTOBUF ON CACHE BOOL "Use libprotobuf shipped with protoc instead of searching for it in the system path.")
+set(BUILD_DOCS OFF CACHE BOOL "Build PopTorch's documentation")
 
+# Note: The next line is also parsed by scripts/utils/_utils.py
 set(TORCH_VERSION 1.6.0)
 
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
@@ -102,68 +104,15 @@ add_compile_options(
 if(${ENABLE_WERROR})
   add_compile_options(-Werror)
 endif()
-#------ release version numnber
-file(READ ${PROJECT_SOURCE_DIR}/version.json VERSION_JSON)
-string(REGEX REPLACE
-       ".*major[^:]*: \"([^\"]*)\".*" "\\1"
-       CPACK_PACKAGE_VERSION_MAJOR
-       ${VERSION_JSON})
-string(REGEX REPLACE
-       ".*minor[^:]*: \"([^\"]*)\".*" "\\1"
-       CPACK_PACKAGE_VERSION_MINOR
-       ${VERSION_JSON})
-string(REGEX REPLACE
-       ".*point[^:]*: \"([^\"]*)\".*" "\\1"
-       CPACK_PACKAGE_VERSION_PATCH
-       ${VERSION_JSON})
-
-set(VERSION ${CPACK_PACKAGE_VERSION_MAJOR})
-set(VERSION ${VERSION}.${CPACK_PACKAGE_VERSION_MINOR})
-set(VERSION ${VERSION}.${CPACK_PACKAGE_VERSION_PATCH})
-
-if (DEFINED BUILD_NUMBER)
-  set(VERSION "${VERSION}+${BUILD_NUMBER}")
-endif()
-#------ end of release version numnber
-
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 set(CMAKE_CXX_STANDARD 17)
 
-#------ OS version info
-if(${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
-  set(OS_TYPE osx)
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL Linux)
-  set(OS_TYPE linux)
-else()
-  set(OS_TYPE unknown)
-endif()
-
-#with cmake >= 3.12 this should be add_compile_definitions(ONNX_NAMESPACE=onnx)
-add_definitions(-DONNX_NAMESPACE=onnx)
-
-#------ git information
-if("${SNAPSHOT}" STREQUAL "")
-  execute_process(
-    COMMAND git rev-parse --short=10 HEAD
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE SNAPSHOT
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif()
-
-if("${SNAPSHOT}" STREQUAL "")
-  set(SHAPSHOT "0000000000")
-endif()
-message(STATUS "Snapshot is " ${SNAPSHOT})
-
-#------ end of git information
-
 set(INSTALL_PYDIR poptorch)
 
-if(${OS_TYPE} STREQUAL osx)
+if(${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
   set(CMAKE_INSTALL_RPATH "@loader_path")
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-elseif(${OS_TYPE} STREQUAL linux)
+else()
   set(CMAKE_INSTALL_RPATH "$ORIGIN")
 endif()
 
@@ -176,123 +125,37 @@ add_subdirectory(tests)
 add_subdirectory(examples)
 add_subdirectory(docs/user_guide)
 
-set(USER_GUIDE_PDF_NAME poptorch-user-guide-${VERSION}-${SNAPSHOT}.pdf)
-set(USER_GUIDE_HTML_NAME poptorch-user-guide-html-${VERSION}-${SNAPSHOT}.zip)
-set(PYTHON_API_PDF_NAME poptorch-python-api-${VERSION}-${SNAPSHOT}.pdf)
-set(PYTHON_API_HTML_NAME poptorch-python-api-html-${VERSION}-${SNAPSHOT}.zip)
-
-#------ packaging
-if(${OS_TYPE} STREQUAL osx)
-  set(PACKAGE_OS_TYPE osx)
-elseif(${OS_TYPE} STREQUAL linux)
-  # For now we assume we are packaging for ubuntu 18.04, this
-  # will have to change at a later date to a be a parameter of the build
-  set(PACKAGE_OS_TYPE ubuntu_18_04)
-else()
-  set(PACKAGE_OS_TYPE unknown)
-endif()
-
-# SWDB_PACKAGE_NAME is used to set the name of the main poplar package,
-# e.g. ubuntu_16_04_installer
-if (DEFINED SWDB_PACKAGE_NAME)
-  set(PACKAGE_OS_TYPE ${SWDB_PACKAGE_NAME})
-  string(REPLACE "_installer" "" PACKAGE_OS_TYPE ${PACKAGE_OS_TYPE})
-  message(STATUS "Overriding package type '${PACKAGE_OS_TYPE}'")
-endif()
-
 find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
-
-configure_file(setup.py.in
-  ${PROJECT_BINARY_DIR}/setup.py
-  @ONLY)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/setup.py DESTINATION .)
-
-execute_process(COMMAND python3 -c "import distutils.util;print(distutils.util.get_platform().replace('.','_').replace('-','_'), end='')"
-  OUTPUT_VARIABLE PYTHON_PLATFORM)
-set(PRODINFO_FILE_NAME poptorch-${VERSION}-${SNAPSHOT}.yml)
-
-set(PKG_UPLOAD_DIR ../../pkg)
 
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 setup.py sdist bdist_wheel
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/setup.py sdist bdist_wheel
   DEPENDS poptorch_core
 )
-
-set( COPY_PDF_IF_EXISTS
-import os, shutil$<SEMICOLON>
-yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
-os.path.exists('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}')
-and shutil.copyfile('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_PDF_NAME}', '${PKG_UPLOAD_DIR}/${USER_GUIDE_PDF_NAME}')
-and yml.write(' ' * 2 + '- name: PopTorch user guide \(PDF\)\\n'+' ' * 4 + 'file: ${USER_GUIDE_PDF_NAME}\\n' + ' ' * 4 + 'type: pdf\\n')
-)
-
-set( COPY_HTML_IF_EXISTS
-import os, shutil$<SEMICOLON>
-yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
-os.path.exists('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}')
-and shutil.copyfile('${CMAKE_CURRENT_BINARY_DIR}/${USER_GUIDE_HTML_NAME}', '${PKG_UPLOAD_DIR}/${USER_GUIDE_HTML_NAME}')
-and yml.write(' ' * 2 + '- name: PopTorch user guide \(HTML\)\\n'+' ' * 4 + 'file: ${USER_GUIDE_HTML_NAME}\\n' + ' ' * 4 + 'type: html_zip\\n')
-)
-
-set( COPY_WHEEL
-import os, shutil, glob$<SEMICOLON>
-src = glob.glob('dist/*.whl')[0]$<SEMICOLON>
-dst = os.path.basename(src).replace('-${VERSION}-','-${VERSION}+${SNAPSHOT}+${PACKAGE_OS_TYPE}-')$<SEMICOLON>
-yml = open('${PKG_UPLOAD_DIR}/${PRODINFO_FILE_NAME}','a')$<SEMICOLON>
-shutil.copyfile(src, os.path.join('${PKG_UPLOAD_DIR}', dst))
-and yml.write(' ' * 4 + 'file: '+ dst +'\\n')
-)
-
-
-add_custom_target(package_and_move
-  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND bash -c "mkdir -p ${PKG_UPLOAD_DIR}"
-  COMMAND bash -c "cp ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME} ${PKG_UPLOAD_DIR}"
-  COMMAND python3 -c \"${COPY_WHEEL}\"
-  COMMAND python3 -c \"${COPY_PDF_IF_EXISTS}\"
-  COMMAND python3 -c \"${COPY_HTML_IF_EXISTS}\"
-  DEPENDS poptorch_wheel
-)
-#------ end of packaging
-
-#------ product info file
-
-execute_process(
-  COMMAND git config --get remote.origin.url
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
-  OUTPUT_VARIABLE VIEW_REMOTE_URL
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-configure_file(poptorch.prodinfo.yml
-  ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME}
-  @ONLY)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PRODINFO_FILE_NAME}
-        DESTINATION .)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
         DESTINATION .)
 
-#------ end of product info file
-
-#------ enable script
-if(${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
-  set(LD_PATH_VARNAME "DYLD_LIBRARY_PATH")
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL Linux)
-  set(LD_PATH_VARNAME "LD_LIBRARY_PATH")
-else()
-  message(FATAL_ERROR "Unknown system name")
+if(BUILD_DOCS)
+  set(PKG_EXTRA_FLAGS "--include-documentation")
 endif()
 
-configure_file(enable.sh.in
+# TODO(T27444): At the moment BUILD_DOCS is bypassed by the CI so instead
+# check if the files exist with --include-documentation-if-exists
+# TODO(T27444): move to Jenkins script: we don't need CMake for that
+set(PKG_UPLOAD_DIR ../../pkg)
+add_custom_target(package_and_move
+  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/package_poptorch.py --output-dir ${PKG_UPLOAD_DIR} ${PKG_EXTRA_FLAGS} --include-documentation-if-exists
+  DEPENDS poptorch_wheel
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/enable.sh.in
   ${PROJECT_BINARY_DIR}/enable.sh
   @ONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/enable.sh
         DESTINATION .)
-#------ end of enable script
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.15.0")
   # Building poptorch without installing it doesn't make sense: the python
