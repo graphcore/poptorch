@@ -71,38 +71,42 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
                                          torch::jit::Node *node) {
-  torch::jit::Symbol kind = node->kind();
+  // aten::adaptive_avg_pool1d(Tensor self, int[] output_size) -> Tensor
   // aten::adaptive_avg_pool2d(Tensor self, int[] output_size) -> Tensor
-  // aten::adaptive_max_pool2d(Tensor self, int[] output_size) -> Tensor
+  // aten::adaptive_avg_pool3d(Tensor self, int[] output_size) -> Tensor
+
+  torch::jit::Value *x = node->input(0);
   std::vector<std::int64_t> output_shape =
       constantToLongVec(node->input(1)->node());
+  std::size_t n_output_dims = output_shape.size();
 
-  c10::TensorTypePtr as_tensor =
-      node->input(0)->type()->cast<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-  std::vector<std::int64_t> input_shape{*dims[2], *dims[3]};
+  std::vector<std::int64_t> input_shape = shapeFromTensor(x);
+  std::size_t input_offset = input_shape.size() - n_output_dims;
 
-  // Need to clean this code up.
-  // TODO(tbd)
-  const std::vector<int64_t> &stride{input_shape[0] / output_shape[0],
-                                     input_shape[1] / output_shape[1]};
-
-  const std::vector<int64_t> &kernel_shape{
-      input_shape[0] - (output_shape[0] - 1) * stride[0],
-      input_shape[1] - (output_shape[1] - 1) * stride[1]};
-  const std::vector<int64_t> &padding{0, 0, 0, 0};
-
-  if (kind == c10::aten::adaptive_avg_pool2d) {
-    return createAveragepool(graph, {node->input(0)}, kernel_shape, 0, 0,
-                             padding, stride);
+  std::vector<std::int64_t> stride(n_output_dims);
+  std::vector<std::int64_t> kernel_shape(n_output_dims);
+  for (std::size_t i = 0; i < n_output_dims; i++) {
+    std::int64_t in_dim = input_shape[input_offset + i];
+    std::int64_t out_dim = output_shape[i];
+    // This matches PyTorch's implementation as long as each input dim is
+    // divisible by the corresponding output dim. If this is not the case, the
+    // shape will be correct but the output will differ.
+    if (in_dim % out_dim != 0) {
+      std::stringstream ss;
+      ss << "Input dim " << i << " (" << in_dim
+         << ") is not divisible by the "
+            "corresponding output dim ("
+         << out_dim
+         << "). The results will differ "
+            "numerically from PyTorch's implementation.";
+      ERROR(ss.str());
+    }
+    stride[i] = in_dim / out_dim;
+    kernel_shape[i] = in_dim - (out_dim - 1) * stride[i];
   }
-  ERROR("Adaptive max pooling isn't currently supported.");
-  /* // TODO(T22978) Fix the number of inputs in PopParse so this can
-     return 2.
-     // Supported by Onnx.
 
-      return poptorch::createMaxpool(graph,
-     {node->input(0)}, 2, kernel_shape, padding, 0, stride);*/
+  std::vector<std::int64_t> padding(n_output_dims * 2, 0);
+  return createAveragepool(graph, {x}, kernel_shape, 0, 0, padding, stride);
 }
 
 } // namespace
@@ -115,8 +119,9 @@ static bool handlers = registerHandlers(
     c10::aten::avg_pool2d, poolingHandler,
     c10::aten::max_pool3d, poolingHandler,
     c10::aten::avg_pool3d, poolingHandler,
+    c10::aten::adaptive_avg_pool1d, adaptivePoolingHandler,
     c10::aten::adaptive_avg_pool2d, adaptivePoolingHandler,
-    c10::aten::adaptive_max_pool2d, adaptivePoolingHandler);
+    c10::aten::adaptive_avg_pool3d, adaptivePoolingHandler);
 // clang-format on
 
 } // namespace poptorch

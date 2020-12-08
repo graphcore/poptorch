@@ -204,7 +204,9 @@ so only the variants with ``return_indices=False`` are supported.
 * ``torch.nn.AvgPool1d``
 * ``torch.nn.AvgPool2d``
 * ``torch.nn.AvgPool3d``
+* ``torch.nn.AdaptiveAvgPool1d``
 * ``torch.nn.AdaptiveAvgPool2d``
+* ``torch.nn.AdaptiveAvgPool3d``
 
 Padding layers
 --------------

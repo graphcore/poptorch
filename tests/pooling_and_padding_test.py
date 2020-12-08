@@ -21,9 +21,12 @@ pool_operators = [
 pool_1D = [torch.nn.MaxPool1d, torch.nn.AvgPool1d]
 pool_2D = [torch.nn.MaxPool2d, torch.nn.AvgPool2d]
 pool_3D = [torch.nn.MaxPool3d, torch.nn.AvgPool3d]
-adaptive_pool_2D = [
-    torch.nn.AdaptiveAvgPool2d
-]  #, torch.nn.AdaptiveMaxPool2d] # Adaptive max pooling isn't supported due to returning 2 outputs, easy fix.
+adaptive_avg_pool = [
+    (torch.nn.AdaptiveAvgPool1d, 1),  # Op, N output dims
+    (torch.nn.AdaptiveAvgPool2d, 2),
+    (torch.nn.AdaptiveAvgPool3d, 3),
+]
+# torch.nn.AdaptiveMaxPool2d] # Adaptive max pooling isn't supported due to returning 2 outputs, easy fix.
 # TODO (T22978)
 
 
@@ -73,18 +76,27 @@ def test_pool2D(op):
         execute_and_check_wrapper(model, input)
 
 
-@pytest.mark.parametrize("op", adaptive_pool_2D)
-def test_adaptive_pool2D(op):
-
+@pytest.mark.parametrize("params", adaptive_avg_pool)
+def test_adaptive_avg_pool(params):
     torch.manual_seed(42)
+    # AdaptiveAvgPool1d: [10, 8, 4]       -> [10, 8, 2]
+    # AdaptiveAvgPool2d: [10, 8, 4, 6]    -> [10, 8, 2, 3]
+    # AdaptiveAvgPool3d: [10, 8, 4, 6, 8] -> [10, 8, 2, 3, 4]
+    # TODO(T31335): Match PyTorch's implementation so that we can test cases where
+    #               input dims are not divisible by corresponding output dims
 
-    input = torch.randn(20, 16, 50, 10)
+    op = params[0]
+    n_output_dims = params[1]
 
-    # Target size of (40, 5)
-    model = op((40, 5))
+    shape = [10, 8]
+    shape.extend([2 * i + 4 for i in range(n_output_dims)])
 
-    # Only check shape due to exact pytorch process being an implementaion detail.
-    execute_and_check_wrapper(model, input, check_shape_only=True)
+    input = torch.randn(shape)
+    output_size = [i + 2 for i in range(n_output_dims)]
+
+    model = op(output_size)
+
+    execute_and_check_wrapper(model, input)
 
 
 # Padding
