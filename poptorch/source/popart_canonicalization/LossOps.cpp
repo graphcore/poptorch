@@ -372,6 +372,10 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
   torch::jit::Value *x = node->input(0);
   // Target
   torch::jit::Value *y = node->input(1);
+
+  // Check if the input is half.
+  const bool is_half = getNodeScalarType(x) == at::ScalarType::Half;
+
   // Weight
   torch::jit::Value *w = node->input(2);
   // Weight of positive examples
@@ -384,7 +388,8 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
   // -x
   torch::jit::Node *loss = createNeg(graph, {x});
   // 0
-  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  torch::jit::Node *zeros = is_half ? createConstantFloat16(graph, {0}, {})
+                                    : createConstantFloat(graph, {0}, {});
   // m = min(-x, 0)
   torch::jit::Node *m = createMin(graph, {loss->output(), zeros->output()});
 
@@ -406,7 +411,8 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
   loss = createAdd(graph, {m->output(), loss->output()});
 
   // 1
-  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  torch::jit::Node *ones = is_half ? createConstantFloat16(graph, {1}, {})
+                                   : createConstantFloat(graph, {1}, {});
 
   // if pos_weight is specified
   if (!isNone(pos_w)) {
