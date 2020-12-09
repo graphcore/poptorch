@@ -43,10 +43,14 @@ class PoptorchPackager:
                 f.write("    file: %s\n" % self.pkg_info.html_filename())
                 f.write("    type: html_zip\n")
 
-    def create_package(self, include_documentation, output_dir):
-        _utils.rmdir_if_exists(output_dir)
+    def create_package(self,
+                       include_documentation,
+                       output_dir,
+                       keep_output_dir=False):
+        if not keep_output_dir:
+            _utils.rmdir_if_exists(output_dir)
 
-        os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=keep_output_dir)
 
         wheels = glob.glob("dist/*.whl")
         assert wheels, "Couldn't find any whl file in dist/"
@@ -71,6 +75,10 @@ if __name__ == "__main__":
     parser.add_argument("--include-documentation",
                         action="store_true",
                         help="Package the documentation too")
+    # TODO(T27444): Temporarily needed to avoid deleting PopART artifacts...
+    parser.add_argument("--keep-output-dir",
+                        action="store_true",
+                        help="Don't delete the output-dir if it exists")
     parser.add_argument("--output-dir",
                         type=str,
                         default="pkg",
@@ -101,4 +109,5 @@ if __name__ == "__main__":
         args.include_documentation = os.path.exists(
             packager.pkg_info.pdf_filename())
 
-    packager.create_package(args.include_documentation, args.output_dir)
+    packager.create_package(args.include_documentation, args.output_dir,
+                            args.keep_output_dir)

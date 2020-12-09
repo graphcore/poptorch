@@ -146,7 +146,7 @@ endif()
 set(PKG_UPLOAD_DIR ../../pkg)
 add_custom_target(package_and_move
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/package_poptorch.py --output-dir ${PKG_UPLOAD_DIR} ${PKG_EXTRA_FLAGS} --include-documentation-if-exists
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/package_poptorch.py --output-dir ${PKG_UPLOAD_DIR} ${PKG_EXTRA_FLAGS} --include-documentation-if-exists --keep-output-dir
   DEPENDS poptorch_wheel
 )
 
