@@ -753,6 +753,28 @@ class AsynchronousWorker:
             pass
 
 
+class _HostCommandHandler:
+    def __init__(self, pipe):
+        self.pipe = pipe
+        self.setup_complete = False
+        self.shutdown_now = False
+
+    def check_messages(self):
+        # Check for messages from the parent process:
+        if self.pipe.poll():
+            self.pipe.recv()  # remove the data
+            # First message is to indicate the setup is complete
+            # the second message is to request shutdown.
+            if self.setup_complete:
+                self.shutdown_now = True
+            self.setup_complete = True
+
+    def wait_until_setup_complete(self):
+        if self.setup_complete:
+            return
+        self.pipe.recv()
+
+
 class _AsynchronousWorkerProcess:
     """Worker process fetching elements from a given dataset"""
 
@@ -832,8 +854,6 @@ class _AsynchronousWorkerProcess:
                                       write_through=True)
         sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0),
                                       write_through=True)
-        shutdown_now = False
-        setup_complete = False
 
         logger.debug("AsynchronousDataAccessor worker process: %d",
                      os.getpid())
@@ -897,18 +917,13 @@ class _AsynchronousWorkerProcess:
 
         ring_write_index = 1
 
-        any_data_sent = True
+        host_handler = _HostCommandHandler(pipe)
 
-        while not shutdown_now:
+        while not host_handler.shutdown_now:
+            eof_reached = False
             # Check for messages from the parent process:
-            if pipe.poll():
-                pipe.recv()  # remove the data
-                # First message is to indicate the setup is complete
-                # the second message is to request shutdown.
-                if setup_complete:
-                    shutdown_now = True
-                    continue
-                setup_complete = True
+            host_handler.check_messages()
+
             # If we hit EOF sleep till re-awakened by host
             if eof_tensor[0] != -1:
                 time.sleep(self._miss_sleep_time_in_ms)
@@ -918,16 +933,33 @@ class _AsynchronousWorkerProcess:
 
                 # Only pull the next iteration if we sent data the last one,
                 # otherwise try send the old one again.
-                if any_data_sent:
-                    data = next(dataset_iterator)
-                    if isinstance(data, torch.Tensor):
-                        data = (data, )
+                data = next(dataset_iterator)
+                if isinstance(data, torch.Tensor):
+                    data = (data, )
             except StopIteration:
+                logger.debug("AsynchronousDataAccessor worker: end of dataset"
+                             " reached")
+                eof_reached = True
+
+            # Wait for a writing slot to become available
+            while ready_to_read_index[
+                    ring_write_index] and not host_handler.shutdown_now:
+                # (Briefly) sleep the thread if we don't have a slot.
+                time.sleep(self._miss_sleep_time_in_ms)
+                host_handler.check_messages()
+
+            if host_handler.shutdown_now:
+                break
+
+            # We've got a writing slot
+            if eof_reached:
+                # Tell the host where the EOF occured.
+                eof_tensor[0] = ring_write_index
                 # If we are not to load indefinitely we just kill the worker.
                 if not self._load_indefinitely:
                     logger.debug(
                         "AsynchronousDataAccessor worker: end of dataset"
-                        " reached")
+                        " reached signaled ot host: exiting")
                     break
 
                 logger.debug(
@@ -936,15 +968,9 @@ class _AsynchronousWorkerProcess:
                 # We always reset and will keep the worker thread running.
                 dataset_iterator = iter(self._dataset)
 
-                # Tell the host where the EOF occured.
-                eof_tensor[0] = ring_write_index
                 logger.debug(
                     "AsynchronousDataAccessor worker: new iterator ready")
-                continue
-
-            any_data_sent = False
-
-            if not ready_to_read_index[ring_write_index]:
+            else:
                 # Copy the tensor into the preallocated shared memory.
                 for index, tensor in enumerate(data):
                     data_buffers[index][ring_write_index].copy_(tensor)
@@ -952,24 +978,16 @@ class _AsynchronousWorkerProcess:
                 # Tell the host this data is ready.
                 ready_to_read_index[ring_write_index] = True
 
-                # Quit the loop
-                any_data_sent = True
-
                 ring_write_index += 1
 
                 # Ring back around.
                 if ring_write_index >= self._buffer_size:
                     ring_write_index = 0
 
-            # (Briefly) sleep the thread if we didn't fetch any data.
-            if not any_data_sent:
-                time.sleep(self._miss_sleep_time_in_ms)
-
         logger.debug(
             "AsynchronousDataAccessor worker: ready to exit: checking parent"
             " is ready")
         # In the unlikely event the worker is done reading the dataset
         # before the parent is done setting the buffers up: wait here.
-        if not setup_complete:
-            pipe.recv()
+        host_handler.wait_until_setup_complete()
         logger.debug("AsynchronousDataAccessor worker: clean exit")

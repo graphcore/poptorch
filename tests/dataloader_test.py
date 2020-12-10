@@ -463,18 +463,17 @@ def test_reuse_workers(DatasetType):
     loader = poptorch.AsynchronousDataAccessor(data)
     loader_no_reuse = poptorch.AsynchronousDataAccessor(data_no_reuse)
 
-    start = None
-    # Workers will be created while fetching the first element
-    # so start the timer after the first element is fetched.
+    # Workers are created when the AsynchronousDataAccessor is instantiated
+    # So the first iteration should be fast
     num_tensors = 0
+    start = time.perf_counter()
     for _ in loader_no_reuse:
         num_tensors += 1
-        if start is None:
-            start = time.perf_counter()
-
     end = time.perf_counter()
     print(f"First epoch no reuse: {end - start} {num_tensors}")
 
+    # subsequent iterations will join and create new workers
+    # when a new iterator is created.
     for _ in range(3):
         start = time.perf_counter()
         for _ in loader_no_reuse:
@@ -482,14 +481,10 @@ def test_reuse_workers(DatasetType):
         end = time.perf_counter()
         print(f"Other epoch no reuse: {end - start}  {num_tensors}")
 
-    start = None
-    # Workers will be created while fetching the first element
-    # so start the timer after the first element is fetched.
+    start = time.perf_counter()
     num_tensors_reuse = 0
     for _ in loader:
         num_tensors_reuse += 1
-        if start is None:
-            start = time.perf_counter()
     end = time.perf_counter()
     print(f"First epoch: {end - start} {num_tensors_reuse}")
 
@@ -499,3 +494,5 @@ def test_reuse_workers(DatasetType):
             num_tensors_reuse += 1
         end = time.perf_counter()
         print(f"Other epoch: {end - start} {num_tensors_reuse}")
+
+    assert num_tensors_reuse == num_tensors
