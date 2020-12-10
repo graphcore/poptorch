@@ -7,12 +7,14 @@ if not poptorch.ipuHardwareIsAvailable():
     os.environ["POPTORCH_IPU_MODEL"] = "1"
 
 # pylint: disable=reimported
+# pylint: disable=ungrouped-imports
+# pylint: disable=wrong-import-order
 # pylint: disable=wrong-import-position
 
 # inference_model_start
-import poptorch
 import torch
 import torchvision
+import poptorch
 
 # Some dummy imagenet sized input.
 picture_of_a_cat_here = torch.randn([1, 3, 224, 224])

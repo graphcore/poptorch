@@ -1,7 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import poptorch
 import torch
+import poptorch
 
 
 # print_tensor_start

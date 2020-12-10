@@ -1,7 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 # pragma pylint: disable=function-redefined
-import poptorch
 import torch
+import poptorch
 
 
 # Cases in which casting resolves to the correct type

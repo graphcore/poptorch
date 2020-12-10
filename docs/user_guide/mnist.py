@@ -2,12 +2,12 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import argparse
 import sys
-from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import poptorch
+from tqdm import tqdm
 
 
 def get_mnist_data(opts):
