@@ -4,7 +4,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
-#include <sstream>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/inliner.h>
@@ -15,7 +14,7 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/script.h>
 
-#include <iostream>
+#include <sstream>
 #include <unordered_map>
 
 #include "popart_compiler/Compiler.hpp"
