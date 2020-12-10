@@ -1772,7 +1772,6 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         _impl->op_builder->getModelProto(), data_flow, device, {}, options,
         popart::PatternsLevel::Default);
   } else {
-
     // Create the optimizer from user provided parameters.
     std::unique_ptr<popart::Optimizer> optimizer =
         _impl->getOptimizer(optimizers);

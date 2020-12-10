@@ -41,7 +41,6 @@ public:
   static void run(torch::jit::Graph *graph);
 };
 
-
 /*
  * ConvertAtenToPopart implementation.
  */
