@@ -140,7 +140,6 @@ OP_DECL(popart, reduceprod, reduceprod, AiOnnxOpset10.reduceprod, ARG(INT_VEC,ax
 OP_DECL(popart, reducesum, reducesum, AiOnnxOpset10.reducesum, ARG(INT_VEC,axes) ARG(INT,keepdims) , BODY_ARG(axes) BODY_ARG(keepdims) )
 OP_DECL(popart, reducesumsquare, reducesumsquare, AiOnnxOpset10.reducesumsquare, ARG(INT_VEC,axes) ARG(INT,keepdims) , BODY_ARG(axes) BODY_ARG(keepdims) )
 OP_DECL(popart, relu, relu, AiOnnxOpset10.relu, NONE, NONE)
-OP_DECL(popart, reshape, reshape, AiOnnxOpset10.reshape, NONE, NONE)
 OP_DECL(popart, selu, selu, AiOnnxOpset10.selu, ARG(FLOAT,alpha) ARG(FLOAT,gamma) , BODY_ARG(alpha) BODY_ARG(gamma) )
 OP_DECL(popart, shape, shape, AiOnnxOpset10.shape, NONE, NONE)
 OP_DECL(popart, sigmoid, sigmoid, AiOnnxOpset10.sigmoid, NONE, NONE)

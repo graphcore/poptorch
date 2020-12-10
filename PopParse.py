@@ -7,6 +7,7 @@ from ctypes.util import find_library
 import logging
 import os
 import re
+import sys
 
 import clang.cindex
 
@@ -403,30 +404,55 @@ def toType(cxxType):
     return "UNKNOWN"
 
 
+CXX_TYPE_CONV_TABLE = {
+    "nonstd::optional<int>": "std::int32_t",
+    "nonstd::optional<int64_t>": "std::int32_t",
+    "popart::ReductionType": "std::int32_t",
+    "nonstd::optional<float>": "float",
+    "nonstd::optional<std::vector<int64_t>>": "std::vector<int64_t>",
+    "Attributes::Ints": "std::vector<int64_t>",
+    "Attributes::Int": "std::int32_t"
+}
+
+CXX_NON_CONV_TYPES = [
+    "bool", "float", "int64_t", "std::string", "std::vector<int64_t>",
+    "unsigned int"
+]
+
+
 # Convert from the popart header types into normal C++ types that can be used by pytorch.
-def convertCxxConvert(cxxType):
+def convertCxxConvert(cxxType_orig):
+    cxxType = cxxType_orig.replace("&", "")
+    cxxType = cxxType.replace("const ", "const[preserved_space]")
+    cxxType = cxxType.replace("unsigned const", "const unsigned")
 
-    if "nonstd::optional<int>" in cxxType or \
-            "nonstd::optional<int64_t>" in cxxType:
-        return "std::int32_t"
+    # Remove any whitespace but keep "const" and "unsigned" safe
+    cxxType = cxxType.replace("const ", "const[preserved_space]")
+    cxxType = cxxType.replace("unsigned ", "unsigned[preserved_space]")
+    cxxType = "".join(cxxType.split())
+    cxxType = cxxType.replace("[preserved_space]", " ")
 
-    if "popart::ReductionType" in cxxType:
-        return "std::int32_t"
-
-    if "nonstd::optional<float>" in cxxType:
-        return "float"
-
-    if "nonstd::optional<std::vector<int64_t" in cxxType:
-        return "std::vector<int64_t>"
-
-    if "Attributes::Ints" in cxxType:
-        return "std::vector<int64_t>"
-
-    if "Attributes::Int" in cxxType:
-        return "std::int32_t"
+    if cxxType in CXX_TYPE_CONV_TABLE:
+        return CXX_TYPE_CONV_TABLE[cxxType]
 
     # Most types won't need processing
-    return cxxType
+    if cxxType in CXX_NON_CONV_TYPES:
+        return cxxType_orig
+
+    # Handle const
+    if cxxType.startswith("const "):
+        non_const_type = cxxType[len("const "):]
+
+        if non_const_type in CXX_TYPE_CONV_TABLE:
+            # const is dropped for legacy
+            return CXX_TYPE_CONV_TABLE[non_const_type]
+
+        if non_const_type in CXX_NON_CONV_TYPES:
+            return cxxType_orig
+
+    # Error on unknown types
+    print(f"Unknown type: {cxxType}")
+    sys.exit(1)
 
 
 def attrTypeGetter(ty):

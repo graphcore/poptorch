@@ -134,7 +134,6 @@ torch::jit::Node* createReduceprod(torch::jit::Graph *graph,  const std::vector<
 torch::jit::Node* createReducesum(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,int64_t keepdims);
 torch::jit::Node* createReducesumsquare(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,int64_t keepdims);
 torch::jit::Node* createRelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createReshape(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float alpha,float gamma);
 torch::jit::Node* createShape(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSigmoid(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

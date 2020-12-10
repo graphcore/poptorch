@@ -694,10 +694,6 @@ torch::jit::Node* createRelu(torch::jit::Graph *graph,  const std::vector<torch:
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::relu, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
-torch::jit::Node* createReshape(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::reshape, args, ImplicitCast::None, OutputType::AsFirstInput);
-return new_node;
-}
 torch::jit::Node* createSelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float alpha,float gamma) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::selu, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->f_(c10::Symbol::fromQualString("attr::alpha"),alpha);
