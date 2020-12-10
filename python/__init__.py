@@ -1,16 +1,18 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import atexit
-
 import torch
-import torch.nn as nn
-from . import _logging
 
+# These are needed before the assert
+# pylint: disable=wrong-import-order
+from . import _logging
 from ._logging import logger
+# pylint: enable=wrong-import-order
 
 assert torch.__version__.startswith("@TORCH_VERSION@"), (
     "This version"
     " of PopTorch only works with torch==@TORCH_VERSION@ but the version "
     f"installed is {torch.__version__}")
+
 import poptorch.poptorch_core as poptorch_core
 
 from . import _impl
@@ -138,11 +140,13 @@ class DataLoader(torch.utils.data.DataLoader):
             assert drop_last or self._combined_batch_size is None or \
                 num_elts % (self._combined_batch_size *
                             options.Distributed.numProcesses) == 0, (
-                f"The number of elements in the dataset ({num_elts}) is not "
-                "divisible by the number of elements processed per step "
-                f'''({self._combined_batch_size *
-                        options.Distributed.numProcesses})'''
-                " and drop_last=False. Switch to drop_last=True.")
+                                f"The number of elements in the dataset "
+                                "({num_elts}) is not divisible by the number of"
+                                " elements processed per step "
+                                f'''({self._combined_batch_size *
+                                options.Distributed.numProcesses})'''
+                                " and drop_last=False. Switch to "
+                                "drop_last=True.")
 
             if options.Distributed.numProcesses > 1:
                 assert not shuffle or options.exists("random_seed"), (
