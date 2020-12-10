@@ -18,8 +18,8 @@ foreach(EXAMPLE ${EXAMPLES})
 endforeach()
 
 if(BUILD_DOCS)
-  find_package(popart REQUIRED)
   find_package(poplar REQUIRED)
+  find_package(popart REQUIRED COMPONENTS popart-only)
 
   get_target_property(POPLAR_LIB poplar LOCATION)
   get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)
