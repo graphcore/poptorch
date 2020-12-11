@@ -398,8 +398,8 @@ def test_repeat(input_shapes, dims):
 
     if len(dims) < len(input_shapes):
         pytest.skip(
-            "Number of dimensions of repeat dims can not be smaller than number of dimensions of tensor."
-        )
+            "Number of dimensions of repeat dims can not be smaller than number"
+            " of dimensions of tensor.")
 
     torch.manual_seed(42)
 

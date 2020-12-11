@@ -260,6 +260,29 @@ def test_weights_sharing_ipu_cpu():
     assert torch.allclose(nativeOut, target, rtol=1e-02, atol=1e-02)
 
 
+def train_N_times_and_run(N, inference_model, training_model, input, target):
+    # Train on IPU.
+    for _ in range(0, N):
+        out, _ = training_model(input, target)
+
+    assert training_model.deviceToHostCounter == 0, \
+            "No implicit copy needed to train the model"
+
+    # Run without copying the weights and check they've been automatically updated.
+    out_inference = inference_model(input)
+    assert torch.allclose(out_inference, out)
+    assert training_model.deviceToHostCounter == 1, \
+            "1 implicit copy after having trained the model"
+    training_model.deviceToHostCounter = 0  # reset counter
+
+    out_inference = inference_model(input)
+    assert torch.allclose(out_inference, out)
+    assert training_model.deviceToHostCounter == 0, \
+            "No implicit copy needed after inference"
+
+    return out_inference
+
+
 def test_weights_sharing_ipus():
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
@@ -288,45 +311,10 @@ def test_weights_sharing_ipus():
     original, _ = training_model(input, target)
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
-    # Train on IPU.
-    for _ in range(0, 1000):
-        out, _ = training_model(input, target)
+    train_N_times_and_run(1000, inference_model, training_model, input, target)
+    out_inference = train_N_times_and_run(1500, inference_model,
+                                          training_model, input, target)
 
-    assert training_model.deviceToHostCounter == 0, \
-            "No implicit copy needed to train the model"
-
-    # Run without copying the weights and check they've been automatically updated.
-    out_inference = inference_model(input)
-    assert torch.allclose(out_inference, out)
-    assert training_model.deviceToHostCounter == 1, \
-            "1 implicit copy after having trained the model"
-    training_model.deviceToHostCounter = 0  # reset counter
-
-    out_inference = inference_model(input)
-    assert torch.allclose(out_inference, out)
-    assert training_model.deviceToHostCounter == 0, \
-            "No implicit copy needed after inference"
-
-    # Train on IPU.
-    for _ in range(0, 1500):
-        out, _ = training_model(input, target)
-
-    assert training_model.deviceToHostCounter == 0, \
-            "No implicit copy needed to train the model"
-
-    # Run without copying the weights and check they've been automatically updated.
-    out_inference = inference_model(input)
-    assert torch.allclose(out_inference, out)
-    assert training_model.deviceToHostCounter == 1, \
-            "1 implicit copy after having trained the model"
-    training_model.deviceToHostCounter = 0  # reset counter
-
-    out_inference = inference_model(input)
-    assert torch.allclose(out_inference, out)
-    assert training_model.deviceToHostCounter == 0, \
-            "No implicit copy needed after inference"
-
-    # Check we have trained the "model"
     assert torch.allclose(out_inference, target, rtol=1e-02, atol=1e-02)
 
 
