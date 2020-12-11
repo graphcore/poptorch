@@ -696,11 +696,11 @@ class AsynchronousWorker:
         self._previously_ready_element = None
         self._ring_read_index = 0
         self._buffer_size = buffer_size
+        self._was_used = False
 
         # Keep end of file events in a special buffer shared between worker and device. This is due to the worker reseting automatically.
-        (self._shutdown_pipe, self._ready_to_read_index,
-         self._is_single_tensor, self._eof_event_tensor,
-         self._data_buffers) = self._process.start()
+        (self._command_pipe, self._ready_to_read_index, self._is_single_tensor,
+         self._eof_event_tensor, self._data_buffers) = self._process.start()
 
     def terminate(self):
         if self._process.isAlive():
@@ -709,7 +709,19 @@ class AsynchronousWorker:
         self._process.join()
 
     def resetIterator(self):
+        if self._was_used and not self.endOfFile():
+            # Request reset:
+            self._command_pipe.send(_HostCommand.ResetIterator)
+
+            # Flush the ring buffer
+            while not self.endOfFile():
+                self.releaseElement()
+                self.acquireElementIfAvailable()
+            self.releaseElement()
+
+        # Let worker know it can start reading again
         self._eof_event_tensor[0] = -1
+        self._was_used = False
 
     def dataIsAvailable(self):
         return self._ready_to_read_index[self._ring_read_index]
@@ -724,6 +736,7 @@ class AsynchronousWorker:
             "acquire a new one")
         if not self.dataIsAvailable():
             return None
+        self._was_used = True
         # Pull the ready buffer.
         data = [buffer[self._ring_read_index] for buffer in self._data_buffers]
 
@@ -756,31 +769,51 @@ class AsynchronousWorker:
     def _requestShutdown(self):
         # Send the exit signal if the worker is still alive.
         try:
-            self._shutdown_pipe.send(0)
+            self._command_pipe.send(_HostCommand.Shutdown)
         except BrokenPipeError:
             pass
 
 
+class _HostCommand(enum.IntEnum):
+    SetupComplete = 0
+    Shutdown = 1
+    ResetIterator = 2
+
+
 class _HostCommandHandler:
-    def __init__(self, pipe):
-        self.pipe = pipe
+    def __init__(self, command_pipe):
+        self.pipe = command_pipe
         self.setup_complete = False
         self.shutdown_now = False
+        self.reset_iterator = False
 
     def check_messages(self):
         # Check for messages from the parent process:
         if self.pipe.poll():
-            self.pipe.recv()  # remove the data
-            # First message is to indicate the setup is complete
-            # the second message is to request shutdown.
-            if self.setup_complete:
+            cmd = self.pipe.recv()  # remove the data
+            assert isinstance(cmd, _HostCommand)
+            if cmd == _HostCommand.SetupComplete:
+                logger.debug("SetupComplete command received")
+                self.setup_complete = True
+            elif cmd == _HostCommand.Shutdown:
+                logger.debug("Shutdown command received")
                 self.shutdown_now = True
-            self.setup_complete = True
+            elif cmd == _HostCommand.ResetIterator:
+                logger.debug("ResetIterator command received")
+                self.reset_iterator = True
+            else:
+                raise RuntimeError(f"Unknown command received {cmd}")
 
     def wait_until_setup_complete(self):
         if self.setup_complete:
             return
-        self.pipe.recv()
+        # Blocking wait
+        cmd = self.pipe.recv()
+        assert isinstance(cmd,
+                          _HostCommand) and cmd == _HostCommand.SetupComplete
+
+    def mark_iterator_as_reset(self):
+        self.reset_iterator = False
 
 
 class _AsynchronousWorkerProcess:
@@ -819,18 +852,16 @@ class _AsynchronousWorkerProcess:
         # If the worker exits before the parent process is done
         # setting up the _data_buffers then the pipe will get freed
         # and bad things will happen.
-        read_setup_complete_pipe, write_setup_complete_pipe = ctx.Pipe(
-            duplex=False)
+        read_command_pipe, write_command_pipe = ctx.Pipe(duplex=False)
 
         # Fetch the data on a seperate process.
         logger.debug("AsynchronousDataAccessor parent process: %d",
                      os.getpid())
         self._process = ctx.Process(target=self._main_loop,
-                                    args=(write_data_pipe,
-                                          read_setup_complete_pipe))
+                                    args=(write_data_pipe, read_command_pipe))
         self._process.start()
         write_data_pipe.close()
-        read_setup_complete_pipe.close()
+        read_command_pipe.close()
 
         try:
             ready_to_read_index = read_data_pipe.recv()
@@ -845,10 +876,10 @@ class _AsynchronousWorkerProcess:
                 data_buffers.append(buffer)
 
             # We're all set: let the worker know.
-            write_setup_complete_pipe.send(0)
+            write_command_pipe.send(_HostCommand.SetupComplete)
             # We reuse the read_setup_complete_pipe pipe as a shutdown pipe
-            return (write_setup_complete_pipe, ready_to_read_index,
-                    is_single_tensor, eof_event_tensor, data_buffers)
+            return (write_command_pipe, ready_to_read_index, is_single_tensor,
+                    eof_event_tensor, data_buffers)
         except EOFError:
             pass
         # Exit the except block before raising a cleaner exception otherwise the previous one will not be cleared.
@@ -856,13 +887,15 @@ class _AsynchronousWorkerProcess:
             "AsynchronousDataAccessor worker thread failed to start "
             "(Check above for details)")
 
-    def _main_loop(self, conn, pipe):  # pylint: disable=too-many-statements
+    def _main_loop(self, conn, command_pipe):  # pylint: disable=too-many-statements
         # Make sure this process's output gets printed (In case of error)
         sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0),
                                       write_through=True)
         sys.stderr = io.TextIOWrapper(open(sys.stderr.fileno(), 'wb', 0),
                                       write_through=True)
 
+        # We're in a new process: we need to re-initialise the logger
+        from ._logging import logger  # pylint: disable=import-outside-toplevel
         logger.debug("AsynchronousDataAccessor worker process: %d",
                      os.getpid())
         dataset_iterator = iter(self._dataset)
@@ -925,7 +958,7 @@ class _AsynchronousWorkerProcess:
 
         ring_write_index = 1
 
-        host_handler = _HostCommandHandler(pipe)
+        host_handler = _HostCommandHandler(command_pipe)
 
         while not host_handler.shutdown_now:
             eof_reached = False
@@ -960,7 +993,15 @@ class _AsynchronousWorkerProcess:
                 break
 
             # We've got a writing slot
-            if eof_reached:
+            if host_handler.reset_iterator:
+                # Tell the host where the last tensor is.
+                eof_tensor[0] = ring_write_index
+                dataset_iterator = iter(self._dataset)
+
+                logger.debug("AsynchronousDataAccessor worker: the iterator "
+                             "has been reset")
+                host_handler.reset_iterator = False
+            elif eof_reached:
                 # Tell the host where the EOF occured.
                 eof_tensor[0] = ring_write_index
                 # If we are not to load indefinitely we just kill the worker.

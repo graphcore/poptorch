@@ -363,6 +363,36 @@ def test_iterable_dataloader():
         continue
 
 
+def test_iterable_dataloader_reset():
+    shape = [2, 3]
+    num_tensors = 10
+
+    opts = poptorch.Options()
+    # FIXME(T30952): Once done, it should also work with persistent_workers=True
+    data = poptorch.DataLoader(opts,
+                               IncrementDataset(shape, num_tensors),
+                               persistent_workers=False,
+                               batch_size=1,
+                               num_workers=1)
+
+    loader = poptorch.AsynchronousDataAccessor(data)
+
+    # Interrupt the first iteration
+    for i, t in enumerate(loader):
+        assert t.shape == torch.Size([1, 2, 3])
+        assert t[0][0][0] == i
+        if i == 4:
+            print(f"Last tensor first iteration {t}")
+            break
+        continue
+
+    print("Second iterator")
+    # Make sure the second iteration returns all the tensors
+    for i, t in enumerate(loader):
+        assert t[0][0][0] == i
+    assert i == (num_tensors - 1)
+
+
 def test_batch_size_None():
     shape = [2, 3]
     num_tensors = 10
