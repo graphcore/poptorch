@@ -58,8 +58,8 @@ class PoptorchPackager:
         src_wheel = wheels[0]
         # Add the snapshot and package_os_type to the wheel name
         dst_wheel = os.path.basename(src_wheel).replace(
-            f"-{self.pkg_info.version}-",
-            f"-{self.pkg_info.version}+{self.pkg_info.snapshot}+"
+            f"-{self.pkg_info.version_long}-",
+            f"-{self.pkg_info.version_long}+{self.pkg_info.snapshot}+"
             f"{self.pkg_info.os_type}-")
         shutil.copy(src_wheel, os.path.join(output_dir, dst_wheel))
 
