@@ -522,65 +522,9 @@ class PoplarExecutor:
 
             # Compile the poplar executable based on the batchsize.
             if self._options.Jit.trace_model:
-                logger.info('Compiling the model using tracing')
-
-                convertedLayers = []
-
-                for name, layer in self._model.named_modules():
-                    anyIsHalf = False
-                    for param in layer.parameters():
-                        if param.dtype == torch.half:
-                            anyIsHalf = True
-                            break
-
-                    if anyIsHalf:
-                        layer.float()
-
-                        convertedLayers.append(name)
-
-                # We will trace using the normal trace view.
-                self._options._execution_strategy.onStartTracing()
-                self._trace = torch.jit.trace(self._model,
-                                              in_tensors_trace_view.asTuple())
-                self._options._execution_strategy.onEndTracing()
-
-                # Save the inputs of the traced graph printout as it will be
-                # different after getting originals back.
-                # NB empty if log level is not TRACE.
-                if hasConvertedAnyHalf[0]:
-                    trace_input_string = poptorch_core.getTraceInputStr(
-                        self._trace._c).strip()
-                else:
-                    trace_input_string = ""
-
-                # Convert any converted params back to half.
-                for name, layer in self._trace.named_modules():
-                    if name in convertedLayers:
-                        layer.half()
-
-                parameters = {
-                    **dict(self._trace.named_parameters()),
-                    **dict(self._trace.named_buffers())
-                }
-                if hasConvertedAnyHalf[0]:
-                    # Get the originals back.
-                    in_tensors_as_half = self._args_parser(args, kwargs)
-                    in_tensors_as_half.forEach(narrowTensor)
-
-                    # Compile using the actual halves.
-                    self._executable = poptorch_core.compileWithTrace(
-                        self._trace._c, tuple(parameters.keys()),
-                        tuple(parameters.values()),
-                        in_tensors_as_half.asTuple(), trace_input_string,
-                        self._options.toDict(), self._training,
-                        self._optimizer)
-                else:
-                    self._executable = poptorch_core.compileWithTrace(
-                        self._trace._c, tuple(parameters.keys()),
-                        tuple(parameters.values()),
-                        in_tensors_trace_view.asTuple(), trace_input_string,
-                        self._options.toDict(), self._training,
-                        self._optimizer)
+                self._compile_using_tracing(args, kwargs,
+                                            in_tensors_trace_view,
+                                            hasConvertedAnyHalf, narrowTensor)
             else:
                 logger.info('Compiling the model using scripting')
                 self._trace = torch.jit.script(self._model)
@@ -675,6 +619,66 @@ class PoplarExecutor:
             self.copyWeightsToHostIfNeeded()
         del self._executable
         self._executable = None
+
+    def _compile_using_tracing(self, args, kwargs, in_tensors_trace_view,
+                               hasConvertedAnyHalf, narrowTensor):
+        logger.info('Compiling the model using tracing')
+
+        convertedLayers = []
+
+        for name, layer in self._model.named_modules():
+            anyIsHalf = False
+            for param in layer.parameters():
+                if param.dtype == torch.half:
+                    anyIsHalf = True
+                    break
+
+            if anyIsHalf:
+                layer.float()
+
+                convertedLayers.append(name)
+
+        # We will trace using the normal trace view.
+        self._options._execution_strategy.onStartTracing()
+        self._trace = torch.jit.trace(self._model,
+                                      in_tensors_trace_view.asTuple())
+        self._options._execution_strategy.onEndTracing()
+
+        # Save the inputs of the traced graph printout as it will be
+        # different after getting originals back.
+        # NB empty if log level is not TRACE.
+        if hasConvertedAnyHalf[0]:
+            trace_input_string = poptorch_core.getTraceInputStr(
+                self._trace._c).strip()
+        else:
+            trace_input_string = ""
+
+        # Convert any converted params back to half.
+        for name, layer in self._trace.named_modules():
+            if name in convertedLayers:
+                layer.half()
+
+        parameters = {
+            **dict(self._trace.named_parameters()),
+            **dict(self._trace.named_buffers())
+        }
+        if hasConvertedAnyHalf[0]:
+            # Get the originals back.
+            in_tensors_as_half = self._args_parser(args, kwargs)
+            in_tensors_as_half.forEach(narrowTensor)
+
+            # Compile using the actual halves.
+            self._executable = poptorch_core.compileWithTrace(
+                self._trace._c, tuple(parameters.keys()),
+                tuple(parameters.values()),
+                in_tensors_as_half.asTuple(), trace_input_string,
+                self._options.toDict(), self._training, self._optimizer)
+        else:
+            self._executable = poptorch_core.compileWithTrace(
+                self._trace._c, tuple(parameters.keys()),
+                tuple(parameters.values()),
+                in_tensors_trace_view.asTuple(), trace_input_string,
+                self._options.toDict(), self._training, self._optimizer)
 
 
 class AsynchronousWorker:
