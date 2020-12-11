@@ -1,9 +1,9 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import sys
+import distutils.util
 from setuptools import setup
 from setuptools.dist import Distribution
 from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
-import sys
-import distutils.util
 import scripts.utils._utils as utils
 
 VERSION = utils.JenkinsPkgInfo().version_long
