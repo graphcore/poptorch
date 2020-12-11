@@ -538,6 +538,8 @@ class PoplarExecutor:
                     **dict(self._trace.named_parameters()),
                     **dict(self._trace.named_buffers())
                 }
+
+                # pylint: disable=protected-access
                 self._executable = poptorch_core.compileWithScript(
                     self._trace._c, self._trace.graph,
                     tuple(parameters.keys()), tuple(parameters.values()),
@@ -639,6 +641,7 @@ class PoplarExecutor:
                 convertedLayers.append(name)
 
         # We will trace using the normal trace view.
+        # pylint: disable=protected-access
         self._options._execution_strategy.onStartTracing()
         self._trace = torch.jit.trace(self._model,
                                       in_tensors_trace_view.asTuple())
@@ -648,6 +651,7 @@ class PoplarExecutor:
         # different after getting originals back.
         # NB empty if log level is not TRACE.
         if hasConvertedAnyHalf[0]:
+            # pylint: disable=protected-access
             trace_input_string = poptorch_core.getTraceInputStr(
                 self._trace._c).strip()
         else:
