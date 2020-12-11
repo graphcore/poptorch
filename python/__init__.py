@@ -257,7 +257,8 @@ class AsynchronousDataAccessor:
                  dataset,
                  buffer_size=3,
                  miss_sleep_time_in_ms=0.1,
-                 load_indefinitely=True):
+                 load_indefinitely=True,
+                 early_preload=False):
         """
         :param dataset: The dataset to pull data from, this can be any Python
             iterable.
@@ -266,6 +267,9 @@ class AsynchronousDataAccessor:
             we sleep the worker before checking again.
         :param load_indefinitely: If True when we hit the end of the dataset
             we will just loop round again.
+        :param early_preload: If True, start loading data in the ring buffer
+            as soon as the worker is created.
+            If False, wait for an iterator to be created before loading data.
         """
 
         # To avoid hangs when the application exits: implicitly call terminate().
@@ -276,7 +280,8 @@ class AsynchronousDataAccessor:
         self._worker = None
         self._worker = _impl.AsynchronousWorker(buffer_size,
                                                 miss_sleep_time_in_ms, dataset,
-                                                load_indefinitely)
+                                                load_indefinitely,
+                                                early_preload)
 
     def terminate(self):
         """

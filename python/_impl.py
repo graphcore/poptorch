@@ -689,10 +689,11 @@ class AsynchronousWorker:
     """Interface for the host to create and manage a separate worker process to fetch elements from a dataset."""
 
     def __init__(self, buffer_size, miss_sleep_time_in_ms, dataset,
-                 load_indefinitely):
+                 load_indefinitely, early_preload):
         self._process = _AsynchronousWorkerProcess(buffer_size,
                                                    miss_sleep_time_in_ms,
-                                                   dataset, load_indefinitely)
+                                                   dataset, load_indefinitely,
+                                                   early_preload)
         self._previously_ready_element = None
         self._ring_read_index = 0
         self._buffer_size = buffer_size
@@ -812,19 +813,17 @@ class _HostCommandHandler:
         assert isinstance(cmd,
                           _HostCommand) and cmd == _HostCommand.SetupComplete
 
-    def mark_iterator_as_reset(self):
-        self.reset_iterator = False
-
 
 class _AsynchronousWorkerProcess:
     """Worker process fetching elements from a given dataset"""
 
     def __init__(self, buffer_size, miss_sleep_time_in_ms, dataset,
-                 load_indefinitely):
+                 load_indefinitely, early_preload):
         self._buffer_size = buffer_size
         self._miss_sleep_time_in_ms = miss_sleep_time_in_ms
         self._dataset = dataset
         self._load_indefinitely = load_indefinitely
+        self._early_preload = early_preload
         self._process = None
 
     def isAlive(self):
@@ -929,10 +928,17 @@ class _AsynchronousWorkerProcess:
         conn.send(data_length)
         conn.send(is_single_tensor)
 
-        # Share a small buffer with host to signal EOF and where in ring buffer the event occured.
-        # -1 means no event and the worker will keep loading. We start with a dummy event so the
-        # EOF won't be hit before the first call to __init__
-        eof_tensor = torch.tensor([42], dtype=torch.int).share_memory_()
+        # Share a small buffer with host to signal EOF and where in ring
+        # buffer the event occured.
+        # -1 means no event and the worker will keep loading until EOF is
+        # reached or the buffer is full.
+        #
+        # Any other value: wait for an iterator to be created to start
+        # loading more data.
+        if self._early_preload:
+            eof_tensor = torch.tensor([-1], dtype=torch.int).share_memory_()
+        else:
+            eof_tensor = torch.tensor([-2], dtype=torch.int).share_memory_()
         conn.send(eof_tensor)
 
         # Send the tensors to the host.

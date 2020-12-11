@@ -393,6 +393,29 @@ def test_iterable_dataloader_reset():
     assert i == (num_tensors - 1)
 
 
+def test_early_preload():
+    shape = [2, 3]
+    num_tensors = 10
+    num_buffers = 5
+
+    opts = poptorch.Options()
+    data = poptorch.DataLoader(opts,
+                               IncrementDataset(shape, num_tensors),
+                               batch_size=1,
+                               num_workers=1)
+
+    preload = poptorch.AsynchronousDataAccessor(data,
+                                                early_preload=True,
+                                                buffer_size=num_buffers)
+    no_preload = poptorch.AsynchronousDataAccessor(data,
+                                                   early_preload=False,
+                                                   buffer_size=num_buffers)
+    time.sleep(2)  # Give time for the worker to fill the buffer
+
+    assert sum(no_preload._worker._ready_to_read_index) == 1  # pylint: disable=protected-access
+    assert sum(preload._worker._ready_to_read_index) == num_buffers  # pylint: disable=protected-access
+
+
 def test_batch_size_None():
     shape = [2, 3]
     num_tensors = 10
