@@ -152,28 +152,8 @@ def test_access_parameters(use_half):
     assert torch.equal(torch.argmax(out.int(), dim=1), label)
 
 
-def test_weights_sharing_ipu_cpu():
-    torch.manual_seed(42)
-    model = torch.nn.Linear(10, 10)
-
-    training_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss())
-    training_model.deviceToHostCounter = 0
-    realMethod = training_model.copyWeightsToHost
-
-    original_parameters = str(list(model.parameters()))
-
-    def deviceToHostWrapper(model):
-        model.deviceToHostCounter += 1
-        realMethod()
-
-    training_model.copyWeightsToHost = types.MethodType(
-        deviceToHostWrapper, training_model)
-
-    # Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
-    target = torch.randn(10)
-    input = torch.randn(10)
-
+def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
+                                           target, original_parameters):
     # Make sure the first run doesn't already pass the test.
     original, _ = training_model(input, target)
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
@@ -207,6 +187,32 @@ def test_weights_sharing_ipu_cpu():
     assert last_parameters == current_parameters
     assert training_model.deviceToHostCounter == 0, \
             "No implicit copy needed to access the parameters after inference"
+
+
+def test_weights_sharing_ipu_cpu():
+    torch.manual_seed(42)
+    model = torch.nn.Linear(10, 10)
+
+    training_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss())
+    training_model.deviceToHostCounter = 0
+    realMethod = training_model.copyWeightsToHost
+
+    original_parameters = str(list(model.parameters()))
+
+    def deviceToHostWrapper(model):
+        model.deviceToHostCounter += 1
+        realMethod()
+
+    training_model.copyWeightsToHost = types.MethodType(
+        deviceToHostWrapper, training_model)
+
+    # Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
+    target = torch.randn(10)
+    input = torch.randn(10)
+
+    train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
+                                           target, original_parameters)
 
     # Train on IPU.
     for _ in range(0, 50):
@@ -260,7 +266,8 @@ def test_weights_sharing_ipu_cpu():
     assert torch.allclose(nativeOut, target, rtol=1e-02, atol=1e-02)
 
 
-def train_N_times_and_run(N, inference_model, training_model, input, target):
+def train_N_times_and_check_copying(N, inference_model, training_model, input,
+                                    target):
     # Train on IPU.
     for _ in range(0, N):
         out, _ = training_model(input, target)
@@ -311,9 +318,11 @@ def test_weights_sharing_ipus():
     original, _ = training_model(input, target)
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
-    train_N_times_and_run(1000, inference_model, training_model, input, target)
-    out_inference = train_N_times_and_run(1500, inference_model,
-                                          training_model, input, target)
+    train_N_times_and_check_copying(1000, inference_model, training_model,
+                                    input, target)
+    out_inference = train_N_times_and_check_copying(1500, inference_model,
+                                                    training_model, input,
+                                                    target)
 
     assert torch.allclose(out_inference, target, rtol=1e-02, atol=1e-02)
 
