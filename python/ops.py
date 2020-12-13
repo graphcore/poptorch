@@ -28,11 +28,26 @@ def recomputationCheckpoint(*tensors):
 
     :param tensors: one or more tensors which should be checkpointed.
     :return: Tensors (same number and shape as the input tensors).
+    :rtype: tuple
     """
-    out = torch.ops.poptorch.recomputation_checkpoint(tensors)
+
+    # Allow passing a single list or tuple
     if len(tensors) == 1:
+        if isinstance(tensors[0], (tuple, list)):
+            return type(tensors[0])(recomputationCheckpoint(*tensors[0]))
+
+    out = []
+    for t_in in tensors:
+        if not isinstance(t_in, torch.Tensor):
+            raise ValueError("All inputs must be tensors")
+
+        out.append(torch.ops.poptorch.recomputation_checkpoint(t_in))
+
+    if len(out) == 1:
         return out[0]
-    return out
+
+    # Return a tuple by default since Poptorch does not support list inputs
+    return tuple(out)
 
 
 def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):

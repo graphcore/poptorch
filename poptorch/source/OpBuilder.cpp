@@ -461,15 +461,11 @@ createOptimizerGroup(torch::jit::Graph *graph, std::uint64_t group,
   return new_node;
 }
 
-torch::jit::Node *createRecomputationCheckpoint(
-    torch::jit::Graph *graph,
-    const std::vector<torch::jit::Value *> &list_of_params) {
-  torch::jit::Node *new_node = createAndInsertNode(
-      graph, symbols::poptorch::recomputation_checkpoint, list_of_params,
-      ImplicitCast::None, OutputType::Unknown, list_of_params.size());
-
-  return createAndInsertNode(graph, at::prim::ListConstruct,
-                             new_node->outputs());
+torch::jit::Node *createRecomputationCheckpoint(torch::jit::Graph *graph,
+                                                torch::jit::Value *value) {
+  return createAndInsertNode(graph, symbols::poptorch::recomputation_checkpoint,
+                             {value}, ImplicitCast::None,
+                             OutputType::AsFirstInput);
 }
 
 torch::jit::Node *createMultiConvPart(torch::jit::Graph *graph,

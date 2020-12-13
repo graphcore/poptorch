@@ -56,8 +56,36 @@ def test_api_inline(capfd):
     log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
 
 
-def test_recomputation_checkpoint():
+def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted):
     poptorch.setLogLevel(1)  # Force debug logging
+
+    dev_its = 6
+
+    opts = poptorch.Options()
+    opts.deviceIterations(dev_its)
+    opts.Popart.set("autoRecomputation", 3)  # All forward pipeline stages.
+
+    m = poptorch.trainingModel(model_cls(False), opts)
+    m.compile(torch.randn(dev_its, size, 1), torch.randn(dev_its, size, 1))
+    ir = json.loads(m._debugGetPopartIR())  # pylint: disable=protected-access
+    assert not any(["Checkpoint" in node["name"] for node in ir["maingraph"]
+                    ]), ("Popart IR shouldn't contain any checkpoint")
+    assert sum(["Stash" in node["type"] for node in ir["maingraph"]
+                ]) == 1, ("Only the graph input should be stashed")
+
+    native_ckpted = model_cls(True)
+    m = poptorch.trainingModel(native_ckpted, opts)
+    m.compile(torch.randn(dev_its, size, 1), torch.randn(dev_its, size, 1))
+    ir = json.loads(m._debugGetPopartIR())  # pylint: disable=protected-access
+    assert any(["Checkpoint" in node["name"] for node in ir["maingraph"]
+                ]), ("Popart IR should contain a checkpoint")
+    assert sum([
+        "Stash" in node["type"] for node in ir["maingraph"]
+    ]) == exp_num_stash_ckpted, ("Both the graph input and the checkpoint(s) "
+                                 "should be stashed")
+
+
+def test_recomputation_checkpoint_tensor():
     size = 3
 
     class Model(torch.nn.Module):
@@ -80,28 +108,71 @@ def test_recomputation_checkpoint():
                 x = x * 2
                 return x, torch.nn.functional.l1_loss(x, target)
 
-    m = Model()
+    run_recomputation_checkpoint_test(size, Model, 2)
 
-    opts = poptorch.Options()
-    opts.deviceIterations(6)
-    opts.Popart.set("autoRecomputation", 3)  # All forward pipeline stages.
 
-    m = poptorch.trainingModel(Model(), opts)
-    m.compile(torch.randn(size * 6, 1), torch.randn(size * 6, 1))
-    ir = json.loads(m._debugGetPopartIR())  # pylint: disable=protected-access
-    assert not any(["Checkpoint" in node["name"] for node in ir["maingraph"]
-                    ]), ("Popart IR shouldn't contain any checkpoint")
-    assert sum(["Stash" in node["type"] for node in ir["maingraph"]
-                ]) == 1, ("Only the graph input should be stashed")
+def test_recomputation_checkpoint_tensor_two_inputs():
+    size = 3
 
-    m = poptorch.trainingModel(Model(True), opts)
-    m.compile(torch.randn(size * 6, 1), torch.randn(size * 6, 1))
-    ir = json.loads(m._debugGetPopartIR())  # pylint: disable=protected-access
-    assert any(["Checkpoint" in node["name"] for node in ir["maingraph"]
-                ]), ("Popart IR should contain a checkpoint")
-    assert sum([
-        "Stash" in node["type"] for node in ir["maingraph"]
-    ]) == 2, ("Both the graph input and the checkpoint should be stashed")
+    class Model(torch.nn.Module):
+        def __init__(self, checkpoint=False):
+            super().__init__()
+            self.checkpoint = checkpoint
+            weight_1 = torch.nn.Parameter(torch.rand(size, size),
+                                          requires_grad=True)
+            self.register_parameter("weight_1", weight_1)
+
+            weight_2 = torch.nn.Parameter(torch.rand(size, size),
+                                          requires_grad=True)
+            self.register_parameter("weight_2", weight_2)
+
+        def forward(self, x, target):
+            poptorch.Block.useAutoId()
+            with poptorch.Block(ipu_id=0):
+                x = torch.matmul(self.weight_1, x)
+                y = torch.matmul(self.weight_2, x)
+
+                if self.checkpoint:
+                    x, y = poptorch.recomputationCheckpoint(x, y)
+                x = torch.matmul(self.weight_1, x + y)
+
+            with poptorch.Block(ipu_id=1):
+                x = x * 2
+                return x, torch.nn.functional.l1_loss(x, target)
+
+    run_recomputation_checkpoint_test(size, Model, 3)
+
+
+def test_recomputation_checkpoint_tensor_tuple_inputs():
+    size = 3
+
+    class Model(torch.nn.Module):
+        def __init__(self, checkpoint=False):
+            super().__init__()
+            self.checkpoint = checkpoint
+            weight_1 = torch.nn.Parameter(torch.rand(size, size),
+                                          requires_grad=True)
+            self.register_parameter("weight_1", weight_1)
+
+            weight_2 = torch.nn.Parameter(torch.rand(size, size),
+                                          requires_grad=True)
+            self.register_parameter("weight_2", weight_2)
+
+        def forward(self, x, target):
+            poptorch.Block.useAutoId()
+            with poptorch.Block(ipu_id=0):
+                x = torch.matmul(self.weight_1, x)
+                y = torch.matmul(self.weight_2, x)
+
+                if self.checkpoint:
+                    x, y = poptorch.recomputationCheckpoint((x, y))
+                x = torch.matmul(self.weight_1, x + y)
+
+            with poptorch.Block(ipu_id=1):
+                x = x * 2
+                return x, torch.nn.functional.l1_loss(x, target)
+
+    run_recomputation_checkpoint_test(size, Model, 3)
 
 
 def test_api_wrap(capfd):

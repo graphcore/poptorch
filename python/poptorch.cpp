@@ -84,10 +84,6 @@ void optimizerGroup(int64_t group, c10::List<at::Tensor> &&inputs) {
   UNUSED(inputs);
 }
 
-c10::List<at::Tensor> recomputationCheckpoint(c10::List<at::Tensor> inputs) {
-  return inputs;
-}
-
 void beginMultiConv() {}
 
 void endMultiConv(
@@ -112,7 +108,7 @@ static auto registry =
         .op("poptorch::identity_loss", &identityLoss)
         .op("poptorch::optimizer_group", &optimizerGroup)
         .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
-        .op("poptorch::recomputation_checkpoint", &recomputationCheckpoint)
+        .op("poptorch::recomputation_checkpoint", &identityOp)
         .op("poptorch::set_available_memory", &setAvailableMemory)
         .op("poptorch::begin_multi_conv", &beginMultiConv)
         .op("poptorch::end_multi_conv", &endMultiConv);
