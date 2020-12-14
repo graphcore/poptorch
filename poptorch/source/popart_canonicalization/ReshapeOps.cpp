@@ -357,18 +357,16 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
 
   std::vector<std::int64_t> output_size = shapeFromTensor(node->output());
   std::vector<std::int64_t> input_size = shapeFromTensor(node->input(0));
-  std::vector<double> scales;
+
   ERROR_ON_MSG(output_size.size() != input_size.size(),
                "Input / output rank mismatch: " << input_size.size() << " != "
                                                 << output_size.size());
-  // Note: as of torch 1.6 scales is used instead of output_size to perform
-  // the upsampling.
-  scales.push_back(1.0);
-  scales.push_back(1.0);
-  for (std::uint64_t scale_dim = 2; scale_dim < node->inputs().size();
-       ++scale_dim) {
-    float scale = constantToFloat(node->input(scale_dim)->node());
-    scales.push_back(static_cast<double>(scale));
+
+  // Omit the leading batch and channel dims for computing the scale
+  std::vector<double> scales{1.0, 1.0};
+
+  for (size_t dim = 2; dim < input_size.size(); ++dim) {
+    scales.push_back(static_cast<double>(output_size[dim]) / input_size[dim]);
   }
 
   torch::jit::Node *scales_node = createConstantFloat(

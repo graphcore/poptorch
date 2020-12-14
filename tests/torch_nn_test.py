@@ -24,16 +24,10 @@ EXPECTED_FAILURES = {
     "test_nn_GroupNorm_2d_no_affine_IN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
     "test_nn_GroupNorm_2d_no_affine_LN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
 
-    "test_nn_interpolate_nearest_1d": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_1d_zero_dim": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_tuple_1d": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_2d_launch_configs": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_2d": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_tuple_2d": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_2d_zero_dim": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_3d": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_3d_zero_dim": "Cannot force a non-constant node to a float",
-    "test_nn_interpolate_nearest_tuple_3d": "Cannot force a non-constant node to a float",
+    # TODO(T31655): Zero-dim tensor support
+    "test_nn_interpolate_nearest_1d_zero_dim": "IStepIO unexpectedly did not provide input data for tensor input",
+    "test_nn_interpolate_nearest_2d_zero_dim": "IStepIO unexpectedly did not provide input data for tensor input",
+    "test_nn_interpolate_nearest_3d_zero_dim": "IStepIO unexpectedly did not provide input data for tensor input",
 
     "test_nn_CrossMapLRN2d": "Broadcasting failed",
     "test_nn_PReLU_1d_multiparam": "Broadcasting failed",
