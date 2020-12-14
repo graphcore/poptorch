@@ -53,10 +53,29 @@ def test_bert_small_half():
 def test_bert_medium_result():
     torch.manual_seed(42)
 
-    # Bert small.
     pretrained_weights = 'mrm8488/bert-medium-finetuned-squadv2'
-    model = transformers.BertForQuestionAnswering.from_pretrained(
-        pretrained_weights)
+
+    # For later versions of transformers, we need to wrap the model and set
+    # return_dict to False
+    class WrappedModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.wrapped = transformers.BertForQuestionAnswering.from_pretrained(
+                'mrm8488/bert-medium-finetuned-squadv2')
+
+        def forward(self, input_ids, attention_mask):
+            return self.wrapped.forward(input_ids,
+                                        attention_mask,
+                                        return_dict=False)
+
+        def __getattr__(self, attr):
+            try:
+                return torch.nn.Module.__getattr__(self, attr)
+            except torch.nn.modules.module.ModuleAttributeError:
+                return getattr(self.wrapped, attr)
+
+    model = WrappedModel()
+
     tokenizer = transformers.BertTokenizer.from_pretrained(
         pretrained_weights, return_token_type_ids=True)
 

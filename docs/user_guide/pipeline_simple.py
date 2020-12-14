@@ -6,8 +6,30 @@ import poptorch
 
 # A bert model from hugging face. See the packaged BERT example for actual usage.
 pretrained_weights = 'mrm8488/bert-medium-finetuned-squadv2'
-model = transformers.BertForQuestionAnswering.from_pretrained(
-    pretrained_weights)
+
+
+# For later versions of transformers, we need to wrap the model and set
+# return_dict to False
+class WrappedModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.wrapped = transformers.BertForQuestionAnswering.from_pretrained(
+            pretrained_weights)
+
+    def forward(self, input_ids, attention_mask, token_type_ids):
+        return self.wrapped.forward(input_ids,
+                                    attention_mask,
+                                    token_type_ids,
+                                    return_dict=False)
+
+    def __getattr__(self, attr):
+        try:
+            return torch.nn.Module.__getattr__(self, attr)
+        except torch.nn.modules.module.ModuleAttributeError:
+            return getattr(self.wrapped, attr)
+
+
+model = WrappedModel()
 
 # A handy way of seeing the names of all the layers in the network.
 print(model)
