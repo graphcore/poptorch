@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import atexit
+import copy
+
 import torch
 
 # These are needed before the assert
@@ -328,17 +330,18 @@ def trainingModel(model, options=None, optimizer=None):
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
+    training_model = copy.copy(model)
 
-    maybe_wrapped_model = model
+    maybe_wrapped_model = training_model
 
     if optimizer and len(optimizer.param_groups) > 1:
-        maybe_wrapped_model = _impl.OptimizerWrapper(model, optimizer)
+        maybe_wrapped_model = _impl.OptimizerWrapper(training_model, optimizer)
 
     return PoplarExecutor(model=maybe_wrapped_model,
                           options=options,
                           training=True,
                           optimizer=optimizer,
-                          user_model=model)
+                          user_model=training_model)
 
 
 def inferenceModel(model, options=None):
@@ -350,7 +353,9 @@ def inferenceModel(model, options=None):
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
-    return PoplarExecutor(model=model, options=options, training=False)
+    return PoplarExecutor(model=copy.copy(model),
+                          options=options,
+                          training=False)
 
 
 def ipuHardwareIsAvailable():
