@@ -10,14 +10,16 @@ namespace {
 torch::jit::Node *log10Handler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // Log10(X) = Log(X) / Log(10)
+  torch::jit::Value *x = node->input();
 
   // Add log(x)
-  torch::jit::Node *logx = createLog(graph, {node->input(0)});
+  torch::jit::Node *logx = createLog(graph, {x});
 
   // Add log10
   const double log10_const =
       2.302585092994045684017991454684364207601101488628772976033;
-  torch::jit::Node *log10 = createConstantFloat(graph, {log10_const}, {});
+  torch::jit::Node *log10 =
+      createConstantFloatLike(graph, x, {log10_const}, {});
 
   // Add the divide.
   return createDiv(graph, {logx->output(), log10->output()});
@@ -26,12 +28,13 @@ torch::jit::Node *log10Handler(torch::jit::Graph *graph,
 torch::jit::Node *log1pHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // Log1p(x) = log(x + 1)
+  torch::jit::Value *x = node->input();
 
   // Add the one constant
-  torch::jit::Node *one = createConstantFloat(graph, {1.0}, {});
+  torch::jit::Node *one = createConstantFloatLike(graph, x, {1.0}, {});
 
   // Add x + 1
-  torch::jit::Node *add = createAdd(graph, {node->input(0), one->output()});
+  torch::jit::Node *add = createAdd(graph, {x, one->output()});
 
   // Add the log
   return createLog(graph, {add->output()});
@@ -40,14 +43,15 @@ torch::jit::Node *log1pHandler(torch::jit::Graph *graph,
 torch::jit::Node *log2Handler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   // Log2(X) = Log(X) / Log(2)
+  torch::jit::Value *x = node->input();
 
   // Add log(x)
-  torch::jit::Node *logx = createLog(graph, {node->input(0)});
+  torch::jit::Node *logx = createLog(graph, {x});
 
   // Add log2
   const double log2_const =
       0.693147180559945309417232121458176568075500134360255254120;
-  torch::jit::Node *log2 = createConstantFloat(graph, {log2_const}, {});
+  torch::jit::Node *log2 = createConstantFloatLike(graph, x, {log2_const}, {});
 
   // Add the divide.
   return createDiv(graph, {logx->output(), log2->output()});

@@ -98,6 +98,7 @@ OP_CONVERTOR(aten::square, NONE, createMul, {PARAM(0) COMMA PARAM(0)})
 OP_CONVERTOR(aten::tan, NONE, createTan, {PARAM(0)})
 OP_CONVERTOR(aten::tanh, NONE, createTanh, {PARAM(0)})
 OP_CONVERTOR(aten::logical_not, NONE, createLogical_not, {PARAM(0)})
+OP_CONVERTOR(aten::expm1, NONE, createExpm1, {PARAM(0)})
 
 // Activations
 OP_CONVERTOR(aten::selu, NONE, createSelu, {PARAM(0)} COMMA 1.6732632423543772848170429916717f COMMA 1.0507009873554804934193349852946f)

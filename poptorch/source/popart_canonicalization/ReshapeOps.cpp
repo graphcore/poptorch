@@ -355,6 +355,7 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   // aten::upsample_trilinear3d(Tensor self, int[] output_size, bool
   // align_corners, float? scales_d, float? scales_h, float? scales_w) -> Tensor
 
+  torch::jit::Value *x = node->input(0);
   std::vector<std::int64_t> output_size = shapeFromTensor(node->output());
   std::vector<std::int64_t> input_size = shapeFromTensor(node->input(0));
 
@@ -369,10 +370,9 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
     scales.push_back(static_cast<double>(output_size[dim]) / input_size[dim]);
   }
 
-  torch::jit::Node *scales_node = createConstantFloat(
-      graph, scales, {static_cast<std::int64_t>(scales.size())});
-  return createResize(graph, {node->input(0), scales_node->output()},
-                      "nearest");
+  torch::jit::Node *scales_node = createConstantFloatLike(
+      graph, x, scales, {static_cast<std::int64_t>(scales.size())});
+  return createResize(graph, {x, scales_node->output()}, "nearest");
 }
 
 torch::jit::Node *unsupportedUpsampleHandler(torch::jit::Graph *graph,

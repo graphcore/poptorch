@@ -3,12 +3,15 @@
 #define INCLUDE_POPTORCH_OP_BUILDER_HPP
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <functional>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
 
 #include "poptorch/ImplicitCasting.hpp"
+
+#include "poptorch_logging/Error.hpp"
 
 // Represents how the output type of the op is to be determined
 enum class OutputType {
@@ -55,16 +58,19 @@ torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &new_shape);
 
 torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
-                                    const std::vector<int64_t> &data,
-                                    const std::vector<int64_t> &new_shape);
+                                    const std::vector<std::int64_t> &data,
+                                    const std::vector<std::int64_t> &new_shape);
 
-torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
-                                      const std::vector<double> &data,
-                                      const std::vector<int64_t> &new_shape);
+torch::jit::Node *
+createConstantFloat32(torch::jit::Graph *graph, const std::vector<double> &data,
+                      const std::vector<std::int64_t> &new_shape);
 
-torch::jit::Node *createConstantFloat16(torch::jit::Graph *graph,
-                                        const std::vector<double> &data,
-                                        const std::vector<int64_t> &new_shape);
+// Create a constant float that inherits its underlying type (float16/32) from
+// tensor t
+torch::jit::Node *
+createConstantFloatLike(torch::jit::Graph *graph, torch::jit::Value *t,
+                        const std::vector<double> &data,
+                        const std::vector<std::int64_t> &new_shape);
 
 template <typename SymbolHandler>
 torch::jit::Node *
@@ -109,35 +115,6 @@ torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph, Ints... values) {
                            {static_cast<std::int64_t>(data.size())})
       ->output();
 }
-
-template <typename... Floats,
-          std::enable_if_t<std::is_floating_point<typename std::tuple_element<
-                               0, std::tuple<Floats...>>::type>::value,
-                           int> = 0>
-torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph,
-                                    Floats... values) {
-  std::vector<double> data{std::forward<Floats>(values)...};
-  return createConstantFloat(graph, data,
-                             {static_cast<std::int64_t>(data.size())})
-      ->output();
-}
-
-// Default to int in the helper.
-template <typename T> struct CreateConstant {
-  torch::jit::Node *operator()(torch::jit::Graph *graph,
-                               const std::vector<int64_t> &data,
-                               const std::vector<int64_t> &new_shape) {
-    return createConstantInt(graph, data, new_shape);
-  }
-};
-
-template <> struct CreateConstant<float> {
-  torch::jit::Node *operator()(torch::jit::Graph *graph,
-                               const std::vector<double> &data,
-                               const std::vector<int64_t> &new_shape) {
-    return createConstantFloat(graph, data, new_shape);
-  }
-};
 
 template <typename T> struct CreateCast {};
 

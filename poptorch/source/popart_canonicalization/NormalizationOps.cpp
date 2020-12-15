@@ -13,7 +13,7 @@ namespace {
 // To satisfy popart/onnx, create a zero input for running_mean and all ones for
 // running_var
 void maybeInitializeRunningParamConstants(
-    torch::jit::Graph *graph, const c10::ScalarType input_type,
+    torch::jit::Graph *graph, torch::jit::Value *input,
     torch::jit::Value **running_mean, torch::jit::Value **running_var,
     const std::vector<std::int64_t> &new_shape) {
 
@@ -26,27 +26,25 @@ void maybeInitializeRunningParamConstants(
 
   ERROR_ON(!isNone(*running_var));
 
-  switch (input_type) {
+  c10::ScalarType scalar_type =
+      *input->type()->expect<c10::TensorType>()->scalarType();
+  switch (scalar_type) {
   case c10::ScalarType::Int: {
     *running_mean = createConstantInt(graph, {0}, running_shape)->output();
     *running_var = createConstantInt(graph, {1}, running_shape)->output();
     break;
   }
+  case c10::ScalarType::Half:
   case c10::ScalarType::Float: {
-    *running_mean = createConstantFloat(graph, {0.0}, running_shape)->output();
-    *running_var = createConstantFloat(graph, {1.0}, running_shape)->output();
-    break;
-  }
-  case c10::ScalarType::Half: {
     *running_mean =
-        createConstantFloat16(graph, {0.0}, running_shape)->output();
-    *running_var = createConstantFloat16(graph, {1.0}, running_shape)->output();
+        createConstantFloatLike(graph, input, {0}, running_shape)->output();
+    *running_var =
+        createConstantFloatLike(graph, input, {1}, running_shape)->output();
     break;
   }
-  default: {
+  default:
     ERROR("Batch norm input"
-          << " of type " << c10::toString(input_type) << " not supported");
-  }
+          << " of type " << c10::toString(scalar_type) << " not supported");
   }
 }
 
@@ -118,9 +116,9 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
 
   auto batch_norm_fn = [&](torch::jit::Value *input_4d) {
     // Use initialised constants if running_mean and running_var are none
-    maybeInitializeRunningParamConstants(
-        graph, *input_4d->type()->expect<c10::TensorType>()->scalarType(),
-        &running_mean, &running_var, shapeFromTensor(input_4d));
+    maybeInitializeRunningParamConstants(graph, input_4d, &running_mean,
+                                         &running_var,
+                                         shapeFromTensor(input_4d));
 
     // To indicate training, for BatchNormalization-9, use num_outputs = 5
     // From ONNX

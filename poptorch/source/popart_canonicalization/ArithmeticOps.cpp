@@ -36,27 +36,16 @@ torch::jit::Node *rsqrtHandler(torch::jit::Graph *graph,
   return createReciprocal(graph, {sqrt->output()});
 }
 
-torch::jit::Node *expm1Handler(torch::jit::Graph *graph,
-                               torch::jit::Node *node) {
-  // expm1 = exp(x) - 1
-
-  // exp(x)
-  torch::jit::Node *exp = createExp(graph, {node->input()});
-
-  // Add the one constant
-  torch::jit::Node *one = createConstantFloat(graph, {1.0}, {});
-
-  return createSub(graph, {exp->output(), one->output()});
-}
-
 torch::jit::Node *erfcHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   // erfc = 1 - erf(x)
+  torch::jit::Value *x = node->input();
+
   // erf(x)
-  torch::jit::Node *erf = createErf(graph, {node->input()});
+  torch::jit::Node *erf = createErf(graph, {x});
 
   // Add the one constant
-  torch::jit::Node *one = createConstantFloat(graph, {1.0}, {});
+  torch::jit::Node *one = createConstantFloatLike(graph, x, {1.0}, {});
 
   return createSub(graph, {one->output(), erf->output()});
 }
@@ -138,7 +127,6 @@ static bool handlers = registerHandlers(
     c10::aten::add, addHandler,
     c10::aten::rsqrt, rsqrtHandler,
     c10::aten::rsub, rsubHandler,
-    c10::aten::expm1, expm1Handler,
     c10::aten::erfc, erfcHandler,
     c10::aten::trunc, truncHandler,
     c10::aten::frac, fracHandler,

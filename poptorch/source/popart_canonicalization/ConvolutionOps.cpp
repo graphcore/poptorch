@@ -110,7 +110,7 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
   // Create the 1-d conv kernel
   std::vector<double> kernel_data(static_cast<size_t>(span), 1.0);
   torch::jit::Value *ones =
-      createConstantFloat(graph, kernel_data, {span})->output();
+      createConstantFloatLike(graph, data, kernel_data, {span})->output();
 
   // ONNX conv expects the kernel to have size M x C/group X kW X kW
   // So reshape the kernel to have size [1,1,span,1]

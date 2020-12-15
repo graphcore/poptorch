@@ -2,7 +2,6 @@
 
 #include "popart_compiler/PopartEnums.hpp"
 
-#include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -168,9 +167,11 @@ torch::jit::Node *createReshape(torch::jit::Graph *graph, torch::jit::Value *A,
   return new_node;
 }
 
-torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
-                                    const std::vector<int64_t> &data,
-                                    const std::vector<int64_t> &new_shape) {
+template <typename T, typename U>
+torch::jit::Node *createConstant(torch::jit::Graph *graph,
+                                 const std::vector<U> &data,
+                                 const std::vector<int64_t> &new_shape,
+                                 at::ScalarType scalar_type) {
   auto total_size = static_cast<size_t>(std::accumulate(
       new_shape.begin(), new_shape.end(), 1, std::multiplies<int64_t>()));
 
@@ -180,13 +181,12 @@ torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
     stride = 1;
   }
 
-  auto t =
-      at::empty({new_shape}, at::dtype(at::ScalarType::Int)
-                                 .memory_format(c10::MemoryFormat::Contiguous));
+  auto t = at::empty(
+      {new_shape},
+      at::dtype(scalar_type).memory_format(c10::MemoryFormat::Contiguous));
 
   for (size_t i = 0; i < total_size; i++) {
-    // NOLINTNEXTLINE
-    *(t.data_ptr<int32_t>() + i) = static_cast<int32_t>(data[i * stride]);
+    *(t.data_ptr<T>() + i) = static_cast<T>(data[i * stride]); // NOLINT
   }
 
   // Use bounds checking for the last element
@@ -195,42 +195,32 @@ torch::jit::Node *createConstantInt(torch::jit::Graph *graph,
   return tensorToConstant(graph, t);
 }
 
-torch::jit::Node *createConstantFloat(torch::jit::Graph *graph,
-                                      const std::vector<double> &data,
-                                      const std::vector<int64_t> &new_shape) {
-  auto total_size = static_cast<size_t>(std::accumulate(
-      new_shape.begin(), new_shape.end(), 1, std::multiplies<size_t>()));
-  ERROR_ON(total_size == 0);
-
-  size_t stride = 0;
-
-  if (data.size() != 1) {
-    ERROR_ON(total_size != data.size());
-    stride = 1;
-  }
-
-  auto t =
-      at::empty({new_shape}, at::dtype(at::ScalarType::Float)
-                                 .memory_format(c10::MemoryFormat::Contiguous));
-
-  for (size_t i = 0; i < total_size; i++) {
-    // NOLINTNEXTLINE
-    *(t.data_ptr<float>() + i) = static_cast<float>(data[i * stride]);
-  }
-
-  // Use bounds checking for the last element
-  data.at((total_size - 1) * stride);
-
-  return tensorToConstant(graph, t);
+torch::jit::Node *
+createConstantInt(torch::jit::Graph *graph,
+                  const std::vector<std::int64_t> &data,
+                  const std::vector<std::int64_t> &new_shape) {
+  return createConstant<std::int32_t>(graph, data, new_shape,
+                                      at::ScalarType::Int);
 }
 
-torch::jit::Node *createConstantFloat16(torch::jit::Graph *graph,
-                                        const std::vector<double> &data,
-                                        const std::vector<int64_t> &new_shape) {
-  torch::jit::Node *new_node = createConstantFloat(graph, data, new_shape);
-  auto new_tensor = new_node->t(c10::attr::value).to(at::ScalarType::Half);
-  new_node->t_(c10::attr::value, new_tensor);
-  new_node->output()->inferTypeFrom(new_tensor);
+torch::jit::Node *
+createConstantFloat32(torch::jit::Graph *graph, const std::vector<double> &data,
+                      const std::vector<std::int64_t> &new_shape) {
+  return createConstant<float>(graph, data, new_shape, at::ScalarType::Float);
+}
+
+torch::jit::Node *
+createConstantFloatLike(torch::jit::Graph *graph, torch::jit::Value *t,
+                        const std::vector<double> &data,
+                        const std::vector<std::int64_t> &new_shape) {
+  at::ScalarType scalar_type =
+      *t->type()->expect<c10::TensorType>()->scalarType();
+  torch::jit::Node *new_node = createConstantFloat32(graph, data, new_shape);
+  if (scalar_type == at::ScalarType::Half) {
+    auto new_tensor = new_node->t(c10::attr::value).to(scalar_type);
+    new_node->t_(c10::attr::value, new_tensor);
+    new_node->output()->inferTypeFrom(new_tensor);
+  }
   return new_node;
 }
 

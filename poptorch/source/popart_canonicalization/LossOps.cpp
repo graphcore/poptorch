@@ -99,7 +99,7 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
   reduction = convertReduceToPopart(reduction);
 
   // Add the one constant
-  torch::jit::Node *one = createConstantFloat(graph, {1.0}, {});
+  torch::jit::Node *one = createConstantFloatLike(graph, x, {1.0}, {});
 
   torch::jit::Node *log_x = createLog(graph, {x});
 
@@ -284,13 +284,14 @@ torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
     torch::jit::Node *minus_y = createSub(graph, {y_mul_log_y->output(), y});
 
     // 2π
-    torch::jit::Node *two_pi = createConstantFloat(graph, {2 * M_PI}, {});
+    torch::jit::Node *two_pi =
+        createConstantFloatLike(graph, x, {2 * M_PI}, {});
     // 2πy
     torch::jit::Node *two_pi_y = createMul(graph, {two_pi->output(), y});
     // log(2πy)
     torch::jit::Node *log_two_pi_y = createLog(graph, {two_pi_y->output()});
     // 0.5
-    torch::jit::Node *half = createConstantFloat(graph, {0.5}, {});
+    torch::jit::Node *half = createConstantFloatLike(graph, x, {0.5}, {});
     // 0.5 log(2πy)
     torch::jit::Node *mul_half =
         createMul(graph, {half->output(), log_two_pi_y->output()});
@@ -301,9 +302,9 @@ torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
 
     // Approximation values only added for target values > 1
     std::vector<std::int64_t> shape = shapeFromTensor(y);
-    torch::jit::Node *ones = createConstantFloat(graph, {1}, shape);
+    torch::jit::Node *ones = createConstantFloatLike(graph, x, {1}, shape);
     torch::jit::Node *mask = createGreater(graph, {y, ones->output()});
-    torch::jit::Node *zeros = createConstantFloat(graph, {0}, shape);
+    torch::jit::Node *zeros = createConstantFloatLike(graph, x, {0}, shape);
     torch::jit::Node *masked_fill =
         createWhere(graph, {mask->output(), add->output(), zeros->output()});
 
@@ -334,7 +335,7 @@ torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
   // Δ - x
   torch::jit::Node *delta_minus_x = createSub(graph, {delta, x});
   // 0
-  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  torch::jit::Node *zeros = createConstantFloatLike(graph, x, {0}, {});
   // max(0, Δ - x)
   torch::jit::Node *max_delta_minus_x =
       createMax(graph, {zeros->output(), delta_minus_x->output()});
@@ -342,7 +343,7 @@ torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
   // 1
   torch::jit::Node *ones = createConstantInt(graph, {1}, {});
   // -1
-  torch::jit::Node *neg_ones = createConstantFloat(graph, {-1}, {});
+  torch::jit::Node *neg_ones = createConstantFloatLike(graph, x, {-1}, {});
   // if y = 1
   torch::jit::Node *ones_mask = createEqual(graph, {y, ones->output()});
   // if y = -1
@@ -373,9 +374,6 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
   // Target
   torch::jit::Value *y = node->input(1);
 
-  // Check if the input is half.
-  const bool is_half = getNodeScalarType(x) == at::ScalarType::Half;
-
   // Weight
   torch::jit::Value *w = node->input(2);
   // Weight of positive examples
@@ -388,8 +386,8 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
   // -x
   torch::jit::Node *loss = createNeg(graph, {x});
   // 0
-  torch::jit::Node *zeros = is_half ? createConstantFloat16(graph, {0}, {})
-                                    : createConstantFloat(graph, {0}, {});
+  torch::jit::Node *zeros = createConstantFloatLike(graph, x, {0}, {});
+
   // m = min(-x, 0)
   torch::jit::Node *m = createMin(graph, {loss->output(), zeros->output()});
 
@@ -411,8 +409,7 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
   loss = createAdd(graph, {m->output(), loss->output()});
 
   // 1
-  torch::jit::Node *ones = is_half ? createConstantFloat16(graph, {1}, {})
-                                   : createConstantFloat(graph, {1}, {});
+  torch::jit::Node *ones = createConstantFloatLike(graph, x, {1}, {});
 
   // if pos_weight is specified
   if (!isNone(pos_w)) {
@@ -463,19 +460,19 @@ torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
   // |x - y|
   torch::jit::Node *abs_x_minus_y = createAbs(graph, {x_minus_y->output()});
   // 1
-  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  torch::jit::Node *ones = createConstantFloatLike(graph, x, {1}, {});
 
   // if |x - y| < 1
   torch::jit::Node *mask =
       createLess(graph, {abs_x_minus_y->output(), ones->output()});
 
   // 2
-  torch::jit::Node *twos = createConstantFloat(graph, {2}, {});
+  torch::jit::Node *twos = createConstantFloatLike(graph, x, {2}, {});
   // (x - y)^2
   torch::jit::Node *sqr_x_minus_y =
       createPow(graph, {x_minus_y->output(), twos->output()});
   // 0.5
-  torch::jit::Node *half = createConstantFloat(graph, {0.5}, {});
+  torch::jit::Node *half = createConstantFloatLike(graph, x, {0.5}, {});
   // 0.5 (x - y)^2
   torch::jit::Node *half_sqr_x_minus_y =
       createMul(graph, {half->output(), sqr_x_minus_y->output()});
@@ -514,7 +511,7 @@ torch::jit::Node *softMarginLossHandler(torch::jit::Graph *graph,
   loss = createExp(graph, {loss->output()});
 
   // 1
-  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  torch::jit::Node *ones = createConstantFloatLike(graph, x, {1}, {});
   // 1 + exp(-y * x)
   loss = createAdd(graph, {ones->output(), loss->output()});
   // log(1 + exp(-y * x))
@@ -549,7 +546,7 @@ torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
   loss = createHandlerOperation(graph, log_sigmoid_handler, {loss->output()});
 
   // 1
-  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  torch::jit::Node *ones = createConstantFloatLike(graph, x, {1}, {});
   // 1 - y
   torch::jit::Node *one_minus_y = createSub(graph, {ones->output(), y});
 
@@ -597,7 +594,7 @@ torch::jit::Node *cosineEmbeddingLossHandler(torch::jit::Graph *graph,
 
   // Epsilon
   torch::jit::Value *epsilon =
-      createConstantFloat(graph, {1e-12}, {})->output();
+      createConstantFloatLike(graph, x1, {1e-12}, {})->output();
 
   // x1 * x2
   torch::jit::Node *x1_mul_x2 = createMul(graph, {x1, x2});
@@ -629,7 +626,7 @@ torch::jit::Node *cosineEmbeddingLossHandler(torch::jit::Graph *graph,
       createDiv(graph, {sum_x1_mul_x2->output(), sqrt_sq1_mul_sq2->output()});
 
   // 1
-  torch::jit::Node *ones = createConstantFloat(graph, {1}, {});
+  torch::jit::Node *ones = createConstantFloatLike(graph, x1, {1}, {});
   // 1 - cos_sim(x1, x2)
   torch::jit::Node *one_minus_cos_sim =
       createSub(graph, {ones->output(), cos_sim->output()});
@@ -638,7 +635,7 @@ torch::jit::Node *cosineEmbeddingLossHandler(torch::jit::Graph *graph,
   torch::jit::Node *cos_sim_minus_margin =
       createSub(graph, {cos_sim->output(), margin});
   // 0
-  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  torch::jit::Node *zeros = createConstantFloatLike(graph, x1, {0}, {});
   // max(0, cos_sim(x1, x2) - margin)
   torch::jit::Node *max_zero_cos_sim_minus_margin =
       createMax(graph, {zeros->output(), cos_sim_minus_margin->output()});
@@ -693,7 +690,7 @@ torch::jit::Node *marginRankingLossHandler(torch::jit::Graph *graph,
   loss = createAdd(graph, {loss->output(), margin});
 
   // 0
-  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  torch::jit::Node *zeros = createConstantFloatLike(graph, x1, {0}, {});
   // max(0, -y (x1 - x2) + margin)
   loss = createMax(graph, {zeros->output(), loss->output()});
 
@@ -750,7 +747,7 @@ torch::jit::Node *tripletMarginLossHandler(torch::jit::Graph *graph,
   // d(a, pos) - d(a, neg) + margin
   loss = createAdd(graph, {loss->output(), margin});
 
-  torch::jit::Node *zeros = createConstantFloat(graph, {0}, {});
+  torch::jit::Node *zeros = createConstantFloatLike(graph, a, {0}, {});
   // max(d(a, pos) - d(a, neg) + margin, 0)
   loss = createMax(graph, {loss->output(), zeros->output()});
 
