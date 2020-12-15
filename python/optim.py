@@ -231,8 +231,7 @@ class LAMB(torch.optim.Optimizer):
         Based on "Large Batch Optimization for Deep Learning: Training BERT
         in 76 minutes" (https://arxiv.org/abs/1904.00962).
 
-        The scaling function phi(z) is fixed as min(z, mwn);
-        mwn is fixed at 10.0.
+        The scaling function phi(z) is fixed as min(z, max_weight_norm);
     """
 
     def __init__(self,
@@ -243,6 +242,7 @@ class LAMB(torch.optim.Optimizer):
                  weight_decay=1e-2,
                  biasCorrection=True,
                  loss_scaling=1.0,
+                 max_weight_norm=None,
                  accumType=torch.float32,
                  firstOrderMomentumAccumType=torch.float32,
                  secondOrderMomentumAccumType=torch.float32):
@@ -262,6 +262,9 @@ class LAMB(torch.optim.Optimizer):
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.
         :type loss_scaling: float, optional
+        :param max_weight_norm: maximum value of the output of scaling
+            function, phi(). Set to None to disable scaling function.
+        :type max_weight_norm: float, optional
         :param accumType: data type used for gradients.
         :type accumType: torch.dtype, optional
         :param firstOrderMomentumAccumType: data type used to store
@@ -271,13 +274,16 @@ class LAMB(torch.optim.Optimizer):
            the second order momentum values for each parameter.
         :type secondOrderMomentumAccumType: torch.dtype, optional
         """
+        if max_weight_norm is None:
+            max_weight_norm = 65500.0  # FP16 Max
         defaults = dict(lr=lr,
                         betas=betas,
                         eps=eps,
                         weight_decay=weight_decay,
                         biasCorrection=biasCorrection,
-                        loss_scaling=loss_scaling)
-        super(LAMB, self).__init__(params, defaults)
+                        loss_scaling=loss_scaling,
+                        max_weight_norm=max_weight_norm)
+        super().__init__(params, defaults)
 
         supportedTypes = [torch.float16, torch.float32]
         errString = """Accumulation types must be either torch.float32
@@ -293,7 +299,7 @@ class LAMB(torch.optim.Optimizer):
              secondOrderMomentumAccumType == torch.float16
 
     def __setstate__(self, state):
-        super(LAMB, self).__setstate__(state)
+        super().__setstate__(state)
         for group in self.param_groups:
             group.setdefault("biasCorrection", self.defaults["biasCorrection"])
             group.setdefault("loss_scaling", self.defaults["loss_scaling"])
@@ -343,7 +349,7 @@ class LAMB(torch.optim.Optimizer):
                 if r1 == 0 or r2 == 0:
                     trust = 1.0
                 else:
-                    trust = r1 / r2
+                    trust = r1.clamp(max=group["max_weight_norm"]) / r2
 
                 p.data.add_(upd, alpha=-group['lr'] * trust)
 

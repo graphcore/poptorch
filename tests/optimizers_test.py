@@ -386,3 +386,58 @@ def test_optimizer_SGD_nesterov():
                                                    nesterov=True,
                                                    momentum=0.1,
                                                    lr=0.001))
+
+
+@pytest.mark.parametrize("opt", {poptorch.optim.LAMB, LAMBNoBias})
+def test_lamb_max_weight_norm(opt):
+    torch.manual_seed(42)
+
+    model = torch.nn.Linear(10, 10)
+
+    # With max_weight_norm=0.0, lr is multiplied by 0.0. The model shouldn't train.
+    optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=0.0)
+
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.CrossEntropyLoss(), optimizer=optimizer)
+
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
+
+    # Make sure the first run doesn't already pass the test.
+    _, original_loss = poptorch_model(input, label)
+
+    # Loss shouldn't change.
+    for _ in range(0, 50):
+        out, loss = poptorch_model(input, label)
+        assert loss == original_loss
+
+    # Update the optimizer with a non-zero max_weight_norm. It should now train.
+    optimizer.param_groups[0]['max_weight_norm'] = 100.0
+    poptorch_model.setOptimizer(optimizer)
+
+    for _ in range(0, 1000):
+        out, loss = poptorch_model(input, label)
+
+    # Check we have trained the "model"
+    assert loss < original_loss
+    assert loss < 0.03
+    assert torch.argmax(out, dim=1) == label
+
+    # Run from scratch with max_weight_norm disabled.
+    model = torch.nn.Linear(10, 10)
+    optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=None)
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.CrossEntropyLoss(), optimizer=optimizer)
+
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
+
+    # Train model again
+    _, original_loss = poptorch_model(input, label)
+    for _ in range(0, 1000):
+        out, loss = poptorch_model(input, label)
+
+    # Model should have trained like normal
+    assert loss < original_loss
+    assert loss < 0.03
+    assert torch.argmax(out, dim=1) == label

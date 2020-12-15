@@ -146,6 +146,10 @@ def _convertOptimizerToDict(optimizer):
                 "eps": (eps, eps == 1e-08),
                 "loss_scaling": (loss_scaling, loss_scaling == 1.0)
             }
+            if isinstance(optimizer, optim.LAMB):
+                max_weight_norm = optimizer.param_groups[index][
+                    "max_weight_norm"]
+                the_dict[index]["max_weight_norm"] = (max_weight_norm, False)
 
         if isinstance(optimizer, torch.optim.RMSprop):
             momentum = optimizer.param_groups[index]["momentum"]

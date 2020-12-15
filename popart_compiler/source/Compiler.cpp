@@ -1111,7 +1111,7 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
     }
     optimizer = std::make_unique<popart::Adam>(
         opt.learning_rate, opt.weight_decay, opt.beta1, opt.beta2, opt.eps,
-        opt.loss_scaling, adam_mode, decay_mode,
+        opt.loss_scaling, opt.max_weight_norm, adam_mode, decay_mode,
         opt.accum_type_is_half ? popart::DataType::FLOAT16
                                : popart::DataType::FLOAT,
         opt.first_order_momentum_accum_type_is_half ? popart::DataType::FLOAT16

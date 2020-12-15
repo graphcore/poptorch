@@ -95,6 +95,7 @@ struct Optimizer {
       beta1 = findInMapOrDefault(opts, "beta1", 0.9);
       beta2 = findInMapOrDefault(opts, "beta2", 0.999);
       eps = findInMapOrDefault(opts, "eps", 1e-08);
+      max_weight_norm = findInMapOrDefault(opts, "max_weight_norm", 10.0);
       break;
     }
     case OptimizerType::RMSPROP_CENTERED:
@@ -125,6 +126,9 @@ struct Optimizer {
   // Shared by Adam, AdamW and LAMB
   ParamType beta1;
   ParamType beta2;
+
+  // Unique to LAMB
+  ParamType max_weight_norm;
 
   // Unique to SGD
   ParamType dampening;
