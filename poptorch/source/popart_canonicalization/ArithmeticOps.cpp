@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "../PoptorchSymbols.hpp"
@@ -122,17 +123,16 @@ torch::jit::Node *rsubHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::add, addHandler,
-    c10::aten::rsqrt, rsqrtHandler,
-    c10::aten::rsub, rsubHandler,
-    c10::aten::erfc, erfcHandler,
-    c10::aten::trunc, truncHandler,
-    c10::aten::frac, fracHandler,
-    c10::aten::floor_divide, floorDivideHandler,
-    c10::aten::mul, mulHandler,
-    c10::aten::true_divide, trueDivideHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::add, addHandler);
+  registerHandler(c10::aten::rsqrt, rsqrtHandler);
+  registerHandler(c10::aten::rsub, rsubHandler);
+  registerHandler(c10::aten::erfc, erfcHandler);
+  registerHandler(c10::aten::trunc, truncHandler);
+  registerHandler(c10::aten::frac, fracHandler);
+  registerHandler(c10::aten::floor_divide, floorDivideHandler);
+  registerHandler(c10::aten::mul, mulHandler);
+  registerHandler(c10::aten::true_divide, trueDivideHandler);
+}
 
 } // namespace poptorch

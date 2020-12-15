@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -160,11 +161,10 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::_convolution, convolutionHandler,
-    c10::aten::conv2d, conv2dHandler,
-    c10::aten::cumsum, cumsumHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::_convolution, convolutionHandler);
+  registerHandler(c10::aten::conv2d, conv2dHandler);
+  registerHandler(c10::aten::cumsum, cumsumHandler);
+}
 
 } // namespace poptorch

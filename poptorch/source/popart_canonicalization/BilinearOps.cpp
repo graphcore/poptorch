@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include <poptorch/OpBuilder.hpp>
@@ -76,6 +77,8 @@ torch::jit::Node *bilinearHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-static bool handlers = registerHandlers(c10::aten::bilinear, bilinearHandler);
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::bilinear, bilinearHandler);
+}
 
 } // namespace poptorch

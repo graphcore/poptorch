@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -92,11 +93,10 @@ torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
 }
 
 } // namespace
-// clang-format off
-bool handlers =
-    registerHandlers(
-        c10::aten::matmul, matmulHandler,
-        c10::aten::bmm, matmulHandler);
-// clang-format on
+
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::matmul, matmulHandler);
+  registerHandler(c10::aten::bmm, matmulHandler);
+}
 
 } // namespace poptorch

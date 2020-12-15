@@ -16,15 +16,6 @@ using SymbolHandler =
 
 bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler);
 
-// Needed to end the recursion of registerHandlers
-static bool __attribute__((unused)) registerHandlers() { return true; }
-
-template <typename... OtherHandlers>
-bool registerHandlers(c10::Symbol symbol, const SymbolHandler &handler,
-                      OtherHandlers... handlers) {
-  return registerHandler(symbol, handler) && registerHandlers(handlers...);
-}
-
 // Return a pointer to a handler if one is registered for this kind of node or
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::NodeKind kind);

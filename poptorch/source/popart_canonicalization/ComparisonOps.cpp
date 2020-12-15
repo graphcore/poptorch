@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -39,11 +40,10 @@ torch::jit::Node *notEqualHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::ge, greaterLessEqualHandler,
-    c10::aten::le, greaterLessEqualHandler,
-    c10::aten::ne, notEqualHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::ge, greaterLessEqualHandler);
+  registerHandler(c10::aten::le, greaterLessEqualHandler);
+  registerHandler(c10::aten::ne, notEqualHandler);
+}
 
 } // namespace poptorch

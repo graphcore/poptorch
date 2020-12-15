@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "EinsumOp.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
@@ -180,12 +181,11 @@ torch::jit::Node *tensordotHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::einsum, einsumHandler,
-    c10::aten::meshgrid, meshgridHandler,
-    c10::aten::cartesian_prod, cartesianProdHandler,
-    c10::aten::tensordot, tensordotHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::einsum, einsumHandler);
+  registerHandler(c10::aten::meshgrid, meshgridHandler);
+  registerHandler(c10::aten::cartesian_prod, cartesianProdHandler);
+  registerHandler(c10::aten::tensordot, tensordotHandler);
+}
 
 } // namespace poptorch

@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -69,13 +70,11 @@ torch::jit::Node *logSigmoidHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-// clang-format off
-static bool handlers =
-    registerHandlers(
-        c10::aten::log10, log10Handler,
-        c10::aten::log1p, log1pHandler,
-        c10::aten::log2, log2Handler,
-        c10::aten::log_sigmoid, logSigmoidHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::log10, log10Handler);
+  registerHandler(c10::aten::log1p, log1pHandler);
+  registerHandler(c10::aten::log2, log2Handler);
+  registerHandler(c10::aten::log_sigmoid, logSigmoidHandler);
+}
 
 } // namespace poptorch

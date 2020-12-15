@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "../PoptorchSymbols.hpp"
@@ -755,25 +756,25 @@ torch::jit::Node *tripletMarginLossHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-// clang-format off
-static bool handlers =
-    registerHandlers(
-        c10::aten::l1_loss, l1LossHandler,
-        c10::aten::nll_loss, nllLossHandler,
-        c10::aten::nll_loss2d, nllLoss2dHandler,
-        c10::aten::mse_loss, mseLossHandler,
-        c10::aten::binary_cross_entropy, binaryCrossEntropyHandler,
-        c10::aten::kl_div, klDivHandler,
-        c10::aten::poisson_nll_loss, poissonNllLossHandler,
-        c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler,
-        c10::aten::binary_cross_entropy_with_logits, bceWithLogitsHandler,
-        c10::aten::smooth_l1_loss, smoothL1LossHandler,
-        c10::aten::soft_margin_loss, softMarginLossHandler,
-        c10::aten::multilabel_soft_margin_loss, multiLabelSoftMarginLossHandler,
-        c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler,
-        c10::aten::margin_ranking_loss, marginRankingLossHandler,
-        c10::aten::triplet_margin_loss, tripletMarginLossHandler,
-        symbols::poptorch::identity_loss, identityLossHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::l1_loss, l1LossHandler);
+  registerHandler(c10::aten::nll_loss, nllLossHandler);
+  registerHandler(c10::aten::nll_loss2d, nllLoss2dHandler);
+  registerHandler(c10::aten::mse_loss, mseLossHandler);
+  registerHandler(c10::aten::binary_cross_entropy, binaryCrossEntropyHandler);
+  registerHandler(c10::aten::kl_div, klDivHandler);
+  registerHandler(c10::aten::poisson_nll_loss, poissonNllLossHandler);
+  registerHandler(c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler);
+  registerHandler(c10::aten::binary_cross_entropy_with_logits,
+                  bceWithLogitsHandler);
+  registerHandler(c10::aten::smooth_l1_loss, smoothL1LossHandler);
+  registerHandler(c10::aten::soft_margin_loss, softMarginLossHandler);
+  registerHandler(c10::aten::multilabel_soft_margin_loss,
+                  multiLabelSoftMarginLossHandler);
+  registerHandler(c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler);
+  registerHandler(c10::aten::margin_ranking_loss, marginRankingLossHandler);
+  registerHandler(c10::aten::triplet_margin_loss, tripletMarginLossHandler);
+  registerHandler(symbols::poptorch::identity_loss, identityLossHandler);
+}
 
 } // namespace poptorch

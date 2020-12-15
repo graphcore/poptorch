@@ -2,6 +2,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -49,9 +50,8 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::slice,  sliceHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::slice, sliceHandler);
+}
 
 } // namespace poptorch

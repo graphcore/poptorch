@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -31,7 +32,8 @@ torch::jit::Node *featureDropoutHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-static bool handlers =
-    registerHandlers(c10::aten::feature_dropout, featureDropoutHandler);
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::feature_dropout, featureDropoutHandler);
+}
 
 } // namespace poptorch

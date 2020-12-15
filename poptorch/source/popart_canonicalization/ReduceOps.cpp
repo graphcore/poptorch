@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <limits>
 
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -158,15 +159,14 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::argmax, argMinMaxHandler,
-    c10::aten::argmin, argMinMaxHandler,
-    c10::aten::prod, reduceHandler,
-    c10::aten::mean, reduceHandler,
-    c10::aten::sum, reduceHandler,
-    c10::aten::logsumexp, reduceHandler,
-    c10::aten::norm, tensorNormHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::argmax, argMinMaxHandler);
+  registerHandler(c10::aten::argmin, argMinMaxHandler);
+  registerHandler(c10::aten::prod, reduceHandler);
+  registerHandler(c10::aten::mean, reduceHandler);
+  registerHandler(c10::aten::sum, reduceHandler);
+  registerHandler(c10::aten::logsumexp, reduceHandler);
+  registerHandler(c10::aten::norm, tensorNormHandler);
+}
 
 } // namespace poptorch

@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -111,17 +112,16 @@ torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::max_pool1d, poolingHandler,
-    c10::aten::avg_pool1d, poolingHandler,
-    c10::aten::max_pool2d, poolingHandler,
-    c10::aten::avg_pool2d, poolingHandler,
-    c10::aten::max_pool3d, poolingHandler,
-    c10::aten::avg_pool3d, poolingHandler,
-    c10::aten::adaptive_avg_pool1d, adaptivePoolingHandler,
-    c10::aten::adaptive_avg_pool2d, adaptivePoolingHandler,
-    c10::aten::adaptive_avg_pool3d, adaptivePoolingHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::max_pool1d, poolingHandler);
+  registerHandler(c10::aten::avg_pool1d, poolingHandler);
+  registerHandler(c10::aten::max_pool2d, poolingHandler);
+  registerHandler(c10::aten::avg_pool2d, poolingHandler);
+  registerHandler(c10::aten::max_pool3d, poolingHandler);
+  registerHandler(c10::aten::avg_pool3d, poolingHandler);
+  registerHandler(c10::aten::adaptive_avg_pool1d, adaptivePoolingHandler);
+  registerHandler(c10::aten::adaptive_avg_pool2d, adaptivePoolingHandler);
+  registerHandler(c10::aten::adaptive_avg_pool3d, adaptivePoolingHandler);
+}
 
 } // namespace poptorch

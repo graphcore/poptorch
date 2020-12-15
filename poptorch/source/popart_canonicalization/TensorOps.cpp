@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -79,7 +80,11 @@ torch::jit::Node *copy_Handler(torch::jit::Graph *graph,
 }
 } // namespace
 
-static bool handlers = registerHandlers(
-    c10::aten::size, sizeHandler, c10::prim::NumToTensor, numToTensorHandler,
-    c10::aten::repeat, repeatHandler, c10::aten::copy_, copy_Handler);
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::size, sizeHandler);
+  registerHandler(c10::prim::NumToTensor, numToTensorHandler);
+  registerHandler(c10::aten::repeat, repeatHandler);
+  registerHandler(c10::aten::copy_, copy_Handler);
+}
+
 } // namespace poptorch

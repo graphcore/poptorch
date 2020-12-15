@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "../PoptorchStaticInit.hpp"
 #include "../PoptorchSymbols.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -85,8 +86,10 @@ torch::jit::Node *bernoulliHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-static bool handler =
-    registerHandlers(c10::aten::normal, normalHandler, c10::aten::bernoulli,
-                     bernoulliHandler, c10::aten::bernoulli_, bernoulliHandler);
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::normal, normalHandler);
+  registerHandler(c10::aten::bernoulli, bernoulliHandler);
+  registerHandler(c10::aten::bernoulli_, bernoulliHandler);
+}
 
 } // namespace poptorch

@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -229,12 +230,11 @@ torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
 }
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::batch_norm, batchNormHandler,
-    c10::aten::layer_norm, layerNormHandler,
-    c10::aten::group_norm, groupNormHandler,
-    c10::aten::instance_norm, instanceNormHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::batch_norm, batchNormHandler);
+  registerHandler(c10::aten::layer_norm, layerNormHandler);
+  registerHandler(c10::aten::group_norm, groupNormHandler);
+  registerHandler(c10::aten::instance_norm, instanceNormHandler);
+}
 
 } // namespace poptorch

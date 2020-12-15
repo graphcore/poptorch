@@ -2,6 +2,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -404,32 +405,31 @@ torch::jit::Node *stackHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    c10::aten::expand, expandHandler,
-    c10::aten::expand_as, expandAsHandler,
-    c10::aten::view, reshapeHandler,
-    c10::aten::unsqueeze, reshapeHandler,
-    c10::aten::flatten, reshapeHandler,
-    c10::aten::reshape, reshapeHandler,
-    c10::aten::select,  selectHandler,
-    c10::aten::split,  splitChunkHandler,
-    c10::aten::split_with_sizes, splitChunkHandler,
-    c10::aten::chunk,  splitChunkHandler,
-    c10::aten::contiguous,  contiguousHandler,
-    c10::aten::permute,  permuteHandler,
-    c10::aten::transpose, transposeHandler,
-    c10::aten::to, toHandler,
-    c10::aten::type_as, toHandler,
-    c10::aten::upsample_nearest1d, upsampleHandler,
-    c10::aten::upsample_nearest2d, upsampleHandler,
-    c10::aten::upsample_nearest3d, upsampleHandler,
-    c10::aten::upsample_linear1d, unsupportedUpsampleHandler,
-    c10::aten::upsample_bilinear2d, unsupportedUpsampleHandler,
-    c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler,
-    c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler,
-    c10::aten::squeeze, reshapeHandler,
-    c10::aten::stack, stackHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::expand, expandHandler);
+  registerHandler(c10::aten::expand_as, expandAsHandler);
+  registerHandler(c10::aten::view, reshapeHandler);
+  registerHandler(c10::aten::unsqueeze, reshapeHandler);
+  registerHandler(c10::aten::flatten, reshapeHandler);
+  registerHandler(c10::aten::reshape, reshapeHandler);
+  registerHandler(c10::aten::select, selectHandler);
+  registerHandler(c10::aten::split, splitChunkHandler);
+  registerHandler(c10::aten::split_with_sizes, splitChunkHandler);
+  registerHandler(c10::aten::chunk, splitChunkHandler);
+  registerHandler(c10::aten::contiguous, contiguousHandler);
+  registerHandler(c10::aten::permute, permuteHandler);
+  registerHandler(c10::aten::transpose, transposeHandler);
+  registerHandler(c10::aten::to, toHandler);
+  registerHandler(c10::aten::type_as, toHandler);
+  registerHandler(c10::aten::upsample_nearest1d, upsampleHandler);
+  registerHandler(c10::aten::upsample_nearest2d, upsampleHandler);
+  registerHandler(c10::aten::upsample_nearest3d, upsampleHandler);
+  registerHandler(c10::aten::upsample_linear1d, unsupportedUpsampleHandler);
+  registerHandler(c10::aten::upsample_bilinear2d, unsupportedUpsampleHandler);
+  registerHandler(c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler);
+  registerHandler(c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler);
+  registerHandler(c10::aten::squeeze, reshapeHandler);
+  registerHandler(c10::aten::stack, stackHandler);
+}
 
 } // namespace poptorch

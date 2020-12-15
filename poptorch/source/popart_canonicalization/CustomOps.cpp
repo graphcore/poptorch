@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 #include "poptorch/OpBuilder.hpp"
@@ -33,9 +34,8 @@ torch::jit::Node *customOpHandler(torch::jit::Graph *graph,
 
 } // namespace
 
-// clang-format off
-static bool handlers = registerHandlers(
-    symbols::poptorch::custom_operation, customOpHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(symbols::poptorch::custom_operation, customOpHandler);
+}
 
 } // namespace poptorch

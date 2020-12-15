@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -153,17 +154,16 @@ torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
 
   return createWhere(graph, {x_lt_neg_lambda, x_plus_lambda, shrink});
 }
+
 } // namespace
 
-// clang-format off
-static bool handlers =
-    registerHandlers(
-        c10::aten::celu, celuHandler,
-        c10::aten::glu, gluHandler,
-        c10::aten::hardshrink, hardshrinkHandler,
-        c10::aten::rrelu, rreluHandler,
-        c10::aten::softplus, softplusHandler,
-        c10::aten::softshrink, softshrinkHandler);
-// clang-format on
+__attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::celu, celuHandler);
+  registerHandler(c10::aten::glu, gluHandler);
+  registerHandler(c10::aten::hardshrink, hardshrinkHandler);
+  registerHandler(c10::aten::rrelu, rreluHandler);
+  registerHandler(c10::aten::softplus, softplusHandler);
+  registerHandler(c10::aten::softshrink, softshrinkHandler);
+}
 
 } // namespace poptorch
