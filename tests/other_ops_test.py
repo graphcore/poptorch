@@ -48,6 +48,31 @@ def test_einsum(params, implicit_rhs):
     torch.testing.assert_allclose(native_out, poptorch_out)
 
 
+def test_einsum_chained():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x, y, z):
+            r = torch.einsum('b u k m, b u v m -> b k v', x, y)
+            return torch.einsum('b h k n, b k v -> b h v n', z, r)
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    x = torch.randn(1, 4, 16, 4096, dtype=torch.float)
+    y = torch.randn(1, 4, 16, 4096, dtype=torch.float)
+    z = torch.randn(1, 4, 16, 4096, dtype=torch.float)
+
+    native_out = model(x, y, z)
+    poptorch_out = poptorch_model(x, y, z)
+
+    assert native_out.size() == poptorch_out.size()
+    torch.testing.assert_allclose(native_out,
+                                  poptorch_out,
+                                  rtol=1e-3,
+                                  atol=1e-3)
+
+
 @pytest.mark.parametrize("arr_lengths",
                          ([3], [3, 3], [2, 4], [3, 2, 4], [5, 2, 3, 4]))
 def test_meshgrid(arr_lengths):

@@ -17,8 +17,9 @@ torch::jit::Node *einsumHandler(torch::jit::Graph *graph,
   std::vector<torch::jit::Value *> tensors =
       handleTensorList(node->input(1)->node());
 
+  std::vector<std::int64_t> output_shape = shapeFromTensor(node->output());
   EinsumOp einsum(eq, tensors);
-  return einsum.create(graph);
+  return einsum.create(graph, output_shape);
 }
 
 torch::jit::Node *meshgridHandler(torch::jit::Graph *graph,

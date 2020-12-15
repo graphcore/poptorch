@@ -11,7 +11,8 @@ class EinsumOp {
 public:
   EinsumOp(std::string eq, const std::vector<torch::jit::Value *> &tensors);
 
-  torch::jit::Node *create(torch::jit::Graph *graph);
+  torch::jit::Node *create(torch::jit::Graph *graph,
+                           const std::vector<std::int64_t> &output_shape);
 
 private:
   // A modified version of tensordot that handles batch dimensions and takes

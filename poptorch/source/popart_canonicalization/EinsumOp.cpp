@@ -67,7 +67,9 @@ EinsumOp::EinsumOp(std::string eq,
   }
 }
 
-torch::jit::Node *EinsumOp::create(torch::jit::Graph *graph) {
+torch::jit::Node *
+EinsumOp::create(torch::jit::Graph *graph,
+                 const std::vector<std::int64_t> &output_shape) {
   canonicalizeTensors(graph);
 
   torch::jit::Node *output = nullptr;
@@ -93,8 +95,8 @@ torch::jit::Node *EinsumOp::create(torch::jit::Graph *graph) {
     output = permuteOutput(graph, output->output());
   }
 
-  // Remove single dimensions
-  return createSqueeze(graph, {output->output()}, {});
+  // Remove reduced single dimensions by reshaping
+  return createReshape(graph, output->output(), output_shape);
 }
 
 torch::jit::Node *EinsumOp::tensordotBmm(torch::jit::Graph *graph,
