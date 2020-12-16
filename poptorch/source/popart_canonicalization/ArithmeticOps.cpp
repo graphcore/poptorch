@@ -29,14 +29,6 @@ torch::jit::Node *addHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createAdd(graph, {node->input(0), alpha_multiplicand});
 }
 
-torch::jit::Node *rsqrtHandler(torch::jit::Graph *graph,
-                               torch::jit::Node *node) {
-  // rsqrt =  1 / sqrt(x)
-  torch::jit::Node *sqrt = createSqrt(graph, {node->input()});
-
-  return createReciprocal(graph, {sqrt->output()});
-}
-
 torch::jit::Node *erfcHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   // erfc = 1 - erf(x)
@@ -125,7 +117,6 @@ torch::jit::Node *rsubHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::add, addHandler);
-  registerHandler(c10::aten::rsqrt, rsqrtHandler);
   registerHandler(c10::aten::rsub, rsubHandler);
   registerHandler(c10::aten::erfc, erfcHandler);
   registerHandler(c10::aten::trunc, truncHandler);

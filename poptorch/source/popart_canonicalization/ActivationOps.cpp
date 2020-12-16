@@ -9,22 +9,6 @@
 namespace poptorch {
 namespace {
 
-torch::jit::Node *celuHandler(torch::jit::Graph *graph,
-                              torch::jit::Node *node) {
-  // CELU(x) = max(x, 0) + min(0, a * (exp(x/a)-1))
-  auto x = node->input(0);
-  auto a = node->input(1);
-  auto zero = createConstantFloatLike(graph, x, {0.0}, {})->output();
-
-  auto max = createMax(graph, {x, zero})->output();
-  auto div = createDiv(graph, {x, a})->output();
-  auto expm1 = createExpm1(graph, {div})->output();
-  auto mul = createMul(graph, {a, expm1})->output();
-  auto min = createMin(graph, {zero, mul})->output();
-
-  return createAdd(graph, {max, min});
-}
-
 torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   // "aten::glu(Tensor self, int dim) -> Tensor"
   // The input IR before canonicalization:
@@ -114,23 +98,6 @@ torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
   return createWhere(graph, {xlt0, mul, x});
 }
 
-torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
-                                  torch::jit::Node *node) {
-  torch::jit::Value *x = node->input(0);
-  torch::jit::Value *beta = node->input(1);
-  torch::jit::Value *threshold = node->input(2);
-
-  // softplus = 1/beta * log(1 + exp(beta * x))
-  torch::jit::Value *beta_x = createMul(graph, {x, beta})->output();
-  torch::jit::Value *exp_betax = createExp(graph, {beta_x})->output();
-  torch::jit::Value *log1p_exp = createLog1p(graph, {exp_betax})->output();
-  torch::jit::Value *softplus = createDiv(graph, {log1p_exp, beta})->output();
-
-  // For numerical stability, revert to identity when beta * x > threshold
-  torch::jit::Value *mask = createGreater(graph, {beta_x, threshold})->output();
-  return createWhere(graph, {mask, x, softplus});
-}
-
 torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   // softshrink(x) = x - lambda, if x > lambda
@@ -158,11 +125,9 @@ torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
-  registerHandler(c10::aten::celu, celuHandler);
   registerHandler(c10::aten::glu, gluHandler);
   registerHandler(c10::aten::hardshrink, hardshrinkHandler);
   registerHandler(c10::aten::rrelu, rreluHandler);
-  registerHandler(c10::aten::softplus, softplusHandler);
   registerHandler(c10::aten::softshrink, softshrinkHandler);
 }
 

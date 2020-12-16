@@ -16,8 +16,6 @@
 
 namespace poptorch {
 
-namespace {
-
 // An odd function which returns each tensor dimension as an array, a helper for
 // torch.max(tensor) and torch.min(tensor). I.E a 4D tensor will return (0, 1,
 // 2, 3).
@@ -35,6 +33,8 @@ reduceHelperDimensionCreator(torch::jit::Value *value) {
   }
   return shape;
 }
+
+namespace {
 
 class CanonicalizeImpl {
 public:

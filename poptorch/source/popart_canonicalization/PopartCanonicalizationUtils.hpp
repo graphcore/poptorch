@@ -16,6 +16,9 @@ using SymbolHandler =
 
 bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler);
 
+std::vector<std::int64_t>
+reduceHelperDimensionCreator(torch::jit::Value *value);
+
 // Return a pointer to a handler if one is registered for this kind of node or
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::NodeKind kind);
