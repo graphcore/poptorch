@@ -12,6 +12,7 @@ set(SNAPSHOT "" CACHE STRING "Snapshot ID to use for the documentation")
 set(SDK_DIR CACHE PATH "Path to an extracted SDK archive or to a Poplar & Popart install directory (Will populate POPLAR_DIR and POPART_DIR)")
 set(USE_PROTOC_PROTOBUF ON CACHE BOOL "Use libprotobuf shipped with protoc instead of searching for it in the system path.")
 set(BUILD_DOCS OFF CACHE BOOL "Build PopTorch's documentation")
+set(COPY_TESTS OFF CACHE BOOL "Copy tests files to the build folder (instead of running them from the sources folder)")
 
 # Note: The next line is also parsed by scripts/utils/_utils.py
 set(TORCH_VERSION 1.6.0)
