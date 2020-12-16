@@ -86,8 +86,8 @@ def test_bilinear(include_bias, input_feature_shapes):
     model = torch.nn.Bilinear(20, 30, 40, bias=include_bias)
     shape1 = input_feature_shapes['x1']
     shape2 = input_feature_shapes['x2']
-    x1 = torch.randn(128, *shape1, 20)
-    x2 = torch.randn(128, *shape2, 30)
+    x1 = torch.randn(8, *shape1, 20)
+    x2 = torch.randn(8, *shape2, 30)
 
     # Run on CPU
     native_out = model(x1, x2)
