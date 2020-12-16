@@ -18,15 +18,8 @@ foreach(EXAMPLE ${EXAMPLES})
 endforeach()
 
 if(BUILD_DOCS)
-  find_package(poplar REQUIRED)
-  find_package(popart REQUIRED COMPONENTS popart-only)
-
-  get_target_property(POPLAR_LIB poplar LOCATION)
-  get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)
-  install(CODE
-    "set(ENV{LD_LIBRARY_PATH} ${popart_LIB_DIR}:${POPLAR_DIR}:$ENV{LD_LIBRARY_PATH})
-    execute_process( COMMAND python3 ${PROJECT_SOURCE_DIR}/scripts/docs_build.py --install-dir ${CMAKE_INSTALL_PREFIX} --add-to-sys-path ${CMAKE_INSTALL_PREFIX} WORKING_DIRECTORY ${PROJECT_BINARY_DIR} RESULT_VARIABLE RETVAL )
-    if(\${RETVAL})
-      message(FATAL_ERROR \"docs_build.py FAILED (See above)\")
-    endif()")
+  run_poptorch_install_command(
+    "python3 ${PROJECT_SOURCE_DIR}/scripts/docs_build.py --install-dir ${CMAKE_INSTALL_PREFIX} --add-to-sys-path ${CMAKE_INSTALL_PREFIX}"
+    "${PROJECT_BINARY_DIR}"
+    "docs_build.py")
 endif()

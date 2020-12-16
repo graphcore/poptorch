@@ -1,7 +1,6 @@
 include(GNUInstallDirs)
 
 find_package(pybind11 REQUIRED)
-find_package(Torch REQUIRED)
 
 find_library(TORCH_PYTHON_LIBRARY torch_python PATHS "${TORCH_INSTALL_PREFIX}/lib")
 

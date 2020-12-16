@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
 project(popart_compiler)
 
-find_package(popart COMPONENTS popart-only REQUIRED)
-
 add_library(popart_compiler SHARED
   "source/Compiler.cpp"
   "source/PopartEnums.cpp"

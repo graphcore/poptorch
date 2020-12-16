@@ -76,6 +76,25 @@ else()
   endif()
 endif()
 
+if(NOT popart_FOUND)
+  find_package(popart REQUIRED COMPONENTS popart-only)
+endif()
+if(NOT poplar_FOUND)
+  find_package(poplar REQUIRED)
+endif()
+
+# Run an install command that requires PopTorch, PopArt and Poplar to be in the PATH.
+function(run_poptorch_install_command cmd working_directory cmd_name)
+  get_target_property(POPLAR_LIB poplar LOCATION)
+  get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)
+  install(CODE
+    "set(ENV{LD_LIBRARY_PATH} ${popart_LIB_DIR}:${POPLAR_DIR}:$ENV{LD_LIBRARY_PATH})
+    execute_process( COMMAND ${cmd} WORKING_DIRECTORY ${working_directory} RESULT_VARIABLE RETVAL )
+    if(RETVAL AND NOT RETVAL EQUAL 0)
+      message(FATAL_ERROR \"${cmd_name} FAILED (See above)\")
+    endif()")
+endfunction()
+
 file(WRITE ${CMAKE_BINARY_DIR}/tmp/test.sh "
   source ${CMAKE_BINARY_DIR}/enable.sh
   ctest --output-on-failure $@
@@ -116,6 +135,8 @@ else()
   set(CMAKE_INSTALL_RPATH "$ORIGIN")
 endif()
 
+find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
+
 add_subdirectory(poptorch_logging)
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
@@ -124,8 +145,6 @@ add_subdirectory(python)
 add_subdirectory(tests)
 add_subdirectory(examples)
 add_subdirectory(docs/user_guide)
-
-find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
 
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
