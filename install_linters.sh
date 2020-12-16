@@ -9,7 +9,7 @@ realpath() {
 DIR=$(realpath $(dirname $0))
 
 print_usage_and_exit() {
-  echo "Usage: $0 --poplar <path_to_poplar>"
+  echo "Usage: $0 --poplar <path_to_poplar> --popart <path_to_popart>"
   exit 1
 }
 
@@ -23,6 +23,11 @@ case "$1" in
   --poplar)
     shift
     POPLAR_PATH=$1
+    shift
+    ;;
+  --popart)
+    shift
+    POPART_PATH=$1
     shift
     ;;
   *)
@@ -104,6 +109,7 @@ ln -fs ${VE}/bin/cpplint ${DIR}/.linters/cpplint
 ln -fs ${VE}/bin/pylint ${DIR}/.linters/pylint
 ln -fs $torch_path .linters/torch
 ln -fs ${POPLAR_PATH}/include .linters/poplar_includes
+ln -fs ${POPART_PATH}/include .linters/popart_includes
 nproc > .linters/num_threads
 python3-config --includes >> .linters/system_includes
 
