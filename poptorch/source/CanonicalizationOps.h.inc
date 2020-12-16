@@ -120,6 +120,6 @@ OP_CONVERTOR_POP(symbols::poptorch::set_available_memory, NONE, createSetAvailab
 OP_CONVERTOR_POP(symbols::poptorch::begin_ipu_block, NONE, createBeginIpuBlock, CONSTANT_TO_LONG(0) COMMA CONSTANT_TO_LONG(1) COMMA CONSTANT_TO_LONG(2))
 OP_CONVERTOR_POP(symbols::poptorch::set_matmul_serialization, NONE, createSetMatMulSerialization, PARAM(0) COMMA CONSTANT_TO_STRING(1) COMMA CONSTANT_TO_LONG(2) COMMA CONSTANT_TO_LONG(3))
 OP_CONVERTOR_POP(symbols::poptorch::optimizer_group, NONE, createOptimizerGroup, CONSTANT_TO_LONG(0) COMMA HANDLE_TENSOR_LIST(1))
-OP_CONVERTOR_POP(symbols::poptorch::recomputation_checkpoint, NONE, createRecomputationCheckpoint, {PARAM(0)})
+OP_CONVERTOR_POP(symbols::poptorch::recomputation_checkpoint, NONE, createRecomputationCheckpoint, PARAM(0))
 
 OP_CONVERTOR(aten::pixel_shuffle, NONE, createDepthtospace, {PARAM(0)} COMMA CONSTANT_TO_LONG(1) COMMA "CRD")
