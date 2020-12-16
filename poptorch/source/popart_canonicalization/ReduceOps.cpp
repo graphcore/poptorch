@@ -157,6 +157,18 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
   return createPow(graph, {sum->output(), one_over_p->output()});
 }
 
+torch::jit::Node *frobeniusNormHandler(torch::jit::Graph *graph,
+                                       torch::jit::Node *node) {
+  // aten::frobenius_norm(Tensor in, int[] axes, int keepdim) -> Tensor
+  torch::jit::Value *x = node->input(0);
+  std::vector<std::int64_t> axes = constantToLongVec(node->input(1)->node());
+  if (axes.empty()) {
+    axes = reduceHelperDimensionCreator(x);
+  }
+  std::int64_t keepdim = constantToLong(node->input(2)->node());
+
+  return createReducel2(graph, {x}, axes, keepdim);
+}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -167,6 +179,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::sum, reduceHandler);
   registerHandler(c10::aten::logsumexp, reduceHandler);
   registerHandler(c10::aten::norm, tensorNormHandler);
+  registerHandler(c10::aten::frobenius_norm, frobeniusNormHandler);
 }
-
 } // namespace poptorch

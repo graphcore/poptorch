@@ -445,7 +445,8 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
-  // aten::smooth_l1_loss(Tensor input, Tensor target, int reduction)
+  // aten::smooth_l1_loss(Tensor input, Tensor target, int reduction,
+  //                      float beta)
 
   // Input
   torch::jit::Value *x = node->input(0);
@@ -455,17 +456,15 @@ torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
   std::int64_t reduction = constantToLong(node->input(2)->node());
   // Convert to popart reduce values
   reduction = convertReduceToPopart(reduction);
+  torch::jit::Value *beta = node->input(3);
 
   // x - y
   torch::jit::Node *x_minus_y = createSub(graph, {x, y});
   // |x - y|
   torch::jit::Node *abs_x_minus_y = createAbs(graph, {x_minus_y->output()});
-  // 1
-  torch::jit::Node *ones = createConstantFloatLike(graph, x, {1}, {});
 
-  // if |x - y| < 1
-  torch::jit::Node *mask =
-      createLess(graph, {abs_x_minus_y->output(), ones->output()});
+  // if |x - y| < beta
+  torch::jit::Node *mask = createLess(graph, {abs_x_minus_y->output(), beta});
 
   // 2
   torch::jit::Node *twos = createConstantFloatLike(graph, x, {2}, {});
@@ -477,16 +476,21 @@ torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
   // 0.5 (x - y)^2
   torch::jit::Node *half_sqr_x_minus_y =
       createMul(graph, {half->output(), sqr_x_minus_y->output()});
+  // 0.5 (x - y)^2 / beta
+  torch::jit::Node *div_beta =
+      createDiv(graph, {half_sqr_x_minus_y->output(), beta});
 
-  // |x - y| - 0.5
-  torch::jit::Node *abs_minus_half =
-      createSub(graph, {abs_x_minus_y->output(), half->output()});
+  // 0.5 * beta
+  torch::jit::Node *half_beta = createMul(graph, {half->output(), beta});
+  // |x - y| - 0.5 * beta
+  torch::jit::Node *abs_minus_half_beta =
+      createSub(graph, {abs_x_minus_y->output(), half_beta->output()});
 
-  // 0.5 (x - y)^2  if |x - y| < 1
-  // |x - y| - 0.5  otherwise
+  // 0.5 (x - y)^2 / beta  if |x - y| < beta
+  // |x - y| - 0.5 * beta  otherwise
   torch::jit::Node *loss =
-      createWhere(graph, {mask->output(), half_sqr_x_minus_y->output(),
-                          abs_minus_half->output()});
+      createWhere(graph, {mask->output(), div_beta->output(),
+                          abs_minus_half_beta->output()});
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }

@@ -106,6 +106,9 @@ bool isMarkedForDeletion(torch::jit::Node *node);
 void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val);
 void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
                       std::uint64_t outputIdx);
+
+std::vector<std::int64_t>
+reduceHelperDimensionCreator(torch::jit::Value *value);
 } // namespace poptorch
 
 #endif // SOURCE_POPART_CANONICALIZATION_UTILS_H

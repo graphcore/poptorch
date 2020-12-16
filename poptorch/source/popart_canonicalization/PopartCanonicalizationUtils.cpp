@@ -317,4 +317,22 @@ void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
   replaceOutputUse(old_val, new_val);
 }
 
+// An odd function which returns each tensor dimension as an array, a helper for
+// torch.max(tensor) and torch.min(tensor). I.E a 4D tensor will return (0, 1,
+// 2, 3).
+std::vector<std::int64_t>
+reduceHelperDimensionCreator(torch::jit::Value *value) {
+  // Extract the type from the pytorch IR.
+  c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
+  c10::VaryingShape dims = as_tensor->sizes();
+
+  std::int64_t index = 0;
+  // Convert that IR type into a C++ vector of ints.
+  std::vector<std::int64_t> shape;
+  for (auto optional_int : *dims.sizes()) {
+    shape.push_back(index++);
+  }
+  return shape;
+}
+
 } // namespace poptorch

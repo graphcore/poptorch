@@ -14,7 +14,18 @@ torch.set_default_dtype(torch.float32)
 # yapf: disable
 # pylint: disable=line-too-long
 EXPECTED_FAILURES = {
-    "test_nn_BatchNorm3d_not_affine": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.onnx.BatchNormalization:9, inputs=[Reshape:0], outputs=[]), but input is not optional", # TODO(T26651) Popart feature request
+    # TODO(T26651) Popart feature request
+    "test_nn_BatchNorm3d_not_affine": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.onnx.BatchNormalization:9, inputs=[Reshape:0], outputs=[]), but input is not optional",
+
+    # TODO(T31811): Circular padding
+    "test_nn_Padding12_1dcircular": "outputs_[i]->uses().empty() INTERNAL ASSERT FAILED",
+    "test_nn_Padding31_1dcircular": "outputs_[i]->uses().empty() INTERNAL ASSERT FAILED",
+    "test_nn_Padding33_1dcircular": "outputs_[i]->uses().empty() INTERNAL ASSERT FAILED",
+    "test_nn_Padding1221_2dcircular": "outputs_[i]->uses().empty() INTERNAL ASSERT FAILED",
+    "test_nn_Padding2322_2dcircular": "outputs_[i]->uses().empty() INTERNAL ASSERT FAILED",
+    "test_nn_Padding3331_2dcircular": "outputs_[i]->uses().empty() INTERNAL ASSERT FAILED",
+    "test_nn_Conv1d_circular_stride2_pad2": "margin of error",
+    "test_nn_Conv2d_circular_stride2_pad2": "margin of error",
 
     # TODO(T26652): Popart feature request
     "test_nn_LayerNorm_3d_no_elementwise_affine": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
@@ -53,16 +64,23 @@ EXPECTED_FAILURES = {
     "test_nn_AdaptiveMaxPool2d_single": "T30564",
     "test_nn_AdaptiveMaxPool2d_tuple": "T30564",
     "test_nn_AdaptiveMaxPool2d_tuple_none": "T30564",
+    "test_nn_AdaptiveMaxPool2d_alert_nondeterministic": "T30564",
 
+    "test_nn_AdaptiveAvgPool1d": "margin of error",
+    "test_nn_AdaptiveAvgPool1d_one_output": "margin of error",
     "test_nn_AdaptiveAvgPool2d_single": "margin of error",
     "test_nn_AdaptiveAvgPool2d_tuple": "margin of error",
     "test_nn_AdaptiveAvgPool2d_tuple_none": "margin of error",
+    "test_nn_AdaptiveAvgPool2d_alert_nondeterministic": "margin of error",
+    "test_nn_AdaptiveAvgPool3d_single": "margin of error",
+    "test_nn_AdaptiveAvgPool3d_tuple": "margin of error",
+    "test_nn_AdaptiveAvgPool3d_tuple_none": "margin of error",
+    "test_nn_AdaptiveAvgPool3d_alert_nondeterministic": "margin of error",
 
     "test_nn_Conv3d_circular_stride2_pad2": "hangs ? really slow ?",
     "test_nn_Padding122112_3dcircular": "hangs ? really slow ?",
     "test_nn_Padding322112_3dcircular": "hangs ? really slow ?",
     "test_nn_Padding332122_3dcircular": "hangs ? really slow ?",
-
 
     "test_nn_softmax_spatial_dtype": "AssertionError: With rtol=0.0001 and atol=1e-05, found 64 element(s) (out of 64) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.662305723875761 (0.706894040107727 vs. 0.04458831623196602), which occurred at index (0, 1, 2, 3).",
     "test_nn_Softmin_multidim": "AssertionError: With rtol=0.0001 and atol=1e-05, found 300 element(s) (out of 300) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.528009258210659 (0.5376919507980347 vs. 0.009682692587375641), which occurred at index (0, 1, 4, 6).",
@@ -93,7 +111,8 @@ EXPECTED_FAILURES = {
     "test_nn_log_softmax_dim0": "AssertionError: With rtol=0.0001 and atol=1e-05, found 120 element(s) (out of 120) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 4.541183948516846 (-0.645355224609375 vs. -5.186539173126221), which occurred at index (0, 0, 2, 0).",
     "test_nn_Softmax2d": "AssertionError: With rtol=0.0001 and atol=1e-05, found 600 element(s) (out of 600) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.5474691272247583 (0.5498999953269958 vs. 0.002430868102237582), which occurred at index (0, 1, 6, 13).",
     "test_nn_LogSoftmax_multiparam": "AssertionError: With rtol=0.0001 and atol=1e-05, found 600 element(s) (out of 600) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.692737579345703 (-1.065810203552246 vs. -6.758547782897949), which occurred at index (0, 2, 7, 2).",
-
+    "test_nn_TransformerEncoderLayer_gelu_activation": "AssertionError: With rtol=0.0001 and atol=1e-05, found 2 element(s) (out of 24) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 6.428360939025879e-05 (-0.4767186641693115 vs. -0.47665438055992126), which occurred at index (1, 2, 0).",
+    "test_nn_TransformerDecoderLayer_gelu_activation": "AssertionError: With rtol=0.0001 and atol=1e-05, found 3 element(s) (out of 36) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.00011313706636428833 (-0.07721851021051407 vs. -0.07710537314414978), which occurred at index (0, 0, 3).",
 
     "test_nn_LPPool1d_norm": "Output dimensions mismatch: assert torch.Size([1, 3, 3]) == torch.Size([1, 3, 6])",
     "test_nn_ConvTranspose1d": "Output dimensions mismatch: assert torch.Size([1, 4, 20]) == torch.Size([1, 4, 19])",
@@ -160,9 +179,11 @@ EXPECTED_FAILURES = {
 
     "test_nn_FractionalMaxPool2d_ratio": "T30594",
     "test_nn_FractionalMaxPool2d_size": "T30594",
+    "test_nn_FractionalMaxPool2d_alert_nondeterministic": "T30594",
     "test_nn_FractionalMaxPool3d_ratio": "T30594",
     "test_nn_FractionalMaxPool3d_size": "T30594",
     "test_nn_FractionalMaxPool3d_asymsize": "T30594",
+    "test_nn_FractionalMaxPool3d_alert_nondeterministic": "T30594",
     "test_nn_Threshold_threshold_value": "T30611",
     "test_nn_Threshold_large_value": "T30611",
     "test_nn_BCELoss_no_reduce": "T30603",
@@ -193,10 +214,6 @@ EXPECTED_FAILURES = {
     "test_nn_AdaptiveMaxPool3d_tuple_none": "T30564",
     "test_nn_AdaptiveMaxPool3d_single_nonatomic": "T30564",
     "test_nn_AdaptiveMaxPool3d_tuple_nonatomic": "T30564",
-    "test_nn_AdaptiveAvgPool1d": "T30591",
-    "test_nn_AdaptiveAvgPool1d_one_output": "T30591",
-    "test_nn_AdaptiveAvgPool3d_tuple": "T30591",
-    "test_nn_AdaptiveAvgPool3d_tuple_none": "T30591",
     "test_nn_Fold": "T30606",
     "test_nn_Unfold_int_input": "T30606",
     "test_nn_Fold_int_input": "T30606",
@@ -204,7 +221,6 @@ EXPECTED_FAILURES = {
     "test_nn_GRUCell": "T30600",
     "test_nn_MultiLabelMarginLoss_1d_no_reduce": "T30603",
     "test_nn_AdaptiveMaxPool3d_single": "T30564",
-    "test_nn_AdaptiveAvgPool3d_single": "T30591",
     "test_nn_Unfold": "T30606",
 
     # unsupported upsamplig modes downstream
@@ -214,6 +230,7 @@ EXPECTED_FAILURES = {
     "test_nn_interpolate_linear_1d_zero_dim": "Upsample mode not supported",
     "test_nn_interpolate_linear_1d_align_corners": "Upsample mode not supported",
     "test_nn_interpolate_linear_scale_1d_align_corners": "Upsample mode not supported",
+    "test_nn_interpolate_linear_1d_alert_nondeterministic": "Upsample mode not supported",
     "test_nn_interpolate_bilinear_2d": "Upsample mode not supported",
     "test_nn_interpolate_bilinear_2d_zero_dim": "Upsample mode not supported",
     "test_nn_interpolate_bilinear_tuple_2d": "Upsample mode not supported",
@@ -222,6 +239,7 @@ EXPECTED_FAILURES = {
     "test_nn_interpolate_bilinear_scale_tuple_skewed_2d": "Upsample mode not supported",
     "test_nn_interpolate_bilinear_tuple_2d_align_corners": "Upsample mode not supported",
     "test_nn_interpolate_bilinear_scale_tuple_skewed_2d_align_corners": "Upsample mode not supported",
+    "test_nn_interpolate_bilinear_2d_alert_nondeterministic": "Upsample mode not supported",
     "test_nn_interpolate_bicubic_2d": "Upsample mode not supported",
     "test_nn_interpolate_bicubic_2d_zero_dim": "Upsample mode not supported",
     "test_nn_interpolate_bicubic_tuple_2d": "Upsample mode not supported",
@@ -230,20 +248,26 @@ EXPECTED_FAILURES = {
     "test_nn_interpolate_bicubic_scale_tuple_skewed_2d": "Upsample mode not supported",
     "test_nn_interpolate_bicubic_tuple_2d_align_corners": "Upsample mode not supported",
     "test_nn_interpolate_bicubic_scale_tuple_skewed_2d_align_corners": "Upsample mode not supported",
+    "test_nn_interpolate_bicubic_2d_alert_nondeterministic": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_3d": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_3d_zero_dim": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_tuple_3d": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_scale_3d": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_tuple_3d_align_corners": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_scale_3d_align_corners": "Upsample mode not supported",
+    "test_nn_interpolate_trilinear_3d_alert_nondeterministic": "Upsample mode not supported",
 
     "test_nn_EmbeddingBag_mean": "T30611",
     "test_nn_EmbeddingBag_sum": "T30611",
     "test_nn_EmbeddingBag_max": "T30611",
     "test_nn_EmbeddingBag_sparse": "T30611",
+    "test_nn_EmbeddingBag_alert_nondeterministic": "T30611",
     "test_nn_Embedding_sparse": "T30611",
 
     "test_nn_MultiheadAttention": "ai.onnx.Dropout:10 ratio value 0 is not valid",
+
+    "test_nn_SiLU": "T31522",
+    "test_nn_SiLU_scalar": "T31522",
     }
 
 HALF_EXPECTED_FAILURES = {
@@ -261,6 +285,8 @@ HALF_EXPECTED_FAILURES = {
 
 HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
+    "test_nn_Conv2d_depthwise_padded": (0.05, 1e-3), # TODO(T31811)?
+    "test_nn_Conv3d_dilated": (0.05, 1e-3),
     "test_nn_Conv3d_groups": (0.05, 1e-3),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),

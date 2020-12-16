@@ -116,6 +116,7 @@ OP_CONVERTOR(aten::uniform_, NONE, createRandomUniform, PARAM(0) COMMA TENSOR_SH
 OP_CONVERTOR(aten::randn, NONE, createRandomNormal, {} COMMA OUTPUT_TENSOR_SHAPE(0) COMMA 0.0f COMMA 1.0f COMMA GET_RETURN_TYPE)
 // aten::normal_(Tensor self, float mean, float std, Generator?) -> Tensor
 
+OP_CONVERTOR_POP(symbols::poptorch::ipu_print_tensor, NONE, createPrintIpuTensor, PARAM(0) COMMA CONSTANT_TO_STRING(1))
 OP_CONVERTOR_POP(symbols::poptorch::set_available_memory, NONE, createSetAvailableMemory, PARAM(0) COMMA CONSTANT_TO_FLOAT(1))
 OP_CONVERTOR_POP(symbols::poptorch::begin_ipu_block, NONE, createBeginIpuBlock, CONSTANT_TO_LONG(0) COMMA CONSTANT_TO_LONG(1) COMMA CONSTANT_TO_LONG(2))
 OP_CONVERTOR_POP(symbols::poptorch::set_matmul_serialization, NONE, createSetMatMulSerialization, PARAM(0) COMMA CONSTANT_TO_STRING(1) COMMA CONSTANT_TO_LONG(2) COMMA CONSTANT_TO_LONG(3))

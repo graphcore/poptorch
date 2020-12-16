@@ -45,7 +45,8 @@ def execute_and_check_wrapper(model, input):
 @pytest.mark.parametrize("op", conv_1D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
 def test_conv1D(op, padding_mode):
-    if op is torch.nn.ConvTranspose1d and padding_mode != 'zeros':
+    if (op is torch.nn.ConvTranspose1d and padding_mode != 'zeros') or \
+       padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
     torch.manual_seed(42)
 
@@ -73,7 +74,8 @@ def test_conv1D(op, padding_mode):
 @pytest.mark.parametrize("op", conv_2D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
 def test_conv2D(op, padding_mode):
-    if op is torch.nn.ConvTranspose2d and padding_mode != 'zeros':
+    if (op is torch.nn.ConvTranspose2d and padding_mode != 'zeros') or \
+       padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
     torch.manual_seed(42)
 
@@ -107,7 +109,8 @@ def test_conv2D(op, padding_mode):
 @pytest.mark.parametrize("padding_mode", padding_modes)
 def test_conv3D(op, padding_mode):
     if (op is torch.nn.ConvTranspose3d and padding_mode != 'zeros') or \
-       (op is torch.nn.Conv3d and padding_mode == 'reflect'):
+       (op is torch.nn.Conv3d and padding_mode == 'reflect') or \
+       padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
 
     torch.manual_seed(42)

@@ -13,17 +13,14 @@ c10::Symbol dropout_;
 c10::Symbol hardtanh_;
 c10::Symbol logical_not;
 c10::Symbol floor_divide;
-c10::Symbol true_divide;
 c10::Symbol prelu_;
 c10::Symbol leaky_relu_;
-c10::Symbol clamp_;
 c10::Symbol elu_;
 c10::Symbol selu_;
 c10::Symbol isnan;
 c10::Symbol isinf;
 c10::Symbol uniform_;
 c10::Symbol normal_;
-c10::Symbol masked_fill_;
 c10::Symbol where_;
 c10::Symbol poisson_nll_loss;
 c10::Symbol multilabel_soft_margin_loss;
@@ -38,17 +35,14 @@ static void initializeAtenSymbols()
   SYMBOL_INIT(aten, hardtanh_)
   SYMBOL_INIT(aten, logical_not)
   SYMBOL_INIT(aten, floor_divide)
-  SYMBOL_INIT(aten, true_divide)
   SYMBOL_INIT(aten, prelu_)
   SYMBOL_INIT(aten, leaky_relu_)
-  SYMBOL_INIT(aten, clamp_)
   SYMBOL_INIT(aten, elu_)
   SYMBOL_INIT(aten, selu_)
   SYMBOL_INIT(aten, isnan)
   SYMBOL_INIT(aten, isinf)
   SYMBOL_INIT(aten, uniform_)
   SYMBOL_INIT(aten, normal_)
-  SYMBOL_INIT(aten, masked_fill_)
   SYMBOL_INIT(aten, where_)
   SYMBOL_INIT(aten, poisson_nll_loss)
   SYMBOL_INIT(aten, multilabel_soft_margin_loss)
