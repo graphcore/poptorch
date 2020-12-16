@@ -1791,9 +1791,6 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         {}, options, _impl->options.patterns);
   }
 
-  logging::trace(
-      "Popart serialised IR:\n{}",
-      _impl->session->serializeIr(popart::IrSerializationFormat::JSON));
 
   // Poplar compilation.
   try {
@@ -1803,6 +1800,12 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
     logging::trace("Begining Poplar compilation.");
     _impl->session->prepareDevice();
     logging::trace("Finished Poplar compilation.");
+
+    // serializeIr must be called after prepareDevice in some cases (e.g.
+    // when loading from execution cache)
+    logging::trace(
+        "Popart serialised IR:\n{}",
+        _impl->session->serializeIr(popart::IrSerializationFormat::JSON));
   } catch (popart::memory_allocation_err &e) {
     std::ofstream stream;
     stream.open("OOMReport.json");
