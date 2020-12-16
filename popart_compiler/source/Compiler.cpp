@@ -668,6 +668,26 @@ SessionOptionsImpl::SessionOptionsImpl() {
         static_cast<popart::DeviceConnectionType>(value);
   });
 
+  registerSetter(
+      uint64_options, "accumulateOuterFragmentSettings.schedule",
+      [&](std::uint64_t value) {
+        ERROR_ON_MSG(
+            value > static_cast<std::uint64_t>(
+                        popart::AccumulateOuterFragmentSchedule::
+                            OverlapMemoryOptimized),
+            "Value for popart::AccumulateOuterFragmentSchedule out of range");
+        popart_options.accumulateOuterFragmentSettings.schedule =
+            static_cast<popart::AccumulateOuterFragmentSchedule>(value);
+      });
+
+  registerSetter(container_options,
+                 "accumulateOuterFragmentSettings.excludedVirtualGraphs",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   std::int64_t value = std::stoi(p.first);
+                   popart_options.accumulateOuterFragmentSettings
+                       .excludedVirtualGraphs.push_back(value);
+                 });
+
   registerSetter(uint64_options, "accumulationReductionType",
                  [&](std::uint64_t value) {
                    ERROR_ON_MSG(value > static_cast<std::uint64_t>(

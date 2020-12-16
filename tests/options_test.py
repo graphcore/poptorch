@@ -76,6 +76,11 @@ def test_set_popart_options():
     opts.Popart.set("batchSerializationSettings.transformContext", 0)
     opts.Popart.set("batchSerializationSettings.method", 0)
     opts.Popart.set("batchSerializationSettings.batchSchedule", 1)
+
+    opts.Popart.set("accumulateOuterFragmentSettings.schedule", 1)
+    opts.Popart.set("accumulateOuterFragmentSettings.excludedVirtualGraphs",
+                    ["0", "1"])
+
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
     y = torch.zeros(2)
