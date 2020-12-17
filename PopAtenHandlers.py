@@ -27,11 +27,6 @@ expand("clamp", lambda x, y, z: op.clip(x, cfloat(z), cfloat(y)))
 
 expand("dropout", lambda x, y: op.dropout(x, cint(1), cfloat(y)))
 
-expand(
-    "frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), cfloat(0)))
-expand(
-    "frobenius_norm", lambda x, y, z: op.reducel2(x, clong_list(y), cfloat(z)))
-
 convert("relu", 1)
 forward("relu_", "relu")
 

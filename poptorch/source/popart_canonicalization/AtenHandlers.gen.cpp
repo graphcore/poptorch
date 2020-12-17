@@ -77,27 +77,6 @@ torch::jit::Node *dropoutHandler(torch::jit::Graph *graph,
   return createDropout(graph, {x}, 1, t0);
 }
 
-torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
-                                       torch::jit::Node *node) {
-  if (node->inputs().size() == 1) {
-    auto x = node->input(0);
-    auto t0 = reduceHelperDimensionCreator(x);
-    // reducel2(x, DimensionList(x), 0)
-    return createReducel2(graph, {x}, t0, 0);
-  }
-  if (node->inputs().size() == 3) {
-    auto x = node->input(0);
-    auto y = node->input(1);
-    auto t0 = constantToLongVec(y->node());
-    auto z = node->input(2);
-    auto t1 = constantToFloat(z->node());
-    // reducel2(x, ConstantLongList(y), NonTensorFloat(z))
-    return createReducel2(graph, {x}, t0, t1);
-  }
-  ERROR("Unhandled arity for operator c10::aten::frobenius_norm");
-  return nullptr;
-}
-
 torch::jit::Node *maskedfillHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto i1 = node->input(1);
@@ -219,7 +198,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::celu, celuHandler);
   registerHandler(c10::aten::clamp, clampHandler);
   registerHandler(c10::aten::dropout, dropoutHandler);
-  registerHandler(c10::aten::frobenius_norm, frobeniusnormHandler);
   registerHandler(c10::aten::masked_fill, maskedfillHandler);
   registerHandler(c10::aten::masked_fill_, maskedfillHandler);
   registerHandler(c10::aten::min, minHandler);
