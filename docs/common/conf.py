@@ -39,16 +39,19 @@ templates_path = []
 exclude_patterns = []
 
 nitpick_ignore = [
-    ('py:class', 'int'),
     ('py:class', 'bool'),
-    ('py:class', 'str'),
     ('py:class', 'dict'),
+    ('py:class', 'int'),
     ('py:class', 'iterable'),
     ('py:class', 'optional'),
+    ('py:class', 'str'),
+    ('py:class', 'T_co'),
     ('py:class', 'torch.Tensor'),
-    ('py:class', 'torch.nn.Module'),
     ('py:class', 'torch.dtype'),
+    ('py:class', 'torch.nn.Module'),
     ('py:class', 'torch.optim.Optimizer'),
+    ('py:class', 'torch.utils.data.dataset.Dataset'),
+    ('py:class', 'torch.utils.data.sampler.Sampler'),
     # Enums already described in functions that use them
     ('py:class', 'poptorch.AnchorMode'),
     ('py:class', 'poptorch.ConnectionType'),
