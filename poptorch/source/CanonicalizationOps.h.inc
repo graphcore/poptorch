@@ -115,7 +115,6 @@ OP_CONVERTOR(aten::rand, NONE, createRandomUniform, NULL COMMA OUTPUT_TENSOR_SHA
 OP_CONVERTOR(aten::uniform_, NONE, createRandomUniform, PARAM(0) COMMA TENSOR_SHAPE(0) COMMA CONSTANT_TO_FLOAT(2) COMMA CONSTANT_TO_FLOAT(1))
 // aten::randn(int[] size, *, int? dtype, int? layout, Device? device, bool? pin_memory) -> Tensor
 OP_CONVERTOR(aten::randn, NONE, createRandomNormal, {} COMMA OUTPUT_TENSOR_SHAPE(0) COMMA 0.0f COMMA 1.0f COMMA GET_RETURN_TYPE)
-// aten::normal_(Tensor self, float mean, float std, Generator?) -> Tensor
 
 OP_CONVERTOR_POP(symbols::poptorch::ipu_print_tensor, NONE, createPrintIpuTensor, PARAM(0) COMMA CONSTANT_TO_STRING(1))
 OP_CONVERTOR_POP(symbols::poptorch::set_available_memory, NONE, createSetAvailableMemory, PARAM(0) COMMA CONSTANT_TO_FLOAT(1))

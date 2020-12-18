@@ -28,29 +28,6 @@ from . import profiling
 __version__ = "@VERSION@-@SNAPSHOT@"
 
 
-class _RepeatSampler(torch.utils.data.IterableDataset):
-    """ Sampler that repeats forever.
-
-    Args:
-        real_sampler (Sampler)
-    """
-
-    def __init__(self, real_sampler, is_iterable):
-        self.real_sampler = real_sampler
-        self.is_iterable = is_iterable
-
-    def __iter__(self):
-        while True:
-            yield from iter(self.real_sampler)
-            if self.is_iterable:
-                yield {
-                    "StopIteration": True
-                }  # Indicate the end of the dataset
-
-    def __len__(self):
-        return len(self.real_sampler)
-
-
 class _SubDataset:
     def __init__(self, dataset, opts, step):
         num_elts = len(dataset)
@@ -124,11 +101,6 @@ class DataLoader(torch.utils.data.DataLoader):
             assert options.Distributed.numProcesses == 1, (
                 "IterableDatasets "
                 "not supported for distributed execution")
-            # TODO(T30952: Remove assert once persistent_workers is handled
-            # by upstream Torch.
-            assert num_workers < 2 or not persistent_workers, (
-                "Currently IterableDatasets do not support num_workers > 1 "
-                "and persistent_workers=True")
             if num_workers > 1 and "worker_init_fn" not in kwargs:
                 logger.warning(
                     "IterableDataset used with num_workers="
@@ -160,10 +132,6 @@ class DataLoader(torch.utils.data.DataLoader):
 
                 dataset = _SubDataset(dataset, options,
                                       self._combined_batch_size)
-        # IterableDatasets don't use indices so wrap the dataset in a
-        # _RepeatSampler instead.
-        if self._is_iterable and persistent_workers:
-            dataset = _RepeatSampler(dataset, self._is_iterable)
         if not self._is_iterable:
             dataset = profiling.Channel("dataset").instrument(
                 dataset, "__getitem__")
@@ -173,52 +141,12 @@ class DataLoader(torch.utils.data.DataLoader):
                          shuffle=shuffle,
                          num_workers=num_workers,
                          drop_last=drop_last,
+                         persistent_workers=persistent_workers,
                          **kwargs)
-
-        # PyTorch's sampler creates / deletes workers for each iteration through
-        # the dataset.
-        # In order to reuse the workers between epochs we use our own infinite
-        # sampler.
-        # Note: PyTorch already uses an infinite sampler for iterable datasets
-        # so don't touch it.
-        if persistent_workers and not self._is_iterable:
-            if self.batch_sampler is not None:
-                object.__setattr__(
-                    self, "batch_sampler",
-                    _RepeatSampler(self.batch_sampler, self._is_iterable))
-            if self.sampler is not None:
-                object.__setattr__(
-                    self, "sampler",
-                    _RepeatSampler(self.sampler, self._is_iterable))
-        # The iterator cannot be pickled, so create it in __iter__()
-        self._infinite_iterator = None
-        self._persistent_workers = persistent_workers
 
     @property
     def _profiling(self):
         return profiling.Channel("poptorch.DataLoader")
-
-    def __iter__(self):
-        if not self._persistent_workers:
-            yield from self._profiling.instrument(super().__iter__(),
-                                                  "__next__")
-            return
-        if self._infinite_iterator is None:
-            self._infinite_iterator = self._profiling.instrument(
-                super().__iter__(), "__next__")
-
-        if self._is_iterable:
-            # Return a single epoch long iterator
-            while True:
-                value = next(self._infinite_iterator)  # pylint: disable=stop-iteration-return
-                if isinstance(value, dict) and "StopIteration" in value:
-                    # The sampler returns { "StopIteration":True} to indicate
-                    # the end of the dataset. See class _RepeatSampler
-                    break
-                yield value
-        else:
-            for _ in range(len(self)):
-                yield next(self._infinite_iterator)  # pylint: disable=stop-iteration-return
 
     @property
     def combinedBatchSize(self):

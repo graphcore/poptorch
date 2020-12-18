@@ -363,15 +363,15 @@ def test_iterable_dataloader():
         continue
 
 
-def test_iterable_dataloader_reset():
+@pytest.mark.parametrize("persistent_workers", {True, False})
+def test_iterable_dataloader_reset(persistent_workers):
     shape = [2, 3]
     num_tensors = 10
 
     opts = poptorch.Options()
-    # FIXME(T30952): Once done, it should also work with persistent_workers=True
     data = poptorch.DataLoader(opts,
                                IncrementDataset(shape, num_tensors),
-                               persistent_workers=False,
+                               persistent_workers=persistent_workers,
                                batch_size=1,
                                num_workers=1)
 
@@ -495,9 +495,8 @@ def test_subprocess_broken_dataset():
         "reason in stdout")
 
 
-# TODO(T30952): Enable for IncrementIterableDataset
-# @pytest.mark.parametrize("DatasetType", [IncrementDataset, IncrementIterableDataset])
-@pytest.mark.parametrize("DatasetType", [IncrementDataset])
+@pytest.mark.parametrize("DatasetType",
+                         [IncrementDataset, IncrementIterableDataset])
 def test_reuse_workers(DatasetType):
     shape = [2, 3]
     num_tensors = 10
