@@ -136,13 +136,10 @@ bool isNone(const torch::jit::Value *value) {
   return (value->type()->cast<c10::NoneType>() != nullptr);
 }
 
-std::int64_t handleDimensionParam(torch::jit::Node *node, int index) {
+std::int64_t handleDimensionParam(torch::jit::Value *value,
+                                  c10::TensorTypePtr as_tensor) {
   // Extract the dim.
-  std::int64_t dim = constantToLong(node->input(index)->node());
-
-  // Get the tensor type. Deduce on the first parameter.
-  c10::TensorTypePtr as_tensor =
-      node->input(0)->type()->expect<c10::TensorType>();
+  std::int64_t dim = constantToLong(value->node());
   c10::VaryingShape dims = as_tensor->sizes();
 
   // If dim is less than zero subtract it to get the actual dimension.

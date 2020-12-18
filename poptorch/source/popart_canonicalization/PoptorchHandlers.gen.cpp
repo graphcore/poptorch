@@ -12,6 +12,18 @@ namespace poptorch {
 
 namespace {
 
+torch::jit::Node *beginipublockHandler(torch::jit::Graph *graph,
+                                       torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = constantToLong(x->node());
+  auto y = node->input(1);
+  auto t1 = constantToLong(y->node());
+  auto z = node->input(2);
+  auto t2 = constantToLong(z->node());
+  // beginIpuBlock(NonTensorLong(x), NonTensorLong(y), NonTensorLong(z))
+  return createBeginIpuBlock(graph, t0, t1, t2);
+}
+
 torch::jit::Node *ipuprinttensorHandler(torch::jit::Graph *graph,
                                         torch::jit::Node *node) {
   auto x = node->input(0);
@@ -21,10 +33,58 @@ torch::jit::Node *ipuprinttensorHandler(torch::jit::Graph *graph,
   return createPrintIpuTensor(graph, x, t0);
 }
 
+torch::jit::Node *optimizergroupHandler(torch::jit::Graph *graph,
+                                        torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = constantToLong(x->node());
+  auto l = node->input(1);
+  auto t1 = handleTensorList(l->node());
+  // optimizerGroup(NonTensorLong(x), TensorList(l))
+  return createOptimizerGroup(graph, t0, t1);
+}
+
+torch::jit::Node *recomputationcheckpointHandler(torch::jit::Graph *graph,
+                                                 torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  // recomputationCheckpoint(i0)
+  return createRecomputationCheckpoint(graph, i0);
+}
+
+torch::jit::Node *setavailablememoryHandler(torch::jit::Graph *graph,
+                                            torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto t0 = constantToFloat(y->node());
+  // setAvailableMemory(x, NonTensorFloat(y))
+  return createSetAvailableMemory(graph, x, t0);
+}
+
+torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
+                                                torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto s = node->input(1);
+  auto t0 = constantToString(s->node());
+  auto a = node->input(2);
+  auto t1 = constantToLong(a->node());
+  auto b = node->input(3);
+  auto t2 = constantToLong(b->node());
+  // setMatMulSerialization(x, NonTensorString(s), NonTensorLong(a),
+  // NonTensorLong(b))
+  return createSetMatMulSerialization(graph, x, t0, t1, t2);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(symbols::poptorch::begin_ipu_block, beginipublockHandler);
   registerHandler(symbols::poptorch::ipu_print_tensor, ipuprinttensorHandler);
+  registerHandler(symbols::poptorch::optimizer_group, optimizergroupHandler);
+  registerHandler(symbols::poptorch::recomputation_checkpoint,
+                  recomputationcheckpointHandler);
+  registerHandler(symbols::poptorch::set_available_memory,
+                  setavailablememoryHandler);
+  registerHandler(symbols::poptorch::set_matmul_serialization,
+                  setmatmulserializationHandler);
 }
 
 } // namespace poptorch

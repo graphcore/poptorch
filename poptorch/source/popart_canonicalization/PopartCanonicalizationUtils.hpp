@@ -19,6 +19,15 @@ bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler);
 std::vector<std::int64_t>
 reduceHelperDimensionCreator(torch::jit::Value *value);
 
+static inline std::vector<std::int64_t>
+reduceHelperDimensionCreator(torch::jit::Value *value,
+                             const std::vector<std::int64_t> &axes) {
+  if (!axes.empty()) {
+    return axes;
+  }
+  return reduceHelperDimensionCreator(value);
+}
+
 // Return a pointer to a handler if one is registered for this kind of node or
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::NodeKind kind);
@@ -50,7 +59,8 @@ bool hasUnityValue(torch::jit::Value *value);
 bool isNone(torch::jit::Node *node);
 bool isNone(const torch::jit::Value *value);
 
-std::int64_t handleDimensionParam(torch::jit::Node *node, int index);
+std::int64_t handleDimensionParam(torch::jit::Value *value,
+                                  c10::TensorTypePtr as_tensor);
 
 bool isTensorConstant(torch::jit::Node *node);
 
@@ -107,8 +117,6 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val);
 void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
                       std::uint64_t outputIdx);
 
-std::vector<std::int64_t>
-reduceHelperDimensionCreator(torch::jit::Value *value);
 } // namespace poptorch
 
 #endif // SOURCE_POPART_CANONICALIZATION_UTILS_H

@@ -1,9 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved
 import inspect
-from popgen import generator, registry, values, OperatorFactory, Value
-
-# OperatorFactory instance used to generate popART operators
-op = OperatorFactory()
+from popgen import generator, registry, values
+from popgen.operatorfactory import op
 
 
 # convert(aten, arity, popop=None, swizzles=None)
@@ -27,7 +25,8 @@ def convert(aten, arity, popop=None, swizzles=None):
             "Illegal swizzle for " + aten
         inputs.append(values.InputValue("i" + str(swz), swz))
 
-    registry.add_handler(aten, Value(popop, inputs), arity)
+    fn = getattr(op, popop)
+    registry.add_handler(aten, fn(*inputs), arity)
 
 
 # expand(aten, fn)

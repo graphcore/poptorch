@@ -1,7 +1,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved
 
 import sys
-from popgen import Value, NonTensorValue, op
+from popgen import Value, NonTensorValue
+from popgen.operatorfactory import op
 
 
 # AlphaValue(args)
@@ -53,9 +54,8 @@ class CastInPlace(Value):
         node = "t" + str(val_id)
         f.write(tabs + "auto " + node + " = " + values[self.args[0]] +
                 "->node();\n")
-        f.write(tabs + node + "->t_(c10::attr::value,\n")
-        f.write(tabs + "     " + " " * len(node) + node +
-                "->t(c10::attr::value).to(" + self.to_type + "));\n")
+        f.write(tabs + node + "->t_(c10::attr::value, ")
+        f.write(node + "->t(c10::attr::value).to(" + self.to_type + "));\n")
         f.write(tabs + node + "->output()->inferTypeFrom(" + node +
                 "->t(c10::attr::value));\n")
 
@@ -68,7 +68,31 @@ class CastInPlace(Value):
         return val_id + 1
 
 
-# Helper(op, args, method, expects_node)
+# TensorType(t)
+#
+# Represents the tensor type of a tensor value.
+# Parameters:
+#   t - the input tensor
+class TensorType(NonTensorValue):
+    def __init__(self, t):
+        NonTensorValue.__init__(self, 'TensorType', [t])
+        self.val = t
+
+    def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
+        assert not root, "TensorType cannot be a root expression"
+        if self in values:
+            return val_id
+
+        val_id = self.emit_arguments(values, val_id, tabs, f)
+        self.emit_annotations(tabs, f)
+
+        values[self] = "t" + str(val_id)
+        f.write(tabs + "auto " + values[self] + " = " + values[self.val] +
+                "->type()->expect<c10::TensorType>();\n")
+        return val_id + 1
+
+
+# Helper(op, args, method, expects_node=False, needs_graph=False)
 #
 # A wrapper class for helper methods that return tensors
 # Parameters:
@@ -76,11 +100,14 @@ class CastInPlace(Value):
 #   args - arguments
 #   method - generation method
 #   expects_node - True if arguments should be typed Node* instead of Value*
+#   needs_graph - method takes pointer to graph object
 class Helper(Value):
-    def __init__(self, op, args, method, expects_node=False):
+    def __init__(self, op, args, method, expects_node=False,
+                 needs_graph=False):
         Value.__init__(self, op, args)
         self.method = method
         self.expects_node = expects_node
+        self.needs_graph = needs_graph
 
     def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
         if self in values:
@@ -92,6 +119,9 @@ class Helper(Value):
         args = [values[arg] for arg in self.args]
         if self.expects_node:
             args = [arg + "->node()" for arg in args]
+
+        if self.needs_graph:
+            args = ["graph"] + args
 
         val_id = self.emit_assign_return(values, val_id, root, tabs, f)
         self.emit_call(self.method, args, ";\n", f)
@@ -149,6 +179,9 @@ class OutputValue(Value):
         f.write("node->output(" + str(self.index) + ");\n")
         return val_id + 1
 
+    def render(self):
+        return self.op
+
 
 # NonTensorConstant(op, val, method)
 #
@@ -165,6 +198,9 @@ class NonTensorConstant(NonTensorValue):
             NonTensorValue.__init__(self, op, [val])
         else:
             NonTensorValue.__init__(self, op, [])
+
+        if isinstance(self.val, str):
+            self.val = '"' + self.val + '"'
 
     def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
         assert not root, op + " cannot be a root expression"
@@ -208,10 +244,31 @@ class NonTensorConstant(NonTensorValue):
 #   method - generation method
 #   expects_node - True if arguments should be typed Node* instead of Value*
 class NonTensorHelper(NonTensorValue):
-    def __init__(self, op, args, method, expects_node=False):
-        NonTensorValue.__init__(self, op, args, expects_node)
+    def __init__(self, op, args, method, expects_node=False,
+                 needs_graph=False):
+        NonTensorValue.__init__(self, op, args)
         self.method = method
+        self.expects_node = expects_node
+        self.needs_graph = needs_graph
 
     def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
         assert not root, op + " helper cannot be a root expression"
         return Helper.emit(self, values, val_id, tabs, f, False)
+
+
+# EmptyInitializer()
+#
+# Helper class that produces an empty initializer list
+class EmptyInitializer(NonTensorValue):
+    def __init__(self):
+        NonTensorValue.__init__(self, "EmptyInitializer", [])
+
+    def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
+        values[self] = self.render()
+        return val_id
+
+    def vn(self):
+        return self.render()
+
+    def render(self):
+        return "{}"

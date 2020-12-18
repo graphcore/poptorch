@@ -1,21 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-
 import sys
-
-
-# Factory class for creating popArt ops. Operators are created
-# on the fly based on spelling of attributes.
-class OperatorFactory:
-    def __getattr__(self, name):
-        return lambda *args: Value(name, list(args))
-
-    def printIpuTensor(self, t, s):
-        v = Value('printIpuTensor', [t, s])
-        v.tensor_braces = False
-        return v
-
-
-op = OperatorFactory()
 
 
 # Root class for all expressions - the result of applying an operator
@@ -41,28 +25,28 @@ class Value:
 
     # operator overloading - syntax sugar
     def __add__(self, other):
-        return op.add(self, other)
+        return Value('add', [self, other])
 
     def __gt__(self, other):
-        return op.greater(self, other)
+        return Value('greater', [self, other])
 
     def __mul__(self, other):
-        return op.mul(self, other)
+        return Value('mul', [self, other])
 
     def __sub__(self, other):
-        return op.sub(self, other)
+        return Value('sub', [self, other])
 
     def __truediv__(self, other):
-        return op.div(self, other)
+        return Value('div', [self, other])
 
     def __radd__(self, other):
-        return op.add(other, self)
+        return Value('add', [other, self])
 
     def __rsub__(self, other):
-        return op.sub(other, self)
+        return Value('sub', [other, self])
 
     def __rtruediv__(self, other):
-        return op.div(other, self)
+        return Value('div', [other, self])
 
     def set_graph_arity(self, arity):
         self.graph_arity = arity
@@ -88,11 +72,16 @@ class Value:
         self.emit_annotations(tabs, f)
 
         # split tensor and non-tensor arguments
-        last_tensor = next(arg for arg in reversed(self.args)
-                           if not isinstance(arg, NonTensorValue))
-        last_tensor = len(self.args) - self.args[::-1].index(last_tensor)
-        tensors = [values[arg] for arg in self.args[:last_tensor]]
-        non_tensors = [values[arg] for arg in self.args[last_tensor:]]
+        if isinstance(self.args[0], NonTensorValue):
+            tensors = []
+            non_tensors = [values[arg] for arg in self.args]
+            self.tensor_braces = False
+        else:
+            last_tensor = next(arg for arg in reversed(self.args)
+                               if not isinstance(arg, NonTensorValue))
+            last_tensor = len(self.args) - self.args[::-1].index(last_tensor)
+            tensors = [values[arg] for arg in self.args[:last_tensor]]
+            non_tensors = [values[arg] for arg in self.args[last_tensor:]]
 
         capital_op = self.op[0].upper() + self.op[1:]
         suffix = ";\n"
@@ -230,14 +219,12 @@ class ConstantFloat(Value):
         return str(self.val)
 
 
-# NonTensorValue(op, args, expects_node = False)
+# NonTensorValue(op, args)
 #
 # Root class for non-tensor values.
 # Parameters:
 #   op - operator
 #   args - arguments
-#   expects_node - True if arguments should be typed Node* instead of Value*
 class NonTensorValue(Value):
-    def __init__(self, op, args, expects_node=False):
+    def __init__(self, op, args):
         Value.__init__(self, op, args)
-        self.expects_node = expects_node

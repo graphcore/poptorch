@@ -12,6 +12,17 @@ def alpha(m, a):
     return values.AlphaValue([m, a])
 
 
+# as_ir(v)
+#
+# Helper that returns a vector of ints as IR constant
+# Parameters:
+#   v - the input vector
+def as_ir(v):
+    return values.Helper('AsIr', [v],
+                         'intVectorToIrConstant',
+                         needs_graph=True)
+
+
 # cint(n)
 #
 # Generate an integer as a C int literal or variable
@@ -36,8 +47,9 @@ def clong(n):
 # Parameters
 #   l - value to be generated
 def clong_list(l):
-    return values.NonTensorHelper('ConstantLongList', [l], 'constantToLongVec',
-                                  True)
+    return values.NonTensorHelper('ConstantLongList', [l],
+                                  'constantToLongVec',
+                                  expects_node=True)
 
 
 # cfloat(f)
@@ -58,22 +70,34 @@ def cstr(s):
     return values.NonTensorConstant('NonTensorString', s, 'constantToString')
 
 
-# dimension(a)
+# dimension(a, t)
+#
 # Helper for parameters that are dimensional indices
 # Parameters:
 #   v - value representing a dimensional index
-def dimension(v):
-    return values.NonTensorHelper('Dimension', [v], 'handleDimensionParam')
+#   t - tensor type
+def dimension(v, t):
+    return values.NonTensorHelper('Dimension', [v, t], 'handleDimensionParam')
 
 
-# dimension_list(t)
+# dimension_list(t, a)
+#
 # Produces a list with the dimensions of a tensor. Needed for some
 # reduction operators.
 # Parameters:
 #   t - input tensor
-def dimension_list(t):
-    return values.NonTensorHelper('DimensionList', [t],
+#   a - axes vector (optional)
+def dimension_list(t, a=None):
+    args = [t, a] if a is not None else [t]
+    return values.NonTensorHelper('DimensionList', args,
                                   "reduceHelperDimensionCreator")
+
+
+# empty_initializer()
+#
+# Helper that produces an empty initializer list
+def empty_initializer():
+    return values.EmptyInitializer()
 
 
 # output_shape(index = 0)
@@ -83,6 +107,15 @@ def dimension_list(t):
 #   index - index of output (default: 0)
 def output_shape(idx=0):
     return tensor_shape(values.OutputValue(idx))
+
+
+# output_type(index = 0)
+#
+# Generate the expected scalar type for the output value.
+# Parameters
+#   index - index of output (default: 0)
+def output_type(idx=0):
+    return scalar_type(values.OutputValue(idx))
 
 
 # tensor_list(l)
@@ -111,3 +144,21 @@ def tensor_long(t):
 #   t - input tensor
 def tensor_shape(t):
     return values.NonTensorHelper('TensorShape', [t], "shapeFromTensor")
+
+
+# tensor_type(t)
+#
+# Generate the tensor type of the input
+# Parameters:
+#   t - the input tensor
+def tensor_type(t):
+    return values.TensorType(t)
+
+
+# scalar_type(t)
+#
+# Return the scalar type of a tensor
+# Parameters
+#   t - input tensor
+def scalar_type(t):
+    return values.NonTensorHelper('ScalarType', [t], 'getNodeScalarType')

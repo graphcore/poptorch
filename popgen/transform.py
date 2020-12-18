@@ -92,12 +92,12 @@ def validate_forwarding(source):
     dest = registry.forwardings[source]
 
     assert source not in registry.handlers, \
-        source + "is both forwarded and handled"
+        source + " is both forwarded and handled"
 
     while dest not in registry.handlers:
         assert dest in registry.forwardings, \
-            source + "forwarded but no handler found"
-        assert dest not in visited, source + "has circular forwarding"
+            source + " forwarded but no handler found"
+        assert dest not in visited, source + " has circular forwarding"
         visited.add(dest)
         dest = registry.forwardings[dest]
 
