@@ -33,7 +33,6 @@ for oper in opers:
 
 convert("t", 1, "transpose")
 
-expand("fmod", lambda x: op.mod(x, cint(1)))
 expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), cint(0)))
 expand("max", lambda x: op.reducemax(x, dimension_list(x), cint(0)))
 expand("min", lambda x: op.reducemin(x, dimension_list(x), cint(0)))
@@ -63,6 +62,7 @@ convert("lt", 2, "less")
 expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
 expand("dropout", lambda x, y: op.dropout(x, cint(1), cfloat(y)))
 expand("elu", lambda x, y: op.elu(x, cfloat(y)))
+expand("fmod", lambda x, y: op.mod(x, y, cint(1)))
 expand("full_like", lambda x, y: op.expand(y, as_ir(tensor_shape(x))))
 
 expand("leaky_relu", lambda x, y: op.leakyrelu(x, cfloat(y)))
