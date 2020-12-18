@@ -59,6 +59,7 @@ class DataLoader(torch.utils.data.DataLoader):
                  num_workers=0,
                  drop_last=True,
                  persistent_workers=None,
+                 auto_distributed_partitioning=True,
                  **kwargs):
         """
         :param poptorch.Options options: Options that will be used to compile
@@ -76,6 +77,9 @@ class DataLoader(torch.utils.data.DataLoader):
         :param bool persistent_workers: Re-use workers between
             iterations if True.
             If None (default): enabled if num_workers > 0, disabled otherwise.
+        :param bool auto_distributed_partitioning: If True, partitions the
+            dataset for distributed execution automatically. Otherwise, it is
+            assumed that partitioning has been handled manually.
         :param kwargs: Other options to pass to the Torch's DataLoader's
             constructor.
         """
@@ -98,9 +102,10 @@ class DataLoader(torch.utils.data.DataLoader):
                                        torch.utils.data.IterableDataset)
 
         if self._is_iterable:
-            assert options.Distributed.numProcesses == 1, (
-                "IterableDatasets "
-                "not supported for distributed execution")
+            if auto_distributed_partitioning:
+                assert options.Distributed.numProcesses == 1, (
+                    "auto_distributed_partitioning not supported for"
+                    " IterableDataset")
             if num_workers > 1 and "worker_init_fn" not in kwargs:
                 logger.warning(
                     "IterableDataset used with num_workers="
@@ -123,15 +128,16 @@ class DataLoader(torch.utils.data.DataLoader):
                                 "drop_last=True.")
 
             if options.Distributed.numProcesses > 1:
-                assert not shuffle or options.exists("random_seed"), (
-                    "When using distributed execution you must set "
-                    "poptorch.Options.randomSeed()")
-                assert self._combined_batch_size is not None, (
-                    "batch_size=None not allowed for distributed"
-                    " execution.")
-
-                dataset = _SubDataset(dataset, options,
-                                      self._combined_batch_size)
+                if auto_distributed_partitioning:
+                    assert not shuffle or options.exists("random_seed"), (
+                        "When using auto_distributed_partitioning you must set "
+                        "poptorch.Options.randomSeed() to ensure that tensors "
+                        "are in the same order in all processes.")
+                    assert self._combined_batch_size is not None, (
+                        "batch_size=None not allowed when using "
+                        "auto_distributed_partitioning.")
+                    dataset = _SubDataset(dataset, options,
+                                          self._combined_batch_size)
         if not self._is_iterable:
             dataset = profiling.Channel("dataset").instrument(
                 dataset, "__getitem__")
