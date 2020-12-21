@@ -4,11 +4,13 @@ function(add_poptorch_py_example name path)
   set(extra_labels "")
   if("${name}" STREQUAL "bert_ipu")
     set(extra_labels ";external_data")
+  else()
+    set(extra_labels ";short")
   endif()
   add_test(NAME "${name}_example"
            COMMAND python3 ${path}/${name}.py
            WORKING_DIRECTORY ${CMAKE_CURRENT_BUILD_DIR})
-  set_tests_properties("${name}_example" PROPERTIES LABELS "examples;short${extra_labels}")
+  set_tests_properties("${name}_example" PROPERTIES LABELS "examples${extra_labels}")
 endfunction()
 
 file(GLOB EXAMPLES "${CMAKE_CURRENT_SOURCE_DIR}/*.py")

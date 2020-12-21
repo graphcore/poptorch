@@ -1,14 +1,24 @@
+# Enable IN_LIST operator
+cmake_policy(SET CMP0057 NEW)
+set(LONG_TESTS mnist inferenceModel)
+
 function(add_poptorch_py_user_guide_example name path)
   message(STATUS "Adding python example '${name}'")
   set(extra_labels "")
   if("${name}" STREQUAL "pipeline_simple")
     set(extra_labels ";external_data")
+  else()
+    if("${name}" IN_LIST LONG_TESTS)
+      set(extra_labels "")
+    else()
+      set(extra_labels ";short")
+    endif()
   endif()
 
   add_test(NAME "${name}_user_guide_example"
            COMMAND python3 ${path}/${name}.py
            WORKING_DIRECTORY ${CMAKE_CURRENT_BUILD_DIR})
-  set_tests_properties("${name}_user_guide_example" PROPERTIES LABELS "user_guide_examples;short${extra_labels}")
+  set_tests_properties("${name}_user_guide_example" PROPERTIES LABELS "user_guide_examples${extra_labels}")
 endfunction()
 
 file(GLOB EXAMPLES "${CMAKE_CURRENT_SOURCE_DIR}/*.py")
