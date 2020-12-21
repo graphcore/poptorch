@@ -193,9 +193,8 @@ torch::jit::Node *floorHandler(torch::jit::Graph *graph,
 torch::jit::Node *fmodHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto x = node->input(0);
-  auto y = node->input(1);
-  // mod(x, y, 1)
-  return createMod(graph, {x, y}, 1);
+  // mod(x, 1)
+  return createMod(graph, {x}, 1);
 }
 
 torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,

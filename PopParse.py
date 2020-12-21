@@ -315,7 +315,7 @@ OutputTypeSameAsFirstInput = [
     "abs", "acos", "acos", "acosh", "asin", "asinh", "atan", "atanh",
     "averagepool", "ceil", "celu", "compress", "concat", "cos", "cosh",
     "cumsum", "depthtospace", "det", "detach", "dropout", "einsum", "elu",
-    "erf", "exp", "expand", "expm1", "flatten", "floor", "fmod", "gather",
+    "erf", "exp", "expand", "expm1", "flatten", "floor", "gather",
     "gatherelements", "gathernd", "gelu", "globalaveragepool", "globallppool",
     "globalmaxpool", "hardmax", "hardsigmoid", "identity", "identityloss",
     "l1loss", "lrn", "leakyrelu", "log", "log1p", "logical_not", "logsoftmax",
