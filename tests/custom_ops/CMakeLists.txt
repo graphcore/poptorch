@@ -48,4 +48,4 @@ add_library(custom_cube_op SHARED "custom_cube_op.cpp")
 
 # For some reason protobuf::libprotobuf doesn't work. Protobuf comes from popart.
 target_include_directories(custom_cube_op SYSTEM PRIVATE ${Protobuf_INCLUDE_DIR})
-target_link_libraries(custom_cube_op popart)
+target_link_libraries(custom_cube_op popart onnx ${Protobuf_LIBRARY})
