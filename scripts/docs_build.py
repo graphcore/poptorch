@@ -22,7 +22,7 @@ class DocumentationBuilder:
         self.output_pdf_dir = os.path.join(self.output_dir, "pdf")
         self.output_html_dir = os.path.join(self.output_dir, "html")
         self.output_guide_dir = os.path.join(self.output_html_dir,
-                                             pkg_info.name)
+                                             pkg_info.doc_name)
         self.docs_src_dir = os.path.join(_utils.sources_dir(), "docs",
                                          "user_guide")
         self.sphinx_conf_dir = os.path.join(_utils.sources_dir(), "docs",
@@ -94,7 +94,7 @@ class DocumentationBuilder:
     def build_pdf(self):
         self.assert_poptorch_in_path()
         args = self.common_sphinx_flags + [
-            "-b", "latex", "-D", f"project=\"{self.pkg_info.name}\"", "-D",
+            "-b", "latex", "-D", f"project=\"{self.pkg_info.doc_name}\"", "-D",
             f"release=\"v{self.pkg_info.version_long}\"", "-D",
             f"version=\"v{self.pkg_info.version_long}\"", self.docs_src_dir,
             self.output_pdf_dir
@@ -132,13 +132,15 @@ if __name__ == "__main__":
 
     logging_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=logging_level)
+    logger.debug("Args: %s", str(args))
 
     if args.add_to_sys_path:
         for path in args.add_to_sys_path.split(";"):
             logger.debug("Adding %s", path)
             sys.path.insert(0, path)
 
-    builder = DocumentationBuilder(_utils.JenkinsPkgInfo(), args.install_dir)
+    builder = DocumentationBuilder(
+        _utils.PkgInfo.load_from_file(must_exist=False), args.install_dir)
     if not args.no_pdf:
         builder.build_pdf()
 

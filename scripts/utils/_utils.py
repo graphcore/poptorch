@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import re
 import enum
+import fcntl
 import json
 import os
 import shutil
@@ -21,6 +22,11 @@ def set_logger(new_logger):
 def rmdir_if_exists(directory):
     if os.path.isdir(directory):
         shutil.rmtree(directory)
+
+
+def rm_if_exists(filename):
+    if os.path.isfile(filename):
+        os.remove(filename)
 
 
 def get_first_line(filename):
@@ -48,6 +54,8 @@ def get_required_torch_version():
 
 
 class PkgInfo:
+    _pkg_info_file = "pkg_info.json"
+
     def __init__(self,
                  version=None,
                  snapshot=None,
@@ -55,7 +63,8 @@ class PkgInfo:
                  package_os_type=None,
                  build_number=None,
                  doc_name=None,
-                 project_name=None):
+                 project_name=None,
+                 **kwargs):
         logger.debug(
             "PkgInfo: user provided version=%s snapshot=%s os_type=%s"
             " package_os_type=%s build_number=%s doc_name=%s "
@@ -63,47 +72,44 @@ class PkgInfo:
             build_number, doc_name, project_name)
         self.version = version or _get_version()
         self.snapshot = snapshot or _get_snapshot()
-        self.os_type = os_type or _get_os_type()
+        self.os_type = os_type or get_os_type()
         if isinstance(self.os_type, OsType):
             self.os_type = self.os_type.value
         self.package_os_type = package_os_type or _get_package_os_type()
-        self.name = doc_name or "poptorch-user-guide"
+        self.doc_name = doc_name or "poptorch-user-guide"
         self.project_name = project_name or "poptorch"
         self.version_long = self.version
         if build_number:
             self.version_long += "+" + build_number
-        logger.debug("PkgInfo initialised: %s", str(self.__dict__))
+        logger.debug("Adding custom attributes: %s", kwargs)
+        self.__dict__.update(kwargs)
+        logger.info("PkgInfo initialised: %s", str(self.__dict__))
 
     def pdf_filename(self):
-        return f"{self.name}-{self.version}-{self.snapshot}.pdf"
+        return f"{self.doc_name}-{self.version}-{self.snapshot}.pdf"
 
     def html_filename(self):
-        return f"{self.name}-html-{self.version}-{self.snapshot}.zip"
+        return f"{self.doc_name}-html-{self.version}-{self.snapshot}.zip"
 
     def prodinfo_filename(self):
         return f"{self.project_name}-{self.version}-{self.snapshot}.yml"
 
+    def save_to_file(self):
+        with open(PkgInfo._pkg_info_file, "w") as f:
+            json.dump(self.__dict__, f)
 
-class JenkinsPkgInfo(PkgInfo):
-    """Version of PkgInfo used by the CI: gets override for default values
-    from environment variables."""
-
-    def __init__(self):
-        build_number = os.environ.get("GC_BUILD_NUMBER")
-        logger.debug("Env: GC_BUILD_NUMBER=%s", build_number)
-        os_type = os.environ.get("GCCI_OS")
-        os_version = os.environ.get("GCCI_OS_VERSION")
-
-        logger.debug("Env: GCCI_OS=%s GCCI_OS_VERSION=%s", os_type, os_version)
-        package_os_type = None
-        if os_type and os_version:
-            os_version = os_version.replace(".", "_")
-            package_os_type = f"{os_type}_{os_version}"
-            logger.info(
-                "Package OS type set by 'GCCI_OS' / 'GCCI_OS_VERSION' "
-                "to '%s'", package_os_type)
-        super().__init__(build_number=build_number,
-                         package_os_type=package_os_type)
+    @staticmethod
+    def load_from_file(must_exist=False):
+        if not os.path.exists(PkgInfo._pkg_info_file):
+            if not must_exist:
+                logger.info("Using default PkgInfo() options")
+                return PkgInfo()
+            raise FileNotFoundError(f"{PkgInfo._pkg_info_file} not found")
+        logger.info("Loading packaging options from %s",
+                    PkgInfo._pkg_info_file)
+        with open(PkgInfo._pkg_info_file, "r") as f:
+            attrs = json.load(f)
+            return PkgInfo(**attrs)
 
 
 def _get_version():
@@ -157,7 +163,7 @@ def _get_package_os_type():
     return f"{distrib}_{version}"
 
 
-def _get_os_type():
+def get_os_type():
     p = platform.uname()
     if p.system == "Darwin":
         return OsType.Osx
@@ -165,3 +171,42 @@ def _get_os_type():
         return OsType.Linux
 
     return OsType.Unknown
+
+
+def _make_output_non_blocking(output):
+    fd = output.fileno()
+    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    return output
+
+
+def run_commands(*commands, env=None, stop_on_error=True):
+    bash_flags = ""
+    if logger.isEnabledFor(logging.DEBUG):
+        bash_flags += "x"  # print commands
+    if stop_on_error:
+        bash_flags += "e"
+
+    if bash_flags:
+        bash_flags = "set -" + bash_flags + ";"
+
+    logger.debug("Running: %s", commands)
+    p = subprocess.Popen([bash_flags + ";".join(commands)],
+                         shell=True,
+                         env=env,
+                         executable='/bin/bash',
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    _make_output_non_blocking(p.stdout)
+    _make_output_non_blocking(p.stderr)
+
+    process_alive = True
+    while process_alive:
+        process_alive = p.poll() is None
+        for line in p.stdout.readlines():
+            logger.info(line.decode("utf-8").rstrip())
+        for line in p.stderr.readlines():
+            logger.error(line.decode("utf-8").rstrip())
+
+    assert p.returncode == 0, (f"{commands} failed with "
+                               f"return code {p.returncode}")
