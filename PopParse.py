@@ -551,6 +551,9 @@ for opset in classes:
             if arg["name"] == "name":
                 continue
 
+            if re.search("DebugContext", arg["type"]):
+                continue
+
             macroType = toType(arg["type"])
 
             if macroType == "UNKNOWN":
@@ -599,6 +602,8 @@ for opset in classes:
         for arg in args:
             # Skip the first args and also the "name" arg.
             if arg["name"] == "args" or arg["name"] == "name":
+                continue
+            if re.search("DebugContext", arg["type"]):
                 continue
 
             header += "," + convertCxxConvert(arg["type"]) + " " + arg["name"]
