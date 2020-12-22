@@ -84,7 +84,7 @@ for batch_number, (data, labels) in enumerate(training_data):
 # iterations_end
 
 
-#pylint: disable=R0915,W0612,C0415
+#pylint: disable=too-many-statements, unused-variable, import-outside-toplevel
 def run_data_loader_example():
     model_batch_size = 2
     # replication_start
