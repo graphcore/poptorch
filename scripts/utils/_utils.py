@@ -210,11 +210,11 @@ class _LinesProcessor:
         """
         for line in lines:
             self.partial_line += line.decode("utf-8")
-            if self._is_full_line(line):
-                self.printer_fn(line.rstrip())
+            if self._is_full_line(self.partial_line):
+                self.printer_fn(self.partial_line.rstrip())
                 self.partial_line = ""
-        if flush:
-            self.printer_fn(self.partial_line)
+        if flush and self.partial_line:
+            self.printer_fn(self.partial_line.rstrip())
             self.partial_line = ""
 
 
