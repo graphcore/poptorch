@@ -28,27 +28,31 @@ def assert_contains_multiconv(poptorch_model, expected_num=1):
     assert num_multiconv == expected_num, msg
 
 
-def test_multiconv_basic():
+@pytest.mark.parametrize("num_layers", [1, 2, 3])
+def test_multiconv_basic(num_layers):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.convA = nn.Conv2d(1, 10, 5)
-            self.convB = nn.Conv2d(1, 10, 5, bias=False)
+            self.convA = nn.Conv2d(1, 1, 5)
+            self.convB = nn.Conv2d(1, 1, 5, bias=False)
 
-        def forward(self, x, y):
+        def forward(self, x):
             with poptorch.MultiConv():
-                return (self.convA(x), self.convB(y))
+                a = self.convA(x)
+                absx = torch.abs(x)
+                b = self.convB(absx)
+                return a + b
 
-    m = Model()
+    m = [Model() for i in range(num_layers)]
+    m = torch.nn.Sequential(*m)
     torch.manual_seed(0)
-    first = torch.randn(2, 1, 28, 28)
-    second = torch.randn(2, 1, 28, 28)
+    input = torch.randn(2, 1, 28, 28)
 
-    native = m(first, second)
+    native = m(input)
 
     poptorch_model = poptorch.inferenceModel(m)
-    poptorch_out = poptorch_model(first, second)
-    assert_contains_multiconv(poptorch_model)
+    poptorch_out = poptorch_model(input)
+    assert_contains_multiconv(poptorch_model, num_layers)
 
     for cpu, pop in zip(native, poptorch_out):
         torch.testing.assert_allclose(cpu, pop)
@@ -124,7 +128,8 @@ def test_multiconv_layers():
 
         def forward(self, x):
             with poptorch.MultiConv():
-                y = self.layer1A(x)
+                absx = torch.abs(x)
+                y = self.layer1A(absx)
                 z = self.layer1B(x)
                 x = y + z
 

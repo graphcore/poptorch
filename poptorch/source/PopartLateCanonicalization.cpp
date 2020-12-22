@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <functional>
+#include <queue>
 
 #include "PoptorchSymbols.hpp"
 #include "popart_canonicalization/PopartCanonicalizationUtils.hpp"
@@ -34,7 +35,6 @@ public:
   void begin(torch::jit::Node *node) {
     ERROR_ON_MSG(inMultiConv(), "Nested poptorch.MultiConv is not supported.");
     _in_multi_conv = true;
-    _marker = node;
     _to_delete.insert(node);
   }
 
@@ -45,6 +45,8 @@ public:
                  "Unexpected end_multi_conv, is the IR malformed?");
     _in_multi_conv = false;
     applyOptions(node);
+    _parts_queue.push(_parts);
+    _parts.clear();
     return [this, node]() { applyPartLinks(node); };
   }
 
@@ -106,12 +108,13 @@ private:
     // end_node.  Each conv output flows through the end_multi_conv instruction.
     uint64_t num_outputs = 0;
 
-    for (torch::jit::Node *node : _parts) {
-      // Create the multi_conv_part node and update the marker ensures that the
-      // all components of the multiconv are sequential in the IR.
+    // Track the earliest user for the multiconv outputs
+    torch::jit::Node *earliest_user = nullptr;
+
+    for (torch::jit::Node *node : _parts_queue.front()) {
+      // Create the multi_conv_part node and insert it after the original conv
       torch::jit::Node *conv_part = createMultiConvPart(_graph, node);
-      conv_part->moveAfter(_marker);
-      _marker = conv_part;
+      conv_part->moveAfter(node);
       _to_delete.insert(node);
 
       // Attach the multi_conv_part to the end_multi_conv instruction.
@@ -119,18 +122,49 @@ private:
       torch::jit::Value *output_i = end_node->addOutput();
       output_i->setType(conv_part->output()->type());
       replaceOutputUse(node->output(), end_node->output(num_outputs));
+
+      // Keep track of the first node that consumes the multiconv outputs
+      torch::jit::Node *output_user = findEarliestUser(output_i);
+
+      if (!earliest_user || earliest_user->isAfter(output_user)) {
+        earliest_user = output_user;
+      }
+
       num_outputs++;
     }
 
-    end_node->moveAfter(_marker);
-    _parts.clear();
-    _marker = nullptr;
+    _parts_queue.pop();
+
+    if (end_node->isBefore(earliest_user)) {
+      // All good, nothing further to do here
+      return;
+    }
+
+    // Move the end_multi_conv instruction directly before its first consumer
+    // and check for any dependency violations that might have been introduced.
+    end_node->moveBefore(earliest_user);
+    torch::jit::node_list checklist{end_node};
+
+    while (!checklist.empty()) {
+      torch::jit::Node *consumer = checklist.back();
+      checklist.pop_back();
+
+      for (torch::jit::Value *value : consumer->inputs()) {
+        torch::jit::Node *producer = value->node();
+
+        // Fix any topological ordering violations and check any moved nodes
+        if (producer->isAfter(consumer)) {
+          producer->moveBefore(consumer);
+          checklist.push_back(producer);
+        }
+      }
+    }
   }
 
   torch::jit::Graph *_graph;
   std::unordered_set<torch::jit::Node *> _to_delete;
-  std::vector<torch::jit::Node *> _parts;
-  torch::jit::Node *_marker = nullptr;
+  torch::jit::node_list _parts;
+  std::queue<torch::jit::node_list> _parts_queue;
   bool _in_multi_conv = false;
 };
 
