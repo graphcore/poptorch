@@ -1,12 +1,15 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import sys
 import distutils.util
+import logging
 from setuptools import setup
 from setuptools.dist import Distribution
 from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
 import scripts.utils._utils as utils
 
-VERSION = utils.PkgInfo.load_from_file(must_exist=False).version_long
+logging.basicConfig(level=logging.INFO)
+VERSION = utils.PkgInfo.load_from_file(must_exist=False,
+                                       path="..").version_long
 TORCH_VERSION = utils.get_required_torch_version()
 
 LONG_DESCRIPTION = (

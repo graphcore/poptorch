@@ -79,6 +79,7 @@ class PkgInfo:
         self.doc_name = doc_name or "poptorch-user-guide"
         self.project_name = project_name or "poptorch"
         self.version_long = self.version
+        self.poptorch_hash = _get_poptorch_hash()
         if build_number:
             self.version_long += "+" + build_number
         logger.debug("Adding custom attributes: %s", kwargs)
@@ -99,15 +100,15 @@ class PkgInfo:
             json.dump(self.__dict__, f)
 
     @staticmethod
-    def load_from_file(must_exist=False):
-        if not os.path.exists(PkgInfo._pkg_info_file):
+    def load_from_file(must_exist=False, path="."):
+        pkg_info_path = os.path.join(path, PkgInfo._pkg_info_file)
+        if not os.path.exists(pkg_info_path):
             if not must_exist:
                 logger.info("Using default PkgInfo() options")
                 return PkgInfo()
-            raise FileNotFoundError(f"{PkgInfo._pkg_info_file} not found")
-        logger.info("Loading packaging options from %s",
-                    PkgInfo._pkg_info_file)
-        with open(PkgInfo._pkg_info_file, "r") as f:
+            raise FileNotFoundError(f"{pkg_info_path} not found")
+        logger.info("Loading packaging options from %s", pkg_info_path)
+        with open(pkg_info_path, "r") as f:
             attrs = json.load(f)
             return PkgInfo(**attrs)
 
@@ -117,35 +118,49 @@ def _get_version():
     return f"{v['major']}.{v['minor']}.{v['point']}"
 
 
-def _get_snapshot():
-    """ Use the view hash if available.
-    Use the PopTorch hash as a fallback.
-    Use 0000000000 if no git repository is found
-    """
+def _get_view_hash():
     try:
-        snapshot = subprocess.check_output(
+        hash = subprocess.check_output(
             [
                 "git", "--git-dir",
                 os.path.join(os.path.dirname(sources_dir()), ".git"),
                 "rev-parse", "--short=10", "HEAD"
             ],
             stderr=subprocess.STDOUT).decode("utf-8").strip().rstrip()
+        return hash
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _get_poptorch_hash():
+    try:
+        hash = subprocess.check_output(
+            [
+                "git", "--git-dir",
+                os.path.join(sources_dir(), ".git"), "rev-parse", "--short=10",
+                "HEAD"
+            ],
+            stderr=subprocess.STDOUT).decode("utf-8").strip().rstrip()
+        return hash
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _get_snapshot():
+    """ Use the view hash if available.
+    Use the PopTorch hash as a fallback.
+    Use 0000000000 if no git repository is found
+    """
+    snapshot = _get_view_hash()
+    if snapshot:
         logger.debug("Using View hash %s as snapshot", snapshot)
         return snapshot
-    except subprocess.CalledProcessError:
-        try:
-            snapshot = subprocess.check_output(
-                [
-                    "git", "--git-dir",
-                    os.path.join(sources_dir(), ".git"), "rev-parse",
-                    "--short=10", "HEAD"
-                ],
-                stderr=subprocess.STDOUT).decode("utf-8").strip().rstrip()
-            logger.debug("Using PopTorch hash %s as snapshot", snapshot)
-            return snapshot
-        except subprocess.CalledProcessError:
-            logger.debug("No git hash found to use as snapshot")
-            return "0000000000"
+    snapshot = _get_poptorch_hash()
+    if snapshot:
+        logger.debug("Using PopTorch hash %s as snapshot", snapshot)
+        return snapshot
+    logger.debug("No git hash found to use as snapshot")
+    return "0000000000"
 
 
 def _get_package_os_type():
