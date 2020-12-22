@@ -180,6 +180,29 @@ def _make_output_non_blocking(output):
     return output
 
 
+class _LinesProcessor:
+    def __init__(self, printer_fn):
+        self.printer_fn = printer_fn
+        self.partial_line = ""
+
+    def _is_full_line(self, line):
+        return line[-1] == "\n"
+
+    def process(self, lines, flush=False):
+        """ Due to buffering we need to check if lines
+        are actual lines or just fragment of lines (in which case we
+        wait until we've got the whole line available to print it).
+        """
+        for line in lines:
+            self.partial_line += line.decode("utf-8")
+            if self._is_full_line(line):
+                self.printer_fn(line.rstrip())
+                self.partial_line = ""
+        if flush:
+            self.printer_fn(self.partial_line)
+            self.partial_line = ""
+
+
 def run_commands(*commands, env=None, stop_on_error=True):
     bash_flags = ""
     if logger.isEnabledFor(logging.DEBUG):
@@ -201,12 +224,13 @@ def run_commands(*commands, env=None, stop_on_error=True):
     _make_output_non_blocking(p.stderr)
 
     process_alive = True
+    stdout = _LinesProcessor(logger.info)
+    stderr = _LinesProcessor(logger.error)
     while process_alive:
         process_alive = p.poll() is None
-        for line in p.stdout.readlines():
-            logger.info(line.decode("utf-8").rstrip())
-        for line in p.stderr.readlines():
-            logger.error(line.decode("utf-8").rstrip())
+        # Only flush if it is the last iteration
+        stderr.process(p.stderr.readlines(), not process_alive)
+        stdout.process(p.stdout.readlines(), not process_alive)
 
     assert p.returncode == 0, (f"{commands} failed with "
                                f"return code {p.returncode}")
