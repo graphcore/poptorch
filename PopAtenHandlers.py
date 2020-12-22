@@ -3,9 +3,9 @@
 
 from popgen.api import convert, expand, forward, generate, simplify
 from popgen.helpers import as_ir, alpha, cfloat, cint, clong, clong_list, \
-                           cstr, dimension, dimension_list, output_shape, \
-                           output_type, tensor_list, tensor_long, \
-                           tensor_shape, tensor_type
+                           cstr, dimension, dimension_list, empty_initializer, \
+                           output_shape, output_type, tensor_list, \
+                           tensor_long, tensor_shape, tensor_type
 from popgen.operatorfactory import op
 
 script = "PopAtenHandlers.py"
@@ -41,8 +41,8 @@ expand(
     "rand", lambda x: op.randomUniform(x, output_shape(), cfloat(1.), cfloat(
         0.), output_type()))
 expand(
-    "randn", lambda x: op.randomNormal(x, tensor_shape(x), cfloat(0.),
-                                       cfloat(1.), output_type()))
+    "randn", lambda: op.randomNormal(empty_initializer(), output_shape(),
+                                     cfloat(0.), cfloat(1.), output_type()))
 expand("rsqrt", lambda x: 1. / op.sqrt(x))
 expand("selu", lambda x: op.selu(x, cfloat(selu_alpha), cfloat(selu_lambda)))
 expand("square", lambda x: x * x)

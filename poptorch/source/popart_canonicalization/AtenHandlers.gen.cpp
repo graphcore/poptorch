@@ -400,12 +400,11 @@ torch::jit::Node *randHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *randnHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
-  auto x = node->input(0);
-  auto t0 = shapeFromTensor(x);
-  auto t1 = node->output(0);
-  auto t3 = getNodeScalarType(t1);
-  // randomNormal(x, TensorShape(x), 0.0, 1.0, ScalarType(output0))
-  return createRandomNormal(graph, {x}, t0, 0.0, 1.0, t3);
+  auto t0 = node->output(0);
+  auto t2 = shapeFromTensor(t0);
+  auto t3 = getNodeScalarType(t0);
+  // randomNormal({}, TensorShape(output0), 0.0, 1.0, ScalarType(output0))
+  return createRandomNormal(graph, {}, t2, 0.0, 1.0, t3);
 }
 
 torch::jit::Node *reciprocalHandler(torch::jit::Graph *graph,
