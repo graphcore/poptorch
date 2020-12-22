@@ -60,7 +60,8 @@ else()
     DEPENDS poptorch)
 endif()
 
+# Disabling docs building and poptorch packaging on Buildbot (Now done on Jenkins)
 add_custom_target(package_poptorch
-  COMMAND ${CMAKE_COMMAND} --build . --target package_and_move
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
+  #COMMAND ${CMAKE_COMMAND} --build . --target package_and_move
+  #WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/build/poptorch
   DEPENDS poptorch poptorch_docs)
