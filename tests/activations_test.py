@@ -92,7 +92,7 @@ def test_logsoftmax_numerics():
 @pytest.mark.filterwarnings("ignore:Output nr 1. of the traced function")
 def test_rrelu_training():
     torch.manual_seed(42)
-    input = torch.randn([10000])
+    input = torch.randn([30000])
 
     model = torch.nn.RReLU()
 
