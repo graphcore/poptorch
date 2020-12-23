@@ -74,18 +74,21 @@ external_data_tests = [
 #pylint: enable=line-too-long
 
 
-def add_test(output, test, folder, labels):
+def add_test(output, test, folder, labels, test_id):
     output.write(f"add_test({test} \"python3\" \"-m\" \"pytest\" \"-s\" "
-                 f"\"{folder}/{test}\")\n")
+                 f"\"{folder}/{test}\" "
+                 f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
     if labels:
         output.write(f"set_tests_properties({test} PROPERTIES  LABELS "
                      f"\"{labels}\")\n")
 
 
 with open(args.output_file, "w") as output:
+    test_id = 0
     # Add the short_tests files
     for test in short_tests:
-        add_test(output, test, args.test_dir, "short")
+        add_test(output, test, args.test_dir, "short", test_id)
+        test_id += 1
 
     # Process the list of tests returned by pytest
     for test in list_tests.getvalue().split("\n"):
@@ -103,4 +106,5 @@ with open(args.output_file, "w") as output:
             if test in external_data_tests:
                 labels.append("external_data")
             add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
-                     ";".join(labels))
+                     ";".join(labels), test_id)
+            test_id += 1

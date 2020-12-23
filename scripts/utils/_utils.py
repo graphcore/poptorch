@@ -208,17 +208,23 @@ class _LinesProcessor:
         are actual lines or just fragment of lines (in which case we
         wait until we've got the whole line available to print it).
         """
-        for line in lines:
-            self.partial_line += line.decode("utf-8")
-            if self._is_full_line(self.partial_line):
-                self.printer_fn(self.partial_line.rstrip())
-                self.partial_line = ""
+        if not lines:
+            return
+        lines = lines.decode("utf-8").split("\n")
+        lines[0] = self.partial_line + lines[0]
+        self.partial_line = lines[-1]
+        for line in lines[:-1]:
+            self.printer_fn(line)
         if flush and self.partial_line:
-            self.printer_fn(self.partial_line.rstrip())
+            self.printer_fn(self.partial_line)
             self.partial_line = ""
 
 
-def run_commands(*commands, env=None, stop_on_error=True):
+def run_commands(*commands,
+                 env=None,
+                 stop_on_error=True,
+                 stdout_handler=None,
+                 stderr_handler=None):
     bash_flags = ""
     if logger.isEnabledFor(logging.DEBUG):
         bash_flags += "x"  # print commands
@@ -239,13 +245,13 @@ def run_commands(*commands, env=None, stop_on_error=True):
     _make_output_non_blocking(p.stderr)
 
     process_alive = True
-    stdout = _LinesProcessor(logger.info)
-    stderr = _LinesProcessor(logger.error)
+    stdout = _LinesProcessor(stdout_handler or logger.info)
+    stderr = _LinesProcessor(stderr_handler or logger.error)
     while process_alive:
         process_alive = p.poll() is None
         # Only flush if it is the last iteration
-        stderr.process(p.stderr.readlines(), not process_alive)
-        stdout.process(p.stdout.readlines(), not process_alive)
+        stderr.process(p.stderr.read(), not process_alive)
+        stdout.process(p.stdout.read(), not process_alive)
 
-    assert p.returncode == 0, (f"{commands} failed with "
+    assert p.returncode == 0, (f"Shell commands {commands} failed with "
                                f"return code {p.returncode}")
