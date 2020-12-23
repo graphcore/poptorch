@@ -27,6 +27,7 @@ OP_DECL(popart, shapeddropout, shapeddropout, AiGraphcoreOpset1.shapeddropout, A
 OP_DECL(popart, atan2, atan2, AiGraphcoreOpset1.atan2, NONE, NONE)
 OP_DECL(popart, expm1, expm1, AiGraphcoreOpset1.expm1, NONE, NONE)
 OP_DECL(popart, log1p, log1p, AiGraphcoreOpset1.log1p, NONE, NONE)
+OP_DECL(popart, fmod, fmod, AiGraphcoreOpset1.fmod, NONE, NONE)
 // Ops from AiOnnxOpset10
 OP_DECL(popart, averagepool, averagepool, AiOnnxOpset10.averagepool, ARG(INT_VEC,kernel_shape) ARG(INT,ceil_mode) ARG(INT,count_include_pad) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(kernel_shape) BODY_ARG(ceil_mode) BODY_ARG(count_include_pad) BODY_ARG(pads) BODY_ARG(strides) )
 OP_DECL(popart, convinteger, convinteger, AiOnnxOpset10.convinteger, ARG(INT_VEC,dilations) ARG(INT,group) ARG(INT_VEC,kernel_shape) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(dilations) BODY_ARG(group) BODY_ARG(kernel_shape) BODY_ARG(pads) BODY_ARG(strides) )

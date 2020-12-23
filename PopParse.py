@@ -3,9 +3,9 @@
 
 import enum
 import argparse
-from ctypes.util import find_library
 import logging
 import os
+from popgen import onnx
 import re
 import sys
 
@@ -24,25 +24,14 @@ parser.add_argument("-D",
 
 args = parser.parse_args()
 
+popart_dir = onnx.find_popart_includes()
+onnx.init(popart_dir, args.clang, args.debug)
+jsonOutput = onnx.parse()
+
 logging_level = logging.DEBUG if args.debug else logging.INFO
 logging.basicConfig(level=logging_level)
 
-if args.clang:
-    clang.cindex.Config.set_library_file(args.clang)
-else:
-    clang.cindex.Config.set_library_file(find_library('clang-8'))
-
-jsonOutput = {}
-
 current_dir = os.path.dirname(os.path.realpath(__file__))
-
-# Popart uses both relative includes and full "popart/XXX.hpp" includes so we need point clang to both paths.
-popart_include_dir_partial = current_dir + "/../popart/popart/willow/include/"
-popart_dir = popart_include_dir_partial + "popart"
-
-files = [popart_dir + "/builder.hpp", popart_dir + "/builder.h.gen"]
-
-nodeBlacklist = {"DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11"}
 
 # List of SessionOptions attributes PopTorch decided to not support
 options_not_handled = [
@@ -60,58 +49,6 @@ options_not_handled = [
     "executionPhaseSettings",
     "batchSerializationSettings",
 ]
-
-
-def find_children(node, _argNum):
-    argDict = {}
-    if node.kind == clang.cindex.CursorKind.PARM_DECL:
-        argDict["type"] = node.type.spelling
-        argDict["name"] = node.spelling
-
-    return argDict
-
-
-def find_functions(node, namespace):
-    global jsonOutput
-    # If this is not the file path provided on the comand line, skip.
-    if node.location.file is not None and str(node.location.file) not in files:
-        return
-    if node.spelling in nodeBlacklist:
-        return
-
-    if node.kind == clang.cindex.CursorKind.CLASS_DECL:
-        namespace = node.spelling
-
-    operation = {}
-    if node.kind == clang.cindex.CursorKind.CXX_METHOD:
-        functionName = node.spelling
-
-        returnType = str(node.type.spelling).split("(")[0]
-
-        operation["type"] = returnType
-        operation["args"] = []
-
-        #line += "OP_DEF(\"" + namespace + "." + node.spelling + "\", " + returnType + ", " + namespace + "::" + node.spelling + "("
-        argNum = 0
-        for c in node.get_children():
-
-            # Traverse the children to find any parameters
-            argument = find_children(c, argNum)
-
-            if argument:
-                argument["num"] = argNum
-                operation["args"].append(argument)
-                argNum += 1
-
-    else:
-        for c in node.get_children():
-            find_functions(c, namespace)
-
-    if len(operation) > 0:
-
-        if namespace not in jsonOutput:
-            jsonOutput[namespace] = {}
-        jsonOutput[namespace][functionName] = operation
 
 
 class OptionType(enum.IntEnum):
@@ -226,52 +163,11 @@ tu = index.parse(popart_dir + "/sessionoptions.hpp",
                  args=[
                      "-std=c++14",
                      "-I" + popart_dir,
-                     "-I" + popart_include_dir_partial,
+                     "-I" + popart_dir + "/..",
                      "-DONNX_NAMESPACE=onnx",
-                     "-I/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1/",
                  ])
 
 parse_session_options(tu.cursor)
-
-tu = index.parse(popart_dir + "/builder.hpp",
-                 args=[
-                     "-std=c++14",
-                     "-I" + popart_dir,
-                     "-I" + popart_include_dir_partial,
-                     "-DONNX_NAMESPACE=onnx",
-                     "-I/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1/",
-                 ])
-
-for diag in tu.diagnostics:
-    logger.warning(diag)
-
-root_node = tu.cursor
-find_functions(root_node, "")
-logger.debug("jsonOutput Keys:%s", sorted(jsonOutput.keys()))
-
-classes = []
-
-for n in jsonOutput:
-    if n.startswith("Ai"):
-        classes.append(n)
-
-classes.reverse()
-
-addedFunctions = set()
-
-for opset in classes:
-
-    toRemove = []
-
-    for name in jsonOutput[opset]:
-        if name in addedFunctions:
-            toRemove.append(name)
-        else:
-            addedFunctions.add(name)
-
-    for name in toRemove:
-        jsonOutput[opset].pop(name)
-logger.debug("addedFunctions: %s", sorted(addedFunctions))
 
 ## Implicit cast support
 # Casting on all args
@@ -521,6 +417,11 @@ headerStubs = ""
 
 cxxFile = ""
 
+classes = []
+for classname in jsonOutput:
+    classes.append(classname)
+classes.reverse()
+
 for opset in classes:
     macroFile += "// Ops from %s\n" % opset
     for name in jsonOutput[opset]:
@@ -546,12 +447,6 @@ for opset in classes:
             if arg["name"] == "args":
                 # Guarantee we are working with an op which takes in popart tensors as 0th argument.
                 earlyExit = False
-                continue
-
-            if arg["name"] == "name":
-                continue
-
-            if re.search("DebugContext", arg["type"]):
                 continue
 
             macroType = toType(arg["type"])
@@ -600,10 +495,8 @@ for opset in classes:
 
         args = jsonOutput[opset][name]["args"]
         for arg in args:
-            # Skip the first args and also the "name" arg.
-            if arg["name"] == "args" or arg["name"] == "name":
-                continue
-            if re.search("DebugContext", arg["type"]):
+            # Skip the first args
+            if arg["name"] == "args":
                 continue
 
             header += "," + convertCxxConvert(arg["type"]) + " " + arg["name"]
