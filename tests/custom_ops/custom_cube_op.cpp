@@ -20,6 +20,7 @@
 #include <popart/popx/opx.hpp>
 #include <popart/popx/opxmanager.hpp>
 #include <popart/session.hpp>
+#include <popart/shapeinference.hpp>
 #include <popart/tensordata.hpp>
 #include <popart/tensorinfo.hpp>
 #include <popart/tensornames.hpp>
@@ -30,10 +31,6 @@
 
 #include <popart/names.hpp>
 #include <popart/opidentifier.hpp>
-
-#include <onnx/defs/schema.h> // NOLINT
-
-#include <onnx/defs/shape_inference.h> // NOLINT
 
 namespace {
 
@@ -48,8 +45,6 @@ std::unique_ptr<T> make_unique(Args &&... args) {
 // Use extern to avoid mangled names when importing to python
 extern "C" {
 
-namespace Onnx {
-
 namespace CustomOperators {
 const popart::OperatorIdentifier Cube = {
     "com.acme", "Cube", 1, {2, 2}}; // NOLINT
@@ -61,7 +56,6 @@ const static popart::OperatorIdentifier CubeGrad = { // NOLINT
     1,
     {2, 2}};
 } // namespace CustomGradOperators
-} // namespace Onnx
 
 // For training with a custom Op, four classes need to be implemented,
 // one for each of:
@@ -105,8 +99,8 @@ public:
   float getSubgraphValue() const final { return getLowSubgraphValue(); }
 };
 
-static popart::OpCreator<CubeOp>
-    cubeOpCreator({{Onnx::CustomOperators::Cube, {}}}, true);
+static popart::OpCreator<CubeOp> cubeOpCreator({{CustomOperators::Cube, {}}},
+                                               true);
 
 // The forward Opx (poplar implementation of the forward Op)
 
@@ -115,7 +109,7 @@ public:
   CubeOpx(popart::Op *op, popart::popx::Devicex *devicex)
       : popart::popx::Opx(op, devicex) {
     // Not strictly necessary, we check that op is castable to a CubeOp *.
-    verifyOp<CubeOp>(op, Onnx::CustomOperators::Cube);
+    verifyOp<CubeOp>(op, CustomOperators::Cube);
   }
 
   void grow(poplar::program::Sequence &prog) const override {
@@ -143,7 +137,7 @@ public:
 class CubeGradOp : public popart::Op {
 public:
   explicit CubeGradOp(const popart::Op &fwdOp)
-      : popart::Op(Onnx::CustomGradOperators::CubeGrad, fwdOp.getSettings()) {}
+      : popart::Op(CustomGradOperators::CubeGrad, fwdOp.getSettings()) {}
 
   std::unique_ptr<Op> clone() const final {
     return make_unique<CubeGradOp>(*this);
@@ -197,7 +191,7 @@ class CubeGradOpx : public popart::popx::Opx {
 public:
   CubeGradOpx(popart::Op *op, popart::popx::Devicex *devicex)
       : popart::popx::Opx(op, devicex) {
-    verifyOp<CubeGradOp>(op, Onnx::CustomGradOperators::CubeGrad);
+    verifyOp<CubeGradOp>(op, CustomGradOperators::CubeGrad);
   }
 
   // Create the gradient poplar::Tensor, which is
@@ -216,42 +210,11 @@ public:
   }
 };
 
-static popart::popx::OpxCreator<CubeOpx>
-    cubeOpxCreator(Onnx::CustomOperators::Cube);
+static popart::popx::OpxCreator<CubeOpx> cubeOpxCreator(CustomOperators::Cube);
 static popart::popx::OpxCreator<CubeGradOpx>
-    cubeGradOpxCreator(Onnx::CustomGradOperators::CubeGrad);
-}
-namespace ONNX_NAMESPACE {
-
-void CubeShapeInference(InferenceContext &ctx) {
-  propagateShapeAndTypeFromFirstInput(ctx);
+    cubeGradOpxCreator(CustomGradOperators::CubeGrad);
 }
 
-static const char CubeDoc[] = "Cube cubes (x^3) each element of the tensor.";
-
-ONNX_OPERATOR_SET_SCHEMA_EX(
-    Cube, comAcme, "com.acme", 1, false,
-    OpSchema()
-        .SetDoc(CubeDoc)
-        .Input(0, "X", "Input tensor", "T")
-        .Input(1, "bias", "Input tensor", "T")
-        .Output(0, "Y", "Output tensor", "T")
-        .Output(1, "Y_without_bias", "Output tensor", "T")
-        .TypeConstraint(
-            "T", {"tensor(float)", "tensor(int32)", "tensor(float16)"},
-            "Constrain input and output types to signed numeric tensors.")
-        .TypeAndShapeInferenceFunction(CubeShapeInference))
-
-static bool registerOps() {
-  auto &d = ONNX_NAMESPACE::OpSchemaRegistry::DomainToVersionRange::Instance();
-  d.AddDomainToVersion("com.acme", 1, 1);
-
-  ONNX_NAMESPACE::RegisterSchema(
-      GetOpSchema<ONNX_OPERATOR_SET_SCHEMA_CLASS_NAME(comAcme, 1, Cube)>());
-
-  return true;
-}
-
-static bool ret = registerOps();
-
-} // namespace ONNX_NAMESPACE
+static popart::RegisterShapeInferenceFunction
+    cubeOpShapeInference(CustomOperators::Cube,
+                         [](auto &ctx) { ctx.outInfo(0) = ctx.inInfo(0); });
