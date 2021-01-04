@@ -40,6 +40,12 @@ _conda_packages = [
     "spdlog=1.8.0",
     "wheel==0.34.2",
 ]
+
+_conda_popart_packages = ["boost=1.70.0", "capnproto=0.6.1"]
+
+_conda_protobuf = ["libprotobuf-static=3.14.0", "protobuf=3.14.0"]
+_conda_toolchains = ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
+
 _protobuf_url = "https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-python-3.14.0.tar.gz"
 _onnx_url = "https://github.com/onnx/onnx/archive/v1.7.0.tar.gz"
 _pip_requirements_file = os.path.join(_utils.sources_dir(), "requirements.txt")
@@ -51,13 +57,22 @@ class BuildenvManager:
                  output_dir=None,
                  python_version=None,
                  use_conda_toolchains=False,
-                 build_protobuf=False):
-        self.python_version = python_version or platform.python_version()
-        self.use_conda_toolchains = use_conda_toolchains
-        self.build_protobuf = build_protobuf
+                 build_protobuf=False,
+                 popart_deps=False):
+        python_version = python_version or platform.python_version()
+        self.build_onnx = popart_deps
+        self.build_protobuf = popart_deps and build_protobuf
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
+        self.conda_packages = _conda_packages[:]
+        self.conda_packages.append(f"python={python_version}")
+        if use_conda_toolchains:
+            self.conda_packages += _conda_toolchains
+        if popart_deps:
+            self.conda_packages += _conda_popart_packages
+            if not build_protobuf:
+                self.conda_packages += _conda_protobuf
 
         assert self.output_dir != _utils.sources_dir(), (
             "This script needs "
@@ -136,7 +151,8 @@ class BuildenvManager:
             f". {self.activate_filename}",
             "cd protobuf",
             f"curl -sSL {_protobuf_url} | tar zx --strip-components=1",
-            "CXXFLAGS=-fPIC CFLAGS=-fPIC ./configure --prefix=${CONDA_PREFIX}",
+            "CXXFLAGS=-fPIC CFLAGS=-fPIC ./configure --prefix=${CONDA_PREFIX} \
+                    --disable-shared",
             "make -j`nproc`",
             "make install",
         )
@@ -147,7 +163,7 @@ class BuildenvManager:
         _utils.run_commands(
             f". {self.activate_filename}",
             f"conda create --prefix {self.buildenv_dir} -c conda-forge "
-            f"-y {self._get_conda_packages_list()}")
+            f"-y {' '.join(self.conda_packages)}")
 
         self._append_to_activate_buildenv(
             f"conda activate {self.buildenv_dir}", )
@@ -158,7 +174,8 @@ class BuildenvManager:
         if self.build_protobuf:
             self._build_protobuf()
 
-        self._build_onnx()
+        if self.build_onnx:
+            self._build_onnx()
 
     def _clear_activate_buildenv(self):
         open(self.activate_filename, "w").close()
@@ -212,23 +229,17 @@ class BuildenvManager:
         with open(_pip_requirements_file, "r") as f:
             return f.read()
 
-    def _get_conda_packages_list(self):
-        pkgs = _conda_packages[:]
-        pkgs += [f"python={self.python_version}"]
-        if self.use_conda_toolchains:
-            pkgs += ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
-        if not self.build_protobuf:
-            pkgs += ["protobuf=3.14.0"]
-        return " ".join(pkgs)
-
     def _compute_environment_hash(self):
-        protobuf_used = ""
+        urls_used = ""
         if self.build_protobuf:
-            protobuf_used = _protobuf_url
+            urls_used += _protobuf_url
+        if self.build_onnx:
+            urls_used += _onnx_url
+
         return str(
             hashlib.md5(
-                (self._pip_requirements() + self._get_conda_packages_list() +
-                 protobuf_used + _onnx_url).encode("utf-8")).hexdigest())
+                (self._pip_requirements() + " ".join(self.conda_packages) +
+                 urls_used).encode("utf-8")).hexdigest())
 
 
 if __name__ == "__main__":
@@ -242,6 +253,9 @@ if __name__ == "__main__":
         "-t",
         action="store_true",
         help="Use Conda toolchains instead of the system ones.")
+    parser.add_argument("--popart-deps",
+                        action="store_true",
+                        help="Install dependencies to build PopART.")
     parser.add_argument(
         "--build-protobuf",
         action="store_true",
@@ -273,7 +287,7 @@ if __name__ == "__main__":
 
     manager = BuildenvManager(args.cache_dir, args.output_dir,
                               args.python_version, args.conda_toolchains,
-                              args.build_protobuf)
+                              args.build_protobuf, args.popart_deps)
     manager.create(args.create_template_if_needed)
 
     #FIXME: Clean up conda cache
