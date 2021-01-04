@@ -50,7 +50,7 @@ forward("relu_", "relu")
 forward("selu_", "selu")
 
 # binary operators
-opers = ["atan2", "div", "fmod", "max", "min", "pow", "prelu"]
+opers = ["atan2", "div", "fmod", "max", "min", "pow", "prelu", "remainder"]
 
 for oper in opers:
     convert(oper, 2)

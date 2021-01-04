@@ -27,6 +27,7 @@ torch::jit::Node* createAtan2(torch::jit::Graph *graph,  const std::vector<torch
 torch::jit::Node* createExpm1(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createLog1p(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createFmod(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createRemainder(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
 torch::jit::Node* createConvinteger(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dilations,int64_t group,const std::vector<int64_t> & kernel_shape,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides);
 torch::jit::Node* createDequantizelinear(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

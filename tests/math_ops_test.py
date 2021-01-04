@@ -175,7 +175,7 @@ binary_ops_float = [
     torch.fmod,
     torch.floor_divide,
     torch.mul,
-    # torch.remainder,
+    torch.remainder,
     torch.true_divide
 ]
 
@@ -330,6 +330,17 @@ def test_binary_ops_elementwise_bools(op):
             return self.op(x, y)
 
     binary_op_harness(IntOnRHS(op), input1, input2, compare)
+
+
+@pytest.mark.parametrize("op", [torch.fmod, torch.remainder])
+def test_modulo_mixed_sign(op):
+    input1 = torch.tensor([-4.3, 7.2, 5.0, 4.3, -7.2, 8.0])
+    input2 = torch.tensor([2.1, -3.4, 8.0, -2.1, 3.4, 5.0])
+
+    def compare(x, y):
+        return torch.allclose(x, y, atol=1e-05, equal_nan=True)
+
+    binary_op_harness(op, input1, input2, compare)
 
 
 binary_op_int = [

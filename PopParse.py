@@ -178,7 +178,7 @@ CastingOps = [
     "logical_xor", "matmul", "max", "maxroipool", "mean", "min", "mod", "mul",
     "pow", "prelu", "range", "rnn", "scan", "sequenceconstruct", "sub", "sum",
     "groupnormalization", "call", "dynamicadd", "dynamicupdate",
-    "dynamicslice", "dynamiczero", "fmod"
+    "dynamicslice", "dynamiczero", "fmod", "remainder"
 ]
 # Also Einsum, GreaterOrEqual, LessOrEqual
 
@@ -219,11 +219,11 @@ OutputTypeSameAsFirstInput = [
     "meanvariancenormalization", "neg", "nllloss", "nop", "pad", "printtensor",
     "range", "reciprocal", "reducel1", "reducel2", "reducelogsum",
     "reducelogsumexp", "reducemax", "reducemean", "reducemin", "reduceprod",
-    "reducesum", "reducesumsquare", "relu", "replicatedallreduce", "reshape",
-    "resize", "reversesequence", "roialign", "round", "scale", "scaledadd",
-    "scatter", "selu", "sequenceerase", "shapeddropout", "shrink", "sigmoid",
-    "sign", "sin", "sinh", "slice", "softmax", "softplus", "softsign",
-    "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
+    "reducesum", "reducesumsquare", "relu", "remainder", "replicatedallreduce",
+    "reshape", "resize", "reversesequence", "roialign", "round", "scale",
+    "scaledadd", "scatter", "selu", "sequenceerase", "shapeddropout", "shrink",
+    "sigmoid", "sign", "sin", "sinh", "slice", "softmax", "softplus",
+    "softsign", "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
     "subsample", "tan", "tanh", "thresholdedrelu", "tile", "transpose",
     "unique", "unsqueeze", "upsample"
 ]
