@@ -34,7 +34,7 @@ torch::jit::Node *addmmHandler(torch::jit::Graph *graph,
   auto t0 = constantToFloat(c1->node());
   auto c2 = node->input(4);
   auto t1 = constantToFloat(c2->node());
-  // gemm(y, z, x, NonTensorFloat(c1), NonTensorFloat(c2), 0, 0)
+  // gemm(y, z, x, cfloat(c1), cfloat(c2), 0, 0)
   return createGemm(graph, {y, z, x}, t0, t1, 0, 0);
 }
 
@@ -65,7 +65,7 @@ torch::jit::Node *catHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto t0 = handleTensorList(x->node());
   auto y = node->input(1);
   auto t1 = constantToLong(y->node());
-  // concat(TensorList(x), NonTensorLong(y))
+  // concat(TensorList(x), clong(y))
   return createConcat(graph, {t0}, t1);
 }
 
@@ -98,7 +98,7 @@ torch::jit::Node *clampHandler(torch::jit::Graph *graph,
   auto t0 = constantToFloat(z->node());
   auto y = node->input(1);
   auto t1 = constantToFloat(y->node());
-  // clip(x, NonTensorFloat(z), NonTensorFloat(y))
+  // clip(x, cfloat(z), cfloat(y))
   return createClip(graph, {x}, t0, t1);
 }
 
@@ -109,7 +109,7 @@ torch::jit::Node *constantpadndHandler(torch::jit::Graph *graph,
   auto t0 = constantToLongVec(l->node());
   auto c = node->input(2);
   auto t1 = constantToFloat(c->node());
-  // constantPad(x, ConstantLongList(l), NonTensorFloat(c))
+  // constantPad(x, clong_list(l), cfloat(c))
   return createConstantPad(graph, x, t0, t1);
 }
 
@@ -145,7 +145,7 @@ torch::jit::Node *dropoutHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto y = node->input(1);
   auto t0 = constantToFloat(y->node());
-  // dropout(x, 1, NonTensorFloat(y))
+  // dropout(x, 1, cfloat(y))
   return createDropout(graph, {x}, 1, t0);
 }
 
@@ -153,7 +153,7 @@ torch::jit::Node *eluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
   auto t0 = constantToFloat(y->node());
-  // elu(x, NonTensorFloat(y))
+  // elu(x, cfloat(y))
   return createElu(graph, {x}, t0);
 }
 
@@ -203,7 +203,7 @@ torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
   if (node->inputs().size() == 1) {
     auto x = node->input(0);
     auto t0 = reduceHelperDimensionCreator(x);
-    // reducel2(x, DimensionList(x), 0)
+    // reducel2(x, dimension_list(x), 0)
     return createReducel2(graph, {x}, t0, 0);
   }
   if (node->inputs().size() == 3) {
@@ -213,7 +213,7 @@ torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
     auto t1 = reduceHelperDimensionCreator(x, t0);
     auto c = node->input(2);
     auto t2 = constantToLong(c->node());
-    // reducel2(x, DimensionList(x, ConstantLongList(l)), NonTensorLong(c))
+    // reducel2(x, dimension_list(x, clong_list(l)), clong(c))
     return createReducel2(graph, {x}, t1, t2);
   }
   ERROR("Unhandled arity for operator c10::aten::frobenius_norm");
@@ -229,7 +229,7 @@ torch::jit::Node *fullHandler(torch::jit::Graph *graph,
   auto t2 = createExpand(graph, {y, t1})->output();
   auto t3 = node->output(0);
   auto t5 = getNodeScalarType(t3);
-  // cast(expand(y, AsIr(ConstantLongList(x))), ScalarType(output0))
+  // cast(expand(y, AsIr(clong_list(x))), scalar_type(output0))
   return createCast(graph, t2, t5);
 }
 
@@ -239,7 +239,7 @@ torch::jit::Node *fulllikeHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto t0 = shapeFromTensor(x);
   auto t1 = intVectorToIrConstant(graph, t0);
-  // expand(y, AsIr(TensorShape(x)))
+  // expand(y, AsIr(tensor_shape(x)))
   return createExpand(graph, {y, t1});
 }
 
@@ -264,7 +264,7 @@ torch::jit::Node *hardtanhHandler(torch::jit::Graph *graph,
   auto t0 = constantToFloat(b->node());
   auto a = node->input(1);
   auto t1 = constantToFloat(a->node());
-  // clip(x, NonTensorFloat(b), NonTensorFloat(a))
+  // clip(x, cfloat(b), cfloat(a))
   return createClip(graph, {x}, t0, t1);
 }
 
@@ -280,7 +280,7 @@ torch::jit::Node *leakyreluHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto y = node->input(1);
   auto t0 = constantToFloat(y->node());
-  // leakyrelu(x, NonTensorFloat(y))
+  // leakyrelu(x, cfloat(y))
   return createLeakyrelu(graph, {x}, t0);
 }
 
@@ -317,7 +317,7 @@ torch::jit::Node *maxHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   if (node->inputs().size() == 1) {
     auto x = node->input(0);
     auto t0 = reduceHelperDimensionCreator(x);
-    // reducemax(x, DimensionList(x), 0)
+    // reducemax(x, dimension_list(x), 0)
     return createReducemax(graph, {x}, t0, 0);
   }
   if (node->inputs().size() == 2) {
@@ -334,7 +334,7 @@ torch::jit::Node *minHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   if (node->inputs().size() == 1) {
     auto x = node->input(0);
     auto t0 = reduceHelperDimensionCreator(x);
-    // reducemin(x, DimensionList(x), 0)
+    // reducemin(x, dimension_list(x), 0)
     return createReducemin(graph, {x}, t0, 0);
   }
   if (node->inputs().size() == 2) {
@@ -361,7 +361,7 @@ torch::jit::Node *normalInPlaceHandler(torch::jit::Graph *graph,
   auto t1 = constantToFloat(c1->node());
   auto c2 = node->input(2);
   auto t2 = constantToFloat(c2->node());
-  // randomNormal(x, TensorShape(x), NonTensorFloat(c1), NonTensorFloat(c2))
+  // randomNormal(x, tensor_shape(x), cfloat(c1), cfloat(c2))
   return createRandomNormal(graph, {x}, t0, t1, t2);
 }
 
@@ -370,7 +370,7 @@ torch::jit::Node *pixelshuffleHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto y = node->input(1);
   auto t0 = constantToLong(y->node());
-  // depthtospace(x, NonTensorLong(y), "CRD")
+  // depthtospace(x, clong(y), "CRD")
   return createDepthtospace(graph, {x}, t0, "CRD");
 }
 
@@ -395,7 +395,7 @@ torch::jit::Node *randHandler(torch::jit::Graph *graph,
   auto t0 = node->output(0);
   auto t2 = shapeFromTensor(t0);
   auto t3 = getNodeScalarType(t0);
-  // randomUniform(x, TensorShape(output0), 1.0, 0.0, ScalarType(output0))
+  // randomUniform(x, tensor_shape(output0), 1.0, 0.0, scalar_type(output0))
   return createRandomUniform(graph, x, t2, 1.0, 0.0, t3);
 }
 
@@ -404,7 +404,7 @@ torch::jit::Node *randnHandler(torch::jit::Graph *graph,
   auto t0 = node->output(0);
   auto t2 = shapeFromTensor(t0);
   auto t3 = getNodeScalarType(t0);
-  // randomNormal({}, TensorShape(output0), 0.0, 1.0, ScalarType(output0))
+  // randomNormal({}, tensor_shape(output0), 0.0, 1.0, scalar_type(output0))
   return createRandomNormal(graph, {}, t2, 0.0, 1.0, t3);
 }
 
@@ -420,7 +420,7 @@ torch::jit::Node *reflectionpad1dHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto y = node->input(1);
   auto t0 = constantToLongVec(y->node());
-  // reflectionPad(x, ConstantLongList(y))
+  // reflectionPad(x, clong_list(y))
   return createReflectionPad(graph, x, t0);
 }
 
@@ -436,7 +436,7 @@ torch::jit::Node *replicationpad1dHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto y = node->input(1);
   auto t0 = constantToLongVec(y->node());
-  // edgePad(x, ConstantLongList(y))
+  // edgePad(x, clong_list(y))
   return createEdgePad(graph, x, t0);
 }
 
@@ -561,7 +561,7 @@ torch::jit::Node *topkHandler(torch::jit::Graph *graph,
   auto l = node->input(2);
   auto t2 = x->type()->expect<c10::TensorType>();
   auto t3 = handleDimensionParam(l, t2);
-  // topk(x, inplace_cast<long>(c), Dimension(l, TensorType(x)))
+  // topk(x, inplace_cast<long>(c), dimension(l, TensorType(x)))
   return createTopk(graph, {x, t1}, t3);
 }
 
@@ -573,7 +573,7 @@ torch::jit::Node *uniformInPlaceHandler(torch::jit::Graph *graph,
   auto t1 = constantToFloat(b->node());
   auto a = node->input(1);
   auto t2 = constantToFloat(a->node());
-  // randomUniform(x, TensorShape(x), NonTensorFloat(b), NonTensorFloat(a))
+  // randomUniform(x, tensor_shape(x), cfloat(b), cfloat(a))
   return createRandomUniform(graph, x, t0, t1, t2);
 }
 

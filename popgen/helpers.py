@@ -29,7 +29,7 @@ def as_ir(v):
 # Parameters:
 #   n - value to be generated
 def cint(n):
-    return values.NonTensorConstant('NonTensorInt', n, 'constantToInt')
+    return values.NonTensorConstant('cint', n, 'constantToInt')
 
 
 # clong(n)
@@ -38,7 +38,7 @@ def cint(n):
 # Parameters
 #   n - value to be generated
 def clong(n):
-    return values.NonTensorConstant('NonTensorLong', n, 'constantToLong')
+    return values.NonTensorConstant('clong', n, 'constantToLong')
 
 
 # clong(l)
@@ -47,7 +47,7 @@ def clong(n):
 # Parameters
 #   l - value to be generated
 def clong_list(l):
-    return values.NonTensorHelper('ConstantLongList', [l],
+    return values.NonTensorHelper('clong_list', [l],
                                   'constantToLongVec',
                                   expects_node=True)
 
@@ -58,7 +58,7 @@ def clong_list(l):
 # Parameters
 #   f - value to be generated
 def cfloat(f):
-    return values.NonTensorConstant('NonTensorFloat', f, 'constantToFloat')
+    return values.NonTensorConstant('cfloat', f, 'constantToFloat')
 
 
 # cstr(s)
@@ -67,7 +67,7 @@ def cfloat(f):
 # Parameters
 #   s - value to be generated
 def cstr(s):
-    return values.NonTensorConstant('NonTensorString', s, 'constantToString')
+    return values.NonTensorConstant('cstr', s, 'constantToString')
 
 
 # dimension(a, t)
@@ -77,7 +77,7 @@ def cstr(s):
 #   v - value representing a dimensional index
 #   t - tensor type
 def dimension(v, t):
-    return values.NonTensorHelper('Dimension', [v, t], 'handleDimensionParam')
+    return values.NonTensorHelper('dimension', [v, t], 'handleDimensionParam')
 
 
 # dimension_list(t, a)
@@ -89,7 +89,7 @@ def dimension(v, t):
 #   a - axes vector (optional)
 def dimension_list(t, a=None):
     args = [t, a] if a is not None else [t]
-    return values.NonTensorHelper('DimensionList', args,
+    return values.NonTensorHelper('dimension_list', args,
                                   "reduceHelperDimensionCreator")
 
 
@@ -143,7 +143,7 @@ def tensor_long(t):
 # Parameters
 #   t - input tensor
 def tensor_shape(t):
-    return values.NonTensorHelper('TensorShape', [t], "shapeFromTensor")
+    return values.NonTensorHelper('tensor_shape', [t], "shapeFromTensor")
 
 
 # tensor_type(t)
@@ -161,4 +161,4 @@ def tensor_type(t):
 # Parameters
 #   t - input tensor
 def scalar_type(t):
-    return values.NonTensorHelper('ScalarType', [t], 'getNodeScalarType')
+    return values.NonTensorHelper('scalar_type', [t], 'getNodeScalarType')

@@ -1,5 +1,9 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import sys
+from popgen import onnx
+
+onnx.init()
+onnx.parse_signatures()
 
 
 # Root class for all expressions - the result of applying an operator

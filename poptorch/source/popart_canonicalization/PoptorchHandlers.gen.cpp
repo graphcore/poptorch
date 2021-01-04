@@ -20,7 +20,7 @@ torch::jit::Node *beginipublockHandler(torch::jit::Graph *graph,
   auto t1 = constantToLong(y->node());
   auto z = node->input(2);
   auto t2 = constantToLong(z->node());
-  // beginIpuBlock(NonTensorLong(x), NonTensorLong(y), NonTensorLong(z))
+  // beginIpuBlock(clong(x), clong(y), clong(z))
   return createBeginIpuBlock(graph, t0, t1, t2);
 }
 
@@ -29,7 +29,7 @@ torch::jit::Node *ipuprinttensorHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto s = node->input(1);
   auto t0 = constantToString(s->node());
-  // printIpuTensor(x, NonTensorString(s))
+  // printIpuTensor(x, cstr(s))
   return createPrintIpuTensor(graph, x, t0);
 }
 
@@ -39,7 +39,7 @@ torch::jit::Node *optimizergroupHandler(torch::jit::Graph *graph,
   auto t0 = constantToLong(x->node());
   auto l = node->input(1);
   auto t1 = handleTensorList(l->node());
-  // optimizerGroup(NonTensorLong(x), TensorList(l))
+  // optimizerGroup(clong(x), TensorList(l))
   return createOptimizerGroup(graph, t0, t1);
 }
 
@@ -55,7 +55,7 @@ torch::jit::Node *setavailablememoryHandler(torch::jit::Graph *graph,
   auto x = node->input(0);
   auto y = node->input(1);
   auto t0 = constantToFloat(y->node());
-  // setAvailableMemory(x, NonTensorFloat(y))
+  // setAvailableMemory(x, cfloat(y))
   return createSetAvailableMemory(graph, x, t0);
 }
 
@@ -67,9 +67,8 @@ torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
   auto a = node->input(2);
   auto t1 = constantToLong(a->node());
   auto b = node->input(3);
-  auto t2 = constantToLong(b->node());
-  // setMatMulSerialization(x, NonTensorString(s), NonTensorLong(a),
-  // NonTensorLong(b))
+  auto t2 = constantToInt(b->node());
+  // setMatMulSerialization(x, cstr(s), clong(a), cint(b))
   return createSetMatMulSerialization(graph, x, t0, t1, t2);
 }
 

@@ -168,3 +168,69 @@ def parse():
             json[opset].pop(name)
 
     return json
+
+
+signatures = dict()
+
+
+def parse_signatures():
+    json = parse()
+    classes = []
+    for classname in json:
+        classes.append(classname)
+    classes.reverse()
+
+    type_map = {
+        'bool': ['cint'],
+        'float': ['cfloat'],
+        'int64_t': ['clong', 'dimension'],
+        'unsigned int': ['cint'],
+        'std::string': ['cstr'],
+        'std::vector<float>': ['cfloat_list', 'empty_initializer'],
+        'std::vector<int64_t>': ['clong_list', 'empty_initializer'],
+        'std::vector<std::string>': ['cstr_list', 'empty_initializer'],
+        'nonstd::optional<float>': ['cfloat', 'None'],
+        'nonstd::optional<int>': ['cint', 'None'],
+        'nonstd::optional<int64_t>': ['clong', 'None'],
+        'nonstd::optional<std::string>': ['cstr', 'None'],
+        'nonstd::optional<std::vector<int64_t> >':
+        ['clong_list', 'dimension_list', 'None'],
+        'Attributes::Int': ['clong'],
+        'Attributes::Ints': ['clong_list', 'empty_initializer'],
+        'popart::ReductionType': ['cint'],
+        'popart::Builder':
+        'ignore',
+        'popart::ConstVoidData':
+        'ignore',
+        'popart::MultiConvDilations':
+        'ignore',
+        'popart::MultiConvInputs':
+        'ignore',
+        'popart::MultiConvPads':
+        'ignore',
+        'popart::MultiConvStrides':
+        'ignore',
+        'popart::TensorId':
+        'ignore'
+    }
+
+    for classname in classes:
+        for op in json[classname]:
+            args = json[classname][op]['args']
+
+            arglist = []
+            for arg in args:
+                name = arg['name']
+                ty = arg['type'].replace('const ', '').replace(' &', '')
+
+                if name == 'args':
+                    arglist.append('Args')
+                    continue
+                if ty not in type_map:
+                    assert False, "Unsupported type " + ty + \
+                        " in onnx.parse_signatures()"
+
+                if type_map[ty] != 'ignore':
+                    arglist.append(type_map[ty])
+
+            signatures[op] = arglist

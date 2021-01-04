@@ -261,7 +261,7 @@ class NonTensorHelper(NonTensorValue):
 # Helper class that produces an empty initializer list
 class EmptyInitializer(NonTensorValue):
     def __init__(self):
-        NonTensorValue.__init__(self, "EmptyInitializer", [])
+        NonTensorValue.__init__(self, "empty_initializer", [])
 
     def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
         values[self] = self.render()

@@ -33,9 +33,9 @@ for oper in opers:
 
 convert("t", 1, "transpose")
 
-expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), cint(0)))
-expand("max", lambda x: op.reducemax(x, dimension_list(x), cint(0)))
-expand("min", lambda x: op.reducemin(x, dimension_list(x), cint(0)))
+expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), clong(0)))
+expand("max", lambda x: op.reducemax(x, dimension_list(x), clong(0)))
+expand("min", lambda x: op.reducemin(x, dimension_list(x), clong(0)))
 expand(
     "rand", lambda x: op.randomUniform(x, output_shape(), cfloat(1.), cfloat(
         0.), output_type()))
@@ -125,6 +125,6 @@ forward("where_", "where")
 # everything else
 expand(
     "addmm", lambda x, y, z, c1, c2: op.gemm(y, z, x, cfloat(c1), cfloat(c2),
-                                             cint(0), cint(0)))
+                                             clong(0), clong(0)))
 
 generate(script, "c10::aten", output_dir + "/AtenHandlers.gen.cpp", globals())

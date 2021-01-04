@@ -2,7 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 from popgen.api import expand, convert, generate
-from popgen.helpers import cfloat, clong, cstr, tensor_list
+from popgen.helpers import cfloat, cint, clong, cstr, tensor_list
 from popgen.operatorfactory import op
 
 script = "PopTorchHandlers.py"
@@ -19,7 +19,7 @@ expand(
     "set_available_memory", lambda x, y: op.setAvailableMemory(x, cfloat(y)))
 expand(
     "set_matmul_serialization", lambda x, s, a, b: op.setMatMulSerialization(
-        x, cstr(s), clong(a), clong(b)))
+        x, cstr(s), clong(a), cint(b)))
 
 generate(script, "symbols::poptorch", output_dir + "/PoptorchHandlers.gen.cpp",
          globals())
