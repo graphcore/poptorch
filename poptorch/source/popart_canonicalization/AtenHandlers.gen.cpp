@@ -79,7 +79,7 @@ torch::jit::Node *ceilHandler(torch::jit::Graph *graph,
 torch::jit::Node *celuHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto x = node->input(0);
-  auto t0 = createConstantFloat32(graph, {0.0}, {})->output();
+  auto t0 = createConstantFloatLike(graph, x, {0.0}, {})->output();
   auto t1 = createMax(graph, {x, t0})->output();
   auto a = node->input(1);
   auto t2 = createDiv(graph, {x, a})->output();

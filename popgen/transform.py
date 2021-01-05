@@ -1,6 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved
 
-from popgen import registry, Value
+from popgen import registry, Value, ConstantFloat
 from popgen.values import InputValue
 
 
@@ -56,6 +56,32 @@ def generate_complex_ops(value):
             return generate_complex_ops(new_value)
 
     value.args = [generate_complex_ops(arg) for arg in value.args]
+    return value
+
+
+# generate_typed_constants(value)
+#
+# When possible, have constants inherit type information from sibling operands.
+# This is achieved by attaching a sibling tensor operand as an argument to the
+# constant. The emit function should then produce a creation call that borrows
+# type information from the argument.
+# Parameters:
+#   value - root of the expression tree
+# Returns:
+#   value - potentially new root node
+def generate_typed_constants(value, type_like=None):
+    if isinstance(value, ConstantFloat):
+        if type_like is not None:
+            value.args.append(type_like)
+        return value
+
+    # find the first tensor argument
+    type_like = next((arg for arg in value.args if isinstance(arg, Value)),
+                     None)
+
+    for (i, arg) in enumerate(value.args):
+        value.args[i] = generate_typed_constants(arg, type_like)
+
     return value
 
 

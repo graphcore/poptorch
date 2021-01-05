@@ -209,8 +209,15 @@ class ConstantFloat(Value):
             suffix = "->output();\n"
 
         val_id = self.emit_assign_return(values, val_id, root, tabs, f)
-        self.emit_call("createConstantFloat32",
-                       ["graph", "{", str(self.val), "}", "{}"], suffix, f)
+        if len(self.args) > 0:
+            self.emit_call(
+                "createConstantFloatLike",
+                ["graph", values[self.args[0]], "{",
+                 str(self.val), "}", "{}"], suffix, f)
+        else:
+            self.emit_call(
+                "createConstantFloat32",
+                ["graph", "{", str(self.val), "}", "{}"], suffix, f)
         return val_id
 
     def vn(self):

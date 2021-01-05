@@ -36,6 +36,7 @@ def emit_handlers(namespace, aten, handlers, f=sys.stdout):
         values.clear()
         handler = transform.generate_complex_ops(handler)
         handler = transform.value_numbering(handler)
+        handler = transform.generate_typed_constants(handler)
         handler.annotate("// " + handler.render())
 
         if emit_arity_check:
