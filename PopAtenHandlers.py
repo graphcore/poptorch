@@ -109,6 +109,7 @@ expand(
 expand(
     "topk", lambda x, c, l: op.topk(x, tensor_long(c),
                                     dimension(l, tensor_type(x))))
+expand("threshold", lambda x, threshold, val: op.where(x > threshold, x, val))
 
 
 def softplus_handler(x, b, threshold):

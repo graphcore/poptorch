@@ -558,6 +558,16 @@ torch::jit::Node *tanhHandler(torch::jit::Graph *graph,
   return createTanh(graph, {i0});
 }
 
+torch::jit::Node *thresholdHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto threshold = node->input(1);
+  auto t0 = createGreater(graph, {x, threshold})->output();
+  auto val = node->input(2);
+  // where(greater(x, threshold), x, val)
+  return createWhere(graph, {t0, x, val});
+}
+
 torch::jit::Node *topkHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto x = node->input(0);
@@ -672,6 +682,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::t, tHandler);
   registerHandler(c10::aten::tan, tanHandler);
   registerHandler(c10::aten::tanh, tanhHandler);
+  registerHandler(c10::aten::threshold, thresholdHandler);
   registerHandler(c10::aten::topk, topkHandler);
   registerHandler(c10::aten::uniform_, uniformInPlaceHandler);
   registerHandler(c10::aten::where, whereHandler);

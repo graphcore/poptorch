@@ -245,6 +245,7 @@ Activations
 * ``torch.nn.RReLU``
 * ``torch.nn.Hardtanh``
 * ``torch.nn.functional.glu``
+* ``torch.nn.Threshold``
 
 
 Normalization layers

@@ -1,5 +1,7 @@
 New features:
-- Added support for torch.nn.Hardshrink torch.nn.Softplus, torch.nn.Softshrink
+- Added support for the following activation functions:
+    torch.nn.Hardshrink torch.nn.Softplus, torch.nn.Softshrink, 
+    torch.nn.Threshold
 - Add support for the following random sampling operations:
     torch.bernoulli, torch.distributions.Bernoulli
 - Added Adam optimizer
