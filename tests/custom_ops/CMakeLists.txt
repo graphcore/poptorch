@@ -1,5 +1,5 @@
 # This compiles a shared object file for the cube operator.
-# Run make in the custom_ops folder to build. 
+# Run make in the custom_ops folder to build.
 cmake_minimum_required(VERSION 3.4)
 project(custom_cube_op)
 
@@ -11,6 +11,9 @@ set(POPLAR_DIR CACHE PATH "Path to a Poplar install")
 
 if( NOT ${POPLAR_DIR} STREQUAL "")
   list(APPEND CMAKE_PREFIX_PATH ${POPLAR_DIR})
+  if(NOT poplar_FOUND)
+    find_package(poplar REQUIRED)
+  endif()
 else()
   # Check the package is not already in CMake's path
   find_package(poplar)
@@ -21,18 +24,14 @@ endif()
 if( NOT EXISTS ${POPART_DIR} )
   # Check the package is not already in CMake's path
   find_package(popart COMPONENTS popart-only)
-  if(NOT ONNX_FOUND)
+  if(NOT popart_FOUND)
     message(FATAL_ERROR "You must provide a path to a Popart build using -DPOPART_DIR=/path/to/popart/build")
   endif()
 else()
   list(APPEND CMAKE_PREFIX_PATH ${POPART_DIR})
-endif()
-
-if(NOT popart_FOUND)
-  find_package(popart REQUIRED COMPONENTS popart-only)
-endif()
-if(NOT poplar_FOUND)
-  find_package(poplar REQUIRED)
+  if(NOT popart_FOUND)
+    find_package(popart REQUIRED COMPONENTS popart-only)
+  endif()
 endif()
 
 # All C++ code in this project will be compiled as C++14
