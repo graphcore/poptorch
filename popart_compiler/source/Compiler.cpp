@@ -688,7 +688,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
                        .excludedVirtualGraphs.push_back(value);
                  });
 
-  registerSetter(uint64_options, "accumulationReductionType",
+  registerSetter(uint64_options, "accumulation_reduction_type",
                  [&](std::uint64_t value) {
                    ERROR_ON_MSG(value > static_cast<std::uint64_t>(
                                             popart::ReductionType::NoReduction),

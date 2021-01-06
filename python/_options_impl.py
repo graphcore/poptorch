@@ -16,6 +16,13 @@ class OptionsDict:
     def __init__(self, **default_values):
         self._values = default_values
 
+        # Keep a dictionary of warnings messages based on the parameter options:
+        # these are printed when the dictionarys are consolidated. The use of a
+        # dictionary allows a warning to be removed by the key, e.g. if there is
+        # a warning that the default parameter has changed but the parameter is
+        # specified explicitly.
+        self._warnings = {}
+
     def set(self, **kwargs):
         for option, value in kwargs.items():
             assert self.exists(option), ("Invalid option %s, valid options"
@@ -54,6 +61,9 @@ class OptionsDict:
         return self._values[option]
 
     def update(self, other):
+        for warning in self._warnings.values():
+            logger.warning(warning)
+
         assert not set(self._values.keys()).intersection(
             other), "Can't merge dictionaries, they have some keys in common"
         other.update(self._values)

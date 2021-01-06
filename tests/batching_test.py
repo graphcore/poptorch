@@ -182,3 +182,56 @@ def test_trainingAnchors(anchor):
             assert loss > 500.0
         else:
             assert False, "Unexpected anchor type %s" % anchor
+
+
+def run_gradient_accumulation_test(input, target, gradient_accumulations,
+                                   accumulation_reduction_type, lr):
+    torch.manual_seed(42)
+    model = torch.nn.Linear(10, 10)
+
+    opts = poptorch.Options()
+    opts.anchorMode(poptorch.AnchorMode.All)
+    opts.Training.gradientAccumulation(gradient_accumulations)
+
+    if accumulation_reduction_type is not None:
+        opts.Training.accumulationReductionType(accumulation_reduction_type)
+
+    poptorch_model = helpers.trainingModelWithLoss(
+        model,
+        loss=torch.nn.L1Loss(reduction="mean"),
+        options=opts,
+        optimizer=torch.optim.SGD(model.parameters(), lr=lr))
+
+    # Run 10 training steps
+    for _ in range(10):
+        poptorch_model(input, target)
+
+    # return trained weight matrix
+    return poptorch_model.weight.data
+
+
+def test_gradient_accumulation():
+    torch.manual_seed(42)
+
+    target = torch.randn(4, 10)
+    input = torch.randn(4, 10)
+
+    # Testing gradient accumulations 1 vs 2 and Mean reduction
+    w_with_1 = run_gradient_accumulation_test(target, input, 1,
+                                              poptorch.ReductionType.Mean,
+                                              0.01)
+    w_with_2 = run_gradient_accumulation_test(target, input, 2,
+                                              poptorch.ReductionType.Mean,
+                                              0.01)
+    torch.testing.assert_allclose(w_with_1, w_with_2)
+
+    # Test the default matches as well (i.e. the default is mean)
+    w_with_2 = run_gradient_accumulation_test(target, input, 2, None, 0.01)
+    torch.testing.assert_allclose(w_with_1, w_with_2)
+
+    # Testing gradient accumulations 1 vs 2 and Sum reduction (different lr)
+    w_with_1 = run_gradient_accumulation_test(target, input, 1,
+                                              poptorch.ReductionType.Sum, 0.02)
+    w_with_2 = run_gradient_accumulation_test(target, input, 2,
+                                              poptorch.ReductionType.Sum, 0.01)
+    torch.testing.assert_allclose(w_with_1, w_with_2)

@@ -43,7 +43,15 @@ class _TrainingOptions(_options_impl.OptionsDict):
     """
 
     def __init__(self):
-        super().__init__(gradient_accumulation=1)
+        super().__init__(gradient_accumulation=1,
+                         accumulation_reduction_type=enums.ReductionType.Mean)
+
+        art_warn = (
+            "The default value for accumulation_reduction_type has " +
+            "changed from sum to mean in this release. To suppress " +
+            "this warning use opts.Training.accumulationReductionType(" +
+            "poptorch.ReductionType.Mean).")
+        self._warnings["accumulation_reduction_type"] = art_warn
 
     def gradientAccumulation(self, gradient_accumulation):
         """Number of samples to accumulate for the gradient calculation.
@@ -56,6 +64,31 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
         Might be called "pipeline depth" in some other frameworks."""
         self.set(gradient_accumulation=gradient_accumulation)
+        return self
+
+    def accumulationReductionType(self, accumulation_reduction_type):
+        """The type of reduction (sum or mean) applied to accumulated gradients.
+
+        When using a non-unity value for gradientAccumulation, you can specify
+        whether to reduce the gradients by sum or mean (default). When using
+        mean reduction, changing the gradientAccumulation will not change the
+        training curve of the model (barring numerical error and changes due
+        to the different compute batch size e.g. batch normalization).
+
+        :param poptorch.ReductionType accumulation_reduction_type:
+            * Mean: Reduce gradients by calculating the mean of them.
+            * Sum: Reduce gradients by calculating the sum of them.
+        """
+        incorrect_instance = not isinstance(accumulation_reduction_type,
+                                            enums.ReductionType)
+        no_red = accumulation_reduction_type == enums.ReductionType.NoReduction
+        if incorrect_instance or no_red:
+            raise ValueError("accumulationReductionType must be set to "
+                             "poptorch.ReductionType.Mean or "
+                             "poptorch.ReductionType.Sum")
+
+        self.set(accumulation_reduction_type=accumulation_reduction_type)
+        self._warnings.pop("accumulation_reduction_type")
         return self
 
 
@@ -967,6 +1000,9 @@ class Options(_options_impl.OptionsDict):
     def toDict(self):
         """ Merge all the options, except for the Jit ones, into a single
         dictionary to be serialised and passed to the C++ backend.
+
+        At this stage, any warnings are printed based on options set e.g. if
+        a default option changes.
 
         :meta private:
         """

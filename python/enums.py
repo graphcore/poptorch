@@ -31,6 +31,17 @@ class ConnectionType(enum.IntEnum):
     Never = 2
 
 
+class ReductionType(enum.IntEnum):
+    """
+    - ``Sum``: Calcuulate the sum of all values
+    - ``Mean``: Calculate the mean of all values
+    - ``NoReduction``: Do not reduce
+    """
+    Sum = 0
+    Mean = 1
+    NoReduction = 2
+
+
 class SyncPattern(enum.IntEnum):
     """
     - ``Full``
