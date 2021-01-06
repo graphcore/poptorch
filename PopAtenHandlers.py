@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import math
 from popgen.api import convert, expand, forward, generate, simplify
 from popgen.helpers import as_ir, alpha, cfloat, cint, clong, clong_list, \
                            cstr, dimension, dimension_list, empty_initializer, \
@@ -23,9 +24,9 @@ simplify("div", lambda x, y: 1. / y * x)
 # unary operators
 opers = [
     "abs", "acos", "asin", "atan", "ceil", "cos", "cosh", "detach", "erf",
-    "exp", "expm1", "floor", "gelu", "isnan", "log", "logical_not", "neg",
-    "reciprocal", "relu", "round", "sigmoid", "sin", "sinh", "sign", "sqrt",
-    "tan", "tanh"
+    "exp", "expm1", "floor", "gelu", "isnan", "log", "log1p", "logical_not",
+    "neg", "reciprocal", "relu", "round", "sigmoid", "sin", "sinh", "sign",
+    "sqrt", "tan", "tanh"
 ]
 
 for oper in opers:
@@ -34,6 +35,9 @@ for oper in opers:
 convert("t", 1, "transpose")
 
 expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), clong(0)))
+expand("log2", lambda x: op.log(x) / math.log(2))
+expand("log10", lambda x: op.log(x) / math.log(10))
+expand("log_sigmoid", lambda x: op.log(op.sigmoid(x)))
 expand("max", lambda x: op.reducemax(x, dimension_list(x), clong(0)))
 expand("min", lambda x: op.reducemin(x, dimension_list(x), clong(0)))
 expand(
@@ -63,8 +67,10 @@ expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
 expand("dropout", lambda x, y: op.dropout(x, cint(1), cfloat(y)))
 expand("elu", lambda x, y: op.elu(x, cfloat(y)))
 expand("full_like", lambda x, y: op.expand(y, as_ir(tensor_shape(x))))
-
+expand("ge", lambda x, y: x >= y)
+expand("le", lambda x, y: x <= y)
 expand("leaky_relu", lambda x, y: op.leakyrelu(x, cfloat(y)))
+expand("ne", lambda x, y: x != y)
 expand("pixel_shuffle", lambda x, y: op.depthtospace(x, clong(y), cstr("CRD")))
 expand("reflection_pad1d", lambda x, y: op.reflectionPad(x, clong_list(y)))
 expand("replication_pad1d", lambda x, y: op.edgePad(x, clong_list(y)))

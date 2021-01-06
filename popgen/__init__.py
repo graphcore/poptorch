@@ -28,14 +28,27 @@ class Value:
         self.tensor_braces = True
 
     # operator overloading - syntax sugar
+    # note that we can't support __eq__ -- it would make the object unhashable
     def __add__(self, other):
         return Value('add', [self, other])
+
+    def __ge__(self, other):
+        return Value('logical_or', [self > other, self.equal(other)])
 
     def __gt__(self, other):
         return Value('greater', [self, other])
 
+    def __le__(self, other):
+        return Value('logical_or', [self < other, self.equal(other)])
+
+    def __lt__(self, other):
+        return Value('less', [self, other])
+
     def __mul__(self, other):
         return Value('mul', [self, other])
+
+    def __ne__(self, other):
+        return Value('logical_not', [self.equal(other)])
 
     def __sub__(self, other):
         return Value('sub', [self, other])
@@ -51,6 +64,9 @@ class Value:
 
     def __rtruediv__(self, other):
         return Value('div', [other, self])
+
+    def equal(self, other):
+        return Value('equal', [self, other])
 
     def set_graph_arity(self, arity):
         self.graph_arity = arity

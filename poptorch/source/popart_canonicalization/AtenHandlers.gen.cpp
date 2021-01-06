@@ -243,6 +243,15 @@ torch::jit::Node *fulllikeHandler(torch::jit::Graph *graph,
   return createExpand(graph, {y, t1});
 }
 
+torch::jit::Node *geHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto t0 = createGreater(graph, {x, y})->output();
+  auto t1 = createEqual(graph, {x, y})->output();
+  // logical_or(greater(x, y), equal(x, y))
+  return createLogical_or(graph, {t0, t1});
+}
+
 torch::jit::Node *geluHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto i0 = node->input(0);
@@ -275,6 +284,15 @@ torch::jit::Node *isnanHandler(torch::jit::Graph *graph,
   return createIsnan(graph, {i0});
 }
 
+torch::jit::Node *leHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto t0 = createLess(graph, {x, y})->output();
+  auto t1 = createEqual(graph, {x, y})->output();
+  // logical_or(less(x, y), equal(x, y))
+  return createLogical_or(graph, {t0, t1});
+}
+
 torch::jit::Node *leakyreluHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   auto x = node->input(0);
@@ -288,6 +306,41 @@ torch::jit::Node *logHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto i0 = node->input(0);
   // log(i0)
   return createLog(graph, {i0});
+}
+
+torch::jit::Node *log10Handler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = createLog(graph, {x})->output();
+  auto t1 =
+      createConstantFloatLike(graph, t0, {2.302585092994046}, {})->output();
+  // div(log(x), 2.302585092994046)
+  return createDiv(graph, {t0, t1});
+}
+
+torch::jit::Node *log1pHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  // log1p(i0)
+  return createLog1p(graph, {i0});
+}
+
+torch::jit::Node *log2Handler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = createLog(graph, {x})->output();
+  auto t1 =
+      createConstantFloatLike(graph, t0, {0.6931471805599453}, {})->output();
+  // div(log(x), 0.6931471805599453)
+  return createDiv(graph, {t0, t1});
+}
+
+torch::jit::Node *logsigmoidHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = createSigmoid(graph, {x})->output();
+  // log(sigmoid(x))
+  return createLog(graph, {t0});
 }
 
 torch::jit::Node *logicalnotHandler(torch::jit::Graph *graph,
@@ -345,6 +398,14 @@ torch::jit::Node *minHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   }
   ERROR("Unhandled arity for operator c10::aten::min");
   return nullptr;
+}
+
+torch::jit::Node *neHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto t0 = createEqual(graph, {x, y})->output();
+  // logical_not(equal(x, y))
+  return createLogical_not(graph, {t0});
 }
 
 torch::jit::Node *negHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
@@ -500,18 +561,18 @@ torch::jit::Node *sinhHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
+  auto threshold = node->input(2);
   auto x = node->input(0);
   auto b = node->input(1);
   auto t0 = createMul(graph, {x, b})->output();
-  auto threshold = node->input(2);
-  auto t1 = createGreater(graph, {t0, threshold})->output();
+  auto t1 = createLess(graph, {threshold, t0})->output();
   auto t2 = createMul(graph, {b, x})->output();
   auto t3 = createExp(graph, {t2})->output();
   // matched log1p: log(add(1.0, x))
   auto t4 = createLog1p(graph, {t3})->output();
   // matched div: mul(div(1.0, y), x)
   auto t5 = createDiv(graph, {t4, b})->output();
-  // where(greater(mul(x, b), threshold), x, div(log1p(exp(mul(b, x))), b))
+  // where(less(threshold, mul(x, b)), x, div(log1p(exp(mul(b, x))), b))
   return createWhere(graph, {t1, x, t5});
 }
 
@@ -636,20 +697,27 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::frobenius_norm, frobeniusnormHandler);
   registerHandler(c10::aten::full, fullHandler);
   registerHandler(c10::aten::full_like, fulllikeHandler);
+  registerHandler(c10::aten::ge, geHandler);
   registerHandler(c10::aten::gelu, geluHandler);
   registerHandler(c10::aten::gt, gtHandler);
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
   registerHandler(c10::aten::hardtanh_, hardtanhHandler);
   registerHandler(c10::aten::isnan, isnanHandler);
+  registerHandler(c10::aten::le, leHandler);
   registerHandler(c10::aten::leaky_relu, leakyreluHandler);
   registerHandler(c10::aten::leaky_relu_, leakyreluHandler);
   registerHandler(c10::aten::log, logHandler);
+  registerHandler(c10::aten::log10, log10Handler);
+  registerHandler(c10::aten::log1p, log1pHandler);
+  registerHandler(c10::aten::log2, log2Handler);
+  registerHandler(c10::aten::log_sigmoid, logsigmoidHandler);
   registerHandler(c10::aten::logical_not, logicalnotHandler);
   registerHandler(c10::aten::lt, ltHandler);
   registerHandler(c10::aten::masked_fill, maskedfillHandler);
   registerHandler(c10::aten::masked_fill_, maskedfillHandler);
   registerHandler(c10::aten::max, maxHandler);
   registerHandler(c10::aten::min, minHandler);
+  registerHandler(c10::aten::ne, neHandler);
   registerHandler(c10::aten::neg, negHandler);
   registerHandler(c10::aten::normal_, normalInPlaceHandler);
   registerHandler(c10::aten::pixel_shuffle, pixelshuffleHandler);
