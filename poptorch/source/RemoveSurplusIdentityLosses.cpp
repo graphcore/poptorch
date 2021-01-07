@@ -70,14 +70,23 @@ void removeSurplusIdentityLosses(torch::jit::Graph *graph) {
         // reduction operation.
         const std::size_t reduction =
             node->i(c10::Symbol::fromQualString("attr::reduction"));
-        if (reduction == 0) {
-          // Sum
-          new_node = createSum(graph, {new_node->output()});
-          new_node->moveAfter(node);
-        } else if (reduction == 1) {
-          // Mean
-          new_node = createMean(graph, {new_node->output()});
-          new_node->moveAfter(node);
+
+        if (reduction < 2) {
+          // Flatten it into 1D.
+          torch::jit::Node *flattened =
+              createFlatten(graph, {new_node->output()}, 0);
+          flattened->moveAfter(node);
+
+          // Reduce across that 1D tensor.
+          if (reduction == 0) {
+            // Sum
+            new_node = createReducesum(graph, {flattened->output()}, {1}, 0);
+            new_node->moveAfter(flattened);
+          } else if (reduction == 1) {
+            // Mean
+            new_node = createReducemean(graph, {flattened->output()}, {1}, 0);
+            new_node->moveAfter(flattened);
+          }
         }
 
         node->replaceAllUsesWith(new_node);

@@ -4,6 +4,50 @@
 import torch
 import poptorch
 import helpers
+import pytest
+
+
+#  Test the reductions work as expected
+@pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
+def test_non_final_loss_reductions(reduction):
+    torch.manual_seed(42)
+
+    model = torch.nn.Linear(10, 10)
+
+    class CustomLoss(torch.nn.Module):
+        # Mean squared error scaled.
+        def forward(self, x, target):
+            partial_loss = poptorch.identity_loss(x - target,
+                                                  reduction=reduction)
+            loss = partial_loss * partial_loss * 5
+            return partial_loss, poptorch.identity_loss(loss, reduction="mean")
+
+    loss = CustomLoss()
+
+    poptorch_model = helpers.trainingModelWithLoss(model, loss=loss)
+
+    target = torch.randn(10)
+    input = torch.randn(10)
+
+    # Capture what the loss function will see before the loss changes.
+    x = model(input)
+    _, (partial_loss, _) = poptorch_model(input, target)
+
+    # Check we have actually reduced the loss
+    if reduction != "none":
+        assert torch.numel(partial_loss) == 1
+
+    if reduction == "mean":
+        simulated_loss = torch.mean(x - target)
+    elif reduction == "sum":
+        simulated_loss = torch.sum(x - target)
+    elif reduction == "none":
+        simulated_loss = x - target
+
+    torch.testing.assert_allclose(simulated_loss.reshape_as(partial_loss),
+                                  partial_loss,
+                                  rtol=1e-02,
+                                  atol=1e-02)
 
 
 # Test custom loss by training to a target
