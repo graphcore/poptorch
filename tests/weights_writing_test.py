@@ -2,6 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import types
+import copy
+import numpy as np
 
 import poptorch
 import pytest
@@ -150,6 +152,62 @@ def test_access_parameters(use_half):
 
     # Check we are now equal with labels.
     assert torch.equal(torch.argmax(out.int(), dim=1), label)
+
+
+class DummyTrainingModel(torch.nn.Module):
+    """
+    Dummy training model
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.conv = torch.nn.Conv2d(16, 4, (3, 3))
+        self.loss = torch.nn.NLLLoss()
+        self.softmax = torch.nn.LogSoftmax(dim=1)
+
+    def forward(self, x, target):
+        x = self.conv(x)
+        x = self.softmax(x)
+        return self.loss(x, target)
+
+
+def test_torch_save():
+    torch.manual_seed(42)
+
+    # create a dummy model
+    model = DummyTrainingModel()
+
+    # create optimizer
+    optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+    # store the weights before training
+    pre_train_weights = copy.deepcopy(model.state_dict()['conv.weight'])
+
+    # wrap it in a trainingModel
+    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+
+    # run on dummy data for one iteration
+    input = torch.randn(5, 16, 10, 10)
+    target = torch.empty(5, 8, 8, dtype=torch.long).random_(0, 4)
+    _ = training_model(input, target)
+
+    # save the model
+    torch.save(model, "/tmp/model.save")
+
+    # reload the model
+    reloaded_model = torch.load("/tmp/model.save")
+
+    # make sure the reloaded weights are the same as the
+    # model and trainingModel
+    assert np.allclose(model.state_dict()['conv.weight'],
+                       reloaded_model.state_dict()['conv.weight'])
+    assert np.allclose(model.state_dict()['conv.weight'],
+                       training_model.state_dict()['conv.weight'])
+
+    # make sure we actually trained and we are not just checking
+    # the original wrapped model weights
+    assert not np.allclose(model.state_dict()['conv.weight'],
+                           pre_train_weights)
 
 
 def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
