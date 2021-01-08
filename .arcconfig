@@ -1,9 +1,4 @@
 {
   "phabricator.uri" : "https://phabricator.sourcevertex.net",
-  "load": [
-    "../arcanist_linters/clang-format-xml-linter",
-    "../arcanist_linters/clang-tidy-linter",
-    "../arcanist_linters/yapf_linter"
-  ],
   "arc.land.onto.default": "master"
 }

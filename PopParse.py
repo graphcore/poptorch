@@ -5,11 +5,11 @@ import enum
 import argparse
 import logging
 import os
-from popgen import onnx
 import re
 import sys
 
 import clang.cindex
+from popgen import onnx
 
 logger = logging.getLogger("PopParse")
 parser = argparse.ArgumentParser()
@@ -159,11 +159,11 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
 
 
 index = clang.cindex.Index.create()
-tu = index.parse(popart_dir + "/sessionoptions.hpp",
+session_file = os.path.join(popart_dir, "popart", "sessionoptions.hpp")
+tu = index.parse(session_file,
                  args=[
                      "-std=c++14",
                      "-I" + popart_dir,
-                     "-I" + popart_dir + "/..",
                      "-DONNX_NAMESPACE=onnx",
                  ])
 

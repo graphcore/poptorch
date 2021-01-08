@@ -27,7 +27,7 @@ def _system_conda_exists():
         return False
 
 
-_conda_packages = [
+_conda_poptorch_packages = [
     "ccache=3.7.9",
     "cmake=3.18.2",
     "conda-pack=0.5.0",
@@ -43,8 +43,12 @@ _conda_packages = [
 
 _conda_popart_packages = ["boost=1.70.0", "capnproto=0.6.1"]
 
-_conda_protobuf = ["libprotobuf-static=3.14.0", "protobuf=3.14.0"]
-_conda_toolchains = ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
+_conda_protobuf_packages = ["libprotobuf-static=3.14.0", "protobuf=3.14.0"]
+_conda_toolchains_packages = ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
+_conda_linters_packages = [
+    "yapf=0.27.0", "cpplint=1.4.4", "pylint=2.5.3", "clang-tools=9.0.0",
+    "python-clang=9.0.0", "pyyaml=5.3.1"
+]
 
 _protobuf_url = "https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-python-3.14.0.tar.gz"
 _onnx_url = "https://github.com/onnx/onnx/archive/v1.7.0.tar.gz"
@@ -58,21 +62,28 @@ class BuildenvManager:
                  python_version=None,
                  use_conda_toolchains=False,
                  build_protobuf=False,
-                 popart_deps=False):
+                 popart_deps=False,
+                 install_linters=False,
+                 poptorch_deps=True):
         python_version = python_version or platform.python_version()
         self.build_onnx = popart_deps
         self.build_protobuf = popart_deps and build_protobuf
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
-        self.conda_packages = _conda_packages[:]
-        self.conda_packages.append(f"python={python_version}")
+        self.conda_packages = [f"python={python_version}"]
+        self.python_packages = []
+        if install_linters:
+            self.conda_packages += _conda_linters_packages
+        if poptorch_deps:
+            self.conda_packages += _conda_poptorch_packages
         if use_conda_toolchains:
-            self.conda_packages += _conda_toolchains
+            self.conda_packages += _conda_toolchains_packages
         if popart_deps:
             self.conda_packages += _conda_popart_packages
             if not build_protobuf:
-                self.conda_packages += _conda_protobuf
+                self.conda_packages += _conda_protobuf_packages
+        self.install_pip_reqs = poptorch_deps
 
         assert self.output_dir != _utils.sources_dir(), (
             "This script needs "
@@ -112,7 +123,7 @@ class BuildenvManager:
                 "environment in %s", full_template_name, self.output_dir)
             self._create_new_env()
             if create_template_if_needed:
-                # TODO Create / check lock
+                # TODO(T32430) Create / check lock
                 os.chdir(self.output_dir)
                 _utils.run_commands(
                     f". {self.activate_filename}",
@@ -168,8 +179,9 @@ class BuildenvManager:
         self._append_to_activate_buildenv(
             f"conda activate {self.buildenv_dir}", )
 
-        _utils.run_commands(f". {self.activate_filename}",
-                            f"pip3 install -r {_pip_requirements_file}")
+        if self.install_pip_reqs:
+            _utils.run_commands(f". {self.activate_filename}",
+                                f"pip3 install -r {_pip_requirements_file}")
 
         if self.build_protobuf:
             self._build_protobuf()
@@ -195,7 +207,7 @@ class BuildenvManager:
         conda_sh = os.path.join(miniconda_install_dir, "etc", "profile.d",
                                 "conda.sh")
         installer = os.path.join(self.cache_dir, "Miniconda_installer.sh")
-        # FIXME: Some kind of lock here?
+        # TODO(T32430): Some kind of lock here?
         if os.path.isfile(conda_sh):
             logger.info(
                 "System conda not found, using the instance from the cache "
@@ -226,6 +238,8 @@ class BuildenvManager:
         self._append_to_activate_buildenv(f". {conda_sh}")
 
     def _pip_requirements(self):
+        if not self.install_pip_reqs:
+            return ""
         with open(_pip_requirements_file, "r") as f:
             return f.read()
 
@@ -239,7 +253,8 @@ class BuildenvManager:
         return str(
             hashlib.md5(
                 (self._pip_requirements() + " ".join(self.conda_packages) +
-                 urls_used).encode("utf-8")).hexdigest())
+                 urls_used +
+                 " ".join(self.python_packages)).encode("utf-8")).hexdigest())
 
 
 if __name__ == "__main__":
@@ -260,6 +275,9 @@ if __name__ == "__main__":
         "--build-protobuf",
         action="store_true",
         help="Build protobuf from sources instead of using the Conda package.")
+    parser.add_argument("--no-linters",
+                        action="store_true",
+                        help="Don't install the linters.")
     parser.add_argument(
         "--python-version",
         "-p",
@@ -287,7 +305,8 @@ if __name__ == "__main__":
 
     manager = BuildenvManager(args.cache_dir, args.output_dir,
                               args.python_version, args.conda_toolchains,
-                              args.build_protobuf, args.popart_deps)
+                              args.build_protobuf, args.popart_deps,
+                              not args.no_linters)
     manager.create(args.create_template_if_needed)
 
-    #FIXME: Clean up conda cache
+    #TODO(T32429): Clean up conda cache

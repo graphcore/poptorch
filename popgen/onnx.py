@@ -1,7 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved
 import logging
 import os
-import pathlib
 import re
 from ctypes.util import find_library
 import clang.cindex
@@ -9,7 +8,6 @@ import clang.cindex
 current_dir = os.path.dirname(os.path.realpath(__file__))
 logger = logging.getLogger('OnnxParser')
 
-popart_view_dir = current_dir + '/../../unpacked/popart'
 popart_include_dir = None
 popart_files = ["builder.hpp", "builder.h.gen"]
 
@@ -18,16 +16,15 @@ nodeBlacklist = {"DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11"}
 
 # find_popart_includes(path=None)
 #
-# Detect path to popart include files
-# Parameters:
-#   path - where to look in. Default to popart view directory
-def find_popart_includes(path=None):
-    if path is None:
-        path = popart_view_dir
-
-    paths = list(pathlib.Path(path).glob('**/builder.hpp'))
-    assert len(paths) == 1, "Failed to detect path to popART headers"
-    return paths[0].parent.as_posix()
+# Validate path to popart include files
+def find_popart_includes():
+    assert "CONDA_PREFIX" in os.environ, ("You need to run this script from "
+                                          "inside an activated buildenv")
+    expected_path = os.path.realpath(
+        os.path.join(os.environ["CONDA_PREFIX"], "..", "popart"))
+    assert os.path.isdir(expected_path), ("You need to configure your build "
+                                          "by running cmake")
+    return expected_path
 
 
 # init(popart_path=None, clang_path=None, debug=False):
@@ -45,17 +42,22 @@ def init(popart_path=None, clang_path=None, debug=False):
     if popart_path is None:
         popart_include_dir = find_popart_includes()
     else:
-        paths = list(pathlib.Path(popart_path).glob('builder.hpp'))
-        assert len(paths) == 1, "Unable to locate popART's builder.hpp"
-        popart_include_dir = paths[0].parent.as_posix()
+        builder_path = os.path.isfile(
+            os.path.join(popart_path, "popart", "builder.hpp"))
+        assert builder_path, ("Unable to locate popART's popart/builder.hpp "
+                              "in " + popart_path)
+        popart_include_dir = popart_path
 
     logger.info('Will pick up popART headers from: %s', popart_include_dir)
     for (i, fname) in enumerate(popart_files):
-        popart_files[i] = popart_include_dir + '/' + fname
+        popart_files[i] = os.path.join(popart_include_dir, "popart", fname)
 
-    clang_path = None
+    if clang.cindex.Config.loaded:
+        # Already initialised
+        return
+
     if clang_path is None:
-        for version in [8, 7, 6]:
+        for version in [9, 8, 7, 6]:
             logger.debug('Trying to find: clang-%s', str(version))
             clang_path = find_library('clang-' + str(version))
             if clang_path is not None:
@@ -130,12 +132,12 @@ def find_functions(jsonOutput, node, namespace=""):
 def parse():
     index = clang.cindex.Index.create()
 
-    path = os.path.realpath(popart_include_dir + '/builder.hpp')
+    path = os.path.realpath(
+        os.path.join(popart_include_dir, "popart", "builder.hpp"))
     logger.info('Parsing: %s', path)
-    tu = index.parse(popart_include_dir + '/builder.hpp',
+    tu = index.parse(path,
                      args=[
                          "-std=c++14", "-I" + popart_include_dir,
-                         "-I" + popart_include_dir + "/..",
                          "-DONNX_NAMESPACE=onnx"
                      ])
 

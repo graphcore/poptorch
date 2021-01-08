@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 project(poptorch)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -77,6 +77,15 @@ endif()
 if(NOT poplar_FOUND)
   find_package(poplar REQUIRED)
 endif()
+
+function(create_symlink_to_include target linkname)
+  get_target_property(dirs ${target} INTERFACE_INCLUDE_DIRECTORIES)
+  list(GET dirs 0 include_dir)
+  file(CREATE_LINK ${include_dir} ${linkname} SYMBOLIC)
+endfunction()
+
+create_symlink_to_include(poplar poplar)
+create_symlink_to_include(popart-only popart)
 
 # Run an install command that requires PopTorch, PopArt and Poplar to be in the PATH.
 function(run_poptorch_install_command cmd working_directory cmd_name)

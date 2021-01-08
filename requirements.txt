@@ -5,7 +5,6 @@ sphinx==3.3.1
 sphinx_rtd_theme==0.5.0
 breathe==4.25.1
 scipy==1.5.4
-clang==11.0.0
 torch==1.7.1+cpu; sys_platform != "darwin"
 torchvision==0.8.2+cpu; sys_platform != "darwin"
 torch==1.7.1; sys_platform == "darwin"
