@@ -3,6 +3,7 @@
 
 import pytest
 import torch
+import helpers
 import poptorch
 
 # Tensors
@@ -332,6 +333,7 @@ def test_fill(input_shapes, t):
     class Model(torch.nn.Module):
         def forward(self, x):
             value = 42 if x.dtype == torch.int32 else float_test_num
+            x = x + 0  # Ensure x is not modified in place
             return x.fill_(value), torch.full_like(x, value), torch.full(
                 input_shapes, value, dtype=x.dtype)
 
@@ -472,19 +474,88 @@ def test_copy_(input_shapes, dtype):
         assert torch.equal(native, pop)
 
 
-def test_detach():
+@pytest.mark.parametrize("with_detach", [True, False])
+def test_detach(with_detach):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.first_layer = torch.nn.Linear(10, 10)
+            self.second_layer = torch.nn.Linear(10, 10)
+
         def forward(self, x):
-            return x.detach()
+            out = self.first_layer(x)
+            if with_detach:
+                out = out.detach()
+
+            out = self.second_layer(out)
+            return out
 
     model = Model()
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss(),
+                                                   optimizer=torch.optim.SGD(
+                                                       model.parameters(),
+                                                       lr=0.01))
+
+    target = torch.ones(10)
+    input = torch.randn(10)
+
+    bias_at_start = model.first_layer.bias.clone().data
+    weight_at_start = model.first_layer.weight.clone().data
+
+    for _ in range(100):
+        _, _ = poptorch_model(input, target)
+
+    if with_detach:
+        assert (bias_at_start == model.first_layer.bias).all()
+        assert (weight_at_start == model.first_layer.weight).all()
+    else:
+        assert (bias_at_start != model.first_layer.bias).all()
+        assert (weight_at_start != model.first_layer.weight).all()
+
+
+@helpers.printCapfdOnExit
+def test_inplace_inputs(capfd):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            if isinstance(x, (tuple, list)):
+                x[0].add_(1)
+            elif isinstance(x, (dict)):
+                x['input'] += 1
+            else:
+                x += 1
+
+            return x
+
+    poptorch_model = poptorch.inferenceModel(Model())
+    tensor_in = torch.Tensor([1.0])
+    assert poptorch_model(tensor_in) == 2.0
+    assert tensor_in == 1.0
+
+    list_in = (torch.Tensor([1.0]), )
+    assert poptorch_model(tensor_in)[0] == 2.0
+    assert list_in[0] == 1.0
+
+    log = helpers.LogChecker(capfd)
+    msg = ("An input tensor is modified in-place by the model. This is " +
+           "not supported on the IPU and the input will remain unchanged. " +
+           "This applies to all in-place operations such as \"+=\", \"*=\" " +
+           "or those ending in \"_\". To avoid this warning, please use the " +
+           "non in-place alternatives such as \"x = x + 1\" instead of " +
+           "\"x += 1\" or the operation not ending in \"_\" matching the " +
+           "in-place variant, on all model inputs.")
+
+    log.assert_contains(msg)
+
+
+@helpers.printCapfdOnExit
+def test_requires_grad_true(capfd):
+    model = torch.nn.Linear(1, 1)
     poptorch_model = poptorch.inferenceModel(model)
 
-    x = torch.tensor([1.0], requires_grad=True)
-
-    # Run on IPU.
-    poptorch_out = poptorch_model(x)
-
-    assert not poptorch_out.requires_grad
+    poptorch_model(torch.tensor([0.0], requires_grad=True))
+    log = helpers.LogChecker(capfd)
+    log.assert_contains("Input tensor has requires_grad=True set." +
+                        "This tensor will be detached.")

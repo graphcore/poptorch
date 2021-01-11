@@ -16,6 +16,7 @@ def rng_harness(rng_op, input, stat_funs, expected_dtype=torch.float):
 
         def forward(self, x):
             torch.manual_seed(42)
+            x = x + 0  # Ensure input is not modified in place
             return self.rng_op(x)
 
     model = Model()
@@ -225,6 +226,7 @@ def test_distributions_bernoulli():
 def test_random_seed_repeatability():
     class Model(torch.nn.Module):
         def forward(self, x):
+            x = x + 0  # Ensure input is not modified in place
             return x.normal_()
 
     # Run the model once with a random seed

@@ -216,30 +216,32 @@ def test_distributions_normal_std_correctly_resolved():
 ## tensor._uniform test #
 
 
-# The type will resolve correctly because it is based on the empty tesnsor
+# The type will resolve correctly because it is based on the input tensor
 def test_uniform_correctly_resolved():
-    def fw_op(empty_tensor):
+    def fw_op(input_tensor):
         torch.manual_seed(42)
-        return empty_tensor.uniform_()
+        input_tensor = input_tensor + 0  # Ensure input is not modified in place
+        return input_tensor.uniform_()
 
     type_out_harness(torch.empty((3, 4, 10), dtype=torch.float16), fw_op, True,
                      True)
-    type_out_harness(torch.empty((3, 4, 19), dtype=torch.float32), fw_op, True,
+    type_out_harness(torch.empty((3, 4, 10), dtype=torch.float32), fw_op, True,
                      True)
 
 
 ## tensor._normal test #
 
 
-# The type will also resolve correctly because it is based on the empty tensor
+# The type will also resolve correctly because it is based on the input tensor
 def test_normal_correctly_resolved():
-    def fw_op(empty_tensor):
+    def fw_op(input_tensor):
         torch.manual_seed(42)
-        return empty_tensor.normal_()
+        input_tensor = input_tensor + 0  # Ensure input is not modified in place
+        return input_tensor.normal_()
 
     type_out_harness(torch.empty((3, 4, 10), dtype=torch.float16), fw_op, True,
                      True)
-    type_out_harness(torch.empty((3, 4, 19), dtype=torch.float32), fw_op, True,
+    type_out_harness(torch.empty((3, 4, 10), dtype=torch.float32), fw_op, True,
                      True)
 
 

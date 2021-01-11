@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import copy
 import enum
 import io
 import numbers
@@ -780,6 +781,19 @@ class PoplarExecutor:
 
             in_tensors_trace_view.forEach(narrowTensor)
 
+            def remove_require_grad(tensor):
+                if not isinstance(tensor, torch.Tensor):
+                    return tensor
+
+                if tensor.requires_grad:
+                    tensor = tensor.detach()
+                    logger.warning("Input tensor has requires_grad=True set."
+                                   "This tensor will be detached.")
+
+                return tensor
+
+            in_tensors_trace_view.forEach(remove_require_grad)
+
             # Normal bools don't get captured in python.
             hasConvertedAnyHalf = [False]
 
@@ -923,12 +937,38 @@ class PoplarExecutor:
                 layer.float()
                 halfLayers.add(name)
 
+        # From this point, if in_tensors_trace_view changes in value, the input
+        # is modified in-place. To discover this, take a deep copy of the
+        # inputs.
+        in_tensors_trace_view_tuple = in_tensors_trace_view.asTuple()
+        in_tensors_backup = None
+        try:
+            in_tensors_backup = copy.deepcopy(in_tensors_trace_view_tuple)
+        # pylint: disable=bare-except
+        except:
+            # The trace should raise its own exception for invalid input types,
+            # so simply keep in_tensors_backup as None. Note that a tensors with
+            # requires_grad=True would fail here but such a tensor will have
+            # been detached already.
+            pass
+
         # We will trace using the normal trace view.
         # pylint: disable=protected-access
         self._options._execution_strategy.onStartTracing()
-        self._trace = torch.jit.trace(self._model,
-                                      in_tensors_trace_view.asTuple())
+        self._trace = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
         self._options._execution_strategy.onEndTracing()
+
+        if self._RestoreInputsIfRequired(in_tensors_backup,
+                                         in_tensors_trace_view_tuple):
+            logger.warning(
+                "An input tensor is modified in-place by the model. This is "
+                "not supported on the IPU and the input will remain " +
+                "unchanged. This applies to all in-place operations such " +
+                "as \"+=\", \"*=\" or those ending in \"_\". To avoid this " +
+                "warning, please use the non in-place alternatives such as " +
+                "\"x = x + 1\" instead of \"x += 1\" or the operation " +
+                "not ending in \"_\" matching the in-place variant, on all " +
+                "model inputs.")
 
         # Save the inputs of the traced graph printout as it will be
         # different after getting originals back.
@@ -1003,6 +1043,34 @@ class PoplarExecutor:
         assert not self._is_attached
         poptorch_core.attachToDevice(self._executable)
         self._is_attached = True
+
+    @classmethod
+    def _RestoreInputsIfRequired(cls, backup, post_trace):
+        if isinstance(backup, torch.Tensor):
+            assert isinstance(post_trace, torch.Tensor)
+
+            equals = (backup == post_trace)
+            both_nan = torch.logical_and(backup.isnan(), post_trace.isnan())
+            if torch.logical_or(equals, both_nan).all():
+                return False
+            post_trace.copy_(backup)
+            return True
+
+        if isinstance(backup, (tuple, list)):
+            restore_required = False
+
+            assert isinstance(post_trace, (tuple, list))
+            assert len(backup) == len(post_trace)
+            for idx, backup_val in enumerate(backup):
+                if cls._RestoreInputsIfRequired(backup_val, post_trace[idx]):
+                    restore_required = True
+
+            return restore_required
+
+        # This implies that there is an input type or condition which does not
+        # cause the tracer to fail, yet is none of the above types, or
+        # alternatively, it is one of the above but the deepcopy failed.
+        raise RuntimeError("Unsupported input type or condition.")
 
 
 class AsynchronousWorker:

@@ -79,7 +79,7 @@ def test_training_attributes():
             return self.attr
 
         def forward(self, x, target):
-            x += 1
+            x = x + 1
             x = poptorch.ipu_print_tensor(x) + self.bias
             return x, custom_loss(x, target)
 
@@ -104,7 +104,7 @@ def test_explicit_deletion(use_half):
             self.bias = torch.nn.Parameter(torch.zeros(()))
 
         def forward(self, x):
-            x += 1
+            x = x + 1
 
             # It is important to make sure the result of the print is used.
             x = poptorch.ipu_print_tensor(x)

@@ -523,7 +523,7 @@ def test_access_scalar_parameter(use_half):
             self.bias = torch.nn.Parameter(torch.zeros(()))
 
         def forward(self, x):
-            x += 1
+            x = x + 1
 
             # It is important to make sure the result of the print is used.
             x = poptorch.ipu_print_tensor(x)
