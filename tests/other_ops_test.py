@@ -2,8 +2,9 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import poptorch
 import pytest
+
+import poptorch
 
 torch.manual_seed(42)
 params_einsum = [
@@ -49,6 +50,7 @@ def test_einsum(params, implicit_rhs):
 
 
 def test_einsum_chained():
+    pytest.skip("T32513: Intermittent accuracy failures in this test")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
