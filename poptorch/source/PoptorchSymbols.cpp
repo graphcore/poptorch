@@ -1,34 +1,35 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved
-#include "poptorch_logging/Logging.hpp"
-#include "PoptorchStaticInit.hpp"
 #include "PoptorchSymbols.hpp"
+#include "PoptorchStaticInit.hpp"
+#include "poptorch_logging/Logging.hpp"
 
-#define SYMBOL_INIT(Namespace, Name) \
-    Name = c10::Symbol::fromQualString(#Namespace "::" #Name);
+#define SYMBOL_INIT(Namespace, Name)                                           \
+  Name = c10::Symbol::fromQualString(#Namespace "::" #Name);
 
 namespace c10::aten {
 
-c10::Symbol relu_;
-c10::Symbol dropout_;
-c10::Symbol hardtanh_;
-c10::Symbol logical_not;
-c10::Symbol floor_divide;
-c10::Symbol prelu_;
-c10::Symbol leaky_relu_;
-c10::Symbol elu_;
-c10::Symbol selu_;
-c10::Symbol isnan;
-c10::Symbol isinf;
-c10::Symbol uniform_;
-c10::Symbol normal_;
-c10::Symbol where_;
-c10::Symbol poisson_nll_loss;
-c10::Symbol multilabel_soft_margin_loss;
-c10::Symbol bernoulli_;
+c10::Symbol relu_;                       // NOLINT
+c10::Symbol dropout_;                    // NOLINT
+c10::Symbol hardtanh_;                   // NOLINT
+c10::Symbol logical_not;                 // NOLINT
+c10::Symbol floor_divide;                // NOLINT
+c10::Symbol prelu_;                      // NOLINT
+c10::Symbol leaky_relu_;                 // NOLINT
+c10::Symbol elu_;                        // NOLINT
+c10::Symbol selu_;                       // NOLINT
+c10::Symbol isnan;                       // NOLINT
+c10::Symbol isinf;                       // NOLINT
+c10::Symbol uniform_;                    // NOLINT
+c10::Symbol normal_;                     // NOLINT
+c10::Symbol where_;                      // NOLINT
+c10::Symbol poisson_nll_loss;            // NOLINT
+c10::Symbol multilabel_soft_margin_loss; // NOLINT
+c10::Symbol bernoulli_;                  // NOLINT
 
+// clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
-static void initializeAtenSymbols()
-{
+static void initializeAtenSymbols() {
+  // clang-format on
   logging::trace("Initializing aten symbols");
   SYMBOL_INIT(aten, relu_)
   SYMBOL_INIT(aten, dropout_)
@@ -53,27 +54,29 @@ static void initializeAtenSymbols()
 
 namespace poptorch::symbols {
 
-#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs) \
-    c10::Symbol Namespace::FuncName;
+#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
+  c10::Symbol Namespace::FuncName;
 
-#include "popart_compiler/SupportedOperations.inc.hpp"
+#include "popart_compiler/SupportedOperations.inc.hpp" // NOLINT
 
 #undef OP_DECL
 
+// clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
-static void initializeSupportedOperations()
-{
-    logging::trace("Initializing supported operationss");
+static void initializeSupportedOperations() {
+  // clang-format on
+  logging::trace("Initializing supported operationss");
 
-#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs) \
-    Namespace::FuncName = c10::Symbol::fromQualString(#Namespace "::" #FuncName);
+#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
+  Namespace::FuncName =                                                        \
+      c10::Symbol::fromQualString(#Namespace "::" #FuncName); // NOLINT
 
-#include "popart_compiler/SupportedOperations.inc.hpp"
+#include "popart_compiler/SupportedOperations.inc.hpp" // NOLINT
 
 #undef OP_DECL
 }
 
-}  // namespace poptorch::symbols
+} // namespace poptorch::symbols
 
 namespace poptorch::symbols::poptorch {
 
@@ -88,9 +91,10 @@ c10::Symbol multi_conv_part;
 c10::Symbol end_multi_conv;
 c10::Symbol host_side_cast;
 
+// clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
-static void initializePoptorchSymbols()
-{
+static void initializePoptorchSymbols() {
+  // clang-format on
   logging::trace("Initializing poptorch symbols");
   SYMBOL_INIT(poptorch, begin_ipu_block)
   SYMBOL_INIT(poptorch, end_ipu_block)
@@ -105,4 +109,3 @@ static void initializePoptorchSymbols()
 }
 
 } // namespace poptorch::symbols::poptorch
-

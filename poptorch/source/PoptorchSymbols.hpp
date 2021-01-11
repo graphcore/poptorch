@@ -6,31 +6,31 @@
 // Create all the C10 symbols.
 // For some reason aten::relu_ is missing from the c10 namespace
 namespace c10::aten {
-extern c10::Symbol relu_;
-extern c10::Symbol dropout_;
-extern c10::Symbol hardtanh_;
-extern c10::Symbol logical_not;
-extern c10::Symbol floor_divide;
-extern c10::Symbol prelu_;
-extern c10::Symbol leaky_relu_;
-extern c10::Symbol elu_;
-extern c10::Symbol selu_;
-extern c10::Symbol isnan;
-extern c10::Symbol isinf;
-extern c10::Symbol uniform_;
-extern c10::Symbol normal_;
-extern c10::Symbol where_;
-extern c10::Symbol poisson_nll_loss;
-extern c10::Symbol multilabel_soft_margin_loss;
-extern c10::Symbol bernoulli_;
+extern c10::Symbol relu_;                       // NOLINT
+extern c10::Symbol dropout_;                    // NOLINT
+extern c10::Symbol hardtanh_;                   // NOLINT
+extern c10::Symbol logical_not;                 // NOLINT
+extern c10::Symbol floor_divide;                // NOLINT
+extern c10::Symbol prelu_;                      // NOLINT
+extern c10::Symbol leaky_relu_;                 // NOLINT
+extern c10::Symbol elu_;                        // NOLINT
+extern c10::Symbol selu_;                       // NOLINT
+extern c10::Symbol isnan;                       // NOLINT
+extern c10::Symbol isinf;                       // NOLINT
+extern c10::Symbol uniform_;                    // NOLINT
+extern c10::Symbol normal_;                     // NOLINT
+extern c10::Symbol where_;                      // NOLINT
+extern c10::Symbol poisson_nll_loss;            // NOLINT
+extern c10::Symbol multilabel_soft_margin_loss; // NOLINT
+extern c10::Symbol bernoulli_;                  // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {
 
 namespace symbols {
-#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs) \
-  namespace Namespace {                                                  \
-    extern c10::Symbol FuncName;                                         \
+#define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
+  namespace Namespace {                                                        \
+  extern c10::Symbol FuncName;                                                 \
   }
 
 #include "popart_compiler/SupportedOperations.inc.hpp"

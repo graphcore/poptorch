@@ -84,7 +84,8 @@ class ILinterFamily:
 
 class CppLinters(ILinterFamily):
     def __init__(self):
-        super().__init__(["hpp", "cpp", "inc"],
+        super().__init__(["hpp", "cpp"],
+                         excluded_extensions=["inc.hpp"],
                          linters=[ClangTidy(),
                                   ClangFormat(),
                                   CppLint()])
@@ -331,6 +332,8 @@ class ClangTidy(ILinter):
                     # If this message has already been printed: skip it
                     if output in printed:
                         continue
+                    if not printed:
+                        print("Output of clang-tidy:")
                     print(output)
                     printed.append(output)
                 # Apply the fixes using clang-apply-replacements
@@ -444,7 +447,7 @@ class ClangTidy(ILinter):
 
 class CppLint(ILinter):
     def gen_lint_command(self, filename, autofix):
-        return CondaCommand("cpplint", "--root=include",
+        return CondaCommand("cpplint", "--root=include --quiet",
                             f"--filter=-{',-'.join(cpp_lint_disabled)}",
                             filename)
 
@@ -480,10 +483,6 @@ class Yapf(ILinter):
 
     def check_version(self):
         return True  # TODO(T32437)
-
-
-def arc_clang_tidy(args):
-    os.system("clang-tidy " + " ".join(args))
 
 
 class Executor:
