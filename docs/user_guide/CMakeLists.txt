@@ -1,5 +1,3 @@
-# Enable IN_LIST operator
-cmake_policy(SET CMP0057 NEW)
 set(LONG_TESTS mnist inferenceModel)
 
 function(add_poptorch_py_user_guide_example name path)

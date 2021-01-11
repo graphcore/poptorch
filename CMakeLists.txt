@@ -18,8 +18,6 @@ set(TORCH_VERSION 1.7.1)
 
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
-# Enable IN_LIST operator
-cmake_policy(SET CMP0057 NEW)
 if(NOT CMAKE_BUILD_TYPE)
   list(GET CMAKE_CONFIGURATION_TYPES 0 CMAKE_BUILD_TYPE)
   message(STATUS "Setting build type to '${CMAKE_BUILD_TYPE}' as none was specified")
