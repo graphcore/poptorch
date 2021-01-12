@@ -12,6 +12,10 @@ import subprocess
 logger = logging.getLogger(__name__)
 
 
+def get_nprocs():
+    return len(os.sched_getaffinity(0))
+
+
 # Make the _utils functions log using the caller's logger instead of the
 # default 'utils/_utils.py'
 def set_logger(new_logger):
@@ -208,9 +212,11 @@ class _LinesProcessor:
         are actual lines or just fragment of lines (in which case we
         wait until we've got the whole line available to print it).
         """
-        if not lines:
-            return
-        lines = lines.decode("utf-8").split("\n")
+        if lines is None:
+            lines = ""
+        else:
+            lines = lines.decode("utf-8")
+        lines = lines.split("\n")
         lines[0] = self.partial_line + lines[0]
         self.partial_line = lines[-1]
         for line in lines[:-1]:
@@ -218,6 +224,66 @@ class _LinesProcessor:
         if flush and self.partial_line:
             self.printer_fn(self.partial_line)
             self.partial_line = ""
+
+
+class Process:
+    def __init__(self,
+                 cmd,
+                 env=None,
+                 redirect_stderr=False,
+                 stdout_handler=None,
+                 stderr_handler=None):
+        if redirect_stderr:
+            assert stderr_handler is None, ("You can't have a stderr handler "
+                                            "when it's redirected to stdout")
+            stderr = subprocess.STDOUT
+        else:
+            stderr = subprocess.PIPE
+        self.p = subprocess.Popen(cmd,
+                                  shell=True,
+                                  env=env,
+                                  executable='/bin/bash',
+                                  stdout=subprocess.PIPE,
+                                  stderr=stderr)
+        _make_output_non_blocking(self.p.stdout)
+        self.stdout = _LinesProcessor(stdout_handler or logger.info)
+        self.stderr = None
+        self.is_alive = True
+        self._returncode = None
+        if not redirect_stderr:
+            _make_output_non_blocking(self.p.stderr)
+            self.stderr = _LinesProcessor(stderr_handler or logger.error)
+
+    def _read(self):
+        # If it's the last time _read is called (i.e is_alive is now False)
+        # then flush the pipes and close them
+        if self.stderr:
+            self.stderr.process(self.p.stderr.read(), not self.is_alive)
+            if not self.is_alive:
+                self.p.stderr.close()
+        self.stdout.process(self.p.stdout.read(), not self.is_alive)
+        if not self.is_alive:
+            self.p.stdout.close()
+            self._returncode = self.p.returncode
+            del self.p
+
+    def is_running(self):
+        if not self.is_alive:
+            return self.is_alive
+
+        self.is_alive = self.p.poll() is None
+        # We need to read the outputs to avoid
+        # the process to hang if the output gets too long
+        self._read()
+        return self.is_alive
+
+    def wait(self):
+        while self.is_running():
+            pass
+        return self._returncode
+
+    def returncode(self):
+        return self._returncode
 
 
 def run_commands(*commands,
@@ -235,23 +301,11 @@ def run_commands(*commands,
         bash_flags = "set -" + bash_flags + ";"
 
     logger.debug("Running: %s", commands)
-    p = subprocess.Popen([bash_flags + ";".join(commands)],
-                         shell=True,
-                         env=env,
-                         executable='/bin/bash',
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
-    _make_output_non_blocking(p.stdout)
-    _make_output_non_blocking(p.stderr)
+    c = Process([bash_flags + ";".join(commands)],
+                env=env,
+                stdout_handler=stdout_handler,
+                stderr_handler=stderr_handler)
+    returncode = c.wait()
 
-    process_alive = True
-    stdout = _LinesProcessor(stdout_handler or logger.info)
-    stderr = _LinesProcessor(stderr_handler or logger.error)
-    while process_alive:
-        process_alive = p.poll() is None
-        # Only flush if it is the last iteration
-        stderr.process(p.stderr.read(), not process_alive)
-        stdout.process(p.stdout.read(), not process_alive)
-
-    assert p.returncode == 0, (f"Shell commands {commands} failed with "
-                               f"return code {p.returncode}")
+    assert returncode == 0, (f"Shell commands {commands} failed with "
+                             f"return code {returncode}")

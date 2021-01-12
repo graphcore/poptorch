@@ -8,13 +8,15 @@ import logging
 import os
 import pathlib
 import re
-import subprocess
 import sys
 import tempfile
 import time
 import yaml
 
+from utils import _utils
+
 logger = logging.getLogger("apply_linters")
+_utils.set_logger(logger)
 
 yapf_flags = "--style='{based_on_style: pep8}'"
 cpp_lint_disabled = [
@@ -112,6 +114,57 @@ class ILinter:
         return True
 
 
+class ProcessManager:
+    _manager = None
+
+    @staticmethod
+    def create(max_num_proc=0):
+        assert ProcessManager._manager is None
+        ProcessManager._manager = ProcessManager(max_num_proc)
+
+    @staticmethod
+    def get():
+        if ProcessManager._manager is None:
+            ProcessManager.create()
+        return ProcessManager._manager
+
+    def __init__(self, max_num_proc):
+        self.max_num_proc = max_num_proc
+        self.queue = []
+        self.running = []
+        self.num_running = 0
+
+    def enqueue(self, create_proc_fn):
+        if self.max_num_proc == 0:
+            create_proc_fn()
+            return
+
+        self.queue.append(create_proc_fn)
+        self.update()
+
+    def update(self):
+        def _is_running(proc):
+            """Update num_running when a process just returned
+            """
+            if proc.is_running():
+                return True
+            self.num_running -= 1
+            logger.debug("Process completed, %d/%d processes in use",
+                         self.num_running, self.max_num_proc)
+            return False
+
+        # Check the status of all the running processes
+        self.running = [p for p in self.running if _is_running(p)]
+
+        # Start new processes if slots are available
+        while self.queue and self.num_running < self.max_num_proc:
+            self.running.append(self.queue[0]())
+            self.queue = self.queue[1:]
+            self.num_running += 1
+            logger.debug("Process started, %d/%d processes in use",
+                         self.num_running, self.max_num_proc)
+
+
 class Command:
     """Asynchronously run a command in a sub shell"""
 
@@ -120,38 +173,51 @@ class Command:
                  stop_on_error=True,
                  print_output=True,
                  output_processor=None,
-                 name=None):
+                 name=None,
+                 print_output_on_error=True):
         # Stop on error
         self.cmd = "set -e;" if stop_on_error else ""
         self.cmd += " ".join(cmd)
         self.output_processor = output_processor
         self.print_output = print_output
         self.proc = None
+        self.output = ""
         self.name = name or cmd[0]
+        self.print_output_on_error = print_output_on_error
 
     def start(self):
+        ProcessManager.get().enqueue(self._create_proc)
+
+    def _create_proc(self):
         assert self.proc is None, "Process already started"
-        self.proc = subprocess.Popen([self.cmd],
-                                     shell=True,
-                                     executable='/bin/bash',
-                                     stdout=subprocess.PIPE,
-                                     stderr=subprocess.STDOUT)
+        self.output = ""
+
+        def append_to_output(line):
+            self.output += line + "\n"
+
+        self.proc = _utils.Process([self.cmd],
+                                   redirect_stderr=True,
+                                   stdout_handler=append_to_output)
+        return self.proc
 
     def is_running(self):
-        assert self.proc, "Process not started"
-        return self.proc.poll() is None
+        return self.proc is None or self.proc.is_running()
 
     def wait(self):
-        assert self.proc, "Process not started"
-        self.proc.wait()
+        while self.proc is None:
+            ProcessManager.get().update()
+            time.sleep(1)
+        returncode = self.proc.wait()
+        output = self.output
 
-        output = self.proc.stdout.read().decode("utf-8")
-        returncode = self.proc.returncode
-        logger.debug("Command %s returned with %d",
-                     self.cmd.split("\n")[0], returncode)
+        logger.debug("Command %s returned with %d", self.name, returncode)
         if self.output_processor:
             output, returncode = self.output_processor(output, returncode)
-        if self.print_output and output:
+        if self.print_output_on_error and returncode:
+            print(f"{self.name} failed with exit code {returncode}")
+            print("Output:")
+            print(output)
+        elif self.print_output and output:
             print(f"Output of {self.name}:")
             print(output)
         return returncode
@@ -371,7 +437,10 @@ class ClangTidy(ILinter):
                              c,
                              "--",
                              flags,
+                             name=("clang-tidy --quiet "
+                                   f"{filename} -- {flags}"),
                              output_processor=results,
+                             print_output_on_error=False,
                              print_output=False))
         return commands
 
@@ -400,8 +469,10 @@ class ClangTidy(ILinter):
             return output, returncode
 
         def append_to_includes(output, returncode):
+            if not output:
+                return output, 1
             logger.debug("Adding %s to includes", output)
-            self.includes.append(output)
+            self.includes.append(output.rstrip())
             return output, returncode
 
         def parse_include_tests(output, returncode):
@@ -414,19 +485,17 @@ class ClangTidy(ILinter):
                         output_processor=parse_python_includes).run():
             return False
         if CondaCommand(
-                "python3 -c \"import os,torch; from pathlib import Path;",
-                "print(os.path.join(Path(torch.__file__).parent,\'include'),",
-                " end='')\"",
+                "python3 -c \"import os,torch; from pathlib import Path;" +
+                "print(os.path.join(Path(torch.__file__).parent,\'include')" +
+                ")\"",
                 print_output=False,
                 output_processor=append_to_includes).run():
             return False
-        if CondaCommand("clang-tidy",
-                        "--dump-config",
+        if CondaCommand("clang-tidy --dump-config",
                         print_output=False,
                         output_processor=parse_config).run():
             return False
-        if CondaCommand("clang-tidy",
-                        "--list-checks",
+        if CondaCommand("clang-tidy --list-checks",
                         print_output=False,
                         output_processor=parse_checks).run():
             return False
@@ -576,6 +645,7 @@ class Linters:
         still_running = True
         while still_running:
             still_running = False
+            ProcessManager.get().update()
             for e in executors:
                 if e.execution_complete():
                     continue
@@ -609,11 +679,10 @@ if __name__ == "__main__":
         choices=[v.value for _, v in GitStrategy.__members__.items()],
         default=GitStrategy.Master.value,
         help="Strategy to use when no files are passed")
-    #TODO(T32438): Not implemented
     parser.add_argument("--jobs",
                         "-j",
                         type=int,
-                        default=0,
+                        default=_utils.get_nprocs(),
                         help="Number of cores to use for linting (0 = auto)")
     parser.add_argument("files", nargs="*", help="one or more files to lint")
     args = parser.parse_args()
@@ -621,6 +690,10 @@ if __name__ == "__main__":
     logging_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=logging_level)
     logger.debug("Args: %s", str(args))
+
+    if args.jobs:
+        assert args.jobs >= 0
+        ProcessManager.create(args.jobs)
 
     # Check we've got a Conda environment available
     CondaCommand()
