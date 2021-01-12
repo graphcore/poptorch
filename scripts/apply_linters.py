@@ -195,8 +195,14 @@ class Command:
         def append_to_output(line):
             self.output += line + "\n"
 
+        # We make sure that the PYTHONPATH is clear because we do not want the
+        # linter to undertake run-time inspection of the poptorch module.
+        new_env = os.environ.copy()
+        new_env["PYTHONPATH"] = ""
+
         self.proc = _utils.Process([self.cmd],
                                    redirect_stderr=True,
+                                   env=new_env,
                                    stdout_handler=append_to_output)
         return self.proc
 
