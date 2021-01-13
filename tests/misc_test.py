@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import poptorch
 import pytest
+import poptorch
 
 
 def test_setLogLevel():

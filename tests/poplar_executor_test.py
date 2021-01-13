@@ -4,9 +4,9 @@
 import os
 import tempfile
 import pytest
-import poptorch
 import torch
 import helpers
+import poptorch
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),

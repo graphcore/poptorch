@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
-import poptorch
 from tqdm import tqdm
+import poptorch
 
 
 def get_mnist_data(opts):

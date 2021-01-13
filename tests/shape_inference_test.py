@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import helpers
 import torch
 import torch.nn as nn
+import helpers
 import poptorch
 
 

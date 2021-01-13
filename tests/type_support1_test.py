@@ -4,8 +4,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import poptorch
 import pytest
+import poptorch
 
 MANY_TYPES = (torch.float32, torch.float64, torch.int32, torch.int64)
 

@@ -3,10 +3,10 @@
 
 import os  # pylint: disable=unused-import
 import unittest.mock
-import poptorch
 import torch
 import torchvision.models as models
 import helpers
+import poptorch
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())

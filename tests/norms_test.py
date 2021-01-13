@@ -6,9 +6,9 @@ import unittest.mock
 import torch
 import torch.optim as optim
 import torch.nn as nn
-import poptorch
 import pytest
 import helpers
+import poptorch
 
 # Norms
 #'torch.nn.BatchNorm1d', 'torch.nn.BatchNorm2d', 'torch.nn.BatchNorm3d', 'torch.nn.GroupNorm', 'torch.nn.SyncBatchNorm', 'torch.nn.SyncBatchNorm.convert_sync_batchnorm',

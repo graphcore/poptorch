@@ -4,11 +4,11 @@ import copy
 from io import StringIO
 import json
 
-import poptorch
 import pytest
 import torch
 import torch.optim as optim
 import helpers
+import poptorch
 
 
 # Convenience classes for testing

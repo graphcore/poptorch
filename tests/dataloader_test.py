@@ -1,10 +1,10 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import subprocess
 import time
+import subprocess
+import torch
+import pytest
 import numpy
 import poptorch
-import pytest
-import torch
 
 
 class BrokenDataset(torch.utils.data.Dataset):

@@ -4,9 +4,9 @@ import unittest.mock
 
 import torch
 import torch.nn as nn
+import pytest
 import poptorch
 import poptorch.testing
-import pytest
 
 
 def test_jit_script():

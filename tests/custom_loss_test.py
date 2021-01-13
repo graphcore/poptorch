@@ -2,9 +2,9 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import poptorch
-import helpers
 import pytest
+import helpers
+import poptorch
 
 
 #  Test the reductions work as expected

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import pytest
 import torch
 import poptorch
-
-import pytest
 
 # Tensors
 

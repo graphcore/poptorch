@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
-import poptorch
 import pytest
 import helpers
+import poptorch
 
 # Linears
 # torch.nn.Identity, torch.nn.Linear, torch.nn.Bilinear,

@@ -2,9 +2,9 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import json
 import torch
-import poptorch
 import pytest
 import helpers
+import poptorch
 
 
 def test_missing_block():

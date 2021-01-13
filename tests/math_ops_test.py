@@ -2,8 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import poptorch
 import pytest
+import poptorch
 
 # Unsupported and uncatergorised math ops.
 # torch.addcdiv, torch.addcmul, torch.clamp, torch.lerp,
@@ -168,15 +168,8 @@ def test_clamp_():
 
 
 binary_ops_float = [
-    torch.add,
-    torch.atan2,
-    torch.div,
-    torch.sub,
-    torch.fmod,
-    torch.floor_divide,
-    torch.mul,
-    torch.remainder,
-    torch.true_divide
+    torch.add, torch.atan2, torch.div, torch.sub, torch.fmod,
+    torch.floor_divide, torch.mul, torch.remainder, torch.true_divide
 ]
 
 

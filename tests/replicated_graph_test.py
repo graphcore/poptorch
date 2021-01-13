@@ -1,10 +1,10 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import os
-import numpy as np
 import torch
-import poptorch
-import helpers
 import pytest
+import numpy as np
+import helpers
+import poptorch
 
 partition_name = "poptorch_tests"
 

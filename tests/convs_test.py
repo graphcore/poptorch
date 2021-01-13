@@ -2,10 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import poptorch
-from torch import nn
-
 import pytest
+import poptorch
 
 # Convolutions.
 
@@ -147,10 +145,10 @@ def test_available_memory():
     torch.manual_seed(42)
     input = torch.randn(2, 4, 3, 10)
 
-    class BasicNetwork(nn.Module):
+    class BasicNetwork(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.conv = nn.Conv2d(4, 4, 3, stride=2)
+            self.conv = torch.nn.Conv2d(4, 4, 3, stride=2)
 
         def forward(self, x):
             out = self.conv(x)
@@ -182,7 +180,7 @@ def test_matmul_serialization(mode):
     else:
         assert False, "Invalid mode"
 
-    class BasicNetwork(nn.Module):
+    class BasicNetwork(torch.nn.Module):
         def forward(self, x, y):
             out = poptorch.serializedMatMul(x,
                                             y,
@@ -204,19 +202,21 @@ def test_available_memory_automatic():
     torch.manual_seed(42)
 
     # Just check we don't explode when the value is set.
-    class Network(nn.Module):
+    class Network(torch.nn.Module):
         def __init__(self):
             super().__init__()
 
-            self.layer1 = nn.Sequential(nn.Conv2d(1, 10, 5), nn.MaxPool2d(2),
-                                        nn.ReLU())
-            self.layer2 = nn.Sequential(nn.Conv2d(10, 20, 5), nn.MaxPool2d(2),
-                                        nn.ReLU())
-            self.layer3 = nn.Linear(320, 256)
-            self.layer3_act = nn.ReLU()
-            self.layer4 = nn.Linear(256, 10)
+            self.layer1 = torch.nn.Sequential(torch.nn.Conv2d(1, 10, 5),
+                                              torch.nn.MaxPool2d(2),
+                                              torch.nn.ReLU())
+            self.layer2 = torch.nn.Sequential(torch.nn.Conv2d(10, 20, 5),
+                                              torch.nn.MaxPool2d(2),
+                                              torch.nn.ReLU())
+            self.layer3 = torch.nn.Linear(320, 256)
+            self.layer3_act = torch.nn.ReLU()
+            self.layer4 = torch.nn.Linear(256, 10)
 
-            self.softmax = nn.LogSoftmax(1)
+            self.softmax = torch.nn.LogSoftmax(1)
 
         def forward(self, x):
             x = self.layer1(x)

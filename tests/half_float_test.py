@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-import poptorch
 import pytest
 import torch
 import helpers
+import poptorch
 
 
 def type_out_harness(inputs, forward_op, expect_same_type):

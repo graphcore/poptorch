@@ -2,8 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
-import poptorch
 import pytest
+import poptorch
 
 
 @pytest.mark.parametrize("norm", {1., 2., 3., 4.})

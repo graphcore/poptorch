@@ -4,12 +4,11 @@
 import types
 import copy
 import numpy as np
-
-import poptorch
 import pytest
 import torch
 import torch.optim as optim
 import helpers
+import poptorch
 
 
 @pytest.mark.parametrize("use_half", [True, False])

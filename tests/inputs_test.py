@@ -3,8 +3,8 @@
 
 import torch
 import torch.nn as nn
-import poptorch
 import pytest
+import poptorch
 
 
 @pytest.mark.parametrize("use_half", [True, False])
