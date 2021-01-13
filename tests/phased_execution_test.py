@@ -429,3 +429,27 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
 
     testlog = LogChecker(capfd)
     testlog.validate_2x2_parallel_phased_execution_small()
+
+
+def test_phased_api():
+    # Try to pass a list of Phases
+    poptorch.SerialPhasedExecution(
+        poptorch.Phase('layer1'),
+        poptorch.Phase('layer2'),
+    )
+
+    # Try to pass a list of stages
+    poptorch.SerialPhasedExecution(
+        poptorch.Stage('layer1'),
+        poptorch.Stage('layer2'),
+    )
+
+    # Try to pass a list of list of stages
+    poptorch.SerialPhasedExecution(
+        [poptorch.Stage('layer1'),
+         poptorch.Stage('layer1.b')],
+        [poptorch.Stage('layer2'),
+         poptorch.Stage('layer2.b')])
+
+    # Try to pass a list of list of block IDs
+    poptorch.SerialPhasedExecution(["layer1"], ["layer2"])

@@ -316,6 +316,9 @@ class Stage:
     """
 
     def __init__(self, *block_ids):
+        assert all(isinstance(b, str) for b in block_ids), (
+            "Block ids are "
+            f"supposed to be strings but got {block_ids}")
         self._blocks = block_ids
         self._stage_id = -1
         self._phase_id = -1
@@ -558,8 +561,11 @@ class _IPhasedExecution(_IExecutionStrategy):
         self._separate_backward_phase = False
         self._phases = []
         block_map = {}
-        for phase_id, stages in enumerate(phases):
-            phase = Phase(stages)
+        for phase_id, args in enumerate(phases):
+            if isinstance(args, Phase):
+                phase = args
+            else:
+                phase = Phase(args)
             self._phases.append(phase)
             for _, stage in enumerate(phase.stages):
                 stage._phase_id = phase_id
