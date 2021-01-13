@@ -1696,6 +1696,9 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   case detail::ExecutionMode::Sharded: {
     _impl->setOptionIfNotSet(options.enablePipelining, false,
                              "enablePipelining");
+    _impl->setOptionIfNotSet(
+        options.virtualGraphMode, popart::VirtualGraphMode::Manual,
+        "virtualGraphMode", popart::toString(options.virtualGraphMode));
     break;
   }
   case detail::ExecutionMode::Phased: {
@@ -1810,7 +1813,6 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         transformer.getModelProto(), data_flow, _impl->loss, *optimizer, device,
         {}, options, _impl->options.patterns);
   }
-
 
   // Poplar compilation.
   try {
