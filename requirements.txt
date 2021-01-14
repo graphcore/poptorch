@@ -9,3 +9,4 @@ torch==1.7.1+cpu; sys_platform != "darwin"
 torchvision==0.8.2+cpu; sys_platform != "darwin"
 torch==1.7.1; sys_platform == "darwin"
 torchvision==0.8.2; sys_platform == "darwin"
+tqdm==4.46.1
