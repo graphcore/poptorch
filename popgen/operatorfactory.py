@@ -73,7 +73,7 @@ class OperatorFactory:
             return lambda *args: \
                 check_operator_signature(Value(name, list(args)), \
                 poptorch.signatures)
-        assert False, name + " is not a supported operator"
+        raise ValueError(name + " is not a supported operator")
 
     def cast(self, t, ty):
         value = no_tensor_braces(Value('cast', [t, ty]))

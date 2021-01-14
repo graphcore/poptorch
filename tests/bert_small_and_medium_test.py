@@ -60,7 +60,8 @@ def test_bert_medium_result():
     class WrappedModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.wrapped = transformers.BertForQuestionAnswering.from_pretrained(
+            transformers_BFQA = transformers.BertForQuestionAnswering
+            self.wrapped = transformers_BFQA.from_pretrained(
                 'mrm8488/bert-medium-finetuned-squadv2')
 
         def forward(self, input_ids, attention_mask):

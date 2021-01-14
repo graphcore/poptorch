@@ -123,6 +123,10 @@ def _assertIdIsValid(name, value, expected_type):
                 f"{expected_type.__name__}")
 
 
+# The next two classes do not implement the forward method
+# pylint: disable=abstract-method
+
+
 class Block(torch.nn.Module):
     """Runs all layers called inside this scope on a specified IPU.
 
@@ -229,6 +233,9 @@ class BeginBlock(torch.nn.Module):
 
         out = self._layer_to_call(*input, **kwargs)
         return out
+
+
+# pylint: enable=abstract-method
 
 
 def custom_op(inputs, name, domain, domain_version, example_outputs):

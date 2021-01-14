@@ -9,6 +9,7 @@ import torch
 
 class BrokenDataset(torch.utils.data.Dataset):
     def __init__(self, length):
+        super().__init__()
         self._length = length
 
     def __len__(self):
@@ -20,6 +21,7 @@ class BrokenDataset(torch.utils.data.Dataset):
 
 class IncrementDataset(torch.utils.data.Dataset):
     def __init__(self, shape, length):
+        super().__init__()
         self._shape = shape
         self._length = length
 
@@ -32,6 +34,7 @@ class IncrementDataset(torch.utils.data.Dataset):
 
 class IncrementIterableDataset(torch.utils.data.IterableDataset):
     def __init__(self, shape, length):
+        super().__init__()
         self._shape = shape
         self._length = length
 
@@ -47,6 +50,7 @@ class IncrementIterableDatasetWithLen(IncrementIterableDataset):
 
 class IncrementDatasetWithLabels(torch.utils.data.Dataset):
     def __init__(self, shape, length):
+        super().__init__()
         self._shape = shape
         self._length = length
 

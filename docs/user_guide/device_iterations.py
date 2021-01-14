@@ -30,6 +30,7 @@ class ExampleModelWithLoss(torch.nn.Module):
 
 class ExampleDataset(torch.utils.data.Dataset):
     def __init__(self, shape, length):
+        super().__init__()
         self._shape = shape
         self._length = length
 
