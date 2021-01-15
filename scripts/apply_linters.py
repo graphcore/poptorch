@@ -423,6 +423,8 @@ class ClangTidy(ILinter):
             "poptorch/include", "poptorch_logging/include"
         ]
 
+        self._assert_poplibs_available()
+
     def gen_lint_command(self, filename, autofix):
         if not self.configs:
             self.check_version()
@@ -518,6 +520,31 @@ class ClangTidy(ILinter):
 
     def is_enabled(self, filename, autofix):
         return "custom_cube_op.cpp" not in filename
+
+    @staticmethod
+    def _assert_poplibs_available():
+        """Report an error if poplibs is not available. This occurs if a
+           non-packaged (SDK) version of poplar is relied upon but poplar
+           has not been activated."""
+
+        # If poplar has been activated, poplibs will always be available.
+        if "poplibs/include" in os.environ.get('CPATH', ''):
+            return
+
+        # Use poplin (one element of poplibs) to test for general poplibs
+        # presence in the polar symlink
+        poplibs_avail = not CondaCommand(
+            "test -d ${CONDA_PREFIX}/../poplar/poplin",
+            print_output=False).run()
+
+        # If it is an SDK, poplin, and hence poplibs, will be available
+        if poplibs_avail:
+            return
+
+        print("Poplibs is not in the CPATH nor symbolically linked poplar " +
+              "directory. Please source activate.sh from the poplar_view or " +
+              "use the SDK.")
+        sys.exit(1)
 
 
 class CppLint(ILinter):
