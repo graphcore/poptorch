@@ -60,7 +60,7 @@ bool isNone(torch::jit::Node *node);
 bool isNone(const torch::jit::Value *value);
 
 std::int64_t handleDimensionParam(torch::jit::Value *value,
-                                  c10::TensorTypePtr as_tensor);
+                                  const c10::TensorTypePtr &as_tensor);
 
 bool isTensorConstant(torch::jit::Node *node);
 

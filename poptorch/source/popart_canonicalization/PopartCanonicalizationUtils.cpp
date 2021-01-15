@@ -137,7 +137,7 @@ bool isNone(const torch::jit::Value *value) {
 }
 
 std::int64_t handleDimensionParam(torch::jit::Value *value,
-                                  c10::TensorTypePtr as_tensor) {
+                                  const c10::TensorTypePtr &as_tensor) {
   // Extract the dim.
   std::int64_t dim = constantToLong(value->node());
   c10::VaryingShape dims = as_tensor->sizes();

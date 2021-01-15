@@ -275,7 +275,7 @@ torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
   // x - y log(x)
   torch::jit::Node *final_node = createSub(graph, {x, y_mul_log_x->output()});
 
-  // Stirling approximation term = y log(y) − y + 0.5 log(2πy)
+  // Stirling approximation term = y log(y) -y + 0.5 log(2*PI*y)
   if (full) {
     // log(y)
     torch::jit::Node *log_y = createLog(graph, {y});
@@ -284,20 +284,20 @@ torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
     // y log(y) - y
     torch::jit::Node *minus_y = createSub(graph, {y_mul_log_y->output(), y});
 
-    // 2π
+    // 2*PI
     torch::jit::Node *two_pi =
         createConstantFloatLike(graph, x, {2 * M_PI}, {});
-    // 2πy
+    // 2*PI*y
     torch::jit::Node *two_pi_y = createMul(graph, {two_pi->output(), y});
-    // log(2πy)
+    // log(2*PI*y)
     torch::jit::Node *log_two_pi_y = createLog(graph, {two_pi_y->output()});
     // 0.5
     torch::jit::Node *half = createConstantFloatLike(graph, x, {0.5}, {});
-    // 0.5 log(2πy)
+    // 0.5 log(2*PI*y)
     torch::jit::Node *mul_half =
         createMul(graph, {half->output(), log_two_pi_y->output()});
 
-    // y log(y) - y + 0.5 log(2πy)
+    // y log(y) - y + 0.5 log(2*PI*y)
     torch::jit::Node *add =
         createAdd(graph, {minus_y->output(), mul_half->output()});
 
@@ -309,7 +309,7 @@ torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
     torch::jit::Node *masked_fill =
         createWhere(graph, {mask->output(), add->output(), zeros->output()});
 
-    // x - y log(x) + y log(y) - y + 0.5 log(2πy)
+    // x - y log(x) + y log(y) - y + 0.5 log(2*PI*y)
     final_node =
         createAdd(graph, {final_node->output(), masked_fill->output()});
   }
@@ -333,11 +333,11 @@ torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
   // Convert to popart reduce values
   reduction = convertReduceToPopart(reduction);
 
-  // Δ - x
+  // Delta - x
   torch::jit::Node *delta_minus_x = createSub(graph, {delta, x});
   // 0
   torch::jit::Node *zeros = createConstantFloatLike(graph, x, {0}, {});
-  // max(0, Δ - x)
+  // max(0, Delta - x)
   torch::jit::Node *max_delta_minus_x =
       createMax(graph, {zeros->output(), delta_minus_x->output()});
 
@@ -353,7 +353,7 @@ torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
   // l = x              if y = 1
   torch::jit::Node *ones_masked_fill =
       createWhere(graph, {ones_mask->output(), x, zeros->output()});
-  // l = max(0, Δ - x)  if y = -1
+  // l = max(0, delta - x)  if y = -1
   torch::jit::Node *neg_ones_masked_fill =
       createWhere(graph, {neg_ones_mask->output(), max_delta_minus_x->output(),
                           zeros->output()});
@@ -547,7 +547,7 @@ torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
 
   // -x
   torch::jit::Node *loss = createNeg(graph, {x});
-  // log(σ(-x))
+  // log(sigmoid(-x))
   loss = createHandlerOperation(graph, log_sigmoid_handler, {loss->output()});
 
   // 1
@@ -555,24 +555,24 @@ torch::jit::Node *multiLabelSoftMarginLossHandler(torch::jit::Graph *graph,
   // 1 - y
   torch::jit::Node *one_minus_y = createSub(graph, {ones->output(), y});
 
-  // (1 - y) log(σ(-x))
+  // (1 - y) log(sigmoid(-x))
   loss = createMul(graph, {one_minus_y->output(), loss->output()});
 
-  // log(σ(x))
+  // log(sigmoid(x))
   torch::jit::Node *log_sig_x =
       createHandlerOperation(graph, log_sigmoid_handler, {x});
-  // y log(σ(x))
+  // y log(sigmoid(x))
   torch::jit::Node *y_mul_log_sig_x =
       createMul(graph, {y, log_sig_x->output()});
 
-  // y log(σ(x)) + (1 - y) log(σ(-x))
+  // y log(sigmoid(x)) + (1 - y) log(sigmoid(-x))
   loss = createAdd(graph, {y_mul_log_sig_x->output(), loss->output()});
-  // -(y log(σ(x)) + (1 - y) log(σ(-x)))
+  // -(y log(sigmoid(x)) + (1 - y) log(sigmoid(-x)))
   loss = createNeg(graph, {loss->output()});
 
   // if weight is specified
   if (!isNone(w)) {
-    // -w (y log(σ(x)) + (1 - y) log(σ(-x)))
+    // -w (y log(sigmoid(x)) + (1 - y) log(sigmoid(-x)))
     loss = createMul(graph, {w, loss->output()});
   }
 

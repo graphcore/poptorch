@@ -64,7 +64,7 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   //  aten::argmin(Tensor in, int? dim, int keep_dims) -> Tensor
   //  aten::argmax(Tensor in, int? dim, int keep_dims) -> Tensor
-  // dim (int) – the dimension to reduce. If None, the argmax
+  // dim (int) - the dimension to reduce. If None, the argmax
   //             of the flattened input is returned.
 
   torch::jit::Symbol kind = node->kind();
