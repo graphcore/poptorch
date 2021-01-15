@@ -8,7 +8,10 @@
 // Priority value for symbol initialisation functions
 #define SYMBOL_INIT_PRIORITY 101
 
+// Priority value for shape inference registration functions
+#define SHAPE_INFERENCE_INIT_PRIORITY 102
+
 // Priority value for handler registration functions
-#define HANDLER_INIT_PRIORITY 102
+#define HANDLER_INIT_PRIORITY 103
 
 #endif

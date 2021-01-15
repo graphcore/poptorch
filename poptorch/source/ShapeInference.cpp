@@ -4,6 +4,7 @@
 #include "poptorch/ShapeInference.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "PoptorchStaticInit.hpp"
 #include "PoptorchSymbols.hpp"
 
 namespace poptorch {
@@ -482,32 +483,35 @@ void propagateInputShapes(torch::jit::Graph *graph) {
 }
 
 namespace {
-RegisterInferenceFunction output_matches_input(
-    {c10::aten::batch_norm, c10::aten::relu, c10::aten::relu_,
-     c10::aten::softmax, c10::prim::unchecked_cast},
-    outputTypeMatchesInputType);
-RegisterInferenceFunction conv2d(c10::aten::conv2d, inferShapeConv2d);
-RegisterInferenceFunction maxpool2d(c10::aten::max_pool2d, inferShapeMaxPool2d);
-RegisterInferenceFunction view(c10::aten::view, inferShapeView);
-RegisterInferenceFunction addmm(c10::aten::addmm, inferShapeAddmm);
-RegisterInferenceFunction transpose(c10::aten::t, inferShapeTranspose);
-RegisterInferenceFunction broadcast({c10::aten::add, c10::aten::add_,
-                                     c10::aten::sub, c10::aten::sub_,
-                                     c10::aten::mul, c10::aten::mul_},
-                                    inferShapeBroadcast);
-RegisterInferenceFunction avgpool2d(c10::aten::adaptive_avg_pool2d,
-                                    inferShapeAdaptiveAvgPool2d);
-RegisterInferenceFunction flatten(c10::aten::flatten, inferShapeFlatten);
+__attribute__((constructor(SHAPE_INFERENCE_INIT_PRIORITY))) void
+registerShapeInference() {
+  RegisterInferenceFunction output_matches_input(
+      {c10::aten::batch_norm, c10::aten::relu, c10::aten::relu_,
+       c10::aten::softmax, c10::prim::unchecked_cast},
+      outputTypeMatchesInputType);
+  RegisterInferenceFunction conv2d(c10::aten::conv2d, inferShapeConv2d);
+  RegisterInferenceFunction maxpool2d(c10::aten::max_pool2d,
+                                      inferShapeMaxPool2d);
+  RegisterInferenceFunction view(c10::aten::view, inferShapeView);
+  RegisterInferenceFunction addmm(c10::aten::addmm, inferShapeAddmm);
+  RegisterInferenceFunction transpose(c10::aten::t, inferShapeTranspose);
+  RegisterInferenceFunction broadcast({c10::aten::add, c10::aten::add_,
+                                       c10::aten::sub, c10::aten::sub_,
+                                       c10::aten::mul, c10::aten::mul_},
+                                      inferShapeBroadcast);
+  RegisterInferenceFunction avgpool2d(c10::aten::adaptive_avg_pool2d,
+                                      inferShapeAdaptiveAvgPool2d);
+  RegisterInferenceFunction flatten(c10::aten::flatten, inferShapeFlatten);
 
-// These nodes have a dummy function registered so they are ignored.
-RegisterInferenceFunction
-    ignore({c10::prim::Constant, c10::aten::__getitem__, c10::aten::__is__,
-            c10::aten::__isnot__, c10::aten::eq, c10::aten::ne, c10::aten::dim,
-            c10::aten::len, c10::aten::size},
-           [](auto node) {
-             logging::err("Warning: Shape inference is ignoring node:\n  {}",
-                          *node);
-           });
+  // These nodes have a dummy function registered so they are ignored.
+  RegisterInferenceFunction ignore(
+      {c10::prim::Constant, c10::aten::__getitem__, c10::aten::__is__,
+       c10::aten::__isnot__, c10::aten::eq, c10::aten::ne, c10::aten::dim,
+       c10::aten::len, c10::aten::size},
+      [](auto node) {
+        logging::err("Warning: Shape inference is ignoring node:\n  {}", *node);
+      });
+}
 } // namespace
 
 } // namespace poptorch
