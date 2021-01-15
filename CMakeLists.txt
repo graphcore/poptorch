@@ -98,7 +98,7 @@ function(run_poptorch_install_command cmd working_directory cmd_name)
     endif()")
 endfunction()
 
-file(WRITE ${CMAKE_BINARY_DIR}/tmp/test.sh "
+file(WRITE ${CMAKE_BINARY_DIR}/tmp/test.sh "#!$ENV{SHELL}
   source ${CMAKE_BINARY_DIR}/enable.sh
   ctest --output-on-failure $@
   ")
