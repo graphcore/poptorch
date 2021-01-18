@@ -40,7 +40,7 @@ Creation ops
 * ``torch.zeros``
 
 Indexing, slicing, joining and mutating ops
-''''''''''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''''''''''''
 
 PyTorch functions
 
