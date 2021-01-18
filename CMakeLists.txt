@@ -158,20 +158,6 @@ add_custom_target(poptorch_wheel
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
         DESTINATION .)
 
-if(BUILD_DOCS)
-  set(PKG_EXTRA_FLAGS "--include-documentation")
-endif()
-
-# TODO(T27444): At the moment BUILD_DOCS is bypassed by the CI so instead
-# check if the files exist with --include-documentation-if-exists
-# TODO(T27444): move to Jenkins script: we don't need CMake for that
-set(PKG_UPLOAD_DIR ../../pkg)
-add_custom_target(package_and_move
-  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
-  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/package_poptorch.py --output-dir ${PKG_UPLOAD_DIR} ${PKG_EXTRA_FLAGS} --include-documentation-if-exists --keep-output-dir
-  DEPENDS poptorch_wheel
-)
-
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/enable.sh.in
   ${PROJECT_BINARY_DIR}/enable.sh
   @ONLY)
