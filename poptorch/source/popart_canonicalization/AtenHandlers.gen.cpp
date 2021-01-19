@@ -546,6 +546,14 @@ torch::jit::Node *signHandler(torch::jit::Graph *graph,
   return createSign(graph, {i0});
 }
 
+torch::jit::Node *siluHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = createSigmoid(graph, {x})->output();
+  // mul(x, sigmoid(x))
+  return createMul(graph, {x, t0});
+}
+
 torch::jit::Node *sinHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto i0 = node->input(0);
   // sin(i0)
@@ -741,6 +749,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::selu_, seluHandler);
   registerHandler(c10::aten::sigmoid, sigmoidHandler);
   registerHandler(c10::aten::sign, signHandler);
+  registerHandler(c10::aten::silu, siluHandler);
   registerHandler(c10::aten::sin, sinHandler);
   registerHandler(c10::aten::sinh, sinhHandler);
   registerHandler(c10::aten::softplus, softplusHandler);

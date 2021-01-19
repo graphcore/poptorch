@@ -235,6 +235,7 @@ Activations
 * ``torch.nn.LogSoftmax``
 * ``torch.nn.ReLU``
 * ``torch.nn.SELU``
+* ``torch.nn.SiLU``
 * ``torch.nn.Sigmoid``
 * ``torch.nn.Softmax``
 * ``torch.nn.Softplus``

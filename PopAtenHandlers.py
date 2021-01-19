@@ -48,6 +48,7 @@ expand(
                                      cfloat(0.), cfloat(1.), output_type()))
 expand("rsqrt", lambda x: 1. / op.sqrt(x))
 expand("selu", lambda x: op.selu(x, cfloat(selu_alpha), cfloat(selu_lambda)))
+expand("silu", lambda x: x * op.sigmoid(x))
 expand("square", lambda x: x * x)
 
 forward("relu_", "relu")

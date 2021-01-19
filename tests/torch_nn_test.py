@@ -158,6 +158,7 @@ EXPECTED_FAILURES = {
     "test_nn_Softsign_scalar": "IndexError: tuple index out of range",
     "test_nn_Softmin_scalar": "IndexError: tuple index out of range",
     "test_nn_Tanhshrink_scalar": "IndexError: tuple index out of range",
+    "test_nn_SiLU_scalar": "IndexError: tuple index out of range",
 
     # input 1 for ai.graphcore.BatchNormalization
     "test_nn_BatchNorm2d_zero_batch": "ERROR in NormalizationOps.cpp:98: weight->type()->cast<c10::TensorType>() == nullptr Context: PopartCanonicalization processing %10 : Float(0:20, 5:4, 2:2, 2:1) = aten::batch_norm(%input, %4, %5, %11, %12, %13, %14, %15, %16)",
@@ -262,9 +263,6 @@ EXPECTED_FAILURES = {
     "test_nn_Embedding_sparse": "T30611",
 
     "test_nn_MultiheadAttention": "ai.onnx.Dropout:10 ratio value 0 is not valid",
-
-    "test_nn_SiLU": "T31522",
-    "test_nn_SiLU_scalar": "T31522",
     }
 
 HALF_EXPECTED_FAILURES = {
