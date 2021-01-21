@@ -44,6 +44,12 @@ Creation ops
 Indexing, slicing, joining and mutating ops
 '''''''''''''''''''''''''''''''''''''''''''
 
+In PyTorch, slicing a tensor is accessing a subset of the tensor by providing the start and end indices, such as ``tensor[1:5]``.
+
+With a PopTorch model, you may take a slice of a tensor only if one of two conditions are met:
+* The start and end are constants, or can be resolved to be constants (for example, a function of the shape of a tensor which does not change between runs).
+* The start and end of the slice are related by a constant, for example ``tensor[x:x+5]``. Please note that this will produce different results to PyTorch if the end value exceeds the length of the tensor: PyTorch will output a smaller size tensor but PopTorch will allow the slice to wrap round to the start of the relevant dimension.
+
 PyTorch functions
 
 * ``torch.cat``

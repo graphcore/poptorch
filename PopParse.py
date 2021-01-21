@@ -179,8 +179,7 @@ CastingOps = [
     "logical_and", "logical_or", "logical_xor", "matmul", "max", "maxroipool",
     "mean", "min", "mod", "mul", "pow", "prelu", "range", "rnn", "scan",
     "sequenceconstruct", "sub", "sum", "groupnormalization", "call",
-    "dynamicadd", "dynamicupdate", "dynamicslice", "dynamiczero", "fmod",
-    "remainder"
+    "dynamicadd", "dynamicupdate", "dynamiczero", "fmod", "remainder"
 ]
 # Also Einsum, GreaterOrEqual, LessOrEqual
 
@@ -214,8 +213,8 @@ OutputTypeSameAsFirstInput = [
     "abs", "acos", "acos", "acosh", "asin", "asinh", "atan", "atanh",
     "averagepool", "batchnormalization", "ceil", "celu", "compress", "concat",
     "cos", "cosh", "cumsum", "depthtospace", "det", "detach", "dropout",
-    "einsum", "elu", "erf", "exp", "expand", "expm1", "flatten", "floor",
-    "fmod", "gather", "gatherelements", "gathernd", "gelu",
+    "dynamicslice", "einsum", "elu", "erf", "exp", "expand", "expm1",
+    "flatten", "floor", "fmod", "gather", "gatherelements", "gathernd", "gelu",
     "globalaveragepool", "globallppool", "globalmaxpool", "hardmax",
     "hardsigmoid", "identity", "identityloss", "l1loss", "lrn", "leakyrelu",
     "log", "log1p", "logical_not", "logsoftmax", "lpnormalization", "lppool",

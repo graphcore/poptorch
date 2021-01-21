@@ -62,6 +62,10 @@ bool isNone(const torch::jit::Value *value);
 std::int64_t handleDimensionParam(torch::jit::Value *value,
                                   const c10::TensorTypePtr &as_tensor);
 
+bool isAnyConstant(torch::jit::Node *node);
+
+bool isFloatingPointConstant(torch::jit::Node *node);
+
 bool isTensorConstant(torch::jit::Node *node);
 
 // Force a constant to be a float: this is appropriate if required for popart
@@ -116,6 +120,9 @@ bool isMarkedForDeletion(torch::jit::Node *node);
 void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val);
 void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
                       std::uint64_t outputIdx);
+
+bool attributeEqual(torch::jit::Node *a, torch::jit::Node *b,
+                    c10::Symbol attrb);
 
 } // namespace poptorch
 

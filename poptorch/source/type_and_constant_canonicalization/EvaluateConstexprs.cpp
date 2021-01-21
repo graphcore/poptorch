@@ -201,11 +201,8 @@ bool ConstExprEvaluator::nodeIsConstExpr(const torch::jit::Node &node) const {
     return false;
   }
 
-  // Random nodes cannot be constants - isNondeterministic doesn't quite cover
-  // all of the different random sampling symbols
-  if (node.isNondeterministic() || node.kind() == c10::aten::normal ||
-      node.kind() == c10::aten::normal_ || node.kind() == c10::aten::uniform_ ||
-      node.kind() == c10::aten::bernoulli_) {
+  // Random nodes or nodes with side effects cannot be constants
+  if (isNondeterministic(node) || node.hasSideEffects()) {
     return false;
   }
 

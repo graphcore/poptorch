@@ -12,6 +12,8 @@ namespace poptorch {
 
 torch::jit::Node *findEarliestUser(const torch::jit::Value *value);
 
+bool isNondeterministic(const torch::jit::Node &node);
+
 std::string nodeToString(const torch::jit::Node *node);
 
 std::string scalarTypeToOnnxString(at::ScalarType type);

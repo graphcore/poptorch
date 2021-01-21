@@ -28,6 +28,23 @@ torch::jit::Node *findEarliestUser(const torch::jit::Value *value) {
   return earliest_user;
 }
 
+bool isNondeterministic(const torch::jit::Node &node) {
+  if (node.isNondeterministic()) {
+    return true;
+  }
+
+  // Handle extra cases until this is fixed upstream
+  // https://github.com/pytorch/pytorch/issues/52599
+  if (node.kind() == c10::aten::normal || node.kind() == c10::aten::normal_ ||
+      node.kind() == c10::aten::uniform_ ||
+      node.kind() == c10::aten::bernoulli_ ||
+      node.kind() == c10::aten::feature_dropout) {
+    return true;
+  }
+
+  return false;
+}
+
 std::string nodeToString(const torch::jit::Node *node) {
   std::stringstream ss;
   ss << *node;

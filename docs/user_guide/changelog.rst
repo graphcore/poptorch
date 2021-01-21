@@ -38,8 +38,9 @@ New features
 - Add support for ``poptorch.isRunningOnIpu``. This function returns `True` when executing on IPU and `False` when executing
   the model outside IPU scope.
 - Add support for ``torch.amax`` and ``torch.amin``
-- Add support for attributes in custon ops.
+- Add support for attributes in custom ops.
 - Add support for precompilation and reloading exported executables (``poptorch.PoplarExecutor.compileAndExport`` and ``poptorch.load``)
+- Add support for slices with variable start index (slice size must be constant).
 
 v1.0 (Poplar SDK 1.4)
 =====================

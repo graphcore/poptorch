@@ -151,6 +151,21 @@ std::int64_t handleDimensionParam(torch::jit::Value *value,
   return dim;
 }
 
+bool isAnyConstant(torch::jit::Node *node) {
+  return isTensorConstant(node) || node->kind() == c10::prim::Constant;
+}
+
+bool isFloatingPointConstant(torch::jit::Node *node) {
+  auto tensor_type = node->output()->type()->cast<c10::TensorType>();
+  if (tensor_type) {
+    auto scalar_type = *tensor_type->scalarType();
+    return c10::isFloatingType(scalar_type);
+  }
+
+  ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
+  return torch::jit::constant_as<at::Scalar>(node->output())->isFloatingPoint();
+}
+
 bool isTensorConstant(torch::jit::Node *node) {
   return (node->kind() == symbols::poptorch::tensor_constant ||
           node->kind() == symbols::poptorch::host_side_tensor_constant);
@@ -330,6 +345,60 @@ reduceHelperDimensionCreator(torch::jit::Value *value) {
     shape.push_back(index++);
   }
   return shape;
+}
+
+bool attributeEqual(torch::jit::Node *a, torch::jit::Node *b,
+                    c10::Symbol attr) {
+  if (!a->hasAttribute(attr) || !b->hasAttribute(attr)) {
+    return false;
+  }
+
+  auto attr_kind = a->kindOf(attr);
+  if (b->kindOf(attr) != attr_kind) {
+    return false;
+  }
+
+  switch (attr_kind) {
+  case torch::jit::AttributeKind::f:
+    return a->f(attr) == b->f(attr);
+  case torch::jit::AttributeKind::fs:
+    return a->fs(attr) == b->fs(attr);
+  case torch::jit::AttributeKind::s:
+    return a->s(attr) == b->s(attr);
+  case torch::jit::AttributeKind::ss:
+    return a->ss(attr) == b->ss(attr);
+  case torch::jit::AttributeKind::i:
+    return a->i(attr) == b->i(attr);
+  case torch::jit::AttributeKind::is:
+    return a->is(attr) == b->is(attr);
+  case torch::jit::AttributeKind::t:
+    return a->t(attr).equal(b->t(attr));
+  case torch::jit::AttributeKind::ts: {
+    if (a->ts(attr).size() != b->ts(attr).size()) {
+      return false;
+    }
+    auto a_it = a->ts(attr).begin();
+    auto b_it = b->ts(attr).begin();
+    for (; a_it != a->ts(attr).end(); a_it++, b_it++) {
+      if (!a_it->equal(*b_it)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  case torch::jit::AttributeKind::g:
+    return a->g(attr) == b->g(attr);
+  case torch::jit::AttributeKind::gs:
+    return a->gs(attr) == b->gs(attr);
+  case torch::jit::AttributeKind::ty:
+    return a->ty(attr) == b->ty(attr);
+  case torch::jit::AttributeKind::tys:
+    return a->tys(attr) == b->tys(attr);
+  case torch::jit::AttributeKind::ival:
+    return a->ival(attr) == b->ival(attr);
+  }
+
+  ERROR("Invalid type in attributeSame.");
 }
 
 } // namespace poptorch

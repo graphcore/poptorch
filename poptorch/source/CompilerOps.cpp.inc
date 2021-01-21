@@ -59,7 +59,7 @@ torch::jit::Node* createRound(torch::jit::Graph *graph,  const std::vector<torch
 return new_node;
 }
 torch::jit::Node* createDynamicslice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,std::vector<int64_t> sizes,std::int32_t noOverlap) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dynamicslice, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::dynamicslice, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::axes"),axes);
 new_node->is_(c10::Symbol::fromQualString("attr::sizes"),sizes);
 new_node->i_(c10::Symbol::fromQualString("attr::noOverlap"),noOverlap);
