@@ -90,13 +90,6 @@ class _TrainingOptions(_options_impl.OptionsDict):
         super().__init__(gradient_accumulation=1,
                          accumulation_reduction_type=enums.ReductionType.Mean)
 
-        art_warn = (
-            "The default value for accumulation_reduction_type has " +
-            "changed from sum to mean in this release. To suppress " +
-            "this warning use opts.Training.accumulationReductionType(" +
-            "poptorch.ReductionType.Mean).")
-        self._warnings["accumulation_reduction_type"] = art_warn
-
     def gradientAccumulation(self, gradient_accumulation):
         """Number of samples to accumulate for the gradient calculation.
 
@@ -108,6 +101,15 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
         Might be called "pipeline depth" in some other frameworks."""
         self.set(gradient_accumulation=gradient_accumulation)
+
+        if gradient_accumulation != 1:
+            art_warn = (
+                "The default value for accumulation_reduction_type has " +
+                "changed from sum to mean in this release. To suppress " +
+                "this warning use opts.Training.accumulationReductionType(" +
+                "poptorch.ReductionType.Mean).")
+            self._warnings["accumulation_reduction_type"] = art_warn
+
         return self
 
     def accumulationReductionType(self, accumulation_reduction_type):
@@ -132,7 +134,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
                              "poptorch.ReductionType.Sum")
 
         self.set(accumulation_reduction_type=accumulation_reduction_type)
-        self._warnings.pop("accumulation_reduction_type")
+        self._warnings_disabled.add("accumulation_reduction_type")
         return self
 
 

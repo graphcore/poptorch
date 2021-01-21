@@ -23,6 +23,9 @@ class OptionsDict:
         # specified explicitly.
         self._warnings = {}
 
+        # Allow warnings to be disabled by adding them to the list
+        self._warnings_disabled = set()
+
     def set(self, **kwargs):
         for option, value in kwargs.items():
             assert self.exists(option), ("Invalid option %s, valid options"
@@ -62,7 +65,8 @@ class OptionsDict:
 
     def update(self, other):
         for warning in self._warnings.values():
-            logger.warning(warning)
+            if warning not in self._warnings_disabled:
+                logger.warning(warning)
 
         assert not set(self._values.keys()).intersection(
             other), "Can't merge dictionaries, they have some keys in common"
