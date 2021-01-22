@@ -180,10 +180,19 @@ void handleList(torch::jit::Graph *graph, torch::jit::Node *n,
     } else if (n->output()->type()->isSubtypeOf(c10::ListType::ofInts())) {
       prim_consts.back()->i_(c10::attr::value, val.toInt());
       prim_consts.back()->output()->setType(c10::IntType::get());
-    } else if (n->output()->type()->isSubtypeOf(c10::ListType::ofTensors())) {
-      auto tensor = val.toTensor();
-      prim_consts.back()->t_(c10::attr::value, tensor);
-      prim_consts.back()->output()->inferTypeFrom(tensor);
+    } else if (n->output()->type()->isSubtypeOf(c10::ListType::ofTensors()) ||
+               n->output()->type()->isSubtypeOf(c10::ListType::create(
+                   c10::OptionalType::create(c10::TensorType::get())))) {
+      if (!val.isNone()) {
+        // Treat node as a regular tensor
+        auto tensor = val.toTensor();
+        prim_consts.back()->t_(c10::attr::value, tensor);
+        prim_consts.back()->output()->inferTypeFrom(tensor);
+      } else {
+        // Assign NoneType so that the node can be skipped over
+        // during constant canonicalization
+        prim_consts.back()->output()->setType(c10::NoneType::get());
+      }
     } else {
       ERROR("Unexpected type");
     }
@@ -202,12 +211,15 @@ void handleList(torch::jit::Graph *graph, torch::jit::Node *n,
 
   // Canonicalize each constant individually and ensure deletion
   for (auto prim_const : prim_consts) {
-    if (prim_const->output()->type()->isSubtypeOf(c10::TensorType::get())) {
-      handleTensorConstant(graph, prim_const);
-    } else {
-      handleNumberConstant(graph, prim_const);
+    // If there are NoneTypes we can skip those
+    if (prim_const->output()->type() != c10::NoneType::get()) {
+      if (prim_const->output()->type()->isSubtypeOf(c10::TensorType::get())) {
+        handleTensorConstant(graph, prim_const);
+      } else {
+        handleNumberConstant(graph, prim_const);
+      }
+      to_delete->insert(prim_const);
     }
-    to_delete->insert(prim_const);
   }
 }
 
@@ -262,6 +274,10 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
                    c10::ListType::ofTensors())) {
       // Only known case is the result of an evaluated constexpr
       logging::LogContext ctx2("handling a tensor list constant");
+      handleList(graph, node, &to_delete);
+    } else if (node->output()->type()->isSubtypeOf(c10::ListType::create(
+                   c10::OptionalType::create(c10::TensorType::get())))) {
+      logging::LogContext ctx2("handling an optional tensor list constant");
       handleList(graph, node, &to_delete);
     } else {
       ERROR("Unsupported type " << node->output()->type()->str());
