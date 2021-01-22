@@ -79,16 +79,16 @@ torch::jit::Node *ceilHandler(torch::jit::Graph *graph,
 torch::jit::Node *celuHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto x = node->input(0);
-  auto t0 = createConstantFloatLike(graph, x, {0.0}, {})->output();
-  auto t1 = createMax(graph, {x, t0})->output();
   auto a = node->input(1);
-  auto t2 = createDiv(graph, {x, a})->output();
+  auto t0 = createDiv(graph, {x, a})->output();
   // matched expm1: sub(exp(x), 1.0)
-  auto t3 = createExpm1(graph, {t2})->output();
-  auto t4 = createMul(graph, {a, t3})->output();
-  auto t5 = createMin(graph, {t0, t4})->output();
+  auto t1 = createExpm1(graph, {t0})->output();
+  auto t2 = createMul(graph, {a, t1})->output();
+  auto t3 = createConstantFloatLike(graph, x, {0.0}, {})->output();
+  auto t4 = createMax(graph, {x, t3})->output();
+  auto t5 = createMin(graph, {t3, t2})->output();
   // add(max(x, 0.0), min(0.0, mul(a, expm1(div(x, a)))))
-  return createAdd(graph, {t1, t5});
+  return createAdd(graph, {t4, t5});
 }
 
 torch::jit::Node *clampHandler(torch::jit::Graph *graph,
@@ -168,6 +168,15 @@ torch::jit::Node *erfHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto i0 = node->input(0);
   // erf(i0)
   return createErf(graph, {i0});
+}
+
+torch::jit::Node *erfcHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = createErf(graph, {x})->output();
+  auto t1 = createConstantFloatLike(graph, t0, {1.0}, {})->output();
+  // sub(1.0, erf(x))
+  return createSub(graph, {t1, t0});
 }
 
 torch::jit::Node *expHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
@@ -264,6 +273,18 @@ torch::jit::Node *gtHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto i1 = node->input(1);
   // greater(i0, i1)
   return createGreater(graph, {i0, i1});
+}
+
+torch::jit::Node *hardshrinkHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = createAbs(graph, {x})->output();
+  auto l = node->input(1);
+  auto t1 = createAbs(graph, {l})->output();
+  auto t2 = createGreater(graph, {t0, t1})->output();
+  auto t3 = createConstantFloatLike(graph, x, {0.0}, {})->output();
+  // where(greater(abs(x), abs(l)), x, 0.0)
+  return createWhere(graph, {t2, x, t3});
 }
 
 torch::jit::Node *hardtanhHandler(torch::jit::Graph *graph,
@@ -525,6 +546,14 @@ torch::jit::Node *rsqrtHandler(torch::jit::Graph *graph,
   return createReciprocal(graph, {t0});
 }
 
+torch::jit::Node *rsubHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto y = node->input(1);
+  auto x = node->input(0);
+  // sub(y, x)
+  return createSub(graph, {y, x});
+}
+
 torch::jit::Node *seluHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto x = node->input(0);
@@ -582,6 +611,21 @@ torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
   auto t5 = createDiv(graph, {t4, b})->output();
   // where(less(threshold, mul(x, b)), x, div(log1p(exp(mul(b, x))), b))
   return createWhere(graph, {t1, x, t5});
+}
+
+torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto l = node->input(1);
+  auto t0 = createNeg(graph, {l})->output();
+  auto t1 = createLess(graph, {x, t0})->output();
+  auto t2 = createAdd(graph, {x, l})->output();
+  auto t3 = createGreater(graph, {x, l})->output();
+  auto t4 = createSub(graph, {x, l})->output();
+  auto t5 = createConstantFloatLike(graph, t4, {0.0}, {})->output();
+  auto t6 = createWhere(graph, {t3, t4, t5})->output();
+  // where(less(x, neg(l)), add(x, l), where(greater(x, l), sub(x, l), 0.0))
+  return createWhere(graph, {t1, t2, t6});
 }
 
 torch::jit::Node *sqrtHandler(torch::jit::Graph *graph,
@@ -698,6 +742,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::elu_, eluHandler);
   registerHandler(c10::aten::eq, eqHandler);
   registerHandler(c10::aten::erf, erfHandler);
+  registerHandler(c10::aten::erfc, erfcHandler);
   registerHandler(c10::aten::exp, expHandler);
   registerHandler(c10::aten::expm1, expm1Handler);
   registerHandler(c10::aten::floor, floorHandler);
@@ -708,6 +753,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::ge, geHandler);
   registerHandler(c10::aten::gelu, geluHandler);
   registerHandler(c10::aten::gt, gtHandler);
+  registerHandler(c10::aten::hardshrink, hardshrinkHandler);
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
   registerHandler(c10::aten::hardtanh_, hardtanhHandler);
   registerHandler(c10::aten::isnan, isnanHandler);
@@ -745,6 +791,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::replication_pad3d, replicationpad1dHandler);
   registerHandler(c10::aten::round, roundHandler);
   registerHandler(c10::aten::rsqrt, rsqrtHandler);
+  registerHandler(c10::aten::rsub, rsubHandler);
   registerHandler(c10::aten::selu, seluHandler);
   registerHandler(c10::aten::selu_, seluHandler);
   registerHandler(c10::aten::sigmoid, sigmoidHandler);
@@ -753,6 +800,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::sin, sinHandler);
   registerHandler(c10::aten::sinh, sinhHandler);
   registerHandler(c10::aten::softplus, softplusHandler);
+  registerHandler(c10::aten::softshrink, softshrinkHandler);
   registerHandler(c10::aten::sqrt, sqrtHandler);
   registerHandler(c10::aten::square, squareHandler);
   registerHandler(c10::aten::sub, subHandler);

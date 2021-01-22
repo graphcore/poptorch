@@ -29,19 +29,6 @@ torch::jit::Node *addHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createAdd(graph, {node->input(0), alpha_multiplicand});
 }
 
-torch::jit::Node *erfcHandler(torch::jit::Graph *graph,
-                              torch::jit::Node *node) {
-  // erfc = 1 - erf(x)
-  torch::jit::Value *x = node->input();
-
-  // erf(x)
-  torch::jit::Node *erf = createErf(graph, {x});
-
-  // Add the one constant
-  torch::jit::Node *one = createConstantFloatLike(graph, x, {1.0}, {});
-
-  return createSub(graph, {one->output(), erf->output()});
-}
 torch::jit::Node *truncHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // Drop the exponent by casting to int and back.
@@ -105,20 +92,10 @@ torch::jit::Node *trueDivideHandler(torch::jit::Graph *graph,
   return createDiv(graph, {x->output(), y->output()});
 }
 
-torch::jit::Node *rsubHandler(torch::jit::Graph *graph,
-                              torch::jit::Node *node) {
-  // Tensor aten::rsub(const Tensor& self, const Tensor& other, Scalar alpha)
-  // We are ignoring alpha here.
-
-  torch::jit::Value *other = node->input(1);
-  return createSub(graph, {other, node->input(0)});
-}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::add, addHandler);
-  registerHandler(c10::aten::rsub, rsubHandler);
-  registerHandler(c10::aten::erfc, erfcHandler);
   registerHandler(c10::aten::trunc, truncHandler);
   registerHandler(c10::aten::frac, fracHandler);
   registerHandler(c10::aten::floor_divide, floorDivideHandler);

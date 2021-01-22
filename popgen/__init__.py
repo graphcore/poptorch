@@ -50,6 +50,9 @@ class Value:
     def __ne__(self, other):
         return Value('logical_not', [self.equal(other)])
 
+    def __neg__(self):
+        return Value('neg', [self])
+
     def __sub__(self, other):
         return Value('sub', [self, other])
 
@@ -224,13 +227,15 @@ class ConstantFloat(Value):
         if not root:
             suffix = "->output();\n"
 
-        val_id = self.emit_assign_return(values, val_id, root, tabs, f)
         if len(self.args) > 0:
+            val_id = self.emit_arguments(values, val_id, tabs, f)
+            val_id = self.emit_assign_return(values, val_id, root, tabs, f)
             self.emit_call(
                 "createConstantFloatLike",
                 ["graph", values[self.args[0]], "{",
                  str(self.val), "}", "{}"], suffix, f)
         else:
+            val_id = self.emit_assign_return(values, val_id, root, tabs, f)
             self.emit_call(
                 "createConstantFloat32",
                 ["graph", "{", str(self.val), "}", "{}"], suffix, f)

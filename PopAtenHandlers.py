@@ -34,6 +34,7 @@ for oper in opers:
 
 convert("t", 1, "transpose")
 
+expand("erfc", lambda x: 1. - op.erf(x))
 expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), clong(0)))
 expand("log2", lambda x: op.log(x) / math.log(2))
 expand("log10", lambda x: op.log(x) / math.log(10))
@@ -75,6 +76,7 @@ expand("ne", lambda x, y: x != y)
 expand("pixel_shuffle", lambda x, y: op.depthtospace(x, clong(y), cstr("CRD")))
 expand("reflection_pad1d", lambda x, y: op.reflectionPad(x, clong_list(y)))
 expand("replication_pad1d", lambda x, y: op.edgePad(x, clong_list(y)))
+expand("rsub", lambda x, y: y - x)
 
 
 def celu_handler(x, a):
@@ -85,6 +87,15 @@ def celu_handler(x, a):
 def full_handler(x, y):
     r = op.expand(y, as_ir(clong_list(x)))
     return op.cast(r, output_type())
+
+
+def hardshrink_handler(x, l):
+    return op.where(op.abs(x) > op.abs(l), x, 0.)
+
+
+def softshrink_handler(x, l):
+    r = op.where(x > l, x - l, 0.)
+    return op.where(x < -l, x + l, r)
 
 
 forward("dropout_", "dropout")

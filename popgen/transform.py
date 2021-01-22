@@ -76,8 +76,17 @@ def generate_typed_constants(value, type_like=None):
         return value
 
     # find the first tensor argument
-    type_like = next((arg for arg in value.args if isinstance(arg, Value)),
-                     None)
+    args = [
+        arg for arg in value.args
+        if isinstance(arg, Value) and not isinstance(arg, ConstantFloat)
+    ]
+
+    # 'where' is a nasty case where the first tensor is bool!
+    if len(args) > 0:
+        if value.op != 'where':
+            type_like = args[0]
+        else:
+            type_like = args[1]
 
     for (i, arg) in enumerate(value.args):
         value.args[i] = generate_typed_constants(arg, type_like)
