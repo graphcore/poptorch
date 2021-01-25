@@ -81,9 +81,13 @@ Pointwise ops
 '''''''''''''
 
 * ``torch.abs``
+* ``torch.acos``
+* ``torch.acosh``
 * ``torch.add``
 * ``torch.asin``
+* ``torch.asinh``
 * ``torch.atan``
+* ``torch.atanh``
 * ``torch.ceil``
 * ``torch.clamp``
 * ``torch.cos``

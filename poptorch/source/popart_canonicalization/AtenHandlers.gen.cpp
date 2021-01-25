@@ -25,6 +25,13 @@ torch::jit::Node *acosHandler(torch::jit::Graph *graph,
   return createAcos(graph, {i0});
 }
 
+torch::jit::Node *acoshHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  // acosh(i0)
+  return createAcosh(graph, {i0});
+}
+
 torch::jit::Node *addmmHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   auto y = node->input(1);
@@ -45,6 +52,13 @@ torch::jit::Node *asinHandler(torch::jit::Graph *graph,
   return createAsin(graph, {i0});
 }
 
+torch::jit::Node *asinhHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  // asinh(i0)
+  return createAsinh(graph, {i0});
+}
+
 torch::jit::Node *atanHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto i0 = node->input(0);
@@ -58,6 +72,13 @@ torch::jit::Node *atan2Handler(torch::jit::Graph *graph,
   auto i1 = node->input(1);
   // atan2(i0, i1)
   return createAtan2(graph, {i0, i1});
+}
+
+torch::jit::Node *atanhHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  // atanh(i0)
+  return createAtanh(graph, {i0});
 }
 
 torch::jit::Node *catHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
@@ -722,10 +743,13 @@ torch::jit::Node *whereHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::abs, absHandler);
   registerHandler(c10::aten::acos, acosHandler);
+  registerHandler(c10::aten::acosh, acoshHandler);
   registerHandler(c10::aten::addmm, addmmHandler);
   registerHandler(c10::aten::asin, asinHandler);
+  registerHandler(c10::aten::asinh, asinhHandler);
   registerHandler(c10::aten::atan, atanHandler);
   registerHandler(c10::aten::atan2, atan2Handler);
+  registerHandler(c10::aten::atanh, atanhHandler);
   registerHandler(c10::aten::cat, catHandler);
   registerHandler(c10::aten::ceil, ceilHandler);
   registerHandler(c10::aten::celu, celuHandler);

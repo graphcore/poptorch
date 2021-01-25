@@ -55,8 +55,11 @@ def binary_op_harness(op, input1, input2, eq):
 unary_ops_float = [
     torch.abs,
     torch.acos,
+    torch.acosh,
     torch.asin,
+    torch.asinh,
     torch.atan,
+    torch.atanh,
     # torch.angle,
     torch.ceil,
     torch.cos,

@@ -1,6 +1,7 @@
 New features:
 - Added support for the following activation functions:
-    torch.nn.Hardshrink, torch.nn.SiLU, torch.nn.Softplus, torch.nn.Softshrink, 
+    torch.nn.acosh, torch.nn.asinh, torch.nn.atanh, torch.nn.Hardshrink,
+    torch.nn.SiLU, torch.nn.Softplus, torch.nn.Softshrink,
     torch.nn.Threshold
 - Add support for the following random sampling operations:
     torch.bernoulli, torch.distributions.Bernoulli

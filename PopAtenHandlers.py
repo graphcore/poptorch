@@ -23,10 +23,10 @@ simplify("div", lambda x, y: 1. / y * x)
 
 # unary operators
 opers = [
-    "abs", "acos", "asin", "atan", "ceil", "cos", "cosh", "detach", "erf",
-    "exp", "expm1", "floor", "gelu", "isnan", "log", "log1p", "logical_not",
-    "neg", "reciprocal", "relu", "round", "sigmoid", "sin", "sinh", "sign",
-    "sqrt", "tan", "tanh"
+    "abs", "acos", "acosh", "asin", "asinh", "atan", "atanh", "ceil", "cos",
+    "cosh", "detach", "erf", "exp", "expm1", "floor", "gelu", "isnan", "log",
+    "log1p", "logical_not", "neg", "reciprocal", "relu", "round", "sigmoid",
+    "sin", "sinh", "sign", "sqrt", "tan", "tanh"
 ]
 
 for oper in opers:
