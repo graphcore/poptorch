@@ -30,6 +30,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/EinsumOp.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/EmbeddingOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/FeatureDropoutOps.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/IndexOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/LossOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/LSTMOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/NormalizationOps.cpp"
