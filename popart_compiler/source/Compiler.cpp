@@ -128,6 +128,17 @@ void registerSetter(std::map<std::string, std::function<void(Value)>> &options,
   options[name] = Setter<Value>(fn, name);
 }
 
+bool waitIfIpuIsUnavailable() {
+  bool wait = false;
+  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
+    wait = std::stoi(env_wait_for_ipu) != 0;
+    logging::info("From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
+                  "is available: {}",
+                  wait ? "Wait" : "Fail & exit");
+  }
+  return wait;
+}
+
 } // namespace
 namespace poptorch {
 
@@ -466,6 +477,7 @@ public:
   // R ound up the number of IPUs, if required, to the minimum number which need
   // to be reservered
   static std::uint64_t roundUpNumIPUs(std::uint64_t num_ipu);
+  std::shared_ptr<popart::DeviceInfo> createDevice();
 
 private:
   // Constants which are simply returned (possibly as part of a tuple/list) and
@@ -924,20 +936,142 @@ poptorch::TensorId CompilerImpl::hostSideTensorConstant(
   return ids.size() - 1;
 }
 
+std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
+  updateUseModelConfig();
+
+  std::shared_ptr<popart::DeviceInfo> device;
+  std::uint64_t num_ipus =
+      used_ipus.size() * popart_options.replicatedGraphCount;
+  ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
+                              "operations have been optimised out)");
+  if (options.ipu_model) {
+    if (popart_options.enableEngineCaching) {
+      logging::warn("enableExecutableCaching doesn't work with the IPU model");
+    }
+    std::map<std::string, std::string> model_options;
+    model_options["numIPUs"] = std::to_string(num_ipus);
+    std::string env_ipu_model_version = getIpuModelVersion();
+    model_options["ipuVersion"] = env_ipu_model_version;
+    int num_tiles_per_ipu = getNumTilesPerIpu(env_ipu_model_version);
+    model_options["tilesPerIPU"] = std::to_string(num_tiles_per_ipu);
+
+    ERROR_ON_MSG(options.connection_type == popart::DeviceConnectionType::Never,
+                 "ConnectionType.Never / poptorch.Options.useOfflineIpuTarget "
+                 "not supported for the IPU model");
+    device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
+        model_options);
+    logging::debug("Instantiated device, running on IPU model with {} tiles.",
+                   num_tiles_per_ipu);
+  } else {
+    if (options.connection_type == popart::DeviceConnectionType::Never) {
+      // Offline compilation path: create an offline device regardless of what's
+      // present on the system.
+      ERROR_ON_MSG(options_set.count("ipu_id"),
+                   "Offline compilation targeting a specific id not supported");
+      std::map<std::string, std::string> device_options;
+      device_options["numIPUs"] = std::to_string(num_ipus);
+      device_options["ipuVersion"] =
+          "ipu" + std::to_string(options.ipu_version);
+      device_options["syncPattern"] =
+          popart::syncPatternToString(options.sync_pattern);
+      device =
+          popart::DeviceManager::createDeviceManager().createOfflineIPUDevice(
+              device_options);
+      ERROR_ON_MSG(!device, "Failed to create offline IPU device");
+    } else {
+      // Round up number of ipus to a power of 2
+      // or a multiple of 64 (number of POD-64s)
+      auto rounded_num_ipus = roundUpNumIPUs(num_ipus);
+
+      if (rounded_num_ipus != num_ipus) {
+        std::string common_msg(", because PopTorch must reserve a power of 2 or"
+                               " a multiple of 64 IPUs.");
+        if (options.auto_round_num_ipus) {
+          logging::warn("Reserving {} IPUs when the model specifices the use "
+                        "of only {}{}. {} will be reserved but not used.",
+                        rounded_num_ipus, num_ipus, common_msg,
+                        rounded_num_ipus - num_ipus);
+          num_ipus = rounded_num_ipus;
+        } else {
+          ERROR("The model specifies the use of "
+                << num_ipus
+                << " IPUs, "
+                   "however PopTorch must reserve a minimum of "
+                << rounded_num_ipus << " in order to allow the model to run"
+                << common_msg
+                << " Please reconfigure your model to use a "
+                   "different number of IPUs or set "
+                   "poptorch.Options().autoRoundNumIPUs(True).");
+        }
+      }
+
+      // Use a lambda to cache the value.
+      auto wait_if_unavailable = [this]() {
+        // Force disable the wait if the system doesn't contain an IPU that
+        // matches the requested config.
+        static const bool should_wait =
+            waitIfIpuIsUnavailable() && checkSystemConfig().empty();
+        return should_wait;
+      };
+
+      auto wait_for_a_while = []() {
+        constexpr std::int64_t sleep_time = 15;
+        logging::trace("No IPU available, sleeping for {} seconds", sleep_time);
+        std::this_thread::sleep_for(std::chrono::seconds(sleep_time));
+        return true;
+      };
+
+      do {
+        // Regular IPU hardware target
+        if (!options_set.count("ipu_id")) {
+          device =
+              popart::DeviceManager::createDeviceManager()
+                  .acquireAvailableDevice(num_ipus, 0, options.sync_pattern,
+                                          options.connection_type);
+          ERROR_ON_MSG(!device && !wait_if_unavailable(),
+                       "Failed to acquire " << num_ipus << " IPU(s)"
+                                            << this->checkSystemConfig());
+          if (device) {
+            logging::debug("Acquired {} IPU(s): running on device Id {}.",
+                           num_ipus, device->getId());
+          }
+        } else {
+          device =
+              popart::DeviceManager::createDeviceManager().acquireDeviceById(
+                  options.ipu_id, options.sync_pattern,
+                  options.connection_type);
+          ERROR_ON_MSG(!device && !wait_if_unavailable(),
+                       "Failed to acquire device Id " << options.ipu_id
+                                                      << checkSystemConfig());
+          ERROR_ON_MSG(device && static_cast<std::uint64_t>(
+                                     device->getNumIpus()) < num_ipus,
+                       "Expected at least replication factor * used IPUs = "
+                           << used_ipus.size() << " * "
+                           << popart_options.replicatedGraphCount << " = "
+                           << num_ipus << " device Ids but the user provided "
+                           << device->getNumIpus());
+          if (device &&
+              static_cast<std::uint64_t>(device->getNumIpus()) != num_ipus) {
+            logging::warn(
+                "Expected replication factor * used IPUs = {} * {} "
+                "= {} device Ids but the device selected has {} IPUs which "
+                "means some of them will not be used.",
+                used_ipus.size(), popart_options.replicatedGraphCount, num_ipus,
+                device->getNumIpus());
+          }
+          if (device) {
+            logging::debug("Acquired IPU device with id {}, running on device.",
+                           options.ipu_id);
+          }
+        }
+      } while (!device && wait_for_a_while());
+    }
+  }
+  return device;
+}
+
 } // namespace detail
 
-namespace {
-bool waitIfIpuIsUnavailable() {
-  bool wait = false;
-  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
-    wait = std::stoi(env_wait_for_ipu) != 0;
-    logging::info("From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
-                  "is available: {}",
-                  wait ? "Wait" : "Fail & exit");
-  }
-  return wait;
-}
-} // namespace
 bool ipuHardwareIsAvailable(std::uint64_t num_ipus) {
   return !ipuModelEnvironmentVariableIsEnabled() &&
          !ipuSmallModelEnvironmentVariableIsEnabled() &&
@@ -1540,140 +1674,8 @@ void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
 }
 
 void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
+  auto device = _impl->createDevice();
   popart::SessionOptions &options = _impl->popart_options;
-  _impl->updateUseModelConfig();
-
-  std::shared_ptr<popart::DeviceInfo> device;
-  std::uint64_t num_ipus =
-      _impl->used_ipus.size() * options.replicatedGraphCount;
-  ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
-                              "operations have been optimised out)");
-  if (_impl->options.ipu_model) {
-    if (_impl->popart_options.enableEngineCaching) {
-      logging::warn("enableExecutableCaching doesn't work with the IPU model");
-    }
-    std::map<std::string, std::string> model_options;
-    model_options["numIPUs"] = std::to_string(num_ipus);
-    std::string env_ipu_model_version = getIpuModelVersion();
-    model_options["ipuVersion"] = env_ipu_model_version;
-    int num_tiles_per_ipu = getNumTilesPerIpu(env_ipu_model_version);
-    model_options["tilesPerIPU"] = std::to_string(num_tiles_per_ipu);
-
-    ERROR_ON_MSG(_impl->options.connection_type ==
-                     popart::DeviceConnectionType::Never,
-                 "ConnectionType.Never / poptorch.Options.useOfflineIpuTarget "
-                 "not supported for the IPU model");
-    device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
-        model_options);
-    logging::debug("Instantiated device, running on IPU model with {} tiles.",
-                   num_tiles_per_ipu);
-  } else {
-    if (_impl->options.connection_type == popart::DeviceConnectionType::Never) {
-      // Offline compilation path: create an offline device regardless of what's
-      // present on the system.
-      ERROR_ON_MSG(_impl->options_set.count("ipu_id"),
-                   "Offline compilation targeting a specific id not supported");
-      std::map<std::string, std::string> device_options;
-      device_options["numIPUs"] = std::to_string(num_ipus);
-      device_options["ipuVersion"] =
-          "ipu" + std::to_string(_impl->options.ipu_version);
-      device_options["syncPattern"] =
-          popart::syncPatternToString(_impl->options.sync_pattern);
-      device =
-          popart::DeviceManager::createDeviceManager().createOfflineIPUDevice(
-              device_options);
-      ERROR_ON_MSG(!device, "Failed to create offline IPU device");
-    } else {
-      // Round up number of ipus to a power of 2
-      // or a multiple of 64 (number of POD-64s)
-      auto rounded_num_ipus = _impl->roundUpNumIPUs(num_ipus);
-
-      if (rounded_num_ipus != num_ipus) {
-        std::string common_msg(", because PopTorch must reserve a power of 2 or"
-                               " a multiple of 64 IPUs.");
-        if (_impl->options.auto_round_num_ipus) {
-          logging::warn("Reserving {} IPUs when the model specifices the use "
-                        "of only {}{}. {} will be reserved but not used.",
-                        rounded_num_ipus, num_ipus, common_msg,
-                        rounded_num_ipus - num_ipus);
-          num_ipus = rounded_num_ipus;
-        } else {
-          ERROR("The model specifies the use of "
-                << num_ipus
-                << " IPUs, "
-                   "however PopTorch must reserve a minimum of "
-                << rounded_num_ipus << " in order to allow the model to run"
-                << common_msg
-                << " Please reconfigure your model to use a "
-                   "different number of IPUs or set "
-                   "poptorch.Options().autoRoundNumIPUs(True).");
-        }
-      }
-
-      // Use a lambda to cache the value.
-      auto wait_if_unavailable = [this]() {
-        // Force disable the wait if the system doesn't contain an IPU that
-        // matches the requested config.
-        static const bool should_wait =
-            waitIfIpuIsUnavailable() &&
-            this->_impl->checkSystemConfig().empty();
-        return should_wait;
-      };
-
-      auto wait_for_a_while = []() {
-        constexpr std::int64_t sleep_time = 15;
-        logging::trace("No IPU available, sleeping for {} seconds", sleep_time);
-        std::this_thread::sleep_for(std::chrono::seconds(sleep_time));
-        return true;
-      };
-
-      do {
-        // Regular IPU hardware target
-        if (!_impl->options_set.count("ipu_id")) {
-          device = popart::DeviceManager::createDeviceManager()
-                       .acquireAvailableDevice(num_ipus, 0,
-                                               _impl->options.sync_pattern,
-                                               _impl->options.connection_type);
-          ERROR_ON_MSG(!device && !wait_if_unavailable(),
-                       "Failed to acquire " << num_ipus << " IPU(s)"
-                                            << _impl->checkSystemConfig());
-          if (device) {
-            logging::debug("Acquired {} IPU(s): running on device Id {}.",
-                           num_ipus, device->getId());
-          }
-        } else {
-          device =
-              popart::DeviceManager::createDeviceManager().acquireDeviceById(
-                  _impl->options.ipu_id, _impl->options.sync_pattern,
-                  _impl->options.connection_type);
-          ERROR_ON_MSG(!device && !wait_if_unavailable(),
-                       "Failed to acquire device Id "
-                           << _impl->options.ipu_id
-                           << _impl->checkSystemConfig());
-          ERROR_ON_MSG(device && static_cast<std::uint64_t>(
-                                     device->getNumIpus()) < num_ipus,
-                       "Expected at least replication factor * used IPUs = "
-                           << _impl->used_ipus.size() << " * "
-                           << options.replicatedGraphCount << " = " << num_ipus
-                           << " device Ids but the user provided "
-                           << device->getNumIpus());
-          if (device &&
-              static_cast<std::uint64_t>(device->getNumIpus()) != num_ipus) {
-            logging::warn(
-                "Expected replication factor * used IPUs = {} * {} "
-                "= {} device Ids but the device selected has {} IPUs which "
-                "means some of them will not be used.",
-                _impl->used_ipus.size(), options.replicatedGraphCount, num_ipus,
-                device->getNumIpus());
-          }
-          if (device) {
-            logging::debug("Acquired IPU device with id {}, running on device.",
-                           _impl->options.ipu_id);
-          }
-        }
-      } while (!device && wait_for_a_while());
-    }
-  }
 
   // If Pipelining wasn't set: enable it if more than 1 IPU is used.
   switch (_impl->options.execution_mode) {
