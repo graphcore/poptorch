@@ -489,6 +489,21 @@ getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   return executable->getPopartIR();
 }
 
+void detachFromDevice(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  executable->detachFromDevice();
+}
+
+void attachToDevice(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  executable->attachToDevice();
+}
+
+bool isAttachedToDevice(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  return executable->isAttachedToDevice();
+}
+
 void setLogLevel(std::uint64_t level) {
   ERROR_ON(level > static_cast<std::uint64_t>(logging::Level::Off) ||
            level == 5);
@@ -886,4 +901,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         py::arg("numIpus") = 1);
   m.def("setLogLevel", poptorch::setLogLevel, py::arg("level") = 2);
   m.def("_getPopartIR", poptorch::getPopartIR);
+  m.def("detachFromDevice", poptorch::detachFromDevice);
+  m.def("attachToDevice", poptorch::attachToDevice);
+  m.def("isAttachedToDevice", poptorch::isAttachedToDevice);
 }

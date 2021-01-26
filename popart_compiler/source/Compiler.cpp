@@ -26,6 +26,7 @@
 #include <popart/op/nll.hpp>
 #include <popart/optimizer.hpp>
 #include <popart/popx/devicex.hpp>
+#include <popart/popx/devicexmanager.hpp>
 #include <popart/session.hpp>
 #include <popart/tensorinfo.hpp>
 #include <popart/tensors.hpp>
@@ -2047,6 +2048,9 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
     session.updateOptimizerFromHost(optimizer.get());
   }
 
+  if (!isAttachedToDevice()) {
+    attachToDevice();
+  }
   // Execute the model on IPU.
   popart::StepIO stepio(_impl->popart_incoming, _impl->popart_outgoing);
   _impl->session->run(stepio);
@@ -2495,4 +2499,36 @@ void SessionOptions::setTensorLocation(const char *tensor, const char *option,
 }
 
 SessionOptions::~SessionOptions() = default;
+
+void Compiler::detachFromDevice() {
+  logging::trace("Begin detaching device");
+  popart::popx::Devicex &device = _impl->session->getDevice();
+  auto *device_info = device.getDeviceInfo();
+  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
+  ERROR_ON_MSG(!device_info->isAttached(),
+               "The device has already been detached");
+  device_info->detach();
+  logging::trace("Finished detaching device", "detaching");
+}
+
+void Compiler::attachToDevice() {
+  logging::trace("Begin attaching device");
+  popart::popx::Devicex &device = _impl->session->getDevice();
+  auto *device_info = device.getDeviceInfo();
+  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
+  ERROR_ON_MSG(device_info->isAttached(),
+               "The device has already been attached");
+  device_info->attach();
+  device.loadEngineAndConnectStreams();
+  _impl->session->weightsFromHost();
+  logging::trace("Finished attaching device");
+}
+
+bool Compiler::isAttachedToDevice() const {
+  popart::popx::Devicex &device = _impl->session->getDevice();
+  auto *device_info = device.getDeviceInfo();
+  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
+  return device_info->isAttached();
+}
+
 } // namespace poptorch

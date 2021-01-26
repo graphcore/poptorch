@@ -48,6 +48,10 @@ public:
   // Get the IR from popart.
   std::string getPopartIR() const;
 
+  void detachFromDevice();
+  void attachToDevice();
+  bool isAttachedToDevice() const;
+
 private:
   poptorch::Compiler _compiler;
 

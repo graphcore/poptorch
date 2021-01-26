@@ -31,13 +31,14 @@ assert retval == pytest.ExitCode.OK, f"{str(retval)}: {list_tests.getvalue()}"
 # because they're small / short to run (Under 1 minute)
 #pylint: disable=line-too-long
 short_tests = [
-    "activations_test.py", "batching_test.py", "blas_test.py",
-    "buffers_test.py", "custom_loss_test.py", "custom_ops_test.py",
-    "index_ops_test.py", "inputs_test.py", "lstm_test.py", "loop_test.py",
-    "misc_nn_layers_test.py", "non_contiguous_tensors_test.py", "ops_test.py",
-    "options_test.py", "outputs_test.py", "pipelining_test.py",
-    "poplar_executor_test.py", "random_sampling_test.py",
-    "replicated_graph_test.py", "shape_inference_test.py", "sharding_test.py"
+    "activations_test.py", "attach_detach_test.py", "batching_test.py",
+    "blas_test.py", "buffers_test.py", "custom_loss_test.py",
+    "custom_ops_test.py", "index_ops_test.py", "inputs_test.py",
+    "lstm_test.py", "loop_test.py", "misc_nn_layers_test.py",
+    "non_contiguous_tensors_test.py", "ops_test.py", "options_test.py",
+    "outputs_test.py", "pipelining_test.py", "poplar_executor_test.py",
+    "random_sampling_test.py", "replicated_graph_test.py",
+    "shape_inference_test.py", "sharding_test.py"
 ]
 
 long_tests = [

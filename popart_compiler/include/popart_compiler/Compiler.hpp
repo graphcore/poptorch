@@ -323,6 +323,10 @@ public:
 
   std::vector<poptorch::TensorId> endMultiConv();
 
+  void detachFromDevice();
+  void attachToDevice();
+  bool isAttachedToDevice() const;
+
 private:
   void assertTensorIs(PopartType dataType, poptorch::TensorId id,
                       const char *caller) const;

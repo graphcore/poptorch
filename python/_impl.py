@@ -608,6 +608,7 @@ class PoplarExecutor:
         self._warned_not_contiguous_input = False
         self._dirty_host_weights = False
         self._trace = None
+        self._is_attached = False
 
         self._profiling = profiling.Channel(
             "poptorch.trainingModel" if self.
@@ -615,7 +616,6 @@ class PoplarExecutor:
         self._profiling.instrument(self, "copyWeightsToHost",
                                    "copyWeightsToDevice", "setOptimizer",
                                    "compile", "destroy")
-
         if self._training:
             parent = self
 
@@ -821,6 +821,8 @@ class PoplarExecutor:
                     tuple(parameters.keys()), tuple(parameters.values()),
                     in_tensors_trace_view.asTuple(), self._options.toDict(),
                     self._training)
+            if self._executable:
+                self._is_attached = self.isAttachedToDevice()
 
             # Upload the weights to the IPU
             self.copyWeightsToDevice()
@@ -847,6 +849,8 @@ class PoplarExecutor:
             " (ConnectionType.Never): use model.compile(inputs) instead of"
             " model(inputs)")
         in_tensors = self._parseArgsAndCompile(args, kwargs)
+        if not self._is_attached:
+            self.attachToDevice()
 
         # If this is an inference model: check if the same model is not being
         # trained on a different IPU.
@@ -964,6 +968,41 @@ class PoplarExecutor:
                 tuple(parameters.values()),
                 in_tensors_trace_view.asTuple(), trace_input_string,
                 self._options.toDict(), self._training, self._optimizer)
+
+        if self._executable:
+            self._is_attached = self.isAttachedToDevice()
+
+    def isAttachedToDevice(self):
+        """Returns true, if the target device has been attached. False,
+        otherwise.
+        """
+        if not self._executable:
+            raise RuntimeError("Executable isn't compiled yet")
+
+        return poptorch_core.isAttachedToDevice(self._executable)
+
+    def detachFromDevice(self):
+        """Detach from target device. Before calling this function, the device
+        must be attached."""
+        if not self._executable:
+            raise RuntimeError("Executable isn't compiled yet")
+
+        if self._training:
+            self.copyWeightsToHostIfNeeded()
+
+        assert self._is_attached
+        poptorch_core.detachFromDevice(self._executable)
+        self._is_attached = False
+
+    def attachToDevice(self):
+        """Attach to target device. Before calling this function, the device
+        must be detached."""
+        if not self._executable:
+            raise RuntimeError("Executable isn't compiled yet")
+
+        assert not self._is_attached
+        poptorch_core.attachToDevice(self._executable)
+        self._is_attached = True
 
 
 class AsynchronousWorker:

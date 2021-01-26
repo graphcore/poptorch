@@ -166,4 +166,12 @@ std::string PoplarExecutable::getPopartIR() const {
   return raw_ptr;
 }
 
+void PoplarExecutable::detachFromDevice() { _compiler.detachFromDevice(); }
+
+void PoplarExecutable::attachToDevice() { _compiler.attachToDevice(); }
+
+bool PoplarExecutable::isAttachedToDevice() const {
+  return _compiler.isAttachedToDevice();
+}
+
 } // namespace poptorch
