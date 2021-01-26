@@ -250,53 +250,6 @@ torch::jit::Node *poissonNllLossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {final_node->output()}, reduction);
 }
 
-torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
-                                            torch::jit::Node *node) {
-  // aten::hinge_embedding_loss(Tensor input, Tensor target, float margin,
-  //                            int reduction)
-
-  // Input
-  torch::jit::Value *x = node->input(0);
-  // Target labels containing 1 or -1
-  torch::jit::Value *y = node->input(1);
-  // Margin
-  torch::jit::Value *delta = node->input(2);
-
-  std::int64_t reduction = constantToLong(node->input(3)->node());
-  // Convert to popart reduce values
-  reduction = convertReduceToPopart(reduction);
-
-  // Delta - x
-  torch::jit::Node *delta_minus_x = createSub(graph, {delta, x});
-  // 0
-  torch::jit::Node *zeros = createConstantFloatLike(graph, x, {0}, {});
-  // max(0, Delta - x)
-  torch::jit::Node *max_delta_minus_x =
-      createMax(graph, {zeros->output(), delta_minus_x->output()});
-
-  // 1
-  torch::jit::Node *ones = createConstantInt(graph, {1}, {});
-  // -1
-  torch::jit::Node *neg_ones = createConstantFloatLike(graph, x, {-1}, {});
-  // if y = 1
-  torch::jit::Node *ones_mask = createEqual(graph, {y, ones->output()});
-  // if y = -1
-  torch::jit::Node *neg_ones_mask = createEqual(graph, {y, neg_ones->output()});
-
-  // l = x              if y = 1
-  torch::jit::Node *ones_masked_fill =
-      createWhere(graph, {ones_mask->output(), x, zeros->output()});
-  // l = max(0, delta - x)  if y = -1
-  torch::jit::Node *neg_ones_masked_fill =
-      createWhere(graph, {neg_ones_mask->output(), max_delta_minus_x->output(),
-                          zeros->output()});
-
-  torch::jit::Node *final_node = createAdd(
-      graph, {ones_masked_fill->output(), neg_ones_masked_fill->output()});
-
-  return createIdentityloss(graph, {final_node->output()}, reduction);
-}
-
 torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
                                        torch::jit::Node *node) {
   // aten::binary_cross_entropy_with_logits(Tensor input, Tensor target,
@@ -372,36 +325,6 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
     // w [(1 - y) x + l_p (m + log(exp(-m) + exp(-x - m)))]
     loss = createMul(graph, {w, loss->output()});
   }
-
-  return createIdentityloss(graph, {loss->output()}, reduction);
-}
-
-torch::jit::Node *softMarginLossHandler(torch::jit::Graph *graph,
-                                        torch::jit::Node *node) {
-  // aten::soft_margin_loss(Tensor input, Tensor target, int reduction)
-
-  // Input
-  torch::jit::Value *x = node->input(0);
-  // Target
-  torch::jit::Value *y = node->input(1);
-
-  std::int64_t reduction = constantToLong(node->input(2)->node());
-  // Convert to popart reduce values
-  reduction = convertReduceToPopart(reduction);
-
-  // -y
-  torch::jit::Node *loss = createNeg(graph, {y});
-  // -y * x
-  loss = createMul(graph, {loss->output(), x});
-  // exp(-y * x)
-  loss = createExp(graph, {loss->output()});
-
-  // 1
-  torch::jit::Node *ones = createConstantFloatLike(graph, x, {1}, {});
-  // 1 + exp(-y * x)
-  loss = createAdd(graph, {ones->output(), loss->output()});
-  // log(1 + exp(-y * x))
-  loss = createLog(graph, {loss->output()});
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
@@ -611,10 +534,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::binary_cross_entropy, binaryCrossEntropyHandler);
   registerHandler(c10::aten::kl_div, klDivHandler);
   registerHandler(c10::aten::poisson_nll_loss, poissonNllLossHandler);
-  registerHandler(c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler);
   registerHandler(c10::aten::binary_cross_entropy_with_logits,
                   bceWithLogitsHandler);
-  registerHandler(c10::aten::soft_margin_loss, softMarginLossHandler);
   registerHandler(c10::aten::multilabel_soft_margin_loss,
                   multiLabelSoftMarginLossHandler);
   registerHandler(c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler);

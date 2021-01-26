@@ -319,6 +319,28 @@ torch::jit::Node *hardtanhHandler(torch::jit::Graph *graph,
   return createClip(graph, {x}, t0, t1);
 }
 
+torch::jit::Node *hingeembeddinglossHandler(torch::jit::Graph *graph,
+                                            torch::jit::Node *node) {
+  auto y = node->input(1);
+  auto t0 = createConstantFloatLike(graph, y, {-1.0}, {})->output();
+  auto t1 = createEqual(graph, {y, t0})->output();
+  auto delta = node->input(2);
+  auto x = node->input(0);
+  auto t2 = createSub(graph, {delta, x})->output();
+  auto t3 = createConstantFloatLike(graph, t2, {0.0}, {})->output();
+  auto t4 = createMax(graph, {t3, t2})->output();
+  auto t5 = createConstantFloatLike(graph, y, {1.0}, {})->output();
+  auto t6 = createEqual(graph, {y, t5})->output();
+  auto t7 = createWhere(graph, {t6, x, t3})->output();
+  auto t8 = createWhere(graph, {t1, t4, t7})->output();
+  auto red = node->input(3);
+  auto t9 = constantToLong(red->node());
+  auto t10 = convertReduceToPopart(t9);
+  // identityloss(where(equal(y, -1.0), max(0.0, sub(delta, x)),
+  // where(equal(y, 1.0), x, 0.0)), reduction(clong(red)))
+  return createIdentityloss(graph, {t8}, t10);
+}
+
 torch::jit::Node *isnanHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   auto i0 = node->input(0);
@@ -702,6 +724,22 @@ torch::jit::Node *smoothl1lossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {t9}, t11);
 }
 
+torch::jit::Node *softmarginlossHandler(torch::jit::Graph *graph,
+                                        torch::jit::Node *node) {
+  auto y = node->input(1);
+  auto t0 = createNeg(graph, {y})->output();
+  auto x = node->input(0);
+  auto t1 = createMul(graph, {t0, x})->output();
+  auto t2 = createExp(graph, {t1})->output();
+  // matched log1p: log(add(1.0, x))
+  auto t3 = createLog1p(graph, {t2})->output();
+  auto red = node->input(2);
+  auto t4 = constantToLong(red->node());
+  auto t5 = convertReduceToPopart(t4);
+  // identityloss(log1p(exp(mul(neg(y), x))), reduction(clong(red)))
+  return createIdentityloss(graph, {t3}, t5);
+}
+
 torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   auto threshold = node->input(2);
@@ -865,6 +903,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::hardshrink, hardshrinkHandler);
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
   registerHandler(c10::aten::hardtanh_, hardtanhHandler);
+  registerHandler(c10::aten::hinge_embedding_loss, hingeembeddinglossHandler);
   registerHandler(c10::aten::isnan, isnanHandler);
   registerHandler(c10::aten::l1_loss, l1lossHandler);
   registerHandler(c10::aten::le, leHandler);
@@ -913,6 +952,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::sin, sinHandler);
   registerHandler(c10::aten::sinh, sinhHandler);
   registerHandler(c10::aten::smooth_l1_loss, smoothl1lossHandler);
+  registerHandler(c10::aten::soft_margin_loss, softmarginlossHandler);
   registerHandler(c10::aten::softplus, softplusHandler);
   registerHandler(c10::aten::softshrink, softshrinkHandler);
   registerHandler(c10::aten::sqrt, sqrtHandler);

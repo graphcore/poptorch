@@ -143,6 +143,13 @@ forward("where_", "where")
 
 
 # loss handlers
+def hinge_embedding_loss_handler(x, y, delta, red):
+    red = reduction(clong(red))
+    loss = op.where(y.equal(1.), x, 0.)
+    loss = op.where(y.equal(-1.), op.max(0., delta - x), loss)
+    return op.identityloss(loss, red)
+
+
 def l1_loss_handler(x, y, red):
     red = reduction(clong(red))
     loss = op.l1loss(x - y, cfloat(1.), red)
@@ -173,6 +180,12 @@ def smooth_l1_loss_handler(x, y, red, beta):
     delta = op.abs(x - y)
     loss = op.where(delta < beta, 0.5 * delta * delta / beta,
                     delta - 0.5 * beta)
+    return op.identityloss(loss, red)
+
+
+def soft_margin_loss_handler(x, y, red):
+    red = reduction(clong(red))
+    loss = op.log(1. + op.exp(-y * x))
     return op.identityloss(loss, red)
 
 
