@@ -118,6 +118,15 @@ def output_type(idx=0):
     return scalar_type(values.OutputValue(idx))
 
 
+# reduction(r)
+#
+# Converts reduction type from pytorch to popart
+# Parameters:
+#   r - integer containing reduction Id
+def reduction(r):
+    return values.NonTensorHelper('reduction', [r], 'convertReduceToPopart')
+
+
 # tensor_list(l)
 #
 # Generate a list of tensors

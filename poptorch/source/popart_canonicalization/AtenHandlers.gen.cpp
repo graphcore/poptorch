@@ -326,6 +326,19 @@ torch::jit::Node *isnanHandler(torch::jit::Graph *graph,
   return createIsnan(graph, {i0});
 }
 
+torch::jit::Node *l1lossHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto t0 = createSub(graph, {x, y})->output();
+  auto red = node->input(2);
+  auto t1 = constantToLong(red->node());
+  auto t2 = convertReduceToPopart(t1);
+  auto t3 = createL1loss(graph, {t0}, 1.0, t2)->output();
+  // identityloss(l1loss(sub(x, y), 1.0, reduction(clong(red))), 2)
+  return createIdentityloss(graph, {t3}, 2);
+}
+
 torch::jit::Node *leHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -399,6 +412,26 @@ torch::jit::Node *ltHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createLess(graph, {i0, i1});
 }
 
+torch::jit::Node *marginrankinglossHandler(torch::jit::Graph *graph,
+                                           torch::jit::Node *node) {
+  auto y = node->input(2);
+  auto t0 = createNeg(graph, {y})->output();
+  auto x1 = node->input(0);
+  auto x2 = node->input(1);
+  auto t1 = createSub(graph, {x1, x2})->output();
+  auto t2 = createMul(graph, {t0, t1})->output();
+  auto margin = node->input(3);
+  auto t3 = createAdd(graph, {t2, margin})->output();
+  auto t4 = createConstantFloatLike(graph, t3, {0.0}, {})->output();
+  auto t5 = createMax(graph, {t3, t4})->output();
+  auto red = node->input(4);
+  auto t6 = constantToLong(red->node());
+  auto t7 = convertReduceToPopart(t6);
+  // identityloss(max(add(mul(neg(y), sub(x1, x2)), margin), 0.0),
+  // reduction(clong(red)))
+  return createIdentityloss(graph, {t5}, t7);
+}
+
 torch::jit::Node *maskedfillHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto i1 = node->input(1);
@@ -442,6 +475,19 @@ torch::jit::Node *minHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return nullptr;
 }
 
+torch::jit::Node *mselossHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto t0 = createSub(graph, {x, y})->output();
+  auto t1 = createMul(graph, {t0, t0})->output();
+  auto red = node->input(2);
+  auto t2 = constantToLong(red->node());
+  auto t3 = convertReduceToPopart(t2);
+  // identityloss(mul(sub(x, y), sub(x, y)), reduction(clong(red)))
+  return createIdentityloss(graph, {t1}, t3);
+}
+
 torch::jit::Node *neHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -454,6 +500,21 @@ torch::jit::Node *negHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto i0 = node->input(0);
   // neg(i0)
   return createNeg(graph, {i0});
+}
+
+torch::jit::Node *nlllossHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto red = node->input(3);
+  auto t0 = constantToLong(red->node());
+  auto t1 = convertReduceToPopart(t0);
+  auto ignore_index = node->input(4);
+  auto t2 = constantToInt(ignore_index->node());
+  auto t3 = createNllloss(graph, {x, y}, t1, t2, true)->output();
+  // identityloss(nllloss(x, y, reduction(clong(red)), cint(ignore_index), 1),
+  // 2)
+  return createIdentityloss(graph, {t3}, 2);
 }
 
 torch::jit::Node *normalInPlaceHandler(torch::jit::Graph *graph,
@@ -615,6 +676,30 @@ torch::jit::Node *sinhHandler(torch::jit::Graph *graph,
   auto i0 = node->input(0);
   // sinh(i0)
   return createSinh(graph, {i0});
+}
+
+torch::jit::Node *smoothl1lossHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node) {
+  auto beta = node->input(3);
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto t0 = createSub(graph, {x, y})->output();
+  auto t1 = createAbs(graph, {t0})->output();
+  auto t2 = createGreater(graph, {beta, t1})->output();
+  auto t3 = createConstantFloatLike(graph, t1, {0.5}, {})->output();
+  auto t4 = createMul(graph, {t3, t1})->output();
+  auto t5 = createMul(graph, {t4, t1})->output();
+  auto t6 = createDiv(graph, {t5, beta})->output();
+  auto t7 = createMul(graph, {t3, beta})->output();
+  auto t8 = createSub(graph, {t1, t7})->output();
+  auto t9 = createWhere(graph, {t2, t6, t8})->output();
+  auto red = node->input(2);
+  auto t10 = constantToLong(red->node());
+  auto t11 = convertReduceToPopart(t10);
+  // identityloss(where(greater(beta, abs(sub(x, y))), div(mul(mul(0.5,
+  // abs(sub(x, y))), abs(sub(x, y))), beta), sub(abs(sub(x, y)), mul(0.5,
+  // beta))), reduction(clong(red)))
+  return createIdentityloss(graph, {t9}, t11);
 }
 
 torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
@@ -781,6 +866,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
   registerHandler(c10::aten::hardtanh_, hardtanhHandler);
   registerHandler(c10::aten::isnan, isnanHandler);
+  registerHandler(c10::aten::l1_loss, l1lossHandler);
   registerHandler(c10::aten::le, leHandler);
   registerHandler(c10::aten::leaky_relu, leakyreluHandler);
   registerHandler(c10::aten::leaky_relu_, leakyreluHandler);
@@ -791,12 +877,15 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::log_sigmoid, logsigmoidHandler);
   registerHandler(c10::aten::logical_not, logicalnotHandler);
   registerHandler(c10::aten::lt, ltHandler);
+  registerHandler(c10::aten::margin_ranking_loss, marginrankinglossHandler);
   registerHandler(c10::aten::masked_fill, maskedfillHandler);
   registerHandler(c10::aten::masked_fill_, maskedfillHandler);
   registerHandler(c10::aten::max, maxHandler);
   registerHandler(c10::aten::min, minHandler);
+  registerHandler(c10::aten::mse_loss, mselossHandler);
   registerHandler(c10::aten::ne, neHandler);
   registerHandler(c10::aten::neg, negHandler);
+  registerHandler(c10::aten::nll_loss, nlllossHandler);
   registerHandler(c10::aten::normal_, normalInPlaceHandler);
   registerHandler(c10::aten::pixel_shuffle, pixelshuffleHandler);
   registerHandler(c10::aten::pow, powHandler);
@@ -823,6 +912,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::silu, siluHandler);
   registerHandler(c10::aten::sin, sinHandler);
   registerHandler(c10::aten::sinh, sinhHandler);
+  registerHandler(c10::aten::smooth_l1_loss, smoothl1lossHandler);
   registerHandler(c10::aten::softplus, softplusHandler);
   registerHandler(c10::aten::softshrink, softshrinkHandler);
   registerHandler(c10::aten::sqrt, sqrtHandler);

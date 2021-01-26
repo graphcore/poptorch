@@ -13,6 +13,7 @@ convert("recomputation_checkpoint", 1, "recomputationCheckpoint")
 expand("begin_ipu_block", lambda x, y, z: op.beginIpuBlock(
     clong(x), clong(y), clong(z)))
 expand("ipu_print_tensor", lambda x, s: op.printIpuTensor(x, cstr(s)))
+expand("identity_loss", lambda x, r: op.identityloss(x, cint(r)))
 expand("optimizer_group", lambda x, l: op.optimizerGroup(
     clong(x), tensor_list(l)))
 expand(

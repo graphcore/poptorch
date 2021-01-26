@@ -9,73 +9,6 @@
 
 namespace poptorch {
 namespace {
-torch::jit::Node *l1LossHandler(torch::jit::Graph *graph,
-                                torch::jit::Node *node) {
-  std::int64_t reduction = constantToLong(node->input(2)->node());
-
-  // Convert to popart reduce values.
-  reduction = convertReduceToPopart(reduction);
-
-  // Popart calculates the L1 loss as being the difference from an input to
-  // 0. So we have to manually subract the losses first.
-  torch::jit::Node *subtract =
-      createSub(graph, {node->input(0), node->input(1)});
-
-  const float scale = 1.0f;
-  torch::jit::Node *l1_loss =
-      createL1loss(graph, {subtract->output()}, scale, reduction);
-
-  // Create an identity loss with no further reduction.
-  return createIdentityloss(graph, {l1_loss->output()}, 2);
-}
-
-torch::jit::Node *mseLossHandler(torch::jit::Graph *graph,
-                                 torch::jit::Node *node) {
-  std::int64_t reduction = constantToLong(node->input(2)->node());
-
-  // Convert to popart reduce values.
-  reduction = convertReduceToPopart(reduction);
-
-  // Subtract X - Y
-  torch::jit::Node *subtract =
-      createSub(graph, {node->input(0), node->input(1)});
-
-  // Square it.
-  torch::jit::Node *square =
-      createMul(graph, {subtract->output(), subtract->output()});
-
-  return createIdentityloss(graph, {square->output()}, reduction);
-}
-
-torch::jit::Node *nllLossHandler(torch::jit::Graph *graph,
-                                 torch::jit::Node *node) {
-  // This is derived by me (stephenm@graphcore.ai) not parsed from the
-  // pytorch headers like the others as I can't find it in them.
-
-  // "aten::nll_loss(Tensor input, Tensor label, Tensor? weight, int
-  // reduction, int ignore_index) -> Tensor"
-
-  std::int64_t reduction = constantToLong(node->input(3)->node());
-  std::int64_t ignore_index = constantToLong(node->input(4)->node());
-
-  // Convert to popart reduce values.
-  reduction = convertReduceToPopart(reduction);
-
-  torch::jit::Node *nllloss =
-      createNllloss(graph, {node->input(0), node->input(1)}, reduction,
-                    ignore_index, /*inputIsLogProbability=*/true);
-
-  // Create an identity loss with no further reduction.
-  return createIdentityloss(graph, {nllloss->output()}, 2);
-}
-
-torch::jit::Node *identityLossHandler(torch::jit::Graph *graph,
-                                      torch::jit::Node *node) {
-  std::int64_t reduction = constantToLong(node->input(1)->node());
-
-  return createIdentityloss(graph, {node->input(0)}, reduction);
-}
-
 torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
   // aten::binary_cross_entropy(Tensor input, Tensor target,
@@ -443,58 +376,6 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
 
-torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
-                                      torch::jit::Node *node) {
-  // aten::smooth_l1_loss(Tensor input, Tensor target, int reduction,
-  //                      float beta)
-
-  // Input
-  torch::jit::Value *x = node->input(0);
-  // Target
-  torch::jit::Value *y = node->input(1);
-
-  std::int64_t reduction = constantToLong(node->input(2)->node());
-  // Convert to popart reduce values
-  reduction = convertReduceToPopart(reduction);
-  torch::jit::Value *beta = node->input(3);
-
-  // x - y
-  torch::jit::Node *x_minus_y = createSub(graph, {x, y});
-  // |x - y|
-  torch::jit::Node *abs_x_minus_y = createAbs(graph, {x_minus_y->output()});
-
-  // if |x - y| < beta
-  torch::jit::Node *mask = createLess(graph, {abs_x_minus_y->output(), beta});
-
-  // 2
-  torch::jit::Node *twos = createConstantFloatLike(graph, x, {2}, {});
-  // (x - y)^2
-  torch::jit::Node *sqr_x_minus_y =
-      createPow(graph, {x_minus_y->output(), twos->output()});
-  // 0.5
-  torch::jit::Node *half = createConstantFloatLike(graph, x, {0.5}, {});
-  // 0.5 (x - y)^2
-  torch::jit::Node *half_sqr_x_minus_y =
-      createMul(graph, {half->output(), sqr_x_minus_y->output()});
-  // 0.5 (x - y)^2 / beta
-  torch::jit::Node *div_beta =
-      createDiv(graph, {half_sqr_x_minus_y->output(), beta});
-
-  // 0.5 * beta
-  torch::jit::Node *half_beta = createMul(graph, {half->output(), beta});
-  // |x - y| - 0.5 * beta
-  torch::jit::Node *abs_minus_half_beta =
-      createSub(graph, {abs_x_minus_y->output(), half_beta->output()});
-
-  // 0.5 (x - y)^2 / beta  if |x - y| < beta
-  // |x - y| - 0.5 * beta  otherwise
-  torch::jit::Node *loss =
-      createWhere(graph, {mask->output(), div_beta->output(),
-                          abs_minus_half_beta->output()});
-
-  return createIdentityloss(graph, {loss->output()}, reduction);
-}
-
 torch::jit::Node *softMarginLossHandler(torch::jit::Graph *graph,
                                         torch::jit::Node *node) {
   // aten::soft_margin_loss(Tensor input, Tensor target, int reduction)
@@ -667,41 +548,6 @@ torch::jit::Node *cosineEmbeddingLossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
 
-torch::jit::Node *marginRankingLossHandler(torch::jit::Graph *graph,
-                                           torch::jit::Node *node) {
-  // aten::margin_ranking_loss(Tensor input1, Tensor input2, Tensor target,
-  //                           float margin, int reduction)
-
-  // Input 1
-  torch::jit::Value *x1 = node->input(0);
-  // Input 2
-  torch::jit::Value *x2 = node->input(1);
-  // Target
-  torch::jit::Value *y = node->input(2);
-  // Margin
-  torch::jit::Value *margin = node->input(3);
-
-  std::int64_t reduction = constantToLong(node->input(4)->node());
-  // Convert to popart reduce values
-  reduction = convertReduceToPopart(reduction);
-
-  // x1 - x2
-  torch::jit::Node *loss = createSub(graph, {x1, x2});
-  // -y
-  torch::jit::Node *neg_y = createNeg(graph, {y});
-  // -y (x1 - x2)
-  loss = createMul(graph, {neg_y->output(), loss->output()});
-  // -y (x1 - x2) + margin
-  loss = createAdd(graph, {loss->output(), margin});
-
-  // 0
-  torch::jit::Node *zeros = createConstantFloatLike(graph, x1, {0}, {});
-  // max(0, -y (x1 - x2) + margin)
-  loss = createMax(graph, {zeros->output(), loss->output()});
-
-  return createIdentityloss(graph, {loss->output()}, reduction);
-}
-
 torch::jit::Node *tripletMarginLossHandler(torch::jit::Graph *graph,
                                            torch::jit::Node *node) {
   // aten::triplet_margin_loss(Tensor anchor, Tensor positive, Tensor negative,
@@ -761,24 +607,18 @@ torch::jit::Node *tripletMarginLossHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
-  registerHandler(c10::aten::l1_loss, l1LossHandler);
-  registerHandler(c10::aten::nll_loss, nllLossHandler);
   registerHandler(c10::aten::nll_loss2d, nllLoss2dHandler);
-  registerHandler(c10::aten::mse_loss, mseLossHandler);
   registerHandler(c10::aten::binary_cross_entropy, binaryCrossEntropyHandler);
   registerHandler(c10::aten::kl_div, klDivHandler);
   registerHandler(c10::aten::poisson_nll_loss, poissonNllLossHandler);
   registerHandler(c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler);
   registerHandler(c10::aten::binary_cross_entropy_with_logits,
                   bceWithLogitsHandler);
-  registerHandler(c10::aten::smooth_l1_loss, smoothL1LossHandler);
   registerHandler(c10::aten::soft_margin_loss, softMarginLossHandler);
   registerHandler(c10::aten::multilabel_soft_margin_loss,
                   multiLabelSoftMarginLossHandler);
   registerHandler(c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler);
-  registerHandler(c10::aten::margin_ranking_loss, marginRankingLossHandler);
   registerHandler(c10::aten::triplet_margin_loss, tripletMarginLossHandler);
-  registerHandler(symbols::poptorch::identity_loss, identityLossHandler);
 }
 
 } // namespace poptorch

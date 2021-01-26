@@ -199,7 +199,7 @@ def parse_signatures():
         ['clong_list', 'dimension_list', 'None'],
         'Attributes::Int': ['clong'],
         'Attributes::Ints': ['clong_list', 'empty_initializer'],
-        'popart::ReductionType': ['cint'],
+        'popart::ReductionType': ['cint', 'reduction'],
         'popart::Builder':
         'ignore',
         'popart::ConstVoidData':

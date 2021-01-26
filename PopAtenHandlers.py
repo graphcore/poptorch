@@ -5,7 +5,7 @@ import math
 from popgen.api import convert, expand, forward, generate, simplify
 from popgen.helpers import as_ir, alpha, cfloat, cint, clong, clong_list, \
                            cstr, dimension, dimension_list, empty_initializer, \
-                           output_shape, output_type, tensor_list, \
+                           output_shape, output_type, reduction, tensor_list, \
                            tensor_long, tensor_shape, tensor_type
 from popgen.operatorfactory import op
 
@@ -140,6 +140,41 @@ forward("clamp_", "clamp")
 forward("hardtanh_", "hardtanh")
 forward("masked_fill_", "masked_fill")
 forward("where_", "where")
+
+
+# loss handlers
+def l1_loss_handler(x, y, red):
+    red = reduction(clong(red))
+    loss = op.l1loss(x - y, cfloat(1.), red)
+    return op.identityloss(loss, cint(2))
+
+
+def margin_ranking_loss_handler(x1, x2, y, margin, red):
+    red = reduction(clong(red))
+    loss = op.max(-y * (x1 - x2) + margin, 0.)
+    return op.identityloss(loss, red)
+
+
+def mse_loss_handler(x, y, red):
+    red = reduction(clong(red))
+    loss = (x - y) * (x - y)
+    return op.identityloss(loss, red)
+
+
+def nll_loss_handler(x, y, _weight, red, ignore_index):
+    red = reduction(clong(red))
+    input_islog = cint(1)
+    loss = op.nllloss(x, y, red, cint(ignore_index), input_islog)
+    return op.identityloss(loss, cint(2))
+
+
+def smooth_l1_loss_handler(x, y, red, beta):
+    red = reduction(clong(red))
+    delta = op.abs(x - y)
+    loss = op.where(delta < beta, 0.5 * delta * delta / beta,
+                    delta - 0.5 * beta)
+    return op.identityloss(loss, red)
+
 
 # everything else
 expand(

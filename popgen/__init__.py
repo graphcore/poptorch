@@ -62,6 +62,9 @@ class Value:
     def __radd__(self, other):
         return Value('add', [other, self])
 
+    def __rmul__(self, other):
+        return Value('mul', [other, self])
+
     def __rsub__(self, other):
         return Value('sub', [other, self])
 
