@@ -15,28 +15,25 @@ namespace {
 torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   // aten::ones(int[] size, *, int? dtype, int? layout, Device? device, bool?
-  // pin_memory) -> Tensor
+  //            pin_memory) -> Tensor
   // aten::zeros(int[] size, *, int? dtype, int? layout, Device? device, bool?
-  // pin_memory) -> Tensor
+  //             pin_memory) -> Tensor
+  // aten::zeros_like(Tensor self, ScalarType? dtype, Layout? layout, Device?
+  //                  device, bool? pin_memory, MemoryFormat? memory_format)
+  //                  -> Tensor
+  // aten::ones_like(Tensor self, ScalarType? dtype, Layout? layout, Device?
+  //                 device, bool? pin_memory, MemoryFormat? memory_format)
+  //                 -> Tensor
 
   torch::jit::Symbol kind = node->kind();
-  bool is_ones = kind == c10::aten::ones;
-  ERROR_ON(!is_ones && kind != c10::aten::zeros);
+  bool is_ones = kind == c10::aten::ones || kind == c10::aten::ones_like;
 
-  c10::TensorTypePtr as_tensor =
-      node->outputs()[0]->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-  std::vector<std::int64_t> operation_shape;
-
-  for (auto optional_int : *dims.sizes()) {
-    operation_shape.push_back(*optional_int);
-  }
-
+  auto output = node->output();
   auto new_node = createAndInsertNode(
       graph, is_ones ? symbols::poptorch::ones : symbols::poptorch::zeros, {},
-      ImplicitCast::None, OutputType::AsDtype, 1, *as_tensor->scalarType());
+      ImplicitCast::None, OutputType::AsDtype, 1, getNodeScalarType(output));
 
-  new_node->is_(c10::attr::shape, shapeFromTensor(node->output()));
+  new_node->is_(c10::attr::shape, shapeFromTensor(output));
   return new_node;
 }
 
@@ -63,7 +60,9 @@ torch::jit::Node *arangeHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::arange, arangeHandler);
   registerHandler(c10::aten::ones, onesZerosHandler);
+  registerHandler(c10::aten::ones_like, onesZerosHandler);
   registerHandler(c10::aten::zeros, onesZerosHandler);
+  registerHandler(c10::aten::zeros_like, onesZerosHandler);
 }
 
 } // namespace poptorch

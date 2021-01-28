@@ -18,7 +18,31 @@ import poptorch
 # torch._C.Generator.device,
 
 
-@pytest.mark.parametrize("dtype", (torch.float16, torch.float32, torch.int32))
+def zeros_and_ones_harness(model, dtype, is_like):
+    z = torch.tensor([1.0], dtype=dtype)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    if is_like:
+        t = torch.empty(3, 5, 1)
+        # Run on CPU.
+        native_out = model(t, z)
+        # Run on IPU.
+        poptorch_out = poptorch_model(t, z)
+    else:
+        # Run on CPU.
+        native_out = model(z)
+        # Run on IPU.
+        poptorch_out = poptorch_model(z)
+
+    for native, pop in zip(native_out, poptorch_out):
+        assert native.size() == pop.size()
+        torch.testing.assert_allclose(native, pop)
+
+
+zeros_and_ones_dtypes = (torch.float16, torch.float32, torch.int32)
+
+
+@pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
 def test_zeros_and_ones(dtype):
     class Model(torch.nn.Module):
         def forward(self, z):
@@ -27,18 +51,19 @@ def test_zeros_and_ones(dtype):
 
             return (x * y) + z, (y + x) + z
 
-    model = Model()
+    zeros_and_ones_harness(Model(), dtype, False)
 
-    # Run on CPU.
-    tensor_in = torch.tensor([1.0], dtype=dtype)
-    nativeOut = model(tensor_in)
 
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(tensor_in)
+@pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
+def test_zeros_like_and_ones_like(dtype):
+    class Model(torch.nn.Module):
+        def forward(self, t, z):
+            x = torch.zeros_like(t, dtype=dtype)
+            y = torch.ones_like(t, dtype=dtype)
 
-    assert torch.equal(nativeOut[0], poptorch_out[0])
-    assert torch.equal(nativeOut[1], poptorch_out[1])
+            return (x * y) + z, (y + x) + z
+
+    zeros_and_ones_harness(Model(), dtype, True)
 
 
 def test_cat():

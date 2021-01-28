@@ -37,7 +37,9 @@ Creation ops
 * ``torch.full``
 * ``torch.full_like``
 * ``torch.ones``
+* ``torch.ones_like``
 * ``torch.zeros``
+* ``torch.zeros_like``
 
 Indexing, slicing, joining and mutating ops
 '''''''''''''''''''''''''''''''''''''''''''
