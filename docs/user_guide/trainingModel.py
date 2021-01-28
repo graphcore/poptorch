@@ -28,7 +28,7 @@ input = torch.randn(10)
 target = torch.randn(10)
 
 # Train on IPU.
-for i in range(0, 100):
+for i in range(0, 800):
     # Each call here executes the forward pass, loss calculation, and backward
     # pass in one step.
     # Model input and loss function input are provided together.

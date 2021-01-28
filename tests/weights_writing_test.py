@@ -216,7 +216,7 @@ def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
     # Train on IPU.
-    for _ in range(0, 100):
+    for _ in range(0, 1000):
         out, _ = training_model(input, target)
 
     assert training_model.deviceToHostCounter == 0, \

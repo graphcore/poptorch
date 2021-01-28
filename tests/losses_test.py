@@ -384,9 +384,7 @@ def test_BCE_direct(reduction):
 
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
 def test_BCE_training(reduction):
-    torch.manual_seed(42)
-
-    torch.manual_seed(42)
+    torch.manual_seed(1)
 
     model = torch.nn.Sequential(torch.nn.Linear(10, 10), torch.nn.Sigmoid())
 
@@ -401,7 +399,7 @@ def test_BCE_training(reduction):
     # Make sure the first run doesn't already pass the test.
     _, original_loss = poptorch_model(input, target)
 
-    for _ in range(0, 1000):
+    for _ in range(0, 1500):
         out, loss = poptorch_model(input, target)
 
     print(out)
