@@ -93,7 +93,7 @@ cd build
 3. Create a build environment and install the dependencies.
 
 ```sh
-../poptorch/create_buildenv.sh
+../poptorch/scripts/create_buildenv.py
 ```
 
 4. Activate the build environment
@@ -108,7 +108,9 @@ cd build
 cmake ../poptorch -DSDK_DIR=${SDK_PATH} -GNinja
 ```
 
-By default PopTorch will be built in release mode, to build in debug mode add `-DCMAKE_BUILD_TYPE=Debug`
+By default PopTorch will be built in release mode, to build in debug mode add `-DCMAKE_BUILD_TYPE=Debug`.
+
+To build the documentation, add `-DBUILD_DOCS=ON`. The HTML and PDF documentation will be generated in `docs/`.
 
 6. Compile the PopTorch libraries
 
@@ -131,17 +133,6 @@ ninja poptorch_wheel
 ```
 
 The wheel will be created in `install/dist`.
-
-8. (Optional) Build the documentation
-
-```sh
-. enable.sh
-../poptorch/docs_build.sh
-```
-Note: The documentation loads the `PopTorch` python module to extract the
-documentation so make sure to enable your build folder before calling `docs_build.sh`
-
-The HTML and PDF documentation will be generated in `docs/`
 
 ### Run the tests
 
