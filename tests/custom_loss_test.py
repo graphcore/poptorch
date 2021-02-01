@@ -173,3 +173,82 @@ def test_custom_loss_nll():
     # value that was trained on IPU.
     out = model(input)
     assert torch.argmax(out, dim=1) == label
+
+
+# Test custom loss by training to a label
+def test_two_custom_losses():
+    torch.manual_seed(42)
+
+    model = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                torch.nn.LogSoftmax(dim=1))
+
+    class CustomLoss(torch.nn.Module):
+        # Mean squared error scaled.
+        def forward(self, x, target):
+            loss = torch.nn.functional.nll_loss(x, target)
+            loss2 = torch.nn.functional.nll_loss(x, target) * 5.0
+            a = loss + loss2
+            return a, loss
+
+    loss = CustomLoss()
+
+    poptorch_model = helpers.trainingModelWithLoss(model, loss=loss)
+
+    label = torch.randint(0, 10, [1])
+    input = torch.randn(1, 10)
+
+    error_msg = ("Multiple independent losses found in graph."
+                 " Graph must have one final loss. "
+                 "Wrap final graph loss in poptorch.identityLoss.")
+    with pytest.raises(RuntimeError, match=error_msg):
+        _ = poptorch_model(input, label)
+
+
+def test_two_custom_losses_with_id_wrapper():
+    torch.manual_seed(42)
+
+    model = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                torch.nn.LogSoftmax(dim=1))
+
+    class CustomLoss(torch.nn.Module):
+        # Mean squared error scaled.
+        def forward(self, x, target):
+            loss = torch.nn.functional.nll_loss(x, target)
+            loss2 = torch.nn.functional.nll_loss(x, target) * 5.0
+            a = poptorch.identity_loss(loss + loss2, reduction="mean")
+            return a, loss
+
+    loss = CustomLoss()
+
+    poptorch_model = helpers.trainingModelWithLoss(model, loss=loss)
+
+    label = torch.randint(0, 10, [1])
+    input = torch.randn(1, 10)
+
+    _ = poptorch_model(input, label)
+
+
+def test_no_loss():
+    torch.manual_seed(42)
+
+    model = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                torch.nn.LogSoftmax(dim=1))
+
+    class CustomLoss(torch.nn.Module):
+        # Mean squared error scaled.
+        def forward(self, x, target):
+            loss = x * 12
+            loss2 = target + 1
+            a = loss + loss2
+            return a, loss
+
+    loss = CustomLoss()
+
+    poptorch_model = helpers.trainingModelWithLoss(model, loss=loss)
+
+    label = torch.randint(0, 10, [1])
+    input = torch.randn(1, 10)
+
+    error_msg = "Couldn't find a loss in graph"
+    with pytest.raises(RuntimeError, match=error_msg):
+        _ = poptorch_model(input, label)

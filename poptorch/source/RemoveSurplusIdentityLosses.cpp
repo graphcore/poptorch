@@ -100,14 +100,11 @@ void removeSurplusIdentityLosses(torch::jit::Graph *graph) {
   logging::debug("Found {} losses and removed {}", total_found_losses,
                  total_found_losses - independent_loss_count);
 
-  if (total_found_losses == 0) {
-    logging::warn("Couldn't find a loss in graph!");
-  }
-
-  if (independent_loss_count != 1) {
-    logging::warn("Multiple independent losses found in graph. Graph must have "
-                  "one final loss.");
-  }
+  ERROR_ON_MSG(total_found_losses == 0, "Couldn't find a loss in graph!");
+  ERROR_ON_MSG(independent_loss_count != 1,
+               "Multiple independent losses found"
+               " in graph. Graph must have one final loss."
+               " Wrap final graph loss in poptorch.identityLoss.");
 
   // Remove the dead nodes.
   searchAndPossiblyDestroy(to_delete);
