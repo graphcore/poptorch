@@ -57,10 +57,14 @@ namespace poptorch::symbols {
 #define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
   c10::Symbol Namespace::FuncName;
 
+#define OP_DECL_NO_RETURN(Namespace, FuncName, function, OnnxImpl, Args,       \
+                          BodyArgs)                                            \
+  c10::Symbol Namespace::FuncName;
+
 #include "popart_compiler/SupportedOperations.inc.hpp" // NOLINT
 
 #undef OP_DECL
-
+#undef OP_DECL_NO_RETURN
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializeSupportedOperations() {
@@ -71,9 +75,15 @@ static void initializeSupportedOperations() {
   Namespace::FuncName =                                                        \
       c10::Symbol::fromQualString(#Namespace "::" #FuncName); // NOLINT
 
+#define OP_DECL_NO_RETURN(Namespace, FuncName, function, OnnxImpl, Args,       \
+                          BodyArgs)                                            \
+  Namespace::FuncName =                                                        \
+      c10::Symbol::fromQualString(#Namespace "::" #FuncName); // NOLINT
+
 #include "popart_compiler/SupportedOperations.inc.hpp" // NOLINT
 
 #undef OP_DECL
+#undef OP_DECL_NO_RETURN
 }
 
 } // namespace poptorch::symbols
@@ -91,6 +101,12 @@ c10::Symbol multi_conv_part;
 c10::Symbol end_multi_conv;
 c10::Symbol host_side_cast;
 
+c10::Symbol end_if;
+c10::Symbol start_if_true;
+c10::Symbol start_if_false;
+c10::Symbol start_for_loop;
+c10::Symbol end_for_loop;
+c10::Symbol add_untyped_input_tensor;
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializePoptorchSymbols() {
@@ -106,6 +122,13 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, multi_conv_part)
   SYMBOL_INIT(poptorch, end_multi_conv)
   SYMBOL_INIT(poptorch, host_side_cast)
+
+  SYMBOL_INIT(poptorch, end_if);
+  SYMBOL_INIT(poptorch, start_if_true);
+  SYMBOL_INIT(poptorch, start_if_false);
+  SYMBOL_INIT(poptorch, start_for_loop);
+  SYMBOL_INIT(poptorch, end_for_loop);
+  SYMBOL_INIT(poptorch, add_untyped_input_tensor);
 }
 
 } // namespace poptorch::symbols::poptorch

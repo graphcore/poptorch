@@ -38,9 +38,8 @@ void canonicalizeLists(torch::jit::Graph *graph);
  */
 void warnOnUnsupportedAten(torch::jit::Graph *graph);
 
-/*
- * Convert all float input tensors to half if they actually are half.
- */
+void annotateSubgraphs(torch::jit::Graph *graph);
+
 void removeSurplusIdentityLosses(torch::jit::Graph *graph);
 
 void canonicaliseHalfInputs(torch::jit::Graph *graph,

@@ -19,5 +19,6 @@ signatures = {
     'recomputationCheckpoint': ['Args'],
     'reflectionPad': ['Args', ['clong_list']],
     'setAvailableMemory': ['Args', ['cfloat']],
-    'setMatMulSerialization': ['Args', ['cstr'], ['clong'], ['cint']]
+    'setMatMulSerialization': ['Args', ['cstr'], ['clong'], ['cint']],
+    'endForLoop': ['Args', ['clong']]
 }

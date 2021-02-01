@@ -33,9 +33,16 @@ namespace symbols {
   extern c10::Symbol FuncName;                                                 \
   }
 
+#define OP_DECL_NO_RETURN(Namespace, FuncName, function, OnnxImpl, Args,       \
+                          BodyArgs)                                            \
+  namespace Namespace {                                                        \
+  extern c10::Symbol FuncName;                                                 \
+  }
+
 #include "popart_compiler/SupportedOperations.inc.hpp"
 
 #undef OP_DECL
+#undef OP_DECL_NO_RETURN
 } // namespace symbols
 
 namespace symbols::poptorch {
@@ -53,6 +60,13 @@ extern c10::Symbol end_multi_conv;
 // so that that input types match those received from pytorch but that the input
 // types to later ops have the correct type.
 extern c10::Symbol host_side_cast;
+
+extern c10::Symbol end_if;
+extern c10::Symbol start_if_true;
+extern c10::Symbol start_if_false;
+extern c10::Symbol start_for_loop;
+extern c10::Symbol end_for_loop;
+extern c10::Symbol add_untyped_input_tensor;
 
 } // namespace symbols::poptorch
 

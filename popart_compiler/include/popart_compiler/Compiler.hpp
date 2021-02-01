@@ -237,9 +237,15 @@ public:
   poptorch::TensorId function(                                                 \
       const std::vector<poptorch::TensorId> &inputs Args);
 
+// Create a function decl with the given call and arguments which returns void.
+#define OP_DECL_NO_RETURN(Namespace, FuncName, function, OnnxImpl, Args,       \
+                          BodyArgs)                                            \
+  void function(const std::vector<poptorch::TensorId> &inputs Args);
+
 #include "SupportedOperations.inc.hpp"
 
 #undef OP_DECL
+#undef OP_DECL_NO_RETURN
 #undef BODY_ARG
 #undef HOST_SIDE_CONST_ARG
 #undef POPART_CONST_ARG
@@ -319,6 +325,20 @@ public:
 
   void initSession(const std::vector<Optimizer> &opt);
 
+  void startIfBlock();
+
+  void startElseBlock();
+
+  void startSubgraph();
+
+  poptorch::TensorId endIf(const poptorch::TensorId &condition,
+                           std::size_t num_outputs);
+
+  poptorch::TensorId endForLoop(std::int32_t trip_count,
+                                std::int64_t num_outputs,
+                                const std::vector<poptorch::TensorId> &inputs);
+
+  poptorch::TensorId addUntypedInputTensor();
   // Write the weights into IPU memory from the pytorch tensor buffers in the
   // model.
   void copyWeightsToDevice(const std::vector<void *> &host_buffers);

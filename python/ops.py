@@ -9,6 +9,34 @@ def ipu_print_tensor(tensor, title=""):
     return torch.ops.poptorch.ipu_print_tensor(tensor, title)
 
 
+def for_loop(count, body, inputs):
+    """ An on device for loop. This loop will execute on device for |count|
+        number of iterations.
+
+        The body should be a python function containing the PyTorch code you
+        wish to execute in a loop. It should take as input the same number of
+        tensors as it outputs. Each iteration will have the previous output
+        passed in as input.
+
+    :param count: Number of iterations of the loop.
+    :param body: The function to be executed.
+    :param inputs: The initial inputs to the functon.
+    """
+
+    # Start the for loop.
+    torch.ops.poptorch.start_for_loop(inputs)
+    outputs = body(*inputs)
+
+    # Break the alias of the outputs.
+    example_outputs = []
+    for output in outputs:
+        example_outputs.append(torch.zeros(output.size()))
+
+    # End the for loop.
+    return torch.ops.poptorch.end_for_loop([outputs], inputs, count,
+                                           example_outputs)
+
+
 def nop(tensor):
     """ A no-operation: it is functionally the same as an identity but is never
     elimated by PopART patterns or inlining, so it is useful for debugging.

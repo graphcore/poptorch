@@ -5,6 +5,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <stack>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -237,9 +238,18 @@ public:
 
   CompilerImpl() : op_builder(popart::Builder::create()), loss("") {
     ids.emplace_back(""); // None tensor
+    active_builder = op_builder.get();
   }
 
   std::unique_ptr<popart::Builder> op_builder;
+
+  // Op_builder is the top level graph. However to support subgraphs we switch
+  // between adding ops from each of these subgraphs. All subgraphs are children
+  // of the op_builder top level graph.
+  popart::Builder *active_builder;
+
+  std::stack<popart::Builder *> if_true_stack;
+  std::stack<popart::Builder *> if_false_stack;
 
   std::map<popart::TensorId, popart::AnchorReturnType> anchors;
 
@@ -391,6 +401,14 @@ public:
   popart::TensorId reshape(const std::vector<popart::TensorId> &inputs,
                            const std::vector<int64_t> &shape);
 
+  void addOutputTensor(const std::vector<popart::TensorId> &inputs);
+
+  void
+  addInputTensorFromParentGraph(const std::vector<popart::TensorId> &inputs);
+
+  popart::TensorId
+  addUntypedInputTensor(const std::vector<popart::TensorId> &inputs);
+
   std::vector<popart::TensorId>
   customOperation(const std::vector<popart::TensorId> &args,
                   const std::string &op, const std::string &domain,
@@ -407,6 +425,16 @@ public:
                          HostSideConstant constant);
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
+
+  // Convert a poptorch tensor id to a popart tensor.
+  inline popart::TensorId
+  convertPoptorchToPopartTensor(poptorch::TensorId inputs) {
+    return ids.at(inputs);
+  }
+
+  // Convert a list of poptorch tensors to a list of popart tensors.
+  std::vector<popart::TensorId>
+  convertPoptorchToPopartTensors(const std::vector<poptorch::TensorId> &inputs);
 
   popart::TensorId randomNormal(const std::vector<popart::TensorId> &inputs,
                                 const std::vector<int64_t> &shape, float mean,
@@ -492,17 +520,17 @@ void CompilerImpl::setExecutionStrategyAttributes(
   switch (options.execution_mode) {
   case ExecutionMode::Pipelined:
   case ExecutionMode::Sharded:
-    op_builder->pipelineStage(tensors, active_stage);
+    active_builder->pipelineStage(tensors, active_stage);
     break;
   case ExecutionMode::Phased:
     ERROR_ON(active_phase < 0);
-    op_builder->executionPhase(tensors, active_phase);
+    active_builder->executionPhase(tensors, active_phase);
     break;
   default:
     ERROR("Invalid ExecutionMode active");
   }
   used_ipus.insert(active_ipu);
-  op_builder->virtualGraph(tensors, active_ipu);
+  active_builder->virtualGraph(tensors, active_ipu);
 }
 
 bool WeightsIO::contains(popart::TensorId id) const {
@@ -579,6 +607,16 @@ void CompilerImpl::addMemoryToOutput(poptorch::TensorId id, void *ptr,
     // with that id.
     outgoing_duplicates[popart_id].push_back(ptr);
   }
+}
+
+void CompilerImpl::addOutputTensor(
+    const std::vector<popart::TensorId> &inputs) {
+  active_builder->addOutputTensor(inputs.at(0));
+}
+
+void CompilerImpl::addInputTensorFromParentGraph(
+    const std::vector<popart::TensorId> &inputs) {
+  active_builder->addInputTensorFromParentGraph(inputs.at(0));
 }
 
 struct SessionOptionsImpl {
@@ -887,12 +925,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
 popart::TensorId
 CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
                       const std::vector<int64_t> &shape) {
-  auto ai_onnx = op_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset10();
 
   popart::Shape s = {static_cast<int64_t>(shape.size())};
   popart::TensorInfo tensor_info("INT64", s);
   auto new_shape = ai_onnx.constant({shape.data(), tensor_info});
-  return ai_onnx.reshape({inputs[0], new_shape});
+  return ai_onnx.reshape({inputs.at(0), new_shape});
 }
 
 std::vector<popart::TensorId>
@@ -905,7 +943,7 @@ CompilerImpl::customOperation(const std::vector<popart::TensorId> &args,
   const std::int32_t num_inputs = static_cast<std::int32_t>(args.size());
   popart::OperatorIdentifier id = {domain, op, 1, num_inputs};
 
-  return op_builder->customOp(id, version, args, num_outputs, {});
+  return active_builder->customOp(id, version, args, num_outputs, {});
 }
 
 popart::TensorId CompilerImpl::recomputationCheckpoint(
@@ -913,14 +951,14 @@ popart::TensorId CompilerImpl::recomputationCheckpoint(
   // Popart is simply a for loop over vector inputs and it is better for the
   // PyTorch Graph to avoid Tuple/List packs and unpacks
   ERROR_ON(inputs.size() != 1);
-  return op_builder->checkpointOutput(inputs)[0];
+  return active_builder->checkpointOutput(inputs)[0];
 }
 
 popart::TensorId
 CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &inputs,
                              const PopartConstant &constant) {
   UNUSED(inputs);
-  auto ai_onnx = op_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset10();
 
   return ai_onnx.constant(*constant.getPopartData());
 }
@@ -1113,7 +1151,7 @@ template <> struct HandleOutput<popart::TensorId> {
     if (itr != _impl->options.available_memory_proportion.end()) {
       logging::info("Setting memory proportion on tensor {} to {}. On IPU {}",
                     in, itr->second, itr->first);
-      _impl->op_builder->setAvailableMemoryProportion(in, itr->second);
+      _impl->active_builder->setAvailableMemoryProportion(in, itr->second);
     }
 
     _impl->ids.push_back(in);
@@ -1310,9 +1348,9 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
 
 popart::TensorId
 CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
-  auto ai_onnx = op_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset10();
   popart::TensorId output = ai_onnx.add(in);
-  op_builder->setInplacePreferences(
+  active_builder->setInplacePreferences(
       output, {{"AddLhsInplace", -1}, {"AddRhsInplace", -1}});
   return output;
 }
@@ -1322,7 +1360,7 @@ CompilerImpl::randomNormal(const std::vector<popart::TensorId> &inputs,
                            const std::vector<int64_t> &shape, float mean,
                            float scale, const std::string &dtype) {
   UNUSED(inputs);
-  auto ai_onnx = op_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset10();
   auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomnormal(shape, popart::getONNXDataTypeAsInt(pdt), mean,
                               scale);
@@ -1333,7 +1371,7 @@ CompilerImpl::randomUniform(const std::vector<popart::TensorId> &inputs,
                             const std::vector<int64_t> &shape, float high,
                             float low, const std::string &dtype) {
   UNUSED(inputs);
-  auto ai_onnx = op_builder->aiOnnxOpset10();
+  auto ai_onnx = active_builder->aiOnnxOpset10();
   auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomuniform(shape, popart::getONNXDataTypeAsInt(pdt), high,
                                low);
@@ -1431,7 +1469,7 @@ void CompilerImpl::addMultiConvPart(const std::vector<popart::TensorId> &inputs,
 
 std::vector<popart::TensorId> CompilerImpl::endMultiConv() {
   ERROR_ON_MSG(multi_conv_builder == nullptr, "Unexpected end_multi_conv.");
-  auto outs = multi_conv_builder->build(op_builder.get());
+  auto outs = multi_conv_builder->build(active_builder);
   multi_conv_builder.reset();
   return outs;
 }
@@ -1467,7 +1505,7 @@ Compiler::addInputTensor(const char *type,
                          const std::vector<std::int64_t> &dims) {
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{type, dims};
-  _impl->ids.push_back(_impl->op_builder->addInputTensor(info));
+  _impl->ids.push_back(_impl->active_builder->addInputTensor(info));
   return _impl->ids.size() - 1;
 }
 
@@ -1511,8 +1549,8 @@ static bool IsLoss(const std::string &operation) {
 #define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
   poptorch::TensorId Compiler::function(                                       \
       const std::vector<poptorch::TensorId> &inputs Args) {                    \
-    auto AiOnnxOpset10 = _impl->op_builder->aiOnnxOpset10();                   \
-    auto AiGraphcoreOpset1 = _impl->op_builder->aiGraphcoreOpset1();           \
+    auto AiOnnxOpset10 = _impl->active_builder->aiOnnxOpset10();               \
+    auto AiGraphcoreOpset1 = _impl->active_builder->aiGraphcoreOpset1();       \
     const bool isLoss = IsLoss(#ns "::" #funcName);                            \
     std::vector<popart::TensorId> ins;                                         \
     std::transform(                                                            \
@@ -1522,9 +1560,23 @@ static bool IsLoss(const std::string &operation) {
     return HandleOutput<decltype(output)>{}(output, isLoss, _impl.get());      \
   }
 
+// Create a function decl with the given call and arguments.
+#define OP_DECL_NO_RETURN(ns, funcName, function, onnxImpl, Args, BodyArgs)    \
+  void Compiler::function(                                                     \
+      const std::vector<poptorch::TensorId> &inputs Args) {                    \
+    auto AiOnnxOpset10 = _impl->active_builder->aiOnnxOpset10();               \
+    auto AiGraphcoreOpset1 = _impl->active_builder->aiGraphcoreOpset1();       \
+    std::vector<popart::TensorId> ins;                                         \
+    std::transform(                                                            \
+        inputs.begin(), inputs.end(), std::back_inserter(ins),                 \
+        [&](poptorch::TensorId index) { return _impl->ids[index]; });          \
+    onnxImpl(ins BodyArgs);                                                    \
+  }
+
 #include "popart_compiler/SupportedOperations.inc.hpp"
 
 #undef OP_DECL
+#undef OP_DECL_NO_RETURN
 #undef BODY_ARG
 #undef POPART_CONST_ARG
 #undef HOST_SIDE_CONST_ARG
@@ -1550,7 +1602,7 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
   the_data.info = info;
 
   _impl->ids.push_back(
-      _impl->op_builder->addInitializedInputTensor(the_data, name));
+      _impl->active_builder->addInitializedInputTensor(the_data, name));
 
   popart::TensorId id = _impl->ids[_impl->ids.size() - 1];
 
@@ -1797,7 +1849,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
     logging::LogContext ctx{
         "Compiler::initSession popart::InferenceSession::createFromOnnxModel"};
     _impl->session = popart::InferenceSession::createFromOnnxModel(
-        _impl->op_builder->getModelProto(), data_flow, device, {}, options,
+        _impl->active_builder->getModelProto(), data_flow, device, {}, options,
         popart::PatternsLevel::Default);
   } else {
     // Create the optimizer from user provided parameters.
@@ -1805,7 +1857,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         _impl->getOptimizer(optimizers);
 
     // Transform nodes which have training/inference variants. I.E BatchNorm.
-    popart::GraphTransformer transformer{_impl->op_builder->getModelProto()};
+    popart::GraphTransformer transformer{
+        _impl->active_builder->getModelProto()};
     transformer.prepareNodesForTraining();
 
     // Create the training session.
@@ -1967,7 +2020,7 @@ std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
 
   auto popart_id = _impl->ids.at(id);
   try {
-    return _impl->op_builder->getTensorShape(popart_id);
+    return _impl->active_builder->getTensorShape(popart_id);
   } catch (const popart::error &e) {
     return {};
   }
@@ -1982,7 +2035,7 @@ Compiler::getTensorDTypeString(poptorch::TensorId id) const {
   } else {
     auto popart_id = _impl->ids.at(id);
     try {
-      type_str = _impl->op_builder->getTensorDtypeString(popart_id);
+      type_str = _impl->active_builder->getTensorDtypeString(popart_id);
     } catch (const popart::error &e) {
       type_str = "unknown";
     }
@@ -2067,16 +2120,16 @@ void Compiler::setAvailableMemoryProportion(
     const std::vector<poptorch::TensorId> &inputs,
     float availableMemoryProportion) {
   for (const poptorch::TensorId &id : inputs) {
-    _impl->op_builder->setAvailableMemoryProportion(_impl->ids[id],
-                                                    availableMemoryProportion);
+    _impl->active_builder->setAvailableMemoryProportion(
+        _impl->ids[id], availableMemoryProportion);
   }
 }
 
 void Compiler::setMatMulSerialization(poptorch::TensorId matmul,
                                       const char *mode, std::uint64_t factor,
                                       std::uint64_t keep_precision) {
-  _impl->op_builder->setSerializeMatMul({_impl->ids[matmul]}, mode, factor,
-                                        keep_precision);
+  _impl->active_builder->setSerializeMatMul({_impl->ids[matmul]}, mode, factor,
+                                            keep_precision);
 }
 
 void Compiler::optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
@@ -2102,6 +2155,100 @@ void Compiler::addOutputType(OutputType type) {
 
 const std::vector<OutputType> &Compiler::outputTypes() const {
   return _impl->output_types;
+}
+
+void Compiler::startSubgraph() {
+  popart::Builder *subgraph = &_impl->active_builder->createSubgraphBuilder();
+  _impl->active_builder = subgraph;
+
+  _impl->active_builder->addInputTensor(
+      popart::TensorInfo{"INT64", popart::Shape{}});
+  popart::TensorId keep_going = _impl->active_builder->addInputTensor(
+      popart::TensorInfo{"BOOL", popart::Shape{}});
+
+  _impl->active_builder->addOutputTensor({keep_going});
+}
+
+void Compiler::startIfBlock() {
+  popart::Builder *subgraph = &_impl->active_builder->createSubgraphBuilder();
+  _impl->active_builder = subgraph;
+  _impl->if_true_stack.push(_impl->active_builder);
+}
+
+void Compiler::startElseBlock() {
+  // Else must by definition be added after a if block.
+  _impl->active_builder = _impl->active_builder->getParent();
+  popart::Builder *subgraph = &_impl->active_builder->createSubgraphBuilder();
+  _impl->active_builder = subgraph;
+  _impl->if_false_stack.push(_impl->active_builder);
+}
+
+poptorch::TensorId
+Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
+                     const std::vector<poptorch::TensorId> &inputs) {
+  popart::Builder *body = _impl->active_builder;
+
+  // Switch back to main graph.
+  _impl->active_builder = _impl->active_builder->getParent();
+  auto ai_onnx = _impl->active_builder->aiOnnxOpset10();
+
+  PopartConstant popart_const(PopartType::INT32, &trip_count, {});
+  popart::TensorId trip_count_as_tensor =
+      _impl->tensorConstant({}, popart_const);
+
+  popart::ConstVoidData the_data;
+
+  const bool true_const = true;
+  the_data.data = &true_const;
+  the_data.info = {"BOOL", popart::Shape{}};
+
+  popart::TensorId condition = ai_onnx.constant(the_data);
+
+  std::vector<popart::TensorId> transformed_ins = {trip_count_as_tensor,
+                                                   condition};
+
+  for (poptorch::TensorId id : inputs) {
+    transformed_ins.push_back(_impl->ids[id]);
+  }
+
+  std::vector<popart::TensorId> output =
+      ai_onnx.loop(transformed_ins, num_outputs, *body);
+
+  for (const popart::TensorId &id : output) {
+    logging::warn("Output {}", id);
+  }
+
+  return HandleOutput<std::vector<popart::TensorId>>{}(output, false,
+                                                       _impl.get());
+}
+
+poptorch::TensorId Compiler::endIf(const poptorch::TensorId &condition,
+                                   std::size_t num_outputs) {
+  // Pop back to the parent.
+  _impl->active_builder = _impl->active_builder->getParent();
+
+  // Pop the true branch off the stack.
+  popart::Builder *true_branch = _impl->if_true_stack.top();
+  _impl->if_true_stack.pop();
+
+  // Pop the false branch off the stack.
+  popart::Builder *false_branch = _impl->if_false_stack.top();
+  _impl->if_false_stack.pop();
+
+  popart::TensorId cond_as_popart =
+      _impl->convertPoptorchToPopartTensor(condition);
+
+  auto ai_onnx = _impl->active_builder->aiOnnxOpset10();
+  std::vector<popart::TensorId> output = ai_onnx.logical_if(
+      {cond_as_popart}, num_outputs, *false_branch, *true_branch);
+  return HandleOutput<std::vector<popart::TensorId>>{}(output, false,
+                                                       _impl.get());
+}
+
+poptorch::TensorId Compiler::addUntypedInputTensor() {
+  popart::TensorId out = _impl->active_builder->addUntypedInputTensor();
+  _impl->ids.push_back(out);
+  return _impl->ids.size() - 1;
 }
 
 void Compiler::assertTensorIs(PopartType dataType, poptorch::TensorId id,

@@ -427,6 +427,68 @@ void LowerToPopart::lowerBody() {
       }
     } else if (kind == symbols::poptorch::end_ipu_block) {
       _compiler.clearActiveIpu();
+    } else if (kind == symbols::poptorch::start_if_true) {
+      // Starting the if block means changing the internal builder state to work
+      // with a new subgraph.
+      _compiler.startIfBlock();
+    } else if (kind == symbols::poptorch::start_if_false) {
+      // Starting the else block means changing the internal builder state to
+      // work with a new subgraph.
+      _compiler.startElseBlock();
+    } else if (kind == symbols::poptorch::end_if) {
+      // Process the if condition.
+      poptorch::TensorId condition = _valueMap.tensor(node->input(0));
+
+      // Popart needs to know the number of outputs even though it's in the
+      // graph.
+      const std::size_t num_outputs =
+          node->i(c10::Symbol::fromQualString("attr::num_outputs"));
+
+      // Call the callback. This will pop the subgraphs from the stack.
+      poptorch::TensorId first_output_tensor =
+          _compiler.endIf(condition, num_outputs);
+
+      // The callback only returns the ID of the first tensor, but we know
+      // the generated tensors have contiguous IDs, so we can infer the other
+      // IDs.
+      std::vector<poptorch::TensorId> outs{num_outputs};
+      for (std::uint64_t i = 0; i < num_outputs; ++i) {
+        outs[i] = first_output_tensor + i;
+      }
+
+      _valueMap.setTuple(node->output(), outs);
+
+    } else if (kind == symbols::poptorch::start_for_loop) {
+      _compiler.startSubgraph();
+    } else if (kind == symbols::poptorch::end_for_loop) {
+      // Process the if condition.
+      std::vector<poptorch::TensorId> inputs =
+          _valueMap.tensors(node->input(0));
+
+      // Popart needs to know the number of outputs even though it's in the
+      // graph.
+      const std::size_t num_outputs =
+          node->i(c10::Symbol::fromQualString("attr::num_outputs"));
+
+      const std::int32_t trip_count = static_cast<std::int32_t>(
+          node->i(c10::Symbol::fromQualString("attr::trip_count")));
+
+      // Call the callback. This will pop the subgraphs from the stack.
+      poptorch::TensorId first_output_tensor =
+          _compiler.endForLoop(trip_count, num_outputs, inputs);
+
+      // The callback only returns the ID of the first tensor, but we know
+      // the generated tensors have contiguous IDs, so we can infer the other
+      // IDs.
+      std::vector<poptorch::TensorId> outs{num_outputs};
+      for (std::uint64_t i = 0; i < num_outputs; ++i) {
+        outs[i] = first_output_tensor + i;
+      }
+
+      _valueMap.setTuple(node->output(), outs);
+    } else if (kind == symbols::poptorch::add_untyped_input_tensor) {
+      poptorch::TensorId out = _compiler.addUntypedInputTensor();
+      _valueMap.setTensor(node->output(), out);
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       _compiler.setActiveIpu(
           node->i(c10::Symbol::fromQualString("attr::stage")),
@@ -823,6 +885,16 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
      return _compiler.function(inputs Args);                                   \
    }},
 
+#define OP_DECL_NO_RETURN(ns, symbolName, function, unused, Args, unused2)     \
+  {symbols::ns::symbolName, [&](const std::vector<poptorch::TensorId> &inputs, \
+                                torch::jit::Node *node) {                      \
+     _compiler.function(inputs Args);                                          \
+     ERROR_ON_MSG(node->outputs().size() != 0,                                 \
+                  "Void return function called on torch::jit::Node which has " \
+                  "outputs");                                                  \
+     return poptorch::TensorId{};                                              \
+   }},
+
 #include "popart_compiler/SupportedOperations.inc.hpp"
 
 #undef BODY_STR_ARG
@@ -831,6 +903,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 #undef HOST_SIDE_CONST_ARG
 #undef POPART_CONST_ARG
 #undef OP_DECL
+#undef OP_DECL_NO_RETURN
 #undef ARG
 #undef NONE
 #undef BOOL

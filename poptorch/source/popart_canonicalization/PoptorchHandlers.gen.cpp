@@ -24,6 +24,16 @@ torch::jit::Node *beginipublockHandler(torch::jit::Graph *graph,
   return createBeginIpuBlock(graph, t0, t1, t2);
 }
 
+torch::jit::Node *endforloopHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  auto output = node->input(0);
+  auto inputs = node->input(1);
+  auto trip_count = node->input(2);
+  auto t0 = constantToLong(trip_count->node());
+  // endForLoop(output, inputs, clong(trip_count))
+  return createEndForLoop(graph, output, inputs, t0);
+}
+
 torch::jit::Node *identitylossHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   auto x = node->input(0);
@@ -85,6 +95,7 @@ torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::begin_ipu_block, beginipublockHandler);
+  registerHandler(symbols::poptorch::end_for_loop, endforloopHandler);
   registerHandler(symbols::poptorch::identity_loss, identitylossHandler);
   registerHandler(symbols::poptorch::ipu_print_tensor, ipuprinttensorHandler);
   registerHandler(symbols::poptorch::optimizer_group, optimizergroupHandler);

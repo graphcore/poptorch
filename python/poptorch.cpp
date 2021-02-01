@@ -41,6 +41,13 @@ void beginIpuBlock(int64_t stage_id, int64_t phase_id, int64_t ipu_id) {
 
 void endIpuBlock() {}
 
+void whileLoopBegin(const at::Tensor &condition,           // NOLINT
+                    const c10::List<at::Tensor> &inputs) { // NOLINT
+  UNUSED(condition);
+  UNUSED(inputs);
+}
+void whileLoopEnd() {}
+
 at::Tensor setAvailableMemory(at::Tensor t, double mem) {
   UNUSED(mem);
   return t;
@@ -80,6 +87,36 @@ customOperation(c10::List<at::Tensor> inputs,            // NOLINT
   return example_outputs;
 }
 
+void ifElse() {}
+
+// We track the outputs of the if in this brach as it is easier to add them
+// immediately before.
+void elseBranch(c10::List<at::Tensor> if_out) { // NOLINT
+  UNUSED(if_out);
+}
+
+c10::List<at::Tensor> endIf(at::Tensor condition,               // NOLINT
+                            c10::List<at::Tensor> example_outs, // NOLINT
+                            c10::List<at::Tensor> else_out) {   // NOLINT
+  UNUSED(condition);
+  UNUSED(else_out);
+  return example_outs;
+}
+
+void startForLoop(c10::List<at::Tensor> inputs) { // NOLINT
+  UNUSED(inputs);
+}
+
+c10::List<at::Tensor>
+endForLoop(c10::List<at::Tensor> outputs,               // NOLINT
+           c10::List<at::Tensor> inputs, int64_t count, // NOLINT
+           c10::List<at::Tensor> example_outputs) {     // NOLINT
+  UNUSED(count);
+  UNUSED(outputs);
+  UNUSED(inputs);
+  return example_outputs;
+}
+
 void optimizerGroup(int64_t group, c10::List<at::Tensor> &&inputs) {
   UNUSED(group);
   UNUSED(inputs);
@@ -107,6 +144,13 @@ static auto registry =
         .op("popart::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss)
+        .op("poptorch::while_loop_begin", &whileLoopBegin)
+        .op("poptorch::end_loop_begin", &whileLoopEnd)
+        .op("poptorch::start_if_true", &ifElse)
+        .op("poptorch::start_if_false", &elseBranch)
+        .op("poptorch::end_if", &endIf)
+        .op("poptorch::start_for_loop", &startForLoop)
+        .op("poptorch::end_for_loop", &endForLoop)
         .op("poptorch::optimizer_group", &optimizerGroup)
         .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
         .op("poptorch::recomputation_checkpoint", &identityOp)
@@ -617,6 +661,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
 
     printGraphBeforeHalfFloatResolution(*graph);
 
+    poptorch::annotateSubgraphs(graph.get());
     // Resolve
     poptorch::resolveHalfOrFloat(graph.get());
 

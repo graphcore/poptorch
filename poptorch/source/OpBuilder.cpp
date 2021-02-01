@@ -345,6 +345,52 @@ createCustomOperation(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *
+createAddInputTensorFromParentGraph(torch::jit::Graph *graph,
+                                    torch::jit::Value *input) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::addInputTensorFromParentGraph, {input},
+      ImplicitCast::None, OutputType::Unknown, 0);
+  return new_node;
+}
+
+torch::jit::Node *createAddUntypedInputTensor(torch::jit::Graph *graph,
+                                              torch::jit::Value *input) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::add_untyped_input_tensor, {input});
+  return new_node;
+}
+
+torch::jit::Node *createAddOutputTensor(torch::jit::Graph *graph,
+                                        torch::jit::Value *output) {
+  // We explicitly don't want to add this one as we want to add it based on the
+  // position of the other node.
+  torch::jit::Node *new_node =
+      graph->create(symbols::poptorch::addOutputTensor, {output}, 0);
+  return new_node;
+}
+
+torch::jit::Node *createEndIf(torch::jit::Graph *graph,
+                              torch::jit::Value *condition,
+                              torch::jit::Value *if_false_out) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::end_if, {condition, if_false_out});
+  return new_node;
+}
+
+torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
+                                   torch::jit::Value *outputs,
+                                   torch::jit::Value *inputs,
+                                   std::int64_t trip_count) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::end_for_loop, {outputs, inputs});
+  new_node->i_(c10::Symbol::fromQualString("attr::trip_count"), trip_count);
+
+  const std::size_t num_outputs = outputs->node()->inputs().size();
+  new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"), num_outputs);
+  return new_node;
+}
+
+torch::jit::Node *
 createRandomNormal(torch::jit::Graph *graph,
                    const std::vector<torch::jit::Value *> &possible_inputs,
                    const std::vector<int64_t> &shape, float mean, float scale,

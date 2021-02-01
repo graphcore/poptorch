@@ -138,5 +138,11 @@ class OperatorFactory:
         check_operator_signature(value, poptorch.signatures)
         return value
 
+    def endForLoop(self, output, inputs, trip_count):
+        value = no_tensor_braces(
+            Value('endForLoop', [output, inputs, trip_count]))
+        check_operator_signature(value, poptorch.signatures)
+        return value
+
 
 op = OperatorFactory()
