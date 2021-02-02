@@ -562,3 +562,37 @@ def test_access_scalar_parameter(use_half):
     poptorch_model.copyWeightsToHost()
     # Bias should already be up to date
     assert updated_bias == str(poptorch_model.model.model.bias)
+
+
+@pytest.mark.parametrize("reverse_equal_call", [True, False])
+def test_copy_on_torch_equal(reverse_equal_call):
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer = torch.nn.Linear(10, 10)
+
+        def forward(self, x):
+            out = self.layer(x)
+            return out
+
+    model = Model()
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss(),
+                                                   optimizer=torch.optim.SGD(
+                                                       model.parameters(),
+                                                       lr=0.01))
+
+    target = torch.ones(10)
+    input = torch.randn(10)
+
+    weight_at_start = model.layer.weight.clone().data
+
+    for _ in range(100):
+        _, _ = poptorch_model(input, target)
+
+    if reverse_equal_call:
+        assert not torch.equal(model.layer.weight, weight_at_start)
+    else:
+        assert not torch.equal(weight_at_start, model.layer.weight)

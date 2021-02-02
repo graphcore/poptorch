@@ -391,17 +391,31 @@ class PoplarExecutor:
                         self.copyWeightsToHostIfNeeded()
                     return attribute
 
+            # The mere existence of the "__torch_function__" results in a
+            # "__getattribute__" call and hence weight copying if required.
+            # "check_has_torch_function" and "handle_torch_function_getter"
+            # in the Pytorch source code may explain this.
+            # Without this, the weights will not be copied in certain
+            # situations such as torch.equal(a, b).
             class PoptorchParameter(torch.nn.Parameter):
                 def __getattribute__(self, name):
                     parent._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
 
                     return object.__getattribute__(self, name)
 
+                def __torch_function__(self, func, types, args=(),
+                                       kwargs=None):
+                    if kwargs is None:
+                        kwargs = {}
+                    return super().__torch_function__(func, types, args,
+                                                      kwargs)
+
             for p in self._user_model.parameters():
                 p.__class__ = PoptorchParameter
 
-            # __getattr__ and __getattribute__ are attributes, not methods, unfortunately we cannot just
-            # replace them in the model object: we have to create a wrapper class
+            # __getattr__ and __getattribute__ are attributes, not methods,
+            # unfortunately we cannot just replace them in the model object: we
+            # have to create a wrapper class
             # and change the object's class.
             PoptorchModel.__name__ = "Poptorch%s" % type(
                 self._user_model).__name__
