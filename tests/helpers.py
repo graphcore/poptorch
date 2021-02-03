@@ -1,4 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import copy
 import torch
 import poptorch
 import poptorch.poptorch_core as poptorch_core
@@ -37,9 +38,17 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
             loss = self._loss(output, loss_inputs)
             return output, loss
 
+    training_model = copy.copy(model)
+
+    maybe_wrapped_model = training_model
+
+    if optimizer and optimizer.param_groups:
+        maybe_wrapped_model = poptorch._impl.OptimizerWrapper(  # pylint: disable=protected-access
+            training_model, optimizer)
+
     # Store the real __call__ method before PoplarExecutor wraps it
     return poptorch._impl.PoplarExecutor(  # pylint: disable=protected-access
-        model=TrainingModelWithLoss(model, loss),
+        model=TrainingModelWithLoss(maybe_wrapped_model, loss),
         options=options,
         training=True,
         optimizer=optimizer,

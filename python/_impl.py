@@ -2,6 +2,7 @@
 
 import enum
 import io
+import numbers
 import os
 import sys
 import time
@@ -18,7 +19,7 @@ from ._logging import logger
 from .options import Options
 
 
-def apply_optimizer(optimizer):
+def applyOptimizer(optimizer):
     num_groups = len(optimizer.param_groups)
     for index in range(0, num_groups):
         torch.ops.poptorch.optimizer_group(
@@ -39,7 +40,7 @@ class OptimizerWrapper(torch.nn.Module):
 
     def forward(self, *args, **kwargs):
         out = self.model(*args, **kwargs)
-        apply_optimizer(self.optimizer)
+        applyOptimizer(self.optimizer)
         return out
 
 
@@ -54,8 +55,25 @@ class _OptimizerType(enum.IntEnum):
     LAMB_NO_BIAS = 7
 
 
+def _toPoptorchClass(optimizer_type):
+    assert isinstance(optimizer_type, _OptimizerType)
+    if optimizer_type in [_OptimizerType.ADAMW, _OptimizerType.ADAMW_NO_BIAS]:
+        return optim.AdamW
+    if optimizer_type in [
+            _OptimizerType.RMSPROP, _OptimizerType.RMSPROP_CENTERED
+    ]:
+        return optim.RMSprop
+    if optimizer_type in [_OptimizerType.LAMB, _OptimizerType.LAMB_NO_BIAS]:
+        return optim.LAMB
+    if optimizer_type == _OptimizerType.SGD:
+        return optim.SGD
+    assert optimizer_type == _OptimizerType.ADAM, (
+        "Unknown optimizer_type %s" % optimizer_type)
+    return optim.Adam
+
+
 # pylint: disable=too-many-return-statements
-def _to_poptorch_optimizer(optimizer):
+def _toPoptorchOptimizer(optimizer):
     if isinstance(optimizer, torch.optim.SGD):
         return _OptimizerType.SGD
 
@@ -64,107 +82,309 @@ def _to_poptorch_optimizer(optimizer):
 
     if isinstance(optimizer, torch.optim.AdamW):
         if isinstance(optimizer, optim.AdamW):
-            bias_correction = optimizer.param_groups[0]["biasCorrection"]
+            bias_correction = getattr(optimizer, "bias_correction", True)
             if not bias_correction:
                 return _OptimizerType.ADAMW_NO_BIAS
         return _OptimizerType.ADAMW
 
     if isinstance(optimizer, torch.optim.RMSprop):
         centered = optimizer.param_groups[0]["centered"]
+        for i, group in enumerate(optimizer.param_groups):
+            assert group["centered"] == centered, (
+                "All parameter groups must "
+                "have the same value for the 'centered' attribute (Group 0: "
+                f"{centered} / Group {i}: {group['centered']})")
 
         if centered:
             return _OptimizerType.RMSPROP_CENTERED
         return _OptimizerType.RMSPROP
 
     if isinstance(optimizer, optim.LAMB):
-        bias_correction = optimizer.param_groups[0]["biasCorrection"]
-
-        return _OptimizerType.LAMB if bias_correction \
-            else _OptimizerType.LAMB_NO_BIAS
+        bias_correction = getattr(optimizer, "bias_correction", True)
+        if bias_correction:
+            return _OptimizerType.LAMB
+        return _OptimizerType.LAMB_NO_BIAS
     return None
 
 
+def _toCamelCase(string):
+    """Convert a snake case string (Pytorch) to camel case (Popart)"""
+    words = string.split("_")
+    return words[0] + "".join(w.capitalize() for w in words[1:])
+
+
+class _GroupGetter:
+    """Functor to access a parameter group attribute"""
+
+    def __init__(self, default_value=None):
+        self.default_value = default_value
+
+    def __call__(self, group, name):
+        assert isinstance(group, dict), (f"{name} must be stored in "
+                                         "param_groups")
+        value = group.get(name, self.default_value)
+        assert value is not None, (f"Mandatory attribute {name} not found "
+                                   "in optimizer group")
+        return value
+
+
+class _OptimizerGetter:
+    """Functor to access an Optimizer attribute"""
+
+    def __init__(self, default_value=None):
+        self.default_value = default_value
+
+    def __call__(self, opt, name):
+        assert isinstance(opt, torch.optim.Optimizer), (
+            f"{name} must be stored "
+            "as an Optimizer attribute (Not in a group)")
+        value = getattr(opt, name, self.default_value)
+        assert value is not None, (f"Mandatory attribute {name} not found "
+                                   "in optimizer attributes")
+        return value
+
+
+def _assertIsNumber(value, name):
+    assert isinstance(value, numbers.Number), (f"Expected a number for {name}"
+                                               f" but got {value} instead")
+
+
+class _ValueConstPairFormatter:
+    """Functor to format a value into a pair (value, is_const) where
+    "is_const" is a boolean
+
+    If variable_attrs is provided it will be used to determine the
+    attribute's constness.
+
+    Otherwise the const_evaluator function will be called.
+    """
+
+    def __init__(self, variable_attrs, const_evaluator, value_validator=None):
+        assert variable_attrs is None or isinstance(variable_attrs,
+                                                    optim.VariableAttributes)
+        if value_validator is None:
+            value_validator = _assertIsNumber
+        self.value_validator = value_validator
+        self.variable_attrs = variable_attrs
+        self.const_evaluator = const_evaluator
+
+    def __call__(self, value, name):
+        self.value_validator(value, name)
+        if self.variable_attrs:
+            is_const = self.variable_attrs.isConstant(name)
+        else:
+            is_const = self.const_evaluator(value)
+        return (value, is_const)
+
+
+class _IsEqualTo:
+    """Functor which returns True if the passed value is equal to the reference"""
+
+    def __init__(self, reference):
+        self.reference = reference
+
+    def __call__(self, value):
+        return value == self.reference
+
+
+class _AttrReader:
+    def __init__(self, readers, name, getter, formatter=None, new_name=None):
+        if new_name is None:
+            new_name = _toCamelCase(name)
+        if formatter is None:
+            formatter = lambda x: x
+
+        self.name = name
+        self.getter = getter
+        self.new_name = new_name
+        self.formatter = formatter
+
+        # Register itself
+        readers[name] = self
+
+    def __call__(self, params):
+        """Get the 'name' attribute value from 'params' (An optimizer or param_group)
+        - if 'name' is not part of 'params' then 'default_value' will be used.
+        - If no 'variable_attrs' list and no const val are provided then only
+          {name: value} will be returned.
+        - if a 'variable_attrs' obj is provided then the param's constness will
+          depend on whether or not it's marked as const.
+        - if no list is provided but the param's value is equal to
+          'is_const_val' then the param wil be considered constant
+        """
+        value = self.getter(params, self.name)
+        return {self.new_name: self.formatter(value, self.name)}
+
+
+class _BetaReader(_AttrReader):
+    def __init__(self, attr_readers, variable_attrs):
+        def isAlwaysConst(_value):
+            return True
+
+        def assertIsFloatPair(value, name):
+            assert isinstance(value, tuple) and len(value) == 2, (
+                f"Expected a pair for {name}"
+                f" but got {value} instead")
+            _assertIsNumber(value[0], name + "[0]")
+            _assertIsNumber(value[1], name + "[1]")
+
+        super().__init__(
+            attr_readers, "betas", _GroupGetter(),
+            _ValueConstPairFormatter(variable_attrs, isAlwaysConst,
+                                     assertIsFloatPair))
+
+    def __call__(self, params):
+        betas = super().__call__(params)["betas"]
+        assert betas and isinstance(betas, tuple) and len(betas) == 2
+        assert isinstance(betas[0], tuple) and len(
+            betas[0]) == 2, ("'betas' group attribute must be a pair")
+        return {
+            "beta1": (betas[0][0], betas[1]),
+            "beta2": (betas[0][1], betas[1])
+        }
+
+
 def _convertOptimizerToDict(optimizer):
-    optimizer_type = _to_poptorch_optimizer(optimizer)
+    optimizer_type = _toPoptorchOptimizer(optimizer)
 
     assert optimizer_type is not None, """Unsupported optimizer type.
          Types supported %s""" % str(list(_OptimizerType))
+    opt_class = _toPoptorchClass(optimizer_type)
 
     num_groups = len(optimizer.param_groups)
+    variable_attrs = getattr(optimizer, "variable_attrs", None)
 
-    accumType = getattr(optimizer, "accumType", False)
-    firstOrderTy = getattr(optimizer, "firstOrderMomentumAccumType", False)
-    secondOrderTy = getattr(optimizer, "secondOrderMomentumAccumType", False)
+    def assertNesterovDisabled(params):
+        if params["nesterov"]:
+            raise ValueError("Nesterov momentum is currently not supported.")
+        return {}
 
-    the_dict = {
-        "optimizer_type": optimizer_type,
-        "num_groups": num_groups,
-        "accumType": accumType,
-        "firstOrderMomentumAccumType": firstOrderTy,
-        "secondOrderMomentumAccumType": secondOrderTy
+    def assertAmsgradDisabled(params):
+        if params["amsgrad"]:
+            raise ValueError("Only non-amsgrad "
+                             "Adam/AdamW optimizers are supported.")
+        return {}
+
+    def isFloat16(type, name):
+        assert type in [
+            torch.float16, torch.float32
+        ], (f"{name} must be set "
+            "to either torch.float16 or torch.float32 not {type}")
+        return type == torch.float16
+
+    def ignore(_params):
+        return {}
+
+    def isAlwaysConst(_value):
+        return True
+
+    def isNeverConst(_value):
+        return False
+
+    # Separate attributes which can be set per group (And therefore are stored
+    # in `defaults` and `param_groups`) and the ones which are global and just
+    # stored as attributes of the optimizer.
+
+    # Register all the attribute readers
+    attr_readers = {
+        "nesterov": assertNesterovDisabled,
+        "amsgrad": assertAmsgradDisabled,
+        "bias_correction": ignore,
+        "centered": ignore
     }
+    # Optimizer attributes: global, cannot change over time.
+    #     source: opt.name
+    #     format: {name: value}
+    _AttrReader(attr_readers, "accum_type", _OptimizerGetter(torch.float32),
+                isFloat16)
+    _AttrReader(attr_readers, "first_order_momentum_accum_type",
+                _OptimizerGetter(torch.float32), isFloat16)
+    _AttrReader(attr_readers, "second_order_momentum_accum_type",
+                _OptimizerGetter(torch.float32), isFloat16)
+    # Optimizer variables: global, can change over time.
+    #     source: opt.name
+    #     format: {name: (value, is_const)}
+    _AttrReader(attr_readers, "loss_scaling", _OptimizerGetter(1.0),
+                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(1.0)))
+    _AttrReader(attr_readers, "max_weight_norm", _OptimizerGetter(),
+                _ValueConstPairFormatter(variable_attrs, isAlwaysConst))
+    # Group variables: per group, can change over time.
+    #     source: opt.param_groups[i][name] / opt.defaults[name]
+    #     format: {name: (value, is_const)}
+    _AttrReader(attr_readers,
+                "lr",
+                _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, isNeverConst),
+                new_name="learningRate")
+    _AttrReader(attr_readers, "weight_decay", _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(0.0)))
+    _AttrReader(attr_readers, "momentum", _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(0.0)))
+    _AttrReader(attr_readers, "velocity_scaling", _GroupGetter(1.0),
+                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(1.0)))
+    _AttrReader(attr_readers, "dampening", _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(0.0)))
+    _AttrReader(attr_readers, "eps", _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(1e-08)))
+    _AttrReader(attr_readers, "alpha", _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, isAlwaysConst))
+    _BetaReader(attr_readers, variable_attrs)
 
+    # Split the optimizer's attributes in one of the three categories:
+    # - Group variables
+    # - Optimizer variables
+    # - Optimizer attributes
+    #
+    # The optimizer dictionary we send to the backend is structured like:
+    # {
+    #   "optimizer_type": type,
+    #   "opt_attrs_0": value,
+    #   ...
+    #   "defaults": {
+    #       "group_vars_0": (value, is_const),
+    #       ...
+    #       "opt_vars_0": (value, is_const),
+    #       ...
+    #   },
+    #   "groups": [
+    #       {
+    #           "group_vars_0": (value, is_const),
+    #           ...
+    #       },
+    #       ...
+    #   ]
+    # }
+    group_vars = opt_class._group_vars  # pylint: disable=protected-access
+    opt_attrs = [
+        attr for attr in opt_class._child_only if attr not in group_vars  # pylint: disable=protected-access
+        and attr not in opt_class._child_vars  # pylint: disable=protected-access
+    ]
+    opt_vars = [
+        attr for attr in opt_class._child_only  # pylint: disable=protected-access
+        if attr in opt_class._child_vars  # pylint: disable=protected-access
+    ]
+
+    opts = {"optimizer_type": optimizer_type}
+    for attr in opt_attrs:
+        opts.update(attr_readers[attr](optimizer))
+    defaults = {}
+    for attr in group_vars:
+        defaults.update(attr_readers[attr](optimizer.defaults))
+    for attr in opt_vars:
+        defaults.update(attr_readers[attr](optimizer))
+    opts["defaults"] = defaults
+
+    # Create num_groups dictionaries
+    opts["groups"] = []
     for index in range(0, num_groups):
-        learning_rate = optimizer.param_groups[index]["lr"]
-        weight_decay = optimizer.param_groups[index]["weight_decay"]
-        loss_scaling = getattr(optimizer, "loss_scaling", 1.0)
+        group = {}
+        params = optimizer.param_groups[index]
+        for attr in group_vars:
+            group.update(attr_readers[attr](params))
+        opts["groups"].append(group)
 
-        if isinstance(optimizer, torch.optim.SGD):
-            if optimizer.param_groups[index]["nesterov"]:
-                raise ValueError(
-                    "Nesterov momentum is currently not supported.")
-
-            velocity_scaling = getattr(optimizer, "velocity_scaling", 1.0)
-            momentum = optimizer.param_groups[0]["momentum"]
-            dampening = optimizer.param_groups[0]["dampening"]
-            # We will default momentum, weight decay, and dampening, to be
-            # constant if they are set to zero.
-            the_dict[index] = {
-                "lr": (learning_rate, False),
-                "momentum": (momentum, momentum == 0.0),
-                "weight_decay": (weight_decay, weight_decay == 0.0),
-                "dampening": (dampening, dampening == 0.0),
-                "loss_scaling": (loss_scaling, loss_scaling == 1.0),
-                "velocity_scaling":
-                (velocity_scaling, velocity_scaling == 1.0),
-            }
-        if isinstance(optimizer,
-                      (torch.optim.Adam, torch.optim.AdamW, optim.LAMB)):
-            beta1 = optimizer.param_groups[index]["betas"][0]
-            beta2 = optimizer.param_groups[index]["betas"][1]
-            eps = optimizer.param_groups[index]["eps"]
-
-            if isinstance(optimizer, (torch.optim.Adam, torch.optim.AdamW)):
-                assert not optimizer.param_groups[index]["amsgrad"], (
-                    "Only non-amsgrad "
-                    "Adam/AdamW optimizers are supported.")
-            the_dict[index] = {
-                "lr": (learning_rate, False),
-                "beta1": (beta1, False),
-                "beta2": (beta2, False),
-                "weight_decay": (weight_decay, weight_decay == 0.01),
-                "eps": (eps, eps == 1e-08),
-                "loss_scaling": (loss_scaling, loss_scaling == 1.0)
-            }
-            if isinstance(optimizer, optim.LAMB):
-                max_weight_norm = optimizer.param_groups[index][
-                    "max_weight_norm"]
-                the_dict[index]["max_weight_norm"] = (max_weight_norm, False)
-
-        if isinstance(optimizer, torch.optim.RMSprop):
-            momentum = optimizer.param_groups[index]["momentum"]
-            alpha = optimizer.param_groups[index]["alpha"]
-            eps = optimizer.param_groups[index]["eps"]
-            the_dict[index] = {
-                "lr": (learning_rate, False),
-                "momentum": (momentum, momentum == 0.0),
-                "alpha": (alpha, False),
-                "eps": (eps, eps == 1e-08),
-                "weight_decay": (weight_decay, weight_decay == 0.01),
-                "loss_scaling": (loss_scaling, loss_scaling == 1.0)
-            }
-
-    return the_dict
+    logger.debug("Python optimizer %s", opts)
+    return opts
 
 
 class ArgsParser:

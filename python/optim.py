@@ -2,7 +2,54 @@
 import math
 import inspect
 import torch
-from torch.optim.optimizer import required
+
+
+class VariableAttributes:
+    """Track which attributes are variable or constant.
+    """
+
+    def __init__(self, variable_attributes, allowed_attributes):
+        """
+        :param variable_attributes: list of variable attributes.
+        :param allowed_attributes: list of all the attributes.
+        """
+        self._variable_attributes = variable_attributes
+        self._allowed_attributes = allowed_attributes
+
+    def isConstant(self, attr):
+        return attr not in self._variable_attributes
+
+    def markAsConstant(self, attr):
+        "Explicitly mark an attribute as constant" ""
+        assert attr in self._allowed_attributes, (
+            f"Unknown attribute {attr},"
+            f" allowed values: {self._allowed_attributes}")
+        self._variable_attributes = [
+            a for a in self._variable_attributes if a != attr
+        ]
+
+    def markAsVariable(self, attr):
+        "Explicitly mark an attribute as variable" ""
+        assert attr in self._allowed_attributes, (
+            f"Unknown attribute {attr},"
+            f" allowed values: {self._allowed_attributes}")
+        self._variable_attributes.append(attr)
+
+
+def _parseArgs(all_args, child_attrs=None):
+    child_attrs = child_attrs or []
+    args = all_args.copy()
+    # Remove special local() variables
+    del args["self"]
+    del args["__class__"]
+    # Attributes explicitly set by the user are considered variable
+    not_const = [k for k, v in args.items() if v is not None]
+    # Filter out the child class attributes
+    parent_args = {
+        k: v
+        for k, v in args.items() if k in not_const and k not in child_attrs
+    }
+    return parent_args, not_const
 
 
 class SGD(torch.optim.SGD):
@@ -13,16 +60,26 @@ class SGD(torch.optim.SGD):
 
     Nesterov momentum is not currently supported.
     """
+    # Variables which don't exist in the parent optimizer class and are
+    # global (Cannot be set per group).
+    _child_vars = ["loss_scaling"]
+    # All the attributes and variables which don't exist in the parent optimizer class.
+    _child_only = _child_vars + ["velocity_scaling"]
+    # Attributes (from the parent or child class) which can be set per group.
+    _group_vars = [
+        "lr", "momentum", "dampening", "weight_decay", "nesterov",
+        "velocity_scaling", "velocity_scaling", "nesterov"
+    ]
 
     def __init__(self,
                  params,
-                 lr=required,
-                 momentum=0,
-                 dampening=0,
-                 weight_decay=0,
-                 nesterov=False,
-                 loss_scaling=1.0,
-                 velocity_scaling=1.0):
+                 lr=None,
+                 momentum=None,
+                 dampening=None,
+                 weight_decay=None,
+                 nesterov=None,
+                 loss_scaling=None,
+                 velocity_scaling=None):
         """
         :param iterable params: parameters to optimize.
         :param float lr: learning rate.
@@ -41,14 +98,34 @@ class SGD(torch.optim.SGD):
             to assist numerical stability when using float16.
         :type velocity_scaling: float, optional
         """
-        super().__init__(params, lr, momentum, dampening, weight_decay,
-                         nesterov)
+        # Call to locals() must be at the very top of  __init__
+        parent_args, variables = _parseArgs(locals(), SGD._child_only)
+        super().__init__(**parent_args)
 
-        self.defaults["loss_scaling"] = loss_scaling
+        # Loss scaling is a global setting: store it as an attribute
+        if loss_scaling is None:
+            loss_scaling = 1.0
+        self.loss_scaling = loss_scaling
+
+        # Velocity scaling can be set per group: register it in defaults
+        # and update the existing groups.
+        if velocity_scaling is None:
+            velocity_scaling = 1.0
         self.defaults["velocity_scaling"] = velocity_scaling
         for group in self.param_groups:
-            group.setdefault("loss_scaling", loss_scaling)
             group.setdefault("velocity_scaling", velocity_scaling)
+
+        self.variable_attrs = VariableAttributes(
+            variables,
+            list(self.defaults) + SGD._child_vars)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        # Manually save the attributes
+        # (groups / defaults are saved by the parent)
+        state["variable_attrs"] = self.variable_attrs
+        state["loss_scaling"] = self.loss_scaling
+        return state
 
 
 class Adam(torch.optim.Adam):
@@ -59,17 +136,28 @@ class Adam(torch.optim.Adam):
 
     AMSGrad is currently not supported."""
 
+    # Variables which don't exist in the parent optimizer class and are
+    # global (Cannot be set per group).
+    _child_vars = ["loss_scaling"]
+    # All the attributes and variables which don't exist in the parent optimizer class.
+    _child_only = _child_vars + [
+        "accum_type", "first_order_momentum_accum_type",
+        "second_order_momentum_accum_type"
+    ]
+    # Attributes (from the parent or child class) which can be set per group.
+    _group_vars = ["lr", "betas", "eps", "weight_decay", "amsgrad"]
+
     def __init__(self,
                  params,
-                 lr=1e-3,
-                 betas=(0.9, 0.999),
-                 eps=1e-8,
-                 weight_decay=0,
-                 amsgrad=False,
-                 loss_scaling=1.0,
-                 accumType=torch.float32,
-                 firstOrderMomentumAccumType=torch.float32,
-                 secondOrderMomentumAccumType=torch.float32):
+                 lr=None,
+                 betas=None,
+                 eps=None,
+                 weight_decay=None,
+                 amsgrad=None,
+                 loss_scaling=None,
+                 accum_type=None,
+                 first_order_momentum_accum_type=None,
+                 second_order_momentum_accum_type=None):
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate
@@ -85,34 +173,62 @@ class Adam(torch.optim.Adam):
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.
         :type loss_scaling: float, optional
-        :param accumType: data type used for gradients.
-        :type accumType: torch.dtype, optional
-        :param firstOrderMomentumAccumType: data type used to store
+        :param accum_type: data type used for gradients.
+        :type accum_type: torch.dtype, optional
+        :param first_order_momentum_accum_type: data type used to store
             the first order momentum values for each parameter.
-        :type firstOrderMomentumAccumType: torch.dtype, optional
-        :param secondOrderMomentumAccumType: data type used to store
+        :type first_order_momentum_accum_type: torch.dtype, optional
+        :param second_order_momentum_accum_type: data type used to store
             the second order momentum values for each parameter.
-        :type secondOrderMomentumAccumType: torch.dtype, optional
+        :type second_order_momentum_accum_type: torch.dtype, optional
         """
-        super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
+        # Call to locals() must be at the very top of  __init__
+        parent_args, variables = _parseArgs(locals(), Adam._child_only)
+        super().__init__(**parent_args)
 
-        self.defaults["loss_scaling"] = loss_scaling
+        if loss_scaling is None:
+            loss_scaling = 1.0
+        if accum_type is None:
+            accum_type = torch.float32
+        if first_order_momentum_accum_type is None:
+            first_order_momentum_accum_type = torch.float32
+        if second_order_momentum_accum_type is None:
+            second_order_momentum_accum_type = torch.float32
+
+        # All the child attributes are global: store them as
+        # attributes.
+        self.loss_scaling = loss_scaling
 
         supportedTypes = [torch.float16, torch.float32]
         errString = ("Accumulation types must be either torch.float32"
                      " or torch.float16")
-        assert accumType in supportedTypes, errString
-        assert firstOrderMomentumAccumType in supportedTypes, errString
-        assert secondOrderMomentumAccumType in supportedTypes, errString
+        assert accum_type in supportedTypes, errString
+        self.accum_type = accum_type
 
-        self.accumType = accumType == torch.float16
-        self.firstOrderMomentumAccumType = \
-             firstOrderMomentumAccumType == torch.float16
-        self.secondOrderMomentumAccumType = \
-             secondOrderMomentumAccumType == torch.float16
+        assert first_order_momentum_accum_type in supportedTypes, errString
+        self.first_order_momentum_accum_type = \
+             first_order_momentum_accum_type
 
-        for group in self.param_groups:
-            group.setdefault("loss_scaling", loss_scaling)
+        assert second_order_momentum_accum_type in supportedTypes, errString
+        self.second_order_momentum_accum_type = \
+             second_order_momentum_accum_type
+
+        self.variable_attrs = VariableAttributes(
+            variables,
+            list(self.defaults) + Adam._child_vars)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        # Manually save the attributes
+        # (groups / defaults are saved by the parent)
+        state["variable_attrs"] = self.variable_attrs
+        state["loss_scaling"] = self.loss_scaling
+        state["accum_type"] = self.accum_type
+        state["first_order_momentum_accum_type"] = \
+                self.first_order_momentum_accum_type
+        state["second_order_momentum_accum_type"] = \
+                self.second_order_momentum_accum_type
+        return state
 
 
 class AdamW(torch.optim.AdamW):
@@ -123,18 +239,31 @@ class AdamW(torch.optim.AdamW):
 
     AMSGrad is currently not supported."""
 
+    # Variables which don't exist in the parent optimizer class and are
+    # global (Cannot be set per group).
+    _child_vars = ["loss_scaling"]
+    # All the attributes and variables which don't exist in the parent optimizer class.
+    _child_only = _child_vars + [
+        "bias_correction",
+        "accum_type",
+        "first_order_momentum_accum_type",
+        "second_order_momentum_accum_type",
+    ]
+    # Attributes (from the parent or child class) which can be set per group.
+    _group_vars = ["lr", "betas", "weight_decay", "eps", "amsgrad"]
+
     def __init__(self,
                  params,
-                 lr=1e-3,
-                 betas=(0.9, 0.999),
-                 eps=1e-8,
-                 weight_decay=0.01,
-                 amsgrad=False,
-                 loss_scaling=1.0,
-                 biasCorrection=True,
-                 accumType=torch.float32,
-                 firstOrderMomentumAccumType=torch.float32,
-                 secondOrderMomentumAccumType=torch.float32):
+                 lr=None,
+                 betas=None,
+                 eps=None,
+                 weight_decay=None,
+                 amsgrad=None,
+                 loss_scaling=None,
+                 bias_correction=None,
+                 accum_type=None,
+                 first_order_momentum_accum_type=None,
+                 second_order_momentum_accum_type=None):
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate
@@ -150,36 +279,63 @@ class AdamW(torch.optim.AdamW):
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.
         :type loss_scaling: float, optional
-        :param accumType: data type used for gradients.
-        :type accumType: torch.dtype, optional
-        :param firstOrderMomentumAccumType: data type used to store
+        :param accum_type: data type used for gradients.
+        :type accum_type: torch.dtype, optional
+        :param first_order_momentum_accum_type: data type used to store
             the first order momentum values for each parameter.
-        :type firstOrderMomentumAccumType: torch.dtype, optional
-        :param secondOrderMomentumAccumType: data type used to store
+        :type first_order_momentum_accum_type: torch.dtype, optional
+        :param second_order_momentum_accum_type: data type used to store
             the second order momentum values for each parameter.
-        :type secondOrderMomentumAccumType: torch.dtype, optional
+        :type second_order_momentum_accum_type: torch.dtype, optional
         """
-        super().__init__(params, lr, betas, eps, weight_decay, amsgrad)
+        # Call to locals() must be at the very top of  __init__
+        parent_args, variables = _parseArgs(locals(), AdamW._child_only)
+        super().__init__(**parent_args)
 
-        self.defaults["loss_scaling"] = loss_scaling
-        self.defaults["biasCorrection"] = biasCorrection
+        if loss_scaling is None:
+            loss_scaling = 1.0
+        if bias_correction is None:
+            bias_correction = True
+        if accum_type is None:
+            accum_type = torch.float32
+        if first_order_momentum_accum_type is None:
+            first_order_momentum_accum_type = torch.float32
+        if second_order_momentum_accum_type is None:
+            second_order_momentum_accum_type = torch.float32
+
+        self.loss_scaling = loss_scaling
+        self.bias_correction = bias_correction
 
         supportedTypes = [torch.float16, torch.float32]
         errString = ("Accumulation types must be either torch.float32"
                      " or torch.float16")
-        assert accumType in supportedTypes, errString
-        assert firstOrderMomentumAccumType in supportedTypes, errString
-        assert secondOrderMomentumAccumType in supportedTypes, errString
+        assert accum_type in supportedTypes, errString
+        self.accum_type = accum_type
 
-        self.accumType = accumType == torch.float16
-        self.firstOrderMomentumAccumType = \
-             firstOrderMomentumAccumType == torch.float16
-        self.secondOrderMomentumAccumType = \
-             secondOrderMomentumAccumType == torch.float16
+        assert first_order_momentum_accum_type in supportedTypes, errString
+        self.first_order_momentum_accum_type = \
+             first_order_momentum_accum_type
 
-        for group in self.param_groups:
-            group.setdefault("loss_scaling", loss_scaling)
-            group.setdefault("biasCorrection", biasCorrection)
+        assert second_order_momentum_accum_type in supportedTypes, errString
+        self.second_order_momentum_accum_type = \
+             second_order_momentum_accum_type
+        self.variable_attrs = VariableAttributes(
+            variables,
+            list(self.defaults) + AdamW._child_vars)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        # Manually save the attributes
+        # (groups / defaults are saved by the parent)
+        state["variable_attrs"] = self.variable_attrs
+        state["loss_scaling"] = self.loss_scaling
+        state["bias_correction"] = self.bias_correction
+        state["accum_type"] = self.accum_type
+        state["first_order_momentum_accum_type"] = \
+                self.first_order_momentum_accum_type
+        state["second_order_momentum_accum_type"] = \
+                self.second_order_momentum_accum_type
+        return state
 
 
 class RMSprop(torch.optim.RMSprop):
@@ -188,15 +344,31 @@ class RMSprop(torch.optim.RMSprop):
     This optimizer matches PyTorch's implementation (torch.optim.RMSprop) with
     optional loss scaling."""
 
+    # Variables which don't exist in the parent optimizer class and are
+    # global (Cannot be set per group).
+    _child_vars = ["loss_scaling"]
+    # All the attributes and variables which don't exist in the parent optimizer class.
+    _child_only = _child_vars + [
+        "accum_type", "first_order_momentum_accum_type",
+        "second_order_momentum_accum_type"
+    ]
+    # Attributes (from the parent or child class) which can be set per group.
+    _group_vars = [
+        "lr", "momentum", "weight_decay", "alpha", "eps", "centered"
+    ]
+
     def __init__(self,
                  params,
-                 lr=1e-2,
-                 alpha=0.99,
-                 eps=1e-8,
-                 weight_decay=0,
-                 momentum=0,
-                 centered=False,
-                 loss_scaling=1.0):
+                 lr=None,
+                 alpha=None,
+                 eps=None,
+                 weight_decay=None,
+                 momentum=None,
+                 centered=None,
+                 loss_scaling=None,
+                 accum_type=None,
+                 first_order_momentum_accum_type=None,
+                 second_order_momentum_accum_type=None):
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate.
@@ -216,13 +388,58 @@ class RMSprop(torch.optim.RMSprop):
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.
         :type loss_scaling: float, optional
+        :param accum_type: data type used for gradients.
+        :type accum_type: torch.dtype, optional
+        :param first_order_momentum_accum_type: data type used to store
+            the first order momentum values for each parameter.
+        :type first_order_momentum_accum_type: torch.dtype, optional
+        :param second_order_momentum_accum_type: data type used to store
+            the second order momentum values for each parameter.
+        :type second_order_momentum_accum_type: torch.dtype, optional
         """
-        super().__init__(params, lr, alpha, eps, weight_decay, momentum,
-                         centered)
+        # Call to locals() must be at the very top of  __init__
+        parent_args, variables = _parseArgs(locals(), RMSprop._child_only)
+        super().__init__(**parent_args)
 
-        self.defaults["loss_scaling"] = loss_scaling
-        for group in self.param_groups:
-            group.setdefault("loss_scaling", loss_scaling)
+        if loss_scaling is None:
+            loss_scaling = 1.0
+        if accum_type is None:
+            accum_type = torch.float32
+        if first_order_momentum_accum_type is None:
+            first_order_momentum_accum_type = torch.float32
+        if second_order_momentum_accum_type is None:
+            second_order_momentum_accum_type = torch.float32
+        self.loss_scaling = loss_scaling
+
+        supportedTypes = [torch.float16, torch.float32]
+        errString = ("Accumulation types must be either torch.float32"
+                     " or torch.float16")
+        assert accum_type in supportedTypes, errString
+        self.accum_type = accum_type
+
+        assert first_order_momentum_accum_type in supportedTypes, errString
+        self.first_order_momentum_accum_type = \
+             first_order_momentum_accum_type
+
+        assert second_order_momentum_accum_type in supportedTypes, errString
+        self.second_order_momentum_accum_type = \
+             second_order_momentum_accum_type
+        self.variable_attrs = VariableAttributes(
+            variables,
+            list(self.defaults) + RMSprop._child_vars)
+
+    def __getstate__(self):
+        state = super().__getstate__()
+        # Manually save the attributes
+        # (groups / defaults are saved by the parent)
+        state["variable_attrs"] = self.variable_attrs
+        state["loss_scaling"] = self.loss_scaling
+        state["accum_type"] = self.accum_type
+        state["first_order_momentum_accum_type"] = \
+                self.first_order_momentum_accum_type
+        state["second_order_momentum_accum_type"] = \
+                self.second_order_momentum_accum_type
+        return state
 
 
 class LAMB(torch.optim.Optimizer):
@@ -233,19 +450,29 @@ class LAMB(torch.optim.Optimizer):
 
         The scaling function phi(z) is fixed as min(z, max_weight_norm);
     """
+    # Variables which don't exist in the parent optimizer class and are
+    # global (Cannot be set per group).
+    _child_vars = ["max_weight_norm", "loss_scaling"]
+    # All the attributes and variables which don't exist in the parent optimizer class.
+    _child_only = _child_vars + [
+        "accum_type", "first_order_momentum_accum_type",
+        "second_order_momentum_accum_type"
+    ]
+    # Attributes (from the parent or child class) which can be set per group.
+    _group_vars = ["lr", "weight_decay", "betas", "eps"]
 
     def __init__(self,
                  params,
-                 lr=1e-3,
-                 betas=(0.9, 0.999),
-                 eps=1e-8,
-                 weight_decay=1e-2,
-                 biasCorrection=True,
-                 loss_scaling=1.0,
+                 lr=None,
+                 betas=None,
+                 eps=None,
+                 weight_decay=None,
+                 bias_correction=None,
+                 loss_scaling=None,
                  max_weight_norm=None,
-                 accumType=torch.float32,
-                 firstOrderMomentumAccumType=torch.float32,
-                 secondOrderMomentumAccumType=torch.float32):
+                 accum_type=None,
+                 first_order_momentum_accum_type=None,
+                 second_order_momentum_accum_type=None):
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate
@@ -255,54 +482,69 @@ class LAMB(torch.optim.Optimizer):
         :param eps: term added to the denominator to ensure numerical
            stability/
         :type eps: float, optional
-        :param weight_decay: (AdamW) weight decay factor.
+        :param weight_decay: weight decay factor.
         :type weight_decay: float, optional
-        :param biasCorrection: True: compute LAMB with bias correction.
-        :type biasCorrection: bool, optional
+        :param bias_correction: True: compute LAMB with bias correction.
+        :type bias_correction: bool, optional
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.
         :type loss_scaling: float, optional
         :param max_weight_norm: maximum value of the output of scaling
             function, phi(). Set to None to disable scaling function.
         :type max_weight_norm: float, optional
-        :param accumType: data type used for gradients.
-        :type accumType: torch.dtype, optional
-        :param firstOrderMomentumAccumType: data type used to store
+        :param accum_type: data type used for gradients.
+        :type accum_type: torch.dtype, optional
+        :param first_order_momentum_accum_type: data type used to store
             the first order momentum values for each parameter.
-        :type firstOrderMomentumAccumType: torch.dtype, optional
-        :param secondOrderMomentumAccumType: data type used to store
+        :type first_order_momentum_accum_type: torch.dtype, optional
+        :param second_order_momentum_accum_type: data type used to store
            the second order momentum values for each parameter.
-        :type secondOrderMomentumAccumType: torch.dtype, optional
+        :type second_order_momentum_accum_type: torch.dtype, optional
         """
+        # Call to locals() must be at the very top of  __init__
+        _, variables = _parseArgs(locals(), [])
         if max_weight_norm is None:
             max_weight_norm = 65500.0  # FP16 Max
-        defaults = dict(lr=lr,
-                        betas=betas,
-                        eps=eps,
-                        weight_decay=weight_decay,
-                        biasCorrection=biasCorrection,
-                        loss_scaling=loss_scaling,
-                        max_weight_norm=max_weight_norm)
+        if lr is None:
+            lr = 1e-3
+        if betas is None:
+            betas = (0.9, 0.999)
+        if eps is None:
+            eps = 1e-8
+        if weight_decay is None:
+            weight_decay = 1e-2
+        if bias_correction is None:
+            bias_correction = True
+        if loss_scaling is None:
+            loss_scaling = 1.0
+        if accum_type is None:
+            accum_type = torch.float32
+        if first_order_momentum_accum_type is None:
+            first_order_momentum_accum_type = torch.float32
+        if second_order_momentum_accum_type is None:
+            second_order_momentum_accum_type = torch.float32
+        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
         super().__init__(params, defaults)
 
         supportedTypes = [torch.float16, torch.float32]
         errString = """Accumulation types must be either torch.float32
                 or torch.float16"""
-        assert accumType in supportedTypes, errString
-        assert firstOrderMomentumAccumType in supportedTypes, errString
-        assert secondOrderMomentumAccumType in supportedTypes, errString
+        assert accum_type in supportedTypes, errString
+        assert first_order_momentum_accum_type in supportedTypes, errString
+        assert second_order_momentum_accum_type in supportedTypes, errString
 
-        self.accumType = accumType == torch.float16
-        self.firstOrderMomentumAccumType = \
-             firstOrderMomentumAccumType == torch.float16
-        self.secondOrderMomentumAccumType = \
-             secondOrderMomentumAccumType == torch.float16
+        self.bias_correction = bias_correction
+        self.loss_scaling = loss_scaling
+        self.max_weight_norm = max_weight_norm
+        self.accum_type = accum_type
+        self.first_order_momentum_accum_type = \
+             first_order_momentum_accum_type
+        self.second_order_momentum_accum_type = \
+             second_order_momentum_accum_type
 
-    def __setstate__(self, state):
-        super().__setstate__(state)
-        for group in self.param_groups:
-            group.setdefault("biasCorrection", self.defaults["biasCorrection"])
-            group.setdefault("loss_scaling", self.defaults["loss_scaling"])
+        self.variable_attrs = VariableAttributes(
+            variables,
+            list(self.defaults) + LAMB._child_vars)
 
     def step(self, closure=None):
         loss = None
@@ -327,7 +569,7 @@ class LAMB(torch.optim.Optimizer):
 
                 beta1, beta2 = group["betas"]
 
-                if group["biasCorrection"]:
+                if group["bias_correction"]:
                     bias_correction1 = 1 - beta1**state["step"]
                     bias_correction2 = 1 - beta2**state["step"]
                 else:
@@ -349,18 +591,32 @@ class LAMB(torch.optim.Optimizer):
                 if r1 == 0 or r2 == 0:
                     trust = 1.0
                 else:
-                    trust = r1.clamp(max=group["max_weight_norm"]) / r2
+                    trust = r1.clamp(max=self.max_weight_norm) / r2
 
                 p.data.add_(upd, alpha=-group['lr'] * trust)
 
         return loss
 
+    def __getstate__(self):
+        state = super().__getstate__()
+        # Manually save the attributes
+        # (groups / defaults are saved by the parent)
+        state["variable_attrs"] = self.variable_attrs
+        state["loss_scaling"] = self.loss_scaling
+        state["bias_correction"] = self.bias_correction
+        state["accum_type"] = self.accum_type
+        state["first_order_momentum_accum_type"] = \
+                self.first_order_momentum_accum_type
+        state["second_order_momentum_accum_type"] = \
+                self.second_order_momentum_accum_type
+        return state
 
-def _check_constructor_match_parent(child_class, extra_args=None):
+
+def _check_constructor_match_parent(child_class):
     parent = child_class.__bases__[0]
     parent_params = inspect.signature(parent.__init__).parameters
     child_params = inspect.signature(child_class.__init__).parameters
-    extra_args = extra_args or []
+    extra_args = child_class._child_only  # pylint: disable=protected-access
     assert len(parent_params) + len(extra_args) == len(child_params), (
         f"Expected {len(parent_params) + len(extra_args)} parameters but got "
         f"{len(child_params)}")
@@ -368,8 +624,9 @@ def _check_constructor_match_parent(child_class, extra_args=None):
     child_params = iter(child_params.items())
     for idx, (_, param) in enumerate(parent_params.items()):
         _, child_param = next(child_params)
-        assert child_param == param, (f"Mismatch for parameter {idx}: expected"
-                                      f"'{param}' but got '{child_param}'")
+        assert child_param.name == param.name, (
+            f"Mismatch for parameter {idx}: expected"
+            f"'{param}' but got '{child_param}'")
 
     for extra_arg in extra_args:
         name, _ = next(child_params)
@@ -377,13 +634,7 @@ def _check_constructor_match_parent(child_class, extra_args=None):
                                    f"'{extra_arg}' but got '{name}'")
 
 
-_check_constructor_match_parent(SGD, ["loss_scaling", "velocity_scaling"])
-_check_constructor_match_parent(Adam, [
-    "loss_scaling", "accumType", "firstOrderMomentumAccumType",
-    "secondOrderMomentumAccumType"
-])
-_check_constructor_match_parent(AdamW, [
-    "loss_scaling", "biasCorrection", "accumType",
-    "firstOrderMomentumAccumType", "secondOrderMomentumAccumType"
-])
-_check_constructor_match_parent(RMSprop, ["loss_scaling"])
+_check_constructor_match_parent(SGD)
+_check_constructor_match_parent(Adam)
+_check_constructor_match_parent(AdamW)
+_check_constructor_match_parent(RMSprop)

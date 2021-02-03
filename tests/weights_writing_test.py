@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import os
 import types
 import copy
+import tempfile
 import numpy as np
 import pytest
 import torch
@@ -190,11 +192,13 @@ def test_torch_save():
     target = torch.empty(5, 8, 8, dtype=torch.long).random_(0, 4)
     _ = training_model(input, target)
 
-    # save the model
-    torch.save(model, "/tmp/model.save")
+    with tempfile.TemporaryDirectory(dir=".") as d:
+        model_file = os.path.join(d, "model.save")
+        # save the model
+        torch.save(model, model_file)
 
-    # reload the model
-    reloaded_model = torch.load("/tmp/model.save")
+        # reload the model
+        reloaded_model = torch.load(model_file)
 
     # make sure the reloaded weights are the same as the
     # model and trainingModel

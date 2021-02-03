@@ -161,58 +161,88 @@ static auto registry =
 namespace poptorch {
 namespace {
 
+template <typename T>
+T getOptimizerValue(const py::dict &d, const std::string &key) {
+  ERROR_ON_MSG(!d.contains(key), "Missing optimizer value for '"
+                                     << key << "' in "
+                                     << py::str(d.cast<py::object>()));
+  return d[key.c_str()].cast<T>();
+}
+
+template <typename T>
+void getOptimizerValue(T &value, const py::dict &d, const std::string &key) {
+  value = getOptimizerValue<T>(d, key);
+}
+
+void copyParametersDict(Optimizer *out, const py::dict &in) {
+  out->parameters.resize(in.size());
+  std::uint64_t param_idx = 0;
+  for (auto optimizer_field : in) {
+    auto &param = out->parameters[param_idx];
+    param_idx++;
+
+    const std::string name = optimizer_field.first.cast<std::string>();
+    logging::LogContext ctx("copyParametersDict attr: " + name);
+    std::pair<float, bool> p =
+        optimizer_field.second.cast<std::pair<float, bool>>();
+
+    ERROR_ON(name.size() >= sizeof(param.name));
+    // We need to use a C-style string here to avoid ABI issues.
+    snprintf(reinterpret_cast<char *>(param.name), sizeof(param.name), "%s",
+             name.c_str());
+    param.value = p.first;
+    param.is_const = p.second;
+  }
+}
+
 // Process the user provided dictionary and extract the relevant optimizer
 // information.
 std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
-  // optimizer is the map containing all set options.
-  std::vector<Optimizer::ParamList> optimizer_params;
+  if (opt.empty()) {
+    return {};
+  }
+
   OptimizerType type = OptimizerType::NONE;
-  std::uint64_t num_groups = 0;
+  std::uint64_t num_groups;
+  type = static_cast<OptimizerType>(
+      getOptimizerValue<std::uint64_t>(opt, "optimizer_type"));
+  auto defaults = getOptimizerValue<py::dict>(opt, "defaults");
+  auto groups = getOptimizerValue<py::list>(opt, "groups");
+  num_groups = groups.size();
+  std::vector<Optimizer> optimizers;
+  // Note: all the group variables and optimizer variables are
+  // automatically forwarded to the Compiler backend however
+  // the optimizer attributes are extracted here.
+  if (opt.contains("accumType")) {
+    bool accum_type = false;
+    bool first_order_momentum_accum_type = false;
+    bool second_order_momentum_accum_type = false;
 
-  // Accumulation types for adam.
-  bool accum_type = false;
-  bool first_order_momentum_accum_type = false;
-  bool second_order_momentum_accum_type = false;
-
-  // Extract all options from the python dictionary.
-  for (auto element : opt) {
-    // All values are in the form of pair{float, bool} except for the optimizer
-    // option, num groups, and the accumulation types.
-    if (py::isinstance<py::str>(element.first)) {
-      const std::string name = element.first.cast<std::string>();
-      if (name == "optimizer_type") {
-        type = static_cast<OptimizerType>(element.second.cast<std::uint64_t>());
-      } else if (name == "num_groups") {
-        num_groups = element.second.cast<std::uint64_t>();
-        optimizer_params.resize(num_groups);
-      } else if (name == "accumType") {
-        accum_type = element.second.cast<bool>();
-      } else if (name == "firstOrderMomentumAccumType") {
-        first_order_momentum_accum_type = element.second.cast<bool>();
-      } else if (name == "secondOrderMomentumAccumType") {
-        second_order_momentum_accum_type = element.second.cast<bool>();
-      }
-    } else if (py::isinstance<py::int_>(element.first)) {
-      const std::uint64_t group = element.first.cast<std::uint64_t>();
-      const py::dict &sub_dict = element.second.cast<py::dict>();
-
-      for (auto optimizer_field : sub_dict) {
-        std::pair<float, bool> p =
-            optimizer_field.second.cast<std::pair<float, bool>>();
-        const std::string param = optimizer_field.first.cast<std::string>();
-        optimizer_params[group][param] = p;
-      }
-
-    } else {
-      ERROR("(Internal) Unknown type.");
+    // Indicate whether the optimizer should use float16 types
+    getOptimizerValue(accum_type, opt, "accumType");
+    getOptimizerValue(first_order_momentum_accum_type, opt,
+                      "firstOrderMomentumAccumType");
+    getOptimizerValue(second_order_momentum_accum_type, opt,
+                      "secondOrderMomentumAccumType");
+    // Create one Optimizer per parameter group + 1 for defaults
+    for (std::uint64_t i = 0; i <= num_groups; ++i) {
+      optimizers.emplace_back(type, accum_type, first_order_momentum_accum_type,
+                              second_order_momentum_accum_type);
+    }
+  } else {
+    // Create one Optimizer per parameter group + 1 for defaults
+    for (std::uint64_t i = 0; i <= num_groups; ++i) {
+      optimizers.emplace_back(type);
     }
   }
 
-  std::vector<Optimizer> optimizers;
-  for (const Optimizer::ParamList &p : optimizer_params) {
-    Optimizer o{type, p, accum_type, first_order_momentum_accum_type,
-                second_order_momentum_accum_type};
-    optimizers.push_back(o);
+  copyParametersDict(&optimizers[0], defaults);
+  // For each group copy all the attributes
+  // Start at 1: index 0 is 'defaults'
+  std::uint64_t group = 1;
+  for (auto group_attr : groups) {
+    copyParametersDict(&optimizers[group], group_attr.cast<py::dict>());
+    ++group;
   }
 
   return optimizers;

@@ -14,12 +14,12 @@ import poptorch
 # Convenience classes for testing
 class LAMBNoBias(poptorch.optim.LAMB):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, biasCorrection=False, **kwargs)
+        super().__init__(*args, bias_correction=False, **kwargs)
 
 
 class AdamWNoBias(poptorch.optim.AdamW):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, biasCorrection=False, **kwargs)
+        super().__init__(*args, bias_correction=False, **kwargs)
 
 
 @pytest.mark.parametrize(
@@ -109,12 +109,12 @@ def test_sgd_IR(opt):
 @pytest.mark.parametrize("opt", (poptorch.optim.Adam, poptorch.optim.AdamW,
                                  AdamWNoBias, poptorch.optim.LAMB, LAMBNoBias))
 @pytest.mark.parametrize("accType", (torch.float16, torch.float))
-def test_sgd_IR_accum_type(opt, accType):
+def test_IR_accum_type(opt, accType):
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10).half()
 
     # "Train" with learning rate of zero and check the loss remains the same.
-    optimizer = opt(model.parameters(), lr=0.01, accumType=accType)
+    optimizer = opt(model.parameters(), lr=0.01, accum_type=accType)
     # These two should also be tested but they don't appear to work in popart yet.
     #firstOrderMomentumAccumType=torch.float16,
     #secondOrderMomentumAccumType=torch.float16 )
@@ -143,8 +143,9 @@ def test_velocity_scaling_copy():
 
     # "Train" with learning rate of zero and check the loss remains the same.
     optimizer = poptorch.optim.SGD(model.parameters(),
-                                   lr=0.01,
-                                   velocity_scaling=128)
+                                   lr=0.05,
+                                   loss_scaling=0.05,
+                                   velocity_scaling=128.1)
 
     poptorch_model = helpers.trainingModelWithLoss(
         model,
@@ -388,6 +389,53 @@ def test_optimizer_SGD_nesterov():
                                                    lr=0.001))
 
 
+@pytest.mark.parametrize(
+    "opt", {
+        poptorch.optim.SGD, poptorch.optim.Adam, poptorch.optim.AdamW,
+        poptorch.optim.RMSprop, poptorch.optim.LAMB, AdamWNoBias, LAMBNoBias
+    })
+def test_optimizer_const(opt):
+    torch.manual_seed(42)
+
+    model = torch.nn.Linear(10, 10)
+    # Initialise the optimiser with the default loss_scaling value
+    optimizer = opt(model.parameters(), loss_scaling=1.0, lr=1.0)
+
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.CrossEntropyLoss(), optimizer=optimizer)
+    poptorch_model(input, label)
+
+    optimizer.loss_scaling = 2.0
+    poptorch_model.setOptimizer(optimizer)
+    poptorch_model(input, label)
+
+
+@pytest.mark.parametrize(
+    "opt", {
+        poptorch.optim.SGD, poptorch.optim.Adam, poptorch.optim.AdamW,
+        poptorch.optim.RMSprop, poptorch.optim.LAMB, AdamWNoBias, LAMBNoBias
+    })
+def test_optimizer_mark_as_variable(opt):
+    torch.manual_seed(42)
+
+    model = torch.nn.Linear(10, 10)
+    # Initialise the optimiser with the default loss_scaling value
+    optimizer = opt(model.parameters(), lr=1.0)
+    optimizer.variable_attrs.markAsVariable("loss_scaling")
+
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, loss=torch.nn.CrossEntropyLoss(), optimizer=optimizer)
+    poptorch_model(input, label)
+
+    optimizer.loss_scaling = 2.0
+    poptorch_model.setOptimizer(optimizer)
+    poptorch_model(input, label)
+
+
 @pytest.mark.parametrize("opt", {poptorch.optim.LAMB, LAMBNoBias})
 def test_lamb_max_weight_norm(opt):
     torch.manual_seed(42)
@@ -412,7 +460,7 @@ def test_lamb_max_weight_norm(opt):
         assert loss == original_loss
 
     # Update the optimizer with a non-zero max_weight_norm. It should now train.
-    optimizer.param_groups[0]['max_weight_norm'] = 100.0
+    optimizer.max_weight_norm = 100.0
     poptorch_model.setOptimizer(optimizer)
 
     for _ in range(0, 1000):

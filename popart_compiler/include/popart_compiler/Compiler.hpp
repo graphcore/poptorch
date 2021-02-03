@@ -34,113 +34,36 @@ struct OutputType {
   int64_t num_elements{0};
 };
 
-// Extract the value from the map or return zero.
-static std::pair<float, bool> findInMapOrDefault(
-    const std::unordered_map<std::string, std::pair<float, bool>> &opts,
-    const std::string &name, float defaultValue = 0.0f) {
-
-  // Lookup map.
-  auto itr = opts.find(name);
-  if (itr != opts.end()) {
-    return itr->second;
-  }
-
-  logging::info("Optimizer map didn't have field for {}, defaulting to {}",
-                name, defaultValue);
-  return {defaultValue, false};
-}
-
 /* Returns true if the system contains a device with numIpus
  * Note: This function doesn't check if the devices are currently in use.
  */
 bool ipuHardwareIsAvailable(std::uint64_t num_ipus = 1);
 
 struct Optimizer {
+  struct Parameter {
+    char name[32];
+    float value;
+    bool is_const;
+  };
   using ParamType = std::pair<float, bool>;
-  using ParamList = std::unordered_map<std::string, ParamType>;
 
-  explicit Optimizer(OptimizerType t, const ParamList &opts)
-      : Optimizer(t, opts, false, false, false) {}
-
-  Optimizer(OptimizerType t, const ParamList &opts, bool accumType,
-            bool firstOrderType, bool secondOrderType)
-      : type(t), accum_type_is_half(accumType),
+  explicit Optimizer(OptimizerType t) : type(t), accum_types_provided(false) {}
+  Optimizer(OptimizerType t, bool accumType, bool firstOrderType,
+            bool secondOrderType)
+      : type(t), accum_types_provided(true), accum_type_is_half(accumType),
         first_order_momentum_accum_type_is_half(firstOrderType),
-        second_order_momentum_accum_type_is_half(secondOrderType) {
-    // It is valid to not pass in a optimizer.
-    if (opts.empty() || type == OptimizerType::NONE) {
-      return;
-    }
-
-    // We will assume all optimizers will have a learning rate.
-    auto itr = opts.find("lr");
-    ERROR_ON_MSG(itr == opts.end(),
-                 "Learning rate was not provided in optimizer dictionary!");
-    learning_rate = itr->second;
-    weight_decay = findInMapOrDefault(opts, "weight_decay");
-    loss_scaling = findInMapOrDefault(opts, "loss_scaling", 1.0f);
-    velocity_scaling = findInMapOrDefault(opts, "velocity_scaling", 1.0f);
-
-    switch (type) {
-    case OptimizerType::SGD: {
-      momentum = findInMapOrDefault(opts, "momentum");
-      dampening = findInMapOrDefault(opts, "dampening");
-      break;
-    }
-    case OptimizerType::LAMB:
-    case OptimizerType::LAMB_NO_BIAS:
-    case OptimizerType::ADAM:
-    case OptimizerType::ADAMW:
-    case OptimizerType::ADAMW_NO_BIAS: {
-      beta1 = findInMapOrDefault(opts, "beta1", 0.9);
-      beta2 = findInMapOrDefault(opts, "beta2", 0.999);
-      eps = findInMapOrDefault(opts, "eps", 1e-08);
-      max_weight_norm = findInMapOrDefault(opts, "max_weight_norm", 10.0);
-      break;
-    }
-    case OptimizerType::RMSPROP_CENTERED:
-    case OptimizerType::RMSPROP: {
-      alpha = findInMapOrDefault(opts, "alpha", 0.99);
-      eps = findInMapOrDefault(opts, "eps", 1e-08);
-      break;
-    }
-    case OptimizerType::NONE:
-    default:
-      ERROR("UNREACHABLE: Unsupported optimizer type");
-    }
-  }
+        second_order_momentum_accum_type_is_half(secondOrderType) {}
 
   OptimizerType type;
-
-  ParamType learning_rate;
-  ParamType weight_decay;
-  ParamType loss_scaling;
-  ParamType velocity_scaling;
-
-  // Shared by SGD and RMSprop
-  ParamType momentum;
-
-  // Shared by Adam, AdamW, RMSprop and LAMB
-  ParamType eps;
-
-  // Shared by Adam, AdamW and LAMB
-  ParamType beta1;
-  ParamType beta2;
-
-  // Unique to LAMB
-  ParamType max_weight_norm;
-
-  // Unique to SGD
-  ParamType dampening;
-
-  // Unique to RMSprop
-  ParamType alpha;
-
+  // True if the main, first and second order accum types have been set.
+  bool accum_types_provided;
   // Special parameters for adam/lamb. If true accumulations will be half
   // otherwise will be float.
   bool accum_type_is_half;
   bool first_order_momentum_accum_type_is_half;
   bool second_order_momentum_accum_type_is_half;
+
+  std::vector<Parameter> parameters;
 };
 
 class Compiler;

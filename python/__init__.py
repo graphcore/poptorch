@@ -273,7 +273,7 @@ def trainingModel(model, options=None, optimizer=None):
 
     maybe_wrapped_model = training_model
 
-    if optimizer and len(optimizer.param_groups) > 1:
+    if optimizer and optimizer.param_groups:
         maybe_wrapped_model = _impl.OptimizerWrapper(training_model, optimizer)
 
     return PoplarExecutor(model=maybe_wrapped_model,

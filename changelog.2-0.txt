@@ -10,6 +10,7 @@ New features:
 - Migrated to PyTorch version 1.7.1
 - Add support for aten::index, aten::index_put_
 - Add support for torch.zeros_like, torch.ones_like
+- Allow the user to specify which Optimizer attributes are constant or not.
 
 Known issues:
 

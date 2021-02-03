@@ -129,6 +129,25 @@ void registerSetter(std::map<std::string, std::function<void(Value)>> &options,
   options[name] = Setter<Value>(fn, name);
 }
 
+// Round up the number of IPUs, if required, to the minimum number which need
+// to be reservered
+std::uint64_t roundUpNumIPUs(std::uint64_t num_ipus) {
+  std::uint64_t rounded_num_ipus;
+
+  if (num_ipus < 64) {
+    // If fewer than 64, find the next power of 2
+    rounded_num_ipus = 1;
+    while (rounded_num_ipus < num_ipus) {
+      rounded_num_ipus *= 2;
+    }
+  } else {
+    // Otherwise, find the next multiple of 64
+    rounded_num_ipus = ((num_ipus - 1) / 64 + 1) * 64;
+  }
+
+  return rounded_num_ipus;
+}
+
 bool waitIfIpuIsUnavailable() {
   bool wait = false;
   if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
@@ -502,10 +521,11 @@ public:
 
   bool isHostSideConstant(poptorch::TensorId id) const;
 
-  // R ound up the number of IPUs, if required, to the minimum number which need
-  // to be reservered
-  static std::uint64_t roundUpNumIPUs(std::uint64_t num_ipu);
   std::shared_ptr<popart::DeviceInfo> createDevice();
+
+  template <typename OptimizerType>
+  void updateGroups(OptimizerType *optimizer,
+                    const std::vector<Optimizer> &optimizers);
 
 private:
   // Constants which are simply returned (possibly as part of a tuple/list) and
@@ -1118,6 +1138,7 @@ bool ipuHardwareIsAvailable(std::uint64_t num_ipus) {
               .empty();
 }
 
+namespace {
 // Variadic output case. For now we will add all outputs to the graph and
 // allocate them on the same IPU but we will only return one. This means only
 // one output can be used by user IR (but can still be used by the backed via
@@ -1175,96 +1196,216 @@ template <> struct HandleOutput<poptorch::TensorId> {
   }
 };
 
-static void insertValuesForTensor(popart::Optimizer *popart_optimizer,
-                                  const Optimizer &py_opt,
-                                  const popart::TensorId &tensor) {
-  if (py_opt.type == OptimizerType::SGD) {
-    dynamic_cast<popart::SGD *>(popart_optimizer)
-        ->insertSpecific(tensor, py_opt.learning_rate, py_opt.weight_decay,
-                         py_opt.momentum, py_opt.dampening,
-                         py_opt.velocity_scaling);
-  }
-
-  if (py_opt.type == OptimizerType::ADAM ||
-      py_opt.type == OptimizerType::ADAMW ||
-      py_opt.type == OptimizerType::ADAMW_NO_BIAS ||
-      py_opt.type == OptimizerType::LAMB ||
-      py_opt.type == OptimizerType::LAMB_NO_BIAS) {
-    dynamic_cast<popart::Adam *>(popart_optimizer)
-        ->insertSpecific(tensor, py_opt.learning_rate, py_opt.weight_decay,
-                         py_opt.beta1, py_opt.beta2, py_opt.eps);
-  }
-  if (py_opt.type == OptimizerType::RMSPROP ||
-      py_opt.type == OptimizerType::RMSPROP_CENTERED) {
-    dynamic_cast<popart::Adaptive *>(popart_optimizer)
-        ->insertSpecific(tensor, py_opt.learning_rate, py_opt.weight_decay,
-                         py_opt.alpha, py_opt.momentum, py_opt.eps);
-  }
-}
-
-template <typename... Args>
-static void printOptimizerToDebug(const std::string &opt_name,
-                                  const std::vector<std::string> &arg_names,
-                                  Args... args) {
-  std::stringstream ss;
-  ss << "Updating graph optimizer " << opt_name << " with parameters: ";
-  for (const auto &arg_name : arg_names) {
-    ss << arg_name << " {}, ";
-  }
-  logging::debug(ss.str().c_str(), args...);
-}
-
-static void printAdamLambOptimizers(const std::string &name,
-                                    const Optimizer &opt) {
-  printOptimizerToDebug(name,
-                        {"Learning rate", "Weight decay", "beta1", "beta2",
-                         "eps", "Bias correction"},
-                        opt.learning_rate.first, opt.weight_decay.first,
-                        opt.beta1.first, opt.beta2.first, opt.eps.first,
-                        opt.type == OptimizerType::ADAMW ||
-                            opt.type == OptimizerType::LAMB);
-}
-
-static void printOptimizerToDebug(const Optimizer &opt) {
-  switch (opt.type) {
+std::string toString(OptimizerType type) {
+  switch (type) {
   case OptimizerType::SGD:
-    printOptimizerToDebug(
-        "SGD", {"Learning rate", "Weight decay", "Momentum", "Dampening"},
-        opt.learning_rate.first, opt.weight_decay.first, opt.momentum.first,
-        opt.dampening.first);
-    break;
-
+    return "SGD";
   case OptimizerType::LAMB:
   case OptimizerType::LAMB_NO_BIAS:
-    printAdamLambOptimizers("LAMB", opt);
-    break;
-
+    return "LAMB";
   case OptimizerType::ADAM:
-    printAdamLambOptimizers("ADAM", opt);
-    break;
-
+    return "ADAM";
   case OptimizerType::ADAMW:
   case OptimizerType::ADAMW_NO_BIAS:
-    printAdamLambOptimizers("ADAMW", opt);
-    break;
-
+    return "ADAMW";
   case OptimizerType::RMSPROP_CENTERED:
   case OptimizerType::RMSPROP:
-    printOptimizerToDebug("RMSPROP",
-                          {"Learning rate", "alpha", "eps", "Weight decay",
-                           "Momentum", "Centered"},
-                          opt.learning_rate.first, opt.alpha.first,
-                          opt.eps.first, opt.weight_decay.first,
-                          opt.momentum.first,
-                          opt.type == OptimizerType::RMSPROP_CENTERED);
-    break;
-
+    return "RMSPROP";
   default:
     ERROR("Unreachable: Unsupported optimizer.");
   }
 }
 
+// If is_default: return the list of keys accepted by the
+// `const std::map<std::string, std::pair<float, bool>> &params` parameter
+// of the Popart constructor: it is usually the list of OptimizerValue
+// accepted by the explicit constructor.
+//
+// Else: return the list of keys accepted by insertSpecific (It's usually
+// defined in the optimizer's cpp file in a function called getSpecificNames()
+// TODO(T33686): these names should be provided by PopART.
+std::vector<std::string> getAttributeNames(OptimizerType type,
+                                           bool is_default) {
+  switch (type) {
+  case OptimizerType::SGD: {
+    if (is_default) {
+      return {"defaultLearningRate",    "defaultWeightDecay",
+              "defaultMomentum",        "defaultDampening",
+              "defaultVelocityScaling", "lossScaling"};
+    }
+    return {"learningRate", "weightDecay", "momentum", "dampening",
+            "velocityScaling"};
+  }
+  case OptimizerType::LAMB:
+  case OptimizerType::LAMB_NO_BIAS: {
+    if (is_default) {
+      return {"defaultLearningRate", "defaultWeightDecay", "defaultBeta1",
+              "defaultBeta2",        "defaultEps",         "lossScaling",
+              "maxWeightNorm"};
+    }
+    return {"learningRate", "weightDecay", "beta1", "beta2", "eps"};
+  }
+  case OptimizerType::ADAM:
+  case OptimizerType::ADAMW:
+  case OptimizerType::ADAMW_NO_BIAS: {
+    if (is_default) {
+      return {"defaultLearningRate", "defaultWeightDecay", "defaultBeta1",
+              "defaultBeta2",        "defaultEps",         "lossScaling"};
+    }
+    return {"learningRate", "weightDecay", "beta1", "beta2", "eps"};
+  }
+  case OptimizerType::RMSPROP_CENTERED:
+  case OptimizerType::RMSPROP: {
+    if (is_default) {
+      return {"defaultLearningRate", "defaultWeightDecay", "defaultAlpha",
+              "defaultMomentum",     "defaultEps",         "lossScaling"};
+    }
+    return {"learningRate", "weightDecay", "alpha", "momentum", "eps"};
+  }
+  default:
+    ERROR("Unreachable: Unsupported optimizer.");
+  }
+}
+
+std::string toString(const std::vector<std::string> &vec) {
+  std::stringstream ss;
+  ss << "[";
+  std::string sep;
+  for (const auto &s : vec) {
+    ss << sep << s;
+    sep = ", ";
+  }
+  ss << "]";
+  return ss.str();
+}
+
+int indexOf(const std::vector<std::string> &vec, const std::string &v) {
+  auto it = std::find(vec.begin(), vec.end(), v);
+  if (it == vec.end()) {
+    return -1;
+  }
+  return it - vec.begin();
+}
+
+std::vector<std::string> vectorDiff(const std::vector<std::string> &provided,
+                                    const std::vector<std::string> &expected) {
+  std::vector<std::string> missing;
+  for (const auto &exp : expected) {
+    if (indexOf(provided, exp) < 0) {
+      missing.push_back(exp);
+    }
+  }
+  return missing;
+}
+
+// Convert a Poptorch Optimizer into a map of parameters + types that
+// can be understood by the Popart Optimizer / insertSpecific.
+struct OptimizerParameters {
+public:
+  OptimizerParameters(const Optimizer &opt, bool is_default);
+  std::string debug() const;
+  OptimizerType type;
+  bool accum_types_provided;
+  popart::DataType accum_type;
+  popart::DataType first_order_momentum_accum_type;
+  popart::DataType second_order_momentum_accum_type;
+  std::map<std::string, std::pair<float, bool>> params;
+};
+
+std::string OptimizerParameters::debug() const {
+  std::stringstream ss;
+  ss << toString(type);
+  for (const auto &p : params) {
+    ss << ", " << p.first << "=" << p.second.first;
+    if (p.second.second) {
+      ss << " (const)";
+    }
+  }
+  if (accum_types_provided) {
+    ss << ", accumType=" << accum_type;
+    ss << ", firstOrderMomentumAccumType=" << first_order_momentum_accum_type;
+    ss << ", secondOrderMomentumAccumType=" << first_order_momentum_accum_type;
+  }
+  return ss.str();
+}
+
+OptimizerParameters::OptimizerParameters(const Optimizer &opt, bool is_default)
+    : type(opt.type), accum_types_provided(opt.accum_types_provided),
+      accum_type(opt.accum_type_is_half ? popart::DataType::FLOAT16
+                                        : popart::DataType::FLOAT),
+      first_order_momentum_accum_type(
+          opt.first_order_momentum_accum_type_is_half
+              ? popart::DataType::FLOAT16
+              : popart::DataType::FLOAT),
+      second_order_momentum_accum_type(
+          opt.second_order_momentum_accum_type_is_half
+              ? popart::DataType::FLOAT16
+              : popart::DataType::FLOAT) {
+  // In Popart the attributes which can be specified per group are prefixed with
+  // "default" For example learningRate -> defaultLearningRate In order to keep
+  // it simple the PopTorch frontend will always use the group name, therefore
+  // here we need to remap the PopTorch names to the Popart ones in the default
+  // case we then fall back onto the default names for the remaining attributes
+  // (e.g lossScaling)
+  std::vector<std::string> poptorch_names = getAttributeNames(opt.type, false);
+  std::vector<std::string> popart_names =
+      getAttributeNames(opt.type, is_default);
+  if (is_default) {
+    poptorch_names.reserve(popart_names.size());
+    for (std::uint64_t i = poptorch_names.size(); i < popart_names.size();
+         ++i) {
+      poptorch_names.push_back(popart_names[i]);
+    }
+  }
+  std::vector<std::string> provided_names;
+  provided_names.reserve(poptorch_names.size());
+  for (auto &p : opt.parameters) {
+    const std::string name = reinterpret_cast<const char *>(p.name);
+    provided_names.push_back(name);
+    auto idx = indexOf(poptorch_names, name);
+    ERROR_ON_MSG(idx < 0,
+                 "Unexpected "
+                     << (is_default ? "" : "group ") << "attribute " << name
+                     << " for optimizer " << toString(type)
+                     << ", allowed values: " << toString(poptorch_names));
+    ERROR_ON(
+        !params.emplace(popart_names[idx], std::make_pair(p.value, p.is_const))
+             .second);
+  }
+  ERROR_ON_MSG(opt.parameters.size() != poptorch_names.size(),
+               "Missing attributes: "
+                   << toString(type) << " optimizers require values for "
+                   << toString(vectorDiff(provided_names, poptorch_names)));
+}
+
+// A whitelist of supported loss operations. Popart needs to know which
+// operations are losses so they can be marked by the session.
+bool IsLoss(const std::string &operation) {
+  return operation == "popart::identityloss";
+}
+
+} // namespace
+
 namespace detail {
+
+template <typename OptimizerType>
+void CompilerImpl::updateGroups(OptimizerType *optimizer,
+                                const std::vector<Optimizer> &optimizers) {
+  // For each optimizer group.
+  for (std::size_t idx = 1; idx < optimizers.size(); ++idx) {
+    // Index 0 is 'defaults'
+    const std::size_t group = idx - 1;
+    OptimizerParameters group_opt{optimizers[idx], false};
+    logging::debug(
+        "Updating group {} optimizer with {} for (tensors affected {})", group,
+        group_opt.debug(), toString(grad_update_groups[group]));
+    // For each tensor in the group.
+    for (popart::TensorId &id : grad_update_groups[group]) {
+      // Update the optimizer
+      optimizer->insertSpecific(id, group_opt.params);
+    }
+  }
+}
 
 std::unique_ptr<popart::Optimizer>
 CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
@@ -1272,24 +1413,24 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
     return nullptr;
   }
 
-  std::unique_ptr<popart::Optimizer> optimizer = nullptr;
-
-  // We always use the first optimizer to initalise the optimizer.
-  const Optimizer &opt = optimizers[0];
+  // The first optimizer contains the default values.
+  OptimizerParameters opt{optimizers[0], true};
 
   // Print to debug the new optimizer.
-  printOptimizerToDebug(opt);
+  logging::debug("Updating graph optimizer with {}", opt.debug());
 
-  if (opt.type == OptimizerType::SGD) {
-    optimizer = std::make_unique<popart::SGD>(
-        opt.learning_rate, opt.weight_decay, opt.momentum, opt.dampening,
-        opt.velocity_scaling, opt.loss_scaling);
+  switch (opt.type) {
+  case OptimizerType::SGD: {
+    ERROR_ON(opt.accum_types_provided);
+    auto optimizer = std::make_unique<popart::SGD>(opt.params);
+    updateGroups(optimizer.get(), optimizers);
+    return optimizer;
   }
-
-  if (opt.type == OptimizerType::ADAM || opt.type == OptimizerType::ADAMW ||
-      opt.type == OptimizerType::ADAMW_NO_BIAS ||
-      opt.type == OptimizerType::LAMB ||
-      opt.type == OptimizerType::LAMB_NO_BIAS) {
+  case OptimizerType::ADAM:
+  case OptimizerType::ADAMW:
+  case OptimizerType::ADAMW_NO_BIAS:
+  case OptimizerType::LAMB:
+  case OptimizerType::LAMB_NO_BIAS: {
     auto adam_mode = popart::AdamMode::AdamNoBias;
     auto decay_mode = popart::WeightDecayMode::Decay;
     if (opt.type == OptimizerType::ADAM) {
@@ -1301,49 +1442,33 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
     } else if (opt.type == OptimizerType::LAMB_NO_BIAS) {
       adam_mode = popart::AdamMode::LambNoBias;
     }
-    optimizer = std::make_unique<popart::Adam>(
-        opt.learning_rate, opt.weight_decay, opt.beta1, opt.beta2, opt.eps,
-        opt.loss_scaling, opt.max_weight_norm, adam_mode, decay_mode,
-        opt.accum_type_is_half ? popart::DataType::FLOAT16
-                               : popart::DataType::FLOAT,
-        opt.first_order_momentum_accum_type_is_half ? popart::DataType::FLOAT16
-                                                    : popart::DataType::FLOAT,
-        opt.second_order_momentum_accum_type_is_half ? popart::DataType::FLOAT16
-                                                     : popart::DataType::FLOAT);
 
     // NB WeightDecayMode set to default WeightDecayMode::Decay meaning true
     // weight decay rather than L2
+    ERROR_ON(!opt.accum_types_provided);
+    auto optimizer = std::make_unique<popart::Adam>(
+        opt.params, adam_mode, decay_mode, opt.accum_type,
+        opt.first_order_momentum_accum_type,
+        opt.second_order_momentum_accum_type);
+    updateGroups(optimizer.get(), optimizers);
+    return optimizer;
   }
-
-  if (opt.type == OptimizerType::RMSPROP ||
-      opt.type == OptimizerType::RMSPROP_CENTERED) {
+  case OptimizerType::RMSPROP:
+  case OptimizerType::RMSPROP_CENTERED: {
+    ERROR_ON(!opt.accum_types_provided);
     popart::AdaptiveMode mode = opt.type == OptimizerType::RMSPROP
                                     ? popart::AdaptiveMode::RMSProp
                                     : popart::AdaptiveMode::CenteredRMSProp;
-    optimizer = std::make_unique<popart::Adaptive>(
-        opt.learning_rate, opt.weight_decay, opt.alpha, opt.momentum, opt.eps,
-        opt.loss_scaling, mode, popart::WeightDecayMode::L2Regularization,
-        popart::DataType::FLOAT, popart::DataType::FLOAT,
-        popart::DataType::FLOAT, popart::DataType::FLOAT);
+    auto optimizer = std::make_unique<popart::Adaptive>(
+        opt.params, mode, popart::WeightDecayMode::L2Regularization,
+        opt.accum_type, opt.first_order_momentum_accum_type,
+        opt.second_order_momentum_accum_type, popart::DataType::FLOAT);
+    updateGroups(optimizer.get(), optimizers);
+    return optimizer;
   }
-
-  if (optimizer == nullptr) {
-    ERROR("Unreachable: Unsupported optimizer");
-    return nullptr;
+  default:
+    ERROR("Unreachable: Unsupported optimizer.");
   }
-
-  if (optimizers.size() > 1) {
-    // For each optimizer grouo.
-    for (std::size_t group = 0; group < optimizers.size(); ++group) {
-      // For each tensor in the group.
-      for (popart::TensorId &id : grad_update_groups[group]) {
-        // Update the optimizer
-        insertValuesForTensor(optimizer.get(), optimizers[group], id);
-      }
-    }
-  }
-
-  return optimizer;
 }
 
 popart::TensorId
@@ -1438,23 +1563,6 @@ bool CompilerImpl::isHostSideConstant(poptorch::TensorId id) const {
   return _host_side_constants.count(id);
 }
 
-std::uint64_t CompilerImpl::roundUpNumIPUs(std::uint64_t num_ipus) {
-  std::uint64_t rounded_num_ipus;
-
-  if (num_ipus < 64) {
-    // If fewer than 64, find the next power of 2
-    rounded_num_ipus = 1;
-    while (rounded_num_ipus < num_ipus) {
-      rounded_num_ipus *= 2;
-    }
-  } else {
-    // Otherwise, find the next multiple of 64
-    rounded_num_ipus = ((num_ipus - 1) / 64 + 1) * 64;
-  }
-
-  return rounded_num_ipus;
-}
-
 void CompilerImpl::addMultiConvPart(const std::vector<popart::TensorId> &inputs,
                                     const std::vector<int64_t> &dilations,
                                     const std::vector<int64_t> &kernel_shape,
@@ -1507,30 +1615,6 @@ Compiler::addInputTensor(const char *type,
   popart::TensorInfo info{type, dims};
   _impl->ids.push_back(_impl->active_builder->addInputTensor(info));
   return _impl->ids.size() - 1;
-}
-
-std::vector<std::int32_t> int64ToInt32(const std::vector<std::int64_t> &in) {
-  std::vector<std::int32_t> x;
-
-  for (std::int64_t i : in) {
-    // If i is less than the int32 smallest value or greater than its biggest,
-    // throw overflow error.
-    bool overflow =
-        i > static_cast<std::int64_t>(
-                std::numeric_limits<std::int32_t>::max()) ||
-        i < static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::min());
-
-    ERROR_ON_MSG(overflow, "Int 64 overflowed during poptorch compilation.");
-    x.push_back(i);
-  }
-
-  return x;
-}
-
-// A whitelist of supported loss operations. Popart needs to know which
-// operations are losses so they can be marked by the session.
-static bool IsLoss(const std::string &operation) {
-  return operation == "popart::identityloss";
 }
 
 #define INT_VEC std::vector<std::int64_t>
