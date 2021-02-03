@@ -8,7 +8,7 @@ New features:
 - Added Adam optimizer
 - Added support for torch.nn.AdaptiveAvgPool1d, torch.nn.AdaptiveAvgPool3d
 - Migrated to PyTorch version 1.7.1
-- Add support for aten::index
+- Add support for aten::index, aten::index_put_
 - Add support for torch.zeros_like, torch.ones_like
 
 Known issues:
