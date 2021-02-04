@@ -19,12 +19,14 @@ def _default_cache_dir():
     return os.path.join(_utils.sources_dir(), ".cache")
 
 
-def _system_conda_exists():
+def _system_conda_path():
     try:
-        subprocess.check_call(["conda", "--version"], stdout=None, stderr=None)
-        return True
+        conda_root = subprocess.check_output(["conda", "info", "--base"],
+                                             stderr=None)
+        conda_root = conda_root.decode("utf-8").strip()
+        return conda_root
     except FileNotFoundError:
-        return False
+        return None
 
 
 _conda_poptorch_packages = [
@@ -198,11 +200,15 @@ class BuildenvManager:
                 f.write(f"{line}\n")
 
     def _install_conda_if_needed(self):
-        if _system_conda_exists():
+        os.makedirs(self.cache_dir, exist_ok=True)
+        system_conda = _system_conda_path()
+        if system_conda is not None:
             logger.info("Using system conda")
+            conda_sh = os.path.join(system_conda, "etc", "profile.d",
+                                    "conda.sh")
+            self._append_to_activate_buildenv(f". {conda_sh}")
             return
 
-        os.makedirs(self.cache_dir, exist_ok=True)
         miniconda_install_dir = os.path.join(self.cache_dir, "miniconda")
         conda_sh = os.path.join(miniconda_install_dir, "etc", "profile.d",
                                 "conda.sh")
