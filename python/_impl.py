@@ -868,9 +868,13 @@ class PoplarExecutor:
                                hasConvertedAnyHalf, narrowTensor):
         logger.info('Compiling the model using tracing')
 
-        convertedLayers = []
+        # CPU tracing doens't work for half types. We need to convert all half
+        # layers to float, run tracing and revert the types to their original.
+        halfLayers = set()
+        allLayers = list(self._model.named_modules())
 
-        for name, layer in self._model.named_modules():
+        # iterate in reverse to process inner layers first
+        for (name, layer) in reversed(allLayers):
             anyIsHalf = False
             for param in layer.parameters():
                 if param.dtype == torch.half:
@@ -879,8 +883,7 @@ class PoplarExecutor:
 
             if anyIsHalf:
                 layer.float()
-
-                convertedLayers.append(name)
+                halfLayers.add(name)
 
         # We will trace using the normal trace view.
         # pylint: disable=protected-access
@@ -899,9 +902,11 @@ class PoplarExecutor:
         else:
             trace_input_string = ""
 
-        # Convert any converted params back to half.
+        # Some of the trace layers of tuple float should be of type half.
+        # The following works because the iterator is hierarchic,
+        # yielding containers before contents.
         for name, layer in self._trace.named_modules():
-            if name in convertedLayers:
+            if name in halfLayers:
                 layer.half()
 
         parameters = {

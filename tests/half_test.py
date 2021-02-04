@@ -99,3 +99,45 @@ def test_ipu_print_tensor():
     out = inference_model(t1)
     assert out == 1.0
     assert out.dtype == torch.float16
+
+
+# pylint: disable=protected-access
+def test_half_tracing():
+    def check_param_types(module, dtype):
+        for param in module.parameters():
+            assert param.dtype == dtype
+
+    torch.manual_seed(42)
+
+    x = torch.randn(10, 10)
+    model = torch.nn.Sequential()
+    model.add_module('linear1', torch.nn.Linear(10, 10))
+    model.add_module('linear2', torch.nn.Linear(10, 10))
+
+    popmodel = poptorch.inferenceModel(model)
+    popmodel(x)
+    check_param_types(popmodel._trace.linear1, torch.float)
+    check_param_types(popmodel._trace.linear2, torch.float)
+
+    model.linear2.half()
+    popmodel = poptorch.inferenceModel(model)
+    popmodel(x)
+    check_param_types(popmodel._trace.linear1, torch.float)
+    check_param_types(popmodel._trace.linear2, torch.half)
+
+    model.half()
+    popmodel = poptorch.inferenceModel(model)
+    popmodel(x)
+    check_param_types(popmodel._trace.linear1, torch.half)
+    check_param_types(popmodel._trace.linear2, torch.half)
+
+    model.linear1.float()
+    popmodel = poptorch.inferenceModel(model)
+    popmodel(x)
+    check_param_types(popmodel._trace.linear1, torch.float)
+    check_param_types(popmodel._trace.linear2, torch.half)
+
+    model.half()
+    model.linear2.float()
+    check_param_types(popmodel._trace.linear1, torch.half)
+    check_param_types(popmodel._trace.linear2, torch.float)
