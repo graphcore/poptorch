@@ -9,6 +9,78 @@ import helpers
 import poptorch
 
 
+def test_half_float_default_option():
+    class SimpleAdder(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = SimpleAdder()
+    inference_model = poptorch.inferenceModel(model)
+
+    t1 = torch.tensor([1.]).half()
+    t2 = torch.tensor([2.]).float()
+
+    outHalf = inference_model(t1, t2)
+    assert outHalf.dtype == torch.half
+
+    # Refresh and try the other way
+    model = SimpleAdder()
+    inference_model = poptorch.inferenceModel(model)
+
+    outHalf = inference_model(t2, t1)
+    assert outHalf.dtype == torch.half
+
+
+def test_half_float_downcast_option():
+    class SimpleAdder(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = SimpleAdder()
+    opts = poptorch.Options()
+    opts.GraphProcessing.halfFloatCasting(
+        poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)
+    inference_model = poptorch.inferenceModel(model, opts)
+
+    t1 = torch.tensor([1.]).half()
+    t2 = torch.tensor([2.]).float()
+
+    outHalf = inference_model(t1, t2)
+    assert outHalf.dtype == torch.half
+
+    # Refresh and try the other way
+    model = SimpleAdder()
+    inference_model = poptorch.inferenceModel(model)
+
+    outHalf = inference_model(t2, t1)
+    assert outHalf.dtype == torch.half
+
+
+def test_half_float_upcast_option():
+    class SimpleAdder(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = SimpleAdder()
+    opts = poptorch.Options()
+    opts.GraphProcessing.halfFloatCasting(
+        poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
+    inference_model = poptorch.inferenceModel(model, opts)
+
+    t1 = torch.tensor([1.]).half()
+    t2 = torch.tensor([2.]).float()
+
+    outFlot = inference_model(t1, t2)
+    assert outFlot.dtype == torch.float
+
+    # Refresh and try the other way
+    model = SimpleAdder()
+    inference_model = poptorch.inferenceModel(model, opts)
+
+    outFloat = inference_model(t2, t1)
+    assert outFloat.dtype == torch.float
+
+
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 def test_resnet():
     torch.manual_seed(42)

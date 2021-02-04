@@ -51,7 +51,8 @@ bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
 
 c10::ScalarType promoteTypes(c10::ScalarType t1, c10::ScalarType t2) {
   if (halfFloatCastingBehavior() == HalfFloatCasting::FloatDowncastToHalf) {
-    if (t1 == c10::ScalarType::Half && t2 == c10::ScalarType::Float) {
+    if ((t1 == c10::ScalarType::Half && t2 == c10::ScalarType::Float) ||
+        (t1 == c10::ScalarType::Float && t2 == c10::ScalarType::Half)) {
       return c10::ScalarType::Half;
     }
   } else {
