@@ -124,9 +124,15 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
     index += *dims[dim];
   }
 
-  return createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
-                             wrapInConstant1D(graph, index + 1),
-                             wrapInConstant1D(graph, dim)});
+  auto slice_node =
+      createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
+                          wrapInConstant1D(graph, index + 1),
+                          wrapInConstant1D(graph, dim)});
+
+  // Reshape to remove the singleton dimenson left in by slice
+  auto original_shape = shapeFromTensor(node->output());
+
+  return createReshape(graph, slice_node->output(), original_shape);
 }
 
 torch::jit::Node *contiguousHandler(torch::jit::Graph *graph,
@@ -263,7 +269,6 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
 
   // Slice up according to the canonicalised split vector.
   for (std::int64_t slice_size : size_of_each_split) {
-    // Create a slice.
     torch::jit::Node *slice =
         createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
                             wrapInConstant1D(graph, index + slice_size),

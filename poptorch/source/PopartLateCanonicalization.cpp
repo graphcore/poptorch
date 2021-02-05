@@ -183,41 +183,7 @@ void canonicalizeLate(torch::jit::Graph *graph) {
                             nodeToString(node));
     const torch::jit::Symbol kind = node->kind();
 
-    if (kind == symbols::popart::slice) {
-      /*
-         Popart slice leaves in singleton dimensions whereas pytorch does not.
-         So we must reshape the output to retain the pytorch form.
-      */
-      callbacks.emplace_back([node, &graph]() {
-        c10::TensorTypePtr as_tensor =
-            node->output()->type()->cast<c10::TensorType>();
-
-        c10::VaryingShape dims = as_tensor->sizes();
-
-        if (!dims.size()) {
-          return;
-        }
-
-        std::vector<std::int64_t> original_shape;
-
-        for (auto optional_int : *dims.sizes()) {
-          original_shape.push_back(*optional_int);
-        }
-
-        torch::jit::Node *reshaped =
-            createReshape(graph, node->output(), original_shape);
-        reshaped->moveAfter(node);
-
-        node->replaceAllUsesWith(reshaped);
-
-        // Replace all uses doesn't check that the use isn't in the instruction
-        // doing the replacing! So we revert that manually.
-        reshaped->replaceInput(0, node->output());
-
-        // Take the type of the old value.
-        reshaped->output()->setType(node->output()->type());
-      });
-    } else if (kind == symbols::poptorch::begin_multi_conv) {
+    if (kind == symbols::poptorch::begin_multi_conv) {
       multi_conv_handler.begin(node);
     } else if (multi_conv_handler.inMultiConv() &&
                kind == symbols::popart::conv) {

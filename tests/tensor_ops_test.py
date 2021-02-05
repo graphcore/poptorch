@@ -146,6 +146,28 @@ def test_split(split_size_or_sections):
         assert torch.equal(native, pop)
 
 
+def test_split_singleton():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.split(x, 1, 1)[0]
+
+    model = Model()
+    x = torch.randn(1, 4, 3, 1)
+
+    # Run on CPU.
+    native_out = model(x)
+    print(native_out.shape)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+    print(poptorch_out.shape)
+
+    for native, pop in zip(native_out, poptorch_out):
+        assert native.size() == pop.size()
+        assert torch.equal(native, pop)
+
+
 def test_squeeze():
     class Model(torch.nn.Module):
         def forward(self, x):
