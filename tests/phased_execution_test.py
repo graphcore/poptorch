@@ -239,6 +239,7 @@ class LogChecker(helpers.LogChecker):
         # pylint: enable=line-too-long
 
 
+@helpers.printCapfdOnExit
 def test_2x2_parallel_phased_execution_inline(capfd):
     poptorch.setLogLevel(1)  # Force debug logging
     N = 3
@@ -294,6 +295,7 @@ def test_2x2_parallel_phased_execution_inline(capfd):
     testlog.validate_2x2_parallel_phased_execution()
 
 
+@helpers.printCapfdOnExit
 def test_2x2_parallel_phased_execution_opts(capfd):
     poptorch.setLogLevel(1)  # Force debug logging
     N = 3
@@ -354,6 +356,7 @@ def test_2x2_parallel_phased_execution_opts(capfd):
     testlog.validate_2x2_parallel_phased_execution()
 
 
+@helpers.printCapfdOnExit
 def test_2x2_parallel_phased_execution_small_opts(capfd):
     poptorch.setLogLevel(1)  # Force debug logging
     size = 10

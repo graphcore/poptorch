@@ -55,6 +55,36 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
         user_model=model)
 
 
+class PrintCapfdOnExit:
+    """Helper that prints the content of capfd on exit
+
+    Useful if a test fails before its output validation step."""
+
+    def __init__(self, capfd):
+        self.capfd = capfd
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        out, err = self.capfd.readouterr()
+        log = out + err
+        with self.capfd.disabled():
+            if log:
+                print(log)
+
+
+def printCapfdOnExit(func):
+    """Decorator to print the content of capfd after the wrapped function
+    exits."""
+
+    def wrapper(capfd, *args, **kwargs):
+        with PrintCapfdOnExit(capfd):
+            func(*args, **kwargs, capfd=capfd)
+
+    return wrapper
+
+
 class LogChecker:
     def __init__(self, capfd):
         out, err = capfd.readouterr()

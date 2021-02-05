@@ -11,6 +11,7 @@ import poptorch
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
+@helpers.printCapfdOnExit
 def test_ExecutableCaching(capfd):
     poptorch.setLogLevel(1)  # Force debug logging
 

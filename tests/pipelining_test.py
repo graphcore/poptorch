@@ -30,6 +30,7 @@ def test_missing_block():
         m.compile(torch.randn(2, 5))
 
 
+@helpers.printCapfdOnExit
 def test_api_inline(capfd):
     poptorch.setLogLevel(1)  # Force debug logging
 
@@ -175,6 +176,7 @@ def test_recomputation_checkpoint_tensor_tuple_inputs():
     run_recomputation_checkpoint_test(size, Model, 3)
 
 
+@helpers.printCapfdOnExit
 def test_api_wrap(capfd):
     """
     stage "0" ipu(0) stage(0) l0 l1 l2
@@ -212,6 +214,7 @@ def test_api_wrap(capfd):
     log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(0), stage(0)")
 
 
+@helpers.printCapfdOnExit
 def test_api_wrap_2stages(capfd):
     """
     stage "0" ipu(0) stage(0) l0
@@ -253,6 +256,7 @@ def test_api_wrap_2stages(capfd):
     log.assert_contains(" Mul:0/2 ", " mode(Pipelined), ipu(1), stage(1)")
 
 
+@helpers.printCapfdOnExit
 def test_inline_AutoIncrement(capfd):
     poptorch.setLogLevel(1)  # Force debug logging
 
@@ -287,6 +291,7 @@ def test_inline_AutoIncrement(capfd):
     log.assert_contains(" Mul:0/3 ", " mode(Pipelined), ipu(1), stage(4)")
 
 
+@helpers.printCapfdOnExit
 def test_api_AutoIncrement(capfd):
     poptorch.setLogLevel(1)  # Force debug logging
 
