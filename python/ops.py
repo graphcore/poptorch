@@ -280,7 +280,12 @@ class BeginBlock(torch.nn.Module):
 # pylint: enable=abstract-method
 
 
-def custom_op(inputs, name, domain, domain_version, example_outputs):
+def custom_op(inputs,
+              name,
+              domain,
+              domain_version,
+              example_outputs,
+              attributes=None):
     """Applies a custom operation, implemented within PopART, to the inputs.
 
     :param tuple inputs: A tuple of input tensors, for example, (x, y).
@@ -290,6 +295,7 @@ def custom_op(inputs, name, domain, domain_version, example_outputs):
     :param iterable example_outputs: a tuple of tensors with the same type
         and shape of the outputs; the value does not matter as all values will
         be set to zero for tracing purposes.
+    :param dict attributes: a dictionary of attributes for the custom op.
 
     :returns: The outputs of the forward op of the custom op.
     """
@@ -300,10 +306,53 @@ def custom_op(inputs, name, domain, domain_version, example_outputs):
         # to be a template). Otherwise the compiler may recognise the alias.
         transformed_outputs.append(torch.zeros_like(output))
 
+    def encodeStr(s):
+        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+    def strForAttribute(name, value):
+        if not isinstance(name, str):
+            raise ValueError("Attribute key is not a string.")
+
+        s = f"{name}: "
+
+        if isinstance(value, (float, int)):
+            return s + str(value)
+
+        if isinstance(value, (str)):
+            return s + encodeStr(value)
+
+        if isinstance(value, (list, tuple)):
+            if len(value) == 0:
+                return s + "[]"
+
+            if not all(isinstance(v, type(value[0])) for v in value):
+                raise ValueError("All types in an attributes list must be " +
+                                 "the same")
+
+            if isinstance(value[0], (float, int)):
+                return s + repr(value)
+
+            if isinstance(value[0], (str)):
+                s += "["
+                s += ", ".join([encodeStr(v) for v in value])
+                s += "]"
+                return s
+
+        raise ValueError(f"Invalid type {type(value)} for attribute {name}")
+
+    def toAttribStr(attributes):
+        if attributes is None:
+            return ""
+
+        return ", ".join([
+            strForAttribute(name, value) for name, value in attributes.items()
+        ])
+
     return torch.ops.poptorch.custom_operation(inputs, name, domain,
                                                domain_version,
                                                len(transformed_outputs),
-                                               transformed_outputs)
+                                               transformed_outputs,
+                                               toAttribStr(attributes))
 
 
 def identity_loss(x, reduction):

@@ -22,9 +22,13 @@ torch::jit::Node *customOpHandler(torch::jit::Graph *graph,
   // Get the number of outputs.
   std::int64_t num_outputs = constantToLong(node->input(4)->node());
 
+  // The attributes are encoded in a string and can be processed upon the
+  // lowering
+  std::string attributes = constantToString(node->input(6)->node());
+
   // Add the custom op with a variadic number of outputs.
   torch::jit::Node *custom_op = createCustomOperation(
-      graph, inputs, name, domain, domain_version, num_outputs);
+      graph, inputs, name, domain, domain_version, num_outputs, attributes);
 
   // It is replacing an operation which returned a list so add a list
   // construct to keep the IR legal.

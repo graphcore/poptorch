@@ -74,15 +74,17 @@ at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
 }
 
 c10::List<at::Tensor>
-customOperation(c10::List<at::Tensor> inputs,            // NOLINT
-                std::string name, std::string domain,    // NOLINT
-                int64_t version, int64_t num_outputs,    // NOLINT
-                c10::List<at::Tensor> example_outputs) { // NOLINT
+customOperation(c10::List<at::Tensor> inputs,          // NOLINT
+                std::string name, std::string domain,  // NOLINT
+                int64_t version, int64_t num_outputs,  // NOLINT
+                c10::List<at::Tensor> example_outputs, // NOLINT
+                std::string attributes) {              // NOLINT
   UNUSED(inputs);
   UNUSED(name);
   UNUSED(domain);
   UNUSED(version);
   UNUSED(num_outputs);
+  UNUSED(attributes);
 
   return example_outputs;
 }

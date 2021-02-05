@@ -84,7 +84,8 @@ torch::jit::Node *
 createCustomOperation(torch::jit::Graph *graph,
                       const std::vector<torch::jit::Value *> &inputs,
                       const std::string &name, const std::string &domain,
-                      std::int64_t domainVersion, std::int64_t numOutputs);
+                      std::int64_t domainVersion, std::int64_t numOutputs,
+                      const std::string &attributes);
 
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
                              c10::ScalarType scalar);
