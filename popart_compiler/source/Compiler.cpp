@@ -234,7 +234,7 @@ public:
 
   std::vector<popart::TensorId> build(popart::Builder *builder) const {
     auto opset = builder->aiGraphcoreOpset1();
-    return opset.multiconv(_inputs, _dilations, _pads, _strides,
+    return opset.multiconv(_inputs, _dilations, {}, _pads, {}, _strides,
                            _options.availableMemoryProportions,
                            _options.partialsTypes, _options.planType,
                            _options.perConvReservedTiles,
