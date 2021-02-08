@@ -323,8 +323,15 @@ def _convertOptimizerToDict(optimizer):
                 _GroupGetter(),
                 _ValueConstPairFormatter(variable_attrs, isNeverConst),
                 new_name="learningRate")
-    _AttrReader(attr_readers, "weight_decay", _GroupGetter(),
-                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(0.0)))
+    weight_decay_const_value = 0.0
+    # In PyTorch AdamW has a different default value from Adam
+    if optimizer_type == _OptimizerType.ADAMW:
+        weight_decay_const_value = 1e-2
+
+    _AttrReader(
+        attr_readers, "weight_decay", _GroupGetter(),
+        _ValueConstPairFormatter(variable_attrs,
+                                 _IsEqualTo(weight_decay_const_value)))
     _AttrReader(attr_readers, "momentum", _GroupGetter(),
                 _ValueConstPairFormatter(variable_attrs, _IsEqualTo(0.0)))
     _AttrReader(attr_readers, "velocity_scaling", _GroupGetter(1.0),

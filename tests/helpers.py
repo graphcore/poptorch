@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import copy
+import functools
+import re
 import torch
 import poptorch
 import poptorch.poptorch_core as poptorch_core
@@ -78,6 +80,7 @@ def printCapfdOnExit(func):
     """Decorator to print the content of capfd after the wrapped function
     exits."""
 
+    @functools.wraps(func)
     def wrapper(capfd, *args, **kwargs):
         with PrintCapfdOnExit(capfd):
             func(*args, **kwargs, capfd=capfd)
@@ -104,3 +107,25 @@ class LogChecker:
             ]), (f"{self._log}"
                  "\n No line in the above log contains all of the strings "
                  f"{strings}")
+
+    def assert_matches(self, *exprs):
+        """Assert there is a line in the log matching all the regular expressions provided
+        """
+        for line in self._lines:
+            if all([re.search(e, line) for e in exprs]):
+                # Found a line matching all the exprs
+                return
+        raise ValueError(
+            f"{self._log}"
+            "\n No line in the above log matches all of the expressions "
+            f"{exprs}")
+
+    def assert_no_matches(self, *exprs):
+        """Assert there is no line matching all the regular expressions provided"""
+        for line in self._lines:
+            if all([re.search(e, line) for e in exprs]):
+                # Found a line matching all the exprs
+                raise ValueError(
+                    f"{line}"
+                    "\n The line above matches all of the expressions "
+                    f"{exprs}")

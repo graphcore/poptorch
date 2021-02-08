@@ -453,3 +453,149 @@ def test_variable_groups(capfd):
                             "velocityScaling=3,")
     testlog.assert_contains("group 1 optimizer with SGD", "learningRate=1,",
                             "velocityScaling=3,")
+
+
+@helpers.printCapfdOnExit
+@pytest.mark.parametrize("opt", (
+    (poptorch.optim.SGD, (("momentum", 0.0), ("dampening", 0.0),
+                          ("weight_decay", 0.0))),
+    (poptorch.optim.Adam, (("betas", (0.9, 0.999)), ("eps", 1e-08),
+                           ("weight_decay", 0.0), ("amsgrad", False))),
+    (poptorch.optim.AdamW, (("betas", (0.9, 0.999)), ("eps", 1e-08),
+                            ("weight_decay", 0.01), ("amsgrad", False))),
+    (poptorch.optim.RMSprop, (("momentum", 0.0), ("alpha", 0.99),
+                              ("eps", 1e-08), ("weight_decay", 0.0))),
+))
+# pylint: disable=too-many-statements
+def test_variable_default(opt, capfd):
+    def toCamelCase(string):
+        """Convert a snake case string (Pytorch) to camel case (Popart)"""
+        words = string.split("_")
+        return words[0] + "".join(w.capitalize() for w in words[1:])
+
+    def toPopartName(name, default):
+        if name == "lr":
+            name = "learning_rate"
+        # amsgrad doesn't get passed to the backend
+        if name in ["amsgrad"]:
+            return []
+        if name == "betas":
+            return toPopartName("beta1", default) + toPopartName(
+                "beta2", default)
+        if default:
+            name = "default_" + name
+        return [toCamelCase(name)]
+
+    def createExpr(attr, is_const=True):
+        const_expr = r" \(const\)"
+        if not is_const:
+            const_expr = "(?!" + const_expr + ")"
+
+        return r"%s=[^ ,]+%s" % (attr, const_expr)
+
+    def genRegexp(attrs, default=False, is_const=False):
+        if isinstance(attrs, str):
+            attrs = [attrs]
+        exprs = []
+        for a in attrs:
+            for n in toPopartName(a, default):
+                exprs.append(createExpr(n, is_const))
+        return exprs
+
+    # All the attribute values in "opt" are the default pytorch values which
+    # means if the user instantiate a pytorch optimizer with them, we'll
+    # consider all these attributes as constant.
+    # However if a poptorch optimizer is used then they will all be considered
+    # as variable because they were explicitly passed to the constructor.
+    poptorch_opt, opt_args_tuple = opt
+    opt_args = dict(opt_args_tuple)
+    poptorch.setLogLevel(1)  # Force debug logging
+    pytorch_opt = poptorch_opt.__bases__[0]  # Retrieve the upstream type
+
+    # Learning rate is a special case: it's always variable so handle it separately.
+    attrs = list(opt_args.keys())
+
+    # Test the torch Optimizer: check all the attributes are set to constant by default
+    model = OptimizerTestModel()
+    optimizer = pytorch_opt(model.parameters(), lr=1.0, **opt_args)
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches("graph optimizer",
+                           *genRegexp(attrs, default=True, is_const=True),
+                           *genRegexp("lr", default=True, is_const=False))
+    testlog.assert_matches("group 0 optimizer",
+                           *genRegexp(attrs, is_const=True),
+                           *genRegexp("lr", is_const=False))
+
+    # Create a default pytorch optimizer (It should be identical to the previous one)
+    optimizer = pytorch_opt(model.parameters(), lr=1.0)
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    # As the optimizer is identical it shouldn't trigger any update in the backend
+    testlog.assert_no_matches("graph optimizer")
+    testlog.assert_no_matches("group 0 optimizer")
+
+    # Create a default poptorch optimizer (As we don't explicitly specify any attribute they will all be considered as constant)
+    optimizer = poptorch_opt(model.parameters(), lr=1.0)
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    # As the optimizer is identical it shouldn't trigger any update in the backend
+    testlog.assert_no_matches("graph optimizer")
+    testlog.assert_no_matches("group 0 optimizer")
+
+    # Create a poptorch optimizer and set all the attributes manually: they should all be marked as variable
+    # So let's now manually mark them as constant (This should result in the same optimizer as the default one)
+    optimizer = poptorch_opt(model.parameters(), lr=1.0, **opt_args)
+    for attr in opt_args.keys():
+        assert not optimizer.variable_attrs.isConstant(attr)
+        optimizer.variable_attrs.markAsConstant(attr)
+    model.run(optimizer)
+    # As the optimizer is identical it shouldn't trigger any update in the backend
+    testlog.assert_no_matches("graph optimizer")
+    testlog.assert_no_matches("group 0 optimizer")
+
+    # Test the poptorch Optimizer: check all the manually set attributes are set to variable by default
+    # Create a new model as the optimizers would otherwise mismatch
+    model = OptimizerTestModel()
+    optimizer = poptorch_opt(model.parameters(), lr=1.0, **opt_args)
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches("graph optimizer",
+                           *genRegexp(attrs, default=True, is_const=False),
+                           *genRegexp("lr", default=True, is_const=False))
+    testlog.assert_matches("group 0 optimizer",
+                           *genRegexp(attrs, is_const=False),
+                           *genRegexp("lr", is_const=False))
+
+    # Check the values can actually change
+    new_opts = {}
+    for k, v in opt_args.items():
+        if isinstance(v, float):
+            new_opts[k] = v + 0.5
+        elif isinstance(v, tuple):
+            new_opts[k] = tuple(elt / 2.0 for elt in v)
+        else:
+            new_opts[k] = v
+    optimizer = poptorch_opt(model.parameters(), lr=1.0, **new_opts)
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches("graph optimizer",
+                           *genRegexp(attrs, default=True, is_const=False),
+                           *genRegexp("lr", default=True, is_const=False))
+    testlog.assert_matches("group 0 optimizer",
+                           *genRegexp(attrs, is_const=False),
+                           *genRegexp("lr", is_const=False))
+
+    # Check we can manually mark attributes as variable
+    optimizer = poptorch_opt(model.parameters(), lr=1.0)
+    for attr in opt_args.keys():
+        assert optimizer.variable_attrs.isConstant(attr)
+        optimizer.variable_attrs.markAsVariable(attr)
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches("graph optimizer",
+                           *genRegexp(attrs, default=True, is_const=False),
+                           *genRegexp("lr", default=True, is_const=False))
+    testlog.assert_matches("group 0 optimizer",
+                           *genRegexp(attrs, is_const=False),
+                           *genRegexp("lr", is_const=False))
