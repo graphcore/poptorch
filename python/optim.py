@@ -68,7 +68,7 @@ class SGD(torch.optim.SGD):
     # Attributes (from the parent or child class) which can be set per group.
     _group_vars = [
         "lr", "momentum", "dampening", "weight_decay", "nesterov",
-        "velocity_scaling", "velocity_scaling", "nesterov"
+        "velocity_scaling"
     ]
 
     def __init__(self,
@@ -455,7 +455,7 @@ class LAMB(torch.optim.Optimizer):
     _child_vars = ["max_weight_norm", "loss_scaling"]
     # All the attributes and variables which don't exist in the parent optimizer class.
     _child_only = _child_vars + [
-        "accum_type", "first_order_momentum_accum_type",
+        "bias_correction", "accum_type", "first_order_momentum_accum_type",
         "second_order_momentum_accum_type"
     ]
     # Attributes (from the parent or child class) which can be set per group.

@@ -244,6 +244,13 @@ class _BetaReader(_AttrReader):
         }
 
 
+def warnOnExtraAttr(expected, provided, attr_type, opt_type):
+    extra = [attr for attr in provided if attr not in expected]
+    if extra:
+        logger.warning("Ignoring unexpected %s in %s optimizer: %s ",
+                       attr_type, opt_type.name, extra)
+
+
 def _convertOptimizerToDict(optimizer):
     optimizer_type = _toPoptorchOptimizer(optimizer)
 
@@ -355,14 +362,26 @@ def _convertOptimizerToDict(optimizer):
     #   ]
     # }
     group_vars = opt_class._group_vars  # pylint: disable=protected-access
-    opt_attrs = [
+    all_attrs = [
         attr for attr in opt_class._child_only if attr not in group_vars  # pylint: disable=protected-access
-        and attr not in opt_class._child_vars  # pylint: disable=protected-access
+    ]
+    opt_attrs = [
+        attr for attr in all_attrs if attr not in opt_class._child_vars  # pylint: disable=protected-access
     ]
     opt_vars = [
         attr for attr in opt_class._child_only  # pylint: disable=protected-access
         if attr in opt_class._child_vars  # pylint: disable=protected-access
     ]
+
+    def getOptimizerAttrNames(opt):
+        # Remove attributes belonging to the upstream Optimizer
+        exceptions = ["defaults", "state", "param_groups", "variable_attrs"]
+        return [k for k in opt.__dict__.keys() if k not in exceptions]
+
+    def getGroupAttrNames(group):
+        # Remove attributes belonging to the upstream Optimizer
+        exceptions = ["params"]
+        return [k for k in group.keys() if k not in exceptions]
 
     opts = {"optimizer_type": optimizer_type}
     for attr in opt_attrs:
@@ -370,8 +389,16 @@ def _convertOptimizerToDict(optimizer):
     defaults = {}
     for attr in group_vars:
         defaults.update(attr_readers[attr](optimizer.defaults))
+    warnOnExtraAttr(group_vars, list(optimizer.defaults.keys()),
+                    "default group variable", optimizer_type)
     for attr in opt_vars:
         defaults.update(attr_readers[attr](optimizer))
+    warnOnExtraAttr(opt_attrs + opt_vars, getOptimizerAttrNames(optimizer),
+                    "optimizer attribute", optimizer_type)
+    for i, g in enumerate(optimizer.param_groups):
+        warnOnExtraAttr(group_vars, getGroupAttrNames(g),
+                        f"group {i} attribute", optimizer_type)
+
     opts["defaults"] = defaults
 
     # Create num_groups dictionaries
