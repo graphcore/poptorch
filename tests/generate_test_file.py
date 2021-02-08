@@ -63,20 +63,24 @@ external_data_tests = [
 #pylint: enable=line-too-long
 
 
-def add_test(output, test, folder, labels, test_id):
+def add_test(output, test, folder, labels, test_id, work_dir):
     output.write(f"add_test({test} \"python3\" \"-m\" \"pytest\" \"-s\" "
                  f"\"{folder}/{test}\" "
                  f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
+    labels_props = ""
     if labels:
-        output.write(f"set_tests_properties({test} PROPERTIES  LABELS "
-                     f"\"{labels}\")\n")
+        labels_props = f"LABELS \"{labels}\""
+    output.write(f"set_tests_properties({test} PROPERTIES ${labels_props}"
+                 f" WORKING_DIRECTORY \"{work_dir}\")\n")
 
+
+work_dir = os.getcwd()
 
 with open(args.output_file, "w") as output:
     test_id = 0
     # Add the short_tests files
     for test in short_tests:
-        add_test(output, test, args.test_dir, "short", test_id)
+        add_test(output, test, args.test_dir, "short", test_id, work_dir)
         test_id += 1
 
     # Process the list of tests returned by pytest
@@ -95,5 +99,5 @@ with open(args.output_file, "w") as output:
             if test in external_data_tests:
                 labels.append("external_data")
             add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
-                     ";".join(labels), test_id)
+                     ";".join(labels), test_id, work_dir)
             test_id += 1

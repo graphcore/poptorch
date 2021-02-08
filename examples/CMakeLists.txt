@@ -9,7 +9,7 @@ function(add_poptorch_py_example name path)
   endif()
   add_test(NAME "${name}_example"
            COMMAND python3 ${path}/${name}.py
-           WORKING_DIRECTORY ${CMAKE_CURRENT_BUILD_DIR})
+           WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
   set_tests_properties("${name}_example" PROPERTIES LABELS "examples${extra_labels}")
 endfunction()
 

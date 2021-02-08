@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import os
 import ctypes
-import platform
+import pathlib
 import torch
 import torch.nn as nn
 import helpers
 import poptorch
 
 #loading_library_start
-if platform.system() == "Darwin":
-    myso = os.path.join(os.getcwd(), "custom_ops/libcustom_cube_op.dylib")
-else:
-    myso = os.path.join(os.getcwd(), "custom_ops/libcustom_cube_op.so")
-
-myop = ctypes.cdll.LoadLibrary(myso)
+myso = list(pathlib.Path("tests").rglob("libcustom_cube_op.*"))
+assert myso, "Failed to find libcustom_cube_op"
+myop = ctypes.cdll.LoadLibrary(myso[0])
 
 #loading_library_end
 
