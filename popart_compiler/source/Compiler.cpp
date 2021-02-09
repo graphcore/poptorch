@@ -1325,7 +1325,7 @@ std::string OptimizerParameters::debug() const {
   if (accum_types_provided) {
     ss << ", accumType=" << accum_type;
     ss << ", firstOrderMomentumAccumType=" << first_order_momentum_accum_type;
-    ss << ", secondOrderMomentumAccumType=" << first_order_momentum_accum_type;
+    ss << ", secondOrderMomentumAccumType=" << second_order_momentum_accum_type;
   }
   return ss.str();
 }

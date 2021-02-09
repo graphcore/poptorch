@@ -124,29 +124,35 @@ def test_sgd_IR(opt):
         assert AdamVarUpdate == 2 and AdamUpdater == 2
 
 
+@helpers.printCapfdOnExit
 @pytest.mark.parametrize("opt", (poptorch.optim.Adam, poptorch.optim.AdamW,
                                  AdamWNoBias, poptorch.optim.LAMB, LAMBNoBias))
-@pytest.mark.parametrize("accType", (torch.float16, torch.float))
-def test_IR_accum_type(opt, accType):
+@pytest.mark.parametrize("accum_type", (torch.float16, torch.float))
+@pytest.mark.parametrize("first_order_type", (torch.float16, torch.float))
+@pytest.mark.parametrize("second_order_type", (torch.float16, torch.float))
+def test_accum_type(capfd, opt, accum_type, first_order_type,
+                    second_order_type):
+    def torchTypeToStr(dt):
+        t = str(dt)
+        assert t in ["torch.float32", "torch.float16"]
+        return t.split(".")[1]
+
+    poptorch.setLogLevel(1)  # Force debug logging
     torch.manual_seed(42)
     model = OptimizerTestModel()
 
     # "Train" with learning rate of zero and check the loss remains the same.
-    optimizer = opt(model.parameters(), lr=0.01, accum_type=accType)
-    # These two should also be tested but they don't appear to work in popart yet.
-    # first_order_momentum_accum_type=torch.float16,
-    # second_order_momentum_accum_type=torch.float16,
-    #TODO ^
+    optimizer = opt(model.parameters(),
+                    lr=0.01,
+                    accum_type=accum_type,
+                    first_order_momentum_accum_type=first_order_type,
+                    second_order_momentum_accum_type=second_order_type)
     model.run(optimizer)
-
-    as_json = json.load(StringIO(model.poptorch_model._debugGetPopartIR()))  # pylint: disable=protected-access
-
-    numCastsFound = sum([op["type"] == "Cast" for op in as_json["maingraph"]])
-
-    if accType == torch.float16:
-        assert numCastsFound == 2
-    else:
-        assert numCastsFound == 0
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches(
+        "graph optimizer", "accumType=" + torchTypeToStr(accum_type),
+        "firstOrderMomentumAccumType=" + torchTypeToStr(first_order_type),
+        "secondOrderMomentumAccumType=" + torchTypeToStr(second_order_type))
 
 
 def test_velocity_scaling_copy():
