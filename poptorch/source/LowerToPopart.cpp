@@ -451,7 +451,8 @@ void LowerToPopart::lowerBody() {
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other
       // IDs.
-      std::vector<poptorch::TensorId> outs{num_outputs};
+      std::vector<poptorch::TensorId> outs;
+      outs.resize(num_outputs);
       for (std::uint64_t i = 0; i < num_outputs; ++i) {
         outs[i] = first_output_tensor + i;
       }
@@ -480,7 +481,8 @@ void LowerToPopart::lowerBody() {
       // The callback only returns the ID of the first tensor, but we know
       // the generated tensors have contiguous IDs, so we can infer the other
       // IDs.
-      std::vector<poptorch::TensorId> outs{num_outputs};
+      std::vector<poptorch::TensorId> outs;
+      outs.resize(num_outputs);
       for (std::uint64_t i = 0; i < num_outputs; ++i) {
         outs[i] = first_output_tensor + i;
       }

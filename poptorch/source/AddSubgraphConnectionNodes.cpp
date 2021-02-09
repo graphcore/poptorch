@@ -29,7 +29,12 @@ struct Subgraph {
   // Track the inputs already added so we don't double count them.
   std::unordered_set<torch::jit::Value *> added_inputs;
 
+  // Map of new inputs to old inputs.
   std::unordered_map<torch::jit::Value *, torch::jit::Value *> input_map;
+
+  // Map of old inputs to the new ones.
+  std::unordered_map<torch::jit::Value *, torch::jit::Value *>
+      reverse_input_map;
 
   bool is_loop;
 };
@@ -73,6 +78,7 @@ bool markInputsAsComingFromParent(torch::jit::Graph *graph,
       } else {
         torch::jit::Node *new_out = createAddUntypedInputTensor(graph, value);
         subgraph->input_map.insert({new_out->output(), value});
+        subgraph->reverse_input_map.insert({value, new_out->output()});
       }
       subgraph->added_inputs.insert(value);
       changed = true;
@@ -96,6 +102,12 @@ void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
     if (not_used_in_subgraph) {
       torch::jit::Node *node = createIdentity(graph, {output});
       output = node->output();
+    }
+
+    // PopART doesn't allow inputs to be outputs directly.
+    if (subgraph->reverse_input_map.find(output) !=
+        subgraph->reverse_input_map.end()) {
+      output = subgraph->reverse_input_map[output];
     }
 
     torch::jit::Node *new_node = createAddOutputTensor(graph, output);

@@ -23,6 +23,17 @@ def for_loop(count, body, inputs):
     :param inputs: The initial inputs to the functon.
     """
 
+    if not isinstance(inputs, list):
+        raise ValueError(("poptorch.for_loop expects input tensors (inputs)"
+                          " to be a list of tensors. (Object is not list)"))
+
+    for ind, tensor in enumerate(inputs):
+        if not isinstance(tensor, torch.Tensor):
+            raise ValueError(
+                ("poptorch.for_loop expects input tensors (inputs) to be"
+                 " a list of tensors. (Object contained in list at index"
+                 " %d is not torch.tensor)") % ind)
+
     # Start the for loop.
     torch.ops.poptorch.start_for_loop(inputs)
     outputs = body(*inputs)
@@ -32,8 +43,11 @@ def for_loop(count, body, inputs):
     for output in outputs:
         example_outputs.append(torch.zeros(output.size()))
 
+    if not isinstance(outputs, list) and not isinstance(outputs, tuple):
+        outputs = [outputs]
+
     # End the for loop.
-    return torch.ops.poptorch.end_for_loop([outputs], inputs, count,
+    return torch.ops.poptorch.end_for_loop(outputs, inputs, count,
                                            example_outputs)
 
 
