@@ -169,6 +169,8 @@ tu = index.parse(session_file,
 
 parse_session_options(tu.cursor)
 
+UnsupportedOps = ["abort"]
+
 ## Implicit cast support
 # Casting on all args
 CastingOps = [
@@ -428,6 +430,9 @@ classes.reverse()
 for opset in classes:
     macroFile += "// Ops from %s\n" % opset
     for name in jsonOutput[opset]:
+        if name in UnsupportedOps:
+            continue
+
         logger.debug("Generating code for %s::%s", opset, name)
         # Generate the macro
         opDecl = "OP_DECL("
