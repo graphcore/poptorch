@@ -22,7 +22,14 @@ void setHalfFloatCastingBehavior(HalfFloatCasting behavior);
 
 HalfFloatCasting halfFloatCastingBehavior();
 
-enum class ImplicitCast { None, All, ExceptFirst, ExceptSecond, ExceptThird };
+enum class ImplicitCast {
+  None,
+  All,
+  ExceptFirst,
+  ExceptSecond,
+  ExceptThird,
+  ExceptFifth
+};
 
 enum class ImplicitCastOutput { None, AsPromoted, AlwaysBool, AlwaysFloat };
 

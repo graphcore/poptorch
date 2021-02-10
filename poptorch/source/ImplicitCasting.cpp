@@ -45,6 +45,9 @@ bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
   if (implicit_cast == ImplicitCast::ExceptThird && input_num == 2) {
     return true;
   }
+  if (implicit_cast == ImplicitCast::ExceptFifth && input_num == 4) {
+    return true;
+  }
 
   return false;
 }

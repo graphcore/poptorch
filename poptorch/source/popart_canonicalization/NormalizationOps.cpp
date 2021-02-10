@@ -39,8 +39,8 @@ void maybeInitializeRunningParamConstants(
   case c10::ScalarType::Float: {
     *running_mean =
         createConstantFloatLike(graph, input, {0}, running_shape)->output();
-    *running_var =
-        createConstantFloatLike(graph, input, {1}, running_shape)->output();
+    // running_var should always be float - half variance no longer supported
+    *running_var = createConstantFloat32(graph, {1}, running_shape)->output();
     break;
   }
   default:
@@ -112,6 +112,13 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
 
   float momentum = constantToFloat(node->input(6)->node());
   float epsilon = constantToFloat(node->input(7)->node());
+
+  if (!isNone(running_var)) {
+    // make sure the variance tensor is of type float
+    // decision was taken to not support half types for this buffer
+    auto old_type = running_var->type()->cast<c10::TensorType>();
+    running_var->setType(old_type->withScalarType(at::ScalarType::Float));
+  }
 
   bool training = constantToBool(node->input(5)->node());
 

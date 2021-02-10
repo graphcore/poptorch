@@ -172,13 +172,13 @@ parse_session_options(tu.cursor)
 ## Implicit cast support
 # Casting on all args
 CastingOps = [
-    "add", "atan2", "batchnormalization", "bitshift", "clip", "conv",
-    "convtranspose", "div", "equal", "gru", "gemm", "greater",
-    "instancenormalization", "less", "lstm", "logical_and", "logical_or",
-    "logical_xor", "matmul", "max", "maxroipool", "mean", "min", "mod", "mul",
-    "pow", "prelu", "range", "rnn", "scan", "sequenceconstruct", "sub", "sum",
-    "groupnormalization", "call", "dynamicadd", "dynamicupdate",
-    "dynamicslice", "dynamiczero", "fmod", "remainder"
+    "add", "atan2", "bitshift", "clip", "conv", "convtranspose", "div",
+    "equal", "gru", "gemm", "greater", "instancenormalization", "less", "lstm",
+    "logical_and", "logical_or", "logical_xor", "matmul", "max", "maxroipool",
+    "mean", "min", "mod", "mul", "pow", "prelu", "range", "rnn", "scan",
+    "sequenceconstruct", "sub", "sum", "groupnormalization", "call",
+    "dynamicadd", "dynamicupdate", "dynamicslice", "dynamiczero", "fmod",
+    "remainder"
 ]
 # Also Einsum, GreaterOrEqual, LessOrEqual
 
@@ -188,6 +188,7 @@ CastingExceptSecondArgsOps = [
 ]
 # Also Pad but only after >= 11
 CastingExceptThirdArgsOps = ["roialign"]
+CastingExceptFifthArgsOps = ["batchnormalization"]
 
 # Implicit casting ops not in these catagories:
 # QLinearConv, QLinearMatMul
@@ -209,23 +210,23 @@ CastingAlwaysIntOutput = ["convinteger", "matmulinteger"]
 
 OutputTypeSameAsFirstInput = [
     "abs", "acos", "acos", "acosh", "asin", "asinh", "atan", "atanh",
-    "averagepool", "ceil", "celu", "compress", "concat", "cos", "cosh",
-    "cumsum", "depthtospace", "det", "detach", "dropout", "einsum", "elu",
-    "erf", "exp", "expand", "expm1", "flatten", "floor", "fmod", "gather",
-    "gatherelements", "gathernd", "gelu", "globalaveragepool", "globallppool",
-    "globalmaxpool", "hardmax", "hardsigmoid", "identity", "identityloss",
-    "l1loss", "lrn", "leakyrelu", "log", "log1p", "logical_not", "logsoftmax",
-    "lpnormalization", "lppool", "maxpool", "maxunpool",
-    "meanvariancenormalization", "neg", "nllloss", "nop", "pad", "printtensor",
-    "range", "reciprocal", "reducel1", "reducel2", "reducelogsum",
-    "reducelogsumexp", "reducemax", "reducemean", "reducemin", "reduceprod",
-    "reducesum", "reducesumsquare", "relu", "remainder", "replicatedallreduce",
-    "reshape", "resize", "reversesequence", "roialign", "round", "scale",
-    "scaledadd", "scatter", "selu", "sequenceerase", "shapeddropout", "shrink",
-    "sigmoid", "sign", "sin", "sinh", "slice", "softmax", "softplus",
-    "softsign", "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
-    "subsample", "tan", "tanh", "thresholdedrelu", "tile", "transpose",
-    "unique", "unsqueeze", "upsample"
+    "averagepool", "batchnormalization", "ceil", "celu", "compress", "concat",
+    "cos", "cosh", "cumsum", "depthtospace", "det", "detach", "dropout",
+    "einsum", "elu", "erf", "exp", "expand", "expm1", "flatten", "floor",
+    "fmod", "gather", "gatherelements", "gathernd", "gelu",
+    "globalaveragepool", "globallppool", "globalmaxpool", "hardmax",
+    "hardsigmoid", "identity", "identityloss", "l1loss", "lrn", "leakyrelu",
+    "log", "log1p", "logical_not", "logsoftmax", "lpnormalization", "lppool",
+    "maxpool", "maxunpool", "meanvariancenormalization", "neg", "nllloss",
+    "nop", "pad", "printtensor", "range", "reciprocal", "reducel1", "reducel2",
+    "reducelogsum", "reducelogsumexp", "reducemax", "reducemean", "reducemin",
+    "reduceprod", "reducesum", "reducesumsquare", "relu", "remainder",
+    "replicatedallreduce", "reshape", "resize", "reversesequence", "roialign",
+    "round", "scale", "scaledadd", "scatter", "selu", "sequenceerase",
+    "shapeddropout", "shrink", "sigmoid", "sign", "sin", "sinh", "slice",
+    "softmax", "softplus", "softsign", "spacetodepth", "split", "sqrt",
+    "squeeze", "stringnormalizer", "subsample", "tan", "tanh",
+    "thresholdedrelu", "tile", "transpose", "unique", "unsqueeze", "upsample"
 ]
 
 FirstOutputTypeSameAsFirstInputButSecondAlwaysInt = ["topk"]
@@ -377,6 +378,8 @@ def addCastingOptStr(name):
         return "ImplicitCast::ExceptSecond"
     if name in CastingExceptThirdArgsOps:
         return "ImplicitCast::ExceptThird"
+    if name in CastingExceptFifthArgsOps:
+        return "ImplicitCast::ExceptFifth"
     return "ImplicitCast::None"
 
 
