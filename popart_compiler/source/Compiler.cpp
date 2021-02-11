@@ -160,6 +160,13 @@ bool waitIfIpuIsUnavailable() {
   return wait;
 }
 
+bool waitForAWhile() {
+  constexpr std::int64_t sleep_time = 15;
+  logging::trace("No IPU available, sleeping for {} seconds", sleep_time);
+  std::this_thread::sleep_for(std::chrono::seconds(sleep_time));
+  return true;
+}
+
 } // namespace
 namespace poptorch {
 
@@ -497,7 +504,7 @@ public:
   getOptimizer(const std::vector<Optimizer> &optimizers);
 
   void updateUseModelConfig();
-  std::string checkSystemConfig();
+  std::string checkSystemConfig() const;
   template <typename T, typename U>
   void setOptionIfNotSet(T &option, U value, const std::string &name,
                          const std::string &value_as_string) {
@@ -523,6 +530,8 @@ public:
   bool isHostSideConstant(poptorch::TensorId id) const;
 
   std::shared_ptr<popart::DeviceInfo> createDevice();
+  bool waitIfUnavailable() const;
+  void attachToDevice();
 
   template <typename OptimizerType>
   void updateGroups(OptimizerType *optimizer,
@@ -576,7 +585,7 @@ void WeightsIO::updateData(const std::vector<void *> &host_buffers) {
   }
 }
 
-std::string CompilerImpl::checkSystemConfig() {
+std::string CompilerImpl::checkSystemConfig() const {
   auto dm = popart::DeviceManager::createDeviceManager();
   if (dm.enumerateDevices().empty()) {
     return "\nNo IPU detected in the system: are you sure the gc-driver is "
@@ -1065,22 +1074,6 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
         }
       }
 
-      // Use a lambda to cache the value.
-      auto wait_if_unavailable = [this]() {
-        // Force disable the wait if the system doesn't contain an IPU that
-        // matches the requested config.
-        static const bool should_wait =
-            waitIfIpuIsUnavailable() && checkSystemConfig().empty();
-        return should_wait;
-      };
-
-      auto wait_for_a_while = []() {
-        constexpr std::int64_t sleep_time = 15;
-        logging::trace("No IPU available, sleeping for {} seconds", sleep_time);
-        std::this_thread::sleep_for(std::chrono::seconds(sleep_time));
-        return true;
-      };
-
       do {
         // Regular IPU hardware target
         if (!options_set.count("ipu_id")) {
@@ -1088,7 +1081,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
               popart::DeviceManager::createDeviceManager()
                   .acquireAvailableDevice(num_ipus, 0, options.sync_pattern,
                                           options.connection_type);
-          ERROR_ON_MSG(!device && !wait_if_unavailable(),
+          ERROR_ON_MSG(!device && !waitIfUnavailable(),
                        "Failed to acquire " << num_ipus << " IPU(s)"
                                             << this->checkSystemConfig());
           if (device) {
@@ -1100,7 +1093,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
               popart::DeviceManager::createDeviceManager().acquireDeviceById(
                   options.ipu_id, options.sync_pattern,
                   options.connection_type);
-          ERROR_ON_MSG(!device && !wait_if_unavailable(),
+          ERROR_ON_MSG(!device && !waitIfUnavailable(),
                        "Failed to acquire device Id " << options.ipu_id
                                                       << checkSystemConfig());
           ERROR_ON_MSG(device && static_cast<std::uint64_t>(
@@ -1124,7 +1117,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
                            options.ipu_id);
           }
         }
-      } while (!device && wait_for_a_while());
+      } while (!device && waitForAWhile());
     }
   }
   return device;
@@ -1582,6 +1575,31 @@ std::vector<popart::TensorId> CompilerImpl::endMultiConv() {
   auto outs = multi_conv_builder->build(active_builder);
   multi_conv_builder.reset();
   return outs;
+}
+
+bool CompilerImpl::waitIfUnavailable() const {
+  // Force disable the wait if the system doesn't contain an IPU that
+  // matches the requested config.
+  static const bool should_wait =
+      waitIfIpuIsUnavailable() && checkSystemConfig().empty();
+  return should_wait;
+}
+
+void CompilerImpl::attachToDevice() {
+  popart::popx::Devicex &device = session->getDevice();
+  auto *device_info = device.getDeviceInfo();
+  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
+  ERROR_ON_MSG(device_info->isAttached(),
+               "The device has already been attached");
+  bool has_attached = false;
+  do {
+    has_attached = device_info->attach();
+    ERROR_ON_MSG(!has_attached && !waitIfUnavailable(),
+                 "Failed to acquire device Id " << options.ipu_id
+                                                << checkSystemConfig());
+  } while (!has_attached && waitForAWhile());
+  device.loadEngineAndConnectStreams();
+  session->weightsFromHost();
 }
 
 } // namespace detail
@@ -2513,14 +2531,7 @@ void Compiler::detachFromDevice() {
 
 void Compiler::attachToDevice() {
   logging::trace("Begin attaching device");
-  popart::popx::Devicex &device = _impl->session->getDevice();
-  auto *device_info = device.getDeviceInfo();
-  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
-  ERROR_ON_MSG(device_info->isAttached(),
-               "The device has already been attached");
-  device_info->attach();
-  device.loadEngineAndConnectStreams();
-  _impl->session->weightsFromHost();
+  _impl->attachToDevice();
   logging::trace("Finished attaching device");
 }
 
