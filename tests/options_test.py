@@ -7,6 +7,7 @@ import torch.nn as nn
 import pytest
 import poptorch
 import poptorch.testing
+import helpers
 
 
 def test_jit_script():
@@ -183,3 +184,39 @@ def test_tensor_location():
     y = torch.zeros(2)
 
     inference_model(x, y)
+
+
+@helpers.printCapfdOnExit
+@pytest.mark.parametrize("dtype", [torch.half, torch.float])
+@pytest.mark.parametrize("setting", [True, False, None])
+def test_running_variance(capfd, dtype, setting):
+    x = torch.randn((16, 16), dtype=dtype)
+
+    model = torch.nn.Sequential()
+    model.add_module('lin', torch.nn.Linear(16, 16))
+    model.add_module('bn', torch.nn.BatchNorm1d(16))
+
+    if dtype == torch.half:
+        model.half()
+
+    poptorch.setLogLevel(0)
+    opts = poptorch.Options()
+    if setting is not None:
+        opts.GraphProcessing.runningVarianceAlwaysFloat(setting)
+    poptorch_model = poptorch.inferenceModel(model, opts)
+    poptorch_model(x)
+
+    log = helpers.LogChecker(capfd)
+    if setting is None or setting:
+        log.assert_contains(
+            "poptorch.Options set runningVarianceAlwaysFloat to true")
+    else:
+        log.assert_contains(
+            "poptorch.Options set runningVarianceAlwaysFloat to false")
+
+    if dtype == torch.float:
+        log.assert_contains("%24 : Float(16:1, requires_grad=0, device=cpu)):")
+    elif setting is None or setting:
+        log.assert_contains("%24 : Float(16:1, requires_grad=0, device=cpu)):")
+    else:
+        log.assert_contains("%24 : Half(16:1, requires_grad=0, device=cpu)):")

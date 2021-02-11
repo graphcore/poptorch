@@ -44,7 +44,8 @@ class _GraphProcessingOptions(_options_impl.OptionsDict):
 
     def __init__(self):
         super().__init__(half_float_casting=enums.HalfFloatCastingBehavior.
-                         FloatDowncastToHalf)
+                         FloatDowncastToHalf,
+                         running_variance_always_float=True)
 
     def halfFloatCasting(self, half_float_casting):
         """ Changes the casting behavior for ops involving a float16 (half) and
@@ -72,6 +73,21 @@ class _GraphProcessingOptions(_options_impl.OptionsDict):
                 "poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat")
 
         self.set(half_float_casting=half_float_casting)
+        return self
+
+    def runningVarianceAlwaysFloat(self, value):
+        """Controls whether the running variance tensor to normalization layers
+           should be Float regardless of input type.
+
+        :param bool value: if true, running variance will always be a Float.
+                           Otherwise it will be typed same as the input.
+        """
+
+        if not isinstance(value, bool):
+            raise ValueError(
+                "runningVarianceAlwaysFloat needs to be set to a bool")
+
+        self.set(running_variance_always_float=value)
         return self
 
 

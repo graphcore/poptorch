@@ -397,3 +397,22 @@ The following examples show cases where the type output differs from PyTorch:
     :linenos:
     :start-after: uniform_res_start
     :end-before: uniform_res_end
+
+Normalization
+-------------
+
+Some normalization layers require the computation of a running variance. The tensor will be computed as float32 even though the input to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy. 
+
+The following operators are affected:
+* ``torch.nn.BatchNorm1d``
+* ``torch.nn.BatchNorm2d``
+* ``torch.nn.BatchNorm3d``
+
+The type of running variance computations may be controlled via ``opts.GraphProcessing.runningVarianceAlwaysFloat(bool)``. For example, in the script below, variance computations will be performed in half precision:
+
+.. literalinclude:: running_variance_half.py
+    :language: python
+    :caption: Controlling type of running variance computations
+    :linenos:
+    :start-after: half_var_begin
+    :end-before: half_var_end

@@ -22,6 +22,12 @@ HalfFloatCasting &getHalfFloatCastingBehavior() {
   return behavior;
 }
 
+bool &getRunningVarianceAlwaysFloat() {
+  static bool always_float = true;
+
+  return always_float;
+}
+
 } // namespace
 
 void setHalfFloatCastingBehavior(const HalfFloatCasting behavior) {
@@ -31,6 +37,14 @@ void setHalfFloatCastingBehavior(const HalfFloatCasting behavior) {
 HalfFloatCasting halfFloatCastingBehavior() {
   return getHalfFloatCastingBehavior();
 }
+
+void setRunningVarianceAlwaysFloat(bool value) {
+  logging::debug("poptorch.Options set runningVarianceAlwaysFloat to {}",
+                 value);
+  getRunningVarianceAlwaysFloat() = value;
+}
+
+bool runningVarianceAlwaysFloat() { return getRunningVarianceAlwaysFloat(); }
 
 namespace {
 bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {

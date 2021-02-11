@@ -578,6 +578,9 @@ void processGraphProcessingOptions(py::handle h) {
 
   poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
       values_dict["half_float_casting"].cast<uint64_t>()));
+
+  poptorch::setRunningVarianceAlwaysFloat(
+      values_dict["running_variance_always_float"].cast<bool>());
 }
 
 torch::jit::script::Module *asModule(py::handle h) {
