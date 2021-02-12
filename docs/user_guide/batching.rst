@@ -98,7 +98,7 @@ batches out of order.
 Note :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
 is only needed by :py:class:`poptorch.PipelinedExecution`.
 
-.. seealso:: :py:class:`poptorch.Block`
+See also :py:class:`poptorch.Block`.
 
 .. literalinclude:: device_iterations.py
   :caption: Use of gradient accumulation

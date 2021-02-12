@@ -204,9 +204,10 @@ def run_data_loader_example():
 
         # Run over the training data with "batch_size" 200 essentially.
         for batch_number, (data, labels) in enumerate(training_data):
-            # Execute the device with a 100 iteration loop of batchsize 2 across
-            # 4 IPUs. "output" and "loss" will be the respective output and loss of the
-            # final batch of each replica (the default AnchorMode).
+            # Execute the device with a 100 iteration loop of batchsize 8 across
+            # 4 IPUs (batch-size 2 per replica). "output" and "loss" will be the 
+            # respective output and loss of the final batch of each replica
+            # (the default AnchorMode).
             output, loss = poptorch_model(data, labels)
             print(f"{batch_number} {labels[-1]}, {output}, {loss}")
 
