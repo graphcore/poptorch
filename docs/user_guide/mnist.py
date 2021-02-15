@@ -11,7 +11,9 @@ import poptorch
 
 
 def get_mnist_data(opts):
-    training_data = torch.utils.data.DataLoader(
+    options = poptorch.Options()
+    training_data = poptorch.DataLoader(
+        options,
         torchvision.datasets.MNIST('mnist_data/',
                                    train=True,
                                    download=True,
@@ -24,7 +26,8 @@ def get_mnist_data(opts):
         shuffle=True,
         drop_last=True)
 
-    validation_data = torch.utils.data.DataLoader(
+    validation_data = poptorch.DataLoader(
+        options,
         torchvision.datasets.MNIST('mnist_data/',
                                    train=False,
                                    download=True,
@@ -136,8 +139,8 @@ if __name__ == '__main__':
                         help='number of epochs to train (default: 1)')
     parser.add_argument('--lr',
                         type=float,
-                        default=0.05,
-                        help='learning rate (default: 0.05)')
+                        default=1e-4,
+                        help='learning rate (default: 1e-4)')
     parser.add_argument(
         '--profile',
         type=str,

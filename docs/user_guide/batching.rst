@@ -26,17 +26,18 @@ in the model will process that number of elements at any given time.
 
 .. autoclass:: poptorch.DataLoader
    :special-members: __init__
-   :members:
+   :members: terminate
 
 poptorch.AsynchronousDataAccessor
 =================================
 
 To reduce host overhead you can offload the data loading process to a
-separate thread using an :py:class:`~poptorch.AsynchronousDataAccessor`.
-Doing this allows you to reduce the host/IPU communication overhead by
-using the time that the IPU is running to load the next batch on the
-CPU. This means that when the IPU is finished executing and returns to host
-the data will be ready for the IPU to pull in again.
+separate thread by specifying `mode=poptorch.DataLoaderMode.Async` in the
+:py:class:`~poptorch.DataLoader` constructor. Internally this uses an
+:py:class:`~poptorch.AsynchronousDataAccessor`. Doing this allows you to reduce
+the host/IPU communication overhead by using the time that the IPU is running
+to load the next batch on the CPU. This means that when the IPU is finished
+executing and returns to host the data will be ready for the IPU to pull in again.
 
 .. autoclass:: poptorch.AsynchronousDataAccessor
    :special-members: __init__, __len__
@@ -69,7 +70,7 @@ Example
   :caption: Use of device iterations and batch size
   :start-after: iterations_start
   :end-before: iterations_end
-  :emphasize-lines: 55, 61
+  :emphasize-lines: 52, 58
   :linenos:
 
 poptorch.Options.replicationFactor

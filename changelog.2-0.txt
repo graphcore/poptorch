@@ -11,6 +11,8 @@ New features:
 - Add support for aten::index, aten::index_put_
 - Add support for torch.zeros_like, torch.ones_like
 - Allow the user to specify which Optimizer attributes are constant or not.
+- Allow the user to specify mode=poptorch.DataLoaderMode.Async in poptorch.DataLoader
+  constructor instead of explicitly creating an AsynchronousDataAccessor
 
 Known issues:
 

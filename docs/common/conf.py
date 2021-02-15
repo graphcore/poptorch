@@ -59,6 +59,7 @@ nitpick_ignore = [
     ('py:class', 'poptorch.MatMulSerializationMode'),
     ('py:class', 'poptorch.ReductionType'),
     ('py:class', 'poptorch.SyncPattern'),
+    ('py:class', 'poptorch.DataLoaderMode'),
 ]
 
 # -- Options for HTML output -------------------------------------------------

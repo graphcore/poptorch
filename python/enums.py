@@ -2,6 +2,16 @@
 import enum
 
 
+class DataLoaderMode(enum.IntEnum):
+    """
+    - ``Sync``: Access data synchronously
+    - ``Async``: Uses an :py:class:`~poptorch.AsynchronousDataAccessor`
+      to access the dataset
+    """
+    Sync = 0
+    Async = 1
+
+
 class SharingStrategy(enum.IntEnum):
     """Strategy to use to pass objects when spawning new processes.
 

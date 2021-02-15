@@ -154,12 +154,12 @@ def _run_process_test(shape=None,
     opts.deviceIterations(device_iterations)
     opts.replicationFactor(replication_factor)
 
-    data = poptorch.DataLoader(opts,
-                               IncrementDataset(shape, num_tensors),
-                               batch_size=batch_size,
-                               num_workers=num_workers)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDataset(shape, num_tensors),
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 mode=poptorch.DataLoaderMode.Async)
 
-    loader = poptorch.AsynchronousDataAccessor(data)
     assert len(loader) == num_tensors // (device_iterations * batch_size *
                                           replication_factor)
 
@@ -171,8 +171,8 @@ def _run_process_test(shape=None,
 
             expected = torch.stack([
                 torch.full(shape, i * 2, dtype=torch.float32)
-                for i in range(data.combinedBatchSize *
-                               it, data.combinedBatchSize * (it + 1))
+                for i in range(loader.combinedBatchSize *
+                               it, loader.combinedBatchSize * (it + 1))
             ])
 
             assert torch.equal(expected, out)
@@ -216,12 +216,13 @@ def _run_process_label_test(shape=None,
     opts.deviceIterations(device_iterations)
     opts.replicationFactor(replication_factor)
 
-    data = poptorch.DataLoader(opts,
-                               IncrementDatasetWithLabels(shape, num_tensors),
-                               batch_size=batch_size,
-                               num_workers=num_workers)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDatasetWithLabels(
+                                     shape, num_tensors),
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 mode=poptorch.DataLoaderMode.Async)
 
-    loader = poptorch.AsynchronousDataAccessor(data)
     assert len(loader) == num_tensors // (device_iterations * batch_size *
                                           replication_factor)
 
@@ -265,21 +266,21 @@ def _run_dataset_test(shape=None,
     opts.replicationFactor(replication_factor)
     opts.Distributed.configureProcessId(host_id, num_hosts)
 
-    data = poptorch.DataLoader(opts,
-                               IncrementDataset(shape, num_tensors),
-                               batch_size=batch_size,
-                               num_workers=num_workers)
-    loader = poptorch.AsynchronousDataAccessor(data)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDataset(shape, num_tensors),
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 mode=poptorch.DataLoaderMode.Async)
 
     offset = host_id * (num_tensors // num_hosts)
-    assert len(data) == num_tensors // (device_iterations * batch_size *
-                                        replication_factor * num_hosts)
+    assert len(loader) == num_tensors // (device_iterations * batch_size *
+                                          replication_factor * num_hosts)
     for it, d in enumerate(loader):
         expected = torch.from_numpy(
             numpy.stack([
                 numpy.full(shape, offset + i, dtype=numpy.float32)
-                for i in range(data.combinedBatchSize *
-                               it, data.combinedBatchSize * (it + 1))
+                for i in range(loader.combinedBatchSize *
+                               it, loader.combinedBatchSize * (it + 1))
             ]))
         diff = torch.sum(torch.sum(d - expected))
 
@@ -302,12 +303,12 @@ def test_interrupt_async_loader():
     num_tensors = 100
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               IncrementDataset(shape, num_tensors),
-                               batch_size=1,
-                               num_workers=1)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDataset(shape, num_tensors),
+                                 batch_size=1,
+                                 num_workers=1,
+                                 mode=poptorch.DataLoaderMode.Async)
 
-    loader = poptorch.AsynchronousDataAccessor(data)
     assert len(loader) == num_tensors
 
     for _, _ in enumerate(loader):
@@ -319,12 +320,12 @@ def test_single_epoch():
     num_tensors = 100
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               IncrementDataset(shape, num_tensors),
-                               batch_size=1,
-                               num_workers=32)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDataset(shape, num_tensors),
+                                 batch_size=1,
+                                 num_workers=32,
+                                 mode=poptorch.DataLoaderMode.Async)
 
-    loader = poptorch.AsynchronousDataAccessor(data)
     assert len(loader) == num_tensors
 
     for _, _ in enumerate(loader):
@@ -351,12 +352,11 @@ def test_iterable_dataloader():
     num_tensors = 100
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               IncrementIterableDataset(shape, num_tensors),
-                               batch_size=1,
-                               num_workers=1)
-
-    loader = poptorch.AsynchronousDataAccessor(data)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementIterableDataset(shape, num_tensors),
+                                 batch_size=1,
+                                 num_workers=1,
+                                 mode=poptorch.DataLoaderMode.Async)
 
     for _, t in enumerate(loader):
         assert t.shape == torch.Size([1, 2, 3])
@@ -373,13 +373,12 @@ def test_iterable_dataloader_reset(persistent_workers):
     num_tensors = 10
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               IncrementDataset(shape, num_tensors),
-                               persistent_workers=persistent_workers,
-                               batch_size=1,
-                               num_workers=1)
-
-    loader = poptorch.AsynchronousDataAccessor(data)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDataset(shape, num_tensors),
+                                 persistent_workers=persistent_workers,
+                                 batch_size=1,
+                                 num_workers=1,
+                                 mode=poptorch.DataLoaderMode.Async)
 
     # Interrupt the first iteration
     for i, t in enumerate(loader):
@@ -403,21 +402,31 @@ def test_early_preload():
     num_buffers = 5
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               IncrementDataset(shape, num_tensors),
-                               batch_size=1,
-                               num_workers=1)
+    data = IncrementDataset(shape, num_tensors)
 
-    preload = poptorch.AsynchronousDataAccessor(data,
-                                                early_preload=True,
-                                                buffer_size=num_buffers)
-    no_preload = poptorch.AsynchronousDataAccessor(data,
-                                                   early_preload=False,
-                                                   buffer_size=num_buffers)
+    async_opts_preload = {'early_preload': True, 'buffer_size': num_buffers}
+    async_opts_no_preload = {
+        'early_preload': False,
+        'buffer_size': num_buffers
+    }
+    dataloader_args = {
+        'options': opts,
+        'dataset': data,
+        'batch_size': 1,
+        'num_workers': 1
+    }
+
+    preload = poptorch.DataLoader(**dataloader_args,
+                                  mode=poptorch.DataLoaderMode.Async,
+                                  async_options=async_opts_preload)
+    no_preload = poptorch.DataLoader(**dataloader_args,
+                                     mode=poptorch.DataLoaderMode.Async,
+                                     async_options=async_opts_no_preload)
+
     time.sleep(2)  # Give time for the worker to fill the buffer
 
-    assert sum(no_preload._worker._ready_to_read_index) == 1  # pylint: disable=protected-access
-    assert sum(preload._worker._ready_to_read_index) == num_buffers  # pylint: disable=protected-access
+    assert sum(no_preload._accessor._worker._ready_to_read_index) == 1  # pylint: disable=protected-access
+    assert sum(preload._accessor._worker._ready_to_read_index) == num_buffers  # pylint: disable=protected-access
 
 
 def test_batch_size_None():
@@ -425,13 +434,12 @@ def test_batch_size_None():
     num_tensors = 10
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               IncrementIterableDataset(shape, num_tensors),
-                               batch_size=None,
-                               drop_last=False,
-                               num_workers=1)
-
-    loader = poptorch.AsynchronousDataAccessor(data)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementIterableDataset(shape, num_tensors),
+                                 batch_size=None,
+                                 drop_last=False,
+                                 num_workers=1,
+                                 mode=poptorch.DataLoaderMode.Async)
 
     for _, t in enumerate(loader):
         assert t.shape == torch.Size([2, 3])
@@ -447,24 +455,24 @@ def test_len():
     num_tensors = 10
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               IncrementIterableDataset(shape, num_tensors),
-                               batch_size=None,
-                               drop_last=False,
-                               num_workers=1)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementIterableDataset(shape, num_tensors),
+                                 batch_size=None,
+                                 drop_last=False,
+                                 num_workers=1,
+                                 mode=poptorch.DataLoaderMode.Async)
 
-    loader = poptorch.AsynchronousDataAccessor(data)
     with pytest.raises(TypeError,
                        match="'IncrementIterableDataset' has no len()"):
         len(loader)
-    data = poptorch.DataLoader(opts,
-                               IncrementIterableDatasetWithLen(
-                                   shape, num_tensors),
-                               batch_size=None,
-                               drop_last=False,
-                               num_workers=1)
+    loader = poptorch.DataLoader(opts,
+                                 IncrementIterableDatasetWithLen(
+                                     shape, num_tensors),
+                                 batch_size=None,
+                                 drop_last=False,
+                                 num_workers=1,
+                                 mode=poptorch.DataLoaderMode.Async)
 
-    loader = poptorch.AsynchronousDataAccessor(data)
     len(loader)
 
 
@@ -506,18 +514,17 @@ def test_reuse_workers(DatasetType):
     num_tensors = 10
 
     opts = poptorch.Options()
-    data = poptorch.DataLoader(opts,
-                               DatasetType(shape, num_tensors),
-                               batch_size=1,
-                               num_workers=2)
-    data_no_reuse = poptorch.DataLoader(opts,
-                                        DatasetType(shape, num_tensors),
-                                        batch_size=1,
-                                        persistent_workers=False,
-                                        num_workers=2)
-
-    loader = poptorch.AsynchronousDataAccessor(data)
-    loader_no_reuse = poptorch.AsynchronousDataAccessor(data_no_reuse)
+    loader = poptorch.DataLoader(opts,
+                                 DatasetType(shape, num_tensors),
+                                 batch_size=1,
+                                 num_workers=2,
+                                 mode=poptorch.DataLoaderMode.Async)
+    loader_no_reuse = poptorch.DataLoader(opts,
+                                          DatasetType(shape, num_tensors),
+                                          batch_size=1,
+                                          persistent_workers=False,
+                                          num_workers=2,
+                                          mode=poptorch.DataLoaderMode.Async)
 
     # Workers are created when the AsynchronousDataAccessor is instantiated
     # So the first iteration should be fast

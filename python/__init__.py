@@ -60,6 +60,8 @@ class DataLoader(torch.utils.data.DataLoader):
                  drop_last=True,
                  persistent_workers=None,
                  auto_distributed_partitioning=True,
+                 mode=DataLoaderMode.Sync,
+                 async_options=None,
                  **kwargs):
         """
         :param poptorch.Options options: Options that will be used to compile
@@ -80,6 +82,12 @@ class DataLoader(torch.utils.data.DataLoader):
         :param bool auto_distributed_partitioning: If True, partitions the
             dataset for distributed execution automatically. Otherwise, it is
             assumed that partitioning has been handled manually.
+        :param poptorch.DataLoaderMode mode: If `DataLoaderMode.Async`, uses an
+            :py:class:`~poptorch.AsynchronousDataAccessor` to access the
+            dataset. If `DataLoaderMode.Sync`, accesses the dataset
+            synchronously.
+        :param dict async_options: Options to pass to
+            :py:class:`~poptorch.AsynchronousDataAccessor`.
         :param kwargs: Other options to pass to the Torch's DataLoader's
             constructor.
         """
@@ -150,6 +158,14 @@ class DataLoader(torch.utils.data.DataLoader):
                          persistent_workers=persistent_workers,
                          **kwargs)
 
+        self._accessor = None
+        if mode == DataLoaderMode.Async:
+            if async_options is None:
+                self._accessor = AsynchronousDataAccessor(self)
+            else:
+                self._accessor = AsynchronousDataAccessor(
+                    self, **async_options)
+
     @property
     def _profiling(self):
         return profiling.Channel("poptorch.DataLoader")
@@ -166,6 +182,22 @@ class DataLoader(torch.utils.data.DataLoader):
         DataLoader.
         """
         return self._options
+
+    def terminate(self):
+        """If `mode==DataLoaderMode.Async`, kills the worker process in the
+        underlying AsynchronousDataAccessor manually, otherwise has no effect.
+        """
+        if self._accessor is not None:
+            self._accessor.terminate()
+
+    def __del__(self):
+        self.terminate()
+
+    def __iter__(self):
+        if self._accessor is not None:
+            return self._accessor.__iter__()
+
+        return super().__iter__()
 
 
 class AsynchronousDataAccessor:
@@ -212,9 +244,17 @@ class AsynchronousDataAccessor:
             will be slower.
         """
 
+        self._dataset = dataset
         # To avoid hangs when the application exits: implicitly call terminate().
         atexit.register(self.terminate)
-        self._dataset = dataset
+
+        # Ensure the DataLoader doesn't already have an AsynchronousDataAccessor
+        if isinstance(dataset, DataLoader) and dataset._accessor is not None:
+            raise RuntimeError(
+                'The DataLoader already uses an '
+                'AsynchronousDataAccessor internally. Either use '
+                'the existing one or set mode=\'poptorch.DataLoaderMode.Sync\''
+                ' in the DataLoader.')
 
         # Set _worker to None  in case something goes wrong in the AsynchronousWorker constructor
         self._worker = None

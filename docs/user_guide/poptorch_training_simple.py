@@ -1,5 +1,4 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-
 import torch
 import poptorch
 
@@ -52,83 +51,88 @@ class ExampleDataset(torch.utils.data.Dataset):
         return self._all_data[index], self._all_labels[index]
 
 
-# simple_ipu_start
-# Set up the PyTorch DataLoader to load that much data at each iteration
-opts = poptorch.Options()
-opts.deviceIterations(10)
-training_data = poptorch.DataLoader(options=opts,
-                                    dataset=ExampleDataset(shape=[1],
-                                                           length=20000),
-                                    batch_size=10,
-                                    shuffle=True,
-                                    drop_last=True)
+def run_examples():
+    # simple_ipu_start
+    # Set up the PyTorch DataLoader to load that much data at each iteration
+    opts = poptorch.Options()
+    opts.deviceIterations(10)
+    training_data = poptorch.DataLoader(options=opts,
+                                        dataset=ExampleDataset(shape=[1],
+                                                               length=20000),
+                                        batch_size=10,
+                                        shuffle=True,
+                                        drop_last=True)
 
-model = ExampleModelWithLoss()
-model.train()
+    model = ExampleModelWithLoss()
+    model.train()
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 
-# Wrap the model in a PopTorch training wrapper
-poptorch_model = poptorch.trainingModel(model,
-                                        options=opts,
-                                        optimizer=optimizer)
+    # Wrap the model in a PopTorch training wrapper
+    poptorch_model = poptorch.trainingModel(model,
+                                            options=opts,
+                                            optimizer=optimizer)
 
-momentum_loss = None
+    momentum_loss = None
 
-for batch, target in training_data:
-    # Performs forward pass, loss function evaluation,
-    # backward pass and weight update in one go on the device.
-    _, loss = poptorch_model(batch, target)
+    for batch, target in training_data:
+        # Performs forward pass, loss function evaluation,
+        # backward pass and weight update in one go on the device.
+        _, loss = poptorch_model(batch, target)
 
-    if momentum_loss is None:
-        momentum_loss = loss
-    else:
-        momentum_loss = momentum_loss * 0.95 + loss * 0.05
+        if momentum_loss is None:
+            momentum_loss = loss
+        else:
+            momentum_loss = momentum_loss * 0.95 + loss * 0.05
 
-    # Optimizer can be updated via setOptimizer.
-    if momentum_loss < 0.1:
-        poptorch_model.setOptimizer(
-            torch.optim.AdamW(model.parameters(), lr=0.0001))
-# simple_ipu_end
+        # Optimizer can be updated via setOptimizer.
+        if momentum_loss < 0.1:
+            poptorch_model.setOptimizer(
+                torch.optim.AdamW(model.parameters(), lr=0.0001))
+    # simple_ipu_end
 
-print(model.model.bias)
-assert (model.model.bias > 0.4 and model.model.bias < 0.6)
+    print(model.model.bias)
+    assert (model.model.bias > 0.4 and model.model.bias < 0.6)
 
-# simple_cpu_start
-training_data = torch.utils.data.DataLoader(ExampleDataset(shape=[1],
-                                                           length=20000),
-                                            batch_size=10,
-                                            shuffle=True,
-                                            drop_last=True)
+    # simple_cpu_start
+    training_data = torch.utils.data.DataLoader(ExampleDataset(shape=[1],
+                                                               length=20000),
+                                                batch_size=10,
+                                                shuffle=True,
+                                                drop_last=True)
 
-model = ExampleModelWithLoss()
-model.train()
+    model = ExampleModelWithLoss()
+    model.train()
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 
-momentum_loss = None
+    momentum_loss = None
 
-for batch, target in training_data:
-    # Zero gradients
-    optimizer.zero_grad()
+    for batch, target in training_data:
+        # Zero gradients
+        optimizer.zero_grad()
 
-    # Run model.
-    _, loss = model(batch, target)
+        # Run model.
+        _, loss = model(batch, target)
 
-    # Back propagate the gradients.
-    loss.backward()
+        # Back propagate the gradients.
+        loss.backward()
 
-    # Update the weights.
-    optimizer.step()
+        # Update the weights.
+        optimizer.step()
 
-    if momentum_loss is None:
-        momentum_loss = loss
-    else:
-        momentum_loss = momentum_loss * 0.95 + loss * 0.05
+        if momentum_loss is None:
+            momentum_loss = loss
+        else:
+            momentum_loss = momentum_loss * 0.95 + loss * 0.05
 
-    if momentum_loss < 0.1:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
-# simple_cpu_end
+        if momentum_loss < 0.1:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001)
+    # simple_cpu_end
 
-print(model.model.bias)
-assert (model.model.bias > 0.4 and model.model.bias < 0.6)
+    print(model.model.bias)
+    assert (model.model.bias > 0.4 and model.model.bias < 0.6)
+
+
+if __name__ == "__main__":
+    run_examples()
