@@ -5,7 +5,9 @@ import enum
 import io
 import numbers
 import os
+import pickle
 import sys
+import tempfile
 import time
 import inspect
 import torch
@@ -962,12 +964,12 @@ class PoplarExecutor:
                                          in_tensors_trace_view_tuple):
             logger.warning(
                 "An input tensor is modified in-place by the model. This is "
-                "not supported on the IPU and the input will remain " +
-                "unchanged. This applies to all in-place operations such " +
-                "as \"+=\", \"*=\" or those ending in \"_\". To avoid this " +
-                "warning, please use the non in-place alternatives such as " +
-                "\"x = x + 1\" instead of \"x += 1\" or the operation " +
-                "not ending in \"_\" matching the in-place variant, on all " +
+                "not supported on the IPU and the input will remain "
+                "unchanged. This applies to all in-place operations such "
+                "as \"+=\", \"*=\" or those ending in \"_\". To avoid this "
+                "warning, please use the non in-place alternatives such as "
+                "\"x = x + 1\" instead of \"x += 1\" or the operation "
+                "not ending in \"_\" matching the in-place variant, on all "
                 "model inputs.")
 
         # Save the inputs of the traced graph printout as it will be
@@ -1077,11 +1079,12 @@ class AsynchronousWorker:
     """Interface for the host to create and manage a separate worker process to fetch elements from a dataset."""
 
     def __init__(self, buffer_size, miss_sleep_time_in_ms, dataset,
-                 load_indefinitely, early_preload):
+                 load_indefinitely, early_preload, sharing_strategy):
         self._process = _AsynchronousWorkerProcess(buffer_size,
                                                    miss_sleep_time_in_ms,
                                                    dataset, load_indefinitely,
-                                                   early_preload)
+                                                   early_preload,
+                                                   sharing_strategy)
         self._previously_ready_element = None
         self._ring_read_index = 0
         self._buffer_size = buffer_size
@@ -1206,13 +1209,14 @@ class _AsynchronousWorkerProcess:
     """Worker process fetching elements from a given dataset"""
 
     def __init__(self, buffer_size, miss_sleep_time_in_ms, dataset,
-                 load_indefinitely, early_preload):
+                 load_indefinitely, early_preload, sharing_strategy):
         self._buffer_size = buffer_size
         self._miss_sleep_time_in_ms = miss_sleep_time_in_ms
         self._dataset = dataset
         self._load_indefinitely = load_indefinitely
         self._early_preload = early_preload
         self._process = None
+        self._sharing_strategy = sharing_strategy
 
     def isAlive(self):
         return self._process.exitcode is None
@@ -1227,6 +1231,24 @@ class _AsynchronousWorkerProcess:
         self._process.join()
 
     def start(self):
+        # The dataset might not fit in shared memory: so use the file system instead.
+        if self._sharing_strategy != enums.SharingStrategy.FileSystem:
+            return self._start()
+
+        # Serialise the dataset to file and replace the dataset by the filename.
+        with tempfile.TemporaryDirectory() as d:
+            pickle_file = os.path.join(d, "dataset.pkl")
+            logger.debug("Serialising dataset to file: %s", pickle_file)
+            dataset = self._dataset
+            with open(pickle_file, "wb") as f:
+                pickle.dump(self._dataset, f)
+                self._dataset = pickle_file
+            try:
+                return self._start()
+            finally:
+                self._dataset = dataset
+
+    def _start(self):
         assert self._process is None, "Worker already started"
         # We use a small pipe to get the initial data. The latency of
         # deserialising the python data is too high to be used for the
@@ -1244,6 +1266,7 @@ class _AsynchronousWorkerProcess:
         # Fetch the data on a seperate process.
         logger.debug("AsynchronousDataAccessor parent process: %d",
                      os.getpid())
+
         self._process = ctx.Process(target=self._main_loop,
                                     args=(write_data_pipe, read_command_pipe))
         self._process.start()
@@ -1285,6 +1308,11 @@ class _AsynchronousWorkerProcess:
         from ._logging import logger  # pylint: disable=import-outside-toplevel
         logger.debug("AsynchronousDataAccessor worker process: %d",
                      os.getpid())
+        # If the dataset is a string then it's a path to file containing
+        # the dataset
+        if isinstance(self._dataset, str):
+            with open(self._dataset, "rb") as f:
+                self._dataset = pickle.load(f)
         dataset_iterator = iter(self._dataset)
 
         data = None

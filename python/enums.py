@@ -2,6 +2,16 @@
 import enum
 
 
+class SharingStrategy(enum.IntEnum):
+    """Strategy to use to pass objects when spawning new processes.
+
+    - ``SharedMemory``: Fast but limited availability.
+    - ``FileSystem``: Slower but larger than memory.
+    """
+    SharedMemory = 0
+    FileSystem = 1
+
+
 class AnchorMode(enum.IntEnum):
     """
     - ``All``: Return a result for each batch.

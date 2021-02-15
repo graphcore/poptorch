@@ -192,7 +192,8 @@ class AsynchronousDataAccessor:
                  buffer_size=3,
                  miss_sleep_time_in_ms=0.1,
                  load_indefinitely=True,
-                 early_preload=False):
+                 early_preload=False,
+                 sharing_strategy=SharingStrategy.FileSystem):
         """
         :param dataset: The dataset to pull data from, this can be any Python
             iterable.
@@ -204,6 +205,11 @@ class AsynchronousDataAccessor:
         :param early_preload: If True, start loading data in the ring buffer
             as soon as the worker is created.
             If False, wait for an iterator to be created before loading data.
+        :param sharing_strategy: Method to use to pass the dataset object when
+            the child process is spawned.
+            SharedMemory is fast but might be quite limited in size.
+            FileSystem will serialise the dataset to file and reload it which
+            will be slower.
         """
 
         # To avoid hangs when the application exits: implicitly call terminate().
@@ -215,7 +221,8 @@ class AsynchronousDataAccessor:
         self._worker = _impl.AsynchronousWorker(buffer_size,
                                                 miss_sleep_time_in_ms, dataset,
                                                 load_indefinitely,
-                                                early_preload)
+                                                early_preload,
+                                                sharing_strategy)
 
     def terminate(self):
         """
