@@ -59,9 +59,9 @@ class DocumentationBuilder:
     def build_html(self):
         self.assert_poptorch_in_path()
         args = self.common_sphinx_flags + [
-            "-b", "html", "-D", f"project=\"{self.title}\"", "-D",
-            f"html_title=\"{self.title}\"", "-D",
-            f"version=\"v{self.pkg_info.version_long}\"", self.docs_src_dir,
+            "-b", "html", "-D", f"project={self.title}", "-D",
+            f"html_title={self.title}", "-D",
+            f"version=v{self.pkg_info.version_long}", self.docs_src_dir,
             self.output_guide_dir
         ]
         assert not sphinx.cmd.build.build_main(args), (
@@ -94,9 +94,9 @@ class DocumentationBuilder:
     def build_pdf(self):
         self.assert_poptorch_in_path()
         args = self.common_sphinx_flags + [
-            "-b", "latex", "-D", f"project=\"{self.pkg_info.doc_name}\"", "-D",
-            f"release=\"v{self.pkg_info.version_long}\"", "-D",
-            f"version=\"v{self.pkg_info.version_long}\"", self.docs_src_dir,
+            "-b", "latex", "-D", f"project={self.pkg_info.doc_name}", "-D",
+            f"release=v{self.pkg_info.version_long}", "-D",
+            f"version=v{self.pkg_info.version_long}", self.docs_src_dir,
             self.output_pdf_dir
         ]
         os.environ["DOC_TITLE"] = self.title

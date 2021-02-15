@@ -85,10 +85,10 @@ endfunction()
 create_symlink_to_include(poplar poplar)
 create_symlink_to_include(popart-only popart)
 
+get_target_property(POPLAR_LIB poplar LOCATION)
+get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)
 # Run an install command that requires PopTorch, PopArt and Poplar to be in the PATH.
 function(run_poptorch_install_command cmd working_directory cmd_name)
-  get_target_property(POPLAR_LIB poplar LOCATION)
-  get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)
   install(CODE
     "set(ENV{LD_LIBRARY_PATH} ${popart_LIB_DIR}:${POPLAR_DIR}:$ENV{LD_LIBRARY_PATH})
     set(ENV{POPTORCH_SMALL_IPU_MODEL} 1)
@@ -135,7 +135,13 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
   set(CMAKE_INSTALL_RPATH "@loader_path")
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 else()
-  set(CMAKE_INSTALL_RPATH "$ORIGIN")
+  # $ORIGIN/lib is needed by the standalone wheel: by default libraries expect
+  # their dependencies to be in $ORIGIN/../lib therefore for Poplar
+  # and Popart to work they need to be stored in a folder named "lib".
+  # However the poptorch shared libraries which are loaded from python must be at
+  # the root of the poptorch package, which is why we need to add $ORIGIN/lib
+  # to the poptorch libraries.
+  set(CMAKE_INSTALL_RPATH "$ORIGIN:$ORIGIN/lib")
 endif()
 
 find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
@@ -148,6 +154,12 @@ add_subdirectory(python)
 add_subdirectory(tests)
 add_subdirectory(examples)
 add_subdirectory(docs/user_guide)
+
+add_custom_target(poptorch_standalone_wheel
+  WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}
+  COMMAND  ${CMAKE_COMMAND} -E env WHEEL_LIB_DIRS="${popart_LIB_DIR}:${POPLAR_DIR}" python3 ${CMAKE_CURRENT_SOURCE_DIR}/setup.py sdist bdist_wheel
+  DEPENDS poptorch_core
+)
 
 add_custom_target(poptorch_wheel
   WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}

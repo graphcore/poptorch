@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import os
 import sys
+import distutils
 import distutils.util
 import logging
 from setuptools import setup
@@ -37,6 +39,19 @@ class BinaryDistribution(Distribution):
         return True
 
 
+package_data = {'poptorch': LIBS}
+wheel_lib_dirs = os.environ.get("WHEEL_LIB_DIRS")
+if wheel_lib_dirs:
+    lib = "poptorch/lib"
+    utils.rmdir_if_exists(lib)
+    os.makedirs(lib)
+    for d in wheel_lib_dirs.split(":"):
+        distutils.dir_util.copy_tree(d, lib)
+    package_data["poptorch"].append("lib/*")
+    package_data["poptorch"].append("lib/poplar_rt/*")
+    package_data["poptorch"].append("lib/graphcore/lib/*.a")
+    VERSION += "+standalone"
+
 setup(
     name='poptorch',
     version=VERSION,
@@ -48,7 +63,7 @@ setup(
     author_email='contact@graphcore.ai',
     license='Apache 2.0',
     packages=['poptorch'],
-    package_data={'poptorch': LIBS},
+    package_data=package_data,
     python_requires=f"=={sys.version_info.major}.{sys.version_info.minor}.*",
     platforms=platform,
     install_requires=REQUIRES,
