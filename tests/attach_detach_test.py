@@ -3,14 +3,24 @@
 
 import math
 import os
-from unittest import mock
+import unittest.mock
 import pytest
 import torch
 import helpers
 import poptorch
 
 
-def entry_point():
+def wait_for_ipu_removed():
+    env = os.environ.copy()
+    env.pop("POPTORCH_WAIT_FOR_IPU", None)
+    return env
+
+
+@helpers.printCapfdOnExit
+@unittest.mock.patch.dict("os.environ", wait_for_ipu_removed())
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed to test this feature")
+def test_attach_detach():
     torch.manual_seed(42)
 
     target = torch.randint(0, 10, [1])
@@ -66,12 +76,3 @@ def entry_point():
 
         inference(torch.randn(10))
         inference.detachFromDevice()
-
-
-def test_attach_detach():
-    wait_for_ipu_removed = {
-        k: v
-        for k, v in os.environ.items() if k not in 'POPTORCH_WAIT_FOR_IPU'
-    }
-    with mock.patch.dict(os.environ, wait_for_ipu_removed, clear=True):
-        entry_point()
