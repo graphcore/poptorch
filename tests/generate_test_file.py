@@ -31,8 +31,7 @@ assert retval == pytest.ExitCode.OK, f"{str(retval)}: {list_tests.getvalue()}"
 # because they're small / short to run (Under 1 minute)
 #pylint: disable=line-too-long
 short_tests = [
-    "activations_test.py", "attach_detach_test.py",
-    "attach_detach_wait_for_ipu_test.py", "batching_test.py", "blas_test.py",
+    "activations_test.py", "batching_test.py", "blas_test.py",
     "buffers_test.py", "custom_loss_test.py", "custom_ops_test.py",
     "index_ops_test.py", "inputs_test.py", "lstm_test.py", "loop_test.py",
     "misc_nn_layers_test.py", "non_contiguous_tensors_test.py", "ops_test.py",
@@ -61,18 +60,20 @@ external_data_tests = [
     "bert_small_and_medium_test.py::test_bert_small_half",
     "bert_small_and_medium_test.py::test_bert_medium_result",
 ]
+
+# Tests that cannot run in parallel with other tests
+serial_tests = ["attach_detach_test.py", "attach_detach_wait_for_ipu_test.py"]
 #pylint: enable=line-too-long
 
 
-def add_test(output, test, folder, labels, test_id, work_dir):
+def add_test(output, test, folder, test_id, test_properties):
     output.write(f"add_test({test} \"python3\" \"-m\" \"pytest\" \"-s\" "
                  f"\"{folder}/{test}\" "
                  f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
-    labels_props = ""
-    if labels:
-        labels_props = f"LABELS \"{labels}\""
-    output.write(f"set_tests_properties({test} PROPERTIES ${labels_props}"
-                 f" WORKING_DIRECTORY \"{work_dir}\")\n")
+
+    props_string = " ".join(f"{k} {v}" for k, v in test_properties.items())
+
+    output.write(f"set_tests_properties({test} PROPERTIES\n{props_string})\n")
 
 
 work_dir = os.getcwd()
@@ -81,7 +82,10 @@ with open(args.output_file, "w") as output:
     test_id = 0
     # Add the short_tests files
     for test in short_tests:
-        add_test(output, test, args.test_dir, "short", test_id, work_dir)
+        add_test(output, test, args.test_dir, test_id, {
+            "LABELS": "short",
+            "WORKING_DIRECTORY": work_dir
+        })
         test_id += 1
 
     # Process the list of tests returned by pytest
@@ -89,6 +93,7 @@ with open(args.output_file, "w") as output:
         # Extract the file name from the test name
         m = re.match("^(.*)::(.*)", test)
         if m:
+            test_properties = {"WORKING_DIRECTORY": work_dir}
             # Use os.path.basename() to ensure we only have
             # the filename
             test_file = os.path.basename(m.group(1))
@@ -99,6 +104,13 @@ with open(args.output_file, "w") as output:
                 labels.append("long")
             if test in external_data_tests:
                 labels.append("external_data")
+
+            if test_file in serial_tests:
+                test_properties['RUN_SERIAL'] = 'TRUE'
+
+            if labels:
+                test_properties['LABELS'] = ";".join(labels)
+
             add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
-                     ";".join(labels), test_id, work_dir)
+                     test_id, test_properties)
             test_id += 1
