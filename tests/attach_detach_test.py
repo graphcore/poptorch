@@ -2,13 +2,15 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import math
+import os
+from unittest import mock
 import pytest
 import torch
 import helpers
 import poptorch
 
 
-def test_attach_detach():
+def entry_point():
     torch.manual_seed(42)
 
     target = torch.randint(0, 10, [1])
@@ -64,3 +66,12 @@ def test_attach_detach():
 
         inference(torch.randn(10))
         inference.detachFromDevice()
+
+
+def test_attach_detach():
+    wait_for_ipu_removed = {
+        k: v
+        for k, v in os.environ.items() if k not in 'POPTORCH_WAIT_FOR_IPU'
+    }
+    with mock.patch.dict(os.environ, wait_for_ipu_removed, clear=True):
+        entry_point()
