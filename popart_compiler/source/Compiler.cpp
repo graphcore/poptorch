@@ -267,6 +267,7 @@ public:
     ids.emplace_back(""); // None tensor
     active_builder = op_builder.get();
   }
+  ~CompilerImpl();
 
   std::unique_ptr<popart::Builder> op_builder;
 
@@ -532,6 +533,8 @@ public:
   std::shared_ptr<popart::DeviceInfo> createDevice();
   bool waitIfUnavailable() const;
   void attachToDevice();
+  void detachFromDevice();
+  bool isAttachedToDevice() const;
 
   template <typename OptimizerType>
   void updateGroups(OptimizerType *optimizer,
@@ -541,7 +544,14 @@ private:
   // Constants which are simply returned (possibly as part of a tuple/list) and
   // do not need to be input into Popart
   std::unordered_map<poptorch::TensorId, HostSideConstant> _host_side_constants;
+  std::shared_ptr<popart::DeviceInfo> _device;
 };
+
+CompilerImpl::~CompilerImpl() {
+  if (_device && isAttachedToDevice()) {
+    detachFromDevice();
+  }
+}
 
 void CompilerImpl::setExecutionStrategyAttributes(
     const std::set<popart::TensorId> &tensors) {
@@ -1006,9 +1016,9 @@ poptorch::TensorId CompilerImpl::hostSideTensorConstant(
 }
 
 std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
+  ERROR_ON_MSG(_device, "device already created");
   updateUseModelConfig();
 
-  std::shared_ptr<popart::DeviceInfo> device;
   std::uint64_t num_ipus =
       used_ipus.size() * popart_options.replicatedGraphCount;
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
@@ -1027,7 +1037,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
     ERROR_ON_MSG(options.connection_type == popart::DeviceConnectionType::Never,
                  "ConnectionType.Never / poptorch.Options.useOfflineIpuTarget "
                  "not supported for the IPU model");
-    device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
+    _device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
         model_options);
     logging::debug("Instantiated device, running on IPU model with {} tiles.",
                    num_tiles_per_ipu);
@@ -1043,10 +1053,10 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
           "ipu" + std::to_string(options.ipu_version);
       device_options["syncPattern"] =
           popart::syncPatternToString(options.sync_pattern);
-      device =
+      _device =
           popart::DeviceManager::createDeviceManager().createOfflineIPUDevice(
               device_options);
-      ERROR_ON_MSG(!device, "Failed to create offline IPU device");
+      ERROR_ON_MSG(!_device, "Failed to create offline IPU device");
     } else {
       // Round up number of ipus to a power of 2
       // or a multiple of 64 (number of POD-64s)
@@ -1077,52 +1087,64 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
       do {
         // Regular IPU hardware target
         if (!options_set.count("ipu_id")) {
-          device =
+          _device =
               popart::DeviceManager::createDeviceManager()
                   .acquireAvailableDevice(num_ipus, 0, options.sync_pattern,
                                           options.connection_type);
-          ERROR_ON_MSG(!device && !waitIfUnavailable(),
+          ERROR_ON_MSG(!_device && !waitIfUnavailable(),
                        "Failed to acquire " << num_ipus << " IPU(s)"
                                             << this->checkSystemConfig());
-          if (device) {
+          if (_device) {
             logging::debug("Acquired {} IPU(s): running on device Id {}.",
-                           num_ipus, device->getId());
+                           num_ipus, _device->getId());
           }
         } else {
-          device =
+          _device =
               popart::DeviceManager::createDeviceManager().acquireDeviceById(
                   options.ipu_id, options.sync_pattern,
                   options.connection_type);
-          ERROR_ON_MSG(!device && !waitIfUnavailable(),
+          ERROR_ON_MSG(!_device && !waitIfUnavailable(),
                        "Failed to acquire device Id " << options.ipu_id
                                                       << checkSystemConfig());
-          ERROR_ON_MSG(device && static_cast<std::uint64_t>(
-                                     device->getNumIpus()) < num_ipus,
+          ERROR_ON_MSG(_device && static_cast<std::uint64_t>(
+                                      _device->getNumIpus()) < num_ipus,
                        "Expected at least replication factor * used IPUs = "
                            << used_ipus.size() << " * "
                            << popart_options.replicatedGraphCount << " = "
                            << num_ipus << " device Ids but the user provided "
-                           << device->getNumIpus());
-          if (device &&
-              static_cast<std::uint64_t>(device->getNumIpus()) != num_ipus) {
+                           << _device->getNumIpus());
+          if (_device &&
+              static_cast<std::uint64_t>(_device->getNumIpus()) != num_ipus) {
             logging::warn(
                 "Expected replication factor * used IPUs = {} * {} "
                 "= {} device Ids but the device selected has {} IPUs which "
                 "means some of them will not be used.",
                 used_ipus.size(), popart_options.replicatedGraphCount, num_ipus,
-                device->getNumIpus());
+                _device->getNumIpus());
           }
-          if (device) {
+          if (_device) {
             logging::debug("Acquired IPU device with id {}, running on device.",
                            options.ipu_id);
           }
         }
-      } while (!device && waitForAWhile());
+      } while (!_device && waitForAWhile());
     }
   }
-  return device;
+  return _device;
 }
 
+void CompilerImpl::detachFromDevice() {
+  logging::trace("Begin detaching device");
+  ERROR_ON_MSG(!_device, "Cannot find a valid device");
+  ERROR_ON_MSG(!_device->isAttached(), "The device has already been detached");
+  _device->detach();
+  logging::debug("Detached from device {}", _device->getId());
+}
+
+bool CompilerImpl::isAttachedToDevice() const {
+  ERROR_ON_MSG(!_device, "Cannot find a valid device");
+  return _device->isAttached();
+}
 } // namespace detail
 
 bool ipuHardwareIsAvailable(std::uint64_t num_ipus) {
@@ -1589,6 +1611,7 @@ void CompilerImpl::attachToDevice() {
   popart::popx::Devicex &device = session->getDevice();
   auto *device_info = device.getDeviceInfo();
   ERROR_ON_MSG(!device_info, "Cannot find a valid device");
+  ERROR_ON_MSG(device_info != _device.get(), "Device mismatch");
   ERROR_ON_MSG(device_info->isAttached(),
                "The device has already been attached");
   bool has_attached = false;
@@ -2518,16 +2541,7 @@ void SessionOptions::setTensorLocation(const char *tensor, const char *option,
 
 SessionOptions::~SessionOptions() = default;
 
-void Compiler::detachFromDevice() {
-  logging::trace("Begin detaching device");
-  popart::popx::Devicex &device = _impl->session->getDevice();
-  auto *device_info = device.getDeviceInfo();
-  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
-  ERROR_ON_MSG(!device_info->isAttached(),
-               "The device has already been detached");
-  device_info->detach();
-  logging::trace("Finished detaching device", "detaching");
-}
+void Compiler::detachFromDevice() { _impl->detachFromDevice(); }
 
 void Compiler::attachToDevice() {
   logging::trace("Begin attaching device");
@@ -2536,10 +2550,7 @@ void Compiler::attachToDevice() {
 }
 
 bool Compiler::isAttachedToDevice() const {
-  popart::popx::Devicex &device = _impl->session->getDevice();
-  auto *device_info = device.getDeviceInfo();
-  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
-  return device_info->isAttached();
+  return _impl->isAttachedToDevice();
 }
 
 } // namespace poptorch
