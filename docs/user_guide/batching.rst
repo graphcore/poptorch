@@ -53,6 +53,36 @@ Example
   :emphasize-lines: 10
   :linenos:
 
+.. warning:: :py:class:`~poptorch.AsynchronousDataAccessor` makes use of the Python
+  ``multiprocessing`` module's `spawn` start method. Consequently, the entry point of
+  a program that uses it must be guarded by a ``if __name__ == '__main__':`` block
+  to avoid endless recursion. The dataset used must also be picklable. For more
+  information, please see https://docs.python.org/3/library/multiprocessing.html#the-spawn-and-forkserver-start-methods.
+
+.. warning:: Tensors being iterated over using an
+  :py:class:`~poptorch.AsynchronousDataAccessor` use shared memory. You must clone
+  tensors at each iteration if you wish to keep their references outside of each
+  iteration.
+  
+  Consider the following example:
+
+  .. code-block:: python
+    :emphasize-lines: 5
+
+    predictions, labels = [], []
+
+    for data, label in dataloader:
+        predictions += poptorch_model(data)
+        labels += label
+
+  The ``predictions`` list will be correct because it's producing a new tensor from the
+  inputs. However, The list ``labels`` will contain identical references. This line
+  would need to be replaced with the following:
+
+  .. code-block:: python
+
+    labels += label.detach().clone()
+
 poptorch.Options.deviceIterations
 =================================
 
