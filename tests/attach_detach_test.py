@@ -2,7 +2,6 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import math
-import os
 import unittest.mock
 import pytest
 import torch
@@ -10,14 +9,7 @@ import helpers
 import poptorch
 
 
-def wait_for_ipu_removed():
-    env = os.environ.copy()
-    env.pop("POPTORCH_WAIT_FOR_IPU", None)
-    return env
-
-
-@helpers.printCapfdOnExit
-@unittest.mock.patch.dict("os.environ", wait_for_ipu_removed())
+@unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "0"})
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test this feature")
 def test_attach_detach():

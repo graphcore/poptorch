@@ -6,9 +6,9 @@ import os
 import time
 import unittest.mock
 import pytest
-import helpers
 import torch
 import torch.multiprocessing as mp
+import helpers
 import poptorch
 
 
