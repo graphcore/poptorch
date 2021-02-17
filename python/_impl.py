@@ -5,6 +5,7 @@ import enum
 import io
 import numbers
 import os
+import weakref
 import pickle
 import sys
 import tempfile
@@ -620,7 +621,9 @@ class PoplarExecutor:
                                    "copyWeightsToDevice", "setOptimizer",
                                    "compile", "destroy")
         if self._training:
-            parent = self
+            # We don't want the pytorch model to keep the Poptorch one
+            # alive so only keep a weak reference.
+            parent = weakref.ref(self)
 
             class PoptorchModel(type(self._user_model)):
                 def copyWeightsToHostIfNeeded(self):
@@ -628,16 +631,18 @@ class PoplarExecutor:
                     have been updated.
                     Return False if the weights were already up to date.
                     """
-                    if parent._dirty_host_weights:  # pylint: disable=protected-access
+                    if parent() and parent()._dirty_host_weights:  # pylint: disable=protected-access
                         logger.debug("Implicit copyWeightsToHost()")
-                        parent._dirty_host_weights = False  # pylint: disable=protected-access
-                        parent.copyWeightsToHost()
+                        parent()._dirty_host_weights = False  # pylint: disable=protected-access
+                        parent().copyWeightsToHost()
                         return True
                     return False
 
                 def __getattribute__(self, name):
                     if name == "_host_weights_version":
-                        return parent._host_weights_version
+                        if not parent():
+                            return None
+                        return parent()._host_weights_version
                     if name in ("_parameters", "forward"):
                         self.copyWeightsToHostIfNeeded()
                     return object.__getattribute__(self, name)
@@ -656,7 +661,8 @@ class PoplarExecutor:
             # situations such as torch.equal(a, b).
             class PoptorchParameter(torch.nn.Parameter):
                 def __getattribute__(self, name):
-                    parent._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
+                    if parent():
+                        parent()._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
 
                     return object.__getattribute__(self, name)
 
