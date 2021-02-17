@@ -106,6 +106,40 @@ def test_popart_patterns():
     inference_model(x, y)
 
 
+@helpers.printCapfdOnExit
+@pytest.mark.parametrize("dtype", [torch.half, torch.float])
+@pytest.mark.parametrize("ptype", [torch.half, torch.float])
+def test_popart_partials(capfd, dtype, ptype):
+    torch.manual_seed(42)
+    x = torch.randn((1, 16, 16), dtype=dtype)
+
+    model = torch.nn.Sequential()
+    model.add_module('lin', torch.nn.Linear(16, 16))
+    model.add_module('conv', torch.nn.Conv1d(16, 16, 1))
+
+    poptorch.setLogLevel(0)
+    opts = poptorch.Options()
+    opts.Popart.setPartialsType(ptype)
+    poptorch_model = poptorch.inferenceModel(model, opts)
+    poptorch_model(x)
+
+    log = helpers.LogChecker(capfd)
+    if ptype == torch.float:
+        log.assert_contains(
+            'poptorch.Options set partialsTypeMatMuls to value float')
+        log.assert_contains(
+            'poptorch.Options set convolutionOptions[partialsType] to float')
+        log.assert_contains('"partialsType":"MatMulPartialsType::FLOAT"')
+        log.assert_contains('"partialsType[0]":"float"')
+    else:
+        log.assert_contains(
+            'poptorch.Options set partialsTypeMatMuls to value half')
+        log.assert_contains(
+            'poptorch.Options set convolutionOptions[partialsType] to half')
+        log.assert_contains('"partialsType":"MatMulPartialsType::HALF"')
+        log.assert_contains('"partialsType[0]":"half"')
+
+
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 def test_real_ipu_selection():

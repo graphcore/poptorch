@@ -191,6 +191,25 @@ class _PopartOptions:
         self.options["patterns_level"] = level
         self.options["patterns"] = patterns
 
+    def setPartialsType(self, dtype):
+        """Set the data type of partial results for matrix multiply and
+           convolution operators.
+
+        :param torch.dtype type: either torch.float or torch.half
+        """
+
+        type_str = ''
+        if dtype in [torch.float, torch.float32]:
+            type_str = 'float'
+        elif dtype in [torch.half, torch.float16]:
+            type_str = 'half'
+        else:
+            raise ValueError("parameter to setPartialsType should be either" \
+                             "torch.float or torch.half")
+
+        self.options["partialsTypeMatMuls"] = type_str
+        self.options["convolutionOptions"] = {"partialsType": type_str}
+
 
 class _DistributedOptions(_options_impl.OptionsDict):
     """Options related to distributed execution.

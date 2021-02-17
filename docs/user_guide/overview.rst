@@ -626,8 +626,6 @@ Use :py:class:`poptorch.MultiConv` wrapper class to define multi-convolutions.
 .. autoclass:: poptorch.MultiConv
    :members:
 
-.. autoclass:: poptorch.MultiConvPartialsType
-
 .. autoclass:: poptorch.MultiConvPlanType
 
 poptorch.custom_op

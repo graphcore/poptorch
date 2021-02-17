@@ -156,6 +156,7 @@ class AutoStage(enum.IntEnum):
     AutoIncrement = 1
 
 
+# TODO(T34238): enums.MultiConvPartialsType deprecated in 2.0
 class MultiConvPartialsType(enum.IntEnum):
     """Type for the partials of each convolution of a ``poptorch.MultiConv``
 
