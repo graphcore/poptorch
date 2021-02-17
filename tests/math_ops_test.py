@@ -148,24 +148,30 @@ def test_unary_ops_int(op):
     unary_op_harness(op, input, compare)
 
 
-def test_clamp():
+# Parameterize torch.clamp unittests for different supported overloads
+clamp_inputs = [{"min": 0.2, "max": 0.8}, {"min": 0.2}, {"max": 0.8}]
+
+
+@pytest.mark.parametrize("args", clamp_inputs)
+def test_clamp(args):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 200])
 
     def op_clamp(x):
-        return x.clamp(min=0.2, max=0.8)
+        return x.clamp(**args)
 
     unary_op_harness(op_clamp, input, torch.equal)
 
 
-def test_clamp_():
+@pytest.mark.parametrize("args", clamp_inputs)
+def test_clamp_(args):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 200])
 
     def op_clamp_(x):
-        return x.clamp_(min=0.2, max=0.8)
+        return x.clamp_(**args)
 
     unary_op_harness(op_clamp_, input, torch.equal)
 

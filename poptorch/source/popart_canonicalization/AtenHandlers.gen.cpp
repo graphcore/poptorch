@@ -112,17 +112,6 @@ torch::jit::Node *celuHandler(torch::jit::Graph *graph,
   return createAdd(graph, {t4, t5});
 }
 
-torch::jit::Node *clampHandler(torch::jit::Graph *graph,
-                               torch::jit::Node *node) {
-  auto x = node->input(0);
-  auto z = node->input(2);
-  auto t0 = constantToFloat(z->node());
-  auto y = node->input(1);
-  auto t1 = constantToFloat(y->node());
-  // clip(x, cfloat(z), cfloat(y))
-  return createClip(graph, {x}, t0, t1);
-}
-
 torch::jit::Node *constantpadndHandler(torch::jit::Graph *graph,
                                        torch::jit::Node *node) {
   auto x = node->input(0);
@@ -876,8 +865,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::cat, catHandler);
   registerHandler(c10::aten::ceil, ceilHandler);
   registerHandler(c10::aten::celu, celuHandler);
-  registerHandler(c10::aten::clamp, clampHandler);
-  registerHandler(c10::aten::clamp_, clampHandler);
   registerHandler(c10::aten::constant_pad_nd, constantpadndHandler);
   registerHandler(c10::aten::cos, cosHandler);
   registerHandler(c10::aten::cosh, coshHandler);

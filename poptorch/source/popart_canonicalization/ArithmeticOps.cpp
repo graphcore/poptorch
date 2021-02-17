@@ -92,6 +92,19 @@ torch::jit::Node *trueDivideHandler(torch::jit::Graph *graph,
   return createDiv(graph, {x->output(), y->output()});
 }
 
+torch::jit::Node *clampHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto min_node = node->input(1)->node();
+  auto min = isNone(min_node) ? std::numeric_limits<float>::lowest()
+                              : constantToFloat(min_node);
+
+  auto max_node = node->input(2)->node();
+  auto max = isNone(max_node) ? std::numeric_limits<float>::max()
+                              : constantToFloat(max_node);
+  return createClip(graph, {x}, max, min);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -101,6 +114,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::floor_divide, floorDivideHandler);
   registerHandler(c10::aten::mul, mulHandler);
   registerHandler(c10::aten::true_divide, trueDivideHandler);
+  registerHandler(c10::aten::clamp, clampHandler);
+  registerHandler(c10::aten::clamp_, clampHandler);
 }
 
 } // namespace poptorch

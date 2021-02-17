@@ -110,7 +110,6 @@ forward("replication_pad3d", "replication_pad1d")
 convert("masked_fill", 3, "where", [1, 2, 0])
 convert("where", 3)
 
-expand("clamp", lambda x, y, z: op.clip(x, cfloat(z), cfloat(y)))
 expand("constant_pad_nd", lambda x, l, c: op.constantPad(
     x, clong_list(l), cfloat(c)))
 expand(
@@ -136,7 +135,6 @@ def softplus_handler(x, b, threshold):
     return op.where(condition, x, softplus)
 
 
-forward("clamp_", "clamp")
 forward("hardtanh_", "hardtanh")
 forward("masked_fill_", "masked_fill")
 forward("where_", "where")
