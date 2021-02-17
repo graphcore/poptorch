@@ -292,6 +292,7 @@ Sparse layers
 Embedding is supported with the exception of ``padding_idx`` being ignored.
 
 * ``torch.nn.Embedding``
+* ``torch.nn.EmbeddingBag``
 
 Loss functions
 --------------

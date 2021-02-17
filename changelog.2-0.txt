@@ -13,6 +13,7 @@ New features:
 - Allow the user to specify which Optimizer attributes are constant or not.
 - Allow the user to specify mode=poptorch.DataLoaderMode.Async in poptorch.DataLoader
   constructor instead of explicitly creating an AsynchronousDataAccessor
+- Add support for torch.nn.EmbeddingBag
 
 Known issues:
 

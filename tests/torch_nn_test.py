@@ -255,12 +255,8 @@ EXPECTED_FAILURES = {
     "test_nn_interpolate_trilinear_scale_3d_align_corners": "Upsample mode not supported",
     "test_nn_interpolate_trilinear_3d_alert_nondeterministic": "Upsample mode not supported",
 
-    "test_nn_EmbeddingBag_mean": "T30611",
-    "test_nn_EmbeddingBag_sum": "T30611",
-    "test_nn_EmbeddingBag_max": "T30611",
-    "test_nn_EmbeddingBag_sparse": "T30611",
-    "test_nn_EmbeddingBag_alert_nondeterministic": "T30611",
-    "test_nn_Embedding_sparse": "T30611",
+    "test_nn_EmbeddingBag_sparse": "T27057: sparse gradient support",
+    "test_nn_Embedding_sparse": "T27057: sparse gradient support",
 
     "test_nn_MultiheadAttention": "ai.onnx.Dropout:10 ratio value 0 is not valid",
     }

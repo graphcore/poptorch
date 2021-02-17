@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
+import torch.nn.functional as F
 import pytest
 import helpers
 import poptorch
@@ -254,6 +255,65 @@ def test_embedding():
 
     assert nativeOut.size() == poptorch_out.size()
     assert torch.equal(nativeOut, poptorch_out)
+
+
+@pytest.mark.parametrize("mode", ["max", "mean", "sum"])
+def test_embedding_bag(mode):
+    torch.manual_seed(0)
+    model = torch.nn.EmbeddingBag(10, 3, mode=mode)
+    x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
+    cpu_out = model(x)
+    pop_model = poptorch.inferenceModel(model)
+    pop_out = pop_model(x)
+    torch.testing.assert_allclose(pop_out, cpu_out)
+
+
+def test_embedding_bag_per_sample_weights():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            # per_sample_weights are only supported for mode="sum"
+            self.embedding_bag = torch.nn.EmbeddingBag(10, 3, mode="sum")
+            self.per_sample_weights = torch.randn(2, 4)
+
+        def forward(self, x):
+            return self.embedding_bag(
+                x, per_sample_weights=self.per_sample_weights)
+
+    torch.manual_seed(0)
+    model = Model()
+    x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
+    cpu_out = model(x)
+    pop_model = poptorch.inferenceModel(model)
+    pop_out = pop_model(x)
+    torch.testing.assert_allclose(pop_out, cpu_out)
+
+
+@pytest.mark.parametrize("mode", ["max", "mean", "sum"])
+def test_embedding_bag_include_last_offset(mode):
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.weight = torch.nn.Parameter(torch.Tensor(10, 3))
+            torch.nn.init.normal_(self.weight)
+
+        def forward(self, x):
+            offsets = torch.arange(0, x.numel(), x.size(1))
+            offsets = torch.cat((offsets, torch.tensor([x.numel()])))
+            x = x.reshape(-1)
+            return F.embedding_bag(x,
+                                   self.weight,
+                                   offsets=offsets,
+                                   include_last_offset=True,
+                                   mode=mode)
+
+    torch.manual_seed(0)
+    model = Model()
+    x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
+    cpu_out = model(x)
+    pop_model = poptorch.inferenceModel(model)
+    pop_out = pop_model(x)
+    torch.testing.assert_allclose(pop_out, cpu_out)
 
 
 def test_pixel_shuffle():
