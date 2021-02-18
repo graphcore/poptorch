@@ -429,6 +429,29 @@ def test_reduction_ops_float_api2(op):
     unary_op_harness(operation, input, compare)
 
 
+@pytest.mark.parametrize("op", [torch.min, torch.max])
+@pytest.mark.parametrize("dim", range(3))
+@pytest.mark.parametrize("keepdim", [False, True])
+def test_minmax_tuple_out(op, dim, keepdim):
+    torch.manual_seed(42)
+
+    input = torch.randn([1, 2, 10, 200])
+
+    def operation(x):
+        return op(x, dim=dim, keepdim=keepdim)
+
+    def compare(cpu_out, pop_out):
+        assert isinstance(cpu_out, tuple) and isinstance(pop_out, tuple)
+        assert len(cpu_out) == len(pop_out)
+
+        for i, cpu in enumerate(cpu_out):
+            torch.testing.assert_allclose(pop_out[i], cpu)
+
+        return True
+
+    unary_op_harness(operation, input, compare)
+
+
 # Interesting p-values for testing torch.norm(X, p=<>)
 norm_pvals = ['fro', float('inf'), float('-inf'), 1, 1.0, 2, 2.0, 3, 3.0]
 

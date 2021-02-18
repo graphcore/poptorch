@@ -458,52 +458,6 @@ torch::jit::Node *maskedfillHandler(torch::jit::Graph *graph,
   return createWhere(graph, {i1, i2, i0});
 }
 
-torch::jit::Node *maxHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
-  if (node->inputs().size() == 1) {
-    auto x = node->input(0);
-    auto t0 = reduceHelperDimensionCreator(x);
-    // reducemax(x, dimension_list(x), 0)
-    return createReducemax(graph, {x}, t0, 0);
-  }
-  if (node->inputs().size() == 2) {
-    auto i0 = node->input(0);
-    auto i1 = node->input(1);
-    // max(i0, i1)
-    return createMax(graph, {i0, i1});
-  }
-
-  std::stringstream errmsg;
-  errmsg << "Incorrect number of arguments for operator ";
-  errmsg << "c10::aten::max. ";
-  errmsg << "Expecting 1 or 2 operands, ";
-  errmsg << "got " << node->inputs().size() << " operand(s).";
-  ERROR(&errmsg);
-  return nullptr;
-}
-
-torch::jit::Node *minHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
-  if (node->inputs().size() == 1) {
-    auto x = node->input(0);
-    auto t0 = reduceHelperDimensionCreator(x);
-    // reducemin(x, dimension_list(x), 0)
-    return createReducemin(graph, {x}, t0, 0);
-  }
-  if (node->inputs().size() == 2) {
-    auto i0 = node->input(0);
-    auto i1 = node->input(1);
-    // min(i0, i1)
-    return createMin(graph, {i0, i1});
-  }
-
-  std::stringstream errmsg;
-  errmsg << "Incorrect number of arguments for operator ";
-  errmsg << "c10::aten::min. ";
-  errmsg << "Expecting 1 or 2 operands, ";
-  errmsg << "got " << node->inputs().size() << " operand(s).";
-  ERROR(&errmsg);
-  return nullptr;
-}
-
 torch::jit::Node *mselossHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   auto x = node->input(0);
@@ -924,8 +878,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::margin_ranking_loss, marginrankinglossHandler);
   registerHandler(c10::aten::masked_fill, maskedfillHandler);
   registerHandler(c10::aten::masked_fill_, maskedfillHandler);
-  registerHandler(c10::aten::max, maxHandler);
-  registerHandler(c10::aten::min, minHandler);
   registerHandler(c10::aten::mse_loss, mselossHandler);
   registerHandler(c10::aten::ne, neHandler);
   registerHandler(c10::aten::neg, negHandler);

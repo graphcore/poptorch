@@ -15,6 +15,7 @@ New features:
   constructor instead of explicitly creating an AsynchronousDataAccessor
 - Add support for torch.nn.EmbeddingBag
 - Added support for torch.clamp_max and torch.clamp_min
+- Add support for ``torch.min(tensor, dim=.*, keepdim=.*)`` and ``torch.max(tensor, dim=.*, keepdim=.*)`` overloads.
 
 Known issues:
 

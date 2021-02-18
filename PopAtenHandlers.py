@@ -39,8 +39,6 @@ expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), clong(0)))
 expand("log2", lambda x: op.log(x) / math.log(2))
 expand("log10", lambda x: op.log(x) / math.log(10))
 expand("log_sigmoid", lambda x: op.log(op.sigmoid(x)))
-expand("max", lambda x: op.reducemax(x, dimension_list(x), clong(0)))
-expand("min", lambda x: op.reducemin(x, dimension_list(x), clong(0)))
 expand(
     "rand", lambda x: op.randomUniform(x, output_shape(), cfloat(1.), cfloat(
         0.), output_type()))
@@ -56,7 +54,7 @@ forward("relu_", "relu")
 forward("selu_", "selu")
 
 # binary operators
-opers = ["atan2", "div", "fmod", "max", "min", "pow", "prelu", "remainder"]
+opers = ["atan2", "div", "fmod", "pow", "prelu", "remainder"]
 
 for oper in opers:
     convert(oper, 2)

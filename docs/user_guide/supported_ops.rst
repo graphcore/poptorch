@@ -145,11 +145,6 @@ Comparison ops
 * ``torch.gt``
 * ``torch.le``
 * ``torch.lt``
-
-    ``torch.min`` and ``torch.max`` only support ``(tensor, tensor)`` and
-    ``(tensor)`` overloads. They do not support the
-    ``(tensor, dim=.*, keepdim=.*)`` overload.
-
 * ``torch.max``
 * ``torch.min``
 * ``torch.ne``

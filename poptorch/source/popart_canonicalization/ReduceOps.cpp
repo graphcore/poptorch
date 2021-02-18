@@ -96,6 +96,68 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
   return createArgmin(graph, {input}, dim_to_use, keep_dim);
 }
 
+torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
+                                           torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = x->type()->expect<c10::TensorType>();
+  auto dim = handleDimensionParam(node->input(1), t0);
+  auto keepdim = constantToBool(node->input(2)->node());
+  bool negate = node->kind() == c10::aten::min;
+
+  if (negate) {
+    x = createNeg(graph, {x})->output();
+  }
+
+  auto one = tensorToConstant(graph, at::tensor(1L))->output();
+  auto result = createTopk(graph, {x, one}, dim);
+  auto values = result->output(0);
+  auto indices = result->output(1);
+
+  if (negate) {
+    values = createNeg(graph, {values})->output();
+  }
+
+  if (!keepdim) {
+    // Squeeze out the singleton-dim left by topk
+    values = createSqueeze(graph, {values}, {dim})->output();
+    indices = createSqueeze(graph, {indices}, {dim})->output();
+  }
+
+  if (node->hasUses()) {
+    replaceOutputUse(node->output(0), values);
+    replaceOutputUse(node->output(1), indices);
+  }
+
+  markNodeForDeletion(node);
+  return nullptr;
+}
+
+template <typename ReduceFunc, typename ExtremaFunc>
+torch::jit::Node *minMaxHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node, ReduceFunc &&reduceFunc,
+                                ExtremaFunc &&extremaFunc) {
+  if (node->inputs().size() == 1) {
+    auto x = node->input(0);
+    auto t0 = reduceHelperDimensionCreator(x);
+    return reduceFunc(graph, {x}, t0, 0);
+  }
+  if (node->inputs().size() == 2) {
+    auto i0 = node->input(0);
+    auto i1 = node->input(1);
+    return extremaFunc(graph, {i0, i1});
+  }
+
+  return minMaxWithIndicesHandler(graph, node);
+}
+
+torch::jit::Node *minHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  return minMaxHandler(graph, node, createReducemin, createMin);
+}
+
+torch::jit::Node *maxHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  return minMaxHandler(graph, node, createReducemax, createMax);
+}
+
 torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   // aten::norm(Tensor in, int p) -> Tensor
@@ -167,5 +229,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::sum, reduceHandler);
   registerHandler(c10::aten::logsumexp, reduceHandler);
   registerHandler(c10::aten::norm, tensorNormHandler);
+  registerHandler(c10::aten::min, minHandler);
+  registerHandler(c10::aten::max, maxHandler);
 }
 } // namespace poptorch
