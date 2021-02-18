@@ -58,12 +58,17 @@ def emit_handlers(namespace, aten, handlers, f=sys.stdout):
             expect_str += ' or ' + str(arity_list[-1])
 
         if len(arity_list) > 1 or arity_list[0] > 1:
-            expect_str += " operands."
+            expect_str += " operands, "
         else:
-            expect_str += " operand."
+            expect_str += " operand, "
 
-        f.write("  ERROR(\"Incorrect number of arguments for operator " \
-                + namespace + "::" + aten + ". " + expect_str + "\");\n")
+        f.write('\n  std::stringstream errmsg;\n')
+        f.write('  errmsg << "Incorrect number of arguments for operator ";\n')
+        f.write('  errmsg << "' + namespace + '::' + aten + '. ";\n')
+        f.write('  errmsg << "' + expect_str + '";\n')
+        f.write(
+            '  errmsg << "got " << node->inputs().size() << " operand(s).";\n')
+        f.write("  ERROR(&errmsg);\n")
         f.write("  return nullptr;\n")
 
     f.write("}\n\n")
