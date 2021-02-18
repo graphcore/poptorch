@@ -48,8 +48,22 @@ def emit_handlers(namespace, aten, handlers, f=sys.stdout):
             handler.emit(values, 0, "  ", f, True)
 
     if emit_arity_check:
-        f.write("  ERROR(\"Unhandled arity for operator " + namespace + "::" + \
-                aten + "\");\n")
+        arity_list = sorted(list(arities))
+        expect_str = "Expecting " + str(arity_list[0])
+
+        for i in range(1, len(arity_list) - 1):
+            expect_str += ', ' + str(arity_list[i])
+
+        if len(arity_list) > 1:
+            expect_str += ' or ' + str(arity_list[-1])
+
+        if len(arity_list) > 1 or arity_list[0] > 1:
+            expect_str += " operands."
+        else:
+            expect_str += " operand."
+
+        f.write("  ERROR(\"Incorrect number of arguments for operator " \
+                + namespace + "::" + aten + ". " + expect_str + "\");\n")
         f.write("  return nullptr;\n")
 
     f.write("}\n\n")

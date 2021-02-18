@@ -235,7 +235,8 @@ torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
     // reducel2(x, dimension_list(x, clong_list(l)), clong(c))
     return createReducel2(graph, {x}, t1, t2);
   }
-  ERROR("Unhandled arity for operator c10::aten::frobenius_norm");
+  ERROR("Incorrect number of arguments for operator c10::aten::frobenius_norm. "
+        "Expecting 1 or 3 operands.");
   return nullptr;
 }
 
@@ -465,7 +466,8 @@ torch::jit::Node *maxHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
     // max(i0, i1)
     return createMax(graph, {i0, i1});
   }
-  ERROR("Unhandled arity for operator c10::aten::max");
+  ERROR("Incorrect number of arguments for operator c10::aten::max. Expecting "
+        "1 or 2 operands.");
   return nullptr;
 }
 
@@ -482,7 +484,8 @@ torch::jit::Node *minHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
     // min(i0, i1)
     return createMin(graph, {i0, i1});
   }
-  ERROR("Unhandled arity for operator c10::aten::min");
+  ERROR("Incorrect number of arguments for operator c10::aten::min. Expecting "
+        "1 or 2 operands.");
   return nullptr;
 }
 
