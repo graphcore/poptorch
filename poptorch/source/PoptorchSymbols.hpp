@@ -23,6 +23,8 @@ extern c10::Symbol where_;                      // NOLINT
 extern c10::Symbol poisson_nll_loss;            // NOLINT
 extern c10::Symbol multilabel_soft_margin_loss; // NOLINT
 extern c10::Symbol bernoulli_;                  // NOLINT
+extern c10::Symbol clamp_min_;                  // NOLINT
+extern c10::Symbol clamp_max_;                  // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {

@@ -176,6 +176,20 @@ def test_clamp_(args):
     unary_op_harness(op_clamp_, input, torch.equal)
 
 
+@pytest.mark.parametrize(
+    "op",
+    [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
+def test_clamp_min(op):
+    torch.manual_seed(42)
+
+    input = torch.randn([1, 2, 10, 200])
+
+    def op_clamp(x):
+        return op(x, 0.5)
+
+    unary_op_harness(op_clamp, input, torch.equal)
+
+
 binary_ops_float = [
     torch.add, torch.atan2, torch.div, torch.sub, torch.fmod,
     torch.floor_divide, torch.mul, torch.remainder, torch.true_divide

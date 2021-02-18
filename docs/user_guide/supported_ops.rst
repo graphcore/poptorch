@@ -92,6 +92,8 @@ Pointwise ops
 * ``torch.atanh``
 * ``torch.ceil``
 * ``torch.clamp``
+* ``torch.clamp_max``
+* ``torch.clamp_min``
 * ``torch.cos``
 * ``torch.cosh``
 * ``torch.div``

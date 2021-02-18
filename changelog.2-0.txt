@@ -14,6 +14,7 @@ New features:
 - Allow the user to specify mode=poptorch.DataLoaderMode.Async in poptorch.DataLoader
   constructor instead of explicitly creating an AsynchronousDataAccessor
 - Add support for torch.nn.EmbeddingBag
+- Added support for torch.clamp_max and torch.clamp_min
 
 Known issues:
 
