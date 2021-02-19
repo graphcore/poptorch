@@ -27,6 +27,8 @@ c10::Symbol multilabel_soft_margin_loss; // NOLINT
 c10::Symbol bernoulli_;                  // NOLINT
 c10::Symbol clamp_min_;                  // NOLINT
 c10::Symbol clamp_max_;                  // NOLINT
+c10::Symbol amax;                        // NOLINT
+c10::Symbol amin;                        // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -52,6 +54,8 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, bernoulli_)
   SYMBOL_INIT(aten, clamp_min_)
   SYMBOL_INIT(aten, clamp_max_)
+  SYMBOL_INIT(aten, amax)
+  SYMBOL_INIT(aten, amin)
 }
 
 } // namespace c10::aten

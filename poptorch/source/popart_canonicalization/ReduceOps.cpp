@@ -60,6 +60,25 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   ERROR("Popart Canonicalisation: UNREACHABLE reached in reductions.");
 }
 
+torch::jit::Node *aMinMaxHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  // aten::max(Tensor self, int[] dim, int keepdim)
+  // aten::min(Tensor self, int[] dim, int keepdim)
+  auto input = node->input(0);
+  auto axes = constantToLongVec(node->input(1)->node());
+  auto keepdim = constantToLong(node->input(2)->node());
+
+  if (axes.empty()) {
+    input = createFlatten(graph, {input}, 0)->output();
+    axes = {1};
+  }
+
+  if (node->kind() == c10::aten::amax) {
+    return createReducemax(graph, {input}, axes, keepdim);
+  }
+  return createReducemin(graph, {input}, axes, keepdim);
+}
+
 torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   //  aten::argmin(Tensor in, int? dim, int keep_dims) -> Tensor
@@ -222,6 +241,8 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::amax, aMinMaxHandler);
+  registerHandler(c10::aten::amin, aMinMaxHandler);
   registerHandler(c10::aten::argmax, argMinMaxHandler);
   registerHandler(c10::aten::argmin, argMinMaxHandler);
   registerHandler(c10::aten::prod, reduceHandler);

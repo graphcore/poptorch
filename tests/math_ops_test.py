@@ -365,6 +365,8 @@ binary_op_int = [
 
 # These functions support API 1 - op(input)
 reduction_ops_api1 = [
+    torch.amax,
+    torch.amin,
     torch.argmax,
     torch.argmin,
     # torch.dist,
@@ -379,6 +381,8 @@ reduction_ops_api1 = [
 
 # These functions support API 2 - op(input,dim,keep_dim)
 reduction_ops_api2 = [
+    torch.amax,
+    torch.amin,
     torch.argmax,
     torch.argmin,
     # torch.dist,

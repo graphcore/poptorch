@@ -16,6 +16,7 @@ New features:
 - Add support for torch.nn.EmbeddingBag
 - Added support for torch.clamp_max and torch.clamp_min
 - Add support for ``torch.min(tensor, dim=.*, keepdim=.*)`` and ``torch.max(tensor, dim=.*, keepdim=.*)`` overloads.
+- Add support for torch.amax and torch.amin
 
 Known issues:
 

@@ -86,6 +86,8 @@ Pointwise ops
 * ``torch.acos``
 * ``torch.acosh``
 * ``torch.add``
+* ``torch.amax``
+* ``torch.amin``
 * ``torch.asin``
 * ``torch.asinh``
 * ``torch.atan``
