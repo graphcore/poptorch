@@ -280,6 +280,11 @@ class BeginBlock(torch.nn.Module):
 
 # pylint: enable=abstract-method
 
+# Store all attributes to prevent garbage collection
+attributes_lists = []
+
+ATTR_PREFIX = "attr:"
+
 
 def custom_op(inputs,
               name,
@@ -296,7 +301,10 @@ def custom_op(inputs,
     :param iterable example_outputs: a tuple of tensors with the same type
         and shape of the outputs; the value does not matter as all values will
         be set to zero for tracing purposes.
-    :param dict attributes: a dictionary of attributes for the custom op.
+    :param dict attributes: a dictionary of attributes for the custom op. All
+        attributes keys must be strings. All attribute values must be floats,
+        ints, strings, or a list/tuple containing only floats, only ints or only
+        strings (not a mix of types within the list).
 
     :returns: The outputs of the forward op of the custom op.
     """
@@ -307,53 +315,61 @@ def custom_op(inputs,
         # to be a template). Otherwise the compiler may recognise the alias.
         transformed_outputs.append(torch.zeros_like(output))
 
-    def encodeStr(s):
-        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    if attributes is not None:
+        # Handle attributes list
+        for k, v in attributes.items():
+            if not isinstance(k, (str)):
+                raise ValueError("All attribute keys must be strings.")
+            if not isinstance(v, (float, int, str, list, tuple)):
+                raise ValueError("Attribute values must be floats, ints, " +
+                                 "strings or a list/tuple of float, ints of " +
+                                 "strings.")
 
-    def strForAttribute(name, value):
-        if not isinstance(name, str):
-            raise ValueError("Attribute key is not a string.")
+            if isinstance(v, (list, tuple)):
+                for element in v:
+                    if not isinstance(element, (type(v[0]))):
+                        raise ValueError("The types in a list/tuple " +
+                                         "attribute must all be the same.")
 
-        s = f"{name}: "
+        # The id should not change between traces, so we need to re-use any
+        # attribute dictionaries. This more complicated because equality of
+        # values is insufficient: [1, 2, 3] == [1.0, 2.0, 3.0]
+        def same_attribute_types(candidate_att, search_attr):
+            sorted_keys = sorted(candidate_att.keys())
+            if sorted_keys != sorted(search_attr.keys()):
+                return False
 
-        if isinstance(value, (float, int)):
-            return s + str(value)
+            for key in sorted_keys:
+                candidate = candidate_att[key]
+                search = search_attr[key]
+                if not isinstance(candidate, (type(search))):
+                    return False
+                if isinstance(candidate, (list, tuple)):
+                    if not isinstance(candidate[0], type(search[0])):
+                        return False
+            return True
 
-        if isinstance(value, (str)):
-            return s + encodeStr(value)
+        for attrib_cand in attributes_lists:
+            if attrib_cand != attributes:
+                continue
 
-        if isinstance(value, (list, tuple)):
-            if len(value) == 0:
-                return s + "[]"
+            # Equality does not imply same types
+            if not same_attribute_types(attrib_cand, attributes):
+                continue
 
-            if not all(isinstance(v, type(value[0])) for v in value):
-                raise ValueError("All types in an attributes list must be " +
-                                 "the same")
+            attributes = attrib_cand
+            break
+        else:
+            attributes_lists.append(attributes)
 
-            if isinstance(value[0], (float, int)):
-                return s + repr(value)
-
-            if isinstance(value[0], (str)):
-                s += "["
-                s += ", ".join([encodeStr(v) for v in value])
-                s += "]"
-                return s
-
-        raise ValueError(f"Invalid type {type(value)} for attribute {name}")
-
-    def toAttribStr(attributes):
-        if attributes is None:
-            return ""
-
-        return ", ".join([
-            strForAttribute(name, value) for name, value in attributes.items()
-        ])
+    # NB None is a singleton in Python
+    attributes_id_str = f"{ATTR_PREFIX}{hex(id(attributes))}"
 
     return torch.ops.poptorch.custom_operation(inputs, name, domain,
                                                domain_version,
                                                len(transformed_outputs),
                                                transformed_outputs,
-                                               toAttribStr(attributes))
+                                               attributes_id_str)
 
 
 def identity_loss(x, reduction):

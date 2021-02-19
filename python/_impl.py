@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import copy
+import ctypes
 import enum
 import io
 import numbers
@@ -21,6 +22,7 @@ from . import profiling
 from . import poptorch_core
 from ._logging import logger
 from .options import Options
+from .ops import ATTR_PREFIX
 
 
 def applyOptimizer(optimizer):
@@ -565,6 +567,27 @@ class ArgsParser:
                 " including when nested in tuples.\nReceived list " + end_msg)
 
 
+# Allow access to attributes
+def accessAttributes(attribute_id_str):
+    logger.debug("Accessing attributes with: %s", attribute_id_str)
+
+    if not isinstance(attribute_id_str, (str)):
+        raise ValueError("Wrong type for attribute_id_str")
+
+    if not attribute_id_str.startswith(ATTR_PREFIX):
+        raise ValueError("Invalid attribute_id_str")
+
+    attribute_id = int(attribute_id_str[len(ATTR_PREFIX):], 16)
+
+    # NB this is undefined behavior if attribute_id does not exist
+    attributes = ctypes.cast(attribute_id, ctypes.py_object).value
+    logger.debug(str(attributes))
+
+    if attributes is None:
+        return {}
+    return attributes
+
+
 class PoplarExecutor:
     """ This class should not be created directly but is a wrapper around
     the model that was passed into `inferenceModel` or `trainingModel`.
@@ -842,7 +865,7 @@ class PoplarExecutor:
                     self._trace._c, self._trace.graph,
                     tuple(parameters.keys()), tuple(parameters.values()),
                     in_tensors_trace_view.asTuple(), self._options.toDict(),
-                    self._training)
+                    self._training, accessAttributes)
             if self._executable:
                 self._is_attached = self.isAttachedToDevice()
 
@@ -999,6 +1022,7 @@ class PoplarExecutor:
             **dict(self._trace.named_parameters()),
             **dict(self._trace.named_buffers())
         }
+
         if hasConvertedAnyHalf[0]:
             # Get the originals back.
             in_tensors_as_half = self._args_parser(args, kwargs)
@@ -1009,13 +1033,15 @@ class PoplarExecutor:
                 self._trace._c, tuple(parameters.keys()),
                 tuple(parameters.values()),
                 in_tensors_as_half.asTuple(), trace_input_string,
-                self._options.toDict(), self._training, self._optimizer)
+                self._options.toDict(), self._training, self._optimizer,
+                accessAttributes)
         else:
             self._executable = poptorch_core.compileWithTrace(
                 self._trace._c, tuple(parameters.keys()),
                 tuple(parameters.values()),
                 in_tensors_trace_view.asTuple(), trace_input_string,
-                self._options.toDict(), self._training, self._optimizer)
+                self._options.toDict(), self._training, self._optimizer,
+                accessAttributes)
 
         if self._executable:
             self._is_attached = self.isAttachedToDevice()

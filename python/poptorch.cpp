@@ -78,13 +78,13 @@ customOperation(c10::List<at::Tensor> inputs,          // NOLINT
                 std::string name, std::string domain,  // NOLINT
                 int64_t version, int64_t num_outputs,  // NOLINT
                 c10::List<at::Tensor> example_outputs, // NOLINT
-                std::string attributes) {              // NOLINT
+                std::string attributes_map_id) {       // NOLINT
   UNUSED(inputs);
   UNUSED(name);
   UNUSED(domain);
   UNUSED(version);
   UNUSED(num_outputs);
-  UNUSED(attributes);
+  UNUSED(attributes_map_id);
 
   return example_outputs;
 }
@@ -629,7 +629,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     py::handle h, const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
     const std::string &trace_input_str, const pybind11::dict &options,
-    bool training, const py::dict &optimizerDict) {
+    bool training, const py::dict &optimizerDict,
+    const py::function &attribute_accessor) {
   try {
     auto module = asModule(h);
 
@@ -731,15 +732,17 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     return poptorch::lowerToPopart(
         graph.get(), &input_tensors, std::move(traced_tensors),
         std::move(parameters), training, std::move(optimizers),
-        parseSessionOptions(options));
+        parseSessionOptions(options), attribute_accessor);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
-    py::handle h, py::handle g, const pybind11::tuple &parameter_names,
-    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
-    const pybind11::dict &options, bool training) {
+std::shared_ptr<poptorch::PoplarExecutable>
+compileWithScript(py::handle h, py::handle g,
+                  const pybind11::tuple &parameter_names,
+                  const pybind11::tuple &parameter_tensors,
+                  const pybind11::tuple &inputs, const pybind11::dict &options,
+                  bool training, const py::function &attribute_accessor) {
   try {
     auto module = asModule(h);
     auto arg_graph = asGraph(g);
@@ -822,7 +825,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
 
     return poptorch::lowerToPopart(
         graph.get(), &input_tensors, std::move(parameter_data),
-        std::move(parameters), training, {}, parseSessionOptions(options));
+        std::move(parameters), training, {}, parseSessionOptions(options),
+        attribute_accessor);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }

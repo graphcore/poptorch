@@ -4,6 +4,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <memory>
 #include <string>
 #include <unordered_set>
 
@@ -24,6 +25,8 @@ void searchAndPossiblyDestroy(
 // Use unused type BFLOAT16 to indicate ambiguity between FLOAT16 and FLOAT32
 // NOLINTNEXTLINE
 const auto HALF_OR_FLOAT = at::ScalarType::BFloat16;
+
+std::unique_ptr<char[]> stringToUniquePtr(const std::string &str);
 
 } // namespace poptorch
 

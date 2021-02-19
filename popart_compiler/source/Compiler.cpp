@@ -437,10 +437,10 @@ public:
   popart::TensorId
   addUntypedInputTensor(const std::vector<popart::TensorId> &inputs);
 
-  std::vector<popart::TensorId>
-  customOperation(const std::vector<popart::TensorId> &args,
-                  const std::string &op, const std::string &domain,
-                  std::int64_t version, std::int64_t num_outputs);
+  std::vector<popart::TensorId> customOperation(
+      const std::vector<popart::TensorId> &args, const std::string &op,
+      const std::string &domain, std::int64_t version, std::int64_t num_outputs,
+      const std::shared_ptr<std::vector<PopartAttribute>> &attributes);
 
   popart::TensorId
   recomputationCheckpoint(const std::vector<popart::TensorId> &input);
@@ -974,17 +974,39 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
   return ai_onnx.reshape({inputs.at(0), new_shape});
 }
 
-std::vector<popart::TensorId>
-CompilerImpl::customOperation(const std::vector<popart::TensorId> &args,
-                              const std::string &op, const std::string &domain,
-                              std::int64_t version, std::int64_t num_outputs) {
-  logging::info("Adding operator with {} inputs ",
+std::vector<popart::TensorId> CompilerImpl::customOperation(
+    const std::vector<popart::TensorId> &args, const std::string &op,
+    const std::string &domain, std::int64_t version, std::int64_t num_outputs,
+    const std::shared_ptr<std::vector<PopartAttribute>> &attributes) {
+  logging::info("Adding custom op with {} inputs ",
                 static_cast<std::int32_t>(args.size()));
+
+  // Convert to the the format required for Popart. We cannot use popart::any
+  // as a known type externally in poptorch to avoid needing popart headers.
+  std::map<std::string, popart::any> attributes_map;
+  for (auto &attribute : *attributes) {
+    attributes_map[attribute.name()] = *(attribute.getValue());
+  }
+
+  if (!attributes->empty()) {
+    std::stringstream ss;
+    ss << "Attributes: ";
+
+    for (auto &attribute : *attributes) {
+      ss << attribute.name();
+
+      if (&attribute != &attributes->back()) {
+        ss << ", ";
+      }
+    }
+    logging::trace(ss.str().c_str());
+  }
 
   const std::int32_t num_inputs = static_cast<std::int32_t>(args.size());
   popart::OperatorIdentifier id = {domain, op, 1, num_inputs};
 
-  return active_builder->customOp(id, version, args, num_outputs, {});
+  return active_builder->customOp(id, version, args, num_outputs,
+                                  attributes_map);
 }
 
 popart::TensorId CompilerImpl::recomputationCheckpoint(
@@ -1627,6 +1649,39 @@ void CompilerImpl::attachToDevice() {
 
 } // namespace detail
 
+PopartAttribute::PopartAttribute(const char *name, const int64_t &value)
+    : _name(stringToUniquePtr(name)), _any(new popart::any(value)) {}
+PopartAttribute::PopartAttribute(const char *name,
+                                 const std::vector<int64_t> &values)
+    : _name(stringToUniquePtr(name)), _any(new popart::any(values)) {}
+PopartAttribute::PopartAttribute(const char *name, const float &value)
+    : _name(stringToUniquePtr(name)), _any(new popart::any(value)) {}
+PopartAttribute::PopartAttribute(const char *name,
+                                 const std::vector<float> &values)
+    : _name(stringToUniquePtr(name)), _any(new popart::any(values)) {}
+
+PopartAttribute::PopartAttribute(const char *name,
+                                 const std::unique_ptr<char[]> &str)
+    : _name(stringToUniquePtr(name)),
+      _any(new popart::any(std::string(str.get()))) {}
+
+PopartAttribute::PopartAttribute(
+    const char *name, const std::vector<std::unique_ptr<char[]>> &strs)
+    : _name(stringToUniquePtr(name)) {
+  std::vector<std::string> strs_new;
+  strs_new.reserve(strs.size());
+  for (auto &str : strs) {
+    strs_new.emplace_back(str.get());
+  }
+  _any = std::make_unique<popart::any>(std::move(strs_new));
+}
+
+PopartAttribute::PopartAttribute(PopartAttribute &&) = default;
+PopartAttribute &PopartAttribute::operator=(PopartAttribute &&) = default;
+PopartAttribute::~PopartAttribute() = default;
+
+popart::any *PopartAttribute::getValue() { return _any.get(); }
+
 PopartConstant::PopartConstant(const PopartType &popart_type, const void *data,
                                const std::vector<std::int64_t> &shape) {
   ERROR_ON_MSG(popart_type == PopartType::DOUBLE,
@@ -1670,6 +1725,8 @@ Compiler::addInputTensor(const char *type,
 #define ARG(Type, Name) , Type Name
 #define POPART_CONST_ARG(Name) , const PopartConstant &Name
 #define HOST_SIDE_CONST_ARG(Name) , const HostSideConstant &Name
+#define POPART_ATTRIB_VEC_ARG(Name)                                            \
+  , std::shared_ptr<std::vector<PopartAttribute>> Name
 #define BODY_ARG(Name) , Name
 
 // Create a function decl with the given call and arguments.
@@ -1705,6 +1762,7 @@ Compiler::addInputTensor(const char *type,
 #undef OP_DECL
 #undef OP_DECL_NO_RETURN
 #undef BODY_ARG
+#undef POPART_ATTRIB_VEC_ARG
 #undef POPART_CONST_ARG
 #undef HOST_SIDE_CONST_ARG
 #undef ARG

@@ -1,6 +1,8 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "poptorch/LowerToPopart.hpp"
 
+#include <pybind11/pybind11.h>
+
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
@@ -96,7 +98,8 @@ public:
   LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
                 std::vector<at::Tensor> params,
                 std::vector<std::string> parameter_names, bool training,
-                std::vector<Optimizer> &&opt, const SessionOptions &options);
+                std::vector<Optimizer> &&opt, const SessionOptions &options,
+                const py::function &attribute_accessor);
 
   void lower();
 
@@ -832,13 +835,100 @@ convertHostSideTensorConstantNode(const torch::jit::Node *node) {
           tensor.nbytes(), getTensorDimensions(tensor)};
 }
 
+float pyFloatToFloatWithRangeCheck(const pybind11::handle &pyFloat) {
+  // A python "float" is a double
+  double value = pyFloat.cast<double>();
+  ERROR_ON_MSG(value > std::numeric_limits<float>::max(),
+               value << " is too high for a Popart float attribute.");
+  ERROR_ON_MSG(value < std::numeric_limits<float>::lowest(),
+               value << " is too low for a Popart float attribute.");
+  return static_cast<float>(value);
+}
+
+void processListAttribute(
+    const char *name,
+    const std::shared_ptr<std::vector<PopartAttribute>> &attributes,
+    const py::list &elements) {
+  ERROR_ON(elements.empty());
+  const auto &first_element = static_cast<py::object>(elements[0]);
+
+  if (py::isinstance<py::int_>(first_element)) {
+    std::vector<int64_t> ints;
+    ints.reserve(elements.size());
+    for (const auto &int_obj : elements) {
+      ints.push_back(int_obj.cast<int64_t>());
+    }
+    attributes->emplace_back(name, ints);
+    return;
+  }
+
+  if (py::isinstance<py::float_>(first_element)) {
+    std::vector<float> floats;
+    floats.reserve(elements.size());
+    for (const auto &float_obj : elements) {
+      floats.push_back(pyFloatToFloatWithRangeCheck(float_obj));
+    }
+    attributes->emplace_back(name, floats);
+    return;
+  }
+
+  if (py::isinstance<py::str>(first_element)) {
+    std::vector<std::unique_ptr<char[]>> strs;
+    strs.reserve(elements.size());
+    for (const auto &str : elements) {
+      strs.emplace_back(stringToUniquePtr(str.cast<std::string>()));
+    }
+    attributes->emplace_back(name, strs);
+    return;
+  }
+
+  ERROR("Invalid type for Popart attribute.");
+}
+
+std::shared_ptr<std::vector<PopartAttribute>>
+convertCustomOpAttributes(const torch::jit::Node *node,
+                          const py::function &attribute_accessor) {
+  logging::LogContext ctx("convertCustomOpAttributes processing " +
+                          nodeToString(node));
+  std::string attributes_id_str(
+      node->s(c10::Symbol::fromQualString("attr::attributes_id")));
+
+  auto dict_obj = attribute_accessor(attributes_id_str);
+
+  auto dict = dict_obj.cast<py::dict>();
+
+  auto attributes = std::make_shared<std::vector<PopartAttribute>>();
+  for (const auto &attribute : dict) {
+    std::string name = attribute.first.cast<std::string>();
+
+    if (py::isinstance<py::int_>(attribute.second)) {
+      attributes->emplace_back(name.c_str(), attribute.second.cast<int64_t>());
+    } else if (py::isinstance<py::float_>(attribute.second)) {
+      attributes->emplace_back(name.c_str(),
+                               pyFloatToFloatWithRangeCheck(attribute.second));
+    } else if (py::isinstance<py::str>(attribute.second)) {
+      attributes->emplace_back(
+          name.c_str(),
+          stringToUniquePtr(attribute.second.cast<std::string>()));
+    } else if (py::isinstance<py::list>(attribute.second) ||
+               py::isinstance<py::tuple>(attribute.second)) {
+      processListAttribute(name.c_str(), attributes,
+                           attribute.second.cast<py::tuple>());
+    } else {
+      ERROR("Invalid attribute Type");
+    }
+  }
+
+  return attributes;
+}
 } // namespace
 
 LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
                              std::vector<at::Tensor> params,
                              std::vector<std::string> parameter_names,
                              bool training, std::vector<Optimizer> &&opt,
-                             const SessionOptions &options)
+                             const SessionOptions &options,
+                             const py::function &attribute_accessor)
     : _graph(*g), _in_tensors(*ins), _parameters(std::move(params)),
       _parameter_names(std::move(parameter_names)), _optimizers(opt),
       _compiler({training, options}) {
@@ -877,6 +967,9 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 #define HOST_SIDE_CONST_ARG(unused)                                            \
   , std::move(convertHostSideTensorConstantNode(node))
 
+#define POPART_ATTRIB_VEC_ARG(unused)                                          \
+  , convertCustomOpAttributes(node, attribute_accessor)
+
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
@@ -902,6 +995,7 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 #undef BODY_STR_ARG
 #undef STR_ARG
 #undef BODY_ARG
+#undef POPART_ATTRIB_VEC_ARG
 #undef HOST_SIDE_CONST_ARG
 #undef POPART_CONST_ARG
 #undef OP_DECL
@@ -921,7 +1015,8 @@ std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
               std::vector<at::Tensor> parameters,
               std::vector<std::string> parameter_names, bool training,
-              std::vector<Optimizer> &&opt, const SessionOptions &options) {
+              std::vector<Optimizer> &&opt, const SessionOptions &options,
+              const py::function &attribute_accessor) {
   std::srand(std::time(nullptr));
 
   LowerToPopart lower_impl{graph,
@@ -930,7 +1025,8 @@ lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
                            std::move(parameter_names),
                            training,
                            std::move(opt),
-                           std::move(options)};
+                           std::move(options),
+                           attribute_accessor};
   lower_impl.lower();
 
   auto executable = lower_impl.compile();

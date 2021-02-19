@@ -13,6 +13,11 @@
 #include "popart_compiler/PopartEnums.hpp"
 #include "poptorch/PoplarExecutable.hpp"
 
+namespace pybind11 {
+class function;
+}
+namespace py = pybind11;
+
 namespace poptorch {
 class SessionOptions;
 
@@ -23,7 +28,8 @@ std::shared_ptr<poptorch::PoplarExecutable>
 lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
               std::vector<at::Tensor> parameters,
               std::vector<std::string> parameter_names, bool training,
-              std::vector<Optimizer> &&opt, const SessionOptions &options);
+              std::vector<Optimizer> &&opt, const SessionOptions &options,
+              const py::function &attribute_accessor);
 
 } // namespace poptorch
 

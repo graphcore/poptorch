@@ -23,8 +23,8 @@ OP_DECL(poptorch, edge_pad, edge_pad, AiOnnxOpset10.pad,
 OP_DECL(poptorch, add_not_in_place, add_not_in_place, _impl->addNotInPlace, NONE, NONE)
 
 OP_DECL(poptorch, custom_operation, custom_operation, _impl->customOperation,
-        ARG(STRING, name) ARG(STRING, domain) ARG(INT, version) ARG(INT, num_outputs),
-        BODY_ARG(name) BODY_ARG(domain) BODY_ARG(version) BODY_ARG(num_outputs))
+        ARG(STRING, name) ARG(STRING, domain) ARG(INT, version) ARG(INT, num_outputs) POPART_ATTRIB_VEC_ARG(attributes),
+        BODY_ARG(name) BODY_ARG(domain) BODY_ARG(version) BODY_ARG(num_outputs) BODY_ARG(attributes))
 
 OP_DECL_NO_RETURN(poptorch, addInputTensorFromParentGraph, addInputTensorFromParentGraph,
                         _impl->addInputTensorFromParentGraph, NONE, NONE)

@@ -40,5 +40,26 @@ set (CMAKE_CXX_STANDARD 14)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 add_library(custom_cube_op SHARED "custom_cube_op.cpp")
-
 target_link_libraries(custom_cube_op popart-only)
+
+add_library(custom_add_scalar_op SHARED "custom_add_scalar_op.cpp")
+target_link_libraries(custom_add_scalar_op popart-only)
+
+add_library(custom_add_scalar_vec_op SHARED "custom_add_scalar_vec_op.cpp")
+target_link_libraries(custom_add_scalar_vec_op popart-only)
+
+add_library(custom_add_vec_scalar_mul_op SHARED
+            "custom_add_vec_scalar_mul_op.cpp")
+target_link_libraries(custom_add_vec_scalar_mul_op popart-only)
+
+add_library(custom_reduce_op SHARED
+            "custom_reduce_op.cpp")
+target_link_libraries(custom_reduce_op popart-only)
+
+add_library(custom_three_input_reduce_op SHARED
+            "custom_three_input_reduce_op.cpp")
+target_link_libraries(custom_three_input_reduce_op popart-only)
+
+add_library(custom_many_attribute_op SHARED
+            "custom_many_attribute_op.cpp")
+target_link_libraries(custom_many_attribute_op popart-only)

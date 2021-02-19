@@ -17,6 +17,7 @@ New features:
 - Added support for torch.clamp_max and torch.clamp_min
 - Add support for ``torch.min(tensor, dim=.*, keepdim=.*)`` and ``torch.max(tensor, dim=.*, keepdim=.*)`` overloads.
 - Add support for torch.amax and torch.amin
+- Add support for attributes in custon ops.
 
 Known issues:
 

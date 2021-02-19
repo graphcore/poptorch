@@ -13,6 +13,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 namespace popart {
+class any;
 enum class DataType;
 class ConstVoidData;
 } // namespace popart
@@ -98,6 +99,39 @@ private:
   friend Compiler;
 };
 
+// Represents an attribute used in a custom operation: popart uses popart::any
+// to store the different values
+class PopartAttribute {
+public:
+  // Templating works with g++ but not clang++
+  PopartAttribute(const char *name, const int64_t &value);
+  PopartAttribute(const char *name, const std::vector<int64_t> &values);
+  PopartAttribute(const char *name, const float &value);
+  PopartAttribute(const char *name, const std::vector<float> &values);
+  PopartAttribute(const char *name, const std::unique_ptr<char[]> &str);
+  PopartAttribute(const char *name,
+                  const std::vector<std::unique_ptr<char[]>> &strs);
+
+  // Required for opaque pointer
+  PopartAttribute(PopartAttribute &&);
+  PopartAttribute &operator=(PopartAttribute &&);
+  ~PopartAttribute();
+
+  popart::any *getValue();
+
+  const char *name() const { return _name.get(); }
+
+private:
+  // Convert a "const char *" to a std::unique_ptr char*
+  static std::unique_ptr<const char[]> cStrToUP(const char *name);
+
+  // Use a pointer to circumvent the C++ ABI problems with std::string
+  std::unique_ptr<const char[]> _name;
+
+  // Use an opaque pointer to avoid the need for popart headers
+  std::unique_ptr<popart::any> _any;
+};
+
 // A class to store all the data and info required to create a constant in the
 // popart builder for convenience. Internally, it is a simple wrapper to
 // popart::ConstVoidData.
@@ -153,6 +187,8 @@ public:
 #define ARG(Type, Name) , Type Name
 #define POPART_CONST_ARG(Name) , const PopartConstant &Name
 #define HOST_SIDE_CONST_ARG(Name) , const HostSideConstant &Name
+#define POPART_ATTRIB_VEC_ARG(Name)                                            \
+  , std::shared_ptr<std::vector<PopartAttribute>> Name
 #define BODY_ARG(Name) NONE
 
 // Create a function decl with the given call and arguments.
@@ -170,6 +206,7 @@ public:
 #undef OP_DECL
 #undef OP_DECL_NO_RETURN
 #undef BODY_ARG
+#undef POPART_ATTRIB_VEC_ARG
 #undef HOST_SIDE_CONST_ARG
 #undef POPART_CONST_ARG
 #undef ARG
@@ -193,10 +230,6 @@ public:
   std::unique_ptr<char[]> getTensorDTypeString(poptorch::TensorId id) const;
 
   bool isHostSideConstant(poptorch::TensorId id) const;
-
-  poptorch::TensorId
-  customOperation(const char *op,
-                  const std::vector<poptorch::TensorId> &inputs);
 
   void addOutputType(OutputType type);
 
