@@ -740,9 +740,9 @@ You can simply input float 16 tensors into your model.
 (You can convert a tensor to float 16 using ``tensor = tensor.half()``)
 
 You can use your models in one of the following ways:
+
 #. Convert all parameters (weights) to float 16 by using using a ``Module``'s .``half()`` method. This is the most memory efficient, however small updates to weights may be lost, hindering training.
-#. Keep the parameters (weights) as float 32, in which case the parameter updates will occur using float 32. However, the parameters will be converted to float 16 if you call an operation with a float 16 input.
-This is more memory efficient than using float 32 tensors (inputs) but less memory efficient than using float 16 weights.
+#. Keep the parameters (weights) as float 32, in which case the parameter updates will occur using float 32. However, the parameters will be converted to float 16 if you call an operation with a float 16 input. This is more memory efficient than using float 32 tensors (inputs) but less memory efficient than using float 16 weights.
 #. Use a mix of float 32 and float 16 parameters by manually specifying parameters as float 16 or float 32.
 
 .. note::  When PyTorch encounters a mix of float 16 and float 32 inputs for a given operation, it will usually cast all inputs and float 32.
