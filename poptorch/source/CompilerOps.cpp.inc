@@ -265,7 +265,7 @@ torch::jit::Node* createAtanh(torch::jit::Graph *graph,  const std::vector<torch
 return new_node;
 }
 torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFifth, OutputType::AsImplicitCastPromoted);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFifth, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
 new_node->f_(c10::Symbol::fromQualString("attr::epsilon"),epsilon);
 new_node->f_(c10::Symbol::fromQualString("attr::momentum"),momentum);

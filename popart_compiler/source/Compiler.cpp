@@ -850,6 +850,11 @@ SessionOptionsImpl::SessionOptionsImpl() {
                    popart_options.convolutionOptions.emplace(p);
                  });
 
+  registerSetter(container_options, "lstmOptions",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.lstmOptions.emplace(p);
+                 });
+
   registerSetter(container_options, "gclOptions",
                  [&](const std::pair<std::string, std::string> &p) {
                    popart_options.gclOptions.emplace(p);
