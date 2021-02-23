@@ -32,6 +32,35 @@ def applyOptimizer(optimizer):
             index, optimizer.param_groups[index]["params"])
 
 
+# A flag to tell the user if the current target is IPU. This is to allow
+# divergent IPU/CPU codepaths within one model.
+_is_ipu_context = False
+
+
+def isRunningOnIpu():
+    """ This function returns `True` when executing on IPU and `False` when
+        executing the model outside IPU scope. This allows for seperate
+        codepaths to be marked in the model simply by using:
+
+            if poptorch.isRunningOnIpu():
+                # IPU path
+            else:
+                # CPU path
+
+        Note this will only apply to code during execution. During model
+        creation it will always return `False`.
+
+        :returns: True if running on IPU, otherwise False.
+    """
+    global _is_ipu_context
+    return _is_ipu_context
+
+
+def _SetIpuContext(val):
+    global _is_ipu_context
+    _is_ipu_context = val
+
+
 # To understand which variable groups the user wants to apply the
 # optimizer to we need to mark them via a wrapper. We do this because
 # when we reference the variables in the context of the operation we
@@ -986,7 +1015,15 @@ class PoplarExecutor:
         # We will trace using the normal trace view.
         # pylint: disable=protected-access
         self._options._execution_strategy.onStartTracing()
+
+        # The CPU execution happening during trace represents the IPU codepath.
+        _SetIpuContext(True)
+
         self._trace = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
+
+        # Restore to non-IPU codepath.
+        _SetIpuContext(False)
+
         self._options._execution_strategy.onEndTracing()
 
         if self._RestoreInputsIfRequired(in_tensors_backup,

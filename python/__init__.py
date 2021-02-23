@@ -21,7 +21,7 @@ from . import _impl
 from .enums import *
 from .ops import *
 from .options import *
-from ._impl import PoplarExecutor
+from ._impl import PoplarExecutor, isRunningOnIpu
 from . import optim
 from . import profiling
 

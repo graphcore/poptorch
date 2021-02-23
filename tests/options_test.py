@@ -254,3 +254,24 @@ def test_running_variance(capfd, dtype, setting):
         log.assert_contains("%24 : Float(16:1, requires_grad=0, device=cpu)):")
     else:
         log.assert_contains("%24 : Half(16:1, requires_grad=0, device=cpu)):")
+
+
+def test_ipu_context_flag():
+    class Network(nn.Module):
+        def forward(self, x, y):
+            if poptorch.isRunningOnIpu():
+                output = x + y
+            else:
+                output = x * y
+
+            return output
+
+    model = Network()
+
+    inference_model = poptorch.inferenceModel(model)
+
+    x = torch.tensor([50])
+    y = torch.tensor([2])
+
+    assert inference_model(x, y) == 52
+    assert model(x, y) == 100

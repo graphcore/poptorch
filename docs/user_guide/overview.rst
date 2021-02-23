@@ -103,6 +103,11 @@ poptorch.PoplarExecutor
 
 .. _parallel_execution:
 
+poptorch.isRunningOnIpu
+-----------------------
+
+.. autofunction:: poptorch.isRunningOnIpu
+
 Parallel execution
 ==================
 
