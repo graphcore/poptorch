@@ -173,7 +173,7 @@ onwards (inclusive) will be on IPU 1.
     :linenos:
     :start-after: annotations_start
     :end-before: annotations_end
-    :emphasize-lines: 15-16, 19-20, 23-24
+    :emphasize-lines: 37-38, 41-42, 45-46
     :caption: Annotations can be attached to layers in existing models.
 
 
@@ -331,7 +331,7 @@ and used in :py:class:`poptorch.Stage` dynamically. They match exactly.
   :linenos:
   :start-after: annotations_start
   :end-before: annotations_end
-  :emphasize-lines: 24, 31, 45-46, 49-50
+  :emphasize-lines: 25, 32, 47-48, 51-52
 
 
 Parallel execution strategies
