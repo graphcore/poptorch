@@ -36,6 +36,13 @@ torch::jit::Node *expandHandler(torch::jit::Graph *graph,
   std::vector<std::int64_t> new_shape =
       constantToLongVec(node->input(1)->node());
 
+  // a new shape element of -1 means that dimension should not change
+  for (unsigned i = 0; i < new_shape.size(); ++i) {
+    if (new_shape[i] == -1) {
+      new_shape[i] = old_shape[i];
+    }
+  }
+
   // Count the number of elements in the target shape.
   std::int64_t new_elem_count = std::accumulate(
       new_shape.begin(), new_shape.end(), 1, std::multiplies<std::int64_t>());

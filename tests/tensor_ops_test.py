@@ -263,6 +263,25 @@ def test_expand():
     assert torch.equal(nativeOut, poptorch_out)
 
 
+def test_expand_preserve_dim():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x.expand(2, -1, -1)
+
+    model = Model()
+    x = torch.randn(1, 1, 100)
+
+    # Run on CPU.
+    nativeOut = model(x)
+
+    # Run on IPU.
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(x)
+
+    assert nativeOut.size() == poptorch_out.size()
+    assert torch.equal(nativeOut, poptorch_out)
+
+
 def test_expand_as():
     class Model(torch.nn.Module):
         def forward(self, x, y):
