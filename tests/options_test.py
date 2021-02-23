@@ -65,7 +65,6 @@ def test_set_popart_options():
     })
     opts.Popart.set("customCodelets", [])
     opts.Popart.set("autoRecomputation", 1)
-    opts.Popart.set("cachePath", "/tmp")
     opts.Popart.set("enableOutlining", True)
     opts.Popart.set("batchSerializationSettings.factor", 1)
     opts.Popart.set("batchSerializationSettings.concatOnVirtualGraphChange",
