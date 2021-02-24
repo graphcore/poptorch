@@ -1,19 +1,12 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import os
 import torch
 import pytest
 import numpy as np
 import helpers
 import poptorch
 
-partition_name = "poptorch_tests"
 
-
-# Note: poptorch.ipuHardwareIsAvailable() cannot be used before the Options
-# set IPUOF_CONFIG_PATH.
-@pytest.mark.skipif(int(os.environ.get("POPTORCH_IPU_MODEL", "0")) != 0,
-                    reason="Hardware IPU needed")
-@pytest.mark.skipif(int(os.environ.get("POPTORCH_SMALL_IPU_MODEL", "0")) != 0,
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 def test_weight_update_replicas(process_id=0, num_processes=1):
     localReplicationFactor = 2

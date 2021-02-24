@@ -14,6 +14,10 @@ def disableSmallModel():
     return {}
 
 
+def disableAllModels():
+    return {"POPTORCH_IPU_MODEL": "0", "POPTORCH_SMALL_IPU_MODEL": "0"}
+
+
 def propagateInputShapes(graph, dummyInputs):
     for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
         graphInput.inferTypeFrom(dummyInput)

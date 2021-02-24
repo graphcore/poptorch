@@ -173,7 +173,7 @@ def test_ipu_id_selection():
     inference_model(x, y)
 
 
-@unittest.mock.patch.dict("os.environ", {"POPTORCH_IPU_MODEL": "0"})
+@unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
 def test_offline_ipu():
     class Network(nn.Module):
         def forward(self, x, y):
