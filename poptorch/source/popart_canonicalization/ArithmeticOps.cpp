@@ -123,6 +123,14 @@ torch::jit::Node *clampMaxHandler(torch::jit::Graph *graph,
   return createHandlerOperation(graph, clamp_handler, {input, min, max});
 }
 
+torch::jit::Node *addCDivHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  torch::jit::Node *div = createDiv(graph, {node->input(1), node->input(2)});
+  auto scale = constantToFloat(node->input(3)->node());
+  torch::jit::Node *scaled = createScale(graph, {div->output()}, scale);
+  return createAdd(graph, {node->input(0), scaled->output()});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -138,6 +146,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::clamp_min_, clampMinHandler);
   registerHandler(c10::aten::clamp_max, clampMaxHandler);
   registerHandler(c10::aten::clamp_max_, clampMaxHandler);
+  registerHandler(c10::aten::addcdiv, addCDivHandler);
+  registerHandler(c10::aten::addcdiv_, addCDivHandler);
 }
 
 } // namespace poptorch

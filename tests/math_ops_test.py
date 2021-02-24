@@ -72,7 +72,6 @@ unary_ops_float = [
     torch.expm1,
     torch.floor,
     torch.frac,
-
     # torch.imag, torch.lgamma,
     torch.log,
     torch.log10,
@@ -614,3 +613,37 @@ def test_big_constant_arrays_sliced(ty):
         return x * big_array[0]
 
     unary_op_harness(operation, input, torch.equal)
+
+
+# Parametrize input tensor shapes for addcdiv to make sure broadcasting works.
+broadcastable_shapes = [
+    ((3, 1), (3, 1), (3, 1)),
+    ((1, 3), (3, 1), (1, 3)),
+    ((5, 3), (5, 1), (1, 3)),
+    ((1, ), (3, 1), (2, )),
+]
+
+
+@pytest.mark.parametrize("shapes", broadcastable_shapes)
+@pytest.mark.parametrize("scale", [0.35, 4.91, 12.0, -0.53, -3.45, -9.0, 0.0])
+def test_addcdiv(shapes, scale):
+    class Model(torch.nn.Module):
+        def forward(self, tensor0, tensor1, tensor2):
+            return torch.addcdiv(
+                tensor0,
+                tensor1,
+                tensor2,
+                value=scale,
+            )
+
+    t0 = torch.randn(shapes[0])
+    t1 = torch.randn(shapes[1])
+    t2 = torch.randn(shapes[2])
+
+    model = Model()
+    native_out = model(t0, t1, t2)
+
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(t0, t1, t2)
+
+    torch.testing.assert_allclose(poptorch_out, native_out)
