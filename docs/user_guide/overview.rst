@@ -631,6 +631,8 @@ Use :py:class:`poptorch.MultiConv` wrapper class to define multi-convolutions.
 .. autoclass:: poptorch.MultiConv
    :members:
 
+Please refer to the `PopLibs documentation for multi-convolutions <https://docs.graphcore.ai/projects/poplar-api/en/latest/poplibs_api.html>`_ for further information.
+
 .. autoclass:: poptorch.MultiConvPlanType
 
 poptorch.custom_op
