@@ -63,7 +63,7 @@ Example
   :py:class:`~poptorch.AsynchronousDataAccessor` use shared memory. You must clone
   tensors at each iteration if you wish to keep their references outside of each
   iteration.
-  
+
   Consider the following example:
 
   .. code-block:: python
@@ -100,7 +100,7 @@ Example
   :caption: Use of device iterations and batch size
   :start-after: iterations_start
   :end-before: iterations_end
-  :emphasize-lines: 52, 58
+  :emphasize-lines: 51, 57, 63
   :linenos:
 
 poptorch.Options.replicationFactor
