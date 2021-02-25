@@ -7,4 +7,4 @@ IPU-Machine™, IPU-POD™, IPU-Link™ and Virtual-IPU™
 are trademarks of Graphcore Ltd. All other trademarks are the property of
 their respective owners.
 
-© Copyright 2016-2020, Graphcore Ltd.
+© Copyright 2016-2021, Graphcore Ltd.
