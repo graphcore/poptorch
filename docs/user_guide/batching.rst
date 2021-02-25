@@ -157,11 +157,11 @@ These blocks can be shared among multiple parallel execution strategies.
 You can see the code examples of :py:class:`poptorch.SerialPhasedExecution`,
 :py:class:`poptorch.PipelinedExecution`, and
 :py:class:`poptorch.ShardedExecution` below.
-Espeially a strategy of :py:class:`poptorch.PipelinedExecution`
-is created to assign
-layers to multiple IPUs as a pipeline.
-Gradient accumulation is used to push multiple
-batches through the pipeline allowing IPUs to run in parallel.
+
+An instance of class :py:class:`poptorch.PipelinedExecution` defines an
+execution strategy that assigns layers to multiple IPUs as a pipeline. Gradient
+accumulation is used to push multiple batches through the pipeline allowing
+IPUs to run in parallel.
 
 .. literalinclude:: mnist.py
   :caption: An example of different parallel execution strategies
