@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-
+import unittest.mock
 import os
 import tempfile
+import glob
+
 import pytest
 import torch
 import helpers
@@ -33,6 +35,76 @@ def test_ExecutableCaching(capfd):
         n.compile(torch.rand(2, 3))
         log = helpers.LogChecker(capfd)
         log.assert_contains("set enableEngineCaching to value true")
+
+
+class Network(torch.nn.Module):
+    def forward(self, x, y):
+        return x + y
+
+
+def _create_model_and_export(opts, filename):
+    model = Network()
+
+    inference_model = poptorch.inferenceModel(model, opts)
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    inference_model.compileAndExport(filename, x, y)
+    assert os.path.exists(filename)
+
+
+@unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
+def test_offline_ipu_compileAndExport_file(filename=None):
+    # Force-disable the IPU model
+    opts = poptorch.Options().useOfflineIpuTarget()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        filename = os.path.join(tmp, "model.poptorch")
+        _create_model_and_export(opts, filename)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_precompile_then_load():
+    opts = poptorch.Options()
+    with tempfile.TemporaryDirectory() as tmp:
+        filename = os.path.join(tmp, "model.poptorch")
+        _create_model_and_export(opts, filename)
+
+        poptorch_model = poptorch.load(filename)
+
+        x = torch.tensor([1., 2.])
+        y = torch.tensor([3., 4.])
+        # Check the user model was restored
+        torch.testing.assert_allclose(
+            poptorch_model._user_model(x, y),  # pylint: disable=protected-access
+            torch.tensor([4., 6.]))
+        torch.testing.assert_allclose(poptorch_model(x, y),
+                                      torch.tensor([4., 6.]))
+
+
+@unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
+def test_offline_ipu_compileAndExport_dir():
+    class Network(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = Network()
+    # Force-disable the IPU model
+    opts = poptorch.Options().useOfflineIpuTarget()
+    poptorch.inferenceModel(model, opts)
+
+    inference_model = poptorch.inferenceModel(model, opts)
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        assert os.path.isdir(tmp)
+        # Model is local to the function: it cannot be serialised so don't
+        # export it.
+        inference_model.compileAndExport(tmp, x, y, export_model=False)
+        files = glob.glob(f"{tmp}/*")
+        assert len(files) == 1, "Expected exactly 1 file"
 
 
 def test_inference_attributes():

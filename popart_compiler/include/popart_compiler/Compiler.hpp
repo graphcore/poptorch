@@ -280,6 +280,10 @@ public:
                     std::int64_t ipu_id);
 
   void initSession(const std::vector<Optimizer> &opt);
+  void compileAndExport(const char *export_filename);
+  void compileAndPrepareDevice();
+  void loadExecutableAndPrepareDevice(const char *import_filename,
+                                      std::int64_t offset);
 
   void startIfBlock();
 

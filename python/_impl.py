@@ -462,6 +462,12 @@ class ArgsParser:
             self._args = []
             self.first_none = None
 
+        def clone(self):
+            clone = ArgsParser.Args()
+            clone._args = copy.copy(self._args)  # pylint: disable=protected-access
+            clone.first_none = self.first_none
+            return clone
+
         def _forEach(self, data, fn):
             if isinstance(data, (tuple, list)):
                 return type(data)(self._forEach(d, fn) for d in data)
@@ -522,13 +528,14 @@ class ArgsParser:
         ])
         self._varnames = list(sig.parameters.keys())
         self._defaults = [p.default for p in sig.parameters.values()]
+        self._warned_not_contiguous_input = False
 
     def __call__(self, args, kwargs):
         """Calls the wrapped model with the given tensors. Inputs must be
         tensors or tuples/lists of tensors.
         Will compile for IPU on the first invocation.
         """
-        a = ArgsParser.Args()
+        in_tensors = ArgsParser.Args()
         assert self._has_variadic_arguments or len(args) + len(kwargs) <= len(
             self._varnames), ("Too many arguments provided: expected %s (%d) "
                               "but got %d") % (self._varnames,
@@ -546,7 +553,7 @@ class ArgsParser:
         for i, name in enumerate(self._varnames):
             if i < len(args):
                 self._errorOnListOrDict(args[i], name, [])
-                a._args.append(args[i])
+                in_tensors._args.append(args[i])
                 assert name not in kwargs, ("Parameter %s was passed more "
                                             "than once") % name
             elif name in kwargs:
@@ -555,21 +562,30 @@ class ArgsParser:
                     " after the following parameters have defaulted to None."
                     " %s") % (name, ", ".join(none_passed))
                 self._errorOnListOrDict(kwargs[name], name, [])
-                a._args.append(kwargs[name])
+                in_tensors._args.append(kwargs[name])
             else:
                 assert i >= first_optional, ("Mandatory parameter %s "
                                              "missing") % name
                 value = self._defaults[i - first_optional]
                 if value is None:
-                    if a.first_none is None:
-                        a.first_none = i
+                    if in_tensors.first_none is None:
+                        in_tensors.first_none = i
                     none_passed.append("%s (%d)" % (name, i))
                 if not none_passed:
-                    a._args.append(value)
-        if a.first_none is None:
-            a.first_none = len(self._varnames)
+                    in_tensors._args.append(value)
+        if in_tensors.first_none is None:
+            in_tensors.first_none = len(self._varnames)
 
-        return a
+        if in_tensors.forEachMatchedAtLeastOnce(
+                condition=lambda t: isinstance(t, torch.Tensor
+                                               ) and not t.is_contiguous(),
+                doOnTrue=lambda t: t.contiguous()):
+            if not self._warned_not_contiguous_input:
+                logger.warning("At least one input tensor is not contiguous: "
+                               "non-contiguous tensors will be converted.")
+                self._warned_not_contiguous_input = True
+
+        return in_tensors
 
     def _errorOnListOrDict(self, data, arg_name, stack_list):
         if isinstance(data, (tuple)):
@@ -617,22 +633,72 @@ def accessAttributes(attribute_id_str):
     return attributes
 
 
+class PoptorchData:
+    """Metadata to save when exporting an executable in order to be able
+    to reload it.
+
+    Note: poptorch.load() can only be used if all the arguments are provided
+    PoplarExecutor.loadExecutable() can be used in either casa (But only
+    version and executable_inputs will be used)
+    """
+
+    def __init__(self,
+                 version,
+                 executable_inputs,
+                 options=None,
+                 training=None,
+                 model=None,
+                 optimizer=None):
+        self.options = options
+        self.training = training
+        self.model = model
+        self.version = version
+        self.optimizer = optimizer
+        assert executable_inputs, "The executable's inputs are missing"
+        self.executable_inputs = executable_inputs
+
+
+def parsePoptorchData(filename, expected_version):
+    """Extract the PoptorchData and the offset at which the Popart executable
+    is stored from a given file.
+    """
+    assert os.path.isfile(filename)
+    with open(filename, "rb") as f:
+        data = pickle.load(f)
+        assert data.version == expected_version, (
+            "PopTorch version mismatch: "
+            f"{filename} was created with version: {data.version}"
+            f" and this is version {expected_version}")
+        assert data.executable_inputs, (f"Invalid file {filename}:"
+                                        " executable inputs are missing")
+        if data.options:
+            # Remove usefOfflineIpuTarget related flags if used
+            data.options.deleteIfExists("ipu_version")
+            if data.options.connection_type == enums.ConnectionType.Never.value:
+                data.options.connectionType(enums.ConnectionType.Always)
+
+        return data, f.tell()
+
+
 class PoplarExecutor:
     """ This class should not be created directly but is a wrapper around
     the model that was passed into `inferenceModel` or `trainingModel`.
     It only has a few methods which can be used to interface with the IPU.
     """
 
+    # pylint: disable=too-many-statements
     def __init__(self,
                  model,
                  options,
                  training,
                  optimizer=None,
-                 user_model=None):
+                 user_model=None,
+                 poptorch_version=None):
         options = options or Options()
         self._model = model
         self._user_model = user_model or self._model
         self._host_weights_version = 0
+        self._poptorch_version = poptorch_version
         if training:
             if options.defaultAnchorMode():
                 # In training it makes sense to see only the last result, by default.
@@ -640,8 +706,8 @@ class PoplarExecutor:
             if not optimizer:
                 optimizer = torch.optim.SGD(self._user_model.parameters(),
                                             lr=0.01)
-
-            optimizer = _convertOptimizerToDict(optimizer)
+            if not isinstance(optimizer, dict):
+                optimizer = _convertOptimizerToDict(optimizer)
         else:
             if options.defaultAnchorMode():
                 # In inference it makes sense to see all the results, by default.
@@ -656,12 +722,12 @@ class PoplarExecutor:
         # The args parser needs to be initilialised before the model gets wrapped
         # otherwise we will not be able to retrieve the real arguments list
         self._args_parser = ArgsParser(model)
-        self._first_none_arg = None
+        # Inputs used to compile the executable
+        self._executable_inputs = None
 
         self._training = training
         self._optimizer = optimizer or {}
         self._new_optimizer = optimizer or {}
-        self._warned_not_contiguous_input = False
         self._dirty_host_weights = False
         self._trace = None
         self._is_attached = False
@@ -788,24 +854,46 @@ class PoplarExecutor:
         """
         self._new_optimizer = _convertOptimizerToDict(optimizer)
 
-    def _parseArgsAndCompile(self, args, kwargs):
-        # Convert single tensor to tuple.
-        in_tensors = self._args_parser(args, kwargs)
+    def _compile(self, in_tensors):
+        with self._profiling.tracepoint("modelCompilation"):
+            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
+                    self._preprocessGraph(
+                        in_tensors)
 
-        if in_tensors.forEachMatchedAtLeastOnce(
-                condition=lambda t: isinstance(t, torch.Tensor
-                                               ) and not t.is_contiguous(),
-                doOnTrue=lambda t: t.contiguous()):
-            if not self._warned_not_contiguous_input:
-                logger.warning("At least one input tensor is not contiguous: "
-                               "non-contiguous tensors will be converted.")
-                self._warned_not_contiguous_input = True
+            # Compile the poplar executable based on the batchsize.
+            if self._options.Jit.trace_model:
+                trace_args = self._trace_model_and_get_compile_args(
+                    in_tensors, in_tensors_trace_view, has_converted_any_half,
+                    narrow_tensor_fn)
+                self._executable = poptorch_core.compileWithTrace(*trace_args)
+            else:
+                logger.info('Compiling the model using scripting')
+                self._trace = torch.jit.script(self._model)
+                graph_inputs = list(self._trace.graph.inputs())
+                for graph_input, arg_in in zip(
+                        graph_inputs[1:], in_tensors_trace_view.asTuple()):
+                    if isinstance(arg_in, torch.Tensor):
+                        graph_input.inferTypeFrom(arg_in)
 
-        if self._executable is not None:
+                parameters = {
+                    **dict(self._trace.named_parameters()),
+                    **dict(self._trace.named_buffers())
+                }
+
+                # pylint: disable=protected-access
+                self._executable = poptorch_core.compileWithScript(
+                    self._trace._c, self._trace.graph,
+                    tuple(parameters.keys()), tuple(parameters.values()),
+                    in_tensors_trace_view.asTuple(), self._options.toDict(),
+                    self._training, accessAttributes)
+
+            self._is_attached = self.isAttachedToDevice()
+
             return in_tensors
 
-        with self._profiling.tracepoint("modelCompilation"):
-            self._first_none_arg = in_tensors.first_none
+    def _preprocessGraph(self, in_tensors):
+        with self._profiling.tracepoint("graphPreprocessing"):
+            self._executable_inputs = in_tensors.clone()
 
             # Input will be in form of [BatchSize* BatchPerStep, ...] so we
             # should slice it up so we compile by the batch size alone.
@@ -817,7 +905,7 @@ class PoplarExecutor:
             # concept of batching at the popart level. Here we divide by the popart batch size so the
             # trace "sees" the model batch size but when we call execute we pass the full batch and popart
             # will partition it up.
-            in_tensors_trace_view = self._args_parser(args, kwargs)
+            in_tensors_trace_view = in_tensors.clone()
 
             def narrowTensor(tensor):
                 if not isinstance(tensor, torch.Tensor):
@@ -855,60 +943,114 @@ class PoplarExecutor:
             in_tensors_trace_view.forEach(remove_require_grad)
 
             # Normal bools don't get captured in python.
-            hasConvertedAnyHalf = [False]
+            has_converted_any_half = [False]
 
             def possiblyConvertFromHalf(tensor):
                 if isinstance(tensor,
                               torch.Tensor) and tensor.dtype == torch.half:
-                    hasConvertedAnyHalf[0] = True
+                    has_converted_any_half[0] = True
                     return tensor.float()
                 return tensor
 
             in_tensors_trace_view.forEach(possiblyConvertFromHalf)
 
-            assert hasattr(self._options.GraphProcessing, "_values")
             poptorch_core.processGraphProcessingOptions(
                 self._options.GraphProcessing)
 
-            # Compile the poplar executable based on the batchsize.
-            if self._options.Jit.trace_model:
-                self._compile_using_tracing(args, kwargs,
-                                            in_tensors_trace_view,
-                                            hasConvertedAnyHalf, narrowTensor)
-            else:
-                logger.info('Compiling the model using scripting')
-                self._trace = torch.jit.script(self._model)
-                graphInputs = list(self._trace.graph.inputs())
-                for graphInput, argIn in zip(graphInputs[1:],
-                                             in_tensors_trace_view.asTuple()):
-                    if isinstance(argIn, torch.Tensor):
-                        graphInput.inferTypeFrom(argIn)
-
-                parameters = {
-                    **dict(self._trace.named_parameters()),
-                    **dict(self._trace.named_buffers())
-                }
-
-                # pylint: disable=protected-access
-                self._executable = poptorch_core.compileWithScript(
-                    self._trace._c, self._trace.graph,
-                    tuple(parameters.keys()), tuple(parameters.values()),
-                    in_tensors_trace_view.asTuple(), self._options.toDict(),
-                    self._training, accessAttributes)
-            if self._executable:
-                self._is_attached = self.isAttachedToDevice()
-
-            # Upload the weights to the IPU
-            self.copyWeightsToDevice()
-        return in_tensors
+        return in_tensors_trace_view, has_converted_any_half, narrowTensor
 
     def compile(self, *args, **kwargs):
         """Takes the same arguments as the wrapped PyTorch `model.__call__`.
 
         Trace and compile the wrapped model if no executable has been
         created yet.
+
+        Note: The executable created by this method can only be executed,
+        it cannot be exported to file.
+        To precompile and save to file use
+        :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
         """
-        self._parseArgsAndCompile(args, kwargs)
+        in_tensors = self._args_parser(args, kwargs)
+        if self._executable is not None:
+            logger.warning(
+                "Call to compile() ignored: the executable is already compiled"
+            )
+        else:
+            self._compile(in_tensors)
+
+    def loadExecutable(self, filename):
+        """Load an executable previously generated using
+        :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
+        """
+        with self._profiling.tracepoint("loadExecutable"):
+            data, exe_offset = parsePoptorchData(filename,
+                                                 self._poptorch_version)
+            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
+                    self._preprocessGraph(
+                        data.executable_inputs)
+            trace_args = self._trace_model_and_get_compile_args(
+                data.executable_inputs, in_tensors_trace_view,
+                has_converted_any_half, narrow_tensor_fn)
+            self._executable = poptorch_core.processTraceAndImportExecutable(
+                *trace_args, filename, exe_offset)
+            self._is_attached = self.isAttachedToDevice()
+
+    def compileAndExport(self, filename, *args, export_model=True, **kwargs):
+        """Precompile an executable and save it to file.
+
+        args and kwargs are the same arguments as the wrapped PyTorch
+        `model.__call__`
+
+        :param str filename: Where to save the compiled executable.
+        :param bool export_model: If `True` the Torch model will be saved in
+            the file alongside the executable. :py:func:`poptorch.load` can
+            be used to restore both the original Torch model, the PopTorch
+            model and the executable.
+            If `False` then only the executable will be exported and it will
+            be the user's responsibility to call
+            :py:func:`poptorch.inferenceModel` or
+            :py:func:`poptorch.trainingModel` to re-create the PopTorch model
+            before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
+            to restore the executable.
+        """
+        in_tensors = self._args_parser(args, kwargs)
+        dst_dir = os.path.dirname(filename)
+        if dst_dir:
+            if os.path.exists(dst_dir):
+                assert os.path.isdir(dst_dir), ("Destination folder {dst_dir} "
+                                                "is not a directory")
+            else:
+                os.makedirs(dst_dir)
+        if os.path.isdir(filename):
+            dirname = filename
+            filename = os.path.join(dirname, "model.poptorch")
+            logger.warning(
+                "compileAndExport: %s is a directory, saving model to %s",
+                dirname, filename)
+
+        if export_model:
+            data = PoptorchData(self._poptorch_version, in_tensors,
+                                self._options, self._training,
+                                self._user_model, self._optimizer)
+        else:
+            data = PoptorchData(self._poptorch_version, in_tensors)
+        with open(filename, "wb") as f:
+            pickle.dump(data,
+                        f,
+                        protocol=pickle.HIGHEST_PROTOCOL,
+                        fix_imports=True)
+            f.close()
+        assert self._options.Jit.trace_model, (
+            "compileAndExport not supported for"
+            " torch script")
+        with self._profiling.tracepoint("compileAndExport"):
+            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
+                    self._preprocessGraph(
+                        in_tensors)
+            trace_args = self._trace_model_and_get_compile_args(
+                in_tensors, in_tensors_trace_view, has_converted_any_half,
+                narrow_tensor_fn)
+            poptorch_core.compileWithTraceAndExport(*trace_args, filename)
 
     def __call__(self, *args, **kwargs):
         """
@@ -922,9 +1064,15 @@ class PoplarExecutor:
             "Trying to run a model on an offline device "
             " (ConnectionType.Never): use model.compile(inputs) instead of"
             " model(inputs)")
-        in_tensors = self._parseArgsAndCompile(args, kwargs)
+        in_tensors = self._args_parser(args, kwargs)
+        if self._executable is None:
+            self._compile(in_tensors)
+            # Upload the weights to the IPU
+            self.copyWeightsToDevice()
         if not self._is_attached:
             self.attachToDevice()
+            # Upload the weights to the IPU
+            self.copyWeightsToDevice()
 
         # If this is an inference model: check if the same model is not being
         # trained on a different IPU.
@@ -944,8 +1092,9 @@ class PoplarExecutor:
                     self._host_weights_version = \
                             self._user_model._host_weights_version
 
-        assert in_tensors.first_none == self._first_none_arg, (
-            f"Number of arguments mismatch: {self._first_none_arg} "
+        assert in_tensors.first_none == self._executable_inputs.first_none, (
+            "Number of arguments mismatch: "
+            f"{self._executable_inputs.first_none_arg} "
             f"arguments used to compile the model and "
             f"{in_tensors.first_none} provided this time")
         # Execute the poplar executable with the full size (batch * device interations)
@@ -976,26 +1125,28 @@ class PoplarExecutor:
         del self._executable
         self._executable = None
 
-    def _compile_using_tracing(self, args, kwargs, in_tensors_trace_view,
-                               hasConvertedAnyHalf, narrowTensor):
+    def _trace_model_and_get_compile_args(self, in_tensors,
+                                          in_tensors_trace_view,
+                                          has_converted_any_half,
+                                          narrow_tensor_fn):
         logger.info('Compiling the model using tracing')
 
         # CPU tracing doens't work for half types. We need to convert all half
         # layers to float, run tracing and revert the types to their original.
-        halfLayers = set()
-        allLayers = list(self._model.named_modules())
+        half_layers = set()
+        all_layers = list(self._model.named_modules())
 
         # iterate in reverse to process inner layers first
-        for (name, layer) in reversed(allLayers):
-            anyIsHalf = False
+        for (name, layer) in reversed(all_layers):
+            any_is_half = False
             for param in layer.parameters():
                 if param.dtype == torch.half:
-                    anyIsHalf = True
+                    any_is_half = True
                     break
 
-            if anyIsHalf:
+            if any_is_half:
                 layer.float()
-                halfLayers.add(name)
+                half_layers.add(name)
 
         # From this point, if in_tensors_trace_view changes in value, the input
         # is modified in-place. To discover this, take a deep copy of the
@@ -1041,7 +1192,7 @@ class PoplarExecutor:
         # Save the inputs of the traced graph printout as it will be
         # different after getting originals back.
         # NB empty if log level is not TRACE.
-        if hasConvertedAnyHalf[0]:
+        if has_converted_any_half[0]:
             # pylint: disable=protected-access
             trace_input_string = poptorch_core.getTraceInputStr(
                 self._trace._c).strip()
@@ -1052,7 +1203,7 @@ class PoplarExecutor:
         # The following works because the iterator is hierarchic,
         # yielding containers before contents.
         for name, layer in self._trace.named_modules():
-            if name in halfLayers:
+            if name in half_layers:
                 layer.half()
 
         parameters = {
@@ -1060,28 +1211,20 @@ class PoplarExecutor:
             **dict(self._trace.named_buffers())
         }
 
-        if hasConvertedAnyHalf[0]:
+        if has_converted_any_half[0]:
             # Get the originals back.
-            in_tensors_as_half = self._args_parser(args, kwargs)
-            in_tensors_as_half.forEach(narrowTensor)
+            in_tensors_as_half = in_tensors.clone()
+            in_tensors_as_half.forEach(narrow_tensor_fn)
 
             # Compile using the actual halves.
-            self._executable = poptorch_core.compileWithTrace(
-                self._trace._c, tuple(parameters.keys()),
-                tuple(parameters.values()),
-                in_tensors_as_half.asTuple(), trace_input_string,
-                self._options.toDict(), self._training, self._optimizer,
-                accessAttributes)
-        else:
-            self._executable = poptorch_core.compileWithTrace(
-                self._trace._c, tuple(parameters.keys()),
-                tuple(parameters.values()),
-                in_tensors_trace_view.asTuple(), trace_input_string,
-                self._options.toDict(), self._training, self._optimizer,
-                accessAttributes)
-
-        if self._executable:
-            self._is_attached = self.isAttachedToDevice()
+            return (self._trace._c, tuple(parameters.keys()),
+                    tuple(parameters.values()), in_tensors_as_half.asTuple(),
+                    trace_input_string, self._options.toDict(), self._training,
+                    self._optimizer, accessAttributes)
+        return (self._trace._c, tuple(parameters.keys()),
+                tuple(parameters.values()), in_tensors_trace_view.asTuple(),
+                trace_input_string, self._options.toDict(), self._training,
+                self._optimizer, accessAttributes)
 
     def isAttachedToDevice(self):
         """Returns true, if the target device has been attached. False,

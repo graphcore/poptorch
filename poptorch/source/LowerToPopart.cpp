@@ -91,56 +91,6 @@ void ValueMap::setTuple(torch::jit::Value *value,
 }
 
 /*
- * Implementation of the lowering operation.
- */
-class LowerToPopart {
-public:
-  LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
-                std::vector<at::Tensor> params,
-                std::vector<std::string> parameter_names, bool training,
-                std::vector<Optimizer> &&opt, const SessionOptions &options,
-                const py::function &attribute_accessor);
-
-  void lower();
-
-  std::shared_ptr<poptorch::PoplarExecutable> compile();
-
-private:
-  torch::jit::Graph &_graph;
-
-  std::vector<at::Tensor> &_in_tensors;
-
-  std::vector<at::Tensor> _parameters;
-  std::vector<std::string> _parameter_names;
-
-  std::vector<poptorch::TensorId> _inputTensorHooks;
-
-  std::vector<poptorch::TensorId> _outputTensorHooks;
-
-  ValueMap _valueMap;
-
-  // Optimizer from the user.
-  const std::vector<Optimizer> _optimizers;
-
-  using FunctionType = std::function<poptorch::TensorId(
-      const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
-  std::unordered_map<c10::Symbol, FunctionType> _functionToImplementation;
-
-  poptorch::Compiler _compiler;
-
-  void lowerParameters();
-
-  void lowerBody();
-
-  void lowerReturn();
-
-  std::string tensorNames(std::int64_t first_tensor, std::int64_t num_tensors);
-
-  std::string tensorTypesAndShapes(std::int64_t first_tensor,
-                                   std::int64_t num_tensors);
-};
-
-/*
  * Static helper functions.
  */
 
@@ -256,13 +206,71 @@ PopartType toPopartType(const at::ScalarType type) {
   }
 }
 
+} // namespace
+
+namespace detail {
+/*
+ * Implementation of the lowering operation.
+ */
+class LowerToPopartImpl {
+public:
+  LowerToPopartImpl(torch::jit::Graph *g, std::vector<at::Tensor> params,
+                    std::vector<std::string> parameter_names, bool training,
+                    std::vector<Optimizer> &&opt, const SessionOptions &options,
+                    const py::function &attribute_accessor);
+
+  void lower(std::vector<at::Tensor> *in_tensors);
+
+  std::shared_ptr<poptorch::PoplarExecutable> compile();
+  void compileAndExport(const std::string &export_filename);
+  std::shared_ptr<poptorch::PoplarExecutable>
+  loadExecutableFromFile(const std::string &input_filename,
+                         std::int64_t offset);
+
+private:
+  torch::jit::Graph &_graph;
+
+  std::vector<at::Tensor> _parameters;
+  std::vector<std::string> _parameter_names;
+
+  std::vector<poptorch::TensorId> _inputTensorHooks;
+
+  std::vector<poptorch::TensorId> _outputTensorHooks;
+
+  ValueMap _valueMap;
+
+  // Optimizer from the user.
+  const std::vector<Optimizer> _optimizers;
+
+  using FunctionType = std::function<poptorch::TensorId(
+      const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
+  std::unordered_map<c10::Symbol, FunctionType> _functionToImplementation;
+
+  poptorch::Compiler _compiler;
+
+  void lowerParameters(std::vector<at::Tensor> *in_tensors);
+
+  void lowerBody();
+
+  void lowerReturn();
+
+  std::string tensorNames(std::int64_t first_tensor, std::int64_t num_tensors);
+
+  std::string tensorTypesAndShapes(std::int64_t first_tensor,
+                                   std::int64_t num_tensors);
+};
+
 /*
  * Lower to popart impl.
  */
-std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
-  logging::LogContext ctx("LowerToPopart::compiler ");
+std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
+  ERROR_ON_MSG(_outputTensorHooks.empty(),
+               "You need to lower() the graph first");
+
+  logging::LogContext ctx("LowerToPopart::compile ");
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizers);
+  _compiler.compileAndPrepareDevice();
 
   std::vector<at::ScalarType> data_types;
   for (auto id : _outputTensorHooks) {
@@ -274,9 +282,35 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
       std::move(_outputTensorHooks), std::move(data_types), _parameter_names);
 }
 
-void LowerToPopart::lower() {
+std::shared_ptr<poptorch::PoplarExecutable>
+LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
+                                          std::int64_t offset) {
+  logging::LogContext ctx("LowerToPopart::loadExecutableFromFile ");
+  // Init the session, this also involves compiling to poplar.
+  _compiler.initSession(_optimizers);
+  _compiler.loadExecutableAndPrepareDevice(input_filename.c_str(), offset);
+
+  std::vector<at::ScalarType> data_types;
+  for (auto id : _outputTensorHooks) {
+    data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
+  }
+
+  return std::make_shared<poptorch::PoplarExecutable>(
+      std::move(_compiler), std::move(_inputTensorHooks),
+      std::move(_outputTensorHooks), std::move(data_types), _parameter_names);
+}
+
+void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
+  ERROR_ON_MSG(_outputTensorHooks.empty(),
+               "You need to lower() the graph first");
+  logging::LogContext ctx("LowerToPopart::compileAndExport ");
+  _compiler.initSession(_optimizers);
+  _compiler.compileAndExport(export_filename.c_str());
+}
+
+void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
   // Lower the tensor parameters of the _graph to OpInputs.
-  lowerParameters();
+  lowerParameters(in_tensors);
 
   // Lower the body of the _graph.
   lowerBody();
@@ -284,7 +318,7 @@ void LowerToPopart::lower() {
   lowerReturn();
 }
 
-void LowerToPopart::lowerReturn() {
+void LowerToPopartImpl::lowerReturn() {
   _compiler.addOutputType({OutputType::Type::Tuple,
                            static_cast<std::int64_t>(_graph.outputs().size())});
   // Recursively go through the output's type to
@@ -337,8 +371,8 @@ void LowerToPopart::lowerReturn() {
   }
 }
 
-std::string LowerToPopart::tensorNames(std::int64_t first_tensor,
-                                       std::int64_t num_tensors) {
+std::string LowerToPopartImpl::tensorNames(std::int64_t first_tensor,
+                                           std::int64_t num_tensors) {
   std::string sep{};
   std::string names;
   for (std::int64_t i = 0; i < num_tensors; ++i) {
@@ -348,8 +382,8 @@ std::string LowerToPopart::tensorNames(std::int64_t first_tensor,
   return names;
 }
 
-std::string LowerToPopart::tensorTypesAndShapes(std::int64_t first_tensor,
-                                                std::int64_t num_tensors) {
+std::string LowerToPopartImpl::tensorTypesAndShapes(std::int64_t first_tensor,
+                                                    std::int64_t num_tensors) {
   std::string sep{};
   std::string shapes;
 
@@ -387,10 +421,10 @@ std::string LowerToPopart::tensorTypesAndShapes(std::int64_t first_tensor,
 }
 
 // Lower the main body of the _graph.
-void LowerToPopart::lowerBody() {
+void LowerToPopartImpl::lowerBody() {
   logging::debug("Graph lowered to Popart {");
   for (torch::jit::Node *node : _graph.nodes()) {
-    logging::LogContext ctx("LowerToPopart::lowerBody Processing " +
+    logging::LogContext ctx("LowerToPopartImpl::lowerBody Processing " +
                             nodeToString(node));
     // Switch/lookup based on the actual int value.
     const c10::Symbol kind = node->kind();
@@ -681,18 +715,18 @@ void LowerToPopart::lowerBody() {
   logging::debug("}");
 }
 
-void LowerToPopart::lowerParameters() {
+void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   std::size_t num_inputs =
       _graph.param_node()->outputs().size() - _parameters.size();
   std::size_t index = 0;
-  auto tensor_it = _in_tensors.begin();
+  auto tensor_it = in_tensors->begin();
 
   std::function<void(c10::TypePtr, ValueMap::TensorList &)> process_input;
   process_input = [&](const c10::TypePtr &type,
                       ValueMap::TensorList &tensorList) {
     switch (type->kind()) {
     case c10::TypeKind::TensorType: {
-      ERROR_ON(tensor_it == _in_tensors.end());
+      ERROR_ON(tensor_it == in_tensors->end());
       auto tensor = *tensor_it;
       tensor_it++;
       // Convert the tensor type to the correct vector size.
@@ -742,7 +776,7 @@ void LowerToPopart::lowerParameters() {
               << index);
       }
     } else if (!value->uses().empty()) {
-      ERROR_ON_MSG(tensor_it != _in_tensors.end(),
+      ERROR_ON_MSG(tensor_it != in_tensors->end(),
                    "Not all the input tensors have been used");
       // Lower the other params (i.e the weights)
       at::Tensor &tensor_as_param = _parameters[index - num_inputs];
@@ -923,13 +957,14 @@ convertCustomOpAttributes(const torch::jit::Node *node,
 }
 } // namespace
 
-LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
-                             std::vector<at::Tensor> params,
-                             std::vector<std::string> parameter_names,
-                             bool training, std::vector<Optimizer> &&opt,
-                             const SessionOptions &options,
-                             const py::function &attribute_accessor)
-    : _graph(*g), _in_tensors(*ins), _parameters(std::move(params)),
+LowerToPopartImpl::LowerToPopartImpl(torch::jit::Graph *g,
+                                     std::vector<at::Tensor> params,
+                                     std::vector<std::string> parameter_names,
+                                     bool training,
+                                     std::vector<Optimizer> &&opt,
+                                     const SessionOptions &options,
+                                     const py::function &attribute_accessor)
+    : _graph(*g), _parameters(std::move(params)),
       _parameter_names(std::move(parameter_names)), _optimizers(opt),
       _compiler({training, options}) {
   // Init the function implementation map. This map will be populated by
@@ -1009,31 +1044,45 @@ LowerToPopart::LowerToPopart(torch::jit::Graph *g, std::vector<at::Tensor> *ins,
 #undef INT_VEC
   }; // End map initalizer.
 }
-} // namespace
+} // namespace detail
 
-std::shared_ptr<poptorch::PoplarExecutable>
-lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
-              std::vector<at::Tensor> parameters,
-              std::vector<std::string> parameter_names, bool training,
-              std::vector<Optimizer> &&opt, const SessionOptions &options,
-              const py::function &attribute_accessor) {
+LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
+                             std::vector<at::Tensor> parameters,
+                             std::vector<std::string> parameter_names,
+                             bool training, std::vector<Optimizer> &&opt,
+                             const SessionOptions &options,
+                             const py::function &attribute_accessor) {
   std::srand(std::time(nullptr));
+  _impl = std::make_unique<detail::LowerToPopartImpl>(
+      graph, std::move(parameters), std::move(parameter_names), training,
+      std::move(opt), std::move(options), attribute_accessor);
+}
 
-  LowerToPopart lower_impl{graph,
-                           in_tensors,
-                           std::move(parameters),
-                           std::move(parameter_names),
-                           training,
-                           std::move(opt),
-                           std::move(options),
-                           attribute_accessor};
-  lower_impl.lower();
+void LowerToPopart::lower(std::vector<at::Tensor> *in_tensors) {
+  _impl->lower(in_tensors);
+}
 
-  auto executable = lower_impl.compile();
+std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
+  auto executable = _impl->compile();
   if (logging::outputPopartIR()) {
     logging::debug("Popart IR: {}", executable->getPopartIR());
   }
   return executable;
 }
 
+void LowerToPopart::compileAndExport(const std::string &output_filename) {
+  // We cannot currently compile then export
+  // so we need to decide now whether we want an executable
+  // or to compile and export to file.
+  _impl->compileAndExport(output_filename);
+}
+std::shared_ptr<poptorch::PoplarExecutable>
+LowerToPopart::loadExecutableFromFile(const std::string &input_filename,
+                                      std::int64_t offset) {
+  return _impl->loadExecutableFromFile(input_filename, offset);
+}
+LowerToPopart::~LowerToPopart() = default;
+LowerToPopart::LowerToPopart(LowerToPopart &&lower) {
+  _impl = std::move(lower._impl);
+}
 } // namespace poptorch

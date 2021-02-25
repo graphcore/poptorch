@@ -1649,7 +1649,6 @@ void CompilerImpl::attachToDevice() {
                                                 << checkSystemConfig());
   } while (!has_attached && waitForAWhile());
   device.loadEngineAndConnectStreams();
-  session->weightsFromHost();
 }
 
 } // namespace detail
@@ -2058,12 +2057,51 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         transformer.getModelProto(), data_flow, _impl->loss, *optimizer, device,
         {}, options, _impl->options.patterns);
   }
+}
 
+void Compiler::compileAndExport(const char *filename) {
+  logging::LogContext ctx{
+      "Compiler::compileAndExport popart::Session::compileAndExport: Poplar "
+      "compilation"};
+  // We use std::ios_base::ate to append to the file: the Python frontend
+  // will have already created the folder and written the Poptorch python
+  // data in the file.
+  //
+  // Note: PopArt needs to be able to move backward through the stream so
+  // we cannot use std::ios_base::app
+  std::fstream stream(filename, std::ios_base::in | std::ios_base::out |
+                                    std::ios_base::ate | std::ofstream::binary);
+  ERROR_ON_MSG(!stream.is_open(),
+               "Failed to open " + std::string(filename) + " for writing");
+  stream.seekp(0, std::ios::end);
+  _impl->session->compileAndExport(stream);
+  stream.flush();
+  stream.close();
+}
+
+void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
+                                              std::int64_t offset) {
+  logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice "};
+  std::ifstream stream(import_filename, std::ifstream::binary);
+  ERROR_ON_MSG(!stream.is_open(), "Failed to open " +
+                                      std::string(import_filename) +
+                                      " for reading");
+  stream.seekg(offset);
+  _impl->session->loadExecutableFromStream(stream);
+  _impl->session->prepareDevice();
+
+  // Set the random seed (if one was provided) following compilation
+  if (_impl->options_set.count("random_seed")) {
+    logging::trace("Setting random seed to: {}", _impl->options.random_seed);
+    _impl->session->setRandomSeed(_impl->options.random_seed);
+  }
+}
+void Compiler::compileAndPrepareDevice() {
   // Poplar compilation.
   try {
-    logging::LogContext ctx{
-        "Compiler::initSession popart::Session::prepareDevice: Poplar "
-        "compilation"};
+    logging::LogContext ctx{"Compiler::compileAndPrepareDevice "
+                            "popart::Session::prepareDevice: Poplar "
+                            "compilation"};
     logging::trace("Begining Poplar compilation.");
     _impl->session->prepareDevice();
     logging::trace("Finished Poplar compilation.");

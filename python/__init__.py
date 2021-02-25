@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import atexit
 import copy
+import pickle
 
 import torch
 
@@ -26,6 +27,38 @@ from . import optim
 from . import profiling
 
 __version__ = "@VERSION@-@SNAPSHOT@"
+
+
+def load(filename, edit_opts_fn=None):
+    """Load a PopTorch model from a file previously created using
+    :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
+
+    :param str filename: Path to the file containing the model to load.
+    :param edit_opts_fn: Function to edit the options before the model
+        is restored. For example to attach to a specific IPU device.
+    :type edit_ops_fn: function, optional
+
+    >>> model = poptorch.inferenceModel(model)
+    >>> model.compileAndExport("my_model.poptorch")
+    ...
+    >>> model = poptorch.load("my_model.poptorch")
+    >>> model(my_input)
+    """
+    data, _ = _impl.parsePoptorchData(filename, __version__)
+    assert data.model and data.options, (
+        f"{filename} is a valid PopTorch file but was created"
+        " with 'export_model=False' which means you need to re-create"
+        " the PopTorch model using poptorch.inferenceModel or "
+        "poptorch.trainingModel then call "
+        f"poptorch_model.loadExecutable(\"{filename}\").")
+    if edit_opts_fn:
+        edit_opts_fn(data.options)
+    if data.training:
+        executor = trainingModel(data.model, data.options, data.optimizer)
+    else:
+        executor = inferenceModel(data.model, data.options)
+    executor.loadExecutable(filename)
+    return executor
 
 
 class _SubDataset:
@@ -327,7 +360,8 @@ def trainingModel(model, options=None, optimizer=None):
                           options=options,
                           training=True,
                           optimizer=optimizer,
-                          user_model=training_model)
+                          user_model=training_model,
+                          poptorch_version=__version__)
 
 
 def inferenceModel(model, options=None):
@@ -341,7 +375,8 @@ def inferenceModel(model, options=None):
     """
     return PoplarExecutor(model=copy.copy(model),
                           options=options,
-                          training=False)
+                          training=False,
+                          poptorch_version=__version__)
 
 
 def ipuHardwareIsAvailable():

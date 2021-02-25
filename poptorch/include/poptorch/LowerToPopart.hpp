@@ -21,15 +21,31 @@ namespace py = pybind11;
 namespace poptorch {
 class SessionOptions;
 
+namespace detail {
+struct LowerToPopartImpl;
+} // namespace detail
 /*
  * Take the transformed graph and create a poponnx graph from it.
  */
-std::shared_ptr<poptorch::PoplarExecutable>
-lowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> *in_tensors,
-              std::vector<at::Tensor> parameters,
-              std::vector<std::string> parameter_names, bool training,
-              std::vector<Optimizer> &&opt, const SessionOptions &options,
-              const py::function &attribute_accessor);
+class LowerToPopart {
+public:
+  LowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> parameters,
+                std::vector<std::string> parameter_names, bool training,
+                std::vector<Optimizer> &&opt, const SessionOptions &options,
+                const py::function &attribute_accessor);
+  LowerToPopart(LowerToPopart &&lower);
+  ~LowerToPopart();
+
+  void lower(std::vector<at::Tensor> *in_tensors);
+  std::shared_ptr<poptorch::PoplarExecutable> compile();
+  void compileAndExport(const std::string &output_filename);
+  std::shared_ptr<poptorch::PoplarExecutable>
+  loadExecutableFromFile(const std::string &input_filename,
+                         std::int64_t offset);
+
+private:
+  std::unique_ptr<detail::LowerToPopartImpl> _impl;
+};
 
 } // namespace poptorch
 

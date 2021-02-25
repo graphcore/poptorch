@@ -52,10 +52,10 @@ class OptionsDict:
             del self._values[option]
 
     def __getstate__(self):
-        return self._values
+        return self.__dict__
 
     def __setstate__(self, state):
-        self._values = state
+        self.__dict__.update(state)
 
     def __getattr__(self, option):
         assert self.exists(

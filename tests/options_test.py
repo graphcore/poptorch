@@ -184,13 +184,13 @@ def test_offline_ipu():
     opts = poptorch.Options().useOfflineIpuTarget()
     poptorch.inferenceModel(model, opts)
 
-    #TODO(T23447): Support offline compilation
-    #inference_model = poptorch.inferenceModel(model, opts)
-    #x = torch.ones(2)
-    #y = torch.zeros(2)
+    inference_model = poptorch.inferenceModel(model, opts)
+    x = torch.ones(2)
+    y = torch.zeros(2)
 
-    #ipu = inference_model(x, y)
-    #assert not ipu, "Offline compilation shouldn't return anything"
+    with pytest.raises(RuntimeError,
+                       match="Trying to load an engine on an offline device"):
+        inference_model(x, y)
 
 
 def test_tensor_location():

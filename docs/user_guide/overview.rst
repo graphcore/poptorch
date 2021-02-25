@@ -767,6 +767,13 @@ Profiling
 You can profile a graph produced by PopTorch for analysis using the PopVision Graph Analyser, which can be downloaded from the Graphcore support portal.
 To do this, use the :ref:`POPLAR_ENGINE_OPTIONS<profiling_env>` environment variable.
 
+Precompilation and caching
+==========================
+
+.. TODO(T23447): Separate diff
+
+.. autofunction:: poptorch.load
+
 Environment variables
 =====================
 
