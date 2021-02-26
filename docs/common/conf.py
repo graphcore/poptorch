@@ -232,7 +232,7 @@ ADDITIONAL_PREAMBLE += r"""
 %% Redefine sphinxstylethead (used only for table headers) to bold font
 \usepackage{letltxmacro}
 \LetLtxMacro{\oldtextsf}{\sphinxstyletheadfamily}
-\renewcommand{\sphinxstyletheadfamily}[1]{\textbf{\oldtextsf{#1}}}
+\renewcommand{\sphinxstyletheadfamily}[0]{\oldtextsf \bf }
 """
 
 ADDITIONAL_PREAMBLE += r"""

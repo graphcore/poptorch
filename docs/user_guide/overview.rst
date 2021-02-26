@@ -679,9 +679,9 @@ In the PopTorch inference model, only the forward op will be called.
 
 .. literalinclude:: ../../tests/custom_ops_test.py
     :language: python
-    :caption: Calling a PopART custom op in a Poptorch inference model
+    :caption: Calling a PopART custom op in a PopTorch inference model
     :linenos:
-    :emphasize-lines: 3-7
+    :emphasize-lines: 4-8
     :start-after: inference_start
     :end-before: inference_end
 
@@ -693,6 +693,54 @@ returned by the custom op.
 You can also call this custom op inside a training model
 using exactly the same interface of :py:class:`poptorch.custom_op`,
 and the backward op will be called automatically.
+
+You can pass attributes to custom ops using a Python dictionary, as shown by the
+following code example:
+
+.. literalinclude:: ../../tests/custom_ops_test.py
+    :language: python
+    :caption: Passing an attribute to a PopART custom op from PopTorch
+    :linenos:
+    :emphasize-lines: 8
+    :start-after: inference_with_attribute_start
+    :end-before: inference_with_attribute_end
+
+You can then obtain attributes from within the C++ code. The above code
+passes a ``Float`` attribute with the name ``alpha`` to the LeakyRELU implementation in the `Custom operations chapter of the PopART user guide
+<https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`_.
+PopTorch supports all possible attributes supported in PopArt except for
+``Graph``.
+
+Please refer to the following table and code examples for information on how to
+pass other attribute types to a PopArt custom op implementation:
+
+.. list-table:: Python types to use to pass attributes to PopART
+   :widths: 35 65
+   :header-rows: 1
+
+   * - PopART attribute type
+     - Python equivalent
+   * - ``Float``
+     - Python float (converted to 32-bit)
+   * - ``Floats``
+     - list/tuple of Python floats
+   * - ``Int``
+     - Python int (converted to 64-bit signed int)
+   * - ``Ints``
+     - list/tuple of Python ints
+   * - ``String``
+     - Python str (converted to ASCII)
+   * - ``Strings``
+     - List/tuple of Python strs
+   * - ``Graph``
+     - Not supported
+
+.. literalinclude:: ../../tests/custom_ops_attributes_test.py
+    :language: python
+    :caption: Passing different attribute types from PopTorch
+    :linenos:
+    :start-after: many_attribtes_examples_start
+    :end-before: many_attribtes_examples_end
 
 poptorch.nop
 ------------

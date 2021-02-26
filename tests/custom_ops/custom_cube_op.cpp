@@ -91,7 +91,7 @@ public:
   std::unique_ptr<Op> clone() const final { return make_unique<CubeOp>(*this); }
   std::vector<std::unique_ptr<Op>> getGradOps() override {
     std::vector<std::unique_ptr<Op>> upops;
-    upops.emplace_back(std::make_unique<CubeGradOp>(*this));
+    upops.emplace_back(make_unique<CubeGradOp>(*this));
     return upops;
   }
 

@@ -295,6 +295,28 @@ def test_string_attribute(attr):
         torch.testing.assert_allclose(out[0], torch.tensor(18.0))
 
 
+def test_non_ascii_string_attribute():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            x = poptorch.custom_op([x],
+                                   "ReduceOp",
+                                   "test.poptorch",
+                                   1,
+                                   example_outputs=[x],
+                                   attributes={"reduction": "a\u1f00b"})
+            return x
+
+    model = Model()
+
+    x = torch.tensor([5.0, 6.0, 7.0])
+
+    inference_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(ValueError,
+                       match="a\u1f00b contains non-ASCII characters."):
+        inference_model(x)
+
+
 def test_string_list_attribute():
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
@@ -319,6 +341,30 @@ def test_string_list_attribute():
     assert torch.equal(out[0], torch.tensor(2.0))
     assert torch.equal(out[1], torch.tensor(9.0))
     assert torch.equal(out[2], torch.tensor(4.0))
+
+
+def test_non_asciistring_list_attribute():
+    class Model(torch.nn.Module):
+        def forward(self, x, y, z):
+            x = poptorch.custom_op(
+                [x, y, z],
+                "ThreeReduceOp",
+                "test.poptorch",
+                1,
+                example_outputs=[x, y, z],
+                attributes={"reductions": ["a\u1f00b", "sum", "mean"]})
+            return x
+
+    model = Model()
+
+    x = torch.tensor([1.0, 2.0, 3.0])
+    y = torch.tensor([2.0, 3.0, 4.0])
+    z = torch.tensor([3.0, 4.0, 5.0])
+
+    inference_model = poptorch.inferenceModel(model)
+    with pytest.raises(ValueError,
+                       match="a\u1f00b contains non-ASCII characters."):
+        inference_model(x, y, z)
 
 
 ALL_ATTRIBUTES = {
@@ -394,3 +440,37 @@ def test_many_attributes_one_wrong(seed):
     out = inference_model(x)
 
     assert torch.equal(out[0], torch.tensor([0.0]))
+
+
+#many_attribtes_examples_start
+def test_many_attributes_examples():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            attributes = {
+                "float_one": 1.0,
+                "float_minus_two": -2.0,
+                "int_zero": 0,
+                "int_minus_five": -5,
+                "floats_one_two_three": [1.0, 2.0, 3.0],
+                "floats_minus_one_two_three": [-1.0, -2.0, -3.0],
+                "ints_one_two_three": [1, 2, 3],
+                "ints_minus_one_two_three": [-1, -2, -3],
+                "a_string": "string with quotes and slash \" ' \\ end",
+                "strs": ["abc", "def", "ghi"]
+            }
+
+            x = poptorch.custom_op([x],
+                                   "ManyAttributeOp",
+                                   "test.poptorch",
+                                   1,
+                                   example_outputs=[x],
+                                   attributes=attributes)
+            #many_attribtes_examples_end
+            return x
+
+    model = Model()
+
+    x = torch.tensor([0.0])
+
+    inference_model = poptorch.inferenceModel(model)
+    inference_model(x)

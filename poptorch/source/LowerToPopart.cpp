@@ -949,7 +949,7 @@ convertCustomOpAttributes(const torch::jit::Node *node,
       processListAttribute(name.c_str(), attributes,
                            attribute.second.cast<py::tuple>());
     } else {
-      ERROR("Invalid attribute Type");
+      ERROR("Invalid attribute type");
     }
   }
 

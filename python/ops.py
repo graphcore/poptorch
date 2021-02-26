@@ -331,6 +331,25 @@ def custom_op(inputs,
                         raise ValueError("The types in a list/tuple " +
                                          "attribute must all be the same.")
 
+        # Non-ascii cannot be converted to std::string in C++
+        def error_on_non_ascii(s):
+            if isinstance(s, (list, tuple)):
+                for v in s:
+                    error_on_non_ascii(v)
+
+            if not isinstance(s, str):
+                return
+
+            for ch in s:
+                if ord(ch) >= 128:
+                    raise ValueError(f"{s} contains non-ASCII characters.")
+
+        for k in attributes.keys():
+            error_on_non_ascii(k)
+
+        for v in attributes.values():
+            error_on_non_ascii(v)
+
         # The id should not change between traces, so we need to re-use any
         # attribute dictionaries. This more complicated because equality of
         # values is insufficient: [1, 2, 3] == [1.0, 2.0, 3.0]

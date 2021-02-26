@@ -14,6 +14,10 @@ myop = ctypes.cdll.LoadLibrary(myso[0])
 
 #loading_library_end
 
+myso = list(pathlib.Path("tests").rglob("libcustom_leaky_relu_op.*"))
+assert myso, "Failed to find libcustom_leaky_relu_op"
+myop = ctypes.cdll.LoadLibrary(myso[0])
+
 
 #inference_start
 def test_inference():
@@ -80,3 +84,28 @@ def test_training():
         out, _ = training((x, bias), y)
 
     assert torch.argmax(out[0]) == 42
+
+
+def test_inference_with_an_attribute():
+    #inference_with_attribute_start
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            x = poptorch.custom_op([x],
+                                   "LeakyRelu",
+                                   "com.acme",
+                                   1,
+                                   example_outputs=[x],
+                                   attributes={"alpha": 0.02})
+            return x[0]
+
+    #inference_with_attribute_end
+
+    model = Model()
+
+    x = torch.tensor([-1.0, -0.5, 0.0, 0.5, 1.0])
+
+    inference_model = poptorch.inferenceModel(model)
+    out = inference_model(x)
+
+    torch.testing.assert_allclose(out,
+                                  torch.tensor([-0.02, -0.01, 0.0, 0.5, 1.0]))

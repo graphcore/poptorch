@@ -42,6 +42,9 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 add_library(custom_cube_op SHARED "custom_cube_op.cpp")
 target_link_libraries(custom_cube_op popart-only)
 
+add_library(custom_leaky_relu_op SHARED "custom_leaky_relu_op.cpp")
+target_link_libraries(custom_leaky_relu_op popart-only)
+
 add_library(custom_add_scalar_op SHARED "custom_add_scalar_op.cpp")
 target_link_libraries(custom_add_scalar_op popart-only)
 
