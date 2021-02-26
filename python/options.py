@@ -831,6 +831,11 @@ class Options(_options_impl.OptionsDict):
                          connection_type=enums.ConnectionType.Always.value,
                          sync_pattern=enums.SyncPattern.Full.value,
                          available_memory_proportion={})
+        path = os.environ.get("POPTORCH_CACHE_DIR", "")
+        if path:
+            logger.info("POPTORCH_CACHE_DIR is set: setting cache path to %s",
+                        path)
+            self.enableExecutableCaching(path)
 
     @property
     def TensorLocations(self):

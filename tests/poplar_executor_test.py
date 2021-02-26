@@ -29,7 +29,33 @@ def test_ExecutableCaching(capfd):
         m.destroy()
         log = helpers.LogChecker(capfd)
         log.assert_contains("set enableEngineCaching to value true")
-        assert os.listdir(), "No executable saved in the cache"
+        assert len(os.listdir(cache)) == 1, "No executable saved in the cache"
+
+        n = poptorch.inferenceModel(Model(), opts)
+        n.compile(torch.rand(2, 3))
+        log = helpers.LogChecker(capfd)
+        log.assert_contains("set enableEngineCaching to value true")
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+@helpers.printCapfdOnExit
+def test_ExecutableCaching_env(capfd):
+    poptorch.setLogLevel(1)  # Force debug logging
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x * 6
+
+    with tempfile.TemporaryDirectory() as cache:
+        os.environ["POPTORCH_CACHE_DIR"] = cache
+        opts = poptorch.Options()
+        m = poptorch.inferenceModel(Model(), opts)
+        m.compile(torch.rand(2, 3))
+        m.destroy()
+        log = helpers.LogChecker(capfd)
+        log.assert_contains("set enableEngineCaching to value true")
+        assert len(os.listdir(cache)) == 1, "No executable saved in the cache"
 
         n = poptorch.inferenceModel(Model(), opts)
         n.compile(torch.rand(2, 3))

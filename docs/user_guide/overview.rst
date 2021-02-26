@@ -846,3 +846,16 @@ If you would rather wait for an IPU to become available, you can do so by settin
 .. code-block:: bash
 
   export POPTORCH_WAIT_FOR_IPU=1
+
+Enable executable caching
+-------------------------
+
+By default PopTorch will re-compile the model every time you instantiate a model.
+However if you often run the same models you might want to enable executable caching to save time.
+This can be done by either setting the ``POPTORCH_CACHE_DIR`` environment variable or by calling :py:class:`poptorch.Options.enableExecutableCaching`.
+
+.. code-block:: bash
+
+  export POPTORCH_CACHE_DIR=/tmp/poptorch_cache
+
+.. warning:: The cache directory might grow large quickly because PopTorch doesn't evict old models from the cache and, depending on the number and size of your models and the number of IPUs used, the executables might be quite large. It is the user's responsibility to delete the unwanted cache files.

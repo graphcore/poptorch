@@ -44,6 +44,7 @@ New features
 - Add ``ipuHardwareVersion`` function to read the version of the IPU hardware present on the system.
 - Changed default targetd Ipu version for the model and offline compilation to `2`.
 - Changed ``accumulationReductionType(reduction)`` option to now apply to replication reduction as well
+- Add environment variable ``POPTORCH_CACHE_DIR``
 
 v1.0 (Poplar SDK 1.4)
 =====================
