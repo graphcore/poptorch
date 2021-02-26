@@ -1,0 +1,100 @@
+=========
+Reference
+=========
+
+Options
+=======
+
+.. autoclass:: poptorch.Options
+   :members:
+
+.. autoclass:: poptorch.options._DistributedOptions
+   :members:
+
+.. autoclass:: poptorch.options._GraphProcessingOptions
+   :members:
+
+.. autoclass:: poptorch.options._JitOptions
+   :members:
+
+.. autoclass:: poptorch.options._PopartOptions
+   :members:
+
+.. autoclass:: poptorch.options._TensorLocationOptions
+   :members:
+
+.. autoclass:: poptorch.TensorLocationSettings
+   :members:
+
+.. autoclass:: poptorch.options._TrainingOptions
+   :members:
+
+Model wrapping functions
+========================
+
+.. autofunction:: poptorch.trainingModel
+
+.. autofunction:: poptorch.inferenceModel
+
+.. autoclass:: poptorch.PoplarExecutor
+   :special-members: __call__
+   :members:
+
+.. autofunction:: poptorch.isRunningOnIpu
+
+Parallel execution
+==================
+
+.. autoclass:: poptorch.Block
+   :special-members: __init__, useAutoId
+
+.. autoclass:: poptorch.BeginBlock
+   :special-members: __init__
+
+.. autoclass:: poptorch.Stage
+   :special-members: __init__
+
+.. autoclass:: poptorch.AutoStage
+
+.. autoclass:: poptorch.Phase
+   :special-members: __init__
+
+.. autoclass:: poptorch.ShardedExecution
+   :inherited-members:
+
+.. autoclass:: poptorch.PipelinedExecution
+   :special-members: __init__
+   :inherited-members:
+
+.. autoclass:: poptorch.SerialPhasedExecution
+   :special-members: __init__
+   :inherited-members:
+
+.. autoclass:: poptorch.ParallelPhasedExecution
+   :special-members: __init__
+   :inherited-members:
+
+.. autoclass:: poptorch.Liveness
+
+Optimizers
+==========
+
+.. autoclass:: poptorch.optim.SGD
+   :special-members: __init__
+   :members:
+
+.. autoclass:: poptorch.optim.Adam
+   :special-members: __init__
+   :members:
+
+.. autoclass:: poptorch.optim.AdamW
+   :special-members: __init__
+   :members:
+
+.. autoclass:: poptorch.optim.RMSprop
+   :special-members: __init__
+   :members:
+
+.. autoclass:: poptorch.optim.LAMB
+   :special-members: __init__
+   :members:

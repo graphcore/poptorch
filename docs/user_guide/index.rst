@@ -12,5 +12,6 @@ PyTorch for the IPU: User Guide
     supported_ops
     example
     experimental
+    reference
     legal
     changelog

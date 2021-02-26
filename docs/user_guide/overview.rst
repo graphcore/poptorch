@@ -8,39 +8,27 @@ Features
 Options
 =======
 
-The compilation and execution on the IPU can be controlled using :class:`poptorch.Options`:
+The compilation and execution on the IPU can be controlled using :class:`poptorch.Options`.
+Broadly speaking, the functionality provided can be broken down in the following:
+
+#. Computational graph processing (see :class:`poptorch.options._GraphProcessingOptions`)
+#. Management of the training process (see :class:`poptorch.options._TrainingOptions`)
+#. Control of distributed execution environments
+   (see :class:`poptorch.options._DistributedOptions`)
+#. Location of tensors (see: :class:`poptorch.options._TensorLocationOptions` and
+   :class:`poptorch.TensorLocationSettings`)
+#. Finetuning of PopART backend
+   (see :class:`poptorch.options._PopartOptions`)
+#. Options relevant to the Torch JIT compiler 
+   (see :class:`poptorch.options._JitOptions`)
 
 See :ref:`efficient_data_batching`  for a full
 explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
 ``replication_factor`` interact with the output and input sizes.
 
-.. autoclass:: poptorch.Options
-   :members:
-
 You can choose to use the IPU model or the real IPU hardware
 via :py:class:`poptorch.Options.useIpuModel`.
 
-
-.. autoclass:: poptorch.options._DistributedOptions
-   :members:
-
-.. autoclass:: poptorch.options._GraphProcessingOptions
-   :members:
-
-.. autoclass:: poptorch.options._JitOptions
-   :members:
-
-.. autoclass:: poptorch.options._TrainingOptions
-   :members:
-
-.. autoclass:: poptorch.options._PopartOptions
-   :members:
-
-.. autoclass:: poptorch.options._TensorLocationOptions
-   :members:
-
-.. autoclass:: poptorch.TensorLocationSettings
-   :members:
 
 Model wrapping functions
 ========================
@@ -51,7 +39,9 @@ The basis of PopTorch integration comes from these two model wrapping functions.
 poptorch.trainingModel
 ----------------------
 
-.. autofunction:: poptorch.trainingModel
+This function wraps around a PyTorch model, yielding a PopTorch model that may
+be run on the IPU in training mode. See :py:func:`poptorch.trainingModel` for a
+complete reference.
 
 .. literalinclude:: trainingModel.py
     :language: python
@@ -63,7 +53,9 @@ poptorch.trainingModel
 poptorch.inferenceModel
 -----------------------
 
-.. autofunction:: poptorch.inferenceModel
+This function wraps around a PyTorch model, yielding a PopTorch model that can
+be run on the IPU in inference mode. See :py:func:`poptorch.trainingModel` for
+a complete reference.
 
 .. literalinclude:: inferenceModel.py
     :language: python
@@ -76,14 +68,17 @@ poptorch.inferenceModel
 poptorch.PoplarExecutor
 -----------------------
 
-.. autoclass:: poptorch.PoplarExecutor
-   :special-members: __call__
-   :members:
+This class should not be created directly but is a wrapper around the model
+that was passed into :py:func:``inferenceModel`` or :py:func:``trainingModel``.
+It only has a few methods which can be used to interface with the IPU.
 
-.. note:: The ``PoplarExecutor`` will implicitly keep in sync the parameters
-  of the source PyTorch model and the PopTorch model(s).
-  However, weights need to be explicitly copied if the
-  model is trained on the CPU and inference is run on the IPU.
+The :py:class:``PoplarExecutor`` will implicitly keep in sync the parameters
+of the  source PyTorch model and the PopTorch model(s). However, weights need to 
+be  explicitly copied if the model is trained on the CPU and inference is run on
+the IPU.
+
+See :py:class:`poptorch.PoplarExecutor` for complete reference of IPU interface
+functionality.
 
   .. code-block:: python
 
@@ -106,7 +101,24 @@ poptorch.PoplarExecutor
 poptorch.isRunningOnIpu
 -----------------------
 
-.. autofunction:: poptorch.isRunningOnIpu
+One useful utility function is :py:func:`poptorch.isRunningOnIpu`. This
+returns ``True`` when executing on the IPU and ``False`` when executing
+the model outside IPU scope. This allows for different code paths within
+the model.
+
+A common usecase is executing equivalent code to a PopART custom operator
+when running on CPU. For example:
+
+  .. code-block:: python
+
+    class Network(torch.nn.Module):
+      def forward(self, x, y):
+          if poptorch.isRunningOnIpu():
+              # IPU path
+              return my_custom_operator(x, y)
+          else:
+              # CPU path
+              return my_torch_implementation(x,y)
 
 Parallel execution
 ==================
@@ -148,30 +160,16 @@ Annotation tools
 poptorch.Block and poptorch.BeginBlock
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:py:class:`poptorch.BeginBlock` and :py:class:`poptorch.Block` are
-indispensable wrapper classes to define model
-parallelism in a multi-IPU device.
+:py:class:`poptorch.BeginBlock` and :py:class:`poptorch.Block` are wrapper
+classes used to define model parallelism in a multi-IPU device. They partition
+models into "blocks" that will be executed on different IPUs.
+
 You can use :py:class:`poptorch.Block` to define a scope in the context of the
 model.
 
-.. autoclass:: poptorch.Block
-   :special-members: __init__, useAutoId
-
-:py:class:`poptorch.BeginBlock` is an annotation defined outside the
-model, and applied to current and onward layers.
-
-.. autoclass:: poptorch.BeginBlock
-   :special-members: __init__
-
-:py:class:`poptorch.BeginBlock` or :py:class:`poptorch.Block`
-alone is enough to enable parallel execution in the simplest case.
-By default, the layers before the first :py:class:`poptorch.BeginBlock`
-will be placed on IPU 0.
-The complete code examples for :py:class:`poptorch.BeginBlock` and
-:py:class:`poptorch.Block` are shown below.
-All layers before ``model.bert.encoder.layer[0]``
-will be on IPU 0 and all layers from ``model.bert.encoder.layer[0]``
-onwards (inclusive) will be on IPU 1.
+In the example below, all layers before ``model.bert.encoder.layer[0]`` will be
+put on IPU 0 and all layers from ``model.bert.encoder.layer[0]`` onwards
+(inclusive) will be on IPU 1.
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -179,8 +177,11 @@ onwards (inclusive) will be on IPU 1.
     :start-after: annotations_start
     :end-before: annotations_end
     :emphasize-lines: 37-38, 41-42, 45-46
-    :caption: Annotations can be attached to layers in existing models.
+    :caption: Annotating existing layers.
 
+:py:class:`poptorch.BeginBlock` is an annotation defined outside the
+model, and applied to current and onward layers. Both forms can be used
+interchangeably.
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -188,8 +189,11 @@ onwards (inclusive) will be on IPU 1.
     :start-after: annotations_inline_start
     :end-before: annotations_inline_end
     :emphasize-lines: 16, 19, 22, 26
-    :caption: PopTorch also supports annotating the model directly.
-		          Both forms can be used interchangeably.
+    :caption: Annotating a model directly.
+
+Either annotation is enough to enable parallel execution in the simple cases.
+By default, the layers before the first :py:class:`poptorch.BeginBlock` will be
+placed on IPU 0.
 
 Both :py:class:`poptorch.BeginBlock` and :py:class:`poptorch.Block`
 need to follow a set of rules:
@@ -235,9 +239,6 @@ Consecutive layers in a model can be defined either in the same
 Whether stages run in parallel or sequentially depends on specific
 parallel execution strategies.
 
-.. autoclass:: poptorch.Stage
-   :special-members: __init__
-
 Internally, each operation in a model is assigned a ``stage_id``
 through :py:class:`poptorch.Stage`.
 
@@ -248,8 +249,6 @@ You can use :py:class:`poptorch.AutoStage` if you don't want to
 specify :py:class:`poptorch.Stage` by hand.
 It will assign one :py:class:`poptorch.Stage`
 per :py:class:`poptorch.BeginBlock` or :py:class:`poptorch.Block`.
-
-.. autoclass:: poptorch.AutoStage
 
 By default ``poptorch.AutoStage.SameAsIpu`` is in use, which means the
 `stage_id` of :py:class:`poptorch.Stage` will be set to the ``ipu_id``
@@ -286,13 +285,17 @@ It is not used in
 :py:class:`poptorch.ShardedExecution` and
 :py:class:`poptorch.PipelinedExecution`.
 
-.. autoclass:: poptorch.Phase
-   :special-members: __init__
+  .. code-block:: python
 
-In the last two lines above,
-"A" and "B" will run in parallel on IPU 0 and 1 simultaneously since
-they are placed in two stages. They will run sequentially in one IPU
-if they are placed in one stage only.
+    with poptorch.Block("A"):
+        layer()
+    with poptorch.Block("B"):
+        layer()
+    p = Phase(poptorch.Stage("A").ipu(0), poptorch.Stage("B").ipu(1))
+
+In the code snippet above, "A" and "B" will run in parallel on IPU 0 and 1
+simultaneously since they are placed in two stages. They will run 
+sequentially on one IPU if they are placed in a single stage.
 
 
 Advanced annotation with strings
@@ -373,8 +376,6 @@ Layers sharing weights need to be placed on the same IPU.
 for processing a single sample or debugging.
 Overall it has low efficiency since only one IPU is used at a time.
 
-.. autoclass:: poptorch.ShardedExecution
-   :inherited-members:
 
 poptorch.PipelinedExecution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -396,9 +397,6 @@ Hence, all IPUs will be occupied after a warm-up period.
 A cool-down period is required to aggregate the results and apply weight
 changes.
 
-.. autoclass:: poptorch.PipelinedExecution
-   :special-members: __init__
-   :inherited-members:
 
 Phased execution
 ^^^^^^^^^^^^^^^^
@@ -436,9 +434,20 @@ poptorch.SerialPhasedExecution
 In :py:class:`poptorch.SerialPhasedExecution`,
 phases execute on a single group of IPUs sequentially.
 
-.. autoclass:: poptorch.SerialPhasedExecution
-   :special-members: __init__
-   :inherited-members:
+  .. code-block:: python
+
+    strategy = poptorch.SerialPhasedExecution([
+      poptorch.Phase(poptorch.Stage("A"), poptorch.Stage("A2")), 
+      poptorch.Phase(poptorch.Stage("B"), poptorch.Stage("B2")), 
+      poptorch.Phase(poptorch.Stage("C"), poptorch.Stage("C2"))])
+    
+    strategy.phase(0).ipus(0,1)
+    strategy.phase(1).ipus(0,1)
+    strategy.phase(2).ipus(0,1) 
+    
+    opts.setExecutionStrategy(strategy)
+
+The code above causes all phases to run serially on IPUs 0 and 1.
 
 poptorch.ParallelPhasedExecution
 """"""""""""""""""""""""""""""""
@@ -450,16 +459,25 @@ Inter-phase cross-IPU copies can replace the memory transfers to and from
 the streaming memory, if the desired weights and activations are already
 available in another group of IPUs.
 
-.. autoclass:: poptorch.ParallelPhasedExecution
-   :special-members: __init__
-   :inherited-members:
+  .. code-block:: python
 
-In the code example above, there are three phases.
-Each phase has two stages and
-each IPU group has two IPUs, so these two numbers match.
-Even phases 0 and 2 run on IPU 0 and 2, while odd phase 1 runs on IPU 1 and
-3 as required. This allows for faster
-cross-IPU copies, both inter-phase and intra-phase.
+    strategy = poptorch.SerialPhasedExecution([
+      poptorch.Phase(poptorch.Stage("0"), poptorch.Stage("1")), 
+      poptorch.Phase(poptorch.Stage("2"), poptorch.Stage("3")), 
+      poptorch.Phase(poptorch.Stage("4"), poptorch.Stage("5"))])
+    
+    strategy.phase(0).ipus(0,2)
+    strategy.phase(1).ipus(1,3)
+    strategy.phase(2).ipus(0,2) 
+    
+    opts.setExecutionStrategy(strategy)
+
+
+In the code example above, there are three phases. Each phase has two stages
+and each IPU group has two IPUs, so the number of groups matches the number
+of IPUs. Even phases 0 and 2 run on IPU 0 and 2, while odd phase 1 runs on
+IPU 1 and as required. This allows for faster cross-IPU copies, both
+inter-phase and intra-phase.
 
 poptorch.Liveness
 """""""""""""""""
@@ -468,8 +486,6 @@ poptorch.Liveness
 and is only needed for
 :py:class:`poptorch.ParallelPhasedExecution`
 and :py:class:`poptorch.SerialPhasedExecution`.
-
-.. autoclass:: poptorch.Liveness
 
 The default :py:class:`poptorch.Liveness` is ``AlwaysLive``.
 ``OffChipAfterFwd`` and
@@ -480,30 +496,15 @@ with a tight memory budget.
 Optimizers
 ==========
 
-You can use a number of optimizers with PopTorch.
-In addition, PopTorch has additional features to support float16 models such as loss scaling.
+Poptorch supports the following optimizers:
 
+#. SGD (see :py:class:`poptorch.optim.SGD`)
+#. Adam (see :py:class:`poptorch.optim.Adam`)
+#. AdamW (see :py:class:`poptorch.optim.RMSprop`)
+#. RMSprop (see :py:class:`poptorch.optim.RMSprop`)
+#. LAMB (see :py:class:`poptorch.optim.LAMB`)
 
-.. autoclass:: poptorch.optim.SGD
-   :special-members: __init__
-   :members:
-
-.. autoclass:: poptorch.optim.Adam
-   :special-members: __init__
-   :members:
-
-.. autoclass:: poptorch.optim.AdamW
-   :special-members: __init__
-   :members:
-
-.. autoclass:: poptorch.optim.RMSprop
-   :special-members: __init__
-   :members:
-
-.. autoclass:: poptorch.optim.LAMB
-   :special-members: __init__
-   :members:
-
+In addition, PopTorch has additional features to support float16 models, such as loss scaling.
 
 Loss scaling
 ------------
@@ -571,10 +572,10 @@ poptorch.ipu_print_tensor
 
     .. code-block:: python
 
-    def forward(self, c, d, b)
-        a = c + d
-        poptorch.ipu_print_tensor(a, "summation"))
-        return a + b
+      def forward(self, c, d, b)
+          a = c + d
+          poptorch.ipu_print_tensor(a, "summation"))
+          return a + b
 
     The result of ``ipu_print_tensor`` is not used,therefore it will be optimised out by the
     graph optimiser and ``a`` will not be printed.
