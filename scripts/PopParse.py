@@ -10,8 +10,11 @@ import sys
 
 import clang.cindex
 from popgen import onnx
+from utils import _utils
 
 logger = logging.getLogger("PopParse")
+_utils.set_logger(logger)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-c",
                     "--clang",
@@ -30,8 +33,6 @@ jsonOutput = onnx.parse()
 
 logging_level = logging.DEBUG if args.debug else logging.INFO
 logging.basicConfig(level=logging_level)
-
-current_dir = os.path.dirname(os.path.realpath(__file__))
 
 # List of SessionOptions attributes PopTorch decided to not support
 options_not_handled = [
@@ -74,8 +75,9 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
         r" *ADD_POPART_DOUBLE_OPTION\((.*)\).*": OptionType.Float
     }
 
-    for line in open(current_dir + "/popart_compiler/source/Compiler.cpp",
-                     "r"):
+    for line in open(
+            os.path.join(_utils.sources_dir(), "popart_compiler", "source",
+                         "Compiler.cpp"), "r"):
         for expr, type in checks.items():
             m = re.match(expr, line)
             if m:
@@ -537,20 +539,20 @@ autoComment = """// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 """
 
 with open(
-        os.path.join(current_dir, 'popart_compiler', 'include',
+        os.path.join(_utils.sources_dir(), 'popart_compiler', 'include',
                      'popart_compiler', 'CompilerOperationMacros.inc.hpp'),
         'w') as f:
     print(autoComment, file=f)
     print(macroFile, file=f)
 
 with open(
-        os.path.join(current_dir, 'poptorch', 'include', 'poptorch',
+        os.path.join(_utils.sources_dir(), 'poptorch', 'include', 'poptorch',
                      'CompilerOps.inc.hpp'), 'w') as f:
     print(autoComment, file=f)
     print(headerStubs, file=f)
 
 with open(
-        os.path.join(current_dir, 'poptorch', 'source', 'CompilerOps.cpp.inc'),
-        'w') as f:
+        os.path.join(_utils.sources_dir(), 'poptorch', 'source',
+                     'CompilerOps.cpp.inc'), 'w') as f:
     print(autoComment, file=f)
     print(cxxFile, file=f)
