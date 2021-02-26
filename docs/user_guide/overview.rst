@@ -729,6 +729,8 @@ These PopTorch functions, not related to model creation, are available:
 
 .. autofunction:: poptorch.ipuHardwareIsAvailable
 
+.. autofunction:: poptorch.ipuHardwareVersion
+
 .. autofunction:: poptorch.setLogLevel
 
 

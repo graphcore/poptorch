@@ -66,7 +66,8 @@ def test_offline_ipu_compileAndExport_file(filename=None):
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 def test_precompile_then_load():
-    opts = poptorch.Options()
+    opts = poptorch.Options().useOfflineIpuTarget(
+        poptorch.ipuHardwareVersion())
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
         _create_model_and_export(opts, filename)
@@ -169,7 +170,7 @@ def test_training_attributes():
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="We need to be able to lock a specific IPU")
 @pytest.mark.parametrize("use_half", [False])
-def test_explicit_deletion(use_half):
+def test_explicit_destroy(use_half):
     class ExampleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()

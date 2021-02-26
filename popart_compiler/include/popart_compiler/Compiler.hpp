@@ -35,10 +35,13 @@ struct OutputType {
   int64_t num_elements{0};
 };
 
-/* Returns true if the system contains a device with numIpus
+/** Returns the IPU version of the device if the system contains a device with
+ * num_ipus -1 if there is a device but the architecture is unknown. 0 if there
+ * is no device with num_ipus.
+ *
  * Note: This function doesn't check if the devices are currently in use.
  */
-bool ipuHardwareIsAvailable(std::uint64_t num_ipus = 1);
+std::int64_t ipuHardwareVersion(std::uint64_t num_ipus = 1);
 
 struct Optimizer {
   struct Parameter {

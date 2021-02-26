@@ -379,13 +379,29 @@ def inferenceModel(model, options=None):
                           poptorch_version=__version__)
 
 
-def ipuHardwareIsAvailable():
-    """Indicates whether IPU hardware is available to use.
+def ipuHardwareIsAvailable(num_ipus=1):
+    """Indicates whether any IPU hardware with `num_ipus` is present in the system.
 
+    Note: This function doesn't check if the IPU is free or already being used.
+
+    :param int num_ipus:
     :returns: True if physical IPUs are available, False otherwise.
     :rtype: bool
     """
-    return poptorch_core.ipuHardwareIsAvailable()
+    return poptorch_core.ipuHardwareVersion(num_ipus) != 0
+
+
+def ipuHardwareVersion():
+    """Indicates what IPU hardware version is available in the system.
+
+    Raise an exception if no hardware is available.
+
+    :returns: The IPU hardware version or -1 if unknown.
+    :rtype: int
+    """
+    version = poptorch_core.ipuHardwareVersion()
+    assert version != 0, "No IPU hardware available on this system"
+    return version
 
 
 def setLogLevel(level):

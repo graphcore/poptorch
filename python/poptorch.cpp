@@ -950,7 +950,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDeviceImpl);
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);
   m.def("getTraceInputStr", poptorch::getTraceInputStr);
-  m.def("ipuHardwareIsAvailable", poptorch::ipuHardwareIsAvailable,
+  m.def("ipuHardwareVersion", poptorch::ipuHardwareVersion,
         py::arg("numIpus") = 1);
   m.def("setLogLevel", poptorch::setLogLevel, py::arg("level") = 2);
   m.def("_getPopartIR", poptorch::getPopartIR);

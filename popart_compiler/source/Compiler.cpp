@@ -1174,12 +1174,25 @@ bool CompilerImpl::isAttachedToDevice() const {
 }
 } // namespace detail
 
-bool ipuHardwareIsAvailable(std::uint64_t num_ipus) {
-  return !ipuModelEnvironmentVariableIsEnabled() &&
-         !ipuSmallModelEnvironmentVariableIsEnabled() &&
-         !popart::DeviceManager::createDeviceManager()
-              .enumerateDevices(popart::SyncPattern::Full, num_ipus)
-              .empty();
+std::int64_t ipuHardwareVersion(std::uint64_t num_ipus) {
+  if (ipuModelEnvironmentVariableIsEnabled() ||
+      ipuSmallModelEnvironmentVariableIsEnabled()) {
+    return 0;
+  }
+  auto devices = popart::DeviceManager::createDeviceManager().enumerateDevices(
+      popart::SyncPattern::Full, num_ipus);
+  if (devices.empty()) {
+    return 0;
+  }
+  const std::string arch = devices.front()->getTarget().getTargetArchString();
+  if (arch.size() != 4 || arch.rfind("ipu", 0) != 0 || arch[3] < '1' ||
+      arch[3] > '9') {
+    logging::warn("Unknown IPU version: {} (Expected 4 characters string "
+                  "'ipuX' where X is a digit > 0)",
+                  arch);
+    return -1;
+  }
+  return arch[3] - '0';
 }
 
 namespace {
