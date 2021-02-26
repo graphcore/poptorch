@@ -1031,7 +1031,7 @@ class PoplarExecutor:
         if export_model:
             data = PoptorchData(self._poptorch_version, in_tensors,
                                 self._options, self._training,
-                                self._user_model, self._optimizer)
+                                self._user_model, self._new_optimizer)
         else:
             data = PoptorchData(self._poptorch_version, in_tensors)
         with open(filename, "wb") as f:
@@ -1071,9 +1071,6 @@ class PoplarExecutor:
             self.copyWeightsToDevice()
         if not self._is_attached:
             self.attachToDevice()
-            # Upload the weights to the IPU
-            self.copyWeightsToDevice()
-
         # If this is an inference model: check if the same model is not being
         # trained on a different IPU.
         # If it is: make sure the weights are updated.
@@ -1257,6 +1254,11 @@ class PoplarExecutor:
         assert not self._is_attached
         poptorch_core.attachToDevice(self._executable)
         self._is_attached = True
+        # Upload the weights to the IPU
+        self.copyWeightsToDevice()
+        # PopART save / restore the optimizer state with the weight,
+        # but parameters  need to be re-uploaded
+        self._optimizer = {}
 
     @classmethod
     def _RestoreInputsIfRequired(cls, backup, post_trace):
