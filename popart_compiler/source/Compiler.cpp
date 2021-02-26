@@ -75,7 +75,7 @@ std::string getIpuModelVersion() {
     std::string str(env_ipu_model_version);
     return str;
   }
-  return "ipu1"; // Default to MK1 if unspecified
+  return "ipu2"; // Default to MK2 if unspecified
 }
 
 int getNumTilesPerIpu(const std::string &ipu_model_version) {

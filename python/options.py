@@ -1029,14 +1029,14 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(ipu_id=ipu_id)
         return self
 
-    def useOfflineIpuTarget(self, ipu_version=1):
+    def useOfflineIpuTarget(self, ipu_version=2):
         """Create an offline IPU target that can only be used for offline compilation.
 
         .. note:: the offline IPU target cannot be used if the IPU model is
             enabled.
 
         :param int ipu_version: IPU version to target (1 for mk1, 2 for mk2).
-            Default: 1.
+            Default: 2.
         """
         self.connectionType(enums.ConnectionType.Never)
         self.createOrSet(ipu_version=ipu_version)

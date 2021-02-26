@@ -42,6 +42,7 @@ New features
 - Add support for precompilation and reloading exported executables (``poptorch.PoplarExecutor.compileAndExport`` and ``poptorch.load``)
 - Add support for slices with variable start index (slice size must be constant).
 - Add ``ipuHardwareVersion`` function to read the version of the IPU hardware present on the system.
+- Changed default targetd Ipu version for the model and offline compilation to `2`.
 
 v1.0 (Poplar SDK 1.4)
 =====================
