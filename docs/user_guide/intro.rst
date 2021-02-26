@@ -36,7 +36,7 @@ The loop also manually updates the optimiser by calling the ``.step()`` method.
   :end-before: simple_cpu_end
 
 
-Data Batching
+Data batching
 =============
 
 An equivalent training loop executing the model on the IPU with PopTorch is shown
@@ -61,7 +61,7 @@ detect the loss value to backpropagate the gradients from.
   :end-before: simple_ipu_end
 
 
-Distributed Execution
+Distributed execution
 =====================
 
 For additional scalability, you can wrap individual layers in an IPU helper to
@@ -93,3 +93,10 @@ Not all PyTorch operations have been implemented by the PopTorch compiler yet.  
 :ref:`supported_ops` for a list of operators that are supported on the IPU.
 Please also report any unsupported operators to support@graphcore.ai so that these
 ops may be incorporated into a future release.
+
+Other resources
+===============
+
+Please see Graphcore's website for `How-to Videos <https://www.graphcore.ai/resources/how-to-videos>`_  and `Graphcore's code examples GitHub repository <https://github.com/graphcore/examples>`_ for PopTorch `applications <https://github.com/graphcore/examples/tree/master/applications/pytorch>`_,
+`code examples <https://github.com/graphcore/examples/tree/master/code_examples/pytorch>`_ and `tutorials <https://github.com/graphcore/examples/tree/master/tutorials/pytorch>`_.
+Further developer resources can be found on `Graphcore's developer portal <https://www.graphcore.ai/developer>`_.
