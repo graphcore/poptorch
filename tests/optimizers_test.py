@@ -23,7 +23,7 @@ class AdamWNoBias(poptorch.optim.AdamW):
 
 
 class OptimizerTestModel:
-    def __init__(self, num_groups=1):
+    def __init__(self, num_groups=1, options=None):
         layers = [torch.nn.Linear(10, 10) for _ in range(num_groups)]
         if num_groups == 1:
             self.model = layers[0]
@@ -32,6 +32,7 @@ class OptimizerTestModel:
         self.input = torch.randn(1, 10)
         self.label = torch.randint(0, 10, [1])
         self.poptorch_model = None
+        self.options = options
 
     def parameters(self):
         return self.model.parameters()
@@ -46,7 +47,8 @@ class OptimizerTestModel:
             self.poptorch_model = helpers.trainingModelWithLoss(
                 self.model,
                 loss=torch.nn.CrossEntropyLoss(),
-                optimizer=optimizer)
+                optimizer=optimizer,
+                options=self.options)
         elif optimizer:
             self.setOptimizer(optimizer)
         return self.poptorch_model(self.input, self.label)
@@ -605,3 +607,42 @@ def test_variable_default(opt, capfd):
     testlog.assert_matches("group 0 optimizer",
                            *genRegexp(attrs, is_const=False),
                            *genRegexp("lr", is_const=False))
+
+
+@pytest.mark.parametrize(
+    "reduction", (poptorch.ReductionType.Sum, poptorch.ReductionType.Mean))
+def test_gradient_accum(reduction):
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            layers = [torch.nn.Linear(10, 10) for _ in range(3)]
+
+            self.model = torch.nn.Sequential(*layers)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, x, target):
+            fwd = self.model(x)
+            return fwd, self.loss(fwd, target)
+
+    accum = 20
+
+    opts = poptorch.Options()
+    opts.Training.gradientAccumulation(accum)
+    opts.Training.accumulationReductionType(reduction)
+
+    model = Model()
+
+    poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    ins = torch.randn([1, 10]).expand(accum, 10)
+    target = torch.randint(0, 10, size=[1]).expand(accum)
+
+    _, loss = poptorch_model(ins, target)
+
+    for _ in range(0, 500):
+        _, loss = poptorch_model(ins, target)
+
+    # Check we have trained the "model"
+    assert loss < 0.03

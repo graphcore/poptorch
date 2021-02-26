@@ -104,7 +104,8 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
     def __init__(self):
         super().__init__(gradient_accumulation=1,
-                         accumulation_reduction_type=enums.ReductionType.Mean)
+                         accumulation_and_replication_reduction_type=enums.
+                         ReductionType.Mean)
 
     def gradientAccumulation(self, gradient_accumulation):
         """Number of samples to accumulate for the gradient calculation.
@@ -118,39 +119,32 @@ class _TrainingOptions(_options_impl.OptionsDict):
         Might be called "pipeline depth" in some other frameworks."""
         self.set(gradient_accumulation=gradient_accumulation)
 
-        if gradient_accumulation != 1:
-            art_warn = (
-                "The default value for accumulation_reduction_type has " +
-                "changed from sum to mean in this release. To suppress " +
-                "this warning use opts.Training.accumulationReductionType(" +
-                "poptorch.ReductionType.Mean).")
-            self._warnings["accumulation_reduction_type"] = art_warn
-
         return self
 
-    def accumulationReductionType(self, accumulation_reduction_type):
-        """The type of reduction (sum or mean) applied to accumulated gradients.
-
-        When using a non-unity value for gradientAccumulation, you can specify
-        whether to reduce the gradients by sum or mean (default). When using
-        mean reduction, changing the gradientAccumulation will not change the
-        training curve of the model (barring numerical error and changes due
-        to the different compute batch size e.g. batch normalization).
-
-        :param poptorch.ReductionType accumulation_reduction_type:
-            * Mean: Reduce gradients by calculating the mean of them.
-            * Sum: Reduce gradients by calculating the sum of them.
-        """
-        incorrect_instance = not isinstance(accumulation_reduction_type,
+    def _check_reduction_arg(self, reduction_type, name):
+        incorrect_instance = not isinstance(reduction_type,
                                             enums.ReductionType)
-        no_red = accumulation_reduction_type == enums.ReductionType.NoReduction
+        no_red = reduction_type == enums.ReductionType.NoReduction
         if incorrect_instance or no_red:
-            raise ValueError("accumulationReductionType must be set to "
+            raise ValueError(name + " must be set to "
                              "poptorch.ReductionType.Mean or "
                              "poptorch.ReductionType.Sum")
 
-        self.set(accumulation_reduction_type=accumulation_reduction_type)
-        self._warnings_disabled.add("accumulation_reduction_type")
+    def accumulationReductionType(self, reduction_type):
+        """The type of reduction applied to reductions in the graph.
+
+        This governs both the accumulation of the loss gradient in replicated
+        graphs and of all of the gradients when using gradient accumulation.
+        These are the only two cases.
+
+        :param poptorch.ReductionType reduction_type:
+            * Mean: Reduce gradients by calculating the mean of them.
+            * Sum: Reduce gradients by calculating the sum of them.
+        """
+        self._check_reduction_arg(reduction_type, "accumulationReductionType")
+
+        self.set(accumulation_and_replication_reduction_type=reduction_type)
+        self._warnings_disabled.add("accumulationReductionType")
         return self
 
 

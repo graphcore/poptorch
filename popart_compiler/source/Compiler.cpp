@@ -778,12 +778,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
                        .excludedVirtualGraphs.push_back(value);
                  });
 
-  registerSetter(uint64_options, "accumulation_reduction_type",
+  registerSetter(uint64_options, "accumulation_and_replication_reduction_type",
                  [&](std::uint64_t value) {
                    ERROR_ON_MSG(value > static_cast<std::uint64_t>(
                                             popart::ReductionType::NoReduction),
                                 "Value for popart::ReductionType out of range");
-                   popart_options.accumulationReductionType =
+                   popart_options.accumulationAndReplicationReductionType =
                        static_cast<popart::ReductionType>(value);
                  });
 

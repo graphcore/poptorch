@@ -622,7 +622,6 @@ and will backpropagate a gradient of ones through it.
   :end-before: identity_end
   :emphasize-lines: 5
 
-
 poptorch.MultiConv
 ------------------
 

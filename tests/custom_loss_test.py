@@ -2,6 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import torch
+import torch.optim as optim
 import pytest
 import helpers
 import poptorch
@@ -231,20 +232,24 @@ def test_two_custom_losses_with_id_wrapper():
 def test_no_loss():
     torch.manual_seed(42)
 
-    model = torch.nn.Sequential(torch.nn.Linear(10, 10),
-                                torch.nn.LogSoftmax(dim=1))
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                             torch.nn.LogSoftmax(dim=1))
 
-    class CustomLoss(torch.nn.Module):
         # Mean squared error scaled.
         def forward(self, x, target):
-            loss = x * 12
+            fwd = self.model(x)
+            loss = fwd * 12
             loss2 = target + 1
             a = loss + loss2
-            return a, loss
+            return fwd, a, loss
 
-    loss = CustomLoss()
+    model = Model()
+    optimizer = optim.SGD(model.parameters(), lr=0.01)
 
-    poptorch_model = helpers.trainingModelWithLoss(model, loss=loss)
+    poptorch_model = poptorch.trainingModel(model, optimizer=optimizer)
 
     label = torch.randint(0, 10, [1])
     input = torch.randn(1, 10)
