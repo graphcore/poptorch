@@ -889,6 +889,10 @@ class PoplarExecutor:
 
             self._is_attached = self.isAttachedToDevice()
 
+            if self._is_attached:
+                # Upload the weights to the IPU
+                self.copyWeightsToDevice()
+
             return in_tensors
 
     def _preprocessGraph(self, in_tensors):
@@ -1060,15 +1064,13 @@ class PoplarExecutor:
             wrapped model will be traced and compiled.
 
         """
-        assert self._options.connectionType != enums.ConnectionType.Never, (
+        assert self._options.connection_type != enums.ConnectionType.Never, (
             "Trying to run a model on an offline device "
-            " (ConnectionType.Never): use model.compile(inputs) instead of"
+            "(ConnectionType.Never): use model.compile(inputs) instead of"
             " model(inputs)")
         in_tensors = self._args_parser(args, kwargs)
         if self._executable is None:
             self._compile(in_tensors)
-            # Upload the weights to the IPU
-            self.copyWeightsToDevice()
         if not self._is_attached:
             self.attachToDevice()
         # If this is an inference model: check if the same model is not being
@@ -1250,6 +1252,9 @@ class PoplarExecutor:
         must be detached."""
         if not self._executable:
             raise RuntimeError("Executable isn't compiled yet")
+        assert self._options.connection_type != enums.ConnectionType.Never, (
+            "Trying to attach to an offline device"
+            " (ConnectionType.Never)")
 
         assert not self._is_attached
         poptorch_core.attachToDevice(self._executable)

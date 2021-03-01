@@ -188,8 +188,8 @@ def test_offline_ipu():
     x = torch.ones(2)
     y = torch.zeros(2)
 
-    with pytest.raises(RuntimeError,
-                       match="Trying to load an engine on an offline device"):
+    with pytest.raises(AssertionError,
+                       match="Trying to run a model on an offline device"):
         inference_model(x, y)
 
 

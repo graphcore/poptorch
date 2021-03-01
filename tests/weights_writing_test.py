@@ -594,9 +594,38 @@ def test_copy_on_torch_equal(reverse_equal_call):
     weight_at_start = model.layer.weight.clone().data
 
     for _ in range(100):
-        _, _ = poptorch_model(input, target)
+        poptorch_model(input, target)
 
     if reverse_equal_call:
         assert not torch.equal(model.layer.weight, weight_at_start)
     else:
         assert not torch.equal(weight_at_start, model.layer.weight)
+
+
+def test_copy_after_compile():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer = torch.nn.Linear(10, 10)
+
+        def forward(self, x):
+            out = self.layer(x)
+            return out
+
+    model = Model()
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.MSELoss(),
+                                                   optimizer=torch.optim.SGD(
+                                                       model.parameters(),
+                                                       lr=0.01))
+
+    target = torch.ones(10)
+    input = torch.randn(10)
+
+    poptorch_model.compile(input, target)
+
+    # If we haven't copied the weights, Popart will fire an exception
+    # when trying to execute the model.
+    poptorch_model(input, target)
