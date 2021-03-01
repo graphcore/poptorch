@@ -583,7 +583,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
       graph.get(), std::move(traced_tensors), std::move(parameters), training,
       std::move(optimizers), parseSessionOptions(options), attribute_accessor);
   lower.lower(&input_tensors);
-  return std::move(lower);
+  return lower;
 }
 
 } // namespace
