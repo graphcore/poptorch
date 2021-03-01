@@ -408,7 +408,7 @@ The following examples show cases where the type output differs from PyTorch:
 Normalization
 -------------
 
-Some normalization layers require the computation of a running variance. The tensor will be computed as float32 even though the input to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy. 
+Some normalization layers require the computation of a running variance. The tensor will be computed as float32 even though the input to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy.
 
 The following operators are affected:
 * ``torch.nn.BatchNorm1d``

@@ -19,7 +19,7 @@ Broadly speaking, the functionality provided can be broken down in the following
    :class:`poptorch.TensorLocationSettings`)
 #. Finetuning of PopART backend
    (see :class:`poptorch.options._PopartOptions`)
-#. Options relevant to the Torch JIT compiler 
+#. Options relevant to the Torch JIT compiler
    (see :class:`poptorch.options._JitOptions`)
 
 See :ref:`efficient_data_batching`  for a full
@@ -73,7 +73,7 @@ that was passed into :py:func:``inferenceModel`` or :py:func:``trainingModel``.
 It only has a few methods which can be used to interface with the IPU.
 
 The :py:class:``PoplarExecutor`` will implicitly keep in sync the parameters
-of the  source PyTorch model and the PopTorch model(s). However, weights need to 
+of the  source PyTorch model and the PopTorch model(s). However, weights need to
 be  explicitly copied if the model is trained on the CPU and inference is run on
 the IPU.
 
@@ -294,7 +294,7 @@ It is not used in
     p = Phase(poptorch.Stage("A").ipu(0), poptorch.Stage("B").ipu(1))
 
 In the code snippet above, "A" and "B" will run in parallel on IPU 0 and 1
-simultaneously since they are placed in two stages. They will run 
+simultaneously since they are placed in two stages. They will run
 sequentially on one IPU if they are placed in a single stage.
 
 
@@ -437,14 +437,14 @@ phases execute on a single group of IPUs sequentially.
   .. code-block:: python
 
     strategy = poptorch.SerialPhasedExecution([
-      poptorch.Phase(poptorch.Stage("A"), poptorch.Stage("A2")), 
-      poptorch.Phase(poptorch.Stage("B"), poptorch.Stage("B2")), 
+      poptorch.Phase(poptorch.Stage("A"), poptorch.Stage("A2")),
+      poptorch.Phase(poptorch.Stage("B"), poptorch.Stage("B2")),
       poptorch.Phase(poptorch.Stage("C"), poptorch.Stage("C2"))])
-    
+
     strategy.phase(0).ipus(0,1)
     strategy.phase(1).ipus(0,1)
-    strategy.phase(2).ipus(0,1) 
-    
+    strategy.phase(2).ipus(0,1)
+
     opts.setExecutionStrategy(strategy)
 
 The code above causes all phases to run serially on IPUs 0 and 1.
@@ -462,14 +462,14 @@ available in another group of IPUs.
   .. code-block:: python
 
     strategy = poptorch.SerialPhasedExecution([
-      poptorch.Phase(poptorch.Stage("0"), poptorch.Stage("1")), 
-      poptorch.Phase(poptorch.Stage("2"), poptorch.Stage("3")), 
+      poptorch.Phase(poptorch.Stage("0"), poptorch.Stage("1")),
+      poptorch.Phase(poptorch.Stage("2"), poptorch.Stage("3")),
       poptorch.Phase(poptorch.Stage("4"), poptorch.Stage("5"))])
-    
+
     strategy.phase(0).ipus(0,2)
     strategy.phase(1).ipus(1,3)
-    strategy.phase(2).ipus(0,2) 
-    
+    strategy.phase(2).ipus(0,2)
+
     opts.setExecutionStrategy(strategy)
 
 
