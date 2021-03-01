@@ -98,3 +98,14 @@ Optimizers
 .. autoclass:: poptorch.optim.LAMB
    :special-members: __init__
    :members:
+
+Data batching
+=============
+
+.. autoclass:: poptorch.DataLoader
+   :special-members: __init__
+   :members: terminate
+
+.. autoclass:: poptorch.AsynchronousDataAccessor
+   :special-members: __init__, __len__
+   :members: terminate

@@ -21,12 +21,15 @@ actually sent for a single step.
 poptorch.DataLoader
 ===================
 
+Poptorch provides a thin wrapper around the traditional `torch.utils.data.DataLoader`
+to abstract away some of the batch sizes calculations. If :py:class:`poptorch.DataLoader`
+is used in a distributed execution environment, it will ensure that each process uses
+a different subset of the dataset.
+
 If you set the ``DataLoader`` ``batch_size`` to more than 1 then each operation
 in the model will process that number of elements at any given time.
 
-.. autoclass:: poptorch.DataLoader
-   :special-members: __init__
-   :members: terminate
+See below for usage example.
 
 poptorch.AsynchronousDataAccessor
 =================================
@@ -38,13 +41,6 @@ separate thread by specifying `mode=poptorch.DataLoaderMode.Async` in the
 the host/IPU communication overhead by using the time that the IPU is running
 to load the next batch on the CPU. This means that when the IPU is finished
 executing and returns to host the data will be ready for the IPU to pull in again.
-
-.. autoclass:: poptorch.AsynchronousDataAccessor
-   :special-members: __init__, __len__
-   :members: terminate
-
-Example
--------
 
 .. literalinclude:: device_iterations.py
   :caption: Use of AsynchronousDataAccessor
@@ -93,9 +89,6 @@ Essentially, it is the equivalent of launching the IPU in a loop over that
 number of batches. This is efficient because that loop runs on the IPU
 directly.
 
-Example
--------
-
 .. literalinclude:: device_iterations.py
   :caption: Use of device iterations and batch size
   :start-after: iterations_start
@@ -106,8 +99,8 @@ Example
 poptorch.Options.replicationFactor
 ==================================
 
-:py:meth:`~poptorch.Options.replicationFactor` will replicate the model over N
-IPUs to allow automatic data parallelism across many IPUs.
+:py:meth:`~poptorch.Options.replicationFactor` will replicate the model over
+multiple IPUs to allow automatic data parallelism across many IPUs.
 
 .. literalinclude:: device_iterations.py
   :caption: Use of replication factor
@@ -137,9 +130,6 @@ See also :py:class:`poptorch.Block`.
   :end-before: gradient_acc_end
   :emphasize-lines: 8
   :linenos:
-
-Example with parallel execution
--------------------------------
 
 In the code example below, :py:class:`poptorch.Block` introduced in
 :ref:`parallel_execution` is used to divide up
