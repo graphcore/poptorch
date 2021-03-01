@@ -7,6 +7,7 @@ PyTorch for the IPU: User Guide
 
     intro
     installation
+    pytorch_to_poptorch
     overview
     batching
     supported_ops
