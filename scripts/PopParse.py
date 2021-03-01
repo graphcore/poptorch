@@ -171,7 +171,7 @@ tu = index.parse(session_file,
 
 parse_session_options(tu.cursor)
 
-UnsupportedOps = ["abort"]
+UnsupportedOps = ["abort", "ctcloss"]
 
 ## Implicit cast support
 # Casting on all args
@@ -214,22 +214,23 @@ CastingAlwaysIntOutput = ["convinteger", "matmulinteger"]
 OutputTypeSameAsFirstInput = [
     "abs", "acos", "acos", "acosh", "asin", "asinh", "atan", "atanh",
     "averagepool", "batchnormalization", "ceil", "celu", "compress", "concat",
-    "cos", "cosh", "cumsum", "depthtospace", "det", "detach", "dropout",
-    "dynamicslice", "einsum", "elu", "erf", "exp", "expand", "expm1",
-    "flatten", "floor", "fmod", "gather", "gatherelements", "gathernd", "gelu",
-    "globalaveragepool", "globallppool", "globalmaxpool", "hardmax",
-    "hardsigmoid", "identity", "identityloss", "l1loss", "lrn", "leakyrelu",
-    "log", "log1p", "logical_not", "logsoftmax", "lpnormalization", "lppool",
-    "maxpool", "maxunpool", "meanvariancenormalization", "neg", "nllloss",
-    "nop", "pad", "printtensor", "range", "reciprocal", "reducel1", "reducel2",
-    "reducelogsum", "reducelogsumexp", "reducemax", "reducemean", "reducemin",
-    "reduceprod", "reducesum", "reducesumsquare", "relu", "remainder",
-    "replicatedallreduce", "reshape", "resize", "reversesequence", "roialign",
-    "round", "scale", "scaledadd", "scatter", "selu", "sequenceerase",
-    "shapeddropout", "shrink", "sigmoid", "sign", "sin", "sinh", "slice",
-    "softmax", "softplus", "softsign", "spacetodepth", "split", "sqrt",
-    "squeeze", "stringnormalizer", "subsample", "tan", "tanh",
-    "thresholdedrelu", "tile", "transpose", "unique", "unsqueeze", "upsample"
+    "cos", "cosh", "cumsum", "_ctcloss", "depthtospace", "det", "detach",
+    "dropout", "dynamicslice", "einsum", "elu", "erf", "exp", "expand",
+    "expm1", "flatten", "floor", "fmod", "gather", "gatherelements",
+    "gathernd", "gelu", "globalaveragepool", "globallppool", "globalmaxpool",
+    "hardmax", "hardsigmoid", "identity", "identityloss", "l1loss", "lrn",
+    "leakyrelu", "log", "log1p", "logical_not", "logsoftmax",
+    "lpnormalization", "lppool", "maxpool", "maxunpool",
+    "meanvariancenormalization", "neg", "nllloss", "nop", "pad", "printtensor",
+    "range", "reciprocal", "reducel1", "reducel2", "reducelogsum",
+    "reducelogsumexp", "reducemax", "reducemean", "reducemin", "reduceprod",
+    "reducesum", "reducesumsquare", "relu", "remainder", "replicatedallreduce",
+    "reshape", "resize", "reversesequence", "roialign", "round", "scale",
+    "scaledadd", "scatter", "selu", "sequenceerase", "shapeddropout", "shrink",
+    "sigmoid", "sign", "sin", "sinh", "slice", "softmax", "softplus",
+    "softsign", "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
+    "subsample", "tan", "tanh", "thresholdedrelu", "tile", "transpose",
+    "unique", "unsqueeze", "upsample"
 ]
 
 FirstOutputTypeSameAsFirstInputButSecondAlwaysInt = ["topk"]

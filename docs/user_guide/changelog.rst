@@ -24,6 +24,7 @@ New features
   * torch.bernoulli
   * torch.distributions.Bernoulli
 
+- Add experimental support for torch.nn.CTCLoss
 - Added Adam optimizer
 - Added support for ``torch.nn.AdaptiveAvgPool1d``, ``torch.nn.AdaptiveAvgPool3d``
 - Migrated to PyTorch version 1.7.1

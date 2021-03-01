@@ -527,6 +527,33 @@ torch::jit::Node *tripletMarginLossHandler(torch::jit::Graph *graph,
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }
+
+torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto log_probs = node->input(0);
+  auto targets = node->input(1);
+  auto input_lengths = node->input(2);
+  auto target_lengths = node->input(3);
+  auto blank = constantToInt(node->input(4)->node());
+  auto reduction = constantToLong(node->input(5)->node());
+  auto zero_inf = constantToBool(node->input(6)->node());
+
+  ERROR_ON_MSG(zero_inf, "CTCLoss with zero_infinity parameter set to true is "
+                         "currenly not supported");
+
+  ERROR_ON_MSG(reduction == 0,
+               "CTCLoss with reduction=\"none\" is currently not supported");
+
+  targets = createCast(graph, {targets}, "UINT32")->output();
+  input_lengths = createCast(graph, {input_lengths}, "UINT32")->output();
+  target_lengths = createCast(graph, {target_lengths}, "UINT32")->output();
+
+  reduction = convertReduceToPopart(reduction);
+  return create_ctcloss(graph,
+                        {log_probs, targets, input_lengths, target_lengths},
+                        reduction, blank);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -540,6 +567,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
                   multiLabelSoftMarginLossHandler);
   registerHandler(c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler);
   registerHandler(c10::aten::triplet_margin_loss, tripletMarginLossHandler);
+  registerHandler(c10::aten::ctc_loss, ctcLossHandler);
 }
 
 } // namespace poptorch

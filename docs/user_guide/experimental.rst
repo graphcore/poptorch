@@ -26,3 +26,11 @@ the total number of processes the execution is distributed across using
 
 .. warning:: All the processes must use the same seed if ``shuffle=True`` is used
   for the ``DataLoader``.
+
+torch.nn.CTCLoss
+================
+
+Support was added for the CTCLoss operator with a number of limitations:
+#. ``zero_infinity`` parameter must be set ``False``
+#. ``reduction`` parameter must be set to either ``sum`` or ``mean``
+#. ``targets`` tensor must be 2D, corresponding to stacked, padded layout 

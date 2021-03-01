@@ -628,3 +628,50 @@ def test_TripletMarginLoss_direct(p, swap, reduction):
     poptorch_out = poptorch_model(anchor, positive, negative)
 
     torch.testing.assert_allclose(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("blank", {0, 11})
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
+def test_CTCLoss(blank, reduction):
+    class Model(torch.nn.Module):
+        def __init__(self, blank, reduction):
+            super().__init__()
+            self.linear = torch.nn.Linear(C, N)
+            self.loss = torch.nn.CTCLoss(blank=blank, reduction=reduction)
+
+        def forward(self, input, target, input_lengths, target_lengths):
+            input = self.linear(input)
+            loss = self.loss(input, target, input_lengths, target_lengths)
+            return poptorch.identity_loss(loss, reduction="none")
+
+    T = 500  # Input sequence length
+    N = 16  # Batch size
+    C = 20  # Number of classes
+    S = 30  # Target sequence length
+    S_min = 10  # Minimum target length
+
+    torch.manual_seed(42)
+
+    # Initialize random batch of input vectors, for *size = (T,N,C)
+    input = torch.randn(T, N, C).log_softmax(2).detach()
+    input_lengths = torch.full(size=(N, ), fill_value=T, dtype=torch.long)
+
+    target_lengths = torch.randint(low=S_min,
+                                   high=S,
+                                   size=(N, ),
+                                   dtype=torch.long)
+
+    # Initialize random batch of targets (0..C excluding the blank class)
+    target = torch.randint(low=0, high=C - 1, size=(N, S), dtype=torch.long)
+    target[target > blank] += 1
+
+    model = Model(blank=blank, reduction=reduction)
+    poptorch_model = poptorch.trainingModel(model)
+
+    native_out = model(input, target, input_lengths, target_lengths)
+    poptorch_out = poptorch_model(input, target, input_lengths, target_lengths)
+
+    torch.testing.assert_allclose(native_out,
+                                  poptorch_out,
+                                  rtol=1e-3,
+                                  atol=1e-3)

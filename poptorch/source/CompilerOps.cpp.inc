@@ -106,6 +106,12 @@ torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vecto
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 return new_node;
 }
+torch::jit::Node* create_ctcloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,const unsigned int blank) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::_ctcloss, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
+new_node->i_(c10::Symbol::fromQualString("attr::blank"),blank);
+return new_node;
+}
 torch::jit::Node* createShapeddropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & shape,float ratio) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::shapeddropout, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::shape"),shape);

@@ -326,6 +326,7 @@ normal PyTorch operations, where they have to opt in to the gradient pass.
 * ``torch.nn.CosineEmbeddingLoss``
 * ``torch.nn.MarginRankingLoss``
 * ``torch.nn.TripletMarginLoss``
+* ``torch.nn.CTCLoss``
 
 Vision Layers
 -------------
