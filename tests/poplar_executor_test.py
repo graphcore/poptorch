@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import datetime
 import unittest.mock
 import os
+import re
 import tempfile
 import glob
 
 import pytest
 import torch
+import torch.multiprocessing as mp
 import helpers
 import poptorch
 
@@ -15,7 +18,7 @@ import poptorch
                     reason="Hardware IPU needed")
 @helpers.printCapfdOnExit
 def test_ExecutableCaching(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
 
     class Model(torch.nn.Module):
         def forward(self, x):
@@ -41,7 +44,7 @@ def test_ExecutableCaching(capfd):
                     reason="Hardware IPU needed")
 @helpers.printCapfdOnExit
 def test_ExecutableCaching_env(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
 
     class Model(torch.nn.Module):
         def forward(self, x):
@@ -245,3 +248,66 @@ def test_explicit_destroy(use_half):
     training_model.destroy()
 
     inference_model(input)
+
+
+def _compile_model_offline(cache, pid, num_processes):
+    poptorch.setLogLevel(1)  # Force debug logging
+    opts = poptorch.Options().useOfflineIpuTarget()
+    opts.enableExecutableCaching(cache)
+    opts.deviceIterations(10)
+    opts.Distributed.configureProcessId(pid, num_processes)
+
+    model = helpers.trainingModelWithLoss(torch.nn.Linear(10, 10),
+                                          options=opts,
+                                          loss=torch.nn.CrossEntropyLoss())
+
+    # 10 Batches of 10.
+    input = torch.randn(10, 10)
+    # 10 batches of 1
+    label = torch.randint(0, 10, [1])
+    label = label.expand([10])
+
+    model.compile(input, label)
+
+
+# Force-disable the IPU model
+@unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
+@helpers.printCapfdOnExit
+def test_distributed_compile(capfd):
+
+    num_processes = 6
+    with tempfile.TemporaryDirectory() as tmp:
+        cache = os.path.join(tmp, "poptorch_cache")
+
+        ctx = mp.get_context('spawn')
+        processes = [
+            ctx.Process(target=_compile_model_offline,
+                        args=(cache, pid, num_processes))
+            for pid in range(num_processes)
+        ]
+        for p in processes:
+            p.start()
+        for p in processes:
+            p.join()
+
+    def getTimestamp(line):
+        m = re.match(r"\[([\d:.]+)\]", line)
+        return datetime.datetime.strptime(m.group(1), "%H:%M:%S.%f")
+
+    log = helpers.LogChecker(capfd).createIterator()
+    includes_compilation = True
+    for p in processes:
+        start = getTimestamp(log.findNext("cache file locked"))
+        end = getTimestamp(log.findNext("released the cache lock"))
+
+        if includes_compilation:
+            assert end - start > datetime.timedelta(seconds=1), (
+                "Expected the"
+                " first process model compilation to take more than 1 "
+                f"second but it took {end - start}")
+        else:
+            assert end - start < datetime.timedelta(seconds=1), (
+                "Expected "
+                "processes to load the executable from the cache in under"
+                f" 1 second but it took {end - start}")
+        includes_compilation = False

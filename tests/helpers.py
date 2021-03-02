@@ -92,11 +92,36 @@ def printCapfdOnExit(func):
     return wrapper
 
 
+class LogIterator:
+    def __init__(self, lines):
+        self._lines = lines
+        self._current = 0
+        self._num_lines = len(lines)
+        self._all_checks = []
+
+    def findNext(self, *exprs):
+        """Find the next line in the log matching all the regular expressions provided"""
+        self._all_checks.append(exprs)
+        while True:
+            assert self._current < self._num_lines, (
+                "\n".join(self._lines) +
+                "\n The log above doesn't contain lines matching all "
+                "these expressions:\n  " +
+                "\n  ".join(str(e) for e in self._all_checks))
+            line = self._lines[self._current]
+            self._current += 1
+            if all([re.search(e, line) for e in exprs]):
+                return line
+
+
 class LogChecker:
     def __init__(self, capfd):
         out, err = capfd.readouterr()
         self._log = out + err
         self._lines = self._log.split('\n')
+
+    def createIterator(self):
+        return LogIterator(self._lines)
 
     def assert_contains(self, *strings):
         """Assert there is a line in the log matching all the strings provided
