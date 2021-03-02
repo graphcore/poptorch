@@ -1,8 +1,11 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+from contextlib import contextmanager
 import copy
 import ctypes
 import enum
+import fcntl
+import hashlib
 import io
 import numbers
 import os
@@ -680,6 +683,66 @@ def parsePoptorchData(filename, expected_version):
         return data, f.tell()
 
 
+@contextmanager
+def distributedCacheLock(model, opts):
+    """In a distributed environment we only want the model to be compiled once.
+
+    If there is only one process or if the cache is not enabled:
+        no need for a lock, early return.
+    Otherwise:
+        The first process to reach the lock takes it and compiles the model.
+            The model will be added to the Popart cache.
+        After the first process releases the lock the other ones will grab it
+            one at the time and compile the model too (Except that they will
+            now all hit the cache).
+        The last process to grab / release the lock will delete the file.
+        (Each process append a character to the file, so the position in
+        the file when acquiring the lock indicates how many processes have
+        already successfully compiled the model).
+    """
+    filename = None
+    if opts.Distributed.numProcesses > 1:
+        cache = opts._popart.options.get("cachePath", "")  # pylint: disable=protected-access
+        if not cache:
+            logger.warning(
+                "Use poptorch.Options.enableExecutableCaching() to avoid "
+                "compiling the model once per process")
+        else:
+            os.makedirs(cache, exist_ok=True)
+            assert os.access(cache, os.W_OK), (f"Cache folder {cache}"
+                                               " is not writable")
+            filename = os.path.join(
+                cache, "%s.lock" %
+                hashlib.md5(repr(model).encode("utf-8")).hexdigest())
+
+    # Not distributed mode or the cache is not enabled: just compile.
+    if not filename:
+        yield
+        return
+
+    delete_file = False
+    try:
+        with open(filename, "a+") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                # Add a character to the file
+                f.write("0")
+                logger.debug(
+                    "Executable cache file locked by process %s (pos %d/%d)",
+                    opts.Distributed.processId, f.tell(),
+                    opts.Distributed.numProcesses)
+                delete_file = f.tell() == opts.Distributed.numProcesses
+                # Only the first process should compile
+                yield
+            finally:
+                logger.debug("Process %s released the cache lock",
+                             opts.Distributed.processId)
+                fcntl.flock(f, fcntl.LOCK_UN)
+    finally:
+        if delete_file:
+            os.remove(filename)
+
+
 class PoplarExecutor:
     """ This class should not be created directly but is a wrapper around
     the model that was passed into `inferenceModel` or `trainingModel`.
@@ -855,7 +918,8 @@ class PoplarExecutor:
         self._new_optimizer = _convertOptimizerToDict(optimizer)
 
     def _compile(self, in_tensors):
-        with self._profiling.tracepoint("modelCompilation"):
+        with self._profiling.tracepoint("modelCompilation"), \
+            distributedCacheLock(self._model, self._options):
             in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
                     self._preprocessGraph(
                         in_tensors)
@@ -892,8 +956,6 @@ class PoplarExecutor:
             if self._is_attached:
                 # Upload the weights to the IPU
                 self.copyWeightsToDevice()
-
-            return in_tensors
 
     def _preprocessGraph(self, in_tensors):
         with self._profiling.tracepoint("graphPreprocessing"):
