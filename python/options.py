@@ -1120,6 +1120,18 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(random_seed=random_seed)
         return self
 
+    def enableStableNorm(self, enabled):
+        """Set whether a stable version of norm operators is used.
+        This stable version is slower, but more accurate than its
+        unstable counterpart.
+
+        :param bool enabled:
+            * True: Use stable norm calculation.
+            * False: Do not use stable norm calculation.
+        """
+        self._Popart.set("enableStableNorm", enabled)
+        return self
+
     def toDict(self):
         """ Merge all the options, except for the Jit and Precision
         options, into a single dictionary to be serialised and passed to the C++
