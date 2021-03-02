@@ -43,10 +43,11 @@ class _PrecisionOptions(_options_impl.OptionsDict):
           poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
     """
 
-    def __init__(self):
+    def __init__(self, popart_options):
         super().__init__(half_float_casting=enums.HalfFloatCastingBehavior.
                          FloatDowncastToHalf,
                          running_variance_always_float=True)
+        self._popart_options = popart_options
 
     def halfFloatCasting(self, half_float_casting):
         """ Changes the casting behavior for ops involving a float16 (half) and
@@ -89,6 +90,22 @@ class _PrecisionOptions(_options_impl.OptionsDict):
                 "runningVarianceAlwaysFloat needs to be set to a bool")
 
         self.set(running_variance_always_float=value)
+        return self
+
+    def enableStochasticRounding(self, enabled):
+        """Set whether stochastic rounding is enabled on the IPU. This
+        may give better performance when using half precision, by
+        using nondeterminism to simulate higher precision behaviour.
+        Note that using this option will cause divergence from deterministic
+        standard IEEE FP16 behaviour.
+        In the general case, we recommend enabling stochastic rounding for
+        training.
+
+        :param bool enabled:
+            * True: Use stochastic rounding on the IPU.
+            * False: Do not use stochastic rounding.
+        """
+        self._popart_options.set("enableStochasticRounding", enabled)
         return self
 
 
@@ -837,9 +854,9 @@ class Options(_options_impl.OptionsDict):
 
     def __init__(self):
         self._jit = _JitOptions()
-        self._graphProcessing = _PrecisionOptions()
-        self._training = _TrainingOptions()
         self._popart = _PopartOptions()
+        self._graphProcessing = _PrecisionOptions(self._popart)
+        self._training = _TrainingOptions()
         self._distributed = _DistributedOptions()
         self._tensor_locations = _TensorLocationOptions()
         self._execution_strategy = PipelinedExecution()
