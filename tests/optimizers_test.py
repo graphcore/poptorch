@@ -646,3 +646,42 @@ def test_gradient_accum(reduction):
 
     # Check we have trained the "model"
     assert loss < 0.03
+
+
+@pytest.mark.parametrize(
+    "reduction", (poptorch.ReductionType.Sum, poptorch.ReductionType.Mean))
+def test_gradient_accum_new_api(reduction):
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            layers = [torch.nn.Linear(10, 10) for _ in range(3)]
+
+            self.model = torch.nn.Sequential(*layers)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, x, target):
+            fwd = self.model(x)
+            return fwd, self.loss(fwd, target)
+
+    accum = 20
+
+    opts = poptorch.Options()
+    opts.Training.gradientAccumulation(accum)
+    opts.Training.accumulationAndReplicationReductionType(reduction)
+
+    model = Model()
+
+    poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    ins = torch.randn([1, 10]).expand(accum, 10)
+    target = torch.randint(0, 10, size=[1]).expand(accum)
+
+    _, loss = poptorch_model(ins, target)
+
+    for _ in range(0, 500):
+        _, loss = poptorch_model(ins, target)
+
+    # Check we have trained the "model"
+    assert loss < 0.03

@@ -105,8 +105,9 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
     def __init__(self):
         super().__init__(gradient_accumulation=1,
+                         accumulation_reduction_type=enums.ReductionType.Mean,
                          accumulation_and_replication_reduction_type=enums.
-                         ReductionType.Mean)
+                         ReductionType.NoReduction)
 
     def gradientAccumulation(self, gradient_accumulation):
         """Number of samples to accumulate for the gradient calculation.
@@ -131,7 +132,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
                              "poptorch.ReductionType.Mean or "
                              "poptorch.ReductionType.Sum")
 
-    def accumulationReductionType(self, reduction_type):
+    def accumulationAndReplicationReductionType(self, reduction_type):
         """The type of reduction applied to reductions in the graph.
 
         This governs both the accumulation of the loss gradient in replicated
@@ -142,11 +143,32 @@ class _TrainingOptions(_options_impl.OptionsDict):
             * Mean: Reduce gradients by calculating the mean of them.
             * Sum: Reduce gradients by calculating the sum of them.
         """
-        self._check_reduction_arg(reduction_type, "accumulationReductionType")
+        self._check_reduction_arg(reduction_type,
+                                  "accumulationAndReplicationReductionType")
 
         self.set(accumulation_and_replication_reduction_type=reduction_type)
-        self._warnings_disabled.add("accumulationReductionType")
+        self._warnings_disabled.add(
+            "accumulation_and_replication_reduction_type")
         return self
+
+    def accumulationReductionType(self, reduction_type):
+        """The type of reduction (sum or mean) applied to accumulated gradients.
+
+            When using a non-unity value for gradientAccumulation, you can
+            specify whether to reduce the gradients by sum or mean (default).
+            When using mean reduction, changing the gradientAccumulation will
+            not change the training curve of the model (barring numerical error
+            and changes due to the different compute batch size e.g. batch
+            normalization).
+
+            :param poptorch.ReductionType accumulation_reduction_type:
+                * Mean: Reduce gradients by calculating the mean of them.
+                * Sum: Reduce gradients by calculating the sum of them.
+            """
+        self._check_reduction_arg(reduction_type, "accumulationReductionType")
+
+        self.set(accumulation_reduction_type=reduction_type)
+        self._warnings_disabled.add("accumulation_reduction_type")
 
 
 class _PopartOptions:
