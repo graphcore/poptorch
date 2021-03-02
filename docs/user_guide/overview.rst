@@ -17,8 +17,6 @@ Broadly speaking, the functionality provided can be broken down in the following
    (see :class:`poptorch.options._DistributedOptions`)
 #. Location of tensors (see: :class:`poptorch.options._TensorLocationOptions` and
    :class:`poptorch.TensorLocationSettings`)
-#. Finetuning of PopART backend
-   (see :class:`poptorch.options._PopartOptions`)
 #. Options relevant to the Torch JIT compiler
    (see :class:`poptorch.options._JitOptions`)
 

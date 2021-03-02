@@ -17,9 +17,6 @@ Options
 .. autoclass:: poptorch.options._JitOptions
    :members:
 
-.. autoclass:: poptorch.options._PopartOptions
-   :members:
-
 .. autoclass:: poptorch.options._TensorLocationOptions
    :members:
 
