@@ -343,7 +343,7 @@ Float 16 operations
 Due to the limitation of PyTorch's float 16 support on the CPU (used for tracing the model), certain operations may result in the use of float 32 where float 16 would be expected, or float 16 where float 32 would be expected.
 This is because the model must always be traced with float 16 inputs converted to float 32.
 
-This limitation is much less noticeable when ``opts.GraphProcessing.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` has not been set because PopTorch's default casting functionality is to output a float 16 if any input of the op is float 16.
+This limitation is much less noticeable when ``opts.Precision.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` has not been set because PopTorch's default casting functionality is to output a float 16 if any input of the op is float 16.
 In such situations, any dtype which incorrectly resolves to a float 16 would have been cast to a float 16 in any case.
 
 Casting
@@ -415,7 +415,7 @@ The following operators are affected:
 * ``torch.nn.BatchNorm2d``
 * ``torch.nn.BatchNorm3d``
 
-The type of running variance computations may be controlled via ``opts.GraphProcessing.runningVarianceAlwaysFloat(bool)``. For example, in the script below, variance computations will be performed in half precision:
+The type of running variance computations may be controlled via ``opts.Precision.runningVarianceAlwaysFloat(bool)``. For example, in the script below, variance computations will be performed in half precision:
 
 .. literalinclude:: running_variance_half.py
     :language: python

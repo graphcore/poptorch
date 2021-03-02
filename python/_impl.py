@@ -1020,8 +1020,7 @@ class PoplarExecutor:
 
             in_tensors_trace_view.forEach(possiblyConvertFromHalf)
 
-            poptorch_core.processGraphProcessingOptions(
-                self._options.GraphProcessing)
+            poptorch_core.processPrecisionOptions(self._options.Precision)
 
         return in_tensors_trace_view, has_converted_any_half, narrowTensor
 

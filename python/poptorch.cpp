@@ -722,7 +722,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-void processGraphProcessingOptions(py::handle h) {
+void processPrecisionOptions(py::handle h) {
   auto values_dict = h.attr("_values").cast<py::dict>();
 
   poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
@@ -935,8 +935,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
              std::shared_ptr<poptorch::PoplarExecutable>>
       give_me_a_name(m, "InternalPoplarExecutable");
 
-  m.def("processGraphProcessingOptions",
-        poptorch::processGraphProcessingOptions);
+  m.def("processPrecisionOptions", poptorch::processPrecisionOptions);
   m.def("compileWithTrace", poptorch::compileWithTrace);
   m.def("compileWithTraceAndExport", poptorch::compileWithTraceAndExport);
   m.def("processTraceAndImportExecutable",

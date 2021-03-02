@@ -24,7 +24,7 @@ assert native_model(float16_tensor).dtype == torch.float32
 assert native_model(float32_tensor).dtype == torch.float32
 
 opts = poptorch.Options()
-opts.GraphProcessing.halfFloatCasting(
+opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
 # The poptorch model will resolve to the type of x
@@ -51,7 +51,7 @@ float16_tensor = torch.tensor([1.0], dtype=torch.float16)
 float32_tensor = torch.tensor([1.0], dtype=torch.float32)
 
 opts = poptorch.Options()
-opts.GraphProcessing.halfFloatCasting(
+opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
 # The native model always yields a float32 tensor
@@ -89,7 +89,7 @@ assert native_model(float16_tensor).dtype == torch.float32
 assert native_model(float32_tensor).dtype == torch.float32
 
 opts = poptorch.Options()
-opts.GraphProcessing.halfFloatCasting(
+opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
 # The poptorch model will resolve to the type of x

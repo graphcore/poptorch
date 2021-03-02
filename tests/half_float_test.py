@@ -29,12 +29,12 @@ def type_out_harness(inputs, forward_op,
     model = Model()
     opts = poptorch.Options()
 
-    opts.GraphProcessing.halfFloatCasting(
+    opts.Precision.halfFloatCasting(
         poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)
     assert_same_type(inputs, model, opts,
                      expect_same_type_float_downcast_to_half)
 
-    opts.GraphProcessing.halfFloatCasting(
+    opts.Precision.halfFloatCasting(
         poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
     assert_same_type(inputs, model, opts, expect_same_type_like_poptorch)
 

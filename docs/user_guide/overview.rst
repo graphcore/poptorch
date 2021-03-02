@@ -11,7 +11,7 @@ Options
 The compilation and execution on the IPU can be controlled using :class:`poptorch.Options`.
 Broadly speaking, the functionality provided can be broken down in the following:
 
-#. Computational graph processing (see :class:`poptorch.options._GraphProcessingOptions`)
+#. Options related to half precision (see :class:`poptorch.options._PrecisionOptions`)
 #. Management of the training process (see :class:`poptorch.options._TrainingOptions`)
 #. Control of distributed execution environments
    (see :class:`poptorch.options._DistributedOptions`)
@@ -747,7 +747,7 @@ You can use your models in one of the following ways:
 
 .. note::  When PyTorch encounters a mix of float 16 and float 32 inputs for a given operation, it will usually cast all inputs and float 32.
     PopTorch differs and will cast all inputs to float 16.
-    This makes it easier to build models with float 32 weights which take float 16 tensors. However, if you wish to follow PyTorch behavior, you can use  ``opts.GraphProcessing.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` where ``opts`` is the ``poptorch.Options`` object passed to the model wrapping function.
+    This makes it easier to build models with float 32 weights which take float 16 tensors. However, if you wish to follow PyTorch behavior, you can use  ``opts.Precision.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` where ``opts`` is the ``poptorch.Options`` object passed to the model wrapping function.
 
 .. literalinclude:: inferenceModel.py
     :language: python

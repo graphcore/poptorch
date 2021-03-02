@@ -11,7 +11,7 @@ Options
 .. autoclass:: poptorch.options._DistributedOptions
    :members:
 
-.. autoclass:: poptorch.options._GraphProcessingOptions
+.. autoclass:: poptorch.options._PrecisionOptions
    :members:
 
 .. autoclass:: poptorch.options._JitOptions

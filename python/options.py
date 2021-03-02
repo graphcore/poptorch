@@ -32,14 +32,14 @@ class _JitOptions(_options_impl.OptionsDict):
         return self
 
 
-class _GraphProcessingOptions(_options_impl.OptionsDict):
+class _PrecisionOptions(_options_impl.OptionsDict):
     """ Options related to processing the Pytorch JIT graph prior to lowering to
         Popart
 
     Can be accessed via `poptorch.Options`:
 
     >>> opts = poptorch.Options()
-    >>> opts.GraphProcessing.halfFloatCasting(
+    >>> opts.Precision.halfFloatCasting(
           poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
     """
 
@@ -837,7 +837,7 @@ class Options(_options_impl.OptionsDict):
 
     def __init__(self):
         self._jit = _JitOptions()
-        self._graphProcessing = _GraphProcessingOptions()
+        self._graphProcessing = _PrecisionOptions()
         self._training = _TrainingOptions()
         self._popart = _PopartOptions()
         self._distributed = _DistributedOptions()
@@ -882,11 +882,11 @@ class Options(_options_impl.OptionsDict):
         return self._jit
 
     @property
-    def GraphProcessing(self):
+    def Precision(self):
         """Options specific to the processing of the JIT graph prior to
            lowering to Popart.
 
-        .. seealso:: :py:class:`poptorch.options._GraphProcessingOptions`"""
+        .. seealso:: :py:class:`poptorch.options._PrecisionOptions`"""
         return self._graphProcessing
 
     @property
@@ -1121,7 +1121,7 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def toDict(self):
-        """ Merge all the options, except for the Jit and Graph Processing
+        """ Merge all the options, except for the Jit and Precision
         options, into a single dictionary to be serialised and passed to the C++
         backend.
 

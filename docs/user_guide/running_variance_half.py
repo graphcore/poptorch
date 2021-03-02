@@ -10,6 +10,6 @@ model.add_module('bn', torch.nn.BatchNorm1d(16))
 model.float()
 
 opts = poptorch.Options()
-opts.GraphProcessing.runningVarianceAlwaysFloat(False)
+opts.Precision.runningVarianceAlwaysFloat(False)
 poptorch_model = poptorch.inferenceModel(model, opts)
 # half_var_end

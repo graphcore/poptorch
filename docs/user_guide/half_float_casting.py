@@ -55,7 +55,7 @@ assert native_model(float16_tensor, float16_tensor).dtype == torch.float32
 assert native_model(float32_tensor, float16_tensor).dtype == torch.float32
 
 opts = poptorch.Options()
-opts.GraphProcessing.halfFloatCasting(
+opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
 # This incorrectly results in a float 16 tensor

@@ -238,7 +238,7 @@ def test_running_variance(capfd, dtype, setting):
     poptorch.setLogLevel(0)
     opts = poptorch.Options()
     if setting is not None:
-        opts.GraphProcessing.runningVarianceAlwaysFloat(setting)
+        opts.Precision.runningVarianceAlwaysFloat(setting)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x)
 

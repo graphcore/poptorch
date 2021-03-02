@@ -38,7 +38,7 @@ def test_half_float_downcast_option():
 
     model = SimpleAdder()
     opts = poptorch.Options()
-    opts.GraphProcessing.halfFloatCasting(
+    opts.Precision.halfFloatCasting(
         poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)
     inference_model = poptorch.inferenceModel(model, opts)
 
@@ -63,7 +63,7 @@ def test_half_float_upcast_option():
 
     model = SimpleAdder()
     opts = poptorch.Options()
-    opts.GraphProcessing.halfFloatCasting(
+    opts.Precision.halfFloatCasting(
         poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
     inference_model = poptorch.inferenceModel(model, opts)
 
