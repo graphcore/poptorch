@@ -805,7 +805,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   string_options["logDir"] = [&](const std::string &log_dir) {
     UNUSED(log_dir);
     logging::warn(
-        "Ignoring call to poptorch.Options.Popart.set(\"logDir\",...): use "
+        "Ignoring call to poptorch.Options._Popart.set(\"logDir\",...): use "
         "poptorch.Options.logDir() instead");
   };
 

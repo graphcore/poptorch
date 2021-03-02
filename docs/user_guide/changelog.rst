@@ -46,6 +46,7 @@ New features
 - Changed default targetd Ipu version for the model and offline compilation to `2`.
 - Changed ``accumulationReductionType(reduction)`` option to now apply to replication reduction as well
 - Add environment variable ``POPTORCH_CACHE_DIR``
+- Deprecated ``Options.Popart``, ``Options._Popart`` may be used experimentally.
 
 v1.0 (Poplar SDK 1.4)
 =====================

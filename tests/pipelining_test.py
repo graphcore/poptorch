@@ -58,17 +58,18 @@ def test_api_inline(capfd):
 
 
 def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted):
+    # pylint: disable=protected-access
     poptorch.setLogLevel(1)  # Force debug logging
 
     dev_its = 6
 
     opts = poptorch.Options()
     opts.deviceIterations(dev_its)
-    opts.Popart.set("autoRecomputation", 3)  # All forward pipeline stages.
+    opts._Popart.set("autoRecomputation", 3)  # All forward pipeline stages.
 
     m = poptorch.trainingModel(model_cls(False), opts)
     m.compile(torch.randn(dev_its, size, 1), torch.randn(dev_its, size, 1))
-    ir = json.loads(m._debugGetPopartIR())  # pylint: disable=protected-access
+    ir = json.loads(m._debugGetPopartIR())
     assert not any(["Checkpoint" in node["name"] for node in ir["maingraph"]
                     ]), ("Popart IR shouldn't contain any checkpoint")
     assert sum(["Stash" in node["type"] for node in ir["maingraph"]

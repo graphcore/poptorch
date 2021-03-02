@@ -50,6 +50,7 @@ def test_set_options():
 
 
 def test_set_popart_options():
+    # pylint: disable=protected-access
     class Network(nn.Module):
         def forward(self, x, y):
             return x + y
@@ -57,29 +58,29 @@ def test_set_popart_options():
     # Create our model.
     model = Network()
     opts = poptorch.Options()
-    opts.Popart.set("hardwareInstrumentations", set([0, 1]))
-    opts.Popart.set("dotChecks", [0, 1])
-    opts.Popart.set("engineOptions", {
+    opts._Popart.set("hardwareInstrumentations", set([0, 1]))
+    opts._Popart.set("dotChecks", [0, 1])
+    opts._Popart.set("engineOptions", {
         "debug.allowOutOfMemory": "true",
         "exchange.streamBufferOverlap": "any"
     })
-    opts.Popart.set("customCodelets", [])
-    opts.Popart.set("autoRecomputation", 1)
-    opts.Popart.set("enableOutlining", True)
-    opts.Popart.set("batchSerializationSettings.factor", 1)
-    opts.Popart.set("batchSerializationSettings.concatOnVirtualGraphChange",
-                    True)
-    opts.Popart.set("batchSerializationSettings.concatOnExecutionPhaseChange",
-                    True)
-    opts.Popart.set("batchSerializationSettings.concatOnPipelineStageChange",
-                    True)
-    opts.Popart.set("batchSerializationSettings.transformContext", 0)
-    opts.Popart.set("batchSerializationSettings.method", 0)
-    opts.Popart.set("batchSerializationSettings.batchSchedule", 1)
+    opts._Popart.set("customCodelets", [])
+    opts._Popart.set("autoRecomputation", 1)
+    opts._Popart.set("enableOutlining", True)
+    opts._Popart.set("batchSerializationSettings.factor", 1)
+    opts._Popart.set("batchSerializationSettings.concatOnVirtualGraphChange",
+                     True)
+    opts._Popart.set("batchSerializationSettings.concatOnExecutionPhaseChange",
+                     True)
+    opts._Popart.set("batchSerializationSettings.concatOnPipelineStageChange",
+                     True)
+    opts._Popart.set("batchSerializationSettings.transformContext", 0)
+    opts._Popart.set("batchSerializationSettings.method", 0)
+    opts._Popart.set("batchSerializationSettings.batchSchedule", 1)
 
-    opts.Popart.set("accumulateOuterFragmentSettings.schedule", 1)
-    opts.Popart.set("accumulateOuterFragmentSettings.excludedVirtualGraphs",
-                    ["0", "1"])
+    opts._Popart.set("accumulateOuterFragmentSettings.schedule", 1)
+    opts._Popart.set("accumulateOuterFragmentSettings.excludedVirtualGraphs",
+                     ["0", "1"])
 
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
@@ -89,6 +90,7 @@ def test_set_popart_options():
 
 
 def test_popart_patterns():
+    # pylint: disable=protected-access
     class Network(nn.Module):
         def forward(self, x, y):
             return x + y
@@ -97,7 +99,7 @@ def test_popart_patterns():
     model = Network()
     opts = poptorch.Options()
     patterns = {"PadSum": True}
-    opts.Popart.setPatterns(patterns, 0)
+    opts._Popart.setPatterns(patterns, 0)
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
     y = torch.zeros(2)
@@ -109,6 +111,7 @@ def test_popart_patterns():
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("ptype", [torch.half, torch.float])
 def test_popart_partials(capfd, dtype, ptype):
+    # pylint: disable=protected-access
     torch.manual_seed(42)
     x = torch.randn((1, 16, 16), dtype=dtype)
 
@@ -118,7 +121,7 @@ def test_popart_partials(capfd, dtype, ptype):
 
     poptorch.setLogLevel(0)
     opts = poptorch.Options()
-    opts.Popart.setPartialsType(ptype)
+    opts._Popart.setPartialsType(ptype)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x)
 

@@ -5,6 +5,7 @@ from . import enums
 from ._logging import logger
 from . import _options_impl
 from . import ops
+from ._utils import deprecated
 
 
 class _JitOptions(_options_impl.OptionsDict):
@@ -157,11 +158,11 @@ class _PopartOptions:
     .. note:: there is no mapping for the various PopART enums so integers need
     to be used instead.
 
-    Can be accessed via :py:attr:`poptorch.Options.Popart`:
+    Can be accessed via :py:attr:`poptorch.Options._Popart`:
 
     >>> opts = poptorch.Options()
-    >>> opts.Popart.set("autoRecomputation", 3) # RecomputationType::Pipeline
-    >>> opts.Popart.set("syntheticDataMode",
+    >>> opts._Popart.set("autoRecomputation", 3) # RecomputationType::Pipeline
+    >>> opts._Popart.set("syntheticDataMode",
     >>>                  int(popart.SyntheticDataMode.RandomNormal))
     """
 
@@ -874,11 +875,16 @@ class Options(_options_impl.OptionsDict):
         return self._training
 
     @property
+    @deprecated('2.0', 'Use Options._Popart instead for experimental use only')
     def Popart(self):
-        """Options specific to the PopART backend.
-        (Advanced users only).
+        """(Deprecated) Options specific to the PopART backend.
+        (Advanced users only)."""
+        return self._popart
 
-        .. seealso:: :py:class:`poptorch.options._PopartOptions`"""
+    @property
+    def _Popart(self):
+        """Options specific to the PopART backend.
+        (Advanced users only)."""
         return self._popart
 
     def autoRoundNumIPUs(self, auto_round_num_ipus):
@@ -961,10 +967,10 @@ class Options(_options_impl.OptionsDict):
         Otherwise use ``path`` as a cache to save / load Poplar executables.
         """
         if path is None:
-            self.Popart.set("enableEngineCaching", False)
+            self._Popart.set("enableEngineCaching", False)
         else:
-            self.Popart.set("cachePath", path)
-            self.Popart.set("enableEngineCaching", True)
+            self._Popart.set("cachePath", path)
+            self._Popart.set("enableEngineCaching", True)
         return self
 
     def useIpuModel(self, use_model):

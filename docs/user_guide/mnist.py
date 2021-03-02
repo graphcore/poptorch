@@ -196,12 +196,6 @@ if __name__ == '__main__':
         model_opts.TensorLocations.setOptimizerLocation(
             poptorch.TensorLocationSettings().useOnChipStorage(False))
 
-    if opts.profile:
-        model_opts.Popart.set("engineOptions", {
-            "autoReport.all": "true",
-            "autoReport.directory": opts.profile
-        })
-
     training_model = poptorch.trainingModel(
         model_with_loss,
         model_opts,
