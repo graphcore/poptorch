@@ -9,13 +9,18 @@
 
 namespace logging {
 
+// Remove everything before the last occurrence of "/poptorch/" in a string
+// For example given an absolute path like:
+// /a/b/c/poptorch/d/e/f.cpp -> poptorch/d/e/f.cpp
+const char *shortPoptorchFilename(const char *filename);
+
 #define UNUSED(var) (void)(var)
 
 #define ERROR(msg)                                                             \
   do {                                                                         \
     std::stringstream __error_msg;                                             \
-    __error_msg << "ERROR in " << __FILE__ << ":" << __LINE__ << ": "          \
-                << msg; /* NOLINT */                                           \
+    __error_msg << "ERROR in " << logging::shortPoptorchFilename(__FILE__)     \
+                << ":" << __LINE__ << ": " << msg; /* NOLINT */                \
     if (!logging::LogContext::isEmpty()) {                                     \
       __error_msg << " Context:" << logging::LogContext::context();            \
       logging::LogContext::resetContext();                                     \

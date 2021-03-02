@@ -4,6 +4,14 @@
 
 namespace logging {
 
+const char *shortPoptorchFilename(const char *filename) {
+  auto pos = std::string(filename).rfind("/poptorch/");
+  if (pos == std::string::npos) {
+    return filename;
+  }
+  return filename + pos + 1; // NOLINT
+}
+
 std::string &getContext() {
   static std::string log_context;
   return log_context;
