@@ -412,6 +412,9 @@ public:
   // Keep track of what the maximum phase number used is.
   std::int64_t max_phase{0};
 
+  // Number of ipus used (set by createDevice())
+  std::uint64_t num_ipus{0};
+
   std::unordered_set<std::uint64_t> used_ipus;
 
   // Map of the pytorch variable update group to the popart weight.
@@ -596,6 +599,7 @@ void WeightsIO::updateData(const std::vector<void *> &host_buffers) {
 }
 
 std::string CompilerImpl::checkSystemConfig() const {
+  ERROR_ON_MSG(num_ipus == 0, "Must call createDevice() first");
   auto dm = popart::DeviceManager::createDeviceManager();
   if (dm.enumerateDevices().empty()) {
     return "\nNo IPU detected in the system: are you sure the gc-driver is "
@@ -604,8 +608,6 @@ std::string CompilerImpl::checkSystemConfig() const {
   if (options_set.count("ipu_id")) {
     return "";
   }
-  std::uint64_t num_ipus =
-      used_ipus.size() * popart_options.replicatedGraphCount;
   if (dm.enumerateDevices(options.sync_pattern, num_ipus).empty()) {
     std::stringstream ss;
     ss << "\nNo device found on the system with " << num_ipus
@@ -1055,8 +1057,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
   ERROR_ON_MSG(_device, "device already created");
   updateUseModelConfig();
 
-  std::uint64_t num_ipus =
-      used_ipus.size() * popart_options.replicatedGraphCount;
+  num_ipus = used_ipus.size() * popart_options.replicatedGraphCount;
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
                               "operations have been optimised out)");
   if (options.ipu_model) {
