@@ -121,7 +121,7 @@ def test_popart_partials(capfd, dtype, ptype):
 
     poptorch.setLogLevel(0)
     opts = poptorch.Options()
-    opts._Popart.setPartialsType(ptype)
+    opts.Precision.setPartialsType(ptype)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x)
 
