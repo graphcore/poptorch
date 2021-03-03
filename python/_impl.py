@@ -917,7 +917,7 @@ class PoplarExecutor:
         """
         self._new_optimizer = _convertOptimizerToDict(optimizer)
 
-    def _distributedPrecompile(self, in_tensors):
+    def _distributedPrecompile(self, trace_args):
         """TODO(T35376): On POD we want to separate compilation from device
         initialisation because we want only one process to compile the model,
         but all the processes must initialise their device at the same time
@@ -936,12 +936,6 @@ class PoplarExecutor:
             # Only the first process should compile
             if not should_compile:
                 return
-            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
-                    self._preprocessGraph(
-                        in_tensors)
-            trace_args = self._trace_model_and_get_compile_args(
-                in_tensors, in_tensors_trace_view, has_converted_any_half,
-                narrow_tensor_fn)
             cache = self._options._popart.options["cachePath"]  # pylint: disable=protected-access
             with self._profiling.tracepoint("compileAndExport"),\
                     tempfile.NamedTemporaryFile(dir=cache) as f:
@@ -958,6 +952,10 @@ class PoplarExecutor:
                 trace_args = self._trace_model_and_get_compile_args(
                     in_tensors, in_tensors_trace_view, has_converted_any_half,
                     narrow_tensor_fn)
+                # TODO(T35376): In order to separate model compilation from engine loading
+                # on distributed systems
+                if self._options.Distributed.numProcesses > 1:
+                    self._distributedPrecompile(trace_args)
                 self._executable = poptorch_core.compileWithTrace(*trace_args)
             else:
                 logger.info('Compiling the model using scripting')
@@ -1070,10 +1068,6 @@ class PoplarExecutor:
                 "Call to compile() ignored: the executable is already compiled"
             )
         else:
-            # TODO(T35376): In order to separate model compilation from engine loading
-            # on distributed systems
-            if self._options.Distributed.numProcesses > 1:
-                self._distributedPrecompile(in_tensors)
             self._compile(in_tensors)
 
     def loadExecutable(self, filename):
@@ -1164,10 +1158,6 @@ class PoplarExecutor:
             " model(inputs)")
         in_tensors = self._args_parser(args, kwargs)
         if self._executable is None:
-            # TODO(T35376): In order to separate model compilation from engine loading
-            # on distributed systems
-            if self._options.Distributed.numProcesses > 1:
-                self._distributedPrecompile(in_tensors)
             self._compile(in_tensors)
         if not self._is_attached:
             self.attachToDevice()
