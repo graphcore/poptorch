@@ -1,6 +1,10 @@
+.. _reference:
+
 =========
 Reference
 =========
+
+.. _options:
 
 Options
 =======
