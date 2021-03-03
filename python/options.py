@@ -1151,6 +1151,24 @@ class Options(_options_impl.OptionsDict):
         self._Popart.set("enableStableNorm", enabled)
         return self
 
+    def enableSyntheticData(self, enabled):
+        """Set whether host I/O is disabled and synthetic data
+        is generated on the IPU instead. This can be used to benchmark
+        models whilst simulating perfect I/O conditions.
+
+        :param bool enabled:
+            * True: Use data generated from a random normal distribution
+                    on the IPU. Host I/O is disabled.
+            * False: Host I/O is enabled and real data is used.
+        """
+        # popart.SyntheticDataMode
+        #   0 = Off
+        #   1 = Zeros
+        #   2 = RandomNormal
+        mode = 2 if enabled else 0
+        self._Popart.set("syntheticDataMode", mode)
+        return self
+
     def toDict(self):
         """ Merge all the options, except for the Jit and Precision
         options, into a single dictionary to be serialised and passed to the C++

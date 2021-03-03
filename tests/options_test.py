@@ -2,6 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import unittest.mock
 
+import tempfile
 import torch
 import torch.nn as nn
 import pytest
@@ -39,8 +40,10 @@ def test_set_options():
     model = Network()
     opts = poptorch.Options()
     # Just set a bunch of options and check they're successfully parsed.
-    opts.deviceIterations(1).setExecutionStrategy(
-        poptorch.PipelinedExecution()).replicationFactor(1).logDir("/tmp")
+    with tempfile.TemporaryDirectory() as tmp:
+        opts.deviceIterations(1).setExecutionStrategy(
+            poptorch.PipelinedExecution()).replicationFactor(1).logDir(
+                tmp).enableSyntheticData(True)
     inference_model = poptorch.inferenceModel(model, opts)
 
     x = torch.ones(2)
