@@ -8,9 +8,11 @@ Features
 Options
 =======
 
-The compilation and execution on the IPU can be controlled using :class:`poptorch.Options`.
-Broadly speaking, the functionality provided can be broken down in the following:
+You can change how PopTorch compiles and executes models using :class:`poptorch.Options`.
+You can find a full list of options in the :ref:`options` section of the :ref:`reference` chapter.
+Broadly speaking, the options fall into the following catagories:
 
+#. General options (See :class:`poptorch.Options`)
 #. Options related to half precision (see :class:`poptorch.options._PrecisionOptions`)
 #. Management of the training process (see :class:`poptorch.options._TrainingOptions`)
 #. Control of distributed execution environments
@@ -384,7 +386,7 @@ IPUs.
 
 Parallelisation in :py:class:`poptorch.PipelinedExecution`
 requires :py:meth:`~poptorch.Options.deviceIterations`
-and :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`.
+and :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
 as explained in :ref:`efficient_data_batching`.
 After one :py:class:`poptorch.Stage` is finished with processing a batch
 on one IPU, it starts immediately processing the next batch.
