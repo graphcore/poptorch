@@ -715,9 +715,9 @@ def distributedCacheLock(model, opts):
                 cache, "%s.lock" %
                 hashlib.md5(repr(model).encode("utf-8")).hexdigest())
 
-    # Not distributed mode or the cache is not enabled: just compile.
+    # Not distributed mode or the cache is not enabled: do nothing.
     if not filename:
-        yield
+        yield False
         return
 
     delete_file = False
@@ -733,7 +733,7 @@ def distributedCacheLock(model, opts):
                     opts.Distributed.numProcesses)
                 delete_file = f.tell() == opts.Distributed.numProcesses
                 # Only the first process should compile
-                yield
+                yield f.tell() == 1
             finally:
                 logger.debug("Process %s released the cache lock",
                              opts.Distributed.processId)
@@ -917,9 +917,38 @@ class PoplarExecutor:
         """
         self._new_optimizer = _convertOptimizerToDict(optimizer)
 
+    def _distributedPrecompile(self, in_tensors):
+        """TODO(T35376): On POD we want to separate compilation from device
+        initialisation because we want only one process to compile the model,
+        but all the processes must initialise their device at the same time
+        as they need to communicate with each other.
+
+        This is achieved by calling the equivalent of compileAndExport()
+        from one of the processes: this will populate the Popart cache with
+        the executable. (We use a tempfile because we don't need the result,
+        we just want the executable to be added to the cache).
+
+        The caller will then call the regular _compile() method in all the
+        processes at the same time and they should all hit the cache.
+        """
+        with distributedCacheLock(self._model,
+                                  self._options) as should_compile:
+            # Only the first process should compile
+            if not should_compile:
+                return
+            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
+                    self._preprocessGraph(
+                        in_tensors)
+            trace_args = self._trace_model_and_get_compile_args(
+                in_tensors, in_tensors_trace_view, has_converted_any_half,
+                narrow_tensor_fn)
+            cache = self._options._popart.options["cachePath"]  # pylint: disable=protected-access
+            with self._profiling.tracepoint("compileAndExport"),\
+                    tempfile.NamedTemporaryFile(dir=cache) as f:
+                poptorch_core.compileWithTraceAndExport(*trace_args, f.name)
+
     def _compile(self, in_tensors):
-        with self._profiling.tracepoint("modelCompilation"), \
-            distributedCacheLock(self._model, self._options):
+        with self._profiling.tracepoint("modelCompilation"):
             in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
                     self._preprocessGraph(
                         in_tensors)
@@ -1041,6 +1070,10 @@ class PoplarExecutor:
                 "Call to compile() ignored: the executable is already compiled"
             )
         else:
+            # TODO(T35376): In order to separate model compilation from engine loading
+            # on distributed systems
+            if self._options.Distributed.numProcesses > 1:
+                self._distributedPrecompile(in_tensors)
             self._compile(in_tensors)
 
     def loadExecutable(self, filename):
@@ -1131,6 +1164,10 @@ class PoplarExecutor:
             " model(inputs)")
         in_tensors = self._args_parser(args, kwargs)
         if self._executable is None:
+            # TODO(T35376): In order to separate model compilation from engine loading
+            # on distributed systems
+            if self._options.Distributed.numProcesses > 1:
+                self._distributedPrecompile(in_tensors)
             self._compile(in_tensors)
         if not self._is_attached:
             self.attachToDevice()
