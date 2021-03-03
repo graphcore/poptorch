@@ -65,7 +65,6 @@ def test_set_popart_options():
     opts._Popart.set("dotChecks", [0, 1])
     opts._Popart.set("engineOptions", {
         "debug.allowOutOfMemory": "true",
-        "exchange.streamBufferOverlap": "any"
     })
     opts._Popart.set("customCodelets", [])
     opts._Popart.set("autoRecomputation", 1)
@@ -89,7 +88,10 @@ def test_set_popart_options():
     x = torch.ones(2)
     y = torch.zeros(2)
 
-    inference_model(x, y)
+    # The options above don't really make sense so check they're being passed
+    # to the backend without causing any error but don't actually run the
+    # model.
+    inference_model.compile(x, y)
 
 
 def test_popart_patterns():
