@@ -8,6 +8,14 @@ Installation
 PopTorch is part of the Poplar SDK.  It is packaged as a Python wheel
 file that can be installed using ``pip``.
 
+.. important:: pip >= 18.1 is required for PopTorch dependencies to be installed properly.
+
+To update `pip`:
+
+.. code-block:: bash
+
+    $ pip install -U pip
+
 For more information about installing the Poplar SDK, see the relevant
 "Getting Started" guide for your IPU system on the Graphcore
 `documentation portal <https://docs.graphcore.ai>`_.
@@ -23,6 +31,7 @@ for this. You can create a virtual environment and install PopTorch as shown bel
 
     $ virtualenv -p python3 poptorch_test
     $ source poptorch_test/bin/activate
+    $ pip install -U pip
     $ pip install <sdk_path>/poptorch_x.x.x.whl
 
 .. _setting_env:

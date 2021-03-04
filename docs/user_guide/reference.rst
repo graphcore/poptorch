@@ -26,6 +26,38 @@ Options
 .. autoclass:: poptorch.options._TrainingOptions
    :members:
 
+Helpers
+=======
+
+.. autofunction:: poptorch.ipuHardwareIsAvailable
+
+.. autofunction:: poptorch.ipuHardwareVersion
+
+.. autofunction:: poptorch.setLogLevel
+
+.. autoclass:: poptorch.profiling.Channel
+   :members:
+
+PopTorch Ops
+============
+
+.. autofunction:: poptorch.ipu_print_tensor
+
+.. autofunction:: poptorch.identity_loss
+
+.. autoclass:: poptorch.MultiConv
+   :members:
+
+.. autoclass:: poptorch.MultiConvPlanType
+
+.. autoclass:: poptorch.custom_op
+
+.. autofunction:: poptorch.nop
+
+.. autofunction:: poptorch.serializedMatMul
+
+.. autofunction:: poptorch.set_available_memory
+
 Model wrapping functions
 ========================
 

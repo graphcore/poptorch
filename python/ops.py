@@ -7,6 +7,57 @@ _end_ipu_block = torch.ops.poptorch.end_ipu_block
 
 
 def ipu_print_tensor(tensor, title=""):
+    """
+    Adds an op to print the content of a given IPU tensor.
+
+    When this is executed the tensor
+    will be copied back to host and printed.
+
+    When this operation is called in the backward pass it
+    will print the gradient of the tensor.
+
+    The operation is an identity operation and it will return the exact same
+    tensor. The returned tensor should be used in place of the original tensor,
+    in the rest of the program to make sure that the print operation isn't
+    optimised away.
+
+    For example if the original code looks like this:
+
+    .. code-block:: python
+
+      def forward(self, c, d, b)
+        a = c + d
+        return a + b
+
+    If the result of ``ipu_print_tensor`` is not used, it will be optimised
+    out by the graph optimiser and tensor will not be printed.
+
+    So if you want to print the value of `a`, you should do:
+
+    .. code-block:: python
+
+      def forward(self, c, d, b)
+        a = c + d
+        x = poptorch.ipu_print_tensor(a)
+        return x + b
+
+    Optionally, you may add a second string parameter to be used as a title.
+
+    .. code-block:: python
+
+      def forward(self, c, d, b)
+          a = c + d
+          x = poptorch.ipu_print_tensor(a, "summation"))
+          return x + b
+
+
+    .. warning::
+       In order for the print operation to not be optimised out by the graph
+       optimiser, you must use the output of the print.
+
+    :param ipu_print_tensor: The tensor to print.
+    :returns: The input unchanged.
+    """
     return torch.ops.poptorch.ipu_print_tensor(tensor, title)
 
 

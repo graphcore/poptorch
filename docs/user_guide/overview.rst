@@ -67,15 +67,15 @@ poptorch.PoplarExecutor
 -----------------------
 
 This class should not be created directly but is a wrapper around the model
-that was passed into :py:func:``inferenceModel`` or :py:func:``trainingModel``.
+that was passed into :py:func:`~poptorch.inferenceModel` or :py:func:`~poptorch.trainingModel`.
 It only has a few methods which can be used to interface with the IPU.
 
-The :py:class:``PoplarExecutor`` will implicitly keep in sync the parameters
+The :py:class:`~poptorch.PoplarExecutor` will implicitly keep in sync the parameters
 of the  source PyTorch model and the PopTorch model(s). However, weights need to
 be  explicitly copied if the model is trained on the CPU and inference is run on
 the IPU.
 
-See :py:class:`poptorch.PoplarExecutor` for complete reference of IPU interface
+See :py:class:`~poptorch.PoplarExecutor` for a complete description of the IPU interface
 functionality.
 
   .. code-block:: python
@@ -104,7 +104,7 @@ returns ``True`` when executing on the IPU and ``False`` when executing
 the model outside IPU scope. This allows for different code paths within
 the model.
 
-A common usecase is executing equivalent code to a PopART custom operator
+A common use case is executing equivalent code to a PopART custom operator
 when running on CPU. For example:
 
   .. code-block:: python
@@ -536,63 +536,11 @@ These are helper operations to be used within a model.
 poptorch.ipu_print_tensor
 -------------------------
 
-.. py:class:: ipu_print_tensor(tensor_to_print, optional_title)
+Adds an op to print the content of a given IPU tensor.
 
-    Adds a tensor to be printed on the IPU. When this is executed the tensor
-    will be copied back to host and printed.
-
-    When this operation is called in the backward pass it
-    will print the gradient of the tensor.
-
-    The operation is an identity operation and it will return the exact same
-    tensor. The returned tensor should be used in place of the original tensor,
-    in the rest of the program to make sure that the print operation isn't optimised away.
-
-    For example if the original code looks like this:
-
-    .. code-block:: python
-
-      def forward(self, c, d, b)
-        a = c + d
-        return a + b
-
-    And you want to print the value of `a`.
-    If you do:
-
-    .. code-block:: python
-
-      def forward(self, c, d, b)
-        a = c + d
-        poptorch.ipu_print_tensor(a)
-        return a + b
-
-    Optionally, you may add a second string parameter to be used as a title.
-
-    .. code-block:: python
-
-      def forward(self, c, d, b)
-          a = c + d
-          poptorch.ipu_print_tensor(a, "summation"))
-          return a + b
-
-    The result of ``ipu_print_tensor`` is not used,therefore it will be optimised out by the
-    graph optimiser and ``a`` will not be printed.
-
-    Instead you should do:
-
-    .. code-block:: python
-
-      def forward(self, c, d, b)
-        a = c + d
-        x = poptorch.ipu_print_tensor(a)
-        return x + b
-
-    .. warning::
-       In order for the print operation to not be optimised out by the graph
-       optimiser, you must use the output of the print.
-
-    :param ipu_print_tensor: The tensor to print.
-    :returns: The input unchanged.
+.. warning::
+   To prevent the print operation being optimised out by the graph
+   optimiser, you must use the output of the print.
 
 .. literalinclude:: api.py
     :language: python
@@ -601,6 +549,7 @@ poptorch.ipu_print_tensor
     :end-before: print_tensor_end
     :emphasize-lines: 10
 
+For more information see: :py:func:`poptorch.ipu_print_tensor`.
 
 poptorch.identity_loss
 ----------------------
@@ -612,7 +561,6 @@ and will backpropagate a gradient of ones through it.
    Passing a PyTorch loss function or another ``identity_loss`` to this function is not
    supported. Multiple losses must be implemented via composite PyTorch ops.
 
-.. autofunction:: poptorch.identity_loss
 
 .. literalinclude:: api.py
   :language: python
@@ -620,18 +568,18 @@ and will backpropagate a gradient of ones through it.
   :start-after: identity_start
   :end-before: identity_end
   :emphasize-lines: 5
+  :caption: Example of custom loss.
+
+For more information see: :py:func:`poptorch.identity_loss`.
 
 poptorch.MultiConv
 ------------------
 
 Use :py:class:`poptorch.MultiConv` wrapper class to define multi-convolutions.
 
-.. autoclass:: poptorch.MultiConv
-   :members:
-
 Please refer to the `PopLibs documentation for multi-convolutions <https://docs.graphcore.ai/projects/poplar-api/en/latest/poplibs_api.html>`_ for further information.
 
-.. autoclass:: poptorch.MultiConvPlanType
+For more information see: :py:class:`poptorch.MultiConv` :py:class:`poptorch.MultiConvPlanType`.
 
 poptorch.custom_op
 ------------------
@@ -672,7 +620,7 @@ Second, load the dynamic library.
 Finally, use :py:class:`poptorch.custom_op` to finish the call.
 Its wrapper class is specified below.
 
-.. autoclass:: poptorch.custom_op
+For more information see: :py:class:`poptorch.custom_op`.
 
 In the PopART custom op, both forward op and backward op are implemented.
 In the PopTorch inference model, only the forward op will be called.
@@ -747,8 +695,7 @@ poptorch.nop
 
 Poptorch includes a "no-op" function for debugging purposes.
 
-.. autofunction:: poptorch.nop
-
+For more information see: :py:func:`poptorch.nop`.
 
 poptorch.serializedMatMul
 -------------------------
@@ -757,7 +704,7 @@ Use this function to create a serialized matrix multiplication, which splits
 a larger matrix multiplication into smaller matrix multiplications to reduce
 memory requirements.
 
-.. autofunction:: poptorch.serializedMatMul
+For more information see: :py:func:`poptorch.serializedMatMul`.
 
 
 poptorch.set_available_memory
@@ -765,19 +712,16 @@ poptorch.set_available_memory
 
 Use this function to override the proportion of tile memory for available to be used as temporary memory by a convolution or matrix multiplication.
 
-.. autofunction:: poptorch.set_available_memory
-
+For more information see: :py:func:`poptorch.set_available_memory`.
 
 Miscellaneous functions
 =======================
 
 These PopTorch functions, not related to model creation, are available:
 
-.. autofunction:: poptorch.ipuHardwareIsAvailable
-
-.. autofunction:: poptorch.ipuHardwareVersion
-
-.. autofunction:: poptorch.setLogLevel
+- :py:func:`poptorch.ipuHardwareIsAvailable`
+- :py:func:`poptorch.ipuHardwareVersion`
+- :py:func:`poptorch.setLogLevel`
 
 
 Half / float 16 support
@@ -866,10 +810,7 @@ For more options, please refer to the `PopVision Graph Analyser User Guide <http
 
 In order to capture the ``pvti`` reports needed for the PopVision System Analyser you only need to set ``PVTI_OPTIONS='{"enable":"true"}'``
 
-You can also add extra tracepoints in your own code by using
-
-.. autoclass:: poptorch.profiling.Channel
-   :members:
+You can also add extra tracepoints in your own code by using :py:class:`poptorch.profiling.Channel`.
 
 IPU Model
 ---------
