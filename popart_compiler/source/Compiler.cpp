@@ -906,6 +906,8 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_ENUM_OPTION(virtualGraphMode, VirtualGraphMode);
   ADD_POPART_ENUM_OPTION(syntheticDataMode, SyntheticDataMode);
   ADD_POPART_ENUM_OPTION(subgraphCopyingStrategy, SubgraphCopyingStrategy);
+  ADD_POPART_ENUM_OPTION(accumulationAndReplicationReductionType,
+                         ReductionType);
 
   ADD_POPART_STRING_OPTION(logDir);
   ADD_POPART_STRING_OPTION(cachePath);
@@ -926,6 +928,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_UINT64_OPTION(swapLimitScheduler);
   ADD_POPART_UINT64_OPTION(globalReplicationFactor);
   ADD_POPART_UINT64_OPTION(globalReplicaOffset);
+  ADD_POPART_UINT64_OPTION(defaultPrefetchBufferingDepth);
 
   ADD_POPART_BOOL_OPTION(batchSerializationSettings.concatOnVirtualGraphChange);
   ADD_POPART_BOOL_OPTION(

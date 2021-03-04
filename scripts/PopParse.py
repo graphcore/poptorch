@@ -112,11 +112,20 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
         if c.kind != clang.cindex.CursorKind.FIELD_DECL:
             continue
         children = list(c.get_children())
-        if get_child(c, clang.cindex.CursorKind.CXX_BOOL_LITERAL_EXPR):
+
+        # deal with CursorKind.UNEXPOSED_REF
+        # this shows up when there is an implicit cast between the literal
+        # initializer and the storage type of the structure member
+        uc = get_child(c, clang.cindex.CursorKind.UNEXPOSED_EXPR) or c
+
+        if (get_child(c, clang.cindex.CursorKind.CXX_BOOL_LITERAL_EXPR) or
+                get_child(uc, clang.cindex.CursorKind.CXX_BOOL_LITERAL_EXPR)):
             expected[c.spelling] = OptionType.Bool
-        elif get_child(c, clang.cindex.CursorKind.INTEGER_LITERAL):
+        elif (get_child(c, clang.cindex.CursorKind.INTEGER_LITERAL)
+              or get_child(uc, clang.cindex.CursorKind.INTEGER_LITERAL)):
             expected[c.spelling] = OptionType.Int
-        elif get_child(c, clang.cindex.CursorKind.FLOATING_LITERAL):
+        elif (get_child(c, clang.cindex.CursorKind.FLOATING_LITERAL)
+              or get_child(uc, clang.cindex.CursorKind.FLOATING_LITERAL)):
             expected[c.spelling] = OptionType.Float
         else:
             opt_type = get_child(c, clang.cindex.CursorKind.TEMPLATE_REF)

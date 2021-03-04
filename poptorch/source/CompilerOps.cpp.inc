@@ -84,6 +84,11 @@ new_node->is_(c10::Symbol::fromQualString("attr::axes"),axes);
 new_node->is_(c10::Symbol::fromQualString("attr::sizes"),sizes);
 return new_node;
 }
+torch::jit::Node* createSequenceslice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t zeroUnused) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::sequenceslice, args, ImplicitCast::None, OutputType::Unknown);
+new_node->i_(c10::Symbol::fromQualString("attr::zeroUnused"),zeroUnused);
+return new_node;
+}
 torch::jit::Node* createReplicatedallreduce(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::replicatedallreduce, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
@@ -106,10 +111,11 @@ torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vecto
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 return new_node;
 }
-torch::jit::Node* create_ctcloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,const unsigned int blank) {
+torch::jit::Node* create_ctcloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,const unsigned int blank,const std::string & outDataType) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::_ctcloss, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 new_node->i_(c10::Symbol::fromQualString("attr::blank"),blank);
+new_node->s_(c10::Symbol::fromQualString("attr::outDataType"),outDataType);
 return new_node;
 }
 torch::jit::Node* createShapeddropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & shape,float ratio) {
