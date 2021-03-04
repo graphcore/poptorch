@@ -17,10 +17,11 @@ class VariableAttributes:
         self._allowed_attributes = allowed_attributes
 
     def isConstant(self, attr):
+        """Return True if the attribute is marked as constant"""
         return attr not in self._variable_attributes
 
     def markAsConstant(self, attr):
-        "Explicitly mark an attribute as constant" ""
+        """Explicitly mark an attribute as constant"""
         assert attr in self._allowed_attributes, (
             f"Unknown attribute {attr},"
             f" allowed values: {self._allowed_attributes}")

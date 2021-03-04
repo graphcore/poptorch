@@ -282,15 +282,50 @@ class _BetaReader(_AttrReader):
         }
 
 
-def warnOnExtraAttr(expected, provided, attr_type, opt_type):
-    extra = [attr for attr in provided if attr not in expected]
-    if extra:
-        logger.warning("Ignoring unexpected %s in %s optimizer: %s ",
-                       attr_type, opt_type.name, extra)
+class _OptimizerAttrTracker:
+    def __init__(self, opts):
+        if opts._relax_optimizer_checks:
+            self.log = logger.debug
+        else:
+            self.log = logger.warning
+        self.group_attributes = []
+        self.optim_attributes = []
+        self.record_attributes = True
+        self.printed_msgs = []
+        self.type = "Unknown"
+
+    def setType(self, optimizer_type):
+        self.type = optimizer_type.name
+
+    def enableChecks(self):
+        self.record_attributes = False
+
+    def checkDefaultAttributes(self, provided):
+        self._check(self.group_attributes, provided, "default group variable")
+
+    def checkGroupAttributes(self, provided, group):
+        self._check(self.group_attributes, provided,
+                    f"group {group} attribute")
+
+    def checkOptimizerAttributes(self, provided):
+        self._check(self.optim_attributes, provided, "optimizer attribute")
+
+    def _check(self, expected, provided, attr_type):
+        extra = [attr for attr in provided if attr not in expected]
+        if self.record_attributes:
+            expected += extra
+        elif extra:
+            msg = f"Ignoring unexpected {attr_type} in {self.type} optimizer:"
+            msg += f" {extra}"
+            if msg not in self.printed_msgs:
+                self.log(msg)
+                self.printed_msgs.append(msg)
 
 
-def _convertOptimizerToDict(optimizer):
+# pylint: disable=too-many-statements
+def _convertOptimizerToDict(optimizer, attr_tracker):
     optimizer_type = _toPoptorchOptimizer(optimizer)
+    attr_tracker.setType(optimizer_type)
 
     assert optimizer_type is not None, """Unsupported optimizer type.
          Types supported %s""" % str(list(_OptimizerType))
@@ -434,15 +469,12 @@ def _convertOptimizerToDict(optimizer):
     defaults = {}
     for attr in group_vars:
         defaults.update(attr_readers[attr](optimizer.defaults))
-    warnOnExtraAttr(group_vars, list(optimizer.defaults.keys()),
-                    "default group variable", optimizer_type)
+    attr_tracker.checkDefaultAttributes(list(optimizer.defaults.keys()))
     for attr in opt_vars:
         defaults.update(attr_readers[attr](optimizer))
-    warnOnExtraAttr(opt_attrs + opt_vars, getOptimizerAttrNames(optimizer),
-                    "optimizer attribute", optimizer_type)
+    attr_tracker.checkOptimizerAttributes(getOptimizerAttrNames(optimizer))
     for i, g in enumerate(optimizer.param_groups):
-        warnOnExtraAttr(group_vars, getGroupAttrNames(g),
-                        f"group {i} attribute", optimizer_type)
+        attr_tracker.checkGroupAttributes(getGroupAttrNames(g), i)
 
     opts["defaults"] = defaults
 
@@ -456,6 +488,8 @@ def _convertOptimizerToDict(optimizer):
         opts["groups"].append(group)
 
     logger.debug("Python optimizer %s", opts)
+    # From now on print a message when encountering unknown attributes
+    attr_tracker.enableChecks()
     return opts
 
 
@@ -763,6 +797,7 @@ class PoplarExecutor:
         self._host_weights_version = 0
         self._poptorch_version = poptorch_version
         if training:
+            self._attribute_tracker = _OptimizerAttrTracker(options)
             if options.defaultAnchorMode():
                 # In training it makes sense to see only the last result, by default.
                 options.anchorMode(enums.AnchorMode.Final)
@@ -770,7 +805,8 @@ class PoplarExecutor:
                 optimizer = torch.optim.SGD(self._user_model.parameters(),
                                             lr=0.01)
             if not isinstance(optimizer, dict):
-                optimizer = _convertOptimizerToDict(optimizer)
+                optimizer = _convertOptimizerToDict(optimizer,
+                                                    self._attribute_tracker)
         else:
             if options.defaultAnchorMode():
                 # In inference it makes sense to see all the results, by default.
@@ -915,7 +951,8 @@ class PoplarExecutor:
         previous one. Supported optimisers: ``optim.SGD``, ``optim.Adam``,
         ``optim.AdamW``, ``optim.RMSProp``, ``optim.LAMB``.
         """
-        self._new_optimizer = _convertOptimizerToDict(optimizer)
+        self._new_optimizer = _convertOptimizerToDict(optimizer,
+                                                      self._attribute_tracker)
 
     def _distributedPrecompile(self, trace_args):
         """TODO(T35376): On POD we want to separate compilation from device

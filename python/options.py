@@ -879,6 +879,18 @@ class Options(_options_impl.OptionsDict):
                         path)
             self.enableExecutableCaching(path)
 
+        self.relaxOptimizerAttributesChecks(False)
+
+    def relaxOptimizerAttributesChecks(self, relax=True):
+        """By default PopTorch will print warnings the first time it encounters unexpected attributes in setOptimizer()
+
+        In relax mode the messages will be redirected to the debug channel.
+        """
+        # Doesn't need to be stored in the OptionsDict because it's only used
+        # by the python side.
+        self._relax_optimizer_checks = relax
+        return self
+
     @property
     def TensorLocations(self):
         """Options related to tensor locations.

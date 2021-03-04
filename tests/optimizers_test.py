@@ -139,7 +139,7 @@ def test_accum_type(capfd, opt, accum_type, first_order_type,
         assert t in ["torch.float32", "torch.float16"]
         return t.split(".")[1]
 
-    poptorch.setLogLevel(1)  # Force debug logging
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
     torch.manual_seed(42)
     model = OptimizerTestModel()
 
@@ -397,7 +397,7 @@ def test_lamb_max_weight_norm(opt):
 
 @helpers.printCapfdOnExit
 def test_variable_groups(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
     model = OptimizerTestModel(num_groups=2)
 
     # Make sure all groups have the default values, and the values are not (const)
@@ -517,7 +517,7 @@ def test_variable_default(opt, capfd):
     # as variable because they were explicitly passed to the constructor.
     poptorch_opt, opt_args_tuple = opt
     opt_args = dict(opt_args_tuple)
-    poptorch.setLogLevel(1)  # Force debug logging
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
     pytorch_opt = poptorch_opt.__bases__[0]  # Retrieve the upstream type
 
     # Learning rate is a special case: it's always variable so handle it separately.
@@ -685,3 +685,97 @@ def test_gradient_accum_new_api(reduction):
 
     # Check we have trained the "model"
     assert loss < 0.03
+
+
+@helpers.printCapfdOnExit
+def test_extra_attributes(capfd):
+    poptorch.setLogLevel("WARN")  # Make sure we only get warnings
+    model = OptimizerTestModel(num_groups=2)
+
+    # Make sure all groups have the default values, and the values are not (const)
+    params = [{
+        "params": model.model[0].parameters()
+    }, {
+        "params": model.model[1].parameters()
+    }]
+    o = poptorch.optim.SGD(params,
+                           lr=0.01,
+                           loss_scaling=2.0,
+                           velocity_scaling=2.0)
+    model.run(o)
+    o.step = 0
+    o.param_groups[0]["initial_lr"] = 0.1
+    o.param_groups[1]["initial_lr"] = 0.1
+    model.run(o)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches("unexpected optimizer attribute")
+    testlog.assert_matches(r"unexpected group \d attribute")
+    # loss_scaling = 3.0: Make sure optimizer is different to trigger update
+    o.loss_scaling = 3.0
+    model.run(o)
+    # Ensure warnings are printed only once
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_no_matches("unexpected optimizer attribute")
+    testlog.assert_no_matches(r"unexpected group \d attribute")
+
+
+@helpers.printCapfdOnExit
+def test_extra_attributes2(capfd):
+    poptorch.setLogLevel("WARN")  # Make sure we only get warnings
+
+    opts = poptorch.Options()
+    opts.relaxOptimizerAttributesChecks()
+    model = OptimizerTestModel(num_groups=2, options=opts)
+    # Make sure all groups have the default values, and the values are not (const)
+    params = [{
+        "params": model.model[0].parameters()
+    }, {
+        "params": model.model[1].parameters()
+    }]
+    o = poptorch.optim.SGD(params,
+                           lr=0.01,
+                           loss_scaling=2.0,
+                           velocity_scaling=2.0)
+    model.run(o)
+    o.step = 0
+    o.param_groups[0]["initial_lr"] = 0.1
+    o.param_groups[1]["initial_lr"] = 0.1
+    model.run(o)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_no_matches("unexpected optimizer attribute")
+    testlog.assert_no_matches(r"unexpected group \d attribute")
+
+
+@helpers.printCapfdOnExit
+def test_extra_attributes3(capfd):
+    poptorch.setLogLevel("WARN")  # Make sure we only get warnings
+    model = OptimizerTestModel(num_groups=2)
+    # Make sure all groups have the default values, and the values are not (const)
+    params = [{
+        "params": model.model[0].parameters()
+    }, {
+        "params": model.model[1].parameters()
+    }]
+    o = poptorch.optim.SGD(params,
+                           lr=0.01,
+                           loss_scaling=2.0,
+                           velocity_scaling=2.0)
+    o.step = 0
+    o.param_groups[0]["initial_lr"] = 0.1
+    o.param_groups[1]["initial_lr"] = 0.1
+    model.run(o)
+    # If extra attributes are added before the first run
+    # they shouldn't trigger any warning
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_no_matches("unexpected optimizer attribute")
+    testlog.assert_no_matches(r"unexpected group \d attribute")
+
+    # loss_scaling = 4.0: Make sure optimizer is different to trigger update
+    o.loss_scaling = 4.0
+    # initial_lr is a group attribute: should trigger a warning.
+    o.initial_lr = 0.2
+    # If they're added later then they should print a warning
+    model.run(o)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches("unexpected optimizer attribute")
+    testlog.assert_no_matches(r"unexpected group \d attribute")
