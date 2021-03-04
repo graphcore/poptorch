@@ -4,7 +4,6 @@ import argparse
 import collections
 import difflib
 import enum
-import json
 import logging
 import os
 import pathlib
@@ -12,7 +11,6 @@ import re
 import sys
 import tempfile
 import time
-import packaging.version
 import yaml
 
 from utils import _utils
@@ -334,79 +332,6 @@ class DiffCreator:
         return delta, errcode
 
 
-class VersionParseCommandBase(CondaCommand):
-    def __init__(self, *cmd, **kwargs):
-        super().__init__(*cmd, **kwargs)
-        self.version = None
-
-    def _parse_version(self, output, return_code):
-        raise NotImplementedError("Must be implemented in the derived type")
-
-    def run_and_compare_versions(self, expected):
-        self.run()
-        expected_version = packaging.version.parse(expected)
-
-        if expected_version != self.version:
-            logger.error("Required version of %s is %s, but found %s",
-                         self.name, expected_version, self.version)
-            return False
-        return True
-
-
-class VersionJSONParseCommand(VersionParseCommandBase):
-    def __init__(self, command_name):
-        super().__init__(
-            f"grep \\\"version\\\" "
-            f"${{CONDA_PREFIX}}/conda-meta/{command_name}-*.json",
-            print_output=False,
-            output_processor=self._parse_version)
-
-    def _parse_version(self, output, return_code):
-        if return_code:
-            return output, return_code
-        self.version = packaging.version.parse(
-            json.loads("{" + output + "}")["version"])
-        return output, return_code
-
-
-class VersionParseCommand(VersionParseCommandBase):
-    def __init__(self, version_re_prefix, command_name):
-        super().__init__(f"${{CONDA_PREFIX}}/bin/{command_name}",
-                         "--version",
-                         print_output=False,
-                         output_processor=self._parse_version)
-        self.version_re_prefix = version_re_prefix
-        self.version = None
-
-    def _parse_version(self, output, return_code):
-        if return_code:
-            return output, return_code
-
-        match_result = re.match(f"{self.version_re_prefix} ([.0-9]+)",
-                                output,
-                                flags=re.MULTILINE)
-
-        if match_result:
-            self.version = packaging.version.parse(match_result[1])
-
-        return output, return_code
-
-
-def compare_versions_from_conda(command_name, expected):
-    version_parse_cmd = VersionJSONParseCommand(command_name)
-    return version_parse_cmd.run_and_compare_versions(expected)
-
-
-def compare_versions_from_output(command_name,
-                                 expected,
-                                 version_re_prefix=None):
-    if version_re_prefix is None:
-        version_re_prefix = command_name
-
-    version_parse_cmd = VersionParseCommand(version_re_prefix, command_name)
-    return version_parse_cmd.run_and_compare_versions(expected)
-
-
 class ClangFormat(ILinter):
     def gen_lint_command(self, filename, autofix):
         flags = ""
@@ -423,7 +348,7 @@ class ClangFormat(ILinter):
                             print_output=autofix)
 
     def check_version(self):
-        return compare_versions_from_conda("clang-tools", "9.0.0")
+        return True  # TODO(T32437)
 
 
 class ClangTidy(ILinter):
@@ -590,8 +515,8 @@ class ClangTidy(ILinter):
                         stop_on_error=False,
                         output_processor=parse_include_tests).run():
             return False
-
-        return compare_versions_from_conda("clang-tools", "9.0.0")
+        #TODO(T32437) check for clang-apply-replacements
+        return True  # TODO(T32437): check version
 
     def is_enabled(self, filename, autofix):
         return "custom_cube_op.cpp" not in filename
@@ -616,33 +541,31 @@ class ClangTidy(ILinter):
         if poplibs_avail:
             return
 
-        logger.error("Poplibs is not in the CPATH nor symbolically linked "
-                     "poplar directory. Please source activate.sh from the "
-                     "poplar_view or use the SDK.")
+        print("Poplibs is not in the CPATH nor symbolically linked poplar " +
+              "directory. Please source activate.sh from the poplar_view or " +
+              "use the SDK.")
         sys.exit(1)
 
 
 class CppLint(ILinter):
     def gen_lint_command(self, filename, autofix):
-        return CondaCommand("${CONDA_PREFIX}/bin/cpplint",
-                            "--root=include --quiet",
+        return CondaCommand("cpplint", "--root=include --quiet",
                             f"--filter=-{',-'.join(cpp_lint_disabled)}",
                             filename)
 
     def check_version(self):
-        return compare_versions_from_output("cpplint", "1.4.4")
+        return True  # TODO(T32437)
 
 
 class Pylint(ILinter):
     def gen_lint_command(self, filename, autofix):
         return CondaCommand(
-            "${CONDA_PREFIX}/bin/pylint",
-            "--score=no --reports=no -j 0 --msg-template="
+            "pylint", "--score=no --reports=no -j 0 --msg-template="
             "'{path}:{line}:{column}:error:pylint[{symbol}({msg_id})]: {msg}'"
             " --rcfile=.pylintrc", filename)
 
     def check_version(self):
-        return compare_versions_from_output("pylint", "2.5.3")
+        return True  # TODO(T32437)
 
 
 class Yapf(ILinter):
@@ -654,14 +577,14 @@ class Yapf(ILinter):
         else:
             output_processor = DiffCreator(filename, "yapf", autofix)
 
-        return CondaCommand("${CONDA_PREFIX}/bin/yapf",
+        return CondaCommand("yapf",
                             flags,
                             filename,
                             output_processor=output_processor,
                             print_output=autofix)
 
     def check_version(self):
-        return compare_versions_from_output("yapf", "0.27.0")
+        return True  # TODO(T32437)
 
 
 class Executor:
