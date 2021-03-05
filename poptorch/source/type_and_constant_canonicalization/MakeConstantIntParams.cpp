@@ -36,7 +36,13 @@ void makeConstantIntParams(torch::jit::Graph *graph,
       auto current_type = tensor_type->scalarType().value();
 
       if (!c10::isFloatingType(current_type)) {
-        torch::jit::WithInsertPoint insert_point(findEarliestUser(value));
+        // Some nodes might not be used, we skip them if so.
+        torch::jit::Node *earliest_user = findEarliestUser(value);
+        if (!earliest_user) {
+          continue;
+        }
+
+        torch::jit::WithInsertPoint insert_point(earliest_user);
 
         if (current_type == at::ScalarType::Long) {
           tensor = tensor.to(at::ScalarType::Int);
