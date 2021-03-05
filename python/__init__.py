@@ -359,7 +359,7 @@ def trainingModel(model, options=None, optimizer=None):
                           options=options,
                           training=True,
                           optimizer=optimizer,
-                          user_model=maybe_wrapped_model,
+                          user_model=model,
                           poptorch_version=__version__)
 
 
