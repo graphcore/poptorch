@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 import copy
+import copyreg
 import ctypes
 import enum
 import fcntl
@@ -688,12 +689,7 @@ class PoptorchData:
                  optimizer=None):
         self.options = options
         self.training = training
-        if training and model:
-            # Create a copy of the user model and unwrap it
-            self.model = copy.copy(model)
-            self.model.__class__ = model.__class__.__bases__[0]
-        else:
-            self.model = model
+        self.model = model
 
         self.version = version
         self.optimizer = optimizer
@@ -780,6 +776,42 @@ def distributedCacheLock(model, opts):
     finally:
         if delete_file:
             os.remove(filename)
+
+
+# The pickle handlers are called in two cases: when an object is copied
+# (i.e copy.copy(obj)) or when an object is pickled / serialised.
+# In both cases the object is first dumped using _pickleUnwrapModel and then
+# in the copy case _pickleRestoreWrapperIfPossible() is called immediately after
+# to create the new object.
+#
+# The _wrapper_registry keeps track of the mapping between user model types
+# and their corresponding wrapper.
+
+# When an object is copied we want to preserve the Wrapper type: the PopTorch
+# wrapper doesn't contain any attribute so it's just a question of updating
+# the __class__attribute.
+#
+# When an object is loaded from file: the wrapper type doesn't exist anymore
+# therefore we keep the model unwrapped. (It will be wrapped again when passed
+# to poptorch.trainingModel anyway)
+_wrapper_registry = {}
+
+
+def _pickleRestoreWrapperIfPossible(model):
+    wrapperType = _wrapper_registry.get(id(model))
+    if wrapperType:
+        model.__class__ = wrapperType
+    return model
+
+
+def _pickleUnwrapModel(model):
+    global _wrapper_registry
+    wrapperType = model.__class__
+    model.__class__ = model.__class__.__bases__[0]
+    other = copy.copy(model)
+    _wrapper_registry[id(other)] = wrapperType
+    model.__class__ = wrapperType
+    return _pickleRestoreWrapperIfPossible, (other, )
 
 
 class PoplarExecutor:
@@ -910,6 +942,18 @@ class PoplarExecutor:
             PoptorchModel.__name__ = "Poptorch%s" % type(
                 self._user_model).__name__
             self._user_model.__class__ = PoptorchModel
+            # Register custom function to copy / serialize wrappers
+            copyreg.pickle(PoptorchModel, _pickleUnwrapModel)
+
+    def load_state_dict(self, state_dict, strict=True):
+        """Will call load_state_dict() on the wrapped model
+        and automatically synchronise the weights with the IPU.
+        """
+        out = self._user_model.load_state_dict(state_dict, strict)
+        if self.isAttachedToDevice():
+            logger.debug("load_state_dict: implicit copyWeightsToDevice()")
+            self.copyWeightsToDevice()
+        return out
 
     def __getattr__(self, attr):
         return getattr(self._user_model, attr)
@@ -1175,8 +1219,8 @@ class PoplarExecutor:
 
         if export_model:
             data = PoptorchData(self._poptorch_version, in_tensors,
-                                self._options, self._training,
-                                self._user_model, self._new_optimizer)
+                                self._options, self._training, self.model,
+                                self._new_optimizer)
         else:
             data = PoptorchData(self._poptorch_version, in_tensors)
         with open(filename, "wb") as f:

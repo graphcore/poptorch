@@ -860,7 +860,7 @@ For example:
     :linenos:
     :start-after: implicit_cp_start
     :end-before: implicit_cp_end
-    :emphasize-lines: 15,17-19
+    :emphasize-lines: 16,18-20
 
 If you were to export these models:
 
@@ -870,7 +870,9 @@ If you were to export these models:
     :linenos:
     :start-after: precomp_train_val_start
     :end-before: precomp_train_val_end
-    :emphasize-lines: 13,14
+    :emphasize-lines: 11-12,14
+
+.. note:: Don't forget to ``model.eval()`` or ``model.train()`` as required before calling :py:func:`~poptorch.PoplarExecutor.compileAndExport`.
 
 You would then either need to insert explicit copy operations:
 
@@ -891,7 +893,7 @@ and then loading the executable:
     :linenos:
     :start-after: load_train_val_connected_start
     :end-before: load_train_val_connected_end
-    :emphasize-lines: 2-5
+    :emphasize-lines: 2-6
 
 
 Environment variables

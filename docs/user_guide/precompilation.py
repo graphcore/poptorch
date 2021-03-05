@@ -91,16 +91,15 @@ model = ExampleModelWithLoss()
 
 opts = poptorch.Options()
 
-# Wrap the model in our PopTorch annotation wrapper.
-training_model = poptorch.trainingModel(model, opts)
-model.eval()
-validation_model = poptorch.inferenceModel(model, opts)
-
 # Some dummy inputs.
 input = torch.randn(10)
 target = torch.randn(10)
 
+# Wrap the model in our PopTorch annotation wrapper.
+training_model = poptorch.trainingModel(model, opts)
 training_model.compileAndExport("training.poptorch", input, target)
+model.eval()
+validation_model = poptorch.inferenceModel(model, opts)
 validation_model.compileAndExport("validation.poptorch", input)
 # precomp_train_val_end
 
