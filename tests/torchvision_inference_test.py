@@ -71,22 +71,24 @@ def inference_harness(imagenet_model):
     model.eval()
 
     # Run on CPU.
-    nativeOut = model(image_input)
+    native_out = model(image_input)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(image_input)
 
-    torch.testing.assert_allclose(nativeOut,
-                                  poptorch_out,
-                                  atol=1e-05,
-                                  rtol=0.1)
+    helpers.assert_allclose(expected=native_out,
+                            actual=poptorch_out,
+                            atol=1e-05,
+                            rtol=0.1)
 
-    native_class = torch.topk(torch.softmax(nativeOut, 1), 5)
+    native_class = torch.topk(torch.softmax(native_out, 1), 5)
     pop_class = torch.topk(torch.softmax(poptorch_out, 1), 5)
 
-    assert torch.equal(native_class.indices, pop_class.indices)
-    torch.testing.assert_allclose(native_class.values, pop_class.values)
+    helpers.assert_allequal(expected=native_class.indices,
+                            actual=pop_class.indices)
+    helpers.assert_allclose(expected=native_class.values,
+                            actual=pop_class.values)
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())

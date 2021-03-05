@@ -3,6 +3,7 @@
 
 import torch
 import poptorch
+import helpers
 
 
 class FiveAdder(torch.nn.Module):
@@ -33,12 +34,12 @@ def test_non_contiguous():
     assert c1.is_contiguous()
     assert c2.is_contiguous()
 
-    nativeOut = model(nc1, c1, nc2, c2, nc3)
-    popTorchOut = poptorch_model(nc1, c1, nc2, c2, nc3)
+    native_out = model(nc1, c1, nc2, c2, nc3)
+    poptorch_out = poptorch_model(nc1, c1, nc2, c2, nc3)
 
-    assert nativeOut.shape == (OUTER_DIM, INNER_DIM)
+    assert native_out.shape == (OUTER_DIM, INNER_DIM)
 
-    print(nativeOut)
-    print(popTorchOut)
+    print(native_out)
+    print(poptorch_out)
 
-    torch.testing.assert_allclose(popTorchOut, nativeOut)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)

@@ -4,6 +4,7 @@
 import transformers
 import torch
 import poptorch
+import helpers
 
 
 def test_bert_small():
@@ -19,15 +20,15 @@ def test_bert_small():
     input_ids = torch.tensor([tokenizer.encode("E")])
 
     inference_model = poptorch.inferenceModel(model)
-    poptorchOut = inference_model(input_ids)
+    poptorch_out = inference_model(input_ids)
 
     native = model(input_ids)
 
-    for poptorchResult, nativeResult in zip(poptorchOut, native):
-        assert torch.allclose(poptorchResult,
-                              nativeResult,
-                              rtol=1e-02,
-                              atol=1e-02)
+    for poptorchResult, nativeResult in zip(poptorch_out, native):
+        helpers.assert_allclose(actual=poptorchResult,
+                                expected=nativeResult,
+                                rtol=1e-02,
+                                atol=1e-02)
 
 
 def test_bert_small_half():
@@ -44,10 +45,10 @@ def test_bert_small_half():
 
     model.half()
     inference_model = poptorch.inferenceModel(model)
-    poptorchOut = inference_model(input_ids)
+    poptorch_out = inference_model(input_ids)
 
     # Just check that we compile for now.
-    assert poptorchOut[0].dtype == torch.half
+    assert poptorch_out[0].dtype == torch.half
 
 
 def test_bert_medium_result():
@@ -103,14 +104,14 @@ def test_bert_medium_result():
                                                       attention_mask)
 
     # Longer sequences begin to accumulate more floating point error.
-    assert torch.allclose(start_scores_native,
-                          start_score_pop,
-                          rtol=1e-02,
-                          atol=1e-02)
-    assert torch.allclose(end_scores_native,
-                          end_scores_pop,
-                          rtol=1e-02,
-                          atol=1e-02)
+    helpers.assert_allclose(expected=start_scores_native,
+                            actual=start_score_pop,
+                            rtol=1e-02,
+                            atol=1e-02)
+    helpers.assert_allclose(expected=end_scores_native,
+                            actual=end_scores_pop,
+                            rtol=1e-02,
+                            atol=1e-02)
 
     assert torch.argmax(start_score_pop), torch.argmax(start_scores_native)
     assert torch.argmax(end_scores_pop), torch.argmax(end_scores_native)

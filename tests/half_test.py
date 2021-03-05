@@ -115,10 +115,10 @@ def test_model_with_weights():
     model = model.float()
     t1 = t1.float()
 
-    torch.testing.assert_allclose(model(t1),
-                                  out.float(),
-                                  rtol=0.001,
-                                  atol=1e-04)
+    helpers.assert_allclose(expected=model(t1),
+                            actual=out.float(),
+                            rtol=0.001,
+                            atol=1e-04)
 
 
 def test_simple_model():
@@ -154,9 +154,10 @@ def test_lstm():
     inputs = [torch.randn(1, inputSize).half() for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), 1, -1)
-    hidden = (torch.randn(1, 1,
-                          numHidden).half(), torch.randn(1, 1,
-                                                         numHidden).half())
+    hidden = (
+        torch.randn(1, 1, numHidden).half(),
+        torch.randn(1, 1, numHidden).half(),
+    )
     ipuOut = ipuLstm(inputs, hidden)
     assert isinstance(ipuOut[0], torch.HalfTensor)
 

@@ -106,10 +106,10 @@ def test_precompile_then_load():
         x = torch.tensor([1., 2.])
         y = torch.tensor([3., 4.])
         # Check the user model was restored
-        torch.testing.assert_allclose(poptorch_model.model(x, y),
-                                      torch.tensor([4., 6.]))
-        torch.testing.assert_allclose(poptorch_model(x, y),
-                                      torch.tensor([4., 6.]))
+        helpers.assert_allclose(actual=poptorch_model.model(x, y),
+                                expected=torch.tensor([4., 6.]))
+        helpers.assert_allclose(actual=poptorch_model(x, y),
+                                expected=torch.tensor([4., 6.]))
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
@@ -145,11 +145,7 @@ def test_inference_attributes():
         def getAttr(self):
             return self.attr
 
-        def forward(
-                self,
-                x,
-                y,
-        ):
+        def forward(self, x, y):
             return x + y + 5
 
     poptorch_model = poptorch.inferenceModel(Model("MyAttr"))

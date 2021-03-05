@@ -5,6 +5,7 @@ import pytest
 import torch
 
 import poptorch
+import helpers
 
 
 def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn):
@@ -15,13 +16,13 @@ def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn):
     model = SliceModel()
 
     # Run on CPU.
-    nativeOut = model(tensor_x, tensor_y)
+    native_out = model(tensor_x, tensor_y)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(tensor_x, tensor_y)
 
-    assert torch.equal(nativeOut, poptorch_out)
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_slice_idx_size_of():
@@ -79,12 +80,13 @@ def index_test_harness(model, inds):
     poptorch_out = poptorch_model(t, *inds_tuple)
 
     assert native_out.size() == poptorch_out.size()
-    torch.testing.assert_allclose(poptorch_out, native_out)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
-@pytest.mark.parametrize("inds",
-                         ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
-                         )
+@pytest.mark.parametrize(
+    "inds",
+    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
+)
 def test_index_1(inds):
     class Model(torch.nn.Module):
         def forward(self, t, idx):
@@ -93,9 +95,10 @@ def test_index_1(inds):
     index_test_harness(Model(), inds)
 
 
-@pytest.mark.parametrize("inds",
-                         ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
-                         )
+@pytest.mark.parametrize(
+    "inds",
+    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
+)
 def test_index_2(inds):
     class Model(torch.nn.Module):
         def forward(self, t, idx):
@@ -104,9 +107,10 @@ def test_index_2(inds):
     index_test_harness(Model(), inds)
 
 
-@pytest.mark.parametrize("inds",
-                         ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
-                         )
+@pytest.mark.parametrize(
+    "inds",
+    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
+)
 def test_index_3(inds):
     class Model(torch.nn.Module):
         def forward(self, t, idx):
@@ -115,9 +119,10 @@ def test_index_3(inds):
     index_test_harness(Model(), inds)
 
 
-@pytest.mark.parametrize("inds",
-                         ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
-                         )
+@pytest.mark.parametrize(
+    "inds",
+    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
+)
 def test_index_4(inds):
     class Model(torch.nn.Module):
         def forward(self, t, idx):
@@ -126,9 +131,10 @@ def test_index_4(inds):
     index_test_harness(Model(), inds)
 
 
-@pytest.mark.parametrize("inds",
-                         ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
-                         )
+@pytest.mark.parametrize(
+    "inds",
+    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
+)
 def test_index_5(inds):
     class Model(torch.nn.Module):
         def forward(self, t, idx):
@@ -137,9 +143,10 @@ def test_index_5(inds):
     index_test_harness(Model(), inds)
 
 
-@pytest.mark.parametrize("inds",
-                         ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
-                         )
+@pytest.mark.parametrize(
+    "inds",
+    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
+)
 def test_index_6(inds):
     class Model(torch.nn.Module):
         def forward(self, t, idx):
@@ -148,9 +155,10 @@ def test_index_6(inds):
     index_test_harness(Model(), inds)
 
 
-@pytest.mark.parametrize("inds",
-                         ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
-                         )
+@pytest.mark.parametrize(
+    "inds",
+    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
+)
 def test_index_7(inds):
     class Model(torch.nn.Module):
         def forward(self, t, idx):
@@ -167,13 +175,13 @@ def dynamic_slice_harness(tensor_in, extra_in, start_fn, end_fn):
     model = DynamicSliceModel()
 
     # Run on CPU.
-    nativeOut = model(tensor_in, extra_in)
+    native_out = model(tensor_in, extra_in)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(tensor_in, extra_in)
 
-    assert torch.equal(nativeOut, poptorch_out)
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_dynamic_slice_one_dim_add():
@@ -247,12 +255,12 @@ def test_dynamic_slice_two_dims_twice_sliced():
     model = Model()
 
     # Run on CPU.
-    nativeOut = model(tensor_in, start_dim_one, start_dim_two)
+    native_out = model(tensor_in, start_dim_one, start_dim_two)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(tensor_in, start_dim_one, start_dim_two)
-    assert torch.equal(nativeOut, poptorch_out)
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_dynamic_slice_one_dim_equal():

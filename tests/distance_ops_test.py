@@ -4,6 +4,7 @@
 import torch
 import pytest
 import poptorch
+import helpers
 
 
 @pytest.mark.parametrize("norm", {1., 2., 3., 4.})
@@ -22,4 +23,4 @@ def test_pairwise_distance(norm):
     # Run on IPU
     poptorch_out = poptorch_model(input1, input2)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)

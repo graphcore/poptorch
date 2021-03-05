@@ -27,7 +27,7 @@ def test_L1Loss_direct():
             groundTruth = model(target, input)
             poptorch_out = poptorch_model(target, input)
 
-            assert torch.allclose(groundTruth, poptorch_out)
+            helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
 
 
 # Test L1 loss by using it to match a target label
@@ -71,7 +71,10 @@ def test_L1Loss_training():
         else:
             assert loss < 0.001
 
-        assert torch.allclose(out, target, rtol=1e-02, atol=1e-02)
+        helpers.assert_allclose(actual=out,
+                                expected=target,
+                                rtol=1e-02,
+                                atol=1e-02)
 
 
 # Test MSE loss by directly running it against the pytorch native MSE in inference.
@@ -92,7 +95,7 @@ def test_MSELoss_direct():
             groundTruth = model(target, input)
             poptorch_out = poptorch_model(target, input)
 
-            assert torch.allclose(groundTruth, poptorch_out)
+            helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
 
 
 # Test MSE loss by using it to match a target label
@@ -117,7 +120,10 @@ def test_MSELoss_training():
 
     # Check we have trained the "model"
     assert loss < 0.001
-    assert torch.allclose(out, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 # This also servees as the NLL loss test as it uses NLL under the hood.
@@ -136,7 +142,7 @@ def test_CrossEntropy_direct():
 
             groundTruth = model(input, label)
             poptorch_out = poptorch_model(input, label)
-            assert torch.allclose(groundTruth, poptorch_out)
+            helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
 
 
 # Since we swap out the log to conform to popart we are going to need to check that the LogSoftmax still actually works in normal contexts AND can be fed into a loss at the same time.
@@ -166,7 +172,7 @@ def test_LogSoftmax():
         groundTruth = model(input)
         poptorch_out, _ = poptorch_model(input, label)
 
-        assert torch.allclose(groundTruth, poptorch_out)
+        helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
 
 
 # Test softmax and logsoftmax for dimensions more than 2
@@ -182,13 +188,13 @@ def op_withdim(op, input):
     model = Model(op)
 
     # Run on CPU.
-    nativeOut = model(input)
+    native_out = model(input)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
 
-    torch.testing.assert_allclose(nativeOut, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 ops_float = [
@@ -285,7 +291,7 @@ def test_NLLLoss2d_training(reduction):
 
     # # Check we have trained the "model"
     assert loss < original_loss
-    torch.testing.assert_allclose(torch.argmax(out, dim=1), y)
+    helpers.assert_allclose(actual=torch.argmax(out, dim=1), expected=y)
 
 
 # Tell loss 2d in an inference model, comparing against pytorch
@@ -313,7 +319,7 @@ def test_NLLLoss2d_inference(reduction):
     native_out = model(x, y)
     poptorch_out = poptorch_model(x, y)
 
-    torch.testing.assert_allclose(poptorch_out, native_out)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
 # Test CrossEntropyLoss loss by using it to match a target label.
@@ -356,7 +362,7 @@ def test_BCE_direct(reduction):
 
         groundTruth = model(input, target)
         poptorch_out = poptorch_model(input, target)
-        assert torch.allclose(groundTruth, poptorch_out)
+        helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
 
 
 # TODO(T22975)
@@ -379,7 +385,7 @@ def test_BCE_direct(reduction):
 
 #             groundTruth = model(input, target)
 #             poptorch_out = poptorch_model(input, target)
-#             assert torch.allclose(groundTruth, poptorch_out)
+#             helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
@@ -409,7 +415,10 @@ def test_BCE_training(reduction):
 
     # # Check we have trained the "model"
     assert loss < original_loss
-    torch.testing.assert_allclose(target, out, rtol=1e-03, atol=1e-03)
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-03,
+                            atol=1e-03)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum", "batchmean"})
@@ -427,7 +436,7 @@ def test_KLDiv_direct(reduction, log_target):
     native_out = model(input, target)
     poptorch_out = poptorch_model(input, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
@@ -445,7 +454,7 @@ def test_PoissonNLLLoss_direct(reduction, log_input, full):
     native_out = model(input, target)
     poptorch_out = poptorch_model(input, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
@@ -464,7 +473,7 @@ def test_HingeEmbeddingLoss_direct(reduction):
     native_out = model(input, target)
     poptorch_out = poptorch_model(input, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 torch.manual_seed(42)
@@ -498,7 +507,7 @@ def test_BCEWithLogitsLoss_direct(reduction, params):
     native_out = model(input, target)
     poptorch_out = poptorch_model(input, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
@@ -514,7 +523,7 @@ def test_SmoothL1Loss_direct(reduction):
     native_out = model(input, target)
     poptorch_out = poptorch_model(input, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
@@ -532,7 +541,7 @@ def test_SoftMarginLoss_direct(reduction):
     native_out = model(input, target)
     poptorch_out = poptorch_model(input, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 # TODO(T30688): Support MultiLabelSoftMarginLoss
@@ -556,7 +565,7 @@ def test_MultiLabelSoftMarginLoss_direct(reduction, specify_weight):
     poptorch_out = poptorch_model(input, target)
 
     assert native_out.size() == poptorch_out.size()
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
@@ -579,7 +588,7 @@ def test_CosineEmbeddingLoss_direct(reduction):
     native_out = model(input1, input2, target)
     poptorch_out = poptorch_model(input1, input2, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
@@ -602,7 +611,7 @@ def test_MarginRankingLoss_direct(reduction):
     native_out = model(input1, input2, target)
     poptorch_out = poptorch_model(input1, input2, target)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("p", {2., 3.})
@@ -627,7 +636,7 @@ def test_TripletMarginLoss_direct(p, swap, reduction):
     native_out = model(anchor, positive, negative)
     poptorch_out = poptorch_model(anchor, positive, negative)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("blank", {0, 11})
@@ -671,7 +680,7 @@ def test_CTCLoss(blank, reduction):
     native_out = model(input, target, input_lengths, target_lengths)
     poptorch_out = poptorch_model(input, target, input_lengths, target_lengths)
 
-    torch.testing.assert_allclose(native_out,
-                                  poptorch_out,
-                                  rtol=1e-3,
-                                  atol=1e-3)
+    helpers.assert_allclose(expected=native_out,
+                            actual=poptorch_out,
+                            rtol=1e-3,
+                            atol=1e-3)

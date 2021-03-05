@@ -6,6 +6,7 @@ import torch
 from torch.testing._internal.jit_metaprogramming_utils import get_all_nn_module_tests, get_nn_mod_test_name, get_nn_module_name_from_kwargs
 import pytest
 import poptorch
+import helpers
 
 # Importing jit_metaprogramming_utils changes the default type to
 # double set it back to float.
@@ -259,7 +260,7 @@ EXPECTED_FAILURES = {
     "test_nn_Embedding_sparse": "T27057: sparse gradient support",
 
     "test_nn_MultiheadAttention": "ai.onnx.Dropout:10 ratio value 0 is not valid",
-    }
+}
 
 HALF_EXPECTED_FAILURES = {
     # T30731 - tests failing with very large error
@@ -272,7 +273,7 @@ HALF_EXPECTED_FAILURES = {
     "test_nn_BatchNorm2d": "AssertionError: With rtol=0.05 and atol=0.0001",
     "test_nn_BatchNorm3d": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 312.5105660557747 (0.9894339442253113 vs. 313.5), which occurred at index (1, 2, 2, 1, 1).",
     "test_nn_BatchNorm3d_3d_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 30.140776455402374 (0.9842235445976257 vs. 31.125), which occurred at index (1, 0, 2, 2, 3).",
-    }
+}
 
 HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
@@ -284,7 +285,9 @@ HALF_PRECISION_EXCEPTIONS = {
     "test_nn_BatchNorm2d_not_tracking_stats": (0.05, 1e-3),
     "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-3),
     "test_nn_TransformerDecoderLayer_relu_activation": (0.05, 1e-3),
-    }
+    "test_nn_Linear_no_bias": (0.05, 1e-3),
+    "test_nn_Conv2d_replicate_stride2_pad2": (0.05, 1e-3),
+}
 
 # pylint: enable=line-too-long
 # yapf: enable
@@ -339,10 +342,10 @@ def assert_allclose(native_out, poptorch_out, rtol, atol):
         native_out = torch.tensor(native_out.float())
 
     assert native_out.size() == poptorch_out.size()
-    torch.testing.assert_allclose(native_out.float(),
-                                  poptorch_out.float(),
-                                  rtol=rtol,
-                                  atol=atol)
+    helpers.assert_allclose(expected=native_out.float(),
+                            actual=poptorch_out.float(),
+                            rtol=rtol,
+                            atol=atol)
 
 
 @pytest.mark.parametrize("test_name", all_tests.keys())

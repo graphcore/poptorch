@@ -16,17 +16,17 @@ def test_inferenceBatching():
     input = torch.randn([10, 1, 5, 6])
 
     # Run pytorch native on CPU batchsize 10.
-    nativeOutput = model(input)
+    native_output = model(input)
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
     ipuModel = poptorch.inferenceModel(model, opts)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
     # Check that inference wrapper has defaulted to "All".
-    assert len(poptorchOut.size()) == 4
-    assert poptorchOut.size()[0] == 10
-    torch.testing.assert_allclose(poptorchOut, nativeOutput)
+    assert len(poptorch_out.size()) == 4
+    assert poptorch_out.size()[0] == 10
+    helpers.assert_allclose(expected=native_output, actual=poptorch_out)
 
 
 def test_trainingBatching():
@@ -61,7 +61,7 @@ def test_trainingBatching():
     out = model(input)
 
     # Check we are now equal with labels.
-    assert torch.equal(torch.argmax(out, dim=1), label)
+    helpers.assert_allequal(actual=torch.argmax(out, dim=1), expected=label)
 
 
 @pytest.mark.parametrize("anchor", list(poptorch.AnchorMode))
@@ -74,40 +74,41 @@ def test_inferenceAnchors(anchor):
     input = torch.randn([10, 1, 5, 6])
 
     # Run pytorch native on CPU batchsize 10.
-    nativeOutput = model(input)
+    native_out = model(input)
 
     # Run on IPU batch size 1 * 10 popart batches. anchor_return_period ignored if not EVERYN
     opts = poptorch.Options().deviceIterations(10)
     opts.anchorMode(anchor, anchor_return_period=5)
     ipuModel = poptorch.inferenceModel(model, opts)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
     if anchor in [poptorch.AnchorMode.All, poptorch.AnchorMode.Default]:
         # Expect the full batch.
-        assert len(poptorchOut.size()) == 4
-        assert poptorchOut.size()[0] == 10
-        torch.testing.assert_allclose(poptorchOut, nativeOutput)
+        assert len(poptorch_out.size()) == 4
+        assert poptorch_out.size()[0] == 10
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
     elif anchor == poptorch.AnchorMode.EveryN:
         # Otherwise we are expecting device_iterations / N
-        assert len(poptorchOut.size()) == 4
-        assert poptorchOut.size()[0] == 2
+        assert len(poptorch_out.size()) == 4
+        assert poptorch_out.size()[0] == 2
 
         # Check each N is the correct batch
-        torch.testing.assert_allclose(poptorchOut[0], nativeOutput[4])
-        torch.testing.assert_allclose(poptorchOut[1], nativeOutput[9])
+        helpers.assert_allclose(actual=poptorch_out[0], expected=native_out[4])
+        helpers.assert_allclose(actual=poptorch_out[1], expected=native_out[9])
 
     else:
         # Otherwise we are expecting just one element per batch.
-        assert len(poptorchOut.size()) == 4
-        assert poptorchOut.size()[0] == 1
+        assert len(poptorch_out.size()) == 4
+        assert poptorch_out.size()[0] == 1
 
         if anchor == poptorch.AnchorMode.Final:
             # Check we are the same as the last output.
-            torch.testing.assert_allclose(poptorchOut, nativeOutput[-1])
+            helpers.assert_allclose(actual=poptorch_out,
+                                    expected=native_out[-1])
         elif anchor == poptorch.AnchorMode.Sum:
             # Check we are close to the sum of the batch dim.
-            sum = torch.sum(nativeOutput, dim=0, keepdim=True)
-            torch.testing.assert_allclose(poptorchOut, sum)
+            sum = torch.sum(native_out, dim=0, keepdim=True)
+            helpers.assert_allclose(actual=poptorch_out, expected=sum)
         else:
             assert False, "Unexpected anchor type %s" % anchor
 
@@ -135,12 +136,12 @@ def test_trainingAnchors(anchor):
     poptorch_model = helpers.trainingModelWithLoss(
         model, options=opts, loss=torch.nn.CrossEntropyLoss())
 
-    poptorchOut, loss = poptorch_model(input, label)
+    poptorch_out, loss = poptorch_model(input, label)
 
     if anchor == poptorch.AnchorMode.All:
         # Expect the full batch.
-        assert len(poptorchOut.size()) == 2
-        assert poptorchOut.size()[0] == 1000
+        assert len(poptorch_out.size()) == 2
+        assert poptorch_out.size()[0] == 1000
 
         assert len(loss.size()) == 1
         assert loss.size()[0] == 1000
@@ -159,16 +160,16 @@ def test_trainingAnchors(anchor):
 
     elif anchor == poptorch.AnchorMode.EveryN:
         # Otherwise we are expecting device_iterations / N
-        assert len(poptorchOut.size()) == 2
-        assert poptorchOut.size()[0] == 50
+        assert len(poptorch_out.size()) == 2
+        assert poptorch_out.size()[0] == 50
 
         # There's too much noise in the losses for us to test directly without averaging like above so just test sizes.
         assert len(loss.size()) == 1
         assert loss.size()[0] == 50
     else:
         # Otherwise we are expecting just one element per batch.
-        assert len(poptorchOut.size()) == 2
-        assert poptorchOut.size()[0] == 1
+        assert len(poptorch_out.size()) == 2
+        assert poptorch_out.size()[0] == 1
 
         assert len(loss.size()) == 0
 
@@ -217,21 +218,39 @@ def test_gradient_accumulation():
     input = torch.randn(4, 10)
 
     # Testing gradient accumulations 1 vs 2 and Mean reduction
-    w_with_1 = run_gradient_accumulation_test(target, input, 1,
-                                              poptorch.ReductionType.Mean,
-                                              0.01)
-    w_with_2 = run_gradient_accumulation_test(target, input, 2,
-                                              poptorch.ReductionType.Mean,
-                                              0.01)
-    torch.testing.assert_allclose(w_with_1, w_with_2)
+    w_with_1 = run_gradient_accumulation_test(
+        target,
+        input,
+        1,
+        poptorch.ReductionType.Mean,
+        0.01,
+    )
+    w_with_2 = run_gradient_accumulation_test(
+        target,
+        input,
+        2,
+        poptorch.ReductionType.Mean,
+        0.01,
+    )
+    helpers.assert_allclose(actual=w_with_1, expected=w_with_2)
 
     # Test the default matches as well (i.e. the default is mean)
     w_with_2 = run_gradient_accumulation_test(target, input, 2, None, 0.01)
-    torch.testing.assert_allclose(w_with_1, w_with_2)
+    helpers.assert_allclose(actual=w_with_1, expected=w_with_2)
 
     # Testing gradient accumulations 1 vs 2 and Sum reduction (different lr)
-    w_with_1 = run_gradient_accumulation_test(target, input, 1,
-                                              poptorch.ReductionType.Sum, 0.02)
-    w_with_2 = run_gradient_accumulation_test(target, input, 2,
-                                              poptorch.ReductionType.Sum, 0.01)
-    torch.testing.assert_allclose(w_with_1, w_with_2)
+    w_with_1 = run_gradient_accumulation_test(
+        target,
+        input,
+        1,
+        poptorch.ReductionType.Sum,
+        0.02,
+    )
+    w_with_2 = run_gradient_accumulation_test(
+        target,
+        input,
+        2,
+        poptorch.ReductionType.Sum,
+        0.01,
+    )
+    helpers.assert_allclose(actual=w_with_1, expected=w_with_2)

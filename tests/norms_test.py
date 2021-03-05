@@ -32,16 +32,16 @@ def test_batchNorm1D(running_stats, training):
     norm.train(training)
 
     # Run pytorch native on CPU.
-    nativeOutput = norm(input)
+    native_output = norm(input)
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(norm)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
-    torch.testing.assert_allclose(poptorchOut,
-                                  nativeOutput,
-                                  atol=1e-1,
-                                  rtol=0.1)
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=native_output,
+                            atol=1e-1,
+                            rtol=0.1)
 
 
 @pytest.mark.parametrize("running_stats", {True, False})
@@ -60,16 +60,16 @@ def test_batchNorm2D(running_stats, training):
     norm.train(training)
 
     # Run pytorch native on CPU.
-    nativeOutput = norm(input)
+    native_output = norm(input)
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(norm)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
-    torch.testing.assert_allclose(poptorchOut,
-                                  nativeOutput,
-                                  atol=1e-1,
-                                  rtol=0.1)
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=native_output,
+                            atol=1e-1,
+                            rtol=0.1)
 
 
 @pytest.mark.parametrize("running_stats", {True, False})
@@ -88,16 +88,16 @@ def test_batchNorm3D(running_stats, training):
     norm.train(training)
 
     # Run pytorch native on CPU.
-    nativeOutput = norm(input)
+    native_output = norm(input)
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(norm)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
-    torch.testing.assert_allclose(poptorchOut,
-                                  nativeOutput,
-                                  atol=1e-1,
-                                  rtol=0.1)
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=native_output,
+                            atol=1e-1,
+                            rtol=0.1)
 
 
 def test_layerNorm():
@@ -108,13 +108,13 @@ def test_layerNorm():
         layerNorm = nn.LayerNorm(input.size()[i:])
 
         # Run pytorch native on CPU.
-        nativeOutput = layerNorm(input)
+        native_output = layerNorm(input)
 
         # Run on IPU.
         ipuModel = poptorch.inferenceModel(layerNorm)
-        poptorchOut = ipuModel(input)
+        poptorch_out = ipuModel(input)
 
-        assert torch.allclose(poptorchOut, nativeOutput)
+        helpers.assert_allclose(actual=poptorch_out, expected=native_output)
 
 
 def test_layerNormScalar():
@@ -124,13 +124,13 @@ def test_layerNormScalar():
     layerNorm = nn.LayerNorm(2)
 
     # Run pytorch native on CPU.
-    nativeOutput = layerNorm(input)
+    native_output = layerNorm(input)
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(layerNorm)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
-    assert torch.allclose(poptorchOut, nativeOutput)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_output)
 
 
 def test_layerNormPretrainedWeights():
@@ -155,10 +155,13 @@ def test_layerNormPretrainedWeights():
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(model)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
     # Marginally more leeway.
-    assert torch.allclose(poptorchOut, modelOut, rtol=1e-4, atol=1e-6)
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=modelOut,
+                            rtol=1e-4,
+                            atol=1e-6)
 
     # We aren't training to any real target we just want to update the beta/gamma parameters and check they still work in popart.
     criterion = nn.MSELoss()
@@ -175,12 +178,15 @@ def test_layerNormPretrainedWeights():
     model.eval()
     # Run on IPU with trained weights.
     ipuModel = poptorch.inferenceModel(model)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
     # Run on CPU again with trained weights.
     outputs = model(input)
 
-    assert torch.allclose(poptorchOut, outputs, rtol=1e-4, atol=1e-6)
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=outputs,
+                            rtol=1e-4,
+                            atol=1e-6)
 
 
 @pytest.mark.parametrize("dims", {2, 3, 4, 5})
@@ -197,15 +203,15 @@ def test_groupNorm(dims):
         groupNorm = nn.GroupNorm(5, 10)
 
         # Run pytorch native on CPU.
-        nativeOutput = groupNorm(input)
+        native_output = groupNorm(input)
 
         # Run on IPU.
         ipuModel = poptorch.inferenceModel(groupNorm)
-        poptorchOut = ipuModel(input)
+        poptorch_out = ipuModel(input)
 
         # Group norm is pending correctness changes in popart/poplar so we will just test the shape/type for now.
-        assert poptorchOut.size() == nativeOutput.size()
-        assert poptorchOut.type() == nativeOutput.type()
+        assert poptorch_out.size() == native_output.size()
+        assert poptorch_out.type() == native_output.type()
 
 
 @pytest.mark.parametrize("instanceNormXd", {(nn.InstanceNorm1d, 1),
@@ -250,4 +256,5 @@ def test_instanceNorm(instanceNormXd):
         # Check we have trained the model
         assert loss < original_loss
         assert loss < 0.03
-        assert torch.equal(torch.argmax(out, dim=1), label)
+        helpers.assert_allequal(actual=torch.argmax(out, dim=1),
+                                expected=label)

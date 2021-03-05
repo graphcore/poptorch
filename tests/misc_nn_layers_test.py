@@ -41,14 +41,14 @@ def test_upsample(scale_factor, input_shape):
     x = torch.randn(*input_shape)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    torch.testing.assert_allclose(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("mode, input_shape", [("linear", (1, 2, 3)),
@@ -71,14 +71,14 @@ def test_linear():
     x = torch.randn(128, 20)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    torch.testing.assert_allclose(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("include_bias", include_bias)
@@ -98,7 +98,7 @@ def test_bilinear(include_bias, input_feature_shapes):
     actual = poptorch_model(x1, x2)
 
     assert native_out.size() == actual.size()
-    torch.testing.assert_allclose(native_out, actual)
+    helpers.assert_allclose(expected=native_out, actual=actual)
 
 
 def test_identity():
@@ -117,14 +117,14 @@ def test_identity():
     y = torch.zeros_like(x)
 
     # Run on CPU.
-    nativeOut = model(x, y)
+    native_out = model(x, y)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x, y)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 dropout_ops = [torch.nn.Dropout, torch.nn.Dropout2d, torch.nn.Dropout3d]
@@ -146,11 +146,11 @@ def test_dropout_inference(dropout_op):
     poptorch_out = poptorch_model(x)
 
     msg = f"{dropout_op.__name__} in inference session should equal identity."
-    torch.testing.assert_allclose(poptorch_out,
-                                  native_out,
-                                  rtol=0,
-                                  atol=0,
-                                  msg=msg)
+    helpers.assert_allclose(expected=native_out,
+                            actual=poptorch_out,
+                            rtol=0,
+                            atol=0,
+                            msg=msg)
 
 
 def dropout_training_harness(dropout_op, input, check_func):
@@ -186,10 +186,10 @@ def test_dropout_training():
     def check_ratio(poptorch_out):
         # Instead we test that poptorch converge to the expected dropout ratio
         actual_ratio = x[poptorch_out == 0].sum() / x.numel()
-        torch.testing.assert_allclose(actual_ratio,
-                                      drop_ratio,
-                                      rtol=0.01,
-                                      atol=0.01)
+        helpers.assert_allclose(actual=actual_ratio,
+                                expected=drop_ratio,
+                                rtol=0.01,
+                                atol=0.01)
 
     dropout_training_harness(dropout_op, x, check_ratio)
 
@@ -210,10 +210,10 @@ def test_dropout2d_training():
     def check_ratio(poptorch_out):
         channel_mask = (poptorch_out == 0).all(-1).all(-1)
         actual_ratio = channel_mask.sum() / num_channels
-        torch.testing.assert_allclose(actual_ratio,
-                                      drop_ratio,
-                                      rtol=0.01,
-                                      atol=0.01)
+        helpers.assert_allclose(actual=actual_ratio,
+                                expected=drop_ratio,
+                                rtol=0.01,
+                                atol=0.01)
 
     dropout_training_harness(dropout_op, x, check_ratio)
 
@@ -234,10 +234,10 @@ def test_dropout3d_training():
     def check_ratio(poptorch_out):
         channel_mask = (poptorch_out == 0).all(-1).all(-1).all(-1)
         actual_ratio = channel_mask.sum() / num_channels
-        torch.testing.assert_allclose(actual_ratio,
-                                      drop_ratio,
-                                      rtol=0.01,
-                                      atol=0.01)
+        helpers.assert_allclose(actual=actual_ratio,
+                                expected=drop_ratio,
+                                rtol=0.01,
+                                atol=0.01)
 
     dropout_training_harness(dropout_op, x, check_ratio)
 
@@ -247,14 +247,14 @@ def test_embedding():
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
@@ -265,7 +265,7 @@ def test_embedding_bag(mode):
     cpu_out = model(x)
     pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(x)
-    torch.testing.assert_allclose(pop_out, cpu_out)
+    helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
 def test_embedding_bag_per_sample_weights():
@@ -286,7 +286,7 @@ def test_embedding_bag_per_sample_weights():
     cpu_out = model(x)
     pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(x)
-    torch.testing.assert_allclose(pop_out, cpu_out)
+    helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
@@ -313,7 +313,7 @@ def test_embedding_bag_include_last_offset(mode):
     cpu_out = model(x)
     pop_model = poptorch.inferenceModel(model)
     pop_out = pop_model(x)
-    torch.testing.assert_allclose(pop_out, cpu_out)
+    helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
 def test_pixel_shuffle():
@@ -321,11 +321,11 @@ def test_pixel_shuffle():
     x = torch.randn(2, 18, 4, 4)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)

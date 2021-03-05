@@ -4,6 +4,7 @@
 import torch
 import pytest
 import poptorch
+import helpers
 
 # Unsupported and uncatergorised math ops.
 # torch.addcdiv, torch.addcmul, torch.clamp, torch.lerp,
@@ -22,13 +23,13 @@ def unary_op_harness(op, input, eq):
     model = Model(op)
 
     # Run on CPU.
-    nativeOut = model(input)
+    native_out = model(input)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
 
-    assert eq(nativeOut, poptorch_out)
+    assert eq(native_out, poptorch_out)
 
 
 def binary_op_harness(op, input1, input2, eq):
@@ -43,13 +44,13 @@ def binary_op_harness(op, input1, input2, eq):
     model = Model(op)
 
     # Run on CPU.
-    nativeOut = model(input1, input2)
+    native_out = model(input1, input2)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input1, input2)
 
-    assert eq(nativeOut, poptorch_out)
+    assert eq(native_out, poptorch_out)
 
 
 unary_ops_float = [
@@ -448,7 +449,7 @@ def test_minmax_tuple_out(op, dim, keepdim):
         assert len(cpu_out) == len(pop_out)
 
         for i, cpu in enumerate(cpu_out):
-            torch.testing.assert_allclose(pop_out[i], cpu)
+            helpers.assert_allclose(actual=pop_out[i], expected=cpu)
 
         return True
 
@@ -646,4 +647,4 @@ def test_addcdiv(shapes, scale):
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(t0, t1, t2)
 
-    torch.testing.assert_allclose(poptorch_out, native_out)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)

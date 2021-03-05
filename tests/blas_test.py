@@ -5,6 +5,7 @@ import pytest
 import torch
 import torch.optim as optim
 import poptorch
+import helpers
 
 
 def blas_op(op, input1, input2, out):
@@ -21,23 +22,23 @@ def blas_op(op, input1, input2, out):
     if out is not None:
         args.append(out)
     # Run on CPU.
-    nativeOut = model(*args)
+    native_out = model(*args)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(*args)
 
-    torch.testing.assert_allclose(nativeOut,
-                                  poptorch_out,
-                                  atol=1e-05,
-                                  rtol=1e-05,
-                                  equal_nan=True)
+    helpers.assert_allclose(expected=native_out,
+                            actual=poptorch_out,
+                            atol=1e-05,
+                            rtol=1e-05,
+                            equal_nan=True)
     if out is not None:
-        torch.testing.assert_allclose(nativeOut,
-                                      out,
-                                      atol=1e-05,
-                                      rtol=1e-05,
-                                      equal_nan=True)
+        helpers.assert_allclose(expected=native_out,
+                                actual=out,
+                                atol=1e-05,
+                                rtol=1e-05,
+                                equal_nan=True)
 
 
 @pytest.mark.parametrize("optional_out", [True, False])
@@ -89,16 +90,16 @@ def test_matmul_training():
 
     for _ in range(0, 400):
         optimizer.zero_grad()
-        poptorch_output, poptorch_loss = poptorch_model(x, y, target)
-        native_output, native_loss = model(x, y, target)
+        poptorch_out, poptorch_loss = poptorch_model(x, y, target)
+        native_out, native_loss = model(x, y, target)
         native_loss.backward(retain_graph=True)
         optimizer.step()
 
-    torch.testing.assert_allclose(poptorch_output,
-                                  native_output,
-                                  rtol=1e-02,
-                                  atol=1e-02)
-    torch.testing.assert_allclose(poptorch_loss,
-                                  native_loss,
-                                  rtol=1e-03,
-                                  atol=1e-03)
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=native_out,
+                            rtol=1e-02,
+                            atol=1e-02)
+    helpers.assert_allclose(actual=poptorch_loss,
+                            expected=native_loss,
+                            rtol=1e-03,
+                            atol=1e-03)

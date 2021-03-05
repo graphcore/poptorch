@@ -45,10 +45,10 @@ def test_non_final_loss_reductions(reduction):
     elif reduction == "none":
         simulated_loss = x - target
 
-    torch.testing.assert_allclose(simulated_loss.reshape_as(partial_loss),
-                                  partial_loss,
-                                  rtol=1e-02,
-                                  atol=1e-02)
+    helpers.assert_allclose(expected=simulated_loss.reshape_as(partial_loss),
+                            actual=partial_loss,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 # Test custom loss by training to a target
@@ -85,12 +85,18 @@ def test_custom_loss():
 
     # Check we have trained the "model"
     assert loss < 0.001
-    assert torch.allclose(out, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
     # Check that the pytorch native model is also returning the trained
     # value that was trained on IPU.
     out = model(input)
-    assert torch.allclose(out, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 # Test custom loss by training to a target
@@ -128,12 +134,18 @@ def test_custom_loss_l1():
 
     # Check we have trained the "model"
     assert loss < 0.001
-    torch.testing.assert_allclose(out, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
     # Check that the pytorch native model is also returning the trained
     # value that was trained on IPU.
     out = model(input)
-    torch.testing.assert_allclose(out, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 # Test custom loss by training to a label

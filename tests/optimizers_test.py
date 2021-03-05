@@ -211,10 +211,10 @@ def test_optimizer_groups(opt):
     weight2_post, bias2_post = model.model[1].parameters()
 
     # Nothing should have changed.
-    assert torch.equal(weight1, weight1_post)
-    assert torch.equal(weight2, weight2_post)
-    assert torch.equal(bias1, bias1_post)
-    assert torch.equal(bias2, bias2_post)
+    helpers.assert_allequal(expected=weight1, actual=weight1_post)
+    helpers.assert_allequal(expected=weight2, actual=weight2_post)
+    helpers.assert_allequal(expected=bias1, actual=bias1_post)
+    helpers.assert_allequal(expected=bias2, actual=bias2_post)
 
     # Check we have not trained the model
     assert loss == original_loss
@@ -239,9 +239,9 @@ def test_optimizer_groups(opt):
     assert loss != original_loss
 
     assert not torch.equal(weight1, weight1_post)
-    assert torch.equal(weight2, weight2_post)
+    helpers.assert_allequal(expected=weight2, actual=weight2_post)
     assert not torch.equal(bias1, bias1_post)
-    assert torch.equal(bias2, bias2_post)
+    helpers.assert_allequal(expected=bias2, actual=bias2_post)
 
     # Now update the optimizer to train just both weight
     _, original_loss = model.run(
@@ -296,10 +296,10 @@ def test_optimizer_groups_none_args():
     weight2_post, bias2_post = model.model[1].parameters()
 
     # Nothing should have changed.
-    assert torch.equal(weight1, weight1_post)
-    assert torch.equal(weight2, weight2_post)
-    assert torch.equal(bias1, bias1_post)
-    assert torch.equal(bias2, bias2_post)
+    helpers.assert_allequal(expected=weight1, actual=weight1_post)
+    helpers.assert_allequal(expected=weight2, actual=weight2_post)
+    helpers.assert_allequal(expected=bias1, actual=bias1_post)
+    helpers.assert_allequal(expected=bias2, actual=bias2_post)
 
 
 def test_optimizer_SGD_nesterov():

@@ -326,7 +326,10 @@ def test_master_weight_training():
 
     # Check we have trained the "model"
     assert loss.float() < 0.001
-    assert torch.allclose(out.float(), target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out.float(),
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 def test_bigger_model_training():
@@ -354,4 +357,7 @@ def test_bigger_model_training():
 
     # Check we have trained the "model"
     assert loss.float() < 0.001
-    assert torch.allclose(out.float(), target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out.float(),
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)

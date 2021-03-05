@@ -10,6 +10,7 @@ import sys
 import pytest
 import torch
 import poptorch
+import helpers
 
 myso = list(pathlib.Path("tests").rglob("libcustom_*.*"))
 assert myso, "Failed to find libcustom_* libraries"
@@ -38,7 +39,7 @@ def test_float_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    torch.testing.assert_allclose(out, 8.5)
+    helpers.assert_allclose(actual=out, expected=8.5)
 
 
 def test_float_attribute_too_low():
@@ -105,7 +106,8 @@ def test_int_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    assert torch.equal(out[0], torch.tensor([8], dtype=torch.int32))
+    helpers.assert_allequal(actual=out[0],
+                            expected=torch.tensor([8], dtype=torch.int32))
 
 
 def test_float_list_attribute():
@@ -126,7 +128,8 @@ def test_float_list_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    torch.testing.assert_allclose(out[0], torch.tensor([4.0, 6.0, 8.0]))
+    helpers.assert_allclose(actual=out[0],
+                            expected=torch.tensor([4.0, 6.0, 8.0]))
 
 
 def test_float_list_attribute_too_low():
@@ -195,7 +198,8 @@ def test_float_tuple_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    torch.testing.assert_allclose(out[0], torch.tensor([4.0, 6.0, 8.0]))
+    helpers.assert_allclose(expected=out[0],
+                            actual=torch.tensor([4.0, 6.0, 8.0]))
 
 
 def test_int_list_attribute():
@@ -216,7 +220,9 @@ def test_int_list_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    assert torch.equal(out[0], torch.tensor([4, 6, 8], dtype=torch.int32))
+    helpers.assert_allequal(actual=out[0],
+                            expected=torch.tensor([4, 6, 8],
+                                                  dtype=torch.int32))
 
 
 def test_float_combined_attributes():
@@ -240,7 +246,8 @@ def test_float_combined_attributes():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    assert torch.equal(out[0], torch.tensor([8.0, 12.0, 16.0]))
+    helpers.assert_allequal(actual=out[0],
+                            expected=torch.tensor([8.0, 12.0, 16.0]))
 
 
 def test_int_two_attributes():
@@ -267,7 +274,8 @@ def test_int_two_attributes():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    assert torch.equal(out[0], torch.tensor([10], dtype=torch.int32))
+    helpers.assert_allequal(actual=out[0],
+                            expected=torch.tensor([10], dtype=torch.int32))
 
 
 @pytest.mark.parametrize("attr", ("sum", "mean"))
@@ -290,9 +298,9 @@ def test_string_attribute(attr):
     out = inference_model(x)
 
     if attr == "mean":
-        torch.testing.assert_allclose(out[0], torch.tensor(6.0))
+        helpers.assert_allclose(actual=out[0], expected=torch.tensor(6.0))
     else:
-        torch.testing.assert_allclose(out[0], torch.tensor(18.0))
+        helpers.assert_allclose(actual=out[0], expected=torch.tensor(18.0))
 
 
 def test_non_ascii_string_attribute():
@@ -338,9 +346,9 @@ def test_string_list_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x, y, z)
 
-    assert torch.equal(out[0], torch.tensor(2.0))
-    assert torch.equal(out[1], torch.tensor(9.0))
-    assert torch.equal(out[2], torch.tensor(4.0))
+    helpers.assert_allequal(actual=out[0], expected=torch.tensor(2.0))
+    helpers.assert_allequal(actual=out[1], expected=torch.tensor(9.0))
+    helpers.assert_allequal(actual=out[2], expected=torch.tensor(4.0))
 
 
 def test_non_asciistring_list_attribute():
@@ -408,7 +416,7 @@ def test_many_attributes(seed):
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    assert torch.equal(out[0], torch.tensor([1.0]))
+    helpers.assert_allequal(actual=out[0], expected=torch.tensor(1.0))
 
 
 @pytest.mark.parametrize("seed", range(3))
@@ -439,7 +447,7 @@ def test_many_attributes_one_wrong(seed):
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    assert torch.equal(out[0], torch.tensor([0.0]))
+    helpers.assert_allequal(actual=out[0], expected=torch.tensor(0.0))
 
 
 #many_attribtes_examples_start
