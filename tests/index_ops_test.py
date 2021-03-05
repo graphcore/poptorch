@@ -6,6 +6,7 @@ import torch.nn as nn
 import pytest
 
 import poptorch
+import helpers
 
 
 class IndexModel0(nn.Module):
@@ -108,7 +109,7 @@ def index_harness(model, idxs, pass_value, v=None):
         poptorch_out = poptorch_model(t, *idxs_tuple)
 
     assert native_out.size() == poptorch_out.size()
-    torch.testing.assert_allclose(poptorch_out, native_out)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
 index_models = (

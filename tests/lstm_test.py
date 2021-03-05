@@ -21,7 +21,7 @@ def test_lstm():
         out, newHidden = lstm(i.view(1, 1, -1), hidden)
         ipuOut, ipuHidden = ipuLstm(i.view(1, 1, -1), hidden)
         assert poptorch.testing.allclose(newHidden, ipuHidden)
-        torch.testing.assert_allclose(out, ipuOut)
+        helpers.assert_allclose(expected=out, actual=ipuOut)
         hidden = newHidden
 
 

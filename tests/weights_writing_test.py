@@ -51,7 +51,8 @@ def test_training_and_inference(use_half):
     out = inference(input)
 
     # Check we are now equal with labels.
-    assert torch.equal(torch.argmax(out.int(), dim=1), label)
+    helpers.assert_allequal(actual=torch.argmax(out.int(), dim=1),
+                            expected=label)
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -96,7 +97,8 @@ def test_training_inference_parameters(use_half):
     out = inference(input)
 
     # Check we are now equal with labels.
-    assert torch.equal(torch.argmax(out.int(), dim=1), label)
+    helpers.assert_allequal(actual=torch.argmax(out.int(), dim=1),
+                            expected=label)
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -152,7 +154,8 @@ def test_access_parameters(use_half):
     out = inference(input)
 
     # Check we are now equal with labels.
-    assert torch.equal(torch.argmax(out.int(), dim=1), label)
+    helpers.assert_allequal(actual=torch.argmax(out.int(), dim=1),
+                            expected=label)
 
 
 class DummyTrainingModel(torch.nn.Module):
@@ -227,8 +230,8 @@ def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
             "No implicit copy needed to train the model"
 
     # Run without copying the weights and check they've been automatically updated.
-    nativeOut = model(input)
-    assert torch.allclose(nativeOut, out)
+    native_out = model(input)
+    helpers.assert_allclose(expected=native_out, actual=out)
     assert training_model.deviceToHostCounter == 1, \
             "1 implicit copy after having trained the model"
     training_model.deviceToHostCounter = 0  # reset counter
@@ -239,8 +242,8 @@ def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
             "No implicit copy needed to access the parameters after inference"
     last_parameters = current_parameters
 
-    nativeOut = model(input)
-    assert torch.allclose(nativeOut, out)
+    native_out = model(input)
+    helpers.assert_allclose(expected=native_out, actual=out)
     assert training_model.deviceToHostCounter == 0, \
             "No implicit copy needed after inference"
 
@@ -312,19 +315,22 @@ def test_weights_sharing_ipu_cpu():
             "No implicit copy needed to train the model"
 
     # Run without copying the weights and check they've been automatically updated.
-    nativeOut = model(input)
-    assert torch.allclose(nativeOut, out)
+    native_out = model(input)
+    helpers.assert_allclose(expected=native_out, actual=out)
     assert training_model.deviceToHostCounter == 1, \
             "1 implicit copy after having trained the model"
     training_model.deviceToHostCounter = 0  # reset counter
 
-    nativeOut = model(input)
-    assert torch.allclose(nativeOut, out)
+    native_out = model(input)
+    helpers.assert_allclose(expected=native_out, actual=out)
     assert training_model.deviceToHostCounter == 0, \
             "No implicit copy needed after inference"
 
     # Check we have trained the "model"
-    assert torch.allclose(nativeOut, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(expected=native_out,
+                            actual=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 def train_N_times_and_check_copying(N, inference_model, training_model, input,
@@ -338,13 +344,13 @@ def train_N_times_and_check_copying(N, inference_model, training_model, input,
 
     # Run without copying the weights and check they've been automatically updated.
     out_inference = inference_model(input)
-    assert torch.allclose(out_inference, out)
+    helpers.assert_allclose(expected=out, actual=out_inference)
     assert training_model.deviceToHostCounter == 1, \
             "1 implicit copy after having trained the model"
     training_model.deviceToHostCounter = 0  # reset counter
 
     out_inference = inference_model(input)
-    assert torch.allclose(out_inference, out)
+    helpers.assert_allclose(expected=out, actual=out_inference)
     assert training_model.deviceToHostCounter == 0, \
             "No implicit copy needed after inference"
 
@@ -385,7 +391,10 @@ def test_weights_sharing_ipus():
                                                     training_model, input,
                                                     target)
 
-    assert torch.allclose(out_inference, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=out_inference,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 def test_implicit_first_time_copy():
@@ -419,15 +428,21 @@ def test_implicit_first_time_copy():
     # Check the model is now trained
     model.eval()
     native = model(input)
-    assert torch.allclose(native, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=native,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(model)
-    poptorchOut = ipuModel(input)
+    poptorch_out = ipuModel(input)
 
     # Check IPU returns same value as native without the weights explicitly being copied.
-    assert torch.allclose(poptorchOut, native)
-    assert torch.allclose(poptorchOut, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(expected=native, actual=poptorch_out)
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 def test_implicit_first_time_copy_negative():
@@ -448,10 +463,10 @@ def test_implicit_first_time_copy_negative():
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
-    poptorchOut = poptorch_model(input)
+    poptorch_out = poptorch_model(input)
 
     # Weights should be copied so check we are matching host but NOT the target.
-    assert torch.allclose(poptorchOut, native)
+    helpers.assert_allclose(expected=native, actual=poptorch_out)
     assert not torch.allclose(native, target, rtol=1e-02, atol=1e-02)
 
     model.train()
@@ -469,14 +484,17 @@ def test_implicit_first_time_copy_negative():
     # Check the model is now trained
     model.eval()
     native = model(input)
-    assert torch.allclose(native, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=native,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
     # Without recompilation or copying the weights check we are matching neither host nor the target.
-    poptorchOut = poptorch_model(input)
+    poptorch_out = poptorch_model(input)
 
     # Check IPU *does not* return the same value as native
-    assert not torch.allclose(poptorchOut, native)
-    assert not torch.allclose(poptorchOut, target, rtol=1e-02, atol=1e-02)
+    assert not torch.allclose(poptorch_out, native)
+    assert not torch.allclose(poptorch_out, target, rtol=1e-02, atol=1e-02)
 
 
 def test_weight_overwrite_trained_weight():
@@ -497,7 +515,10 @@ def test_weight_overwrite_trained_weight():
         trained_out, trained_loss = poptorch_model(input, target)
 
     # Check we have trained the "model"
-    assert torch.allclose(trained_out, target, rtol=1e-02, atol=1e-02)
+    helpers.assert_allclose(actual=trained_out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
     # Overwrite the trained weights with weights from host.
     poptorch_model.copyWeightsToDevice()
@@ -512,7 +533,7 @@ def test_weight_overwrite_trained_weight():
     assert not torch.allclose(out, target, rtol=1e-02, atol=1e-02)
     assert not torch.allclose(loss, trained_loss)
 
-    assert torch.allclose(host_out, out)
+    helpers.assert_allclose(expected=host_out, actual=out)
 
 
 @pytest.mark.parametrize("use_half", [True, False])

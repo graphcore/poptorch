@@ -4,6 +4,7 @@
 import pytest
 import torch
 import poptorch
+import helpers
 
 # Pools
 pool_operators = [
@@ -31,19 +32,19 @@ adaptive_avg_pool = [
 
 def execute_and_check_wrapper(model, input, check_shape_only=False):
     # Run on CPU.
-    nativeOut = model(input)
+    native_out = model(input)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
 
-    print(nativeOut.size())
+    print(native_out.size())
 
     if not check_shape_only:
-        torch.testing.assert_allclose(poptorch_out, nativeOut)
+        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
     else:
         # This is due to adaptive pooling's process essentially being an implementation detail.
-        assert poptorch_out.size() == nativeOut.size()
+        assert poptorch_out.size() == native_out.size()
 
 
 @pytest.mark.parametrize("op", pool_2D)

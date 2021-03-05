@@ -3,6 +3,7 @@
 import torch
 import pytest
 import poptorch
+import helpers
 
 
 # Random Number Generation Harness
@@ -42,10 +43,10 @@ def rng_harness(rng_op, input, stat_funs, expected_dtype=torch.float):
     print("Checking summary statistics for generated random numbers:")
     for ss in stat_funs:
         print("  {} = {}".format(ss.__name__, ss(pop_out)))
-        torch.testing.assert_allclose(ss(native_out),
-                                      ss(pop_out),
-                                      atol=1e-2,
-                                      rtol=0.1)
+        helpers.assert_allclose(expected=ss(native_out),
+                                actual=ss(pop_out),
+                                atol=1e-2,
+                                rtol=0.1)
 
 
 def rng_requirements(func):
@@ -238,4 +239,4 @@ def test_random_seed_repeatability():
     # Second run with the same seed should produce identical results
     second_model = poptorch.inferenceModel(model, opts)
     second_run = second_model(torch.empty((2, 2)))
-    assert torch.equal(first_run, second_run)
+    helpers.assert_allequal(expected=first_run, actual=second_run)

@@ -41,8 +41,8 @@ def test_inference():
     out = inference_model(x, bias)
 
     print(out)
-    torch.testing.assert_allclose(out[0], 12.0)
-    torch.testing.assert_allclose(out[1], 8.0)
+    helpers.assert_allclose(actual=out[0], expected=12.0)
+    helpers.assert_allclose(actual=out[1], expected=8.0)
 
 
 def test_training():
@@ -107,5 +107,6 @@ def test_inference_with_an_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    torch.testing.assert_allclose(out,
-                                  torch.tensor([-0.02, -0.01, 0.0, 0.5, 1.0]))
+    helpers.assert_allclose(actual=out,
+                            expected=torch.tensor(
+                                [-0.02, -0.01, 0.0, 0.5, 1.0]))

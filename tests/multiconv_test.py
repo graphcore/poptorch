@@ -6,6 +6,7 @@ import pytest
 import torch
 from torch import nn
 import poptorch
+import helpers
 
 
 def getPopartMultiConvs(poptorch_model):
@@ -55,7 +56,7 @@ def test_multiconv_basic(num_layers):
     assert_contains_multiconv(poptorch_model, num_layers)
 
     for cpu, pop in zip(native, poptorch_out):
-        torch.testing.assert_allclose(cpu, pop)
+        helpers.assert_allclose(expected=cpu, actual=pop)
 
 
 def multiconv_harness(multiconv):
@@ -82,7 +83,7 @@ def multiconv_harness(multiconv):
     native = m(x)
     poptorch_model = poptorch.inferenceModel(m)
     poptorch_out = poptorch_model(x)
-    torch.testing.assert_allclose(native, poptorch_out)
+    helpers.assert_allclose(expected=native, actual=poptorch_out)
     assert_contains_multiconv(poptorch_model)
 
 
@@ -168,7 +169,7 @@ def test_multiconv_layers():
     poptorch_out = poptorch_model(input)
 
     assert_contains_multiconv(poptorch_model)
-    torch.testing.assert_allclose(poptorch_out, native_out)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
 def test_invalid_multiconv_nested():

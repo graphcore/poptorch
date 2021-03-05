@@ -5,6 +5,7 @@ import torch
 import pytest
 import numpy
 import poptorch
+import helpers
 
 
 class BrokenDataset(torch.utils.data.Dataset):
@@ -175,7 +176,7 @@ def _run_process_test(shape=None,
                                it, loader.combinedBatchSize * (it + 1))
             ])
 
-            assert torch.equal(expected, out)
+            helpers.assert_allequal(actual=out, expected=expected)
 
 
 def test_multithreaded1():

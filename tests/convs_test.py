@@ -4,6 +4,7 @@
 import torch
 import pytest
 import poptorch
+import helpers
 
 # Convolutions.
 
@@ -31,13 +32,13 @@ conv_3D = [torch.nn.Conv3d, torch.nn.ConvTranspose3d]
 
 def execute_and_check_wrapper(model, input):
     # Run on CPU.
-    nativeOut = model(input)
+    native_out = model(input)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
 
-    torch.testing.assert_allclose(poptorch_out, nativeOut)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
 @pytest.mark.parametrize("op", conv_1D)
@@ -191,11 +192,11 @@ def test_matmul_serialization(mode):
 
     # Just check we don't explode when the value is set.
     model = BasicNetwork()
-    nativeOut = model(lhs, rhs)
+    native_out = model(lhs, rhs)
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(lhs, rhs)
 
-    torch.testing.assert_allclose(poptorch_out, nativeOut)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
 def test_available_memory_automatic():
@@ -231,7 +232,7 @@ def test_available_memory_automatic():
     model = Network()
     # Run on CPU.
     input = torch.randn(2, 1, 28, 28)
-    nativeOut = model(input)
+    native_out = model(input)
 
     # Run on IPU.
     opts = poptorch.Options()
@@ -243,7 +244,7 @@ def test_available_memory_automatic():
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_out = poptorch_model(input)
 
-    torch.testing.assert_allclose(poptorch_out, nativeOut)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))

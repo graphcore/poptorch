@@ -5,6 +5,7 @@ import torch
 import pytest
 
 import poptorch
+import helpers
 
 torch.manual_seed(42)
 params_einsum = [
@@ -46,7 +47,7 @@ def test_einsum(params, implicit_rhs):
     poptorch_out = poptorch_model(xs)
 
     assert native_out.size() == poptorch_out.size()
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 def test_einsum_chained():
@@ -77,10 +78,10 @@ def test_einsum_chained():
     print("native_out=%s\n\npoptorch_out=%s" %
           (native_out, poptorch_out))  # TODO(T32513): Debug code to remove
     assert native_out.size() == poptorch_out.size()
-    torch.testing.assert_allclose(native_out,
-                                  poptorch_out,
-                                  rtol=1e-3,
-                                  atol=1e-3)
+    helpers.assert_allclose(expected=native_out,
+                            actual=poptorch_out,
+                            rtol=1e-3,
+                            atol=1e-3)
 
 
 @pytest.mark.parametrize("arr_lengths",
@@ -106,7 +107,7 @@ def test_meshgrid(arr_lengths):
 
     for native, pop in zip(native_out, poptorch_out):
         assert native.size() == pop.size()
-        torch.testing.assert_allclose(native, pop)
+        helpers.assert_allclose(expected=native, actual=pop)
 
 
 @pytest.mark.parametrize("arr_lengths",
@@ -132,7 +133,7 @@ def test_cartesian_prod(arr_lengths):
     poptorch_out = poptorch_model(xs)
 
     assert native_out.size() == poptorch_out.size()
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("dims",
@@ -156,4 +157,4 @@ def test_tensordot(dims):
     # Run on IPU
     poptorch_out = poptorch_model(x, y)
 
-    torch.testing.assert_allclose(native_out, poptorch_out)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)

@@ -37,7 +37,7 @@ def zeros_and_ones_harness(model, dtype, is_like):
 
     for native, pop in zip(native_out, poptorch_out):
         assert native.size() == pop.size()
-        torch.testing.assert_allclose(native, pop)
+        helpers.assert_allclose(expected=native, actual=pop)
 
 
 zeros_and_ones_dtypes = (torch.float16, torch.float32, torch.int32)
@@ -76,14 +76,14 @@ def test_cat():
     x = torch.randn(2, 3)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_chunk():
@@ -95,14 +95,14 @@ def test_chunk():
     x = torch.randn(20, 10)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    for native, pop in zip(nativeOut, poptorch_out):
-        assert torch.equal(native, pop)
+    for native, pop in zip(native_out, poptorch_out):
+        helpers.assert_allequal(expected=native, actual=pop)
 
 
 def test_reshape():
@@ -114,14 +114,14 @@ def test_reshape():
     x = torch.arange(4.)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("split_size_or_sections",
@@ -143,7 +143,7 @@ def test_split(split_size_or_sections):
 
     for native, pop in zip(native_out, poptorch_out):
         assert native.size() == pop.size()
-        assert torch.equal(native, pop)
+        helpers.assert_allequal(expected=native, actual=pop)
 
 
 def test_split_singleton():
@@ -165,7 +165,7 @@ def test_split_singleton():
 
     for native, pop in zip(native_out, poptorch_out):
         assert native.size() == pop.size()
-        assert torch.equal(native, pop)
+        helpers.assert_allequal(expected=native, actual=pop)
 
 
 def test_squeeze():
@@ -177,14 +177,14 @@ def test_squeeze():
     x = torch.randn(1, 1, 20, 1, 10, 1)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_t():
@@ -196,14 +196,14 @@ def test_t():
     x = torch.randn(20, 10)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_transpose():
@@ -215,14 +215,14 @@ def test_transpose():
     x = torch.randn(3, 2, 5, 10)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_unsqueeze():
@@ -234,14 +234,14 @@ def test_unsqueeze():
     x = torch.randn(3, 2, 5, 10)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_expand():
@@ -253,14 +253,14 @@ def test_expand():
     x = torch.randn(3, 1)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_expand_preserve_dim():
@@ -272,14 +272,14 @@ def test_expand_preserve_dim():
     x = torch.randn(1, 1, 100)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_expand_as():
@@ -292,14 +292,14 @@ def test_expand_as():
     y = torch.randn(3, 4)
 
     # Run on CPU.
-    nativeOut = model(x, y)
+    native_out = model(x, y)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x, y)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_flatten():
@@ -311,14 +311,14 @@ def test_flatten():
     x = torch.randn(3, 1)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 def test_view():
@@ -330,14 +330,14 @@ def test_view():
     x = torch.randn(30, 5)
 
     # Run on CPU.
-    nativeOut = model(x)
+    native_out = model(x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
-    assert nativeOut.size() == poptorch_out.size()
-    assert torch.equal(nativeOut, poptorch_out)
+    assert native_out.size() == poptorch_out.size()
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 2), (2, 3, 4)])
@@ -352,14 +352,14 @@ def test_size(input_shapes):
 
     # Run on CPU.
     native_out = model(x)
-    assert torch.equal(x, native_out)
+    helpers.assert_allequal(actual=native_out, expected=x)
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(x)
 
     assert native_out.size() == poptorch_out.size()
-    assert torch.equal(native_out, poptorch_out)
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
 input_shapes = [(1, 4, 5), (2, ), (2, 2), (2, 3, 4, 1, 3, 4)]
@@ -398,7 +398,7 @@ def test_fill(input_shapes, t):
             pop = pop.float()
 
         assert native.size() == pop.size()
-        assert torch.equal(native, pop)
+        helpers.assert_allequal(expected=native, actual=pop)
         assert native.dtype == pop.dtype
 
 
@@ -425,7 +425,7 @@ def test_masked_fill(input_shapes, value):
 
     for pop, native in zip(poptorch_out, native_out):
         assert native.size() == pop.size()
-        assert torch.equal(native, pop)
+        helpers.assert_allequal(expected=native, actual=pop)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (3, 4), (1, 3, 4)])
@@ -455,7 +455,7 @@ def test_stack(input_shapes, dim):
 
     for pop, native in zip(poptorch_out, native_out):
         assert native.size() == pop.size()
-        assert torch.equal(native, pop)
+        helpers.assert_allequal(expected=native, actual=pop)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
@@ -486,7 +486,7 @@ def test_repeat(input_shapes, dims):
 
     for pop, native in zip(poptorch_out, native_out):
         assert native.size() == pop.size()
-        assert torch.equal(native, pop)
+        helpers.assert_allequal(expected=native, actual=pop)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
@@ -512,7 +512,7 @@ def test_copy_(input_shapes, dtype):
     for pop, native in zip(poptorch_out, native_out):
         assert native.size() == pop.size()
         assert native.dtype == pop.dtype
-        assert torch.equal(native, pop)
+        helpers.assert_allequal(expected=native, actual=pop)
 
 
 @pytest.mark.parametrize("with_detach", [True, False])
