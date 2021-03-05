@@ -551,7 +551,7 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
   reduction = convertReduceToPopart(reduction);
   return create_ctcloss(graph,
                         {log_probs, targets, input_lengths, target_lengths},
-                        reduction, blank, "UNDEFINED");
+                        reduction, blank);
 }
 
 } // namespace
