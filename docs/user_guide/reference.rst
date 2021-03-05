@@ -71,6 +71,8 @@ Model wrapping functions
 
 .. autofunction:: poptorch.isRunningOnIpu
 
+.. autofunction:: poptorch.load
+
 Parallel execution
 ==================
 

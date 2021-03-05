@@ -16,9 +16,9 @@ def ipu_print_tensor(tensor, title=""):
     When this operation is called in the backward pass it
     will print the gradient of the tensor.
 
-    The operation is an identity operation and it will return the exact same
-    tensor. The returned tensor should be used in place of the original tensor,
-    in the rest of the program to make sure that the print operation isn't
+    The operation is an identity operation and will return the exact same
+    tensor. The returned tensor should be used in place of the original tensor
+    in the rest of the program, to make sure that the print operation isn't
     optimised away.
 
     For example if the original code looks like this:

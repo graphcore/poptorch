@@ -764,9 +764,135 @@ To do this, use the :ref:`POPLAR_ENGINE_OPTIONS<profiling_env>` environment vari
 Precompilation and caching
 ==========================
 
-.. TODO(T23447): Separate diff
+.. _caching :
 
-.. autofunction:: poptorch.load
+Caching
+-------
+
+By default PopTorch will re-compile the model every time you instantiate a model.
+However if you often run the same models you might want to enable executable caching to save time.
+
+You can do this by either setting the ``POPTORCH_CACHE_DIR`` environment variable or by calling :py:class:`poptorch.Options.enableExecutableCaching`.
+
+.. warning:: The cache directory might grow large quickly because PopTorch doesn't evict old models from the cache and, depending on the number and size of your models and the number of IPUs used, the executables might be quite large. It is the your responsibility to delete the unwanted cache files.
+
+Precompilation
+--------------
+
+PopTorch supports precompilation: This means you can compile your model on a machine which doesn't have an IPU
+and export the executable to a file. You can then reload and execute it on a different machine which does have an IPU.
+
+.. important:: The PopTorch versions on both machines must be an exact match.
+
+To precompile your model you need to wrap it using either :py:func:`poptorch.trainingModel` or :py:func:`poptorch.inferenceModel` then call :py:meth:`~poptorch.PoplarExecutor.compileAndExport` on the wrapper.
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: How to precompile a model using an offline IPU target.
+    :linenos:
+    :start-after: precomp_start
+    :end-before: precomp_end
+    :emphasize-lines: 22-23,32
+
+.. note:: If you don't know the IPU version on your system you can use :py:func:`poptorch.ipuHardwareVersion`.
+
+The exported file by default will contain your original Torch model (including the weights), and enough information to re-create the PopTorch wrapper and reload the executable.
+
+.. important:: For your model and weights to be exported, your model must be picklable. See https://docs.python.org/3/library/pickle.html for more information.
+  If your model is not picklable then use ``export_model=False``, see :ref:`below for a complete example<export_no_python>`.
+
+Now both the torch model, PopTorch wrapper and executable can be restored on the target machine using :py:func:`poptorch.load`:
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: How to load a precompiled model.
+    :linenos:
+    :start-after: load_start
+    :end-before: load_end
+    :emphasize-lines: 1
+
+In some cases you might want to provide some runtime information to select the device: this can be done
+using the `edit_opts_fn` argument of :py:func:`poptorch.load`:
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: How to load a precompiled model and run on a specific IPU.
+    :linenos:
+    :start-after: load_setIpu_start
+    :end-before: load_setIpu_end
+    :emphasize-lines: 1-2,5
+
+.. note:: Only runtime options will be used as the executable is already compiled
+
+.. _export_no_python:
+
+Going back to the precompilation step: in some cases you might want to export only the
+executable and not the python wrapper or torch model (For example if your model cannot be pickled).
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: How to export only the exectuable.
+    :linenos:
+    :start-after: precomp_no_python_start
+    :end-before: precomp_no_python_end
+
+It means you will need to re-create and wrap the model yourself before loading the executable:
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: How to load a precompiled executable.
+    :linenos:
+    :start-after: load_exe_start
+    :end-before: load_exe_end
+    :emphasize-lines: 1,6-7
+
+.. important:: Exported models lose their connections to other models.
+
+For example, if you have a :py:func:`poptorch.trainingModel` and a :py:func:`poptorch.inferenceModel` based
+on the same PyTorch model, you wouldn't usually need to keep the weights synchronised between the two:
+PopTorch would take care of it implicitly for you.
+
+For example:
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: PopTorch implicit copies.
+    :linenos:
+    :start-after: implicit_cp_start
+    :end-before: implicit_cp_end
+    :emphasize-lines: 15,17-19
+
+If you were to export these models:
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: Precompilation of both a training and validation models.
+    :linenos:
+    :start-after: precomp_train_val_start
+    :end-before: precomp_train_val_end
+    :emphasize-lines: 13,14
+
+You would then either need to insert explicit copy operations:
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: Precompilation of both a training and validation models.
+    :linenos:
+    :start-after: load_train_val_start
+    :end-before: load_train_val_end
+    :emphasize-lines: 9,10
+
+Or you would need to re-connect the two models by creating the second one from the first one
+and then loading the executable:
+
+.. literalinclude:: precompilation.py
+    :language: python
+    :caption: Precompilation of both a training and validation models.
+    :linenos:
+    :start-after: load_train_val_connected_start
+    :end-before: load_train_val_connected_end
+    :emphasize-lines: 2-5
+
 
 Environment variables
 =====================
@@ -838,12 +964,11 @@ If you would rather wait for an IPU to become available, you can do so by settin
 Enable executable caching
 -------------------------
 
-By default PopTorch will re-compile the model every time you instantiate a model.
-However if you often run the same models you might want to enable executable caching to save time.
 This can be done by either setting the ``POPTORCH_CACHE_DIR`` environment variable or by calling :py:class:`poptorch.Options.enableExecutableCaching`.
+
+.. seealso:: For more info :ref:`caching<caching>`
 
 .. code-block:: bash
 
   export POPTORCH_CACHE_DIR=/tmp/poptorch_cache
 
-.. warning:: The cache directory might grow large quickly because PopTorch doesn't evict old models from the cache and, depending on the number and size of your models and the number of IPUs used, the executables might be quite large. It is the user's responsibility to delete the unwanted cache files.

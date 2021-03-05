@@ -349,18 +349,17 @@ def trainingModel(model, options=None, optimizer=None):
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
-    training_model = copy.copy(model)
+    if isinstance(model, PoplarExecutor):
+        model = model._user_model  # pylint: disable=protected-access
 
-    maybe_wrapped_model = training_model
-
-    if optimizer and optimizer.param_groups:
-        maybe_wrapped_model = _impl.OptimizerWrapper(training_model, optimizer)
+    # Create a copy of the original model in case it needs to be wrapped
+    maybe_wrapped_model = copy.copy(model)
 
     return PoplarExecutor(model=maybe_wrapped_model,
                           options=options,
                           training=True,
                           optimizer=optimizer,
-                          user_model=training_model,
+                          user_model=maybe_wrapped_model,
                           poptorch_version=__version__)
 
 
@@ -373,6 +372,8 @@ def inferenceModel(model, options=None):
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
+    if isinstance(model, PoplarExecutor):
+        model = model._user_model  # pylint: disable=protected-access
     return PoplarExecutor(model=copy.copy(model),
                           options=options,
                           training=False,

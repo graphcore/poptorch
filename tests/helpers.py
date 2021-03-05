@@ -44,13 +44,8 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
             loss = self._loss(output, loss_inputs)
             return output, loss
 
-    training_model = copy.copy(model)
-
-    maybe_wrapped_model = training_model
-
-    if optimizer and optimizer.param_groups:
-        maybe_wrapped_model = poptorch._impl.OptimizerWrapper(  # pylint: disable=protected-access
-            training_model, optimizer)
+    # Create a copy of the original model in case it needs to be wrapped
+    maybe_wrapped_model = copy.copy(model)
 
     # Store the real __call__ method before PoplarExecutor wraps it
     return poptorch._impl.PoplarExecutor(  # pylint: disable=protected-access

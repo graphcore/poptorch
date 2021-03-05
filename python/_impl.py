@@ -688,7 +688,13 @@ class PoptorchData:
                  optimizer=None):
         self.options = options
         self.training = training
-        self.model = model
+        if training and model:
+            # Create a copy of the user model and unwrap it
+            self.model = copy.copy(model)
+            self.model.__class__ = model.__class__.__bases__[0]
+        else:
+            self.model = model
+
         self.version = version
         self.optimizer = optimizer
         assert executable_inputs, "The executable's inputs are missing"
@@ -699,7 +705,6 @@ def parsePoptorchData(filename, expected_version):
     """Extract the PoptorchData and the offset at which the Popart executable
     is stored from a given file.
     """
-    assert os.path.isfile(filename)
     with open(filename, "rb") as f:
         data = pickle.load(f)
         assert data.version == expected_version, (
@@ -792,10 +797,7 @@ class PoplarExecutor:
                  user_model=None,
                  poptorch_version=None):
         options = options or Options()
-        self._model = model
-        self._user_model = user_model or self._model
-        self._host_weights_version = 0
-        self._poptorch_version = poptorch_version
+        self._user_model = user_model or model
         if training:
             self._attribute_tracker = _OptimizerAttrTracker(options)
             if options.defaultAnchorMode():
@@ -804,9 +806,7 @@ class PoplarExecutor:
             if not optimizer:
                 optimizer = torch.optim.SGD(self._user_model.parameters(),
                                             lr=0.01)
-            if not isinstance(optimizer, dict):
-                optimizer = _convertOptimizerToDict(optimizer,
-                                                    self._attribute_tracker)
+            model = OptimizerWrapper(model, optimizer)
         else:
             if options.defaultAnchorMode():
                 # In inference it makes sense to see all the results, by default.
@@ -815,6 +815,10 @@ class PoplarExecutor:
                 "Gradient accumulation"
                 " should be left to its default value (1) for inference")
             assert not optimizer, "Optimizer should be None for inference"
+        self._model = model
+
+        self._host_weights_version = 0
+        self._poptorch_version = poptorch_version
 
         self._executable = None
         self._options = options
@@ -825,8 +829,14 @@ class PoplarExecutor:
         self._executable_inputs = None
 
         self._training = training
-        self._optimizer = optimizer or {}
-        self._new_optimizer = optimizer or {}
+        if optimizer:
+            self._dict_optimizer = _convertOptimizerToDict(
+                optimizer, self._attribute_tracker)
+        else:
+            self._dict_optimizer = {}
+
+        self._new_optimizer = optimizer
+        self._dict_new_optimizer = self._dict_optimizer
         self._dirty_host_weights = False
         self._trace = None
         self._is_attached = False
@@ -906,6 +916,7 @@ class PoplarExecutor:
 
     @property
     def model(self):
+        """Access the wrapped Torch model."""
         return self._user_model
 
     def _debugGetPopartIR(self):
@@ -951,8 +962,9 @@ class PoplarExecutor:
         previous one. Supported optimisers: ``optim.SGD``, ``optim.Adam``,
         ``optim.AdamW``, ``optim.RMSProp``, ``optim.LAMB``.
         """
-        self._new_optimizer = _convertOptimizerToDict(optimizer,
-                                                      self._attribute_tracker)
+        self._new_optimizer = optimizer
+        self._dict_new_optimizer = _convertOptimizerToDict(
+            optimizer, self._attribute_tracker)
 
     def _distributedPrecompile(self, trace_args):
         """TODO(T35376): On POD we want to separate compilation from device
@@ -1124,6 +1136,10 @@ class PoplarExecutor:
                 *trace_args, filename, exe_offset)
             self._is_attached = self.isAttachedToDevice()
 
+            if self._is_attached:
+                # Upload the weights to the IPU
+                self.copyWeightsToDevice()
+
     def compileAndExport(self, filename, *args, export_model=True, **kwargs):
         """Precompile an executable and save it to file.
 
@@ -1223,11 +1239,12 @@ class PoplarExecutor:
             f"{in_tensors.first_none} provided this time")
         # Execute the poplar executable with the full size (batch * device interations)
         with self._profiling.tracepoint("modelExecution"):
-            if self._new_optimizer and self._new_optimizer != self._optimizer:
-                self._optimizer = self._new_optimizer
+            if self._dict_new_optimizer and \
+                    self._dict_new_optimizer != self._dict_optimizer:
+                self._dict_optimizer = self._dict_new_optimizer
                 output = poptorch_core.execute(self._executable,
                                                in_tensors.asTuple(),
-                                               self._optimizer)
+                                               self._dict_optimizer)
             else:
                 output = poptorch_core.execute(self._executable,
                                                in_tensors.asTuple(), {})
@@ -1344,11 +1361,11 @@ class PoplarExecutor:
             return (self._trace._c, tuple(parameters.keys()),
                     tuple(parameters.values()), in_tensors_as_half.asTuple(),
                     trace_input_string, self._options.toDict(), self._training,
-                    self._optimizer, accessAttributes)
+                    self._dict_optimizer, accessAttributes)
         return (self._trace._c, tuple(parameters.keys()),
                 tuple(parameters.values()), in_tensors_trace_view.asTuple(),
                 trace_input_string, self._options.toDict(), self._training,
-                self._optimizer, accessAttributes)
+                self._dict_optimizer, accessAttributes)
 
     def isAttachedToDevice(self):
         """Returns true, if the target device has been attached. False,
@@ -1388,7 +1405,7 @@ class PoplarExecutor:
         self.copyWeightsToDevice()
         # PopART save / restore the optimizer state with the weight,
         # but parameters  need to be re-uploaded
-        self._optimizer = {}
+        self._dict_optimizer = {}
 
     @classmethod
     def _RestoreInputsIfRequired(cls, backup, post_trace):

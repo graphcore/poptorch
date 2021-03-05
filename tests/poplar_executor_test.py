@@ -106,9 +106,8 @@ def test_precompile_then_load():
         x = torch.tensor([1., 2.])
         y = torch.tensor([3., 4.])
         # Check the user model was restored
-        torch.testing.assert_allclose(
-            poptorch_model._user_model(x, y),  # pylint: disable=protected-access
-            torch.tensor([4., 6.]))
+        torch.testing.assert_allclose(poptorch_model.model(x, y),
+                                      torch.tensor([4., 6.]))
         torch.testing.assert_allclose(poptorch_model(x, y),
                                       torch.tensor([4., 6.]))
 
