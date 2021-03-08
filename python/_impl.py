@@ -1355,11 +1355,13 @@ class PoplarExecutor:
         # The CPU execution happening during trace represents the IPU codepath.
         _SetIpuContext(True)
 
-        temp_model = copy.deepcopy(self._model)
+        # Trace only a copy to avoid updating original weights during compilation.
+        temp_model = copy.deepcopy(self._model.state_dict())
         self._trace = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
 
-        self._model.load_state_dict(temp_model.state_dict())
-        self._trace.load_state_dict(temp_model.state_dict())
+        # Revert the traced copy to the inital weights.
+        self._trace.load_state_dict(temp_model)
+        self._model.load_state_dict(temp_model)
 
         # Restore to non-IPU codepath.
         _SetIpuContext(False)
