@@ -77,7 +77,7 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
 
     for line in open(
             os.path.join(_utils.sources_dir(), "popart_compiler", "source",
-                         "Compiler.cpp"), "r"):
+                         "SessionOptions.cpp"), "r"):
         for expr, type in checks.items():
             m = re.match(expr, line)
             if m:
