@@ -100,12 +100,16 @@ class Liveness(enum.IntEnum):
     - ``AlwaysLive``: The tensors always stay on the IPU between the phases.
     - ``OffChipAfterFwd``: The tensors are sent off the chip at the end of
       the forward pass and before the beginning of the backward pass.
+    - ``OffChipAfterFwdNoOverlap``: Same as `OffChipAfterFwd`, except there is
+      no overlapping of load and store operations between phases. This makes it
+      a more memory-efficient mode at the cost of delayed computation.
     - ``OffChipAfterEachPhase``: The tensors are sent off the chip at the end
       of each phase.
     """
     AlwaysLive = 0
     OffChipAfterFwd = 1
-    OffChipAfterEachPhase = 2
+    OffChipAfterFwdNoOverlap = 2
+    OffChipAfterEachPhase = 3
 
 
 class AutoStage(enum.IntEnum):

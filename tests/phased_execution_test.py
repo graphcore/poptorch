@@ -2,6 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import torch
 import torch.nn.functional as F
+import pytest
 import poptorch
 import helpers
 
@@ -238,6 +239,59 @@ class LogChecker(helpers.LogChecker):
         )
         # pylint: enable=line-too-long
 
+    def validate_serial_tensor_liveness(self, liveness):
+        # 'phases' does not include the bwd pass, so to calculate,
+        # sum the number of phases in the fwd pass, plus any phase
+        # gap between the end of the fwd and start of the bwd pass
+        if liveness == poptorch.Liveness.AlwaysLive:
+            # fwd:       bwd:
+            # phase 0 -> phase 4
+            # phase 1 -> phase 3
+            # phase 2 -> phase 2
+            phases = 3
+            stride = 1
+        elif liveness == poptorch.Liveness.OffChipAfterFwd:
+            # fwd:       bwd:
+            # phase 0 -> phase 8
+            # phase 1 -> phase 7
+            # phase 2 -> phase 6
+            phases = 6
+            stride = 1
+        elif liveness == poptorch.Liveness.OffChipAfterFwdNoOverlap:
+            # fwd:       bwd:
+            # phase 0 -> phase 12
+            # phase 2 -> phase 10
+            # phase 4 -> phase 8
+            phases = 8
+            stride = 2
+        elif liveness == poptorch.Liveness.OffChipAfterEachPhase:
+            # fwd:       bwd:
+            # phase 0 -> phase 20
+            # phase 4 -> phase 16
+            # phase 8 -> phase 12
+            phases = 12
+            stride = 4
+
+        self.assert_contains('set serial_phases_execution to value true')
+        self.assert_contains('executionPhaseSettings.stages set to value 1')
+
+        self.assert_contains(
+            'executionPhaseSettings.phases set to value {}'.format(phases))
+
+        for phase in range(3):
+            op_label = ':0'
+            if phase > 0:
+                op_label += '/' + str(phase)
+            self.assert_contains(
+                'Transpose{} [float32({}, {}), mode(Phased), ipu(0), phase({})]'
+                .format(op_label, 8 - phase, 7 - phase, phase * stride))
+            self.assert_contains(
+                'MatMul{} [float32({}), mode(Phased), ipu(0), phase({})]'.
+                format(op_label, 7 - phase, phase * stride))
+            self.assert_contains(
+                'Add{} [float32({}), mode(Phased), ipu(0), phase({})]'.format(
+                    op_label, 7 - phase, phase * stride))
+
 
 @helpers.printCapfdOnExit
 def test_2x2_parallel_phased_execution_inline(capfd):
@@ -432,6 +486,45 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
 
     testlog = LogChecker(capfd)
     testlog.validate_2x2_parallel_phased_execution_small()
+
+
+@pytest.mark.parametrize("liveness", list(poptorch.Liveness))
+@helpers.printCapfdOnExit
+def test_serial_tensor_liveness(capfd, liveness):
+    poptorch.setLogLevel(1)  # Force debug logging
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.fc1 = torch.nn.Linear(8, 7)
+            self.fc2 = torch.nn.Linear(7, 6)
+            self.fc3 = torch.nn.Linear(6, 5)
+
+        def forward(self, x):
+            with poptorch.Block("B1"):
+                x = self.fc1(x)
+            with poptorch.Block("B2"):
+                x = self.fc2(x)
+            with poptorch.Block("B3"):
+                x = self.fc3(x)
+            return x
+
+    strategy = poptorch.SerialPhasedExecution("B1", "B2", "B3")
+    strategy.stage("B1").ipu(0)
+    strategy.stage("B2").ipu(0)
+    strategy.stage("B3").ipu(0)
+    strategy.setTensorsLiveness(liveness)
+    opts = poptorch.Options()
+    opts.setExecutionStrategy(strategy)
+
+    model = Model()
+    model = poptorch.inferenceModel(model, opts)
+
+    input = torch.randn(8)
+    model.compile(input)
+
+    testlog = LogChecker(capfd)
+    testlog.validate_serial_tensor_liveness(liveness)
 
 
 def test_phased_api():

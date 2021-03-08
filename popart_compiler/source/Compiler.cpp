@@ -174,8 +174,17 @@ namespace detail {
 
 enum class ExecutionMode { Pipelined, Sharded, Phased, N };
 
+// These settings currently encapsulate the phased execution "stride"
+// between phases
+//
 // To be kept in sync with the Liveness python enum in python/enums.py
-enum class Liveness { AlwaysLive, OffChipAfterFwd, OffChipAfterEachPhase, N };
+enum class Liveness {
+  AlwaysLive,
+  OffChipAfterFwd,
+  OffChipAfterFwdNoOverlap,
+  OffChipAfterEachPhase,
+  N
+};
 
 class WeightsIO : public popart::IWeightsIO {
 public:
@@ -368,6 +377,14 @@ public:
     //
     //  This is done by setting options.executionPhaseSettings.phases to N+1
     //
+    //  Note that the bwd phases begin with phase 4 and not phase 3. This is
+    //  because PopART requires the phase IDs of a fwd/bwd pair to have matching
+    //  parity. Since the fwd phase ID is 2, the next phase ID with even parity
+    //  is 4.
+    //
+    //  Furthermore, all odd phases must run on the same IPUs, and all even
+    //  phases must also run on the same IPUs.
+    //
     // tensors_liveness:
     //  Note: tensors have a liveness of [phase, phase+2]
     //  AlwaysLive:
@@ -375,23 +392,36 @@ public:
     //   phase 0 -> phase 6
     //   phase 1 -> phase 5
     //   phase 2 -> phase 4
+    // Stride = 1
     //
     //  OffChipAfterFwd:
     //   fwd:       bwd:
     //   phase 0 -> phase 8
     //   phase 1 -> phase 7
     //   phase 2 -> phase 6
+    // Stride = 1
     // (Gap between fwd and bwd > 2)
-    //  This is done by setting options.executionPhaseSettings.phases to N+2
+    //  This is done by incrementing options.executionPhaseSettings.phases by 3
+    //
+    //  OffChipAfterFwdNoOverlap:
+    //   fwd:       bwd:
+    //   phase 0 -> phase 12
+    //   phase 2 -> phase 10
+    //   phase 4 -> phase 8
+    // Stride = 2
+    // (Gap between fwd and bwd > 2, with no overlapping of load/store)
+    //  This is done by incrementing options.executionPhaseSettings.phases by 3
+    //  and multiplying the phase_id by 2.
     //
     //  OffChipAfterEachPhase: (Only for stage=1)
     //   fwd:       bwd:
     //   phase 0 -> phase 20
     //   phase 4 -> phase 16
     //   phase 8 -> phase 12
+    // Stride = 4
     // (Gap between each phase > 2)
-    //  This is done by setting options.executionPhaseSettings.phases to N+2
-    //  and multiplying by 4 the phase_id.
+    // This is done by incrementing options.executionPhaseSettings.phases by 3
+    // and multiplying the phase_id by 4.
     //
     bool serial_phases_execution;
     bool separate_backward_phase;
@@ -1979,9 +2009,11 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
     std::uint64_t num_phases = _impl->max_phase + 1;
     std::uint64_t num_stages;
     if (_impl->options.tensors_liveness != detail::Liveness::AlwaysLive) {
-      // We want to send the tensors off chip: we need to have a gap of N+2
-      // before the backward pass.
-      num_phases += 2;
+      // We want to send the tensors off chip: Tensors stay live through
+      // phases N, N+1, N+2 so we need to have a gap of 3 before the bwd
+      // pass, otherwise the bwd pass will start in the same phase as the
+      // end of the fwd pass.
+      num_phases += 3;
     } else if (_impl->options.separate_backward_phase) {
       // Make sure the backward pass will start with a new phase.
       num_phases += 1;
@@ -2313,10 +2345,15 @@ void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
       ERROR_ON_MSG(!_impl->options.serial_phases_execution,
                    "This is only supported for serial phase execution");
       _impl->active_phase = phase_id * 4;
+    } else if (_impl->options.tensors_liveness ==
+               detail::Liveness::OffChipAfterFwdNoOverlap) {
+      ERROR_ON_MSG(!_impl->options.serial_phases_execution,
+                   "This is only supported for serial phase execution");
+      _impl->active_phase = phase_id * 2;
     } else {
       _impl->active_phase = phase_id;
-      _impl->max_phase = std::max(phase_id, _impl->max_phase);
     }
+    _impl->max_phase = std::max(_impl->active_phase, _impl->max_phase);
     if (!_impl->options.serial_phases_execution) {
       ERROR_ON_MSG(_impl->active_phase % 2 != ipu_id % 2,
                    "When phases are executed in parallel: even phases must run "

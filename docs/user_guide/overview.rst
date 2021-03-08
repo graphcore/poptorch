@@ -486,7 +486,7 @@ and is only needed for
 and :py:class:`poptorch.SerialPhasedExecution`.
 
 The default :py:class:`poptorch.Liveness` is ``AlwaysLive``.
-``OffChipAfterFwd`` and
+``OffChipAfterFwd``, ``OffChipAfterFwdNoOverlap`` and
 ``OffChipAfterEachPhase`` may be helpful if you run a large model
 with a tight memory budget.
 
