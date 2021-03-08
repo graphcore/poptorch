@@ -140,7 +140,7 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
     // Popart supports this with "if (output->n() > 1)"
     return createBatchnormalization(
         graph, {input_4d, weight, bias, running_mean, running_var},
-        training ? 5 : 1, epsilon, momentum);
+        training ? 5 : 1, epsilon, 1.0f - momentum);
   };
 
   // Pytorch supports BatchNorm1D/2D/3D. PopART only supports 2D so we need

@@ -258,3 +258,53 @@ def test_instanceNorm(instanceNormXd):
         assert loss < 0.03
         helpers.assert_allequal(actual=torch.argmax(out, dim=1),
                                 expected=label)
+
+
+def test_batchnorm_statistics():
+    torch.manual_seed(42)
+
+    input_data = [torch.randn([4, 4, 3, 3]) for _ in range(10)]
+    label = torch.ones(4).long()
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.bn = torch.nn.BatchNorm2d(4)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, args, loss_inputs=None):
+            output = self.bn(args)
+            if loss_inputs is None:
+                return output
+
+            reduced = torch.mean(output, dim=(2, 3))
+            return output, self.loss(reduced, loss_inputs)
+
+    model1 = Model()
+    model1.train()
+    optimizer = optim.SGD(model1.parameters(), lr=0.0)
+    model_opts = poptorch.Options()
+    training_model = poptorch.trainingModel(model1,
+                                            model_opts,
+                                            optimizer=optimizer)
+
+    for data in input_data:
+        training_model(data, label)
+
+    model2 = Model()
+    model2.train()
+    for data in input_data:
+        model2(data)
+
+    # Shouldn't be needed but buffers alone don't trigger the copy.
+    training_model.copyWeightsToHost()
+
+    # Running mean is very close
+    torch.testing.assert_allclose(model2.bn.running_mean,
+                                  model1.bn.running_mean)
+
+    # Running var is not so close.
+    torch.testing.assert_allclose(model2.bn.running_var,
+                                  model1.bn.running_var,
+                                  atol=1e-1,
+                                  rtol=0.1)
