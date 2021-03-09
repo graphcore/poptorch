@@ -22,7 +22,7 @@ namespace poptorch {
 class SessionOptions;
 
 namespace detail {
-struct LowerToPopartImpl;
+class LowerToPopartImpl;
 } // namespace detail
 /*
  * Take the transformed graph and create a poponnx graph from it.
