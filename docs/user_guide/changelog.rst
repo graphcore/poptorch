@@ -58,6 +58,7 @@ New features
 - Deprecated ``Options.Popart``, ``Options._Popart`` may be used experimentally.
 - Add support for ``torch.fmod``, and ``torch.remainder``
 - Add support for ``torch.addcdiv``
+- Add support for ``torch.bitwise_not``
 
 v1.0 (Poplar SDK 1.4)
 =====================

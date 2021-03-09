@@ -100,6 +100,7 @@ Pointwise ops
 * ``torch.asinh``
 * ``torch.atan``
 * ``torch.atanh``
+* ``torch.bitwise_not``
 * ``torch.ceil``
 * ``torch.clamp``
 * ``torch.clamp_max``

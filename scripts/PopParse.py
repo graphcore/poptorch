@@ -222,10 +222,10 @@ CastingAlwaysIntOutput = ["convinteger", "matmulinteger"]
 
 OutputTypeSameAsFirstInput = [
     "abs", "acos", "acos", "acosh", "asin", "asinh", "atan", "atanh",
-    "averagepool", "batchnormalization", "ceil", "celu", "compress", "concat",
-    "cos", "cosh", "cumsum", "_ctcloss", "depthtospace", "det", "detach",
-    "dropout", "dynamicslice", "einsum", "elu", "erf", "exp", "expand",
-    "expm1", "flatten", "floor", "fmod", "gather", "gatherelements",
+    "averagepool", "batchnormalization", "bitwisenot", "ceil", "celu",
+    "compress", "concat", "cos", "cosh", "cumsum", "_ctcloss", "depthtospace",
+    "det", "detach", "dropout", "dynamicslice", "einsum", "elu", "erf", "exp",
+    "expand", "expm1", "flatten", "floor", "fmod", "gather", "gatherelements",
     "gathernd", "gelu", "globalaveragepool", "globallppool", "globalmaxpool",
     "hardmax", "hardsigmoid", "identity", "identityloss", "l1loss", "lrn",
     "leakyrelu", "log", "log1p", "logical_not", "logsoftmax",

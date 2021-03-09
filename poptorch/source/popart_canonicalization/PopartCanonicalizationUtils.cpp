@@ -46,7 +46,8 @@ SymbolHandler getHandler(torch::jit::NodeKind kind) {
   return {};
 }
 
-bool allInputsBool(torch::jit::Node *node, int ignore_input) {
+bool allInputsOfType(torch::jit::Node *node, int ignore_input,
+                     at::ScalarType type) {
   int idx = 0;
   for (const auto &input : node->inputs()) {
     if (idx++ == ignore_input) {
@@ -57,11 +58,20 @@ bool allInputsBool(torch::jit::Node *node, int ignore_input) {
     ERROR_ON(!tensor_type);
     ERROR_ON(!tensor_type->scalarType());
 
-    if ((*tensor_type->scalarType()) != at::ScalarType::Bool) {
+    if ((*tensor_type->scalarType()) != type) {
       return false;
     }
   }
   return true;
+}
+
+bool allInputsBool(torch::jit::Node *node, int ignore_input) {
+  return allInputsOfType(node, ignore_input, at::ScalarType::Bool);
+}
+
+bool allInputsInteger(torch::jit::Node *node, int ignore_input) {
+  return allInputsOfType(node, ignore_input, at::ScalarType::Int) ||
+         allInputsOfType(node, ignore_input, at::ScalarType::Long);
 }
 
 std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node) {

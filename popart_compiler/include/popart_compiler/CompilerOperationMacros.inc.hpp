@@ -32,6 +32,7 @@ OP_DECL(popart, log1p, log1p, AiGraphcoreOpset1.log1p, NONE, NONE)
 OP_DECL(popart, fmod, fmod, AiGraphcoreOpset1.fmod, NONE, NONE)
 OP_DECL(popart, remainder, remainder, AiGraphcoreOpset1.remainder, NONE, NONE)
 OP_DECL(popart, reverse, reverse, AiGraphcoreOpset1.reverse, ARG(INT_VEC,dimensions) , BODY_ARG(dimensions) )
+OP_DECL(popart, bitwisenot, bitwisenot, AiGraphcoreOpset1.bitwisenot, NONE, NONE)
 // Ops from AiOnnxOpset10
 OP_DECL(popart, averagepool, averagepool, AiOnnxOpset10.averagepool, ARG(INT_VEC,kernel_shape) ARG(INT,ceil_mode) ARG(INT,count_include_pad) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(kernel_shape) BODY_ARG(ceil_mode) BODY_ARG(count_include_pad) BODY_ARG(pads) BODY_ARG(strides) )
 OP_DECL(popart, convinteger, convinteger, AiOnnxOpset10.convinteger, ARG(INT_VEC,dilations) ARG(INT,group) ARG(INT_VEC,kernel_shape) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(dilations) BODY_ARG(group) BODY_ARG(kernel_shape) BODY_ARG(pads) BODY_ARG(strides) )

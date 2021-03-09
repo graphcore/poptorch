@@ -108,10 +108,6 @@ def test_unary_ops_float(op):
     unary_op_harness(op, input, compare)
 
 
-unary_ops_int = [  # torch.bitwise_not,
-]
-
-
 def test_binary_pow():
     torch.manual_seed(42)
     input1 = torch.randn([1, 2, 10, 200])
@@ -136,6 +132,11 @@ def test_binary_pow():
     unary_op_harness(op_float, input1, compare)
 
 
+unary_ops_int = [
+    torch.bitwise_not,
+]
+
+
 @pytest.mark.parametrize("op", unary_ops_int)
 def test_unary_ops_int(op):
     torch.manual_seed(42)
@@ -143,7 +144,24 @@ def test_unary_ops_int(op):
     input = torch.randint(-1000, 1000, [1, 2, 10, 200])
 
     def compare(x, y):
-        return torch.eq(x, y)
+        return torch.all(torch.eq(x, y))
+
+    unary_op_harness(op, input, compare)
+
+
+unary_ops_bool = [
+    torch.bitwise_not,
+]
+
+
+@pytest.mark.parametrize("op", unary_ops_bool)
+def test_unary_ops_bool(op):
+    torch.manual_seed(42)
+
+    input = torch.randint(2, [1, 2, 10, 200]) > 0
+
+    def compare(x, y):
+        return torch.all(torch.eq(x, y))
 
     unary_op_harness(op, input, compare)
 
