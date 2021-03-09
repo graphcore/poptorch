@@ -109,6 +109,7 @@ Pointwise ops
 * ``torch.expm1``
 * ``torch.floor``
 * ``torch.floor_divide``
+* ``torch.fmod``
 * ``torch.frac``
 * ``torch.log``
 * ``torch.log10``
@@ -119,6 +120,7 @@ Pointwise ops
 * ``torch.neg``
 * ``torch.pow``
 * ``torch.reciprocal``
+* ``torch.remainder``
 * ``torch.round``
 * ``torch.rsqrt``
 * ``torch.sigmoid``
