@@ -3,6 +3,7 @@ project(popart_compiler)
 
 add_library(popart_compiler SHARED
   "source/Compiler.cpp"
+  "source/CompilerImpl.cpp"
   "source/PopartEnums.cpp"
   "source/Utils.cpp"
   "source/SessionOptions.cpp"
