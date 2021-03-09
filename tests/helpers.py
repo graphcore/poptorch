@@ -7,19 +7,18 @@ import poptorch
 import poptorch.poptorch_core as poptorch_core
 
 
-def assert_allclose(*args, actual=None, expected=None, **kwargs):
+def assert_allclose(*, actual=None, expected=None, **kwargs):
     """Assertion function that enforces passing the 'actual' and 'expected'
     arguments to torch.testing.assert_allclose in the correct order by forcing
     the use of keyword arguments. This improves error reporting in case of
     assertion failures.
     """
-    assert not args, "Positional arguments are not allowed"
     assert actual is not None and expected is not None, (
         "'actual' and 'expected' keyword arguments must be present")
     torch.testing.assert_allclose(actual, expected, **kwargs)
 
 
-def assert_allequal(*args, actual=None, expected=None, msg=''):
+def assert_allequal(*, actual=None, expected=None, msg=''):
     """Assertion function that enforces passing the 'actual' and 'expected'
     arguments to torch.testing.assert_allclose in the correct order by forcing
     the use of keyword arguments. This improves error reporting in case of
@@ -27,7 +26,6 @@ def assert_allequal(*args, actual=None, expected=None, msg=''):
     torch.testing.assert_allclose as this results in identity comparison for
     integer and boolean tensors.
     """
-    assert not args, "Positional arguments are not allowed"
     assert actual is not None and expected is not None, (
         "'actual' and 'expected' keyword arguments must be present")
     torch.testing.assert_allclose(actual, expected, rtol=0, atol=0, msg=msg)
