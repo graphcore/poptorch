@@ -6,6 +6,12 @@ import torch
 
 class VariableAttributes:
     """Track which attributes are variable or constant.
+
+    Is accessible via any PopTorch optimizer via the ``variable_attrs``
+    attribute.
+
+    >>> opt = poptorch.optim.SGD(params, lr=0.01)
+    >>> opt.variable_attrs.isConstant("lr")
     """
 
     def __init__(self, variable_attributes, allowed_attributes):
@@ -280,6 +286,8 @@ class AdamW(torch.optim.AdamW):
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.
         :type loss_scaling: float, optional
+        :param bias_correction: True: compute Adam with bias correction.
+        :type bias_correction: bool, optional
         :param accum_type: data type used for gradients.
         :type accum_type: torch.dtype, optional
         :param first_order_momentum_accum_type: data type used to store
