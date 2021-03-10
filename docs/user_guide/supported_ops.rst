@@ -92,6 +92,7 @@ Pointwise ops
 * ``torch.acos``
 * ``torch.acosh``
 * ``torch.add``
+* ``torch.addcdiv``
 * ``torch.amax``
 * ``torch.amin``
 * ``torch.asin``
