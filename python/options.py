@@ -3,9 +3,16 @@ import os
 import torch
 from . import enums
 from ._logging import logger
+from . import _options_config
 from . import _options_impl
 from . import ops
 from ._utils import deprecated
+
+
+# Used by _options_config, defined here so that it is reported
+# to the user as a "poptorch.options.ConfigFileError"
+class ConfigFileError(Exception):
+    pass
 
 
 class _JitOptions(_options_impl.OptionsDict):
@@ -880,6 +887,18 @@ class Options(_options_impl.OptionsDict):
             self.enableExecutableCaching(path)
 
         self.relaxOptimizerAttributesChecks(False)
+
+    def loadFromFile(self, filepath):
+        """Load options from a config file where each line in the file
+        corresponds to a single option being set. To set an option, simply
+        specify how you would set the option within a Python script, but omit
+        the ``options.`` prefix.
+
+        For example, if you wanted to set ``options.deviceIterations(1)``,
+        this would be set in the config file by adding a single line with
+        contents ``deviceIterations(1)``.
+        """
+        _options_config.parseAndSetOptions(self, filepath)
 
     def relaxOptimizerAttributesChecks(self, relax=True):
         """By default PopTorch will print warnings the first time it encounters unexpected attributes in setOptimizer()

@@ -3,6 +3,7 @@
 import unittest.mock
 
 import tempfile
+import os
 import torch
 import torch.nn as nn
 import pytest
@@ -50,6 +51,72 @@ def test_set_options():
     y = torch.zeros(2)
 
     inference_model(x, y)
+
+
+@helpers.printCapfdOnExit
+def test_set_options_from_file(capfd):
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
+
+    class LogChecker(helpers.LogChecker):
+        def validate(self):
+            # pylint: disable=line-too-long
+            self.assert_contains(
+                "poptorch.Options set replication_factor to value 1")
+            self.assert_contains(
+                "poptorch.Options set device_iterations to value 1")
+            self.assert_contains(
+                "poptorch.Options set execution_mode to value 1")
+            self.assert_contains(
+                "poptorch.Options set syntheticDataMode to value 2")
+
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    options_list = [
+        "deviceIterations(1)",
+        "setExecutionStrategy(poptorch.ShardedExecution())",
+        "  replicationFactor(1)",  # Whitespace should be stripped
+        " ",  # Empty lines should be skipped
+        "enableSyntheticData(True) # Inline comments should be ignored",
+        "# Comments should be ignored"
+    ]
+    options_list = "\n".join(options_list)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        filepath = os.path.join(tmp, "tmp.conf")
+        f = open(filepath, "w")
+        # Write the options to file
+        f.write(options_list)
+        f.close()
+
+        opts = poptorch.Options()
+        # Read the options back
+        opts.loadFromFile(filepath)
+
+        # Ensure that a useful error message is output on malformed input
+        f = open(filepath, "a")
+        f.write("\nanchorMode(poptorch.AnchorMode.All")
+        f.close()
+        with pytest.raises(poptorch.options.ConfigFileError) as e:
+            opts.loadFromFile(filepath)
+        assert "SyntaxError at line 5 of tmp.conf: unexpected EOF " \
+               "while parsing\n" \
+               "> options.anchorMode(poptorch.AnchorMode.All" in str(e.value)
+
+    # Create the model
+    model = Network()
+    inference_model = poptorch.inferenceModel(model, opts)
+
+    x = torch.ones(2)
+    y = torch.zeros(2)
+
+    # Run the model
+    inference_model(x, y)
+
+    testlog = LogChecker(capfd)
+    # Ensure the options were actually set
+    testlog.validate()
 
 
 def test_set_popart_options():
