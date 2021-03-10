@@ -498,16 +498,29 @@ Poptorch supports the following optimizers:
 
 #. SGD (see :py:class:`poptorch.optim.SGD`)
 #. Adam (see :py:class:`poptorch.optim.Adam`)
-#. AdamW (see :py:class:`poptorch.optim.RMSprop`)
+#. AdamW (see :py:class:`poptorch.optim.AdamW`)
 #. RMSprop (see :py:class:`poptorch.optim.RMSprop`)
 #. LAMB (see :py:class:`poptorch.optim.LAMB`)
 
-In addition, PopTorch has additional features to support float16 models, such as loss scaling.
+In addition, PopTorch has features to support float16 models, such as loss scaling, velocity scaling, bias correction and accumulator types.
+
+.. important:: All of these extra attributes (Except ``velocity_scaling``) cannot have different values for different ``param_groups`` and therefore must be set at the optimizer level.
+
+.. literalinclude:: api.py
+    :language: python
+    :caption: How to update values in an Optimizer
+    :linenos:
+    :start-after: optim_start
+    :end-before: optim_end
+    :emphasize-lines: 8-12
+
+.. important:: You must call :py:func:`~poptorch.PoplarExecutor.setOptimizer` for the new optimizer values to be applied to the model.
 
 Loss scaling
 ------------
 
 When training models which use half/float16 values, you can use loss scaling  to prevent the gradients from becoming too small and underflowing.
+
 Before calculating the gradients, PopTorch will scale the loss by the value of the ``loss_scaling`` parameter.
 PopTorch will multiply the gradients by the inverse scale prior to updating the optimizer state.
 Therefore, beyond improving numerical stability, neither the training nor the hyper-parameters are affected.
@@ -527,6 +540,45 @@ Similar to loss scaling, the ``velocity_scaling`` parameter allows the velocity 
 
 As with loss scaling, higher values can minimise underflow of the velocity values but may result in overflow.
 
+Accumulation types
+------------------
+
+In order to improve numerical stability some of the optimizers (LAMB, Adam, AdamW, RMSprop) give you the option
+to tweak the data type used by the optimizer's accumulators.
+
+``accum_type`` lets you choose the type used for gradient accumulation.
+``first_order_momentum_accum_type`` / ``second_order_momentum_accum_type`` give you control over the type used to store the first-order and second-order momentum optimizer states.
+
+Constant attributes
+-------------------
+
+In order to improve performance and / or save memory PopTorch will try to embed directly in the program the attributes which are constant.
+
+.. important:: Trying to modify a constant attribute after the model has been compiled will result in an error.
+
+For PopTorch optimizers (those from the ``poptorch.optim`` namespace) by default the attributes explicitly passed to the Optimizer's constructor will be considered variables and the others will be considered as constant.
+
+This behaviour can be overridden using :py:func:`~poptorch.optim.VariableAttributes.markAsConstant` and :py:func:`~poptorch.optim.VariableAttributes.markAsVariable` before the model is compiled.
+
+.. literalinclude:: api.py
+    :language: python
+    :caption: Constant and variable attributes for PopTorch optimizers
+    :linenos:
+    :start-after: optim_const_start
+    :end-before: optim_const_end
+
+For native optimizers (those from the ``torch.optim`` namespace) the attributes which are left to their default value in the constructor will be considered as constant.
+
+There is no method to override this behaviour which is why we recommend you always use the ``poptorch.optim`` optimizers instead.
+
+.. literalinclude:: api.py
+    :language: python
+    :caption: Constant and variable attributes for Torch optimizers
+    :linenos:
+    :start-after: torch_optim_const_start
+    :end-before: torch_optim_const_end
+
+.. note:: There is an exception: ``lr`` is always marked as variable.
 
 Custom ops
 ==========

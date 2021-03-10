@@ -110,6 +110,9 @@ Parallel execution
 Optimizers
 ==========
 
+.. autoclass:: poptorch.optim.VariableAttributes
+   :members:
+
 .. autoclass:: poptorch.optim.SGD
    :special-members: __init__
    :members:
