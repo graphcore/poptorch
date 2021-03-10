@@ -50,7 +50,9 @@ if wheel_lib_dirs:
     package_data["poptorch"].append("lib/*")
     package_data["poptorch"].append("lib/poplar_rt/*")
     package_data["poptorch"].append("lib/graphcore/lib/*.a")
-    VERSION += "+standalone"
+    # Only 1 "+" symbol allowed per version
+    separator = "+" if "+" not in VERSION else "_"
+    VERSION += separator + "standalone"
 
 setup(
     name='poptorch',
