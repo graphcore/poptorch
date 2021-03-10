@@ -41,9 +41,9 @@ class BinaryDistribution(Distribution):
 
 package_data = {'poptorch': LIBS}
 wheel_lib_dirs = os.environ.get("WHEEL_LIB_DIRS")
+lib = "poptorch/lib"
+utils.rmdir_if_exists(lib)
 if wheel_lib_dirs:
-    lib = "poptorch/lib"
-    utils.rmdir_if_exists(lib)
     os.makedirs(lib)
     for d in wheel_lib_dirs.split(":"):
         distutils.dir_util.copy_tree(d, lib)
@@ -83,3 +83,6 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
 )
+# Don't keep the Poplar / Popart libs around
+# This might interfere with the enable.sh script
+utils.rmdir_if_exists(lib)
