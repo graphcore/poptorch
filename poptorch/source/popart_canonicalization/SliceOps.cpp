@@ -338,10 +338,34 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
                              wrapInConstant1D(graph, dim)});
 }
 
+torch::jit::Node *unbindHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  // aten::unbind(Tensor self, int dim) -> Tensor[]
+
+  auto x = node->input(0);
+  auto shape = shapeFromTensor(x);
+  int dim = constantToInt(node->input(1)->node());
+  std::int64_t dim_size = shape[dim];
+
+  std::vector<torch::jit::Value *> tensors;
+  // Select each index in dimension 'dim' of x and add all
+  // slices to a vector
+  for (std::int64_t i = 0; i < dim_size; i++) {
+    auto inds = wrapInConstant1D(graph, i);
+    auto gather = createGather(graph, {x, inds}, dim);
+    // Squeeze out the gathered dim
+    auto squeeze = createSqueeze(graph, {gather->output()}, {dim});
+    tensors.push_back(squeeze->output());
+  }
+
+  return createAndInsertNode(graph, at::prim::ListConstruct, tensors);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::slice, sliceHandler);
+  registerHandler(c10::aten::unbind, unbindHandler);
 }
 
 } // namespace poptorch

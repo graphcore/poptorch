@@ -8,6 +8,7 @@ v2.1 (Poplar SDK 2.1)
 New features
 ------------
 
+- Add support for ``torch.unbind``
 
 v2.0 (Poplar SDK 2.0)
 =====================

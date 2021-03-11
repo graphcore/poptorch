@@ -66,107 +66,6 @@ def test_slice_with_branch():
                        torch.tensor([-3.0]), start_fn, end_fn)
 
 
-def index_test_harness(model, inds):
-    t = torch.arange(120).reshape(2, 3, 4, 5)
-    inds_tensors = []
-    for i in inds:
-        inds_tensors.append(torch.tensor(i))
-    inds_tuple = tuple(inds_tensors)
-    poptorch_model = poptorch.inferenceModel(model)
-
-    # Run on CPU
-    native_out = model(t, *inds_tuple)
-    # Run on IPU
-    poptorch_out = poptorch_model(t, *inds_tuple)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
-
-
-@pytest.mark.parametrize(
-    "inds",
-    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
-)
-def test_index_1(inds):
-    class Model(torch.nn.Module):
-        def forward(self, t, idx):
-            return t[idx]
-
-    index_test_harness(Model(), inds)
-
-
-@pytest.mark.parametrize(
-    "inds",
-    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
-)
-def test_index_2(inds):
-    class Model(torch.nn.Module):
-        def forward(self, t, idx):
-            return t[idx, idx]
-
-    index_test_harness(Model(), inds)
-
-
-@pytest.mark.parametrize(
-    "inds",
-    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
-)
-def test_index_3(inds):
-    class Model(torch.nn.Module):
-        def forward(self, t, idx):
-            return t[:, idx]
-
-    index_test_harness(Model(), inds)
-
-
-@pytest.mark.parametrize(
-    "inds",
-    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
-)
-def test_index_4(inds):
-    class Model(torch.nn.Module):
-        def forward(self, t, idx):
-            return t[idx, :, idx]
-
-    index_test_harness(Model(), inds)
-
-
-@pytest.mark.parametrize(
-    "inds",
-    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
-)
-def test_index_5(inds):
-    class Model(torch.nn.Module):
-        def forward(self, t, idx):
-            return t[:, :, idx]
-
-    index_test_harness(Model(), inds)
-
-
-@pytest.mark.parametrize(
-    "inds",
-    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
-)
-def test_index_6(inds):
-    class Model(torch.nn.Module):
-        def forward(self, t, idx):
-            return t[:, idx, idx]
-
-    index_test_harness(Model(), inds)
-
-
-@pytest.mark.parametrize(
-    "inds",
-    ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]]),
-)
-def test_index_7(inds):
-    class Model(torch.nn.Module):
-        def forward(self, t, idx):
-            return t[:, idx, :, idx]
-
-    index_test_harness(Model(), inds)
-
-
 def dynamic_slice_harness(tensor_in, extra_in, start_fn, end_fn):
     class DynamicSliceModel(torch.nn.Module):
         def forward(self, tensor_in, extra_in):
@@ -350,3 +249,27 @@ def test_dynamic_slice_one_dim_mix_up_float():
         dynamic_slice_harness(
             torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
             torch.tensor([5]), start_fn, end_fn)
+
+
+@pytest.mark.parametrize("dim", [0, 1, 2])
+def test_unbind(dim):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.unbind(x, dim)
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    x = torch.randn(2, 3, 4)
+
+    native_out = model(x)
+    poptorch_out = poptorch_model(x)
+
+    # Check the unbound dim length is the same
+    assert len(native_out) == len(poptorch_out)
+
+    for tensor_native, tensor_pop in zip(native_out, poptorch_out):
+        # Check each corresponding tensor has the same shape
+        assert tensor_native.size() == tensor_pop.size()
+        # Check each corresponding tensor is equal
+        helpers.assert_allequal(expected=tensor_native, actual=tensor_pop)

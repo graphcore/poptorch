@@ -60,6 +60,7 @@ PyTorch functions
 * ``torch.squeeze``
 * ``torch.t``
 * ``torch.transpose``
+* ``torch.unbind``
 * ``torch.unsqueeze``
 * ``torch.where``
 
