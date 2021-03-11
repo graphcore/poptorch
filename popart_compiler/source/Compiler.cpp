@@ -2,45 +2,23 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
-#include <list>
-#include <map>
-#include <memory>
 #include <stack>
 #include <string>
 #include <thread>
-#include <unordered_map>
-#include <utility>
-#include <vector>
 
-#include <popart/adam.hpp>
-#include <popart/adaptive.hpp>
-#include <popart/builder.hpp>
-#include <popart/error.hpp>
 #include <popart/graphtransformer.hpp>
-#include <popart/half.hpp>
-#include <popart/ir.hpp>
 #include <popart/ndarraywrapper.hpp>
-#include <popart/op/convbase.hpp>
-#include <popart/op/identity.hpp>
-#include <popart/op/matmul.hpp>
-#include <popart/op/nll.hpp>
 #include <popart/optimizer.hpp>
-#include <popart/popx/devicex.hpp>
-#include <popart/popx/devicexmanager.hpp>
-#include <popart/session.hpp>
-#include <popart/tensorinfo.hpp>
-#include <popart/tensors.hpp>
 
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
+#include "popart_compiler/MultiConvBuilder.hpp"
 #include "popart_compiler/PopartEnums.hpp"
+#include "popart_compiler/SessionOptions.hpp"
 #include "popart_compiler/Utils.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
-
-#include "popart_compiler/CompilerOptions.hpp"
-#include "popart_compiler/MultiConvBuilder.hpp"
-#include "popart_compiler/SessionOptions.hpp"
 
 namespace poptorch {
 namespace {

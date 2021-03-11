@@ -3,23 +3,20 @@
 #include <popart/adaptive.hpp>
 #include <popart/builder.hpp>
 #include <popart/error.hpp>
-#include <popart/graphtransformer.hpp>
 #include <popart/half.hpp>
 #include <popart/ir.hpp>
-#include <popart/ndarraywrapper.hpp>
 #include <popart/op/convbase.hpp>
 #include <popart/op/identity.hpp>
 #include <popart/op/matmul.hpp>
 #include <popart/op/nll.hpp>
-#include <popart/optimizer.hpp>
 #include <popart/popx/devicex.hpp>
 #include <popart/popx/devicexmanager.hpp>
 #include <popart/session.hpp>
 #include <popart/tensorinfo.hpp>
 #include <popart/tensors.hpp>
 
-#include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
+#include "popart_compiler/MultiConvBuilder.hpp"
 #include "popart_compiler/Utils.hpp"
 
 namespace poptorch {
