@@ -29,6 +29,32 @@ explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation
 You can choose to use the IPU model or the real IPU hardware
 via :py:class:`poptorch.Options.useIpuModel`.
 
+Setting options via config file
+-------------------------------
+
+In addition to setting these options programmatically, they can also be set via a
+config text file using :func:`poptorch.Options.loadFromFile`.
+
+Each line in the file must contain a single command corresponding to setting an option
+in :class:`poptorch.Options`. To set an option within the file, write the command as you
+would within a Python script but omit the ``options.`` prefix.
+
+.. code-block::
+    :caption: Example contents of a config file used to set :class:`poptorch.Options`.
+
+    deviceIterations(1)
+    setExecutionStrategy(poptorch.ShardedExecution())
+    replicationFactor(1)
+    enableSyntheticData(True)
+
+Then, simply instantiate :class:`poptorch.Options` and call :func:`poptorch.Options.loadFromFile`.
+
+.. code-block:: python
+    :caption: Setting :class:`poptorch.Options` using a config file named `"poptorch.conf"`.
+    :emphasize-lines: 2
+
+    opts = poptorch.Options()
+    opts.loadFromFile("poptorch.conf")
 
 Model wrapping functions
 ========================

@@ -9,6 +9,7 @@ New features
 ------------
 
 - Add support for ``torch.unbind``
+- Add option to set `poptorch.Options` using options specified in a config file.
 
 v2.0 (Poplar SDK 2.0)
 =====================
