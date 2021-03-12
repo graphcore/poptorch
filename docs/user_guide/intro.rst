@@ -61,15 +61,25 @@ detect the loss value to backpropagate the gradients from.
   :end-before: simple_ipu_end
 
 
-Distributed execution
-=====================
+Parallel and Distributed execution
+==================================
 
-For additional scalability, you can wrap individual layers in an IPU helper to
-designate the IPU to execute the layer. Using the user-provided annotations,
-PopTorch will use PopART to parallelise the model over the given number of IPUs.
-Additional parallelism can be expressed via a replication factor which enables you
-to data-parallelise the model over additional IPUs.
-See :ref:`distributed_execution` for addtional information.
+To scale your models, you can enable :ref:`parallel_execution` using
+PopTorch's :ref:`annotation_tools` to label or wrap individual parts of your
+model and assign parts of the model to an individual IPU or execution phase.
+You can also use PopTorch's :ref:`execution_strategies` to determine how the
+model executes the phases.
+
+Having assigned the model to run on one or more IPUs, you can add additional
+parallelism through replication. Each replica represents an addition copy of the
+entire model, which runs in parallel.
+
+PopTorch can also run across multiple hosts. This is necessary for using more
+than 64 IPUs across IPU-PODs and may be beneficial when using a smaller number
+of IPUs such as models involving intensive pre-processing on the CPU. We
+recommend using the PopRun command-line tool and and PopDist configuration
+library, which can automatically set up PopTorch to run across multiple
+IPU-POD hosts. Please refer to the `PopRun an PopDist user guide <https://docs.graphcore.ai/projects/poprun-user-guide/>`_.
 
 
 Constraints
@@ -93,6 +103,7 @@ Not all PyTorch operations have been implemented by the PopTorch compiler yet.  
 :ref:`supported_ops` for a list of operators that are supported on the IPU.
 Please also report any unsupported operators to support@graphcore.ai so that these
 ops may be incorporated into a future release.
+
 
 Other resources
 ===============

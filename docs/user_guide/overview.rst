@@ -15,12 +15,13 @@ Broadly speaking, the options fall into the following catagories:
 #. General options (See :class:`poptorch.Options`)
 #. Options related to half precision (see :class:`poptorch.options._PrecisionOptions`)
 #. Management of the training process (see :class:`poptorch.options._TrainingOptions`)
-#. Control of distributed execution environments
-   (see :class:`poptorch.options._DistributedOptions`)
 #. Location of tensors (see: :class:`poptorch.options._TensorLocationOptions` and
    :class:`poptorch.TensorLocationSettings`)
 #. Options relevant to the Torch JIT compiler
    (see :class:`poptorch.options._JitOptions`)
+#. Control of distributed execution environments when using tools other than
+   `PopRun <https://docs.graphcore.ai/projects/poprun-user-guide/>`_
+   (see :class:`poptorch.options._DistributedOptions`)
 
 See :ref:`efficient_data_batching`  for a full
 explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
@@ -122,8 +123,6 @@ functionality.
     poptorch_inf.copyWeightsToDevice()
     validate(poptorch_inf)
 
-.. _parallel_execution:
-
 poptorch.isRunningOnIpu
 -----------------------
 
@@ -145,6 +144,9 @@ when running on CPU. For example:
           else:
               # CPU path
               return my_torch_implementation(x,y)
+
+
+.. _parallel_execution:
 
 Parallel execution
 ==================
@@ -178,7 +180,7 @@ excess being reserved but idle.
 This option is not enabled by default to prevent unintentional overbooking of
 IPUs.
 
-
+.. _annotation_tools:
 
 Annotation tools
 ----------------
@@ -367,6 +369,7 @@ and used in :py:class:`poptorch.Stage` dynamically. They match exactly.
   :end-before: annotations_end
   :emphasize-lines: 25, 32, 47-48, 51-52
 
+.. _execution_strategies:
 
 Parallel execution strategies
 -----------------------------

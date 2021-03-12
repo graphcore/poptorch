@@ -2,17 +2,18 @@
 Experimental features
 =====================
 
-.. _distributed_execution:
+Distributed execution without PopRun
+====================================
 
-Distributed execution
-=====================
+PopTorch supports distributed execution on IPU-POD using the IPU over Fabric
+(IPUoF).
 
-PopTorch supports distributed execution on IPU-POD using the IPU over Fabric(IPUoF).
-Please refer to the popdist documentation for examples.
-
-If you run without using ``poprun``, the only change to your code needed is to set the id of the current process and
+If you run using your own distributed processing tool instead of PopRun, the only change to your code needed is to set the id of the current process and
 the total number of processes the execution is distributed across using
-:py:meth:`~poptorch.options._DistributedOptions.configureProcessId`
+:py:meth:`~poptorch.options._DistributedOptions.configureProcessId`.
+Please also be aware that :py:meth:`~poptorch.Options.replicationFactor` should
+be used to set the number of local replicas (per host) not the total (global)
+number of replicas.
 
 .. literalinclude:: device_iterations.py
   :caption: Changes required for distributed execution
@@ -33,4 +34,4 @@ torch.nn.CTCLoss
 Support was added for the CTCLoss operator with a number of limitations:
 #. ``zero_infinity`` parameter must be set ``False``
 #. ``reduction`` parameter must be set to either ``sum`` or ``mean``
-#. ``targets`` tensor must be 2D, corresponding to stacked, padded layout 
+#. ``targets`` tensor must be 2D, corresponding to stacked, padded layout

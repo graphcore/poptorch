@@ -332,6 +332,9 @@ class _PopartOptions:
 class _DistributedOptions(_options_impl.OptionsDict):
     """Options related to distributed execution.
 
+    You should not use these when using PopRun/PopDist. Instead use
+    ``popdist.poptorch.Options`` to set these values automatically.
+
     Can be accessed via :py:attr:`poptorch.Options.Distributed`:
 
     >>> opts = poptorch.Options()
@@ -1019,6 +1022,9 @@ class Options(_options_impl.OptionsDict):
     def Distributed(self):
         """Options specific to running on multiple IPU server (IPU-POD).
 
+        You should not use these when using PopRun/PopDist. Instead use
+        ``popdist.poptorch.Options`` to set these values automatically.
+
         .. seealso:: :py:class:`poptorch.options._DistributedOptions`"""
         return self._distributed
 
@@ -1060,9 +1066,9 @@ class Options(_options_impl.OptionsDict):
 
     def autoRoundNumIPUs(self, auto_round_num_ipus):
         """Whether or not to round up the number of IPUs used automatically: the
-        number of IPUs requested must be a power of 2 or multiple of 64. By
-        default, an error occurs if the model uses an unsupported number of IPUs
-        to prevent you unintentionally overbooking of IPUs.
+        number of IPUs requested must be a power of 2. By default, an error
+        occurs if the model uses an unsupported number of IPUs
+        to prevent you unintentionally overbooking IPUs.
 
         :param bool auto_round_num_ipus:
             * True: round up the number of IPUs to a power of 2 or multiple of
@@ -1121,7 +1127,7 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def replicationFactor(self, replication_factor):
-        """Number of times to replicate the model (fefault: 1).
+        """Number of times to replicate the model (default: 1).
 
         Replicating the model increases the data throughput of the model as
         Poptorch uses more IPUs. This leads to the number of IPUs used being

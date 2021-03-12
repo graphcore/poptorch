@@ -81,7 +81,9 @@ class DataLoader(torch.utils.data.DataLoader):
     abstract away some of the batch sizes calculations.
 
     If this DataLoader is used in a distributed execution environment, it will
-    ensure that each process uses a different subset of the dataset.
+    ensure that each process uses a different subset of the dataset, providing
+    you first call ``options.randomSeed(N)`` with an integer N which is the same
+    across all hosts.
     """
 
     def __init__(self,
