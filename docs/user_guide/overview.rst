@@ -48,7 +48,7 @@ would within a Python script but omit the ``options.`` prefix.
     replicationFactor(1)
     enableSyntheticData(True)
 
-Then, simply instantiate :class:`poptorch.Options` and call :func:`poptorch.Options.loadFromFile`.
+Then, instantiate :class:`poptorch.Options` and call :func:`poptorch.Options.loadFromFile`.
 
 .. code-block:: python
     :caption: Setting :class:`poptorch.Options` using a config file named `"poptorch.conf"`.
