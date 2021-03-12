@@ -7,7 +7,7 @@ This page will introduce the key features that enable training on the IPU, and h
 Preparing your data
 ===================
 
-Data loading in PyTorch is typically handled using `torch.utils.data.DataLoader <https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader>`_.
+Data loading in PyTorch is typically handled using `torch.utils.data.DataLoader <https://pytorch.org/docs/1.7.1/data.html#torch.utils.data.DataLoader>`_.
 
 PopTorch extends PyTorch's DataLoader with a :py:class:`poptorch.DataLoader` to enable efficient data batching with respect to PopTorch's underlying machine learning framework, PopART.
 Instantiation is almost identical to PyTorch, but you must remember to pass an instance of :py:class:`poptorch.Options`.
@@ -129,7 +129,7 @@ Optimizers
 ==========
 
 One important thing to note about using optimizers in PopTorch is that the optimizer state is encapsulated within the PopTorch model.
-As such, any change made to the optimizer outside of the model must be followed by a call to ``poptorch_model.setOptimizer``,
+As such, any change made to the optimizer outside of the model must be followed by a call to :py:meth:`poptorch_model.setOptimizer <poptorch.PoplarExecutor.setOptimizer>`,
 passing in the updated optimizer.
 
 +-------------------------------------------------+

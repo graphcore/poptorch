@@ -21,7 +21,7 @@ actually sent for a single step.
 poptorch.DataLoader
 ===================
 
-Poptorch provides a thin wrapper around the traditional `torch.utils.data.DataLoader`
+Poptorch provides a thin wrapper around the traditional `torch.utils.data.DataLoader <https://pytorch.org/docs/1.7.1/data.html#torch.utils.data.DataLoader>`_
 to abstract away some of the batch sizes calculations. If :py:class:`poptorch.DataLoader`
 is used in a distributed execution environment, it will ensure that each process uses
 a different subset of the dataset.

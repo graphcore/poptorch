@@ -13,22 +13,22 @@ You can find a full list of options in the :ref:`options` section of the :ref:`r
 Broadly speaking, the options fall into the following catagories:
 
 #. General options (See :class:`poptorch.Options`)
-#. Options related to half precision (see :class:`poptorch.options._PrecisionOptions`)
-#. Management of the training process (see :class:`poptorch.options._TrainingOptions`)
-#. Location of tensors (see: :class:`poptorch.options._TensorLocationOptions` and
+#. Options related to half precision (see :class:`opts.Precision.* <poptorch.options._PrecisionOptions>`)
+#. Management of the training process (see :class:`opts.Training.* <poptorch.options._TrainingOptions>`)
+#. Location of tensors (see: :class:`opts.TensorLocations.* <poptorch.options._TensorLocationOptions>` and
    :class:`poptorch.TensorLocationSettings`)
 #. Options relevant to the Torch JIT compiler
-   (see :class:`poptorch.options._JitOptions`)
+   (see :class:`opts.Jit.* <poptorch.options._JitOptions>`)
 #. Control of distributed execution environments when using tools other than
    `PopRun <https://docs.graphcore.ai/projects/poprun-user-guide/>`_
-   (see :class:`poptorch.options._DistributedOptions`)
+   (see :class:`opts.Distributed.* <poptorch.options._DistributedOptions>`)
 
 See :ref:`efficient_data_batching`  for a full
 explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
 ``replication_factor`` interact with the output and input sizes.
 
 You can choose to use the IPU model or the real IPU hardware
-via :py:class:`poptorch.Options.useIpuModel`.
+via :py:meth:`poptorch.Options.useIpuModel`.
 
 Setting options via config file
 -------------------------------
@@ -598,7 +598,7 @@ This behaviour can be overridden using :py:func:`~poptorch.optim.VariableAttribu
     :start-after: optim_const_start
     :end-before: optim_const_end
 
-For native optimizers (those from the ``torch.optim`` namespace) the attributes which are left to their default value in the constructor will be considered as constant.
+For native optimizers (those from the `torch.optim <https://pytorch.org/docs/1.7.1/optim.html>`_ namespace) the attributes which are left to their default value in the constructor will be considered as constant.
 
 There is no method to override this behaviour which is why we recommend you always use the ``poptorch.optim`` optimizers instead.
 
@@ -832,7 +832,7 @@ You can use your models in one of the following ways:
     :end-before: inference_half_end
     :emphasize-lines: 1, 2
 
-Because PopTorch relies on the ``torch.jit.trace`` API, it is limited to tracing operations which run on the CPU.
+Because PopTorch relies on the `torch.jit.trace <https://pytorch.org/docs/1.7.1/generated/torch.jit.trace.html#torch.jit.trace>`_ API, it is limited to tracing operations which run on the CPU.
 Many of these operations do not support float 16 inputs.
 To allow the full range of operations, PopTorch converts all float 16 inputs to float 32 before tracing and then restores the inputs to float 16 as part of the canonicalization process.
 Some operations may result in the model running in float 32 where float 16 would
