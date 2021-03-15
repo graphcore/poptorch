@@ -97,6 +97,9 @@ def find_functions(jsonOutput, node, namespace=""):
     operation["type"] = returnType
     operation["args"] = []
 
+    if node.access_specifier != clang.cindex.AccessSpecifier.PUBLIC:
+        return
+
     argNum = 0
     for child in node.get_children():
         argument = {}
@@ -211,8 +214,6 @@ def parse_signatures():
         'popart::MultiConvPads':
         'ignore',
         'popart::MultiConvStrides':
-        'ignore',
-        'popart::OperatorIdentifier':
         'ignore',
         'popart::TensorId':
         'ignore'
