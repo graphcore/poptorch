@@ -355,6 +355,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(decomposeGradSum);
   ADD_POPART_BOOL_OPTION(enableDistributedReplicatedGraphs);
   ADD_POPART_BOOL_OPTION(groupHostSync);
+  ADD_POPART_BOOL_OPTION(enableAutomaticLossScaling);
 
   ADD_POPART_DOUBLE_OPTION(outlineSequenceBreakCost);
   ADD_POPART_DOUBLE_OPTION(outlineThreshold);

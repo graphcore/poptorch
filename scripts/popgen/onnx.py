@@ -212,6 +212,8 @@ def parse_signatures():
         'ignore',
         'popart::MultiConvStrides':
         'ignore',
+        'popart::OperatorIdentifier':
+        'ignore',
         'popart::TensorId':
         'ignore'
     }
