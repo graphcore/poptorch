@@ -1490,12 +1490,11 @@ class AsynchronousWorker:
     """Interface for the host to create and manage a separate worker process to fetch elements from a dataset."""
 
     def __init__(self, buffer_size, miss_sleep_time_in_ms, dataset,
-                 load_indefinitely, early_preload, sharing_strategy):
-        self._process = _AsynchronousWorkerProcess(buffer_size,
-                                                   miss_sleep_time_in_ms,
-                                                   dataset, load_indefinitely,
-                                                   early_preload,
-                                                   sharing_strategy)
+                 load_indefinitely, early_preload, sharing_strategy,
+                 rebatched_size):
+        self._process = _AsynchronousWorkerProcess(
+            buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
+            early_preload, sharing_strategy, rebatched_size)
         self._previously_ready_element = None
         self._ring_read_index = 0
         self._buffer_size = buffer_size
@@ -1620,7 +1619,8 @@ class _AsynchronousWorkerProcess:
     """Worker process fetching elements from a given dataset"""
 
     def __init__(self, buffer_size, miss_sleep_time_in_ms, dataset,
-                 load_indefinitely, early_preload, sharing_strategy):
+                 load_indefinitely, early_preload, sharing_strategy,
+                 rebatched_size):
         self._buffer_size = buffer_size
         self._miss_sleep_time_in_ms = miss_sleep_time_in_ms
         self._dataset = dataset
@@ -1628,6 +1628,10 @@ class _AsynchronousWorkerProcess:
         self._early_preload = early_preload
         self._process = None
         self._sharing_strategy = sharing_strategy
+        self._rebatched_size = rebatched_size
+        # Only used when rebatch is used: index of the next batch to copy
+        # Start from 1, because 0 will be filled when creating the buffer
+        self._next_batch_idx = 1
 
     def isAlive(self):
         return self._process.exitcode is None
@@ -1778,18 +1782,27 @@ class _AsynchronousWorkerProcess:
                     tensors.""" % index
 
             # Shared with parent process.
+            tensor_size = [*tensor.size()]
+            if self._rebatched_size:
+                assert tensor_size[0] == 1, ("Rebatching can only be used if "
+                                             "the dataset has batch_size == 1")
+                tensor_size[0] = self._rebatched_size
             memory = tensor.expand(
                 self._buffer_size,
-                *tensor.size()).clone().contiguous().share_memory_()
+                *tensor_size).clone().contiguous().share_memory_()
             data_buffers.append(memory)
 
             # Send it to the host.
             conn.send(memory)
 
         # We've loaded the first element as part of the spin up process.
-        ready_to_read_index[0] = True
-
-        ring_write_index = 1
+        # If we're rebatching we need more than one element to make up a full
+        # batch so we can't mark the first element as ready to be read yet.
+        if not self._rebatched_size:
+            ready_to_read_index[0] = True
+            ring_write_index = 1
+        else:
+            ring_write_index = 0
 
         host_handler = _HostCommandHandler(command_pipe)
 
@@ -1830,6 +1843,7 @@ class _AsynchronousWorkerProcess:
                 # Tell the host where the last tensor is.
                 eof_tensor[0] = ring_write_index
                 dataset_iterator = iter(self._dataset)
+                self._next_batch_idx = 0
 
                 logger.debug("AsynchronousDataAccessor worker: the iterator "
                              "has been reset")
@@ -1849,22 +1863,34 @@ class _AsynchronousWorkerProcess:
                     " Creating a new iterator")
                 # We always reset and will keep the worker thread running.
                 dataset_iterator = iter(self._dataset)
+                self._next_batch_idx = 0
 
                 logger.debug(
                     "AsynchronousDataAccessor worker: new iterator ready")
             else:
-                # Copy the tensor into the preallocated shared memory.
-                for index, tensor in enumerate(data):
-                    data_buffers[index][ring_write_index].copy_(tensor)
+                if self._rebatched_size:
+                    for index, tensor in enumerate(data):
+                        data_buffers[index][ring_write_index].index_copy_(
+                            0, torch.tensor([self._next_batch_idx]), tensor)
+                    self._next_batch_idx += 1
+                else:
+                    # Copy the tensor into the preallocated shared memory.
+                    for index, tensor in enumerate(data):
+                        data_buffers[index][ring_write_index].copy_(tensor)
 
-                # Tell the host this data is ready.
-                ready_to_read_index[ring_write_index] = True
+                # If we're not rebatching: always notify the host an element is ready.
+                # Otherwise only notify the host if the full batch is ready.
+                if self._rebatched_size is None or \
+                        self._next_batch_idx == self._rebatched_size:
+                    self._next_batch_idx = 0
+                    # Tell the host this data is ready.
+                    ready_to_read_index[ring_write_index] = True
 
-                ring_write_index += 1
+                    ring_write_index += 1
 
-                # Ring back around.
-                if ring_write_index >= self._buffer_size:
-                    ring_write_index = 0
+                    # Ring back around.
+                    if ring_write_index >= self._buffer_size:
+                        ring_write_index = 0
 
         logger.debug(
             "AsynchronousDataAccessor worker: ready to exit: checking parent"

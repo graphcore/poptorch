@@ -7,9 +7,19 @@ class DataLoaderMode(enum.IntEnum):
     - ``Sync``: Access data synchronously
     - ``Async``: Uses an :py:class:`~poptorch.AsynchronousDataAccessor`
       to access the dataset
+    - ``AsyncRebatched``: For iterable datasets by default PyTorch will round
+      down the number of elements to a multiple of the combined batch size in
+      each worker. When the number of workers is high and/or the batch size
+      large this might lead to a significant part of the dataset being
+      discarded. In this mode, the
+      combined batch size used by the PyTorch workers will be set to 1,
+      and the batched tensor will instead be constructed in the
+      AsynchronousDataAccessor.
+      This mode is identical to Async for map-style datasets.
     """
     Sync = 0
     Async = 1
+    AsyncRebatched = 2
 
 
 class SharingStrategy(enum.IntEnum):

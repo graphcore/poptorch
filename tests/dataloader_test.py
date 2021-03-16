@@ -1,4 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import math
 import time
 import subprocess
 import torch
@@ -30,23 +31,28 @@ class IncrementDataset(torch.utils.data.Dataset):
         return self._length
 
     def __getitem__(self, index):
+        if index >= self._length:
+            raise StopIteration
         return torch.full(self._shape, index, dtype=torch.float32)
 
 
 class IncrementIterableDataset(torch.utils.data.IterableDataset):
-    def __init__(self, shape, length):
+    def __init__(self, shape, length, start=0):
         super().__init__()
         self._shape = shape
-        self._length = length
+        self.length = length
+        self.start = start
 
     def __iter__(self):
-        for index in range(self._length):
-            yield torch.full(self._shape, index, dtype=torch.float32)
+        for index in range(self.length):
+            yield torch.full(self._shape,
+                             self.start + index,
+                             dtype=torch.float32)
 
 
 class IncrementIterableDatasetWithLen(IncrementIterableDataset):
     def __len__(self):
-        return self._length
+        return self.length
 
 
 class IncrementDatasetWithLabels(torch.utils.data.Dataset):
@@ -451,7 +457,7 @@ def test_batch_size_None():
         continue
 
 
-def test_len():
+def test_iterable_dataset_len():
     shape = [2, 3]
     num_tensors = 10
 
@@ -560,3 +566,221 @@ def test_reuse_workers(DatasetType):
         print(f"Other epoch: {end - start} {num_tensors_reuse}")
 
     assert num_tensors_reuse == num_tensors
+
+
+# Select a subset of the dataset for each worker
+def _worker_init_fn(worker_id):
+    worker_info = torch.utils.data.get_worker_info()
+    dataset = worker_info.dataset
+    total_len = dataset.length
+    per_worker = math.ceil(dataset.length / worker_info.num_workers)
+    dataset.start = per_worker * worker_id
+    if worker_id == worker_info.num_workers - 1:
+        dataset.length = total_len - (per_worker *
+                                      (worker_info.num_workers - 1))
+    else:
+        dataset.length = per_worker
+
+
+@pytest.mark.parametrize(
+    "mode", {
+        poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
+        poptorch.DataLoaderMode.Sync
+    })
+def test_iterable_dataloader_drop_last(mode):
+    shape = [2, 3]
+    num_tensors = 101
+    num_workers = 7
+    batch_size = 4
+    if mode != poptorch.DataLoaderMode.AsyncRebatched:
+        # Expected tensors
+        # tensors per worker = ceil(101/7) = 15
+        # last worker = 10 tensor
+        # batch size = 4
+        # Total = 6 * floor(15 / 4) + floor(10/4)
+        #       = 6 * 3 + 2 = 20
+        # Unused tensors = 101 - num_expected * 4 = 21
+        num_expected = 20 * batch_size
+    else:
+        # Best case expected: floor(101/4) = 25 -> unused = 1
+        num_expected = math.floor(num_tensors / batch_size) * batch_size
+
+    opts = poptorch.Options()
+    loader = poptorch.DataLoader(opts,
+                                 IncrementIterableDataset(shape, num_tensors),
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 mode=mode,
+                                 worker_init_fn=_worker_init_fn)
+
+    values = set()
+    for t in loader:
+        assert t.shape == torch.Size([4, 2, 3])
+        for b in range(4):
+            v = int(t[b][0][0])
+            assert v not in values
+            values.add(v)
+
+    assert len(values) == num_expected
+    print("Missing tensors:")
+    for i in range(num_tensors):
+        if i not in values:
+            print(i)
+
+    # Make sure it works for more than 1 epoch
+    values = set()
+    for t in loader:
+        assert t.shape == torch.Size([4, 2, 3])
+        for b in range(4):
+            v = int(t[b][0][0])
+            assert v not in values
+            values.add(v)
+
+    assert len(values) == num_expected
+
+
+@pytest.mark.parametrize(
+    "mode", {
+        poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
+        poptorch.DataLoaderMode.Sync
+    })
+def test_indexable_dataloader_drop_last(mode):
+    shape = [2, 3]
+    num_tensors = 101
+    num_workers = 7
+    batch_size = 4
+    # Expected tensors
+    # Best case expected: floor(101/4) = 25 -> unused = 1
+    num_expected = 100
+
+    opts = poptorch.Options()
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDataset(shape, num_tensors),
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 mode=mode)
+
+    values = set()
+    for t in loader:
+        assert t.shape == torch.Size([4, 2, 3])
+        for b in range(4):
+            v = int(t[b][0][0])
+            assert v not in values
+            values.add(v)
+
+    assert len(values) == num_expected
+    print("Missing tensors:")
+    for i in range(num_tensors):
+        if i not in values:
+            print(i)
+
+    # Make sure it works for more than 1 epoch
+    values = set()
+    for t in loader:
+        assert t.shape == torch.Size([4, 2, 3])
+        for b in range(4):
+            v = int(t[b][0][0])
+            assert v not in values
+            values.add(v)
+
+    assert len(values) == num_expected
+
+
+@pytest.mark.parametrize(
+    "mode", {
+        poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
+        poptorch.DataLoaderMode.Sync
+    })
+def test_indexable_dataloader_len(mode):
+    shape = [2, 3]
+    num_tensors = 101
+    num_workers = 7
+    batch_size = 4
+    ds = IncrementDataset(shape, num_tensors)
+    assert len(ds) == num_tensors
+    n = 0
+    for n, _ in enumerate(ds):
+        pass
+    assert n + 1 == num_tensors
+    opts = poptorch.Options()
+    loader = poptorch.DataLoader(opts,
+                                 ds,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 mode=mode)
+    if mode == poptorch.DataLoaderMode.Sync:
+        # Make sure the user can still manually create the
+        # data accessor. (This can only be tested in Sync
+        # mode as otherwise the loader already contains
+        # a data accessor).
+        accessor = poptorch.AsynchronousDataAccessor(loader)
+        assert len(loader) == num_tensors // batch_size
+        for n, _ in enumerate(accessor):
+            pass
+        assert n + 1 == num_tensors // batch_size
+        accessor = poptorch.AsynchronousDataAccessor(ds)
+        assert len(accessor) == num_tensors
+        for n, _ in enumerate(accessor):
+            pass
+        assert n + 1 == num_tensors
+
+    assert len(loader) == num_tensors // batch_size
+    for n, _ in enumerate(loader):
+        pass
+    assert n + 1 == num_tensors // batch_size
+
+
+@pytest.mark.parametrize(
+    "mode", {
+        poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
+        poptorch.DataLoaderMode.Sync
+    })
+def test_iterable_dataloader_len(mode):
+    shape = [2, 3]
+    num_tensors = 101
+    num_workers = 7
+    batch_size = 4
+    # Note: Upstream torch returns the theoretical length
+    # it doesn't take into account the items lost per worker.
+    expected_len = math.floor(num_tensors / batch_size)
+    if mode != poptorch.DataLoaderMode.AsyncRebatched:
+        # Expected tensors
+        # tensors per worker = ceil(101/7) = 15
+        # last worker = 10 tensor
+        # batch size = 4
+        # Total = 6 * floor(15 / 4) + floor(10/4)
+        #       = 6 * 3 + 2 = 20
+        # Unused tensors = 101 - num_iterations_expected * 4 = 21
+        num_iterations_expected = 20
+    else:
+        # Best case expected: floor(101/4) = 25 -> unused = 1
+        num_iterations_expected = expected_len
+    ds = IncrementIterableDatasetWithLen(shape, num_tensors)
+    assert len(ds) == num_tensors
+    n = 0
+    for n, _ in enumerate(ds):
+        pass
+    assert n + 1 == num_tensors
+    opts = poptorch.Options()
+    loader = poptorch.DataLoader(opts,
+                                 ds,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 worker_init_fn=_worker_init_fn,
+                                 mode=mode)
+    if mode == poptorch.DataLoaderMode.Sync:
+        accessor = poptorch.AsynchronousDataAccessor(loader)
+        assert len(loader) == expected_len
+        for n, _ in enumerate(accessor):
+            pass
+        assert n + 1 == num_iterations_expected
+        accessor = poptorch.AsynchronousDataAccessor(ds)
+        assert len(accessor) == num_tensors
+        for n, _ in enumerate(accessor):
+            pass
+        assert n + 1 == num_tensors
+
+    assert len(loader) == expected_len
+    for n, _ in enumerate(loader):
+        pass
+    assert n + 1 == num_iterations_expected

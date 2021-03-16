@@ -147,3 +147,6 @@ Data batching
 .. autoclass:: poptorch.AsynchronousDataAccessor
    :special-members: __init__, __len__
    :members: terminate
+
+.. autoclass:: poptorch.DataLoaderMode
+   :members:

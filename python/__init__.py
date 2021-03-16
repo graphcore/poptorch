@@ -185,8 +185,18 @@ class DataLoader(torch.utils.data.DataLoader):
             dataset = profiling.Channel("dataset").instrument(
                 dataset, "__getitem__")
 
+        rebatched_size = None
+        dataset_batch_size = self._combined_batch_size
+        if mode == DataLoaderMode.AsyncRebatched:
+            mode = DataLoaderMode.Async
+            if self._is_iterable:
+                # If we're rebatching then we force the dataset to use a
+                # batch size of 1 and the AsynchronousDataAccessor will
+                # build the batched tensor.
+                rebatched_size = self._combined_batch_size
+                dataset_batch_size = 1
         super().__init__(dataset,
-                         batch_size=self._combined_batch_size,
+                         batch_size=dataset_batch_size,
                          shuffle=shuffle,
                          num_workers=num_workers,
                          drop_last=drop_last,
@@ -195,11 +205,21 @@ class DataLoader(torch.utils.data.DataLoader):
 
         self._accessor = None
         if mode == DataLoaderMode.Async:
-            if async_options is None:
-                self._accessor = AsynchronousDataAccessor(self)
-            else:
-                self._accessor = AsynchronousDataAccessor(
-                    self, **async_options)
+            async_options = async_options or {}
+            assert "rebatched_size" not in async_options, (
+                "You cannot "
+                "use DataLoaderMode.AsyncRebatched and manually specify"
+                " the rebatched_size in async_options")
+            self._accessor = AsynchronousDataAccessor(
+                self, **async_options, rebatched_size=rebatched_size)
+
+    def __len__(self):
+        # If we're rebatching in the AsynchronousDataAccessor we need to
+        # adjust the dataset's length.
+        dataset_len = super().__len__()
+        if self._accessor is not None and self._accessor.rebatched_size:
+            dataset_len = dataset_len // self._accessor.rebatched_size
+        return dataset_len
 
     @property
     def _profiling(self):
@@ -260,7 +280,8 @@ class AsynchronousDataAccessor:
                  miss_sleep_time_in_ms=0.1,
                  load_indefinitely=True,
                  early_preload=False,
-                 sharing_strategy=SharingStrategy.FileSystem):
+                 sharing_strategy=SharingStrategy.FileSystem,
+                 rebatched_size=None):
         """
         :param dataset: The dataset to pull data from, this can be any Python
             iterable.
@@ -277,6 +298,9 @@ class AsynchronousDataAccessor:
             SharedMemory is fast but might be quite limited in size.
             FileSystem will serialise the dataset to file and reload it which
             will be slower.
+        :param int rebatched_size: If not None: return N batched tensors from
+            the dataset per iteration. (The passed dataset must have a
+            batch_size of 1).
         """
 
         self._dataset = dataset
@@ -293,11 +317,14 @@ class AsynchronousDataAccessor:
 
         # Set _worker to None  in case something goes wrong in the AsynchronousWorker constructor
         self._worker = None
-        self._worker = _impl.AsynchronousWorker(buffer_size,
-                                                miss_sleep_time_in_ms, dataset,
-                                                load_indefinitely,
-                                                early_preload,
-                                                sharing_strategy)
+
+        assert rebatched_size is None or rebatched_size > 1, (
+            "rebatched_size"
+            " must be None or greater than 1")
+        self.rebatched_size = rebatched_size
+        self._worker = _impl.AsynchronousWorker(
+            buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
+            early_preload, sharing_strategy, rebatched_size)
 
     def terminate(self):
         """
@@ -310,7 +337,13 @@ class AsynchronousDataAccessor:
         self.terminate()
 
     def __len__(self):
-        return len(self._dataset)
+        dataset_len = len(self._dataset)
+        # If this AsynchronousDataAccessor is embedded in a DataLoader then the dataset
+        # length has already been adjusted.
+        if self.rebatched_size and getattr(self._dataset, "_accessor",
+                                           None) != self:
+            dataset_len = dataset_len // self.rebatched_size
+        return dataset_len
 
     def __iter__(self):
         self._worker.resetIterator()

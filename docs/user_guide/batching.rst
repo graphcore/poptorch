@@ -35,7 +35,7 @@ poptorch.AsynchronousDataAccessor
 =================================
 
 To reduce host overhead you can offload the data loading process to a
-separate thread by specifying `mode=poptorch.DataLoaderMode.Async` in the
+separate thread by specifying :py:class:`mode=poptorch.DataLoaderMode.Async <poptorch.DataLoaderMode>` in the
 :py:class:`~poptorch.DataLoader` constructor. Internally this uses an
 :py:class:`~poptorch.AsynchronousDataAccessor`. Doing this allows you to reduce
 the host/IPU communication overhead by using the time that the IPU is running
@@ -78,6 +78,43 @@ executing and returns to host the data will be ready for the IPU to pull in agai
   .. code-block:: python
 
     labels += label.detach().clone()
+
+Rebatching iterable datasets
+----------------------------
+
+There are `two types of datasets in PyTorch <https://pytorch.org/docs/1.7.1/data.html#dataset-types>`_ : map-style datasets and iterable datasets.
+
+As explained in the notes of PyTorch's `Data Loading Order and Sampler <https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler>`_ : for
+`IterableDataset <https://pytorch.org/docs/1.7.1/data.html#torch.utils.data.IterableDataset>`_ :
+"When fetching from iterable-style datasets with multi-processing, the drop_last argument drops the
+last non-full batch of each worker’s dataset replica."
+
+This means that if the number of elements is naively
+divided among the number of workers (which is the default behaviour) then potentially a significant number of elements will be dropped.
+
+For example:
+
+.. code-block:: python
+
+  num_tensors = 100
+  num_workers = 7
+  batch_size = 4
+
+  per_worker_tensors = ceil(100 / num_workers) = 15
+  last_worker_tensors = 100 - (num_workers - 1) * per_worker_tensors = 10
+
+  num_tensors_used = batch_size * (floor(per_worker_tensors / batch_size) * (num_workers - 1) + floor(last_worker_tensors / batch_size))
+                   = 80
+
+This means in this particular case 20% of the dataset will never be used. But, in general the larger the number of workers and the batch size, the more data will end up being unused.
+
+To work around this issue PopTorch has a :py:class:`mode=poptorch.DataLoaderMode.AsyncRebatched <poptorch.DataLoaderMode>`.
+PopTorch will set the ``batch_size`` in the PyTorch Dataset and DataLoader to ``1`` and will instead create the batched tensors in its worker process.
+
+The shape of the tensors returned by the DataLoader will be the same as before, but the number of used tensors from the dataset  will increase to
+``floor(num_tensors / batch_size) * batch_size`` (which means all the tensors would be used in the example above).
+
+.. note:: This flag is not enabled by default because the behaviour is different from the upstream DataLoader.
 
 poptorch.Options.deviceIterations
 =================================
