@@ -62,8 +62,9 @@ def _parseArgs(all_args, child_attrs=None):
 class SGD(torch.optim.SGD):
     """ Stochastic gradient descent with optional momentum.
 
-    The optimizer matches PyTorch's implementation (torch.optim.SGD) with
-    optional loss and velocity scaling.
+    The optimizer matches PyTorch's implementation
+    (`torch.optim.SGD <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.SGD>`_)
+    with optional loss and velocity scaling.
 
     Nesterov momentum is not currently supported.
     """
@@ -92,7 +93,7 @@ class SGD(torch.optim.SGD):
         :param float lr: learning rate.
         :param float, optional momentum: momentum factor.
         :type momentum: float, optional
-        :param dampening: damperning term for momentum.
+        :param dampening: dampening term for momentum.
         :type dampening: float, optional
         :param weight_decay: Weight decay (L2 penalty) factor.
         :type weight_decay: float, optional
@@ -138,7 +139,8 @@ class SGD(torch.optim.SGD):
 class Adam(torch.optim.Adam):
     """ Adam optimizer.
 
-    This optimizer matches PyTorch's implementation (torch.optim.Adam) with
+    This optimizer matches PyTorch's implementation
+    (`torch.optim.Adam <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.Adam>`_) with
     optional loss scaling.
 
     AMSGrad is currently not supported."""
@@ -169,9 +171,9 @@ class Adam(torch.optim.Adam):
         :param iterable params: parameters to optimize.
         :param lr: learning rate
         :type lr: float, optional
-        :param betas: (beta1, beta2) parameters used in Adam.
+        :param betas: ``(beta1, beta2)`` parameters used in Adam.
         :type betas: tuple, optional
-        :param eps: term added to the demoninator to ensure numerical stability.
+        :param eps: term added to the denominator to ensure numerical stability.
         :type eps: float, optional
         :param weight_decay: Weight decay factor.
         :type weight_decay: float, optional
@@ -241,8 +243,9 @@ class Adam(torch.optim.Adam):
 class AdamW(torch.optim.AdamW):
     """ Adam optimizer with true weight decay.
 
-    This optimizer matches PyTorch's implementation (torch.optim.AdamW) with
-    optional loss scaling.
+    This optimizer matches PyTorch's implementation
+    (`torch.optim.AdamW <https://pytorch.org/docs/1.7.1/optim.htmltorch.optim.AdamW>`_)
+    with optional loss scaling.
 
     AMSGrad is currently not supported."""
 
@@ -275,9 +278,9 @@ class AdamW(torch.optim.AdamW):
         :param iterable params: parameters to optimize.
         :param lr: learning rate
         :type lr: float, optional
-        :param betas: (beta1, beta2) parameters used in AdamW.
+        :param betas: ``(beta1, beta2)`` parameters used in AdamW.
         :type betas: tuple, optional
-        :param eps: term added to the demoninator to ensure numerical stability.
+        :param eps: term added to the denominator to ensure numerical stability.
         :type eps: float, optional
         :param weight_decay: Weight decay factor.
         :type weight_decay: float, optional
@@ -350,8 +353,9 @@ class AdamW(torch.optim.AdamW):
 class RMSprop(torch.optim.RMSprop):
     """ RMSprop optimizer with optional L2 penalty.
 
-    This optimizer matches PyTorch's implementation (torch.optim.RMSprop) with
-    optional loss scaling."""
+    This optimizer matches PyTorch's implementation (
+    `torch.optim.RMSprop <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.RMSprop>`_)
+    with optional loss scaling."""
 
     # Variables which don't exist in the parent optimizer class and are
     # global (Cannot be set per group).
@@ -384,14 +388,14 @@ class RMSprop(torch.optim.RMSprop):
         :type lr: float, optional
         :param alpha: smoothing constant.
         :type alpha: float, optional
-        :param eps: term added to the demoninator to ensure numerical
+        :param eps: term added to the denominator to ensure numerical
            stability.
         :type eps: float, optional
-        :param weight_decay: L2 penalty coeffecient.
+        :param weight_decay: L2 penalty coefficient.
         :type weight_decay: float, optional
         :param momentum: momentum factor.
         :type momentum: float, optional
-        :param centered: True: compute centred RMSProp in which the
+        :param centered: True: compute centred RMSprop in which the
             gradient is normalized by an estimate of its variance.
         :type centered: bool, optional
         :param loss_scaling: Factor by which to scale the loss and hence
@@ -486,7 +490,7 @@ class LAMB(torch.optim.Optimizer):
         :param iterable params: parameters to optimize.
         :param lr: learning rate
         :type lr: float, optional
-        :param betas: (beta1, beta2) parameters used in LAMB.
+        :param betas: ``(beta1, beta2)`` parameters used in LAMB.
         :type betas: tuple, optional
         :param eps: term added to the denominator to ensure numerical
            stability/

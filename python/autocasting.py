@@ -33,16 +33,16 @@ class autocast:
         """ Function decorator for controlling whether autocast functionality is
             enabled. For example, turning autocasting on can be done as follows:
 
-            @poptorch.autocast()
-            def forward(x):
-                ...
+            >>> @poptorch.autocast()
+            ... def forward(x):
+            ...    ...
 
             To ensure that autocasting is off for a certain function, set the
             keyword parameter explicitly:
 
-            @poptorch.autocast(enabled=False)
-            def forward(x):
-                ...
+            >>> @poptorch.autocast(enabled=False)
+            ... def forward(x):
+            ...     ...
         """
 
         @functools.wraps(func)

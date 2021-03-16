@@ -67,7 +67,7 @@ class _SubDataset:
     """For distributed execution split the dataset into serial blocks of tensors
 
     All the tensors used by process 0, followed by all the tensors
-    used by process 1, etc.
+    used by process 1, and so on.
 
     [p0, p0, p0, ..., p1, p1, p1, ..., p2,p2, p2]
 
@@ -127,7 +127,7 @@ class DataLoader(torch.utils.data.DataLoader):
     """ Thin wrapper around the traditional `torch.utils.data.DataLoader` to
     abstract away some of the batch sizes calculations.
 
-    If this DataLoader is used in a distributed execution environment, it will
+    If this data loader is used in a distributed execution environment, it will
     ensure that each process uses a different subset of the dataset, providing
     you first call ``options.randomSeed(N)`` with an integer N which is the same
     across all hosts.
@@ -160,7 +160,6 @@ class DataLoader(torch.utils.data.DataLoader):
             incomplete batch at the end will be dropped.
         :param persistent_workers: Re-use workers between
             iterations if True.
-            If None (default): enabled if num_workers > 0, disabled otherwise.
         :param auto_distributed_partitioning: If True, partitions the
             dataset for distributed execution automatically. Otherwise, it is
             assumed that partitioning has been handled manually.
@@ -170,7 +169,7 @@ class DataLoader(torch.utils.data.DataLoader):
             synchronously.
         :param async_options: Options to pass to
             :py:class:`~poptorch.AsynchronousDataAccessor`.
-        :param kwargs: Other options to pass to the Torch's DataLoader's
+        :param kwargs: Other options to pass to PyTorch's ``DataLoader``
             constructor.
         """
         assert isinstance(options, Options)
@@ -293,13 +292,14 @@ class DataLoader(torch.utils.data.DataLoader):
     @property
     def options(self) -> 'poptorch.Options':
         """A reference to the options that were used to initialise this
-        DataLoader.
+           instance.
         """
         return self._options
 
     def terminate(self) -> None:
         """If `mode==DataLoaderMode.Async`, kills the worker process in the
-        underlying AsynchronousDataAccessor manually, otherwise has no effect.
+        underlying :py:class:`~poptorch.AsynchronousDataAccessor` manually,
+        otherwise has no effect.
         """
         if self._accessor is not None:
             self._accessor.terminate()
@@ -317,13 +317,13 @@ class DataLoader(torch.utils.data.DataLoader):
 
 
 class AsynchronousDataAccessor:
-    """A dataloader which launches the dataloading process on a separate thread
-    to allow for the data to be preprocessed asynchronous on CPU to minimize
-    CPU/IPU transfer time.
+    """A data loader which launches the data loading process on a separate
+    thread to allow for the data to be preprocessed asynchronous on CPU to
+    minimise CPU/IPU transfer time.
 
     This works by loading the data into a ring buffer of shared memory.
     When the IPU needs another batch it uses the data ready in the in
-    the ring buffer. The memory is shared so will be used inplace and
+    the ring buffer. The memory is shared so will be used in-place and
     won't be freed until the next batch is requested. Behind the scenes
     the worker thread will be filling the unready elements of the ring
     buffer.
@@ -361,12 +361,15 @@ class AsynchronousDataAccessor:
         :param early_preload: If True, start loading data in the ring buffer
             as soon as the worker is created.
             If False, wait for an iterator to be created before loading data.
-        :param sharing_strategy: Method to use to pass the dataset object when
-            the child process is spawned.
-            SharedMemory is fast but might be quite limited in size.
-            FileSystem will serialise the dataset to file and reload it which
-            will be slower.
-        :param rebatched_size: If not None: return N batched tensors from
+        :param poptorch.SharingStrategy sharing_strategy:
+            Method to use to pass the dataset object when the child process
+            is spawned.
+
+            * `SharedMemory` is fast but might be quite limited in size.
+            * `FileSystem` will serialise the dataset to file and reload it
+              which will be slower.
+
+        :param int rebatched_size: If not None: return N batched tensors from
             the dataset per iteration. (The passed dataset must have a
             batch_size of 1).
 
@@ -540,7 +543,7 @@ def setLogLevel(level: Union[str, int]):
         * TRACE: Print all messages.
         * DEBUG: Print debug messages and above.
         * INFO: Print info messages and above.
-        * WARN: Print warings and errors.
+        * WARN: Print warnings and errors.
         * ERR:  Print errors only.
         * OFF:  Print nothing.
     """

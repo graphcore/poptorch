@@ -56,13 +56,13 @@ def internal_cast(tensor, dtype):
 
 def isRunningOnIpu() -> bool:
     """ This function returns `True` when executing on IPU and `False` when
-        executing the model outside IPU scope. This allows for seperate
-        codepaths to be marked in the model simply by using:
+    executing the model outside IPU scope. This allows for separate
+    codepaths to be marked in the model simply by using:
 
-            if poptorch.isRunningOnIpu():
-                # IPU path
-            else:
-                # CPU path
+    >>> if poptorch.isRunningOnIpu():
+    >>>      # IPU path
+    >>> else:
+    >>>     # CPU path
 
         Note this will only apply to code during execution. During model
         creation it will always return `False`.
@@ -160,7 +160,7 @@ def _toPoptorchOptimizer(optimizer):
 
 
 def _toCamelCase(string):
-    """Convert a snake case string (Pytorch) to camel case (Popart)"""
+    """Convert a snake case string (PyTorch) to camel case (PopART)"""
     words = string.split("_")
     return words[0] + "".join(w.capitalize() for w in words[1:])
 
@@ -202,10 +202,10 @@ def _assertIsNumber(value, name):
 
 
 class _ValueConstPairFormatter:
-    """Functor to format a value into a pair (value, is_const) where
+    """Functor to format a value into a pair ``(value, is_const)`` where
     "is_const" is a boolean
 
-    If variable_attrs is provided it will be used to determine the
+    If ``variable_attrs`` is provided it will be used to determine the
     attribute's constness.
 
     Otherwise the const_evaluator function will be called.
@@ -255,14 +255,16 @@ class _AttrReader:
         readers[name] = self
 
     def __call__(self, params):
-        """Get the 'name' attribute value from 'params' (An optimizer or param_group)
-        - if 'name' is not part of 'params' then 'default_value' will be used.
-        - If no 'variable_attrs' list and no const val are provided then only
-          {name: value} will be returned.
-        - if a 'variable_attrs' obj is provided then the param's constness will
-          depend on whether or not it's marked as const.
-        - if no list is provided but the param's value is equal to
-          'is_const_val' then the param wil be considered constant
+        """Get the ``name`` attribute value from ``params`` (An ``optimizer`` or
+           ``param_group``)
+        - if ``name`` is not part of ``params`` then ``default_value`` will be
+          used.
+        - If no ``variable_attrs`` list and no const value are provided then
+          only ``{name: value}`` will be returned.
+        - if a ``variable_attrs`` object is provided then the parameter's
+          constness will depend on whether or not it's marked as const.
+        - if no list is provided but the parameter's value is equal to
+          ``is_const_val`` then the parameter will be considered constant
         """
         value = self.getter(params, self.name)
         return {self.new_name: self.formatter(value, self.name)}
@@ -688,9 +690,10 @@ class PoptorchData:
     """Metadata to save when exporting an executable in order to be able
     to reload it.
 
-    Note: poptorch.load() can only be used if all the arguments are provided
-    PoplarExecutor.loadExecutable() can be used in either casa (But only
-    version and executable_inputs will be used)
+    Note: :py:func:`poptorch.load` can only be used if all the arguments are
+    provided
+    :py:meth:`poptorch.PoplarExecutor.loadExecutable` can be used in either
+    case (But only version and executable_inputs will be used)
     """
 
     def __init__(self,
@@ -711,8 +714,8 @@ class PoptorchData:
 
 
 def parsePoptorchData(filename: str, expected_version: str):
-    """Extract the PoptorchData and the offset at which the Popart executable
-    is stored from a given file.
+    """Extract the :py:class:`~poptorch.PoptorchData` and the offset at
+       which the PopART executable is stored from a given file.
     """
     with open(filename, "rb") as f:
         data = pickle.load(f)
@@ -739,7 +742,7 @@ def distributedCacheLock(model, opts):
         no need for a lock, early return.
     Otherwise:
         The first process to reach the lock takes it and compiles the model.
-            The model will be added to the Popart cache.
+            The model will be added to the PopART cache.
         After the first process releases the lock the other ones will grab it
             one at the time and compile the model too (Except that they will
             now all hit the cache).
@@ -963,7 +966,7 @@ class PoplarExecutor:
     def load_state_dict(self,
                         state_dict: Dict[str, 'torch.Tensor'],
                         strict: bool = True):
-        """Will call load_state_dict() on the wrapped model
+        """Will call ``load_state_dict()`` on the wrapped model
         and automatically synchronise the weights with the IPU.
 
         Returns:
@@ -1036,9 +1039,17 @@ class PoplarExecutor:
     def _compileWithTrace(self, trace_args):
         """On POD we want to separate compilation from device
         initialisation because we want only one process to compile the model,
-        but loadEngineAndConnectStreams() must happen at the same time in
+        but ``loadEngineAndConnectStreams()`` must happen at the same time in
         all the processes (Because they need to talk to each other during the
         initialisation process).
+
+        This is achieved by calling the equivalent of ``compileAndExport()``
+        from one of the processes: this will populate the PopART cache with
+        the executable. (We use a temp file because we don't need the result,
+        we just want the executable to be added to the cache).
+
+        The caller will then call the regular ``_compile()`` method in all the
+        processes at the same time and they should all hit the cache.
         """
         # Note: in single process execution or if the cache is disabled
         # should_compile will always be False.
@@ -1222,8 +1233,8 @@ class PoplarExecutor:
                          **kwargs: Dict[str, 'torch.Tensor']):
         """Precompile an executable and save it to file.
 
-        args and kwargs are the same arguments as the wrapped PyTorch
-        `model.__call__`
+        ``args`` and ``kwargs`` are the same arguments as the wrapped PyTorch
+        ``model.__call__``
 
         :param str filename: Where to save the compiled executable.
         :param bool export_model: If `True` the Torch model will be saved in
@@ -1278,8 +1289,8 @@ class PoplarExecutor:
         """
         Takes the same arguments as the wrapped PyTorch `model.__call__`.
 
-        .. note:: The first time the PoplarExecutor wrapper is called, the
-            wrapped model will be traced and compiled.
+        .. note:: The first time the :py:class:`~poptorch.PoplarExecutor`
+            wrapper is called, the wrapped model will be traced and compiled.
 
         """
         assert self._options.connection_type != enums.ConnectionType.Never, (
@@ -1729,7 +1740,7 @@ class _HostCommandHandler:
 class _EndOfFileFlag:
     """
     Share a small 2 values buffer with host to signal EOF and where in ring
-    buffer the event occured.
+    buffer the event occurred.
 
     First value:
     -1 means no event and the worker will keep loading until EOF is

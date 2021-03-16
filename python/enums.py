@@ -14,7 +14,7 @@ class DataLoaderMode(enum.IntEnum):
       discarded. In this mode, the
       combined batch size used by the PyTorch workers will be set to 1,
       and the batched tensor will instead be constructed in the
-      AsynchronousDataAccessor.
+      :py:class:`~poptorch.AsynchronousDataAccessor`.
       This mode is identical to Async for map-style datasets.
     """
     Sync = 0
@@ -65,7 +65,7 @@ class HalfFloatCastingBehavior(enum.IntEnum):
     """
     - ``FloatDowncastToHalf`` Any op with operands (inputs) which are a
         mix of float32 and float16 (half) will cast all operands to half.
-    - ``HalfUpcastToFloat``: Implicit casting will follow Pytorch's rules,
+    - ``HalfUpcastToFloat``: Implicit casting will follow PyTorch's rules,
             promoting float16 (half) inputs to float32 if another input is
             float32.
     """

@@ -36,6 +36,7 @@ _conda_poptorch_packages = [
     "ccache=3.7.9",
     "cmake=3.18.2",
     "conda-pack=0.5.0",
+    "hunspell=1.7.0",
     "latexmk=4.55",
     "make=4.3",
     "ninja=1.10.2",

@@ -84,7 +84,7 @@ Rebatching iterable datasets
 
 There are `two types of datasets in PyTorch <https://pytorch.org/docs/1.7.1/data.html#dataset-types>`_ : map-style datasets and iterable datasets.
 
-As explained in the notes of PyTorch's `Data Loading Order and Sampler <https://pytorch.org/docs/stable/data.html#data-loading-order-and-sampler>`_ : for
+As explained in the notes of PyTorch's `Data Loading Order and Sampler <https://pytorch.org/docs/1.7.1/data.html#data-loading-order-and-sampler>`_ : for
 `IterableDataset <https://pytorch.org/docs/1.7.1/data.html#torch.utils.data.IterableDataset>`_ :
 "When fetching from iterable-style datasets with multi-processing, the drop_last argument drops the
 last non-full batch of each worker’s dataset replica."

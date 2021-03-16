@@ -227,24 +227,29 @@ class _LinesProcessor:
 
 
 class Process:
-    def __init__(self,
-                 cmd,
-                 env=None,
-                 redirect_stderr=False,
-                 stdout_handler=None,
-                 stderr_handler=None):
+    def __init__(
+            self,
+            cmd,  # NB as shell=True, shlex.quote is needed for filenames
+            env=None,
+            redirect_stderr=False,
+            stdout_handler=None,
+            stderr_handler=None,
+            bufsize=-1):
         if redirect_stderr:
             assert stderr_handler is None, ("You can't have a stderr handler "
                                             "when it's redirected to stdout")
             stderr = subprocess.STDOUT
         else:
             stderr = subprocess.PIPE
+
         self.p = subprocess.Popen(cmd,
                                   shell=True,
                                   env=env,
                                   executable='/bin/bash',
+                                  stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE,
-                                  stderr=stderr)
+                                  stderr=stderr,
+                                  bufsize=bufsize)
         _make_output_non_blocking(self.p.stdout)
         self.stdout = _LinesProcessor(stdout_handler or logger.info)
         self.stderr = None
@@ -267,6 +272,9 @@ class Process:
             self._returncode = self.p.returncode
             del self.p
 
+    def eof(self):
+        self.p.stdin.close()
+
     def is_running(self):
         if not self.is_alive:
             return self.is_alive
@@ -281,6 +289,9 @@ class Process:
         while self.is_running():
             pass
         return self._returncode
+
+    def write(self, s):
+        self.p.stdin.write(s)
 
     def returncode(self):
         return self._returncode

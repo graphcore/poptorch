@@ -73,7 +73,7 @@ def for_loop(count, body, inputs):
 
     :param count: Number of iterations of the loop.
     :param body: The function to be executed.
-    :param inputs: The initial inputs to the functon.
+    :param inputs: The initial inputs to the function.
     """
 
     if not isinstance(inputs, list):
@@ -106,7 +106,8 @@ def for_loop(count, body, inputs):
 
 def nop(tensor):
     """ A no-operation: it is functionally the same as an identity but is never
-    elimated by PopART patterns or inlining, so it is useful for debugging.
+        eliminated by PopART patterns or inlining, so it is useful for
+        debugging.
 
     :param torch.Tensor tensor: the tensor to simply return by the no-op.
     :returns: The same tensor which was input.
@@ -148,7 +149,7 @@ def recomputationCheckpoint(*tensors):
 def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
     """ Calculates a matrix product using a serialized matrix multiplication.
 
-    The matrix multiplication, lhs*rhs, is split into separate smaller
+    The matrix multiplication, ``lhs*rhs``, is split into separate smaller
     multiplications, calculated one after the other, to reduce the memory
     requirements of the multiplication and its gradient calculation.
 
@@ -157,8 +158,8 @@ def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
     :param poptorch.MatMulSerializationMode mode: Which dimension of the matmul
         to serialize on: for matrix A (m by n) multiplied by matrix B (n by p).
         * InputChannels: Split across the input channels (dimension m).
-        * ReducingDim: Split aross the reducing dimension (n).
-        * OutputChannels: Split across the output channels (dimenion p).
+        * ReducingDim: Split across the reducing dimension (n).
+        * OutputChannels: Split across the output channels (dimension p).
         * Disabled: Same as an ordinary matrix multiplication.
     :param int factor: Number of serialized multiplications. Must be a factor of
         the dimension to serialize on.
@@ -182,9 +183,9 @@ def set_available_memory(tensor, available_memory_proportion):
     When called on the on the output of a convolution or a matrix
     multiplication, it sets the proportion of tile memory (between 0 and 1) to
     be made available as temporary memory for the convolution/matrix
-    multipication. Less temporary memory will reduce the time performance but
+    multiplication. Less temporary memory will reduce the time performance but
     may use less memory overall. Lower memory proportions result in the use of
-    more live (not tempoerary) memory, and so the overall memory may increase
+    more live (not temporary) memory, and so the overall memory may increase
     for too low values, possibly resulting in out of memory errors.
 
     In the event that the value is too low, the planner will replan for the

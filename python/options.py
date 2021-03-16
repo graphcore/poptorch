@@ -33,13 +33,13 @@ class _JitOptions(_options_impl.OptionsDict):
         """
         Controls whether to use PyTorch's tracing or scripting.
 
-        By default, PopTorch uses Pytorch's JIT tracing however you can use
+        By default, PopTorch uses PyTorch's JIT tracing however you can use
         scripting (experimental). See ``torch.jit.trace`` and
         ``torch.jit.script`` for details about PyTorch's JIT implementations.
 
-        :param trace_model:
-            * True: use torch.jit.trace
-            * False: use torch.jit.script (experimental)
+        :param bool trace_model:
+            * True: use `torch.jit.trace <https://pytorch.org/docs/1.7.1/generated/torch.jit.trace.html#torch.jit.trace>`_
+            * False: use `torch.jit.script <https://pytorch.org/docs/1.7.1/generated/torch.jit.script.html#torch.jit.script>`_ (experimental)
        """
         self.set(trace_model=trace_model)
         return self
@@ -47,7 +47,7 @@ class _JitOptions(_options_impl.OptionsDict):
 
 class _PrecisionOptions(_options_impl.OptionsDict):
     """ Options related to processing the PyTorch JIT graph prior to lowering to
-    Popart
+    PopART
 
     Can be accessed via :py:attr:`poptorch.Options.Precision`:
 
@@ -109,14 +109,15 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         efficiency and reduced memory footprint without the same loss of
         precision of parameters during the optimiser update step. However, you
         can change the behaviour to match PyTorch using option
-        "HalfUpcastToFloat".
+        ``HalfUpcastToFloat``.
 
         :param half_float_casting:
-            * FloatDowncastToHalf:  Any op with operands (inputs) which are a
-              mix of float32 and float16 (half) will cast all operands to half.
-            * HalfUpcastToFloat: Implicit casting will follow PyTorch's rules,
-              promoting float16 (half) inputs to float32 if another input is
-              float32.
+            * ``FloatDowncastToHalf``:  Any op with operands (inputs) which are
+              a mix of float32 and float16 (half) will cast all operands to
+              half.
+            * ``HalfUpcastToFloat``: Implicit casting will follow PyTorch's
+              rules, promoting float16 (half) inputs to float32 if another input
+              is float32.
         """
 
         if not isinstance(half_float_casting, enums.HalfFloatCastingBehavior):
@@ -166,8 +167,8 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         * Comparison where any one operand is Not-a-Number
 
        :param enabled:
-           * True: raise RuntimeError on floating point exception
-           * False: do not raise RuntimeError (default)
+           * True: raise ``RuntimeError`` on floating point exception
+           * False: do not raise ``RuntimeError`` (default)
         """
 
         assert isinstance(enabled, bool), \
@@ -182,9 +183,9 @@ class _PrecisionOptions(_options_impl.OptionsDict):
 
         Stochastic rounding rounds up or down a values to half (float16)
         randomly such that that the expected (mean) result of rounded value is
-        equal to the unrounded value. It can improve training perfomance by
+        equal to the unrounded value. It can improve training performance by
         simulating higher precision behaviour and increasing the speed or
-        likelihood of model convergence. However, the model is non-deterimistic
+        likelihood of model convergence. However, the model is non-deterministic
         and represents a departure from (deterministic) standard IEEE FP16
         behaviour.
 
@@ -206,13 +207,13 @@ class _PrecisionOptions(_options_impl.OptionsDict):
 
         The matrix multiplication and convolution operators store intermediate
         results known as partials as part of the calculation. You can use this
-        option to change the data type of the parials. Using ``torch.half``
-        reduces on-chop memory use at the cost of precsion.
+        option to change the data type of the partials. Using ``torch.half``
+        reduces on-chip memory use at the cost of precision.
 
 
-        :param type:
-            The type to store parials, which must be either torch.float or
-            torch.half
+        :param torch.dtype type:
+            The type to store partials, which must be either ``torch.float`` or
+            ``torch.half``
         """
 
         type_str = ''
@@ -316,12 +317,12 @@ class _TrainingOptions(_options_impl.OptionsDict):
         When using, a value for greater than one for
         :py:func:`~poptorch.options._TrainingOptions.gradientAccumulation` or
         for :py:func:`~poptorch.Options.replicationFactor`, PopTorch applies a
-        reduction to the gradient ouputs from each replica, and to the
+        reduction to the gradient outputs from each replica, and to the
         accumulated gradients. This reduction is independent of the model loss
         reduction (summing a mean-reduced loss and a sum-reduced loss in a
         PyTorch model is valid).
 
-        This seting governs both the accumulation of the loss gradients in
+        This setting governs both the accumulation of the loss gradients in
         replicated graphs and of all of the gradients when using gradient
         accumulation.
 
@@ -346,12 +347,15 @@ class _TrainingOptions(_options_impl.OptionsDict):
                                   ) -> "poptorch.options._TrainingOptions":
         """The type of reduction (sum or mean) applied to accumulated gradients.
 
-            When using a non-unity value for gradientAccumulation, you can
-            specify whether to reduce the gradients by sum or mean (default).
-            When using mean reduction, changing the gradientAccumulation will
-            not change the training curve of the model (barring numerical error
-            and changes due to the different compute batch size e.g. batch
-            normalisation).
+            When using a non-unity value for
+            :py:func:`~poptorch.options._TrainingOptions.gradientAccumulation`,
+            you can specify whether to reduce the gradients by sum or mean
+            (default). When using mean reduction, scaling the
+            :py:func:`~poptorch.options._TrainingOptions.gradientAccumulation`,
+            will not change the training curve of the model compared to an
+            identical scaling of the compute batch size (barring numerical
+            error) except for ops which depend on the compute batch size such as
+            batch normalisation.
 
             :param accumulation_reduction_type:
                 * Mean: Reduce gradients by calculating the mean of them.
@@ -390,7 +394,7 @@ class _PopartOptions:
 
     def setPatterns(self, patterns: Dict[str, bool],
                     level: int = 2) -> "poptorch.options._PopartOptions":
-        """Override the default patterns of Popart's compiler.
+        """Override the default patterns of PopART's compiler.
 
         :param patterns: Dictionary of pattern names to
             enable / disable.
@@ -488,7 +492,7 @@ class TensorLocationSettings(_options_impl.OptionsDict):
 
     def minElementsForReplicatedTensorSharding(
             self, min_elements: int) -> "poptorch.TensorLocationSettings":
-        """Only enable Replicated Tensor Sharding (RTS) for tensors with more
+        """Only enable replicated tensor sharding (RTS) for tensors with more
         than `min_elements` elements."""
         assert isinstance(min_elements, int)
         self.createOrSet(minElementsForReplicatedTensorSharding=min_elements)
@@ -1097,7 +1101,7 @@ class Options(_options_impl.OptionsDict):
 
     def relaxOptimizerAttributesChecks(self, relax: bool = True
                                        ) -> "poptorch.Options":
-        """Controls whether unexpeted attributes in
+        """Controls whether unexpected attributes in
         :py:func:`~poptorch.PoplarExecutor.setOptimizer()` lead to warnings or
         debug messages.
 
@@ -1142,7 +1146,7 @@ class Options(_options_impl.OptionsDict):
     @property
     def Precision(self) -> "poptorch.options._PrecisionOptions":
         """Options specific to the processing of the JIT graph prior to lowering
-        to Popart.
+        to PopART.
 
         .. seealso:: :py:class:`poptorch.options._PrecisionOptions`"""
         return self._graphProcessing
@@ -1231,7 +1235,7 @@ class Options(_options_impl.OptionsDict):
         """Number of times to replicate the model (default: 1).
 
         Replicating the model increases the data throughput of the model as
-        Poptorch uses more IPUs. This leads to the number of IPUs used being
+        PopTorch uses more IPUs. This leads to the number of IPUs used being
         scaled by ``replication_factor``, for example, if your model uses 1 IPU,
         a ``replication_factor`` of 2 will use 2 IPUs; if your model uses 4
         IPUs, a replication factor of 4 will use 16 IPUs in total.
@@ -1246,7 +1250,7 @@ class Options(_options_impl.OptionsDict):
         """Set the log directory
 
         :param log_dir:
-            Directory where Poptorch saves log files (default: current
+            Directory where PopTorch saves log files (default: current
             directory)
         """
         self.set(log_dir=log_dir)
@@ -1257,7 +1261,7 @@ class Options(_options_impl.OptionsDict):
         a cache,  to avoid recompiling identical graphs.
 
         :param path:
-            File path for Poplar executation cache store; setting ``path`` to
+            File path for Poplar executable cache store; setting ``path`` to
             None`` disables executable caching.
         """
         if path is None:
@@ -1289,11 +1293,11 @@ class Options(_options_impl.OptionsDict):
         """When to connect to the IPU (if at all).
 
         :param connection_type:
-            * Always: Attach to the IPU from the start (default).
-            * OnDemand: Wait until the compilation is complete and the
+            * ``Always``: Attach to the IPU from the start (default).
+            * ``OnDemand``: Wait until the compilation is complete and the
               executable is ready to be run to attach to the IPU.
-            * Never: Never try to attach to an IPU: this is useful for offline
-              compilation, but trying to run an executable will raise
+            * ``Never``: Never try to attach to an IPU: this is useful for
+              offline compilation, but trying to run an executable will raise
               an exception.
 
         For example:
@@ -1307,9 +1311,9 @@ class Options(_options_impl.OptionsDict):
 
     def syncPattern(self, sync_pattern: "poptorch.SyncPattern"
                     ) -> "poptorch.Options":
-        """Set the IPU SyncPattern.
+        """Set the IPU sync pattern.
 
-        :param poptorch.SyncPattern sync_pattern:
+        :param sync_pattern:
             * ``Full``
             * ``SinglePipeline``
             * ``ReplicaAndLadder``
@@ -1360,10 +1364,10 @@ class Options(_options_impl.OptionsDict):
         """ Specify which data to return from a model.
 
         :param poptorch.AnchorMode anchor_mode:
-            * All: Return a result for each batch.
-            * Sum: Return the sum of all the batches.
-            * Final: Return the last batch.
-            * EveryN: Return every N batches: N is passed in
+            * ``All``: Return a result for each batch.
+            * ``Sum``: Return the sum of all the batches.
+            * ``Final``: Return the last batch.
+            * ``EveryN``: Return every N batches: N is passed in
               as ``anchor_return_period``.
             * Default: `All` for inference, `Final` for training.
 
