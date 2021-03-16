@@ -282,6 +282,7 @@ public:
   void initSession(const std::vector<Optimizer> &opt);
   void compileAndExport(const char *export_filename);
   void compileAndPrepareDevice();
+  void loadEngineAndConnectStreams();
   void loadExecutableAndPrepareDevice(const char *import_filename,
                                       std::int64_t offset);
 

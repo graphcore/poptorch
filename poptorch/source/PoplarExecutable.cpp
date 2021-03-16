@@ -134,6 +134,10 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
   return returnees;
 }
 
+void PoplarExecutable::loadEngineAndConnectStreams() {
+  _compiler.loadEngineAndConnectStreams();
+}
+
 // Tell popart to copy weights off the IPU and write into host memory.
 void PoplarExecutable::copyWeightsToHost(
     const std::map<std::string, void *> &buffers) {

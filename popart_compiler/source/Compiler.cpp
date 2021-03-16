@@ -526,6 +526,10 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
   stream.seekg(offset);
   _impl->session->loadExecutableFromStream(stream);
   _impl->session->prepareDevice();
+}
+
+void Compiler::loadEngineAndConnectStreams() {
+  _impl->session->loadEngineAndConnectStreams();
 
   // Set the random seed (if one was provided) following compilation
   if (_impl->options_set.count("random_seed")) {
@@ -533,6 +537,7 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
     _impl->session->setRandomSeed(_impl->options.random_seed);
   }
 }
+
 void Compiler::compileAndPrepareDevice() {
   // Poplar compilation.
   try {
@@ -555,12 +560,6 @@ void Compiler::compileAndPrepareDevice() {
     stream.close();
 
     std::rethrow_exception(std::current_exception());
-  }
-
-  // Set the random seed (if one was provided) following compilation
-  if (_impl->options_set.count("random_seed")) {
-    logging::trace("Setting random seed to: {}", _impl->options.random_seed);
-    _impl->session->setRandomSeed(_impl->options.random_seed);
   }
 }
 

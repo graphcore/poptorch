@@ -1010,29 +1010,40 @@ class PoplarExecutor:
         self._dict_new_optimizer = _convertOptimizerToDict(
             optimizer, self._attribute_tracker)
 
-    def _distributedPrecompile(self, trace_args):
-        """TODO(T35376): On POD we want to separate compilation from device
+    def _compileWithTrace(self, trace_args):
+        """On POD we want to separate compilation from device
         initialisation because we want only one process to compile the model,
-        but all the processes must initialise their device at the same time
-        as they need to communicate with each other.
-
-        This is achieved by calling the equivalent of compileAndExport()
-        from one of the processes: this will populate the Popart cache with
-        the executable. (We use a tempfile because we don't need the result,
-        we just want the executable to be added to the cache).
-
-        The caller will then call the regular _compile() method in all the
-        processes at the same time and they should all hit the cache.
+        but loadEngineAndConnectStreams() must happen at the same time in
+        all the processes (Because they need to talk to each other during the
+        initialisation process).
         """
+        # Note: in single process execution or if the cache is disabled
+        # should_compile will always be False.
         with distributedCacheLock(self._model,
                                   self._options) as should_compile:
             # Only the first process should compile
-            if not should_compile:
-                return
-            cache = self._options._popart.options["cachePath"]  # pylint: disable=protected-access
-            with self._profiling.tracepoint("compileAndExport"),\
-                    tempfile.NamedTemporaryFile(dir=cache) as f:
-                poptorch_core.compileWithTraceAndExport(*trace_args, f.name)
+            if should_compile:
+                self._executable = poptorch_core.compileWithTrace(*trace_args)
+
+        # In distributed execution mode:
+        # At that point only the first process will have a compiled executable:
+        # trigger the compilation process in all the other processes.
+        if self._executable is None:
+            self._executable = poptorch_core.compileWithTrace(*trace_args)
+
+        # Load the engine and connect the streams in all the processes.
+        #
+        # Note: no sync point was added because we expect the above
+        # compileWithTrace call to be quick as all the processes should
+        # hit the cache.
+        #
+        # If the cache is disabled then we expect the compilation process
+        # to roughly take the same amount of time in all processes.
+        #
+        # Note: if multiple processes run on the same host, it's recommended
+        # to enable executable caching to avoid out of memory issues due
+        # to concurrent compilation processes.
+        poptorch_core.loadEngineAndConnectStreams(self._executable)
 
     def _compile(self, in_tensors):
         with self._profiling.tracepoint("modelCompilation"):
@@ -1045,11 +1056,8 @@ class PoplarExecutor:
                 trace_args = self._trace_model_and_get_compile_args(
                     in_tensors, in_tensors_trace_view, has_converted_any_half,
                     narrow_tensor_fn)
-                # TODO(T35376): In order to separate model compilation from engine loading
-                # on distributed systems
-                if self._options.Distributed.numProcesses > 1:
-                    self._distributedPrecompile(trace_args)
-                self._executable = poptorch_core.compileWithTrace(*trace_args)
+
+                self._compileWithTrace(trace_args)
             else:
                 logger.info('Compiling the model using scripting')
                 self._trace = torch.jit.script(self._model)
@@ -1256,6 +1264,7 @@ class PoplarExecutor:
         in_tensors = self._args_parser(args, kwargs)
         if self._executable is None:
             self._compile(in_tensors)
+
         if not self._is_attached:
             self.attachToDevice()
         # If this is an inference model: check if the same model is not being
@@ -1450,6 +1459,7 @@ class PoplarExecutor:
 
         assert not self._is_attached
         poptorch_core.attachToDevice(self._executable)
+        poptorch_core.loadEngineAndConnectStreams(self._executable)
         self._is_attached = True
         # Upload the weights to the IPU
         self.copyWeightsToDevice()

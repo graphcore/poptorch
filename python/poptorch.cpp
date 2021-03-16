@@ -644,6 +644,11 @@ void setLogLevel(std::uint64_t level) {
   logging::setLogLevel(static_cast<logging::Level>(level));
 }
 
+void loadEngineAndConnectStreams(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  executable->loadEngineAndConnectStreams();
+}
+
 std::vector<pybind11::object>
 execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
         const pybind11::tuple &inputs, py::dict *optimizer_dict) {
@@ -942,6 +947,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         poptorch::processTraceAndImportExecutable);
   m.def("compileWithScript", poptorch::compileWithScript);
   m.def("execute", poptorch::execute);
+  m.def("loadEngineAndConnectStreams", poptorch::loadEngineAndConnectStreams);
   m.def("propagateInputShapes", poptorch::pyPropagateInputShapes);
   m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
   m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);

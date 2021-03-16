@@ -30,6 +30,7 @@ public:
     }
   }
 
+  void loadEngineAndConnectStreams();
   /*
    * Execute the compiled graph stored in field "compiler" with the given
    * |inTensors| and return to the user the resulting tensors if any.
