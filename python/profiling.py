@@ -1,13 +1,14 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import os
+from typing import Dict
 from ._logging import logger
 
 if os.environ.get("PVTI_OPTIONS") is None:
     _pvti_available = False
 else:
     try:
-        import libpvti as pvti
+        import libpvti as pvti  # type: ignore
         _pvti_available = True
     except ImportError as e:
         logger.info("Tracepoints disabled (Couldn't import libpvti: %s)")
@@ -69,7 +70,7 @@ class _DummyTracepoint:
 
 class _Channels:
     """Singleton library of registered Channels"""
-    _channels = {}
+    _channels: Dict[str, 'pvti.Channel'] = {}
 
     @staticmethod
     def getOrCreate(name):

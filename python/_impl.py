@@ -15,6 +15,7 @@ import pickle
 import sys
 import tempfile
 import time
+from typing import Dict, Any, List, Optional
 import inspect
 import torch
 import torch.multiprocessing as multiprocessing
@@ -23,7 +24,7 @@ import torch.multiprocessing as multiprocessing
 from . import enums
 from . import optim
 from . import profiling
-from . import poptorch_core
+from . import poptorch_core  # type: ignore
 from ._logging import logger
 from .options import Options
 from .ops import ATTR_PREFIX
@@ -41,7 +42,7 @@ def applyOptimizer(optimizer):
 _is_ipu_context = False
 
 
-def isRunningOnIpu():
+def isRunningOnIpu() -> bool:
     """ This function returns `True` when executing on IPU and `False` when
         executing the model outside IPU scope. This allows for seperate
         codepaths to be marked in the model simply by using:
@@ -60,7 +61,7 @@ def isRunningOnIpu():
     return _is_ipu_context
 
 
-def _SetIpuContext(val):
+def _SetIpuContext(val: bool):
     global _is_ipu_context
     _is_ipu_context = val
 
@@ -681,12 +682,12 @@ class PoptorchData:
     """
 
     def __init__(self,
-                 version,
-                 executable_inputs,
-                 options=None,
-                 training=None,
-                 model=None,
-                 optimizer=None):
+                 version: str,
+                 executable_inputs: List[Any],
+                 options: Optional['poptorch.Options'] = None,
+                 training: Optional[bool] = None,
+                 model: Optional['torch.nn.Module'] = None,
+                 optimizer: Optional['torch.optim.Optimizer'] = None):
         self.options = options
         self.training = training
         self.model = model
@@ -697,7 +698,7 @@ class PoptorchData:
         self.executable_inputs = executable_inputs
 
 
-def parsePoptorchData(filename, expected_version):
+def parsePoptorchData(filename: str, expected_version: str):
     """Extract the PoptorchData and the offset at which the Popart executable
     is stored from a given file.
     """
@@ -794,7 +795,7 @@ def distributedCacheLock(model, opts):
 # When an object is loaded from file: the wrapper type doesn't exist anymore
 # therefore we keep the model unwrapped. (It will be wrapped again when passed
 # to poptorch.trainingModel anyway)
-_wrapper_registry = {}
+_wrapper_registry: Dict[int, Any] = {}
 
 
 def _pickleRestoreWrapperIfPossible(model):
@@ -822,12 +823,12 @@ class PoplarExecutor:
 
     # pylint: disable=too-many-statements
     def __init__(self,
-                 model,
-                 options,
-                 training,
-                 optimizer=None,
-                 user_model=None,
-                 poptorch_version=None):
+                 model: 'torch.nn.Module',
+                 options: 'poptorch.Options',
+                 training: bool,
+                 poptorch_version: str,
+                 optimizer: Optional['torch.optim.Optimizer'] = None,
+                 user_model: Optional['torch.nn.Module'] = None):
         options = options or Options()
         self._user_model = user_model or model
         if training:
@@ -945,9 +946,17 @@ class PoplarExecutor:
             # Register custom function to copy / serialize wrappers
             copyreg.pickle(PoptorchModel, _pickleUnwrapModel)
 
-    def load_state_dict(self, state_dict, strict=True):
+    def load_state_dict(self,
+                        state_dict: Dict[str, 'torch.Tensor'],
+                        strict: bool = True):
         """Will call load_state_dict() on the wrapped model
         and automatically synchronise the weights with the IPU.
+
+        Returns:
+            ``NamedTuple`` with ``missing_keys`` and ``unexpected_keys`` fields:
+                * **missing_keys** is a list of str containing the missing keys
+                * **unexpected_keys** is a list of str containing the
+                    unexpected keys
         """
         out = self._user_model.load_state_dict(state_dict, strict)
         if self.isAttachedToDevice():
@@ -959,15 +968,15 @@ class PoplarExecutor:
         return getattr(self._user_model, attr)
 
     @property
-    def model(self):
+    def model(self) -> 'torch.nn.Module':
         """Access the wrapped Torch model."""
         return self._user_model
 
-    def _debugGetPopartIR(self):
+    def _debugGetPopartIR(self) -> str:
         return poptorch_core._getPopartIR(self._executable)  # pylint: disable=protected-access
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
-    def copyWeightsToHost(self):
+    def copyWeightsToHost(self) -> None:
         """ Updates the parameters used in `model` with the weights stored on device.
         (The weights in ``model.parameters()``)
         """
@@ -982,7 +991,7 @@ class PoplarExecutor:
 
     # Write from host memory to IPU memory. This is done automatically on
     # compilation so should be rarely used.
-    def copyWeightsToDevice(self):
+    def copyWeightsToDevice(self) -> None:
         """Copies the weights from ``model.parameters()`` to the IPU device.
         Implicitly called on first call.
         """
@@ -1001,7 +1010,7 @@ class PoplarExecutor:
         # Restore dirtiness flag
         self._dirty_host_weights = saved_dirty_flag
 
-    def setOptimizer(self, optimizer):
+    def setOptimizer(self, optimizer: 'torch.optim.Optimizer'):
         """Sets the optimiser for a training model. Will overwrite the
         previous one. Supported optimisers: ``optim.SGD``, ``optim.Adam``,
         ``optim.AdamW``, ``optim.RMSProp``, ``optim.LAMB``.
@@ -1152,7 +1161,7 @@ class PoplarExecutor:
 
         return in_tensors_trace_view, has_converted_any_half, narrowTensor
 
-    def compile(self, *args, **kwargs):
+    def compile(self, *args, **kwargs) -> None:
         """Takes the same arguments as the wrapped PyTorch `model.__call__`.
 
         Trace and compile the wrapped model if no executable has been
@@ -1171,7 +1180,7 @@ class PoplarExecutor:
         else:
             self._compile(in_tensors)
 
-    def loadExecutable(self, filename):
+    def loadExecutable(self, filename: str) -> None:
         """Load an executable previously generated using
         :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
         """
@@ -1192,7 +1201,11 @@ class PoplarExecutor:
                 # Upload the weights to the IPU
                 self.copyWeightsToDevice()
 
-    def compileAndExport(self, filename, *args, export_model=True, **kwargs):
+    def compileAndExport(self,
+                         filename: str,
+                         *args: List['torch.Tensor'],
+                         export_model: bool = True,
+                         **kwargs: Dict[str, 'torch.Tensor']):
         """Precompile an executable and save it to file.
 
         args and kwargs are the same arguments as the wrapped PyTorch
@@ -1249,7 +1262,8 @@ class PoplarExecutor:
                 narrow_tensor_fn)
             poptorch_core.compileWithTraceAndExport(*trace_args, filename)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: List['torch.Tensor'],
+                 **kwargs: Dict[str, 'torch.Tensor']):
         """
         Takes the same arguments as the wrapped PyTorch `model.__call__`.
 
@@ -1309,7 +1323,7 @@ class PoplarExecutor:
             return output
         return output[0]
 
-    def destroy(self):
+    def destroy(self) -> None:
         """Destroy the model: release the IPUs and the executable.
         """
         if not self._executable:
@@ -1426,7 +1440,7 @@ class PoplarExecutor:
                 trace_input_string, self._options.toDict(), self._training,
                 self._dict_optimizer, accessAttributes)
 
-    def isAttachedToDevice(self):
+    def isAttachedToDevice(self) -> bool:
         """Returns true, if the target device has been attached. False,
         otherwise.
         """
@@ -1435,7 +1449,7 @@ class PoplarExecutor:
 
         return poptorch_core.isAttachedToDevice(self._executable)
 
-    def detachFromDevice(self):
+    def detachFromDevice(self) -> None:
         """Detach from target device. Before calling this function, the device
         must be attached."""
         if not self._executable:
@@ -1448,7 +1462,7 @@ class PoplarExecutor:
         poptorch_core.detachFromDevice(self._executable)
         self._is_attached = False
 
-    def attachToDevice(self):
+    def attachToDevice(self) -> None:
         """Attach to target device. Before calling this function, the device
         must be detached."""
         if not self._executable:

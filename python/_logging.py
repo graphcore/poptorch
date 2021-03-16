@@ -41,7 +41,7 @@ def setLogLevel(level, update_cpp=True):
         # Change it in C++ first
         if update_cpp:
             # Only import poptorch_core when it's needed
-            import poptorch.poptorch_core as poptorch_core  # pylint: disable=wrong-import-position, import-outside-toplevel
+            import poptorch.poptorch_core as poptorch_core  # type: ignore # pylint: disable=wrong-import-position, import-outside-toplevel
             level_int = _LOG_LEVEL_MAPPING[level][0]
             poptorch_core.setLogLevel(level_int)
 

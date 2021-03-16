@@ -4,7 +4,7 @@ import functools
 import re
 import torch
 import poptorch
-import poptorch.poptorch_core as poptorch_core
+import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 
 def assert_allclose(*, actual=None, expected=None, **kwargs):
@@ -77,7 +77,8 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
         options=options,
         training=True,
         optimizer=optimizer,
-        user_model=model)
+        user_model=model,
+        poptorch_version=poptorch.__version__)
 
 
 class PrintCapfdOnExit:

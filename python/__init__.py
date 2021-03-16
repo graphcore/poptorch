@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import atexit
 import copy
+from typing import Any, Callable, Dict, Iterator, Optional, Union
 import pickle
 
 import torch
@@ -16,7 +17,7 @@ assert torch.__version__.startswith("@TORCH_VERSION@"), (
     " of PopTorch only works with torch==@TORCH_VERSION@ but the version "
     f"installed is {torch.__version__}")
 
-import poptorch.poptorch_core as poptorch_core
+import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 from . import _impl
 from .enums import *
@@ -29,14 +30,14 @@ from . import profiling
 __version__ = "@VERSION@-@SNAPSHOT@"
 
 
-def load(filename, edit_opts_fn=None):
+def load(filename: str,
+         edit_opts_fn: Optional[Callable[['poptorch.Options'], None]] = None
+         ) -> 'poptorch.PoplarExecutor':
     """Load a PopTorch model from a file previously created using
     :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
 
-    :param str filename: Path to the file containing the model to load.
     :param edit_opts_fn: Function to edit the options before the model
         is restored. For example to attach to a specific IPU device.
-    :type edit_ops_fn: function, optional
 
     >>> model = poptorch.inferenceModel(model)
     >>> model.compileAndExport("my_model.poptorch")
@@ -87,41 +88,41 @@ class DataLoader(torch.utils.data.DataLoader):
     """
 
     def __init__(self,
-                 options,
-                 dataset,
-                 batch_size=1,
-                 shuffle=False,
-                 num_workers=0,
-                 drop_last=True,
-                 persistent_workers=None,
-                 auto_distributed_partitioning=True,
-                 mode=DataLoaderMode.Sync,
-                 async_options=None,
+                 options: 'poptorch.Options',
+                 dataset: 'torch.utils.data.Dataset',
+                 batch_size: int = 1,
+                 shuffle: bool = False,
+                 num_workers: int = 0,
+                 drop_last: bool = True,
+                 persistent_workers: Optional[bool] = None,
+                 auto_distributed_partitioning: bool = True,
+                 mode: 'poptorch.DataLoaderMode' = DataLoaderMode.Sync,
+                 async_options: Optional[Dict[str, Any]] = None,
                  **kwargs):
         """
-        :param poptorch.Options options: Options that will be used to compile
+        :param options: Options that will be used to compile
             and run the model.
         :param dataset: The dataset to get the data from.
-        :param int batch_size: This is the batch size in the conventional sense
+        :param batch_size: This is the batch size in the conventional sense
             of being the size that runs through an operation in the model at
             any given time.
-        :param bool shuffle: Whether or not the dataset should be shuffled.
-        :param int num_workers: Number of worker processes to use to read the
+        :param shuffle: Whether or not the dataset should be shuffled.
+        :param num_workers: Number of worker processes to use to read the
             data.
-        :param bool drop_last: If True and the number of elements in the
+        :param drop_last: If True and the number of elements in the
             dataset is not a multiple of the combined batch size then the
             incomplete batch at the end will be dropped.
-        :param bool persistent_workers: Re-use workers between
+        :param persistent_workers: Re-use workers between
             iterations if True.
             If None (default): enabled if num_workers > 0, disabled otherwise.
-        :param bool auto_distributed_partitioning: If True, partitions the
+        :param auto_distributed_partitioning: If True, partitions the
             dataset for distributed execution automatically. Otherwise, it is
             assumed that partitioning has been handled manually.
-        :param poptorch.DataLoaderMode mode: If `DataLoaderMode.Async`, uses an
+        :param mode: If `DataLoaderMode.Async`, uses an
             :py:class:`~poptorch.AsynchronousDataAccessor` to access the
             dataset. If `DataLoaderMode.Sync`, accesses the dataset
             synchronously.
-        :param dict async_options: Options to pass to
+        :param async_options: Options to pass to
             :py:class:`~poptorch.AsynchronousDataAccessor`.
         :param kwargs: Other options to pass to the Torch's DataLoader's
             constructor.
@@ -130,6 +131,7 @@ class DataLoader(torch.utils.data.DataLoader):
         if persistent_workers is None:
             persistent_workers = num_workers > 0
 
+        self._combined_batch_size: Optional[int]
         if batch_size is None:
             self._combined_batch_size = None
         else:
@@ -213,7 +215,7 @@ class DataLoader(torch.utils.data.DataLoader):
             self._accessor = AsynchronousDataAccessor(
                 self, **async_options, rebatched_size=rebatched_size)
 
-    def __len__(self):
+    def __len__(self) -> int:
         # If we're rebatching in the AsynchronousDataAccessor we need to
         # adjust the dataset's length.
         dataset_len = super().__len__()
@@ -226,29 +228,29 @@ class DataLoader(torch.utils.data.DataLoader):
         return profiling.Channel("poptorch.DataLoader")
 
     @property
-    def combinedBatchSize(self):
+    def combinedBatchSize(self) -> Optional[int]:
         """Total number of elements consumed from the dataset for a single
         execution of the model."""
         return self._combined_batch_size
 
     @property
-    def options(self):
+    def options(self) -> 'poptorch.Options':
         """A reference to the options that were used to initialise this
         DataLoader.
         """
         return self._options
 
-    def terminate(self):
+    def terminate(self) -> None:
         """If `mode==DataLoaderMode.Async`, kills the worker process in the
         underlying AsynchronousDataAccessor manually, otherwise has no effect.
         """
         if self._accessor is not None:
             self._accessor.terminate()
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.terminate()
 
-    def __iter__(self):
+    def __iter__(self) -> "torch.utils.data.dataloader._BaseDataLoaderIter":
         if self._accessor is not None:
             return self._accessor.__iter__()
 
@@ -274,14 +276,16 @@ class AsynchronousDataAccessor:
         https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
     """
 
-    def __init__(self,
-                 dataset,
-                 buffer_size=3,
-                 miss_sleep_time_in_ms=0.1,
-                 load_indefinitely=True,
-                 early_preload=False,
-                 sharing_strategy=SharingStrategy.FileSystem,
-                 rebatched_size=None):
+    def __init__(
+            self,
+            dataset: Union['torch.utils.data.Dataset', DataLoader],
+            buffer_size: int = 3,
+            miss_sleep_time_in_ms: float = 0.1,
+            load_indefinitely: bool = True,
+            early_preload: bool = False,
+            sharing_strategy: 'poptorch.SharingStrategy' = SharingStrategy.
+            FileSystem,
+            rebatched_size: Optional[int] = None):
         """
         :param dataset: The dataset to pull data from, this can be any Python
             iterable.
@@ -298,7 +302,7 @@ class AsynchronousDataAccessor:
             SharedMemory is fast but might be quite limited in size.
             FileSystem will serialise the dataset to file and reload it which
             will be slower.
-        :param int rebatched_size: If not None: return N batched tensors from
+        :param rebatched_size: If not None: return N batched tensors from
             the dataset per iteration. (The passed dataset must have a
             batch_size of 1).
         """
@@ -326,17 +330,17 @@ class AsynchronousDataAccessor:
             buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
             early_preload, sharing_strategy, rebatched_size)
 
-    def terminate(self):
+    def terminate(self) -> None:
         """
         An override function to kill the worker process manually.
         """
         if self._worker:
             self._worker.terminate()
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.terminate()
 
-    def __len__(self):
+    def __len__(self) -> int:
         dataset_len = len(self._dataset)
         # If this AsynchronousDataAccessor is embedded in a DataLoader then the dataset
         # length has already been adjusted.
@@ -345,13 +349,15 @@ class AsynchronousDataAccessor:
             dataset_len = dataset_len // self.rebatched_size
         return dataset_len
 
-    def __iter__(self):
+    def __iter__(self) -> 'poptorch.AsynchronousDataAccessor':
+        assert self._worker
         self._worker.resetIterator()
         return self
 
-    def __next__(self):
+    def __next__(self) -> Any:
         # We return shared memory to the user so we can't tell the worker to
         # refill it until the next item is requested.
+        assert self._worker
         self._worker.releaseElement()
         while not self._worker.endOfFile():
             data = self._worker.acquireElementIfAvailable()
@@ -363,13 +369,16 @@ class AsynchronousDataAccessor:
         raise StopIteration
 
 
-def trainingModel(model, options=None, optimizer=None):
+def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
+                  options: Optional['poptorch.Options'] = None,
+                  optimizer: Optional['torch.optim.Optimizer'] = None
+                  ) -> 'poptorch.PoplarExecutor':
     """ Create a PopTorch training model, from a PyTorch model, to run on IPU
     hardware in training mode.
 
-    :param torch.nn.Module model: The PyTorch model to wrap.
-    :param poptorch.Options options: The IPU specific options
-    :param torch.optim.Optimizer optimizer: The optimizers to apply during \
+    :param model: The PyTorch model to wrap.
+    :param options: The IPU specific options
+    :param optimizer: The optimizers to apply during \
         training.
 
         Supported PyTorch optimizers: ``optim.SGD``, ``optim.Adam``, \
@@ -398,12 +407,14 @@ def trainingModel(model, options=None, optimizer=None):
                           poptorch_version=__version__)
 
 
-def inferenceModel(model, options=None):
+def inferenceModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
+                   options: Optional['poptorch.Options'] = None
+                   ) -> 'poptorch.PoplarExecutor':
     """Create a PopTorch inference model, from a PyTorch model, to run on IPU
     hardware in inference mode.
 
-    :param torch.nn.Module model: The PyTorch model to wrap.
-    :param poptorch.Options options: The IPU specific options
+    :param model: The PyTorch model to wrap.
+    :param options: The IPU specific options
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
@@ -415,35 +426,33 @@ def inferenceModel(model, options=None):
                           poptorch_version=__version__)
 
 
-def ipuHardwareIsAvailable(num_ipus=1):
+def ipuHardwareIsAvailable(num_ipus: int = 1) -> bool:
     """Indicates whether any IPU hardware with `num_ipus` is present in the system.
 
     Note: This function doesn't check if the IPU is free or already being used.
 
-    :param int num_ipus:
+    :param num_ipus:
     :returns: True if physical IPUs are available, False otherwise.
-    :rtype: bool
     """
     return poptorch_core.ipuHardwareVersion(num_ipus) != 0
 
 
-def ipuHardwareVersion():
+def ipuHardwareVersion() -> int:
     """Indicates what IPU hardware version is available in the system.
 
     Raise an exception if no hardware is available.
 
     :returns: The IPU hardware version or -1 if unknown.
-    :rtype: int
     """
     version = poptorch_core.ipuHardwareVersion()
     assert version != 0, "No IPU hardware available on this system"
     return version
 
 
-def setLogLevel(level):
+def setLogLevel(level: Union[str, int]):
     """Changes the volume of messages printed in the console (stdout)
 
-    :param str level:
+    :param level:
         * TRACE: Print all messages.
         * DEBUG: Print debug messages and above.
         * INFO: Print info messages and above.

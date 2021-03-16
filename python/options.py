@@ -953,7 +953,7 @@ class Options(_options_impl.OptionsDict):
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._jit = _JitOptions()
         self._popart = _PopartOptions()
         self._graphProcessing = _PrecisionOptions(self._popart)

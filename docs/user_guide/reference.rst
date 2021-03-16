@@ -150,3 +150,9 @@ Data batching
 
 .. autoclass:: poptorch.DataLoaderMode
    :members:
+
+Enumerations
+============
+
+.. autoclass:: poptorch.SharingStrategy
+   :members:

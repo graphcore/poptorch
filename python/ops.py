@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+from typing import Dict, List, Union
 import torch
+
 from . import enums
 from ._logging import logger
 
@@ -332,7 +334,7 @@ class BeginBlock(torch.nn.Module):
 # pylint: enable=abstract-method
 
 # Store all attributes to prevent garbage collection
-attributes_lists = []
+attributes_lists: List[Dict[str, Union[float, int, str, list, tuple]]] = []
 
 ATTR_PREFIX = "attr:"
 

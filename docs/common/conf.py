@@ -50,7 +50,8 @@ nitpick_ignore = [
     ('py:class', 'torch.dtype'),
     ('py:class', 'torch.nn.Module'),
     ('py:class', 'torch.optim.Optimizer'),
-    ('py:class', 'torch.utils.data.dataset.Dataset'),
+    ('py:class', 'torch.optim.optimizer.Optimizer'),
+    ('py:class', 'torch.utils.data.Dataset'),
     ('py:class', 'torch.utils.data.sampler.Sampler'),
     # Enums already described in functions that use them
     ('py:class', 'poptorch.AnchorMode'),
@@ -59,6 +60,10 @@ nitpick_ignore = [
     ('py:class', 'poptorch.MatMulSerializationMode'),
     ('py:class', 'poptorch.ReductionType'),
     ('py:class', 'poptorch.SyncPattern'),
+    # Type hints
+    ('py:data', 'typing.Optional'),
+    ('py:data', 'typing.Callable'),
+    ('py:class', 'typing.ForwardRef'),
 ]
 
 # -- Options for HTML output -------------------------------------------------
@@ -321,3 +326,5 @@ autodoc_default_options = {
     'undoc-members': True,
 }
 autodoc_inherit_docstrings = True
+
+autodoc_typehints = 'description'
