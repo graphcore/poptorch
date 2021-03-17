@@ -95,7 +95,7 @@ public:
 
     if (_all_passed) {
       auto out_tensor =
-          popops::add(graph(), in_tensor, const_tensor, prog, debugPrefix());
+          popops::add(graph(), in_tensor, const_tensor, prog, debugContext());
       setOutTensor(0, out_tensor);
     } else {
       setOutTensor(0, in_tensor);

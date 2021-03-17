@@ -81,7 +81,7 @@ public:
     graph().setTileMapping(const_tensor, 0);
 
     auto out_tensor =
-        popops::add(graph(), in_tensor, const_tensor, prog, debugPrefix());
+        popops::add(graph(), in_tensor, const_tensor, prog, debugContext());
     setOutTensor(0, out_tensor);
   }
 
@@ -157,7 +157,7 @@ public:
     graph().setTileMapping(const_tensor, 0);
 
     auto out_tensor =
-        popops::add(graph(), in_tensor, const_tensor, prog, debugPrefix());
+        popops::add(graph(), in_tensor, const_tensor, prog, debugContext());
     setOutTensor(0, out_tensor);
   }
 

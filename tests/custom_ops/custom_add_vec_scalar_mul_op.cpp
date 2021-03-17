@@ -88,14 +88,14 @@ public:
     graph().setTileMapping(vec_tensor, 0);
 
     auto added_tensor =
-        popops::add(graph(), in_tensor, vec_tensor, prog, debugPrefix());
+        popops::add(graph(), in_tensor, vec_tensor, prog, debugContext());
 
     auto scalar_tensor =
         graph().addConstant(poplar::FLOAT, {1}, _scalar, "scale_factor");
     graph().setTileMapping(scalar_tensor, 0);
 
     auto out_tensor =
-        popops::mul(graph(), added_tensor, scalar_tensor, prog, debugPrefix());
+        popops::mul(graph(), added_tensor, scalar_tensor, prog, debugContext());
     setOutTensor(0, out_tensor);
   }
 

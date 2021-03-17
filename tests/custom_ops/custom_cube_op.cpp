@@ -119,7 +119,7 @@ public:
                                                               popops::expr::_1),
                                             popops::expr::_1),
                           popops::expr::_2),
-        {getInTensor(0), getInTensor(1)}, prog, debugPrefix());
+        {getInTensor(0), getInTensor(1)}, prog, debugContext());
 
     setOutTensor(0, output);
 
@@ -127,7 +127,7 @@ public:
         graph(),
         popops::expr::Mul(popops::expr::Mul(popops::expr::_1, popops::expr::_1),
                           popops::expr::_1),
-        {getInTensor(0)}, prog, debugPrefix());
+        {getInTensor(0)}, prog, debugContext());
 
     setOutTensor(1, output2);
   }
@@ -206,7 +206,7 @@ public:
                                                             popops::expr::_1),
                                           popops::expr::_2)),
                     {getInTensor(0), getInTensor(1)}, // FwdOut, GradOut
-                    prog, debugPrefix()));
+                    prog, debugContext()));
   }
 };
 
