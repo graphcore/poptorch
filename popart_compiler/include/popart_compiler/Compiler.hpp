@@ -299,6 +299,10 @@ public:
                                 std::int64_t num_outputs,
                                 const std::vector<poptorch::TensorId> &inputs);
 
+  void pushNameScope(const char *name) const;
+
+  void popNameScope() const;
+
   poptorch::TensorId addUntypedInputTensor();
   // Write the weights into IPU memory from the pytorch tensor buffers in the
   // model.

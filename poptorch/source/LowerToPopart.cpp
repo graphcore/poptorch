@@ -533,6 +533,11 @@ void LowerToPopartImpl::lowerBody() {
           node->i(c10::Symbol::fromQualString("attr::stage")),
           node->i(c10::Symbol::fromQualString("attr::phase")),
           node->i(c10::Symbol::fromQualString("attr::ipu")));
+    } else if (kind == symbols::poptorch::push_name_scope) {
+      _compiler.pushNameScope(
+          node->s(c10::Symbol::fromQualString("attr::name")).c_str());
+    } else if (kind == symbols::poptorch::pop_name_scope) {
+      _compiler.popNameScope();
     } else if (kind == symbols::poptorch::set_matmul_serialization) {
       poptorch::TensorId input = _valueMap.tensor(node->input());
       _compiler.setMatMulSerialization(

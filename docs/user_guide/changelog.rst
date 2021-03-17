@@ -11,6 +11,7 @@ New features
 - Add support for ``torch.unbind``
 - Add option to set `poptorch.Options` using options specified in a config file.
 - Added ``mode=poptorch.DataLoaderMode.AsyncRebatched``
+- Add support for PopART name scopes via ``poptorch.NameScope``
 
 v2.0 (Poplar SDK 2.0)
 =====================

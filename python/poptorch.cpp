@@ -139,6 +139,10 @@ void endMultiConv(
   UNUSED(cycle_back_off);
 }
 
+void pushNameScope(const std::string &&name) { UNUSED(name); }
+
+void popNameScope() {}
+
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
@@ -158,7 +162,9 @@ static auto registry =
         .op("poptorch::recomputation_checkpoint", &identityOp)
         .op("poptorch::set_available_memory", &setAvailableMemory)
         .op("poptorch::begin_multi_conv", &beginMultiConv)
-        .op("poptorch::end_multi_conv", &endMultiConv);
+        .op("poptorch::end_multi_conv", &endMultiConv)
+        .op("poptorch::push_name_scope", &pushNameScope)
+        .op("poptorch::pop_name_scope", &popNameScope);
 
 namespace poptorch {
 namespace {

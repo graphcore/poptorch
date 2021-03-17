@@ -190,6 +190,9 @@ void canonicalizeLate(torch::jit::Graph *graph) {
       multi_conv_handler.part(node);
     } else if (kind == symbols::poptorch::end_multi_conv) {
       callbacks.emplace_back(multi_conv_handler.end(node));
+    } else if (kind == symbols::poptorch::push_name_scope) {
+      std::string name = constantToString(node->input(0)->node());
+      node->s_(c10::Symbol::attr("name"), name);
     }
   }
 

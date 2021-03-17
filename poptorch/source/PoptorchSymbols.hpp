@@ -70,6 +70,8 @@ extern c10::Symbol start_if_true;
 extern c10::Symbol start_if_false;
 extern c10::Symbol start_for_loop;
 extern c10::Symbol end_for_loop;
+extern c10::Symbol push_name_scope;
+extern c10::Symbol pop_name_scope;
 extern c10::Symbol add_untyped_input_tensor;
 
 } // namespace symbols::poptorch

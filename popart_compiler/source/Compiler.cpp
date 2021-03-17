@@ -917,6 +917,12 @@ poptorch::TensorId Compiler::endIf(const poptorch::TensorId &condition,
                                                        _impl.get());
 }
 
+void Compiler::pushNameScope(const char *name) const {
+  _impl->active_builder->pushNameScope(std::string(name));
+}
+
+void Compiler::popNameScope() const { _impl->active_builder->popNameScope(); }
+
 poptorch::TensorId Compiler::addUntypedInputTensor() {
   popart::TensorId out = _impl->active_builder->addUntypedInputTensor();
   _impl->ids.push_back(out);

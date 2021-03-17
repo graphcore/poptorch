@@ -620,3 +620,23 @@ class MultiConv():
                                           self._partials_types, plan_type,
                                           self._per_conv_reserved_tiles,
                                           self._cycle_back_off)
+
+
+class NameScope:
+    """ Create a name scope for a code block. All operators originating
+        from this block will have their names prefixed by the given string.
+
+        >>> with poptorch.NameScope("CustomString"):
+        ...     y = self.bmm(a, b)
+        ...     z = torch.relu(y)
+    """
+
+    def __init__(self, name):
+        assert isinstance(name, str), 'Parameter to NameScope must be a string'
+        self.name = name
+
+    def __enter__(self):
+        torch.ops.poptorch.push_name_scope(self.name)
+
+    def __exit__(self, type, value, traceback):
+        torch.ops.poptorch.pop_name_scope()
