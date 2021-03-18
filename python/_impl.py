@@ -1245,10 +1245,7 @@ class PoplarExecutor:
         else:
             data = PoptorchData(self._poptorch_version, in_tensors)
         with open(filename, "wb") as f:
-            pickle.dump(data,
-                        f,
-                        protocol=pickle.HIGHEST_PROTOCOL,
-                        fix_imports=True)
+            pickle.dump(data, f)
             f.close()
         assert self._options.Jit.trace_model, (
             "compileAndExport not supported for"
@@ -1837,7 +1834,8 @@ class _AsynchronousWorkerProcess:
 
             # If we hit EOF sleep till re-awakened by host
             if eof_tensor[0] != -1:
-                time.sleep(self._miss_sleep_time_in_ms)
+                if self._miss_sleep_time_in_ms > 0.0:
+                    time.sleep(self._miss_sleep_time_in_ms)
                 continue
 
             try:
