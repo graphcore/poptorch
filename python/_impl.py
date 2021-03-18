@@ -42,6 +42,18 @@ def applyOptimizer(optimizer):
 _is_ipu_context = False
 
 
+def internal_cast(tensor, dtype):
+    if dtype in [torch.float, torch.float32]:
+        return torch.ops.poptorch.internal_cast(tensor, "FLOAT")
+
+    if dtype in [torch.half, torch.float16]:
+        return torch.ops.poptorch.internal_cast(tensor, "FLOAT16")
+
+    raise ValueError(
+        'Invalid poptorch.cast target type. Expecting torch.float or torch.half'
+    )
+
+
 def isRunningOnIpu() -> bool:
     """ This function returns `True` when executing on IPU and `False` when
         executing the model outside IPU scope. This allows for seperate
@@ -1375,9 +1387,20 @@ class PoplarExecutor:
         # The CPU execution happening during trace represents the IPU codepath.
         _SetIpuContext(True)
 
+        # Override half so user can use it in their models.
+        def NewHalf(tensor):
+            return internal_cast(tensor, torch.half)
+
+        # Store the old half so it can be restored.
+        old_half = torch.Tensor.half
+        torch.Tensor.half = NewHalf
+
         # Trace only a copy to avoid updating original weights during compilation.
         temp_model = copy.deepcopy(self._model.state_dict())
         self._trace = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
+
+        # Restore half to its old meaning.
+        torch.Tensor.half = old_half
 
         # Revert the traced copy to the inital weights.
         self._trace.load_state_dict(temp_model)

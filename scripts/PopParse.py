@@ -229,7 +229,7 @@ OutputTypeSameAsFirstInput = [
     "gathernd", "gelu", "globalaveragepool", "globallppool", "globalmaxpool",
     "hardmax", "hardsigmoid", "identity", "identityloss", "l1loss", "lrn",
     "leakyrelu", "log", "log1p", "logical_not", "logsoftmax",
-    "lpnormalization", "lppool", "maxpool", "maxunpool",
+    "lpnormalization", "lppool", "maxpool", "maxunpool", "onehot",
     "meanvariancenormalization", "neg", "nllloss", "nop", "pad", "printtensor",
     "range", "reciprocal", "reducel1", "reducel2", "reducelogsum",
     "reducelogsumexp", "reducemax", "reducemean", "reducemin", "reduceprod",

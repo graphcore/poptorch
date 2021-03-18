@@ -375,7 +375,7 @@ torch::jit::Node* createNonzero(torch::jit::Graph *graph,  const std::vector<tor
 return new_node;
 }
 torch::jit::Node* createOnehot(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::onehot, args, ImplicitCast::None, OutputType::AsThirdInput);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::onehot, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::axis"),axis);
 return new_node;
 }

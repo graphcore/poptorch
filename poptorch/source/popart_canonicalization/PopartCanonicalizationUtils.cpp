@@ -319,8 +319,9 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
         return;
       }
 
-      ERROR("Scalar type mismatch " << *(old_type->scalarType())
-                                    << " != " << (*new_type->scalarType()));
+      new_val->setType(new_type);
+      old_val->replaceAllUsesWith(new_val);
+      return;
     }
   }
 

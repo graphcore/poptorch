@@ -94,11 +94,29 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
   return createConcat(graph, values, 0);
 }
 
+torch::jit::Node *onehotHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  torch::jit::Value *tensor = node->input(0);
+
+  std::int64_t num_classes = constantToLong(node->input(1)->node());
+
+  ERROR_ON_MSG(num_classes == -1,
+               "OneHot num classes must be specified and must be constant.");
+
+  // The "hot/cold" values for the one hot representation.
+  torch::jit::Node *values = createConstantInt(graph, {0, 1}, {2});
+
+  torch::jit::Node *depth = createConstantInt(graph, {num_classes}, {});
+
+  return createOnehot(graph, {tensor, depth->output(), values->output()}, -1);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::embedding, embeddingHandler);
   registerHandler(c10::aten::embedding_bag, embeddingBagHandler);
+  registerHandler(c10::aten::one_hot, onehotHandler);
 }
 
 } // namespace poptorch

@@ -224,9 +224,20 @@ createConstantFloatLike(torch::jit::Graph *graph, torch::jit::Value *t,
   return new_node;
 }
 
+torch::jit::Node *createInternalCast(torch::jit::Graph *graph,
+                                     torch::jit::Value *A,
+                                     const std::string &type) {
+  // Convert from onnx string to a torch jit scalar object.
+  c10::ScalarType as_type = onnxStrToScalarType(type.c_str());
+
+  // Create the actual cast.
+  return createCast(graph, A, as_type);
+}
+
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
                              c10::ScalarType scalar_type) {
   std::string new_type = scalarTypeToOnnxString(scalar_type);
+
   auto node = createCast(graph, {A}, new_type);
 
   const auto tensor_type = A->type()->expect<c10::TensorType>();

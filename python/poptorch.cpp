@@ -48,6 +48,11 @@ void whileLoopBegin(const at::Tensor &condition,           // NOLINT
 }
 void whileLoopEnd() {}
 
+at::Tensor castOp(at::Tensor tensor, std::string &&type) {
+  UNUSED(type);
+  return tensor;
+}
+
 at::Tensor setAvailableMemory(at::Tensor t, double mem) {
   UNUSED(mem);
   return t;
@@ -147,6 +152,7 @@ static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
         .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
+        .op("poptorch::internal_cast", &castOp)
         .op("popart::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::identity_loss", &identityLoss)

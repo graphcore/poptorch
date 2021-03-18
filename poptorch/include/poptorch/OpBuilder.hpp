@@ -90,6 +90,10 @@ createCustomOperation(torch::jit::Graph *graph,
 torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
                              c10::ScalarType scalar);
 
+torch::jit::Node *createInternalCast(torch::jit::Graph *graph,
+                                     torch::jit::Value *A,
+                                     const std::string &type);
+
 torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
                                     torch::jit::Value *A,
                                     const std::vector<int64_t> &pad_shape,
