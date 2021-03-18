@@ -60,6 +60,31 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   ERROR("Popart Canonicalisation: UNREACHABLE reached in reductions.");
 }
 
+torch::jit::Node *reduceMedianHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node) {
+  auto input = node->input(0);
+  std::vector<std::int64_t> axes;
+  std::int64_t keepdim = 0;
+
+  torch::jit::Node *output;
+
+  if (node->inputs().size() == 1) {
+    // aten::median(Tensor self) -> Tensor
+    axes = reduceHelperDimensionCreator(input);
+    auto reduced = createReducemedian(graph, {input}, axes, keepdim);
+    reduced->eraseOutput(1);
+    output = reduced;
+  } else {
+    // aten::median(Tensor self, int dim, bool keepdim)
+    //             -> (Tensor values, Tensor indices)
+    axes.push_back(constantToLong(node->input(1)->node()));
+    keepdim = constantToLong(node->input(2)->node());
+    output = createReducemedian(graph, {input}, axes, keepdim);
+  }
+
+  return output;
+}
+
 torch::jit::Node *aMinMaxHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   // aten::max(Tensor self, int[] dim, int keepdim)
@@ -247,6 +272,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::argmin, argMinMaxHandler);
   registerHandler(c10::aten::prod, reduceHandler);
   registerHandler(c10::aten::mean, reduceHandler);
+  registerHandler(c10::aten::median, reduceMedianHandler);
   registerHandler(c10::aten::sum, reduceHandler);
   registerHandler(c10::aten::logsumexp, reduceHandler);
   registerHandler(c10::aten::norm, tensorNormHandler);

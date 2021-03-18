@@ -242,7 +242,7 @@ OutputTypeSameAsFirstInput = [
     "unique", "unsqueeze", "upsample"
 ]
 
-FirstOutputTypeSameAsFirstInputButSecondAlwaysInt = ["topk"]
+FirstOutputTypeSameAsFirstInputButSecondAlwaysInt = ["topk", "reducemedian"]
 
 OutputTypeSameAsThirdInput = ["onehot"]
 
@@ -270,7 +270,12 @@ OutputTypeVariable = [
     "sequenceat", "sequentempty", "sequenceinsert ", "splittosequence"
 ]
 
-MultipleOutputsOps = {"lstm": "2", "split": "num_outputs", "topk": "2"}
+MultipleOutputsOps = {
+    "lstm": "2",
+    "split": "num_outputs",
+    "topk": "2",
+    "reducemedian": "2",
+}
 
 CXXTypeToTypeClass = {
     # Scalar integers

@@ -169,6 +169,12 @@ torch::jit::Node* createBitwisexnor(torch::jit::Graph *graph,  const std::vector
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwisexnor, args, ImplicitCast::None, OutputType::Unknown);
 return new_node;
 }
+torch::jit::Node* createReducemedian(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,int64_t keepdims) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::reducemedian, args, ImplicitCast::None, OutputType::FirstAsFirstInputSecondAlwaysInt, 2);
+new_node->is_(c10::Symbol::fromQualString("attr::axes"),axes);
+new_node->i_(c10::Symbol::fromQualString("attr::keepdims"),keepdims);
+return new_node;
+}
 torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::averagepool, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);

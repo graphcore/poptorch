@@ -389,7 +389,8 @@ reduction_ops_api1 = [
     torch.argmin,
     # torch.dist,
     torch.mean,
-    #torch.median, torch.mode,
+    torch.median,
+    # torch.mode,
     torch.norm,
     torch.prod,
     #torch.std, torch.std_mean,
@@ -405,7 +406,8 @@ reduction_ops_api2 = [
     torch.argmin,
     # torch.dist,
     torch.mean,
-    #torch.median, torch.mode,
+    torch.median,
+    # torch.mode,
     torch.norm,
     torch.prod,
     torch.logsumexp,  # logsumexp doesn't support API 1.
@@ -431,16 +433,26 @@ def test_reduction_ops_float(op):
 
 
 @pytest.mark.parametrize("op", reduction_ops_api2)
-def test_reduction_ops_float_api2(op):
+@pytest.mark.parametrize("dim", range(4))
+@pytest.mark.parametrize("keepdim", [False, True])
+def test_reduction_ops_float_api2(op, dim, keepdim):
+    if op is torch.norm and keepdim and dim == 0:
+        # TODO: T36427
+        pytest.skip("Test test_reduction_ops_float_api2[True-0-norm]"
+                    " is failing and needs investigation.")
+
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 200])
 
     def operation(x):
-        return op(x, dim=2, keepdim=False)
+        return op(x, dim=dim, keepdim=keepdim)
 
     def compare(x, y):
-
+        if op is torch.median:
+            # Median returns values and indices with API 2.
+            return torch.allclose(x.values, y[0]) and torch.equal(
+                x.indices, y[1].to(torch.int64))
         if x.dtype == torch.float32:
             return torch.allclose(x, y)
         if torch.numel(x) > 1:
@@ -646,6 +658,8 @@ broadcastable_shapes = [
 @pytest.mark.parametrize("shapes", broadcastable_shapes)
 @pytest.mark.parametrize("scale", [0.35, 4.91, 12.0, -0.53, -3.45, -9.0, 0.0])
 def test_addcdiv(shapes, scale):
+    torch.manual_seed(42)
+
     class Model(torch.nn.Module):
         def forward(self, tensor0, tensor1, tensor2):
             return torch.addcdiv(

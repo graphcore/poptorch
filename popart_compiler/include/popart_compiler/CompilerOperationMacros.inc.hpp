@@ -37,6 +37,7 @@ OP_DECL(popart, bitwiseand, bitwiseand, AiGraphcoreOpset1.bitwiseand, NONE, NONE
 OP_DECL(popart, bitwiseor, bitwiseor, AiGraphcoreOpset1.bitwiseor, NONE, NONE)
 OP_DECL(popart, bitwisexor, bitwisexor, AiGraphcoreOpset1.bitwisexor, NONE, NONE)
 OP_DECL(popart, bitwisexnor, bitwisexnor, AiGraphcoreOpset1.bitwisexnor, NONE, NONE)
+OP_DECL(popart, reducemedian, reducemedian, AiGraphcoreOpset1.reducemedian, ARG(INT_VEC,axes) ARG(INT,keepdims) , BODY_ARG(axes) BODY_ARG(keepdims) )
 // Ops from AiOnnxOpset10
 OP_DECL(popart, averagepool, averagepool, AiOnnxOpset10.averagepool, ARG(INT_VEC,kernel_shape) ARG(INT,ceil_mode) ARG(INT,count_include_pad) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(kernel_shape) BODY_ARG(ceil_mode) BODY_ARG(count_include_pad) BODY_ARG(pads) BODY_ARG(strides) )
 OP_DECL(popart, convinteger, convinteger, AiOnnxOpset10.convinteger, ARG(INT_VEC,dilations) ARG(INT,group) ARG(INT_VEC,kernel_shape) ARG(INT_VEC,pads) ARG(INT_VEC,strides) , BODY_ARG(dilations) BODY_ARG(group) BODY_ARG(kernel_shape) BODY_ARG(pads) BODY_ARG(strides) )

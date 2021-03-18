@@ -145,6 +145,7 @@ Reduction ops
 * ``torch.argmax``
 * ``torch.argmin``
 * ``torch.mean``
+* ``torch.median``
 * ``torch.prod``
 * ``torch.logsumexp``
 * ``torch.sum``
