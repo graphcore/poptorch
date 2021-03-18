@@ -1051,7 +1051,9 @@ class Options(_options_impl.OptionsDict):
         return self._training
 
     @property
-    @deprecated('2.0', 'Use Options._Popart instead for experimental use only')
+    @deprecated(
+        'poptorch.Options', '2.0',
+        'Use poptorch.Options._Popart instead for experimental use only')
     def Popart(self):
         """(Deprecated) Options specific to the PopART backend. (Advanced users
         only).

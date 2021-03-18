@@ -7,14 +7,14 @@ from ._logging import logger
 
 # Decorator function to mark other functions as
 # deprecated.
-def deprecated(since_version, reason):
+def deprecated(domain, since_version, reason):
     def deprecated_func(func):
         @functools.wraps(func)
         def wrapped_func(*args, **kwargs):
             logger.warning(
-                "%s is deprecated since version %s "
-                "and will be removed in a future release.\n%s.", func.__name__,
-                since_version, reason)
+                "%s.%s is deprecated since version %s "
+                "and will be removed in a future release.\n%s.", domain,
+                func.__name__, since_version, reason)
             return func(*args, **kwargs)
 
         return wrapped_func
