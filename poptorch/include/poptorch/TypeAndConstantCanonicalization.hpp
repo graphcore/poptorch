@@ -26,9 +26,9 @@ namespace type_and_constant_canonicalization {
 
 void evaluateConstexprs(torch::jit::Graph *graph);
 
-void makeConstantIntParams(torch::jit::Graph *graph,
-                           const std::vector<std::string> &parameter_names,
-                           const std::vector<at::Tensor> &traced_tensors);
+void makeConstantIntParams(
+    torch::jit::Graph *graph, const std::vector<std::string> &parameter_names,
+    const std::vector<at::Tensor> &traced_parameter_tensors);
 
 // Change the graph to add a poptorch::host_side_cast node after every graph
 // input whose type is unsupported (Long, Double, BFloat16) to reflect the

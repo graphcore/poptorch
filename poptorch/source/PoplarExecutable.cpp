@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 
+#include "poptorch/InplaceOps.hpp"
 #include "poptorch/PoplarExecutable.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -148,6 +149,17 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
 
   // Execute the compiled poplar graph.
   _compiler.run(optimizers);
+
+  auto &mapping = _inplace_op_handler->getMapping();
+  for (size_t i = 0; i < mapping.size(); i++) {
+    if (mapping[i] == InplaceOpHandler::no_mapping) {
+      continue;
+    }
+    auto out_tensor = returnees.at(mapping[i]).toTensor();
+    (*inTensors)[i].copy_(out_tensor, false);
+  }
+
+  returnees.resize(_inplace_op_handler->getNumTensorOuputs());
 
   return returnees;
 }

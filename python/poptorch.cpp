@@ -10,10 +10,10 @@
 #include <torch/csrc/jit/passes/lower_graph.h>
 #include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/peephole.h>
-#include <torch/csrc/jit/passes/remove_inplace_ops.h>
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/script.h>
 
+#include <limits>
 #include <sstream>
 #include <unordered_map>
 
@@ -28,6 +28,7 @@
 #include "poptorch/AutomaticCasting.hpp"
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/ImplicitCasting.hpp"
+#include "poptorch/InplaceOps.hpp"
 #include "poptorch/LowerToPopart.hpp"
 #include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
@@ -410,12 +411,15 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
 }
 
 void buildTensorList(const torch::jit::IValue &value,
-                     std::vector<at::Tensor> *tensors) {
+                     std::vector<at::Tensor> *tensors,
+                     bool allow_tensor_only = false) {
   if (value.isTuple()) {
+    ERROR_ON(allow_tensor_only);
     for (auto &element : value.toTuple()->elements()) {
       buildTensorList(element, tensors);
     }
   } else if (value.isList()) {
+    ERROR_ON(allow_tensor_only);
     for (const auto element : value.toList()) {
       buildTensorList(element, tensors);
     }
@@ -583,13 +587,21 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
     py::handle h, const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
     bool has_converted_any_half, const pybind11::dict &options, bool training,
-    const py::dict &optimizer_dict, const py::function &attribute_accessor) {
+    const py::dict &optimizer_dict, const py::function &attribute_accessor,
+    const bool added_dummy_output) {
   auto module = asModule(h);
 
   auto forward = module->get_method("forward");
   auto graph_and_tensors =
       torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
   auto graph = graph_and_tensors.first;
+
+  // If we added a dummy output to make tracing work (no output case), remove
+  // it
+  if (added_dummy_output) {
+    ERROR_ON(graph->outputs().size() != 1);
+    graph->eraseOutput(0);
+  }
 
   // Create a jit stack from the incoming pytorch tensors.
   torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
@@ -600,16 +612,21 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   for (const torch::jit::IValue &value : input_stack) {
     buildTensorList(value, &input_tensors);
   }
-  std::vector<at::Tensor> traced_tensors;
+
+  // This is subset of "parameters_tensors", but only those actually used.
+  // The order matches the that of graph inputs, and the last
+  // traced_parameter_tensors.size() graph inputs matches these, while those
+  // which come before are the "actual" inputs.
+  std::vector<at::Tensor> traced_parameter_tensors;
   for (const torch::jit::IValue &value : graph_and_tensors.second) {
-    buildTensorList(value, &traced_tensors);
+    buildTensorList(value, &traced_parameter_tensors, true);
   }
 
   identifyZeroSizedTensors(input_tensors);
-  identifyZeroSizedTensors(traced_tensors);
+  identifyZeroSizedTensors(traced_parameter_tensors);
 
-  std::vector<std::string> parameters =
-      getParameterNames(parameter_names, parameter_tensors, traced_tensors);
+  std::vector<std::string> parameters = getParameterNames(
+      parameter_names, parameter_tensors, traced_parameter_tensors);
 
   std::vector<Optimizer> optimizers = parseOptimizer(optimizer_dict);
 
@@ -619,22 +636,24 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   torch::jit::PeepholeOptimize(graph);
   torch::jit::EliminateDeadCode(graph);
 
-  torch::jit::RemoveInplaceOps(graph);
   torch::jit::LowerSimpleTuples(graph);
   torch::jit::PeepholeOptimize(graph);
+
+  logGraph("Graph before handling inplace ops:", *graph, has_converted_any_half,
+           input_tensors);
+  auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
+      graph, traced_parameter_tensors.size());
 
   logGraph("Graph right before evaluating constant expressions:", *graph,
            has_converted_any_half, input_tensors);
   poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
-
-  torch::jit::RemoveInplaceOps(graph);
 
   logGraph("Graph right before casting making integer params as constant "
            "inputs:",
            *graph, has_converted_any_half, input_tensors);
 
   poptorch::type_and_constant_canonicalization::makeConstantIntParams(
-      graph.get(), parameters, traced_tensors);
+      graph.get(), parameters, traced_parameter_tensors);
 
   logGraph("Graph right before casting unsupported inputs:", *graph,
            has_converted_any_half, input_tensors);
@@ -654,7 +673,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   // Convert the IR to half to match the inputs/actual usage.
   logGraph("Graph before canonicalising half:", *graph, has_converted_any_half,
            input_tensors);
-  poptorch::canonicaliseHalfInputs(graph.get(), input_tensors, traced_tensors);
+  poptorch::canonicaliseHalfInputs(graph.get(), input_tensors,
+                                   traced_parameter_tensors);
 
   logging::trace("Graph right before canonicalizing lists:\n{}", *graph);
 
@@ -691,8 +711,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   logging::trace("Graph right before popart:\n{}", *graph);
 
   poptorch::LowerToPopart lower(
-      graph.get(), std::move(traced_tensors), std::move(parameters), training,
-      std::move(optimizers), parseSessionOptions(options), attribute_accessor);
+      graph.get(), std::move(traced_parameter_tensors), std::move(parameters),
+      inplace_op_handler, training, std::move(optimizers),
+      parseSessionOptions(options), attribute_accessor);
   lower.lower(&input_tensors);
   return lower;
 }
@@ -791,6 +812,8 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     auto &output_types = executable->outputTypes();
     auto type_it = output_types.begin();
     ERROR_ON(type_it == output_types.end());
+
+    // First tuple encodes the number of (actual) outputs
     std::uint64_t num_outputs = type_it->num_elements;
     std::function<pybind11::object()> process_output;
     process_output = [&]() -> pybind11::object { // NOLINT
@@ -859,27 +882,32 @@ void processPrecisionOptions(py::handle h) {
 void compileWithTraceAndExport(
     py::handle h, const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
+
     bool has_converted_any_half, const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const std::string &export_filename) {
+    const bool added_dummy_output, const std::string &export_filename) {
   try {
-    auto lower = lowerToPopartFromTrace(
-        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
-        options, training, optimizer_dict, attribute_accessor);
+    auto lower = lowerToPopartFromTrace(h, parameter_names, parameter_tensors,
+                                        inputs, has_converted_any_half, options,
+                                        training, optimizer_dict,
+                                        attribute_accessor, added_dummy_output);
     return lower.compileAndExport(export_filename);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
+
 std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
     py::handle h, const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
     bool has_converted_any_half, const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const std::string &import_filename, std::int64_t offset) {
+    const bool added_dummy_output, const std::string &import_filename,
+    std::int64_t offset) {
   try {
-    auto lower = lowerToPopartFromTrace(
-        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
-        options, training, optimizer_dict, attribute_accessor);
+    auto lower = lowerToPopartFromTrace(h, parameter_names, parameter_tensors,
+                                        inputs, has_converted_any_half, options,
+                                        training, optimizer_dict,
+                                        attribute_accessor, added_dummy_output);
     return lower.loadExecutableFromFile(import_filename, offset);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -889,11 +917,13 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     py::handle h, const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
     bool has_converted_any_half, const pybind11::dict &options, bool training,
-    const py::dict &optimizer_dict, const py::function &attribute_accessor) {
+    const py::dict &optimizer_dict, const py::function &attribute_accessor,
+    const bool added_dummy_output) {
   try {
-    auto lower = lowerToPopartFromTrace(
-        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
-        options, training, optimizer_dict, attribute_accessor);
+    auto lower = lowerToPopartFromTrace(h, parameter_names, parameter_tensors,
+                                        inputs, has_converted_any_half, options,
+                                        training, optimizer_dict,
+                                        attribute_accessor, added_dummy_output);
     return lower.compile();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -944,7 +974,10 @@ compileWithScript(py::handle h, py::handle g,
       loop_count++;
     }
 
-    torch::jit::RemoveInplaceOps(graph);
+    logging::trace("Graph before handling inplace ops:\n{}", *graph);
+
+    auto inplace_op_handler =
+        std::make_shared<InplaceOpHandler>(graph, parameter_data.size());
 
     logging::trace("Graph right before casting unsupported inputs:\n{}",
                    *graph);
@@ -985,9 +1018,10 @@ compileWithScript(py::handle h, py::handle g,
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    poptorch::LowerToPopart lower(
-        graph.get(), std::move(parameter_data), std::move(parameters), training,
-        {}, parseSessionOptions(options), attribute_accessor);
+    poptorch::LowerToPopart lower(graph.get(), std::move(parameter_data),
+                                  std::move(parameters), inplace_op_handler,
+                                  training, {}, parseSessionOptions(options),
+                                  attribute_accessor);
     lower.lower(&input_tensors);
     return lower.compile();
   }

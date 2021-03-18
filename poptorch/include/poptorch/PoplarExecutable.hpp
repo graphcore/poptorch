@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -14,6 +15,8 @@
 
 namespace poptorch {
 
+class InplaceOpHandler;
+
 class PoplarExecutable {
 public:
   PoplarExecutable() = delete;
@@ -21,10 +24,12 @@ public:
                    std::vector<poptorch::TensorId> &&inputs,
                    std::vector<poptorch::TensorId> &&outputs,
                    std::vector<at::ScalarType> &&outputTypes,
-                   std::vector<std::string> parameter_names)
+                   std::vector<std::string> parameter_names,
+                   std::shared_ptr<InplaceOpHandler> inplace_op_handler)
       : _compiler(std::move(c)), _popart_inputs(inputs),
         _popart_outputs(outputs), _popart_output_types(outputTypes),
-        _parameter_names(std::move(parameter_names)) {
+        _parameter_names(std::move(parameter_names)),
+        _inplace_op_handler(std::move(inplace_op_handler)) {
     for (size_t i = 0; i < inputs.size(); i++) {
       _converted_inputs.emplace_back();
     }
@@ -64,6 +69,8 @@ private:
   std::vector<poptorch::TensorId> _popart_outputs;
   std::vector<at::ScalarType> _popart_output_types;
   const std::vector<std::string> _parameter_names;
+
+  std::shared_ptr<InplaceOpHandler> _inplace_op_handler;
 };
 
 } // namespace poptorch

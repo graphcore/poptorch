@@ -1359,6 +1359,8 @@ class PoplarExecutor:
         if self._training:
             self._dirty_host_weights = True
 
+        if len(output) == 0:
+            return None
         if len(output) > 1:
             return output
         return output[0]
@@ -1372,6 +1374,26 @@ class PoplarExecutor:
             self.copyWeightsToHostIfNeeded()
         del self._executable
         self._executable = None
+
+    def _getTraceNoOutput(self, in_tensors_trace_view_tuple):
+        if not isinstance(self._model, torch.nn.Module):
+            raise RuntimeError(
+                "Tracing a model returning no outputs is only " +
+                "supported if the model is an instance of " +
+                "torch.nn.Module or an instance of a subclass " +
+                "of torch.nn.Module.")
+
+        class AddFakeOutput(self._model.__class__):
+            def forward(self, *args, **kwargs):
+                super().forward(*args, **kwargs)
+                return torch.tensor([0])
+
+        old_class = self._model.__class__
+        self._model.__class__ = AddFakeOutput
+        traced = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
+        self._model.__class__ = old_class
+
+        return traced
 
     def _trace_model_and_get_compile_args(self, in_tensors,
                                           in_tensors_trace_view,
@@ -1428,7 +1450,19 @@ class PoplarExecutor:
 
         # Trace only a copy to avoid updating original weights during compilation.
         temp_model = copy.deepcopy(self._model.state_dict())
-        self._trace = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
+
+        added_dummy_output = False
+
+        try:
+            self._trace = torch.jit.trace(self._model,
+                                          in_tensors_trace_view_tuple)
+        except RuntimeError as e:
+            if "didn't return any values" in str(e):
+                self._trace = self._getTraceNoOutput(
+                    in_tensors_trace_view_tuple)
+                added_dummy_output = True
+            else:
+                raise e
 
         # Restore half to its old meaning.
         torch.Tensor.half = old_half
@@ -1441,18 +1475,7 @@ class PoplarExecutor:
         _SetIpuContext(False)
 
         self._options._execution_strategy.onEndTracing()
-
-        if self._restoreInputsIfRequired(in_tensors_backup,
-                                         in_tensors_trace_view_tuple):
-            logger.warning(
-                "An input tensor is modified in-place by the model. This is "
-                "not supported on the IPU and the input will remain "
-                "unchanged. This applies to all in-place operations such "
-                "as \"+=\", \"*=\" or those ending in \"_\". To avoid this "
-                "warning, please use the non in-place alternatives such as "
-                "\"x = x + 1\" instead of \"x += 1\" or the operation "
-                "not ending in \"_\" matching the in-place variant, on all "
-                "model inputs.")
+        self._RestoreInputs(in_tensors_backup, in_tensors_trace_view_tuple)
 
         # Some of the trace layers of tuple float should be of type half.
         # The following works because the iterator is hierarchic,
@@ -1473,13 +1496,15 @@ class PoplarExecutor:
 
             # Compile using the actual halves.
             return (self._trace._c, tuple(parameters.keys()),
-                    tuple(parameters.values()), in_tensors_as_half.asTuple(),
-                    has_converted_any_half[0], self._options.toDict(),
-                    self._training, self._dict_optimizer, accessAttributes)
+                    tuple(parameters.values()),
+                    in_tensors_as_half.asTuple(), has_converted_any_half[0],
+                    self._options.toDict(), self._training,
+                    self._dict_optimizer, accessAttributes, added_dummy_output)
         return (self._trace._c, tuple(parameters.keys()),
-                tuple(parameters.values()), in_tensors_trace_view.asTuple(),
-                has_converted_any_half[0], self._options.toDict(),
-                self._training, self._dict_optimizer, accessAttributes)
+                tuple(parameters.values()),
+                in_tensors_trace_view.asTuple(), has_converted_any_half[0],
+                self._options.toDict(), self._training, self._dict_optimizer,
+                accessAttributes, added_dummy_output)
 
     def isAttachedToDevice(self) -> bool:
         """Returns true, if the target device has been attached. False,
@@ -1523,27 +1548,20 @@ class PoplarExecutor:
         self._dict_optimizer = {}
 
     @classmethod
-    def _restoreInputsIfRequired(cls, backup, post_trace):
+    def _RestoreInputs(cls, backup, post_trace):
         if isinstance(backup, torch.Tensor):
             assert isinstance(post_trace, torch.Tensor)
-
-            equals = (backup == post_trace)
-            both_nan = torch.logical_and(backup.isnan(), post_trace.isnan())
-            if torch.logical_or(equals, both_nan).all():
-                return False
             post_trace.copy_(backup)
-            return True
+            return
 
         if isinstance(backup, (tuple, list)):
-            restore_required = False
-
             assert isinstance(post_trace, (tuple, list))
             assert len(backup) == len(post_trace)
-            for idx, backup_val in enumerate(backup):
-                if cls._restoreInputsIfRequired(backup_val, post_trace[idx]):
-                    restore_required = True
 
-            return restore_required
+            for idx, backup_val in enumerate(backup):
+                cls._RestoreInputs(backup_val, post_trace[idx])
+
+            return
 
         # This implies that there is an input type or condition which does not
         # cause the tracer to fail, yet is none of the above types, or

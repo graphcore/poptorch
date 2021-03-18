@@ -49,6 +49,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/AddSubgraphConnectionNodes.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/AutomaticCasting.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CanonicalizeLists.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/InplaceOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartLateCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoplarExecutable.cpp"

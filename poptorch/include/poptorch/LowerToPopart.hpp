@@ -16,7 +16,7 @@
 namespace pybind11 {
 class function;
 }
-namespace py = pybind11;
+namespace py = pybind11; // NOLINT
 
 namespace poptorch {
 class SessionOptions;
@@ -27,11 +27,16 @@ class LowerToPopartImpl;
 /*
  * Take the transformed graph and create a poponnx graph from it.
  */
+
+class InplaceOpHandler;
+
 class LowerToPopart {
 public:
   LowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> parameters,
-                std::vector<std::string> parameter_names, bool training,
-                std::vector<Optimizer> &&opt, const SessionOptions &options,
+                std::vector<std::string> parameter_names,
+                const std::shared_ptr<InplaceOpHandler> &inplace_op_handler,
+                bool training, std::vector<Optimizer> &&opt,
+                const SessionOptions &options,
                 const py::function &attribute_accessor);
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();

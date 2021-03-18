@@ -14,6 +14,7 @@
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/PopartEnums.hpp"
 
+#include "poptorch/InplaceOps.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -221,8 +222,10 @@ namespace detail {
 class LowerToPopartImpl {
 public:
   LowerToPopartImpl(torch::jit::Graph *g, std::vector<at::Tensor> params,
-                    std::vector<std::string> parameter_names, bool training,
-                    std::vector<Optimizer> &&opt, const SessionOptions &options,
+                    std::vector<std::string> parameter_names,
+                    std::shared_ptr<InplaceOpHandler> inplace_op_handler,
+                    bool training, std::vector<Optimizer> &&opt,
+                    const SessionOptions &options,
                     const py::function &attribute_accessor);
 
   void lower(std::vector<at::Tensor> *in_tensors);
@@ -238,6 +241,7 @@ private:
 
   std::vector<at::Tensor> _parameters;
   std::vector<std::string> _parameter_names;
+  std::shared_ptr<InplaceOpHandler> _inplace_op_handler;
 
   std::vector<poptorch::TensorId> _input_tensor_hooks;
 
@@ -305,7 +309,8 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
 
   return std::make_shared<poptorch::PoplarExecutable>(
       std::move(_compiler), std::move(_input_tensor_hooks),
-      std::move(_output_tensor_hooks), std::move(data_types), _parameter_names);
+      std::move(_output_tensor_hooks), std::move(data_types), _parameter_names,
+      _inplace_op_handler);
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
@@ -323,7 +328,8 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
 
   return std::make_shared<poptorch::PoplarExecutable>(
       std::move(_compiler), std::move(_input_tensor_hooks),
-      std::move(_output_tensor_hooks), std::move(data_types), _parameter_names);
+      std::move(_output_tensor_hooks), std::move(data_types), _parameter_names,
+      _inplace_op_handler);
 }
 
 void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
@@ -348,8 +354,11 @@ void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
 }
 
 void LowerToPopartImpl::lowerReturn() {
-  _compiler.addOutputType({OutputType::Type::Tuple,
-                           static_cast<std::int64_t>(_graph.outputs().size())});
+  // Used to encode the number of (actual) outputs
+  _compiler.addOutputType(
+      {OutputType::Type::Tuple,
+       static_cast<std::int64_t>(_inplace_op_handler->getNumNormalOutputs())});
+
   // Recursively go through the output's type to
   // flatten its structure.
   // In the flat representation each 0 represent a
@@ -357,8 +366,12 @@ void LowerToPopartImpl::lowerReturn() {
   // tuple of that size.
   // e.g: (T0, T1, (T2, T3), T4)
   // [ 4, 0, 0, 2, 0, 0, 0 ]
+
+  // Only lower the outputs not used for tensors modified inplace.
+  size_t num_added = 0;
+
   std::function<void(c10::TypePtr)> process_type;
-  process_type = [this, &process_type](const c10::TypePtr &type) {
+  process_type = [this, &process_type, &num_added](const c10::TypePtr &type) {
     switch (type->kind()) {
     case c10::TypeKind::TensorType: {
       _compiler.addOutputType({OutputType::Type::Tensor});
@@ -1052,15 +1065,15 @@ convertCustomOpAttributes(const torch::jit::Node *node,
 }
 } // namespace
 
-LowerToPopartImpl::LowerToPopartImpl(torch::jit::Graph *g,
-                                     std::vector<at::Tensor> params,
-                                     std::vector<std::string> parameter_names,
-                                     bool training,
-                                     std::vector<Optimizer> &&opt,
-                                     const SessionOptions &options,
-                                     const py::function &attribute_accessor)
+LowerToPopartImpl::LowerToPopartImpl(
+    torch::jit::Graph *g, std::vector<at::Tensor> params,
+    std::vector<std::string> parameter_names,
+    std::shared_ptr<InplaceOpHandler> inplace_op_handler, bool training,
+    std::vector<Optimizer> &&opt, const SessionOptions &options,
+    const py::function &attribute_accessor)
     : _graph(*g), _parameters(std::move(params)),
-      _parameter_names(std::move(parameter_names)), _optimizers(opt),
+      _parameter_names(std::move(parameter_names)),
+      _inplace_op_handler(std::move(inplace_op_handler)), _optimizers(opt),
       _compiler({training, options}) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
@@ -1144,16 +1157,17 @@ LowerToPopartImpl::LowerToPopartImpl(torch::jit::Graph *g,
 }
 } // namespace detail
 
-LowerToPopart::LowerToPopart(torch::jit::Graph *graph,
-                             std::vector<at::Tensor> parameters,
-                             std::vector<std::string> parameter_names,
-                             bool training, std::vector<Optimizer> &&opt,
-                             const SessionOptions &options,
-                             const py::function &attribute_accessor) {
+LowerToPopart::LowerToPopart(
+    torch::jit::Graph *graph, std::vector<at::Tensor> parameters,
+    std::vector<std::string> parameter_names,
+    const std::shared_ptr<InplaceOpHandler> &inplace_op_handler, bool training,
+    std::vector<Optimizer> &&opt, const SessionOptions &options,
+    const py::function &attribute_accessor) {
   std::srand(std::time(nullptr));
   _impl = std::make_unique<detail::LowerToPopartImpl>(
-      graph, std::move(parameters), std::move(parameter_names), training,
-      std::move(opt), std::move(options), attribute_accessor);
+      graph, std::move(parameters), std::move(parameter_names),
+      inplace_op_handler, training, std::move(opt), std::move(options),
+      attribute_accessor);
 }
 
 void LowerToPopart::lower(std::vector<at::Tensor> *in_tensors) {

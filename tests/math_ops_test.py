@@ -119,7 +119,9 @@ def test_binary_pow(inplace, exponent):
 
     def op(x):
         if inplace:
-            x = x + 0  # Ensure input is not modified in place
+            # Although inplace would work, the native and poptorch output will
+            # naturally not match as the input is changed
+            x = x + 0
             return x.pow_(exponent)
         return torch.pow(x, exponent)
 

@@ -104,7 +104,13 @@ void ConstExprEvaluator::evaluate() {
 }
 
 void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
+  std::vector<torch::jit::Node *> nodes_plus_return;
   for (auto node : _graph->nodes()) {
+    nodes_plus_return.push_back(node);
+  }
+  nodes_plus_return.push_back(_graph->return_node());
+
+  for (auto node : nodes_plus_return) {
     logging::LogContext ctx("ConstExprEvaluator processing " +
                             nodeToString(node));
 

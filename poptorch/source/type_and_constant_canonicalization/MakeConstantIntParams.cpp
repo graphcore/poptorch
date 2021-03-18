@@ -12,11 +12,12 @@
 namespace poptorch {
 namespace type_and_constant_canonicalization {
 
-void makeConstantIntParams(torch::jit::Graph *graph,
-                           const std::vector<std::string> &parameter_names,
-                           const std::vector<at::Tensor> &traced_tensors) {
-  //_parameters in Lower to popart is traced_tensors here
-  std::size_t num_inputs = graph->inputs().size() - traced_tensors.size();
+void makeConstantIntParams(
+    torch::jit::Graph *graph, const std::vector<std::string> &parameter_names,
+    const std::vector<at::Tensor> &traced_parameter_tensors) {
+  //_parameters in Lower to popart is traced_parameter_tensors here
+  std::size_t num_inputs =
+      graph->inputs().size() - traced_parameter_tensors.size();
 
   std::size_t index = 0;
   for (torch::jit::Value *value : graph->inputs()) {
@@ -28,8 +29,8 @@ void makeConstantIntParams(torch::jit::Graph *graph,
     logging::LogContext ctx("makeConstantIntParams processing " +
                             parameter_names[index - num_inputs]);
 
-    //_parameters in Lower to popart is traced_tensors here
-    auto tensor = traced_tensors[index - num_inputs];
+    //_parameters in Lower to popart is traced_paramater_tensors here
+    auto tensor = traced_parameter_tensors[index - num_inputs];
 
     if (value->type()->kind() == c10::TypeKind::TensorType) {
       auto tensor_type = value->type()->expect<c10::TensorType>();
