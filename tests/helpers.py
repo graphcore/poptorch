@@ -12,9 +12,29 @@ def assert_allclose(*, actual=None, expected=None, **kwargs):
     arguments to torch.testing.assert_allclose in the correct order by forcing
     the use of keyword arguments. This improves error reporting in case of
     assertion failures.
+
+    :param actual: torch.Tensor, array-like of torch.Tensor objects or
+           scalar value that is tested.
+    :param expected: torch.Tensor, array-like of torch.Tensor objects or
+           scalar value that is used as a reference.
+    :param kwargs: kwargs passed to torch.testing.assert_allclose.
     """
     assert actual is not None and expected is not None, (
         "'actual' and 'expected' keyword arguments must be present")
+
+    in_types = (type(actual), type(expected))
+    if in_types == (torch.Tensor, torch.Tensor):
+        assert actual.shape == expected.shape, (
+            "Shape of 'actual' (%s) should be the same as shape of"
+            " 'expected' (%s)") % (actual.shape, expected.shape)
+    elif in_types in ((list, list), (tuple, tuple)):
+        assert len(actual) == len(expected), (
+            "Length of 'actual' (%s) should be the same as length of"
+            " 'expected' (%s)") % (len(actual), len(expected))
+        for a, e in zip(actual, expected):
+            assert_allclose(actual=a, expected=e, **kwargs)
+        return
+
     torch.testing.assert_allclose(actual, expected, **kwargs)
 
 
@@ -25,9 +45,19 @@ def assert_allequal(*, actual=None, expected=None, msg=''):
     assertion failures. Additionally, rtol=0 and atol=0 are passed to
     torch.testing.assert_allclose as this results in identity comparison for
     integer and boolean tensors.
+
+    :param actual: torch.Tensor or scalar value that is tested.
+    :param expected: torch.Tensor or scalar value that is used as a reference.
+    :param msg: message passed to torch.testing.assert_allclose.
     """
     assert actual is not None and expected is not None, (
         "'actual' and 'expected' keyword arguments must be present")
+
+    if isinstance(actual, torch.Tensor) and isinstance(expected, torch.Tensor):
+        assert actual.shape == expected.shape, (
+            "Shape of 'actual' (%s) should be the same as shape of"
+            " 'expected' (%s)") % (actual.shape, expected.shape)
+
     torch.testing.assert_allclose(actual, expected, rtol=0, atol=0, msg=msg)
 
 

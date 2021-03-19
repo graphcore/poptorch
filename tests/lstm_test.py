@@ -4,7 +4,6 @@
 import torch
 import torch.nn as nn
 import poptorch
-import poptorch.testing
 import helpers
 
 
@@ -20,7 +19,10 @@ def test_lstm():
         # after each step, hidden contains the hidden state.
         out, newHidden = lstm(i.view(1, 1, -1), hidden)
         ipuOut, ipuHidden = ipuLstm(i.view(1, 1, -1), hidden)
-        assert poptorch.testing.allclose(newHidden, ipuHidden)
+        helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
+        helpers.assert_allclose(expected=newHidden[1],
+                                actual=ipuHidden[1].reshape(
+                                    newHidden[1].shape))
         helpers.assert_allclose(expected=out, actual=ipuOut)
         hidden = newHidden
 
@@ -35,9 +37,12 @@ def test_lstm2():
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), 1, -1)
     hidden = (torch.randn(1, 1, numHidden), torch.randn(1, 1, numHidden))
-    out = lstm(inputs, hidden)
-    ipuOut = ipuLstm(inputs, hidden)
-    assert poptorch.testing.allclose(out, ipuOut)
+    out, newHidden = lstm(inputs, hidden)
+    ipuOut, ipuHidden = ipuLstm(inputs, hidden)
+    helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
+    helpers.assert_allclose(expected=newHidden[1],
+                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
 def test_lstm_twice():
@@ -50,13 +55,20 @@ def test_lstm_twice():
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), 1, -1)
     hidden = (torch.randn(1, 1, numHidden), torch.randn(1, 1, numHidden))
-    out = lstm(inputs, hidden)
-    ipuOut = ipuLstm(inputs, hidden)
-    assert poptorch.testing.allclose(out, ipuOut)
-    out = lstm(inputs, hidden)
-    ipuOut2 = ipuLstm(inputs, hidden)
-    assert poptorch.testing.allclose(out, ipuOut2)
-    assert poptorch.testing.allclose(ipuOut, ipuOut2)
+    out, newHidden = lstm(inputs, hidden)
+    ipuOut, ipuHidden = ipuLstm(inputs, hidden)
+    helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
+    helpers.assert_allclose(expected=newHidden[1],
+                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=out, actual=ipuOut)
+
+    out, newHidden = lstm(inputs, hidden)
+    ipuOut2, ipuHidden2 = ipuLstm(inputs, hidden)
+    helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden2[0])
+    helpers.assert_allclose(expected=newHidden[1],
+                            actual=ipuHidden2[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=out, actual=ipuOut2)
+    helpers.assert_allclose(expected=ipuOut, actual=ipuOut2)
 
 
 def test_lstm_batch_first():
@@ -69,9 +81,12 @@ def test_lstm_batch_first():
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(1, len(inputs), -1)
     hidden = (torch.randn(1, 1, numHidden), torch.randn(1, 1, numHidden))
-    out = lstm(inputs, hidden)
-    ipuOut = ipuLstm(inputs, hidden)
-    assert poptorch.testing.allclose(out, ipuOut)
+    out, newHidden = lstm(inputs, hidden)
+    ipuOut, ipuHidden = ipuLstm(inputs, hidden)
+    helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
+    helpers.assert_allclose(expected=newHidden[1],
+                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
 def test_lstm_batched():
@@ -87,9 +102,12 @@ def test_lstm_batched():
     print(inputs.shape)
     hidden = (torch.randn(1, batch,
                           numHidden), torch.randn(1, batch, numHidden))
-    out = lstm(inputs, hidden)
-    ipuOut = ipuLstm(inputs, hidden)
-    assert poptorch.testing.allclose(out, ipuOut)
+    out, newHidden = lstm(inputs, hidden)
+    ipuOut, ipuHidden = ipuLstm(inputs, hidden)
+    helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
+    helpers.assert_allclose(expected=newHidden[1],
+                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
 def test_lstm_batched_batch_first():
@@ -104,9 +122,12 @@ def test_lstm_batched_batch_first():
     inputs = torch.cat(inputs).view(batch, len(inputs), -1)
     hidden = (torch.randn(1, batch,
                           numHidden), torch.randn(1, batch, numHidden))
-    out = lstm(inputs, hidden)
-    ipuOut = ipuLstm(inputs, hidden)
-    assert poptorch.testing.allclose(out, ipuOut)
+    out, newHidden = lstm(inputs, hidden)
+    ipuOut, ipuHidden = ipuLstm(inputs, hidden)
+    helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
+    helpers.assert_allclose(expected=newHidden[1],
+                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
 def test_lstm_fc():
@@ -135,7 +156,7 @@ def test_lstm_fc():
     input = torch.randn(1, batch_size, input_size)
     out = lstm(input)
     ipuOut = ipuLstm(input)
-    assert poptorch.testing.allclose(out, ipuOut)
+    helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
 def test_lstm_fc_training():

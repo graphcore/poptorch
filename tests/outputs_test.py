@@ -4,7 +4,7 @@
 import torch
 import torch.nn as nn
 import poptorch
-import poptorch.testing
+import helpers
 
 
 def test_multiple_tensors():
@@ -25,8 +25,7 @@ def test_multiple_tensors():
 
     ipu = inference_model(x, y)
     ref = model(x, y)
-    assert poptorch.testing.allclose(
-        ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
+    helpers.assert_allclose(actual=ipu, expected=ref)
 
 
 def test_simple_list():
@@ -47,8 +46,7 @@ def test_simple_list():
 
     ipu = inference_model(x, y)
     ref = model(x, y)
-    assert poptorch.testing.allclose(
-        ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
+    helpers.assert_allclose(actual=ipu, expected=ref)
 
 
 def test_simple_tuple():
@@ -69,8 +67,7 @@ def test_simple_tuple():
 
     ipu = inference_model(x, y)
     ref = model(x, y)
-    assert poptorch.testing.allclose(
-        ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
+    helpers.assert_allclose(actual=ipu, expected=ref)
 
 
 def test_nested_tuples():
@@ -92,8 +89,7 @@ def test_nested_tuples():
     ipu = inference_model(x, y)
     ref = model(x, y)
 
-    assert poptorch.testing.allclose(
-        ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
+    helpers.assert_allclose(actual=ipu, expected=ref)
 
 
 def test_same_tensor():
@@ -115,5 +111,4 @@ def test_same_tensor():
     ipu = inference_model(x, y)
     ref = model(x, y)
 
-    assert poptorch.testing.allclose(
-        ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
+    helpers.assert_allclose(actual=ipu, expected=ref)

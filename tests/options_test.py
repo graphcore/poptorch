@@ -8,7 +8,6 @@ import torch
 import torch.nn as nn
 import pytest
 import poptorch
-import poptorch.testing
 import helpers
 
 
@@ -28,8 +27,7 @@ def test_jit_script():
 
     ipu = inference_model(x, y)
     ref = model(x, y)
-    assert poptorch.testing.allclose(
-        ref, ipu), "%s doesn't match the expected output %s" % (ipu, ref)
+    helpers.assert_allclose(expected=ref, actual=ipu)
 
 
 def test_set_options():

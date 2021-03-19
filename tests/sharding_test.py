@@ -2,7 +2,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import torch
 import poptorch
-import poptorch.testing
+import helpers
 
 
 def test_sharded_execution():
@@ -31,4 +31,4 @@ def test_sharded_execution():
 
     native_out = native(inp)
     ipu_out = ipu(inp)
-    assert poptorch.testing.allclose(native_out, ipu_out)
+    helpers.assert_allclose(actual=ipu_out, expected=native_out)

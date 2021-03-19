@@ -39,7 +39,7 @@ def test_float_attribute():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    helpers.assert_allclose(actual=out, expected=8.5)
+    helpers.assert_allclose(actual=out[0], expected=8.5)
 
 
 def test_float_attribute_too_low():
@@ -416,7 +416,8 @@ def test_many_attributes(seed):
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    helpers.assert_allequal(actual=out[0], expected=torch.tensor(1.0))
+    helpers.assert_allequal(actual=out[0],
+                            expected=torch.tensor(1.0).reshape((1, )))
 
 
 @pytest.mark.parametrize("seed", range(3))
@@ -447,7 +448,8 @@ def test_many_attributes_one_wrong(seed):
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
 
-    helpers.assert_allequal(actual=out[0], expected=torch.tensor(0.0))
+    helpers.assert_allequal(actual=out[0],
+                            expected=torch.tensor(0.0).reshape((1, )))
 
 
 #many_attribtes_examples_start

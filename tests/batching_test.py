@@ -103,7 +103,8 @@ def test_inferenceAnchors(anchor):
 
         if anchor == poptorch.AnchorMode.Final:
             # Check we are the same as the last output.
-            helpers.assert_allclose(actual=poptorch_out,
+            helpers.assert_allclose(actual=poptorch_out.reshape(
+                native_out[-1].shape),
                                     expected=native_out[-1])
         elif anchor == poptorch.AnchorMode.Sum:
             # Check we are close to the sum of the batch dim.

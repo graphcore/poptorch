@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import pytest
 import poptorch
+import helpers
 
 MANY_TYPES = (torch.float32, torch.float64, torch.int32, torch.int64)
 
@@ -223,7 +224,7 @@ def test_int8():
     output = model(input)
 
     assert output.dtype == torch.float
-    assert torch.equal(output, input.float())
+    helpers.assert_allequal(actual=output, expected=input.float())
 
 
 def test_uint8():

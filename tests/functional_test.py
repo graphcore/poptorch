@@ -4,6 +4,7 @@
 import torch
 import pytest
 import poptorch
+import helpers
 
 
 def test_one_hot():
@@ -21,7 +22,7 @@ def test_one_hot():
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_out = poptorch_model(input)
 
-    assert torch.equal(nativeOut, poptorch_out.long())
+    helpers.assert_allequal(actual=poptorch_out.long(), expected=nativeOut)
 
 
 def test_one_hot_invalid():
@@ -56,4 +57,4 @@ def test_one_hot_casted():
     poptorch_out = poptorch_model(input)
 
     assert poptorch_out.dtype == torch.half
-    assert torch.equal(nativeOut, poptorch_out)
+    helpers.assert_allequal(actual=poptorch_out, expected=nativeOut)

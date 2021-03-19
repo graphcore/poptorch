@@ -300,11 +300,11 @@ def test_batchnorm_statistics():
     training_model.copyWeightsToHost()
 
     # Running mean is very close
-    torch.testing.assert_allclose(model2.bn.running_mean,
-                                  model1.bn.running_mean)
+    helpers.assert_allclose(actual=model2.bn.running_mean,
+                            expected=model1.bn.running_mean)
 
     # Running var is not so close.
-    torch.testing.assert_allclose(model2.bn.running_var,
-                                  model1.bn.running_var,
-                                  atol=1e-1,
-                                  rtol=0.1)
+    helpers.assert_allclose(actual=model2.bn.running_var,
+                            expected=model1.bn.running_var,
+                            atol=1e-1,
+                            rtol=0.1)
