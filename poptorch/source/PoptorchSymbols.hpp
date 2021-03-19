@@ -61,6 +61,10 @@ extern c10::Symbol optimizer_group;
 extern c10::Symbol begin_multi_conv;
 extern c10::Symbol multi_conv_part;
 extern c10::Symbol end_multi_conv;
+extern c10::Symbol begin_autocast;
+extern c10::Symbol suppress_autocast;
+extern c10::Symbol restore_autocast;
+extern c10::Symbol autocast;
 
 // Casting is done before passing the input to the IPU: the op is used so that
 // so that that input types match those received from pytorch but that the input

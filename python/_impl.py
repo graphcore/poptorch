@@ -843,6 +843,9 @@ class PoplarExecutor:
                  user_model: Optional['torch.nn.Module'] = None):
         options = options or Options()
         self._user_model = user_model or model
+
+        options.Precision.autocast_policy.apply(self._user_model, options)
+
         if training:
             self._attribute_tracker = _OptimizerAttrTracker(options)
             if options.defaultAnchorMode():
@@ -885,7 +888,6 @@ class PoplarExecutor:
         self._dirty_host_weights = False
         self._trace = None
         self._is_attached = False
-
         self._profiling = profiling.Channel(
             "poptorch.trainingModel" if self.
             training else "poptorch.inferenceModel")

@@ -415,6 +415,20 @@ torch::jit::Node *stackHandler(torch::jit::Graph *graph,
   return createConcat(graph, transformed_tensors, dim);
 }
 
+torch::jit::Node *autocastHandler(torch::jit::Graph *graph,
+                                  torch::jit::Node *node) {
+  auto from_type = getNodeScalarType(node->input(0));
+  auto to_type = getNodeScalarType(node->output(0));
+
+  if (from_type == to_type) {
+    node->output()->replaceAllUsesWith(node->input(0));
+    markNodeForDeletion(node);
+    return nullptr;
+  }
+
+  return createCast(graph, node->input(0), to_type);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -442,6 +456,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::squeeze, reshapeHandler);
   registerHandler(c10::aten::stack, stackHandler);
+  registerHandler(symbols::poptorch::autocast, autocastHandler);
 }
 
 } // namespace poptorch

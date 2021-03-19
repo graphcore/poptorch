@@ -46,7 +46,7 @@ torch::jit::Value *shapeFromTensorAsIR(torch::jit::Graph *graph,
                                        torch::jit::Value *value);
 
 // Get the scalar type of this tensor.
-at::ScalarType getNodeScalarType(torch::jit::Value *tensor);
+at::ScalarType getNodeScalarType(const torch::jit::Value *tensor);
 
 torch::jit::Value *
 intVectorToIrConstant(torch::jit::Graph *graph,

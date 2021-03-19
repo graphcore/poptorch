@@ -12,6 +12,7 @@ New features
 - Add option to set `poptorch.Options` using options specified in a config file.
 - Added ``mode=poptorch.DataLoaderMode.AsyncRebatched``
 - Add support for PopART name scopes via ``poptorch.NameScope``
+- Add mixed precision automatic casting
 
 v2.0 (Poplar SDK 2.0)
 =====================

@@ -25,6 +25,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/AutomaticCasting.hpp"
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/ImplicitCasting.hpp"
 #include "poptorch/LowerToPopart.hpp"
@@ -148,6 +149,12 @@ void pushNameScope(const std::string &&name) { UNUSED(name); }
 
 void popNameScope() {}
 
+void beginAutocast() {}
+
+void suppressAutocast() {}
+
+void restoreAutocast() {}
+
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
         .op("poptorch::end_ipu_block", &endIpuBlock)
@@ -170,7 +177,10 @@ static auto registry =
         .op("poptorch::begin_multi_conv", &beginMultiConv)
         .op("poptorch::end_multi_conv", &endMultiConv)
         .op("poptorch::push_name_scope", &pushNameScope)
-        .op("poptorch::pop_name_scope", &popNameScope);
+        .op("poptorch::pop_name_scope", &popNameScope)
+        .op("poptorch::begin_autocast", &beginAutocast)
+        .op("poptorch::suppress_autocast", &suppressAutocast)
+        .op("poptorch::restore_autocast", &restoreAutocast);
 
 namespace poptorch {
 namespace {
@@ -564,10 +574,15 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   logGraph("Graph before canonicalising half:", *graph, trace_input_str);
   poptorch::canonicaliseHalfInputs(graph.get(), input_tensors, traced_tensors);
 
-  logging::trace("Graph right before canonicalization:\n{}", *graph);
+  logging::trace("Graph right before canonicalizing lists:\n{}", *graph);
 
   poptorch::canonicalizeLists(graph.get());
 
+  logging::trace("Graph right before automatic casting:\n{}", *graph);
+
+  poptorch::automaticCasting(graph.get());
+
+  logging::trace("Graph right before canonicalization:\n{}", *graph);
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.
   poptorch::canonicalize(graph.get());
@@ -741,6 +756,14 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
 
 void processPrecisionOptions(py::handle h) {
   auto values_dict = h.attr("_values").cast<py::dict>();
+
+  poptorch::setAutocastEnabled(values_dict["autocast_enabled"].cast<bool>());
+
+  auto policy = values_dict["autocast_policy_dict"].cast<py::dict>();
+  setAutocastHalf(policy["fp16"].cast<std::vector<std::string>>());
+  setAutocastFloat(policy["fp32"].cast<std::vector<std::string>>());
+  setAutocastPromote(policy["promote"].cast<std::vector<std::string>>());
+  setAutocastDemote(policy["demote"].cast<std::vector<std::string>>());
 
   poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
       values_dict["half_float_casting"].cast<uint64_t>()));

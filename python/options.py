@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import os
 import torch
+from . import autocasting
 from . import enums
 from ._logging import logger
 from . import _options_config
@@ -55,10 +56,42 @@ class _PrecisionOptions(_options_impl.OptionsDict):
     """
 
     def __init__(self, popart_options):
-        super().__init__(half_float_casting=enums.HalfFloatCastingBehavior.
-                         FloatDowncastToHalf,
-                         running_variance_always_float=True)
+        super().__init__(
+            autocast_enabled=True,
+            autocast_policy=autocasting.default,
+            autocast_policy_dict=autocasting.default._dict(),  # pylint: disable=protected-access
+            half_float_casting=enums.HalfFloatCastingBehavior.
+            FloatDowncastToHalf,
+            running_variance_always_float=True)
         self._popart_options = popart_options
+
+    def autocastEnabled(self, autocast_enabled):
+        """ Controls whether automatic casting functionality is turned on.
+
+            :param bool autocast_enabled: if True, automatic casting is active.
+                                          Default value is True.
+        """
+
+        if not isinstance(autocast_enabled, bool):
+            raise ValueError(
+                'autocastEnabled must be set to either True or False')
+
+        self.set(autocast_enabled=autocast_enabled)
+        return self
+
+    def autocastPolicy(self, autocast_policy):
+        """ Set the automatic casting policy.
+
+            :param policy: the policy object.
+        """
+
+        if not isinstance(autocast_policy, autocasting.Policy):
+            raise ValueError('autocastPolicy must be set to an instance of'
+                             'poptorch.autocasting.Policy')
+
+        self.set(autocast_policy=autocast_policy)
+        self.set(autocast_policy_dict=self.autocast_policy._dict())  # pylint: disable=protected-access
+        return self
 
     def halfFloatCasting(self, half_float_casting):
         """ Changes the casting behaviour for ops involving a float16 (half) and

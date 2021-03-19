@@ -117,7 +117,7 @@ torch::jit::Value *shapeFromTensorAsIR(torch::jit::Graph *graph,
 }
 
 // Get the scalar type of a given tensor.
-at::ScalarType getNodeScalarType(torch::jit::Value *tensor) {
+at::ScalarType getNodeScalarType(const torch::jit::Value *tensor) {
   // The returned value must be a tensor.
   c10::TensorTypePtr return_tensor = tensor->type()->expect<c10::TensorType>();
 

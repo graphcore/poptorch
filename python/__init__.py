@@ -20,6 +20,7 @@ assert torch.__version__.startswith("@TORCH_VERSION@"), (
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 from . import _impl
+from .autocasting import autocast
 from .enums import *
 from .ops import *
 from .options import *

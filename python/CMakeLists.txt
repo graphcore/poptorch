@@ -46,6 +46,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/SoftmaxOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/TensorOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/AddSubgraphConnectionNodes.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/AutomaticCasting.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CanonicalizeLists.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartLateCanonicalization.cpp"
@@ -85,4 +86,4 @@ install(TARGETS poptorch_core
 
 run_poptorch_install_command("python3 ${PROJECT_SOURCE_DIR}/scripts/set_version.py --torch-version ${TORCH_VERSION} ${CMAKE_CURRENT_BINARY_DIR}/__init__.py" "${PROJECT_SOURCE_DIR}" "Generate __init__.py")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py DESTINATION "${INSTALL_PYDIR}")
-install(FILES _impl.py _options_config.py _options_impl.py _logging.py _utils.py enums.py optim.py ops.py options.py profiling.py py.typed testing.py DESTINATION "${INSTALL_PYDIR}")
+install(FILES _impl.py _options_config.py _options_impl.py _logging.py _utils.py autocasting.py enums.py optim.py ops.py options.py profiling.py py.typed testing.py DESTINATION "${INSTALL_PYDIR}")

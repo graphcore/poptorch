@@ -820,9 +820,9 @@ You can use your models in one of the following ways:
 #. Keep the parameters (weights) as float 32, in which case the parameter updates will occur using float 32. However, the parameters will be converted to float 16 if you call an operation with a float 16 input. This is more memory efficient than using float 32 tensors (inputs) but less memory efficient than using float 16 weights.
 #. Use a mix of float 32 and float 16 parameters by manually specifying parameters as float 16 or float 32.
 
-.. note::  When PyTorch encounters a mix of float 16 and float 32 inputs for a given operation, it will usually cast all inputs and float 32.
+.. note::  When PyTorch encounters a mix of float 16 and float 32 inputs for a given operation, it will usually cast all inputs to float 32.
     PopTorch differs and will cast all inputs to float 16.
-    This makes it easier to build models with float 32 weights which take float 16 tensors. However, if you wish to follow PyTorch behavior, you can use  ``opts.Precision.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` where ``opts`` is the ``poptorch.Options`` object passed to the model wrapping function.
+    This makes it easier to build models with float 32 weights which take float 16 tensors. However, if you wish to follow PyTorch behaviour, you can use  ``opts.Precision.halfFloatCasting(poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)`` where ``opts`` is the ``poptorch.Options`` object passed to the model wrapping function.
 
 .. literalinclude:: inferenceModel.py
     :language: python
@@ -837,6 +837,91 @@ Many of these operations do not support float 16 inputs.
 To allow the full range of operations, PopTorch converts all float 16 inputs to float 32 before tracing and then restores the inputs to float 16 as part of the canonicalization process.
 Some operations may result in the model running in float 32 where float 16 would
 be expected, or vice versa (see :ref:`float_16_op_support` for full details).
+
+
+Automatic mixed-precision casting
+=================================
+
+PopTorch supports converting your model automatically between float 16 and float 32.
+This functionality is not active by default - it has to be enabled explicitly by
+calling the ``autocast(enabled=True)`` method at model level.
+
+.. literalinclude:: autocast.py
+    :language: python
+    :caption: Enabling automatic casting at model level
+    :start-after: model_autocast_start
+    :end-before: model_autocast_end
+    :emphasize-lines: 2
+
+During compilation, selected layers and operators will have their types adjusted aiming
+to strike a good compromise between compute efficiency, memory requirements and numerical
+precision.
+
+The automatic casting setting can be controlled at layer level as well. In this situation,
+its effect is hierarchical: changing the setting for a layer affects it and all layers contained
+within.
+
+In the following example, automatic casting is enabled for all layers of the model, except for the
+first activation and second convolution.
+
+.. literalinclude:: autocast.py
+    :language: python
+    :caption: Controlling automatic casting at layer level
+    :start-after: layer_autocast_start
+    :end-before: layer_autocast_end
+    :emphasize-lines: 6-8
+
+Automatic casting can also be controlled via the function decorator ``@poptorch.autocast(enabled=True)``.
+Its effect is to apply automatic casting to the body of the function. Setting its parameter to ``False``
+has the opposite effect. A typical use-case is applying it to the ``forward`` function of custom modules.
+
+.. literalinclude:: autocast.py
+    :language: python
+    :caption: Controlling automatic casting via decorator
+    :start-after: decorator_autocast_start
+    :end-before: decorator_autocast_end
+    :emphasize-lines: 2
+
+In addition, ``poptorch.autocast(enabled=True)`` can be applied to a code-block, with simmilar effect.
+
+.. literalinclude:: autocast.py
+    :language: python
+    :caption: Controlling automatic casting via decorator
+    :start-after: block_autocast_start
+    :end-before: block_autocast_end
+    :emphasize-lines: 3
+
+The feature can be completely turned off in the whole application via the ``autocastEnabled(bool)``
+method of :class:`poptorch.options._PrecisionOptions`.
+
+.. literalinclude:: autocast.py
+    :language: python
+    :caption: Disabling automatic casting
+    :start-after: block_autocast_start
+    :end-before: block_autocast_end
+    :emphasize-lines: 2
+
+Custom casting policies
+-----------------------
+
+PopTorch provides a mechanism to customize automatic casting behaviour in the form of casting
+policy classes. A casting policy is defined by four sets of Torch modules and/or torch operators:
+
+#. ``fp16`` - set of operations to be typed as float 16
+#. ``fp32`` - set of operations to be typed as float 32
+#. ``promote`` - set of operations to be promoted to float 32 should they take mixed-precision inputs
+#. ``demote`` - set of operations to be demoted to float 16 should they take mixed-precision inputs
+
+The following example describes a policy where convolution and ReLU are to be performed on float 16,
+whilst batch matrix multiplication is to be performed on 32-bits. Dot product computations shall be
+promoted to 32-bits when operands have mixed precision.
+
+.. literalinclude:: autocast.py
+    :language: python
+    :caption: Custom casting policies
+    :start-after: policy_autocast_start
+    :end-before: policy_autocast_end
+    :emphasize-lines: 5, 8
 
 Profiling
 =========
