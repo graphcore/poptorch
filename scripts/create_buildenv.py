@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import argparse
+import contextlib
+import fcntl
 import hashlib
 import logging
 import os
@@ -106,32 +108,32 @@ class BuildenvManager:
         template_name = f"poptorch_{env_hash}.tar.gz"
         full_template_name = os.path.join(self.cache_dir, template_name)
 
-        if os.path.isfile(full_template_name):
-            logger.info("Found template %s: Unpacking to %s",
-                        full_template_name, self.buildenv_dir)
-            os.makedirs(self.buildenv_dir)
-            os.chdir(self.output_dir)
-            tar = tarfile.open(full_template_name)
-            tar.extractall(self.buildenv_dir)
-            assert os.path.isdir(self.buildenv_dir)
-            _utils.run_commands(f". {self.activate_filename}",
-                                f". {self.buildenv_dir}/bin/activate",
-                                "conda-unpack")
-            self._append_to_activate_buildenv(
-                f"conda activate {self.buildenv_dir}", )
-        else:
-            logger.info(
-                "Didn't find template %s: creating a new "
-                "environment in %s", full_template_name, self.output_dir)
-            self._create_new_env()
-            if create_template_if_needed:
-                # TODO(T32430) Create / check lock
+        with self.cache_lock():
+            if os.path.isfile(full_template_name):
+                logger.info("Found template %s: Unpacking to %s",
+                            full_template_name, self.buildenv_dir)
+                os.makedirs(self.buildenv_dir)
                 os.chdir(self.output_dir)
-                _utils.run_commands(
-                    f". {self.activate_filename}",
-                    f"conda activate {self.buildenv_dir}",
-                    f"conda pack -p {self.buildenv_dir} -o {full_template_name}"
-                )
+                tar = tarfile.open(full_template_name)
+                tar.extractall(self.buildenv_dir)
+                assert os.path.isdir(self.buildenv_dir)
+                _utils.run_commands(f". {self.activate_filename}",
+                                    f". {self.buildenv_dir}/bin/activate",
+                                    "conda-unpack")
+                self._append_to_activate_buildenv(
+                    f"conda activate {self.buildenv_dir}", )
+            else:
+                logger.info(
+                    "Didn't find template %s: creating a new "
+                    "environment in %s", full_template_name, self.output_dir)
+                self._create_new_env()
+                if create_template_if_needed:
+                    os.chdir(self.output_dir)
+                    _utils.run_commands(
+                        f". {self.activate_filename}",
+                        f"conda activate {self.buildenv_dir}",
+                        f"conda pack -p {self.buildenv_dir} -o \
+                                {full_template_name}")
 
         os.chdir(self.output_dir)
         _utils.run_commands(
@@ -199,6 +201,16 @@ class BuildenvManager:
             for line in lines:
                 f.write(f"{line}\n")
 
+    @contextlib.contextmanager
+    def cache_lock(self):
+        lock = os.path.join(self.cache_dir, "conda.lock")
+        with open(lock, "w") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                yield
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
     def _install_conda_if_needed(self):
         os.makedirs(self.cache_dir, exist_ok=True)
         system_conda = _system_conda_path()
@@ -213,33 +225,33 @@ class BuildenvManager:
         conda_sh = os.path.join(miniconda_install_dir, "etc", "profile.d",
                                 "conda.sh")
         installer = os.path.join(self.cache_dir, "Miniconda_installer.sh")
-        # TODO(T32430): Some kind of lock here?
-        if os.path.isfile(conda_sh):
-            logger.info(
-                "System conda not found, using the instance from the cache "
-                "(%s) instead", self.cache_dir)
-        else:
-            logger.info(
-                "System conda not found, installing it locally in (%s)",
-                self.cache_dir)
-            if not os.path.isfile(installer):
-                logger.info("Installer not found: downloading...")
-                conda_os = ""
-                os_type = _utils.get_os_type()
-                if os_type == _utils.OsType.Linux:
-                    conda_os = "Linux"
-                elif os_type == _utils.OsType.Osx:
-                    conda_os = "MacOSX"
-                else:
-                    raise RuntimeError(
-                        "Unknown OS. Please download the "
-                        "installer for your platform from "
-                        "https://repo.anaconda.com/miniconda/ and save it "
-                        f"as ${installer}")
-                url = f"https://repo.anaconda.com/miniconda/Miniconda3-latest-{conda_os}-x86_64.sh"
-                urllib.request.urlretrieve(url, installer)
-            _utils.run_commands(
-                f"bash {installer} -b -p {miniconda_install_dir}")
+        with self.cache_lock():
+            if os.path.isfile(conda_sh):
+                logger.info(
+                    "System conda not found, using the instance from the cache "
+                    "(%s) instead", self.cache_dir)
+            else:
+                logger.info(
+                    "System conda not found, installing it locally in (%s)",
+                    self.cache_dir)
+                if not os.path.isfile(installer):
+                    logger.info("Installer not found: downloading...")
+                    conda_os = ""
+                    os_type = _utils.get_os_type()
+                    if os_type == _utils.OsType.Linux:
+                        conda_os = "Linux"
+                    elif os_type == _utils.OsType.Osx:
+                        conda_os = "MacOSX"
+                    else:
+                        raise RuntimeError(
+                            "Unknown OS. Please download the "
+                            "installer for your platform from "
+                            "https://repo.anaconda.com/miniconda/ and save it "
+                            f"as ${installer}")
+                    url = f"https://repo.anaconda.com/miniconda/Miniconda3-latest-{conda_os}-x86_64.sh"
+                    urllib.request.urlretrieve(url, installer)
+                _utils.run_commands(
+                    f"bash {installer} -b -p {miniconda_install_dir}")
         assert os.path.isfile(conda_sh)
         self._append_to_activate_buildenv(f". {conda_sh}")
 
@@ -314,5 +326,3 @@ if __name__ == "__main__":
                               args.build_protobuf, args.popart_deps,
                               not args.no_linters)
     manager.create(args.create_template_if_needed)
-
-    #TODO(T32429): Clean up conda cache
