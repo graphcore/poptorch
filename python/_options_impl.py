@@ -2,10 +2,34 @@
 import abc
 import logging
 import torch
+import tqdm
 
 from ._logging import logger
 
 _begin_ipu_block = torch.ops.poptorch.begin_ipu_block
+
+
+class ProgressBar:
+    def __init__(self):
+        self._bar = None
+        self._last = 0
+
+    def __call__(self, progress: int, total: int):
+        if self._bar is None:
+            # Remove {rate_fmt}{postfix} from the default format
+            # as it doesn't really make sense for a compilation process
+            #
+            # Note: this is *not* a f-string
+            bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} "
+            bar_format += "[{elapsed}<{remaining}]"
+            self._bar = tqdm.tqdm(desc="Graph compilation",
+                                  total=total,
+                                  bar_format=bar_format)
+        self._bar.update(progress - self._last)
+        self._last = progress
+        if progress == total:
+            self._bar.close()
+            self._bar = None
 
 
 class OptionsDict:

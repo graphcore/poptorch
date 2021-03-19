@@ -83,6 +83,8 @@ public:
   void addPattern(const char *pattern, bool enabled);
   void setTensorLocation(const char *tensor, const char *option,
                          std::uint64_t value);
+  void
+  setCompilationProgressLogger(const std::function<void(int, int)> &logger);
 
   void addStringOption(const char *option, const char *value);
   void addUint64Option(const char *option, std::uint64_t value);

@@ -1012,6 +1012,14 @@ class Options(_options_impl.OptionsDict):
             self.enableExecutableCaching(path)
 
         self.relaxOptimizerAttributesChecks(False)
+        self.showCompilationProgressBar(True)
+
+    def showCompilationProgressBar(self, show=True):
+        """"Show / hide a progress bar while the model is being compiled.
+        (The progress bar is shown by default)
+        """
+        self._show_compilation_progress_bar = show
+        return self
 
     def loadFromFile(self, filepath):
         """Load options from a config file where each line in the file
@@ -1389,5 +1397,8 @@ class Options(_options_impl.OptionsDict):
         out = self._training.update(out)
         out = self._distributed.update(out)
         out = self._tensor_locations.update(out)
+
+        if self._show_compilation_progress_bar:
+            out["compilation_progress_bar_fn"] = _options_impl.ProgressBar()
 
         return out

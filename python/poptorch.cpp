@@ -340,7 +340,9 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
     if (option_name == "patterns_level") {
       continue;
     }
-    if (py::isinstance<py::bool_>(element.second)) {
+    if (option_name == "compilation_progress_bar_fn") {
+      options.setCompilationProgressLogger(element.second.cast<py::function>());
+    } else if (py::isinstance<py::bool_>(element.second)) {
       options.addBoolOption(option_name.c_str(), element.second.cast<bool>());
     } else if (py::isinstance<py::float_>(element.second)) {
       options.addDoubleOption(option_name.c_str(),

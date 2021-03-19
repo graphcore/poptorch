@@ -460,6 +460,11 @@ void SessionOptions::setTensorLocation(const char *tensor, const char *option,
   }
 }
 
+void SessionOptions::setCompilationProgressLogger(
+    const std::function<void(int, int)> &logger) {
+  _impl->popart_options.compilationProgressLogger = logger;
+}
+
 SessionOptions::~SessionOptions() = default;
 
 } // namespace poptorch
