@@ -353,16 +353,15 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   auto device = _impl->createDevice();
   popart::SessionOptions &options = _impl->popart_options;
 
+  popart::VirtualGraphMode graph_mode = popart::VirtualGraphMode::Off;
   // If Pipelining wasn't set: enable it if more than 1 IPU is used.
   switch (_impl->options.execution_mode) {
   case detail::ExecutionMode::Pipelined: {
     _impl->setOptionIfNotSet(options.enablePipelining,
                              _impl->used_ipus.size() > 1, "enablePipelining");
-    _impl->setOptionIfNotSet(
-        options.virtualGraphMode, popart::VirtualGraphMode::Manual,
-        "virtualGraphMode", popart::toString(options.virtualGraphMode));
     // If we are pipelining we want to turn on recompute by default.
     if (_impl->used_ipus.size() > 1) {
+      graph_mode = popart::VirtualGraphMode::Manual;
       _impl->setOptionIfNotSet(
           options.autoRecomputation, popart::RecomputationType::Pipeline,
           "autoRecomputation",
@@ -374,17 +373,15 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   case detail::ExecutionMode::Sharded: {
     _impl->setOptionIfNotSet(options.enablePipelining, false,
                              "enablePipelining");
-    _impl->setOptionIfNotSet(
-        options.virtualGraphMode, popart::VirtualGraphMode::Manual,
-        "virtualGraphMode", popart::toString(options.virtualGraphMode));
+    if (_impl->used_ipus.size() > 1) {
+      graph_mode = popart::VirtualGraphMode::Manual;
+    }
     break;
   }
   case detail::ExecutionMode::Phased: {
     _impl->setOptionIfNotSet(options.enablePipelining, false,
                              "enablePipelining");
-    _impl->setOptionIfNotSet(
-        options.virtualGraphMode, popart::VirtualGraphMode::ExecutionPhases,
-        "virtualGraphMode", popart::toString(options.virtualGraphMode));
+    graph_mode = popart::VirtualGraphMode::ExecutionPhases;
     std::uint64_t num_phases = _impl->max_phase + 1;
     std::uint64_t num_stages;
     if (_impl->options.tensors_liveness != detail::Liveness::AlwaysLive) {
@@ -427,6 +424,9 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   default:
     ERROR("ExecutionMode not supported");
   }
+  _impl->setOptionIfNotSet(options.virtualGraphMode, graph_mode,
+                           "virtualGraphMode",
+                           popart::toString(options.virtualGraphMode));
 
   _impl->setOptionIfNotSet(options.enableDistributedReplicatedGraphs,
                            _impl->options.num_distributed_processes > 1,
