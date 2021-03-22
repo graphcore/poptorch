@@ -30,6 +30,7 @@ c10::Symbol clamp_max_;                  // NOLINT
 c10::Symbol one_hot;                     // NOLINT
 c10::Symbol amax;                        // NOLINT
 c10::Symbol amin;                        // NOLINT
+c10::Symbol pow_;                        // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -58,6 +59,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, one_hot)
   SYMBOL_INIT(aten, amax)
   SYMBOL_INIT(aten, amin)
+  SYMBOL_INIT(aten, pow_)
 }
 
 } // namespace c10::aten

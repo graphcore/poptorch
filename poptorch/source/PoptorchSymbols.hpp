@@ -28,6 +28,7 @@ extern c10::Symbol clamp_max_;                  // NOLINT
 extern c10::Symbol one_hot;                     // NOLINT
 extern c10::Symbol amax;                        // NOLINT
 extern c10::Symbol amin;                        // NOLINT
+extern c10::Symbol pow_;                        // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {

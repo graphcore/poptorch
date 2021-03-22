@@ -897,6 +897,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::normal_, normalInPlaceHandler);
   registerHandler(c10::aten::pixel_shuffle, pixelshuffleHandler);
   registerHandler(c10::aten::pow, powHandler);
+  registerHandler(c10::aten::pow_, powHandler);
   registerHandler(c10::aten::prelu, preluHandler);
   registerHandler(c10::aten::prelu_, preluHandler);
   registerHandler(c10::aten::rand, randHandler);

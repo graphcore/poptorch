@@ -108,28 +108,24 @@ def test_unary_ops_float(op):
     unary_op_harness(op, input, compare)
 
 
-def test_binary_pow():
+@pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("exponent", [4.0, 3, 2.5])
+def test_binary_pow(inplace, exponent):
     torch.manual_seed(42)
     input1 = torch.randn([1, 2, 10, 200])
 
     def compare(x, y):
-        return torch.allclose(x, y, atol=1e-05, equal_nan=True)
+        helpers.assert_allclose(actual=y, expected=x)
+        return True
 
     def op(x):
-        return torch.pow(x, 4.0)
+        if inplace:
+            x = x + 0  # Ensure input is not modified in place
+            return x.pow_(exponent)
+
+        return torch.pow(x, exponent)
 
     unary_op_harness(op, input1, compare)
-
-    # Test "int" parameter
-    def op_int(x):
-        return torch.pow(x, 3)
-
-    unary_op_harness(op_int, input1, compare)
-
-    def op_float(x):
-        return torch.pow(x, 2.5)
-
-    unary_op_harness(op_float, input1, compare)
 
 
 unary_ops_int = [

@@ -75,6 +75,7 @@ expand("pixel_shuffle", lambda x, y: op.depthtospace(x, clong(y), cstr("CRD")))
 expand("reflection_pad1d", lambda x, y: op.reflectionPad(x, clong_list(y)))
 expand("replication_pad1d", lambda x, y: op.edgePad(x, clong_list(y)))
 expand("rsub", lambda x, y: y - x)
+forward("pow_", "pow")
 
 
 def celu_handler(x, a):
