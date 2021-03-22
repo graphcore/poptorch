@@ -10,6 +10,8 @@ from wheel.pep425tags import get_abbr_impl, get_impl_ver, get_abi_tag
 import scripts.utils._utils as utils
 
 logging.basicConfig(level=logging.INFO)
+
+REQUIRES = ['tqdm']
 VERSION = utils.PkgInfo.load_from_file(must_exist=False,
                                        path="..").version_long
 TORCH_VERSION = utils.get_required_torch_version()
@@ -23,10 +25,10 @@ LONG_DESCRIPTION = (
 platform = distutils.util.get_platform().replace(".", "_").replace("-", "_")
 
 if "macosx" in platform:
-    REQUIRES = [f'torch=={TORCH_VERSION}']
+    REQUIRES += [f'torch=={TORCH_VERSION}']
     LIBS = ["*.dylib", "*.so"]
 else:
-    REQUIRES = [
+    REQUIRES += [
         f'torch @ https://download.pytorch.org/whl/cpu/torch-{TORCH_VERSION}%2Bcpu-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{platform}.whl',
     ]
     LIBS = ["*.so"]
