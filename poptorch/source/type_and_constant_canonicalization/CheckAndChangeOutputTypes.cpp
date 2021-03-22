@@ -73,13 +73,29 @@ void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
 
   // Ensure no casting to it
   if (node->kind() == c10::aten::to) {
-    // Possible locations of dtype int
-    for (size_t idx = 1; idx < node->inputs().size(); idx++) {
-      if (node->input(idx)->type()->cast<c10::IntType>()) {
-        node->input(idx)->node()->i_(c10::attr::value,
-                                     static_cast<int>(replacement_dtype));
-      }
+    // Possible locations of dtype int depending on the aten::to arity
+    auto num_inputs = node->inputs().size();
+    size_t dtype_index = 0;
+
+    if (num_inputs == 5 || num_inputs == 8) {
+      dtype_index = 1;
+    } else if (num_inputs == 6) {
+      dtype_index = 2;
+    } else {
+      // Must be another aten::to signature
+      return;
     }
+
+    auto int_type = node->input(dtype_index)->type()->cast<c10::IntType>();
+    ERROR_ON_MSG(!int_type, "Expected integer type as dtype input at index "
+                                << dtype_index << " for "
+                                << nodeToString(node));
+
+    auto replacement = static_cast<int>(replacement_dtype);
+    auto input = node->input(dtype_index)->node();
+    logging::warn("Replacing {} with {} for {}", input->i(c10::attr::value),
+                  replacement, nodeToString(input));
+    input->i_(c10::attr::value, replacement);
   }
 }
 
