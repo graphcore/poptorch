@@ -258,48 +258,108 @@ def test_multithreaded4():
                             num_workers=0)
 
 
-def _run_dataset_test(shape=None,
-                      num_tensors=100,
-                      batch_size=1,
-                      num_workers=0,
-                      device_iterations=1,
-                      replication_factor=1,
-                      host_id=0,
-                      num_hosts=1):
-    shape = shape or [2, 3]
+def _run_subdataset_test(num_tensors=100,
+                         batch_size=1,
+                         num_workers=0,
+                         device_iterations=1,
+                         replication_factor=1,
+                         num_hosts=1):
+    shape = [2, 3]
+    dataset = IncrementDataset(shape, num_tensors)
 
-    opts = poptorch.Options()
-    opts.deviceIterations(device_iterations)
-    opts.replicationFactor(replication_factor)
-    opts.Distributed.configureProcessId(host_id, num_hosts)
+    combined_batch_size = 0
+    next_expected = 0
+    for host_id in range(num_hosts):
+        opts = poptorch.Options()
+        opts.deviceIterations(device_iterations)
+        opts.replicationFactor(replication_factor)
+        opts.Distributed.configureProcessId(host_id, num_hosts)
 
-    loader = poptorch.DataLoader(opts,
-                                 IncrementDataset(shape, num_tensors),
-                                 batch_size=batch_size,
-                                 num_workers=num_workers,
-                                 mode=poptorch.DataLoaderMode.Async)
+        loader = poptorch.DataLoader(opts,
+                                     dataset,
+                                     batch_size=batch_size,
+                                     num_workers=num_workers,
+                                     mode=poptorch.DataLoaderMode.Async)
 
-    offset = host_id * (num_tensors // num_hosts)
-    assert len(loader) == num_tensors // (device_iterations * batch_size *
-                                          replication_factor * num_hosts)
-    for it, d in enumerate(loader):
-        expected = torch.from_numpy(
-            numpy.stack([
-                numpy.full(shape, offset + i, dtype=numpy.float32)
-                for i in range(loader.combinedBatchSize *
-                               it, loader.combinedBatchSize * (it + 1))
-            ]))
-        diff = torch.sum(torch.sum(d - expected))
+        combined_batch_size = loader.combinedBatchSize
+        assert combined_batch_size == (device_iterations * batch_size *
+                                       replication_factor)
+        assert len(loader) == num_tensors // (combined_batch_size * num_hosts)
+        for d in loader:
+            for elt in d:
+                val = int(elt[0][0].item())
+                assert val == next_expected
+                next_expected += 1
 
-    numpy.testing.assert_array_equal(diff.numpy(), [0.])
+    # Number of processes shouldn't change how many tensors are returned
+    num_expected = num_hosts * combined_batch_size * (
+        num_tensors // (combined_batch_size * num_hosts))
+    assert next_expected == num_expected
+
+
+def _run_shuffle_subdataset_test(num_tensors=100,
+                                 batch_size=1,
+                                 num_workers=0,
+                                 device_iterations=1,
+                                 replication_factor=1,
+                                 num_hosts=1):
+    shape = [2, 3]
+    dataset = IncrementDataset(shape, num_tensors)
+
+    total = [False] * num_tensors
+    for host_id in range(num_hosts):
+        seen = [False] * num_tensors
+        opts = poptorch.Options()
+        opts.deviceIterations(device_iterations)
+        opts.replicationFactor(replication_factor)
+        opts.randomSeed(42)
+        opts.Distributed.configureProcessId(host_id, num_hosts)
+
+        loader = poptorch.DataLoader(opts,
+                                     dataset,
+                                     batch_size=batch_size,
+                                     shuffle=True,
+                                     num_workers=num_workers,
+                                     mode=poptorch.DataLoaderMode.Async)
+
+        combined_batch_size = loader.combinedBatchSize
+        assert combined_batch_size == (device_iterations * batch_size *
+                                       replication_factor)
+        assert len(loader) == num_tensors // (combined_batch_size * num_hosts)
+        for d in loader:
+            for elt in d:
+                val = int(elt[0][0].item())
+                assert not seen[val]
+                seen[val] = True
+                total[val] = True
+        assert seen.count(
+            True) == combined_batch_size * (num_tensors //
+                                            (combined_batch_size * num_hosts))
+
+        # Iterate a second time to make sure the left over tensors get used too.
+        for d in loader:
+            for elt in d:
+                val = int(elt[0][0].item())
+                total[val] = True
+
+    # If we iterate twice in all the processes then all the tensors should be used.
+    assert total.count(True) == num_tensors
 
 
 def test_subdataset():
-    _run_dataset_test(batch_size=4, host_id=0, num_hosts=2)
+    _run_subdataset_test(batch_size=4, num_hosts=3)
 
 
 def test_subdataset2():
-    _run_dataset_test(batch_size=2, host_id=1, num_hosts=2, num_workers=2)
+    _run_subdataset_test(batch_size=2, num_hosts=2, num_workers=3)
+
+
+def test_shuffle_subdataset():
+    _run_shuffle_subdataset_test(batch_size=4, num_hosts=3)
+
+
+def test_shuffle_subdataset2():
+    _run_shuffle_subdataset_test(batch_size=2, num_hosts=2, num_workers=3)
 
 
 def test_interrupt_async_loader():

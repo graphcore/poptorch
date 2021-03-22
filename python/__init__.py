@@ -64,18 +64,63 @@ def load(filename: str,
 
 
 class _SubDataset:
-    def __init__(self, dataset, opts, step):
+    """For distributed execution split the dataset into serial blocks of tensors
+
+    All the tensors used by process 0, followed by all the tensors
+    used by process 1, etc.
+
+    [p0, p0, p0, ..., p1, p1, p1, ..., p2,p2, p2]
+
+    If ``shuffle`` is enabled, then the indices in the parent dataset are
+    randomised and ``swap_range`` will be called every time a new iterator
+    is created in order to make sure all the tensors get used.
+    """
+
+    def __init__(self, dataset, opts, step, shuffle):
         num_elts = len(dataset)
+        # Note: all the processes must have the same number of batches
+        # or it will hang.
         per_proc = step * (num_elts // (step * opts.Distributed.numProcesses))
         self._offset = opts.Distributed.processId * per_proc
+        self._base_offset = self._offset
         self._length = min(per_proc, num_elts - self._offset)
         self._dataset = dataset
+        self._leftovers = num_elts % per_proc
+
+        self._shuffled_indices = None
+        if shuffle:
+            generator = torch.Generator()
+            generator.manual_seed(opts.random_seed)
+            self._shuffled_indices = torch.randperm(num_elts,
+                                                    generator=generator)
+
+    def swap_range(self):
+        """If there are leftovers in the randomly sampled dataset make sure
+        they get included in the next iteration.
+
+        For example if we've got: T = N * B + L
+        T = total number of tensors
+        N = number of full batches in T
+        B = batch size
+        L = Number of left over tensors
+
+        First the dataset will return the tensors in [0, T-L]
+        after ``swap_range`` was called the dataset will return tensors in
+        [L, T]
+        """
+        if self._base_offset == self._offset:
+            self._offset += self._leftovers
+        else:
+            self._offset = self._base_offset
 
     def __len__(self):
         return self._length
 
     def __getitem__(self, index):
-        return self._dataset[index + self._offset]
+        global_index = index + self._offset
+        if self._shuffled_indices is not None:
+            global_index = self._shuffled_indices[global_index]
+        return self._dataset[global_index]
 
 
 class DataLoader(torch.utils.data.DataLoader):
@@ -146,6 +191,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # __getitem__ and __len__
         self._is_iterable = isinstance(dataset,
                                        torch.utils.data.IterableDataset)
+        self._swap_range = None
 
         if self._is_iterable:
             if auto_distributed_partitioning:
@@ -182,8 +228,11 @@ class DataLoader(torch.utils.data.DataLoader):
                     assert self._combined_batch_size is not None, (
                         "batch_size=None not allowed when using "
                         "auto_distributed_partitioning.")
+
                     dataset = _SubDataset(dataset, options,
-                                          self._combined_batch_size)
+                                          self._combined_batch_size, shuffle)
+                    if shuffle:
+                        self._swap_range = dataset.swap_range
         if not self._is_iterable:
             dataset = profiling.Channel("dataset").instrument(
                 dataset, "__getitem__")
@@ -252,6 +301,8 @@ class DataLoader(torch.utils.data.DataLoader):
         self.terminate()
 
     def __iter__(self) -> "torch.utils.data.dataloader._BaseDataLoaderIter":
+        if self._swap_range is not None:
+            self._swap_range()
         if self._accessor is not None:
             return self._accessor.__iter__()
 
