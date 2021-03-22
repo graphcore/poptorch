@@ -3,6 +3,7 @@
 # signatures for manually added operators
 signatures = {
     'beginIpuBlock': [['clong'], ['clong'], ['clong']],
+    'cast': ['Args', ['scalar_type']],
     'internalCast': ['Args', ['cstr']],
     'constantPad': ['Args', ['clong_list'], ['cfloat']],
     'edgePad': ['Args', ['clong_list']],

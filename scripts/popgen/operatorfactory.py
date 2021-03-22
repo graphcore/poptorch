@@ -75,6 +75,11 @@ class OperatorFactory:
                 poptorch.signatures)
         raise ValueError(name + " is not a supported operator")
 
+    def cast(self, t, ty):
+        value = no_tensor_braces(Value('cast', [t, ty]))
+        check_operator_signature(value, poptorch.signatures)
+        return value
+
     def internalCast(self, t, ty):
         value = no_tensor_braces(Value('internalCast', [t, ty]))
         check_operator_signature(value, poptorch.signatures)
