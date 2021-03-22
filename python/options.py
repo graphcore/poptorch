@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import os
+import sys
 import torch
 from . import autocasting
 from . import enums
@@ -1012,7 +1013,10 @@ class Options(_options_impl.OptionsDict):
             self.enableExecutableCaching(path)
 
         self.relaxOptimizerAttributesChecks(False)
-        self.showCompilationProgressBar(True)
+        # tqdm prints to stderr, so only check stderr
+        runs_in_terminal = sys.stderr.isatty()
+        # By default only enable the progress bar if we run in a terminal
+        self.showCompilationProgressBar(runs_in_terminal)
 
     def showCompilationProgressBar(self, show=True):
         """"Show / hide a progress bar while the model is being compiled.
