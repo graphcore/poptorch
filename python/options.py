@@ -344,6 +344,7 @@ class _PopartOptions:
 
     def __init__(self):
         self.options = {}
+        self.set("rearrangeAnchorsOnHost", False)
 
     def set(self, key, value):
         self.options[key] = value
