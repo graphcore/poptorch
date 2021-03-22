@@ -131,6 +131,54 @@ torch::jit::Node *addCDivHandler(torch::jit::Graph *graph,
   return createAdd(graph, {node->input(0), scaled->output()});
 }
 
+torch::jit::Node *crossHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto y = node->input(1);
+  auto opt_axis = node->input(2)->node();
+
+  auto x_shape = shapeFromTensor(x);
+  auto y_shape = shapeFromTensor(y);
+
+  ERROR_ON_MSG(x_shape.size() != y_shape.size(),
+               "Cross product tensors must have same rank");
+  for (unsigned i = 0; i < x_shape.size(); ++i) {
+    ERROR_ON_MSG(x_shape[i] != y_shape[i],
+                 "Cross product tensors must have same shape");
+  }
+
+  unsigned axis = 0;
+  if (isNone(opt_axis)) {
+    // if unspecified, the axis is the first to have dimension 3
+    for (unsigned i = 0; i < x_shape.size(); ++i) {
+      if (x_shape[i] == 3) {
+        axis = i;
+        break;
+      }
+    }
+  } else {
+    axis = constantToInt(opt_axis);
+  }
+  ERROR_ON_MSG(x_shape[axis] != 3,
+               "Cross product product axis must have dimension 3");
+
+  auto indices = createConstantInt(graph, {2, 0, 1}, {3})->output();
+
+  // circular permutation right by 1 along the axis
+  auto x_roll = createGather(graph, {x, indices}, axis)->output();
+  auto y_roll = createGather(graph, {y, indices}, axis)->output();
+
+  // products of one straight input with the other input permuted
+  auto mul_x_y_roll = createMul(graph, {x, y_roll})->output();
+  auto mul_y_x_roll = createMul(graph, {y, x_roll})->output();
+
+  // subtraction produces result permuted one position left
+  auto result_roll = createSub(graph, {mul_y_x_roll, mul_x_y_roll})->output();
+
+  // permute to compute final result
+  return createGather(graph, {result_roll, indices}, axis);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -148,6 +196,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::clamp_max_, clampMaxHandler);
   registerHandler(c10::aten::addcdiv, addCDivHandler);
   registerHandler(c10::aten::addcdiv_, addCDivHandler);
+  registerHandler(c10::aten::cross, crossHandler);
 }
 
 } // namespace poptorch

@@ -666,3 +666,47 @@ def test_addcdiv(shapes, scale):
     poptorch_out = poptorch_model(t0, t1, t2)
 
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+
+cross_shapes = [(3, 4, 5, 6), (4, 3, 5, 6), (4, 5, 3, 6), (4, 5, 6, 3),
+                (6, 3, 3, 5)]
+
+
+@pytest.mark.parametrize("shape", cross_shapes)
+def test_cross_shape(shape):
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            return torch.cross(x, y)
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    torch.manual_seed(42)
+    x = torch.randn(shape)
+    y = torch.randn(shape)
+
+    native_out = model(x, y)
+    poptorch_out = poptorch_model(x, y)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+
+@pytest.mark.parametrize("axis", range(0, 4))
+def test_cross_axis(axis):
+    class Model(torch.nn.Module):
+        def __init__(self, axis):
+            super().__init__()
+            self.axis = axis
+
+        def forward(self, x, y):
+            return torch.cross(x, y, self.axis)
+
+    model = Model(axis)
+    poptorch_model = poptorch.inferenceModel(model)
+
+    torch.manual_seed(42)
+    x = torch.randn(3, 3, 3, 3)
+    y = torch.randn(3, 3, 3, 3)
+
+    native_out = model(x, y)
+    poptorch_out = poptorch_model(x, y)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)

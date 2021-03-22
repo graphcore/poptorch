@@ -13,6 +13,7 @@ New features
 - Added ``mode=poptorch.DataLoaderMode.AsyncRebatched``
 - Add support for PopART name scopes via ``poptorch.NameScope``
 - Add mixed precision automatic casting
+- Add support for ``torch.cross``
 
 v2.0 (Poplar SDK 2.0)
 =====================
