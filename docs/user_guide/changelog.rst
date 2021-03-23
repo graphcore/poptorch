@@ -17,6 +17,7 @@ New features
 - Add support for ``torch.functional.one_hot``
 - Add support for ``torch.int8`` data types
 - Add support for ``torch.median``
+- Add support for ``torch.index_select``
 
 v2.0 (Poplar SDK 2.0)
 =====================

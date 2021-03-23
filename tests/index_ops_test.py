@@ -154,3 +154,23 @@ def test_index_put_assign_broadcastable():
     v = torch.empty(5, dtype=torch.int32).fill_(2 * 3 * 4 * 5)
     # For each row r in t[:, 0], r = [120, 120, 120, 120, 120]
     index_harness(IndexModel2(), [[0]], True, v)
+
+
+@pytest.mark.parametrize("dim", range(-3, 3))
+def test_index_select(dim):
+    class Model(nn.Module):
+        def forward(self, src, index):
+            return src.index_select(dim, index)
+
+    torch.manual_seed(0)
+    x = torch.randn(4, 16, 64)
+    sz = x.shape[dim]
+    indices = torch.randint(sz, (sz, ))
+
+    model = Model()
+    expect = model(x, indices)
+
+    pop_model = poptorch.inferenceModel(model)
+    actual = pop_model(x, indices)
+
+    helpers.assert_allclose(actual=actual, expected=expect)

@@ -336,6 +336,17 @@ torch::jit::Node *hingeembeddinglossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {t8}, t10);
 }
 
+torch::jit::Node *indexselectHandler(torch::jit::Graph *graph,
+                                     torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto i = node->input(2);
+  auto d = node->input(1);
+  auto t0 = x->type()->expect<c10::TensorType>();
+  auto t1 = handleDimensionParam(d, t0);
+  // gather(x, i, dimension(d, TensorType(x)))
+  return createGather(graph, {x, i}, t1);
+}
+
 torch::jit::Node *isnanHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   auto i0 = node->input(0);
@@ -863,6 +874,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
   registerHandler(c10::aten::hardtanh_, hardtanhHandler);
   registerHandler(c10::aten::hinge_embedding_loss, hingeembeddinglossHandler);
+  registerHandler(c10::aten::index_select, indexselectHandler);
   registerHandler(c10::aten::isnan, isnanHandler);
   registerHandler(c10::aten::l1_loss, l1lossHandler);
   registerHandler(c10::aten::le, leHandler);

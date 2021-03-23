@@ -126,6 +126,9 @@ expand(
                                     dimension(l, tensor_type(x))))
 expand("threshold", lambda x, threshold, val: op.where(x > threshold, x, val))
 
+expand("index_select", lambda x, d, i: op.gather(x, i,
+                                                 dimension(d, tensor_type(x))))
+
 
 def softplus_handler(x, b, threshold):
     condition = x * b > threshold
