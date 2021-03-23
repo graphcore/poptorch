@@ -36,6 +36,16 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
     at::ScalarType elem_type = pytorch_tensor.scalar_type();
 
     switch (elem_type) {
+    case at::ScalarType::Byte:
+      _compiler.setUpInputOp(
+          popart_id, static_cast<std::uint8_t *>(pytorch_tensor.data_ptr()),
+          popart_dims);
+      break;
+    case at::ScalarType::Char:
+      _compiler.setUpInputOp(
+          popart_id, static_cast<std::int8_t *>(pytorch_tensor.data_ptr()),
+          popart_dims);
+      break;
     case at::ScalarType::Float:
       _compiler.setUpInputOp(popart_id,
                              static_cast<float *>(pytorch_tensor.data_ptr()),

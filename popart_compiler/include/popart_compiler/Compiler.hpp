@@ -258,6 +258,14 @@ public:
                     const std::vector<std::int64_t> &dims,
                     bool float16 = false);
 
+  // at::ScalarType::Byte
+  void setUpInputOp(poptorch::TensorId id, std::uint8_t *ptr,
+                    const std::vector<std::int64_t> &dims);
+
+  // at::ScalarType::Char
+  void setUpInputOp(poptorch::TensorId id, std::int8_t *ptr,
+                    const std::vector<std::int64_t> &dims);
+
   void setUpOutputOp(poptorch::TensorId id, float *ptr,
                      const std::vector<std::int64_t> &dims);
 
@@ -372,8 +380,7 @@ public:
   bool isAttachedToDevice() const;
 
 private:
-  void assertTensorIs(PopartType dataType, poptorch::TensorId id,
-                      const char *caller) const;
+  void assertTensorIs(PopartType dataType, poptorch::TensorId id) const;
   std::unique_ptr<detail::CompilerImpl> _impl;
 };
 

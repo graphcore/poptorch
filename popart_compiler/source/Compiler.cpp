@@ -124,7 +124,7 @@ popart::any *PopartAttribute::getValue() { return _any.get(); }
 PopartConstant::PopartConstant(const PopartType &popart_type, const void *data,
                                const std::vector<std::int64_t> &shape) {
   ERROR_ON_MSG(popart_type == PopartType::DOUBLE,
-               "Adding a double constant is not supprted. "
+               "Adding a double constant is not supported. "
                "This should have been demoted to a float");
 
   popart::TensorInfo info{toPopartTypeStr(popart_type), shape};
@@ -255,52 +255,54 @@ void Compiler::addOutputTensor(poptorch::TensorId output) {
   }
 }
 
+template <typename T>
+static void setUpInputImpl(poptorch::TensorId id, T *ptr,
+                           const std::vector<std::int64_t> &dims,
+                           detail::CompilerImpl *impl) {
+  // Popart wrapper around the tensor pointer.
+  impl->memory_manager.push_back(
+      std::make_unique<popart::NDArrayWrapper<T>>(ptr, dims));
+  impl->popart_incoming.insert(
+      {impl->ids[id], *impl->memory_manager.back().get()});
+}
+
 void Compiler::setUpInputOp(poptorch::TensorId id, float *ptr,
                             const std::vector<std::int64_t> &dims) {
-  assertTensorIs(PopartType::FLOAT, id,
-                 static_cast<const char *>(__PRETTY_FUNCTION__));
-
-  // Popart wrapper around the tensor pointer.
-  _impl->memory_manager.push_back(
-      std::make_unique<popart::NDArrayWrapper<float>>(static_cast<float *>(ptr),
-                                                      dims));
-  _impl->popart_incoming.insert(
-      {_impl->ids[id], *_impl->memory_manager.back().get()});
+  assertTensorIs(PopartType::FLOAT, id);
+  setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
 void Compiler::setUpInputOp(poptorch::TensorId id, std::int32_t *ptr,
                             const std::vector<std::int64_t> &dims) {
-  assertTensorIs(PopartType::INT32, id,
-                 static_cast<const char *>(__PRETTY_FUNCTION__));
-
-  // Popart wrapper around the tensor pointer.
-  _impl->memory_manager.push_back(
-      std::make_unique<popart::NDArrayWrapper<std::int32_t>>(ptr, dims));
-  _impl->popart_incoming.insert(
-      {_impl->ids[id], *_impl->memory_manager.back().get()});
+  assertTensorIs(PopartType::INT32, id);
+  setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
 void Compiler::setUpInputOp(poptorch::TensorId id, bool *ptr,
                             const std::vector<std::int64_t> &dims) {
-  assertTensorIs(PopartType::BOOL, id,
-                 static_cast<const char *>(__PRETTY_FUNCTION__));
+  assertTensorIs(PopartType::BOOL, id);
+  setUpInputImpl(id, ptr, dims, _impl.get());
+}
 
-  // Popart wrapper around the tensor pointer.
-  _impl->memory_manager.push_back(
-      std::make_unique<popart::NDArrayWrapper<bool>>(ptr, dims));
-  _impl->popart_incoming.insert(
-      {_impl->ids[id], *_impl->memory_manager.back().get()});
+void Compiler::setUpInputOp(poptorch::TensorId id, std::int8_t *ptr,
+                            const std::vector<std::int64_t> &dims) {
+  assertTensorIs(PopartType::INT8, id);
+  setUpInputImpl(id, ptr, dims, _impl.get());
+}
+
+void Compiler::setUpInputOp(poptorch::TensorId id, std::uint8_t *ptr,
+                            const std::vector<std::int64_t> &dims) {
+  assertTensorIs(PopartType::UINT8, id);
+  setUpInputImpl(id, ptr, dims, _impl.get());
 }
 
 void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
                             const std::vector<std::int64_t> &dims,
                             bool float16) {
   if (float16) {
-    assertTensorIs(PopartType::FLOAT16, id,
-                   static_cast<const char *>(__PRETTY_FUNCTION__));
+    assertTensorIs(PopartType::FLOAT16, id);
   } else {
-    assertTensorIs(PopartType::INT16, id,
-                   static_cast<const char *>(__PRETTY_FUNCTION__));
+    assertTensorIs(PopartType::INT16, id);
   }
 
   // Popart wrapper around the tensor pointer.
@@ -929,8 +931,8 @@ poptorch::TensorId Compiler::addUntypedInputTensor() {
   return _impl->ids.size() - 1;
 }
 
-void Compiler::assertTensorIs(PopartType dataType, poptorch::TensorId id,
-                              const char *caller) const {
+void Compiler::assertTensorIs(PopartType dataType,
+                              poptorch::TensorId id) const {
   PopartType actual_type;
   try {
     actual_type = getPopartType(id);
@@ -940,7 +942,7 @@ void Compiler::assertTensorIs(PopartType dataType, poptorch::TensorId id,
   }
 
   ERROR_ON_MSG(actual_type != dataType,
-               "Incorrect type for tensor, " << id << " used in " << caller);
+               "Incorrect type for tensor, " << id << " used in setUpInputOp");
 }
 
 void Compiler::addMultiConvPart(const std::vector<poptorch::TensorId> &inputs,
