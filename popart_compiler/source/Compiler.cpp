@@ -538,7 +538,10 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
                                       " for reading");
   stream.seekg(offset);
   _impl->session->loadExecutableFromStream(stream);
-  _impl->session->prepareDevice();
+  // Don't automatically load the engine: we want to control when this happens
+  // to make sure it happens at the same time in distributed environments.
+  constexpr bool load_engine = false;
+  _impl->session->prepareDevice(load_engine);
 }
 
 void Compiler::loadEngineAndConnectStreams() {
@@ -558,7 +561,10 @@ void Compiler::compileAndPrepareDevice() {
                             "popart::Session::prepareDevice: Poplar "
                             "compilation"};
     logging::trace("Begining Poplar compilation.");
-    _impl->session->prepareDevice();
+    constexpr bool load_engine = false;
+    // Don't automatically load the engine: we want to control when this happens
+    // to make sure it happens at the same time in distributed environments.
+    _impl->session->prepareDevice(load_engine);
     logging::trace("Finished Poplar compilation.");
 
     // serializeIr must be called after prepareDevice in some cases (e.g.
