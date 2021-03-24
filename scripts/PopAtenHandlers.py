@@ -52,6 +52,8 @@ expand("square", lambda x: x * x)
 
 forward("relu_", "relu")
 forward("selu_", "selu")
+forward("sigmoid_", "sigmoid")
+forward("tanh_", "tanh")
 
 # binary operators
 opers = ["atan2", "div", "fmod", "pow", "prelu", "remainder"]

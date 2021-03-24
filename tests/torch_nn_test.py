@@ -216,8 +216,6 @@ EXPECTED_FAILURES = {
     "test_nn_Fold": "T30606",
     "test_nn_Unfold_int_input": "T30606",
     "test_nn_Fold_int_input": "T30606",
-    "test_nn_LSTMCell": "T30600",
-    "test_nn_GRUCell": "T30600",
     "test_nn_MultiLabelMarginLoss_1d_no_reduce": "T30603",
     "test_nn_AdaptiveMaxPool3d_single": "T30564",
     "test_nn_Unfold": "T30606",
@@ -273,6 +271,7 @@ HALF_EXPECTED_FAILURES = {
     "test_nn_BatchNorm2d": "AssertionError: With rtol=0.05 and atol=0.0001",
     "test_nn_BatchNorm3d": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 312.5105660557747 (0.9894339442253113 vs. 313.5), which occurred at index (1, 2, 2, 1, 1).",
     "test_nn_BatchNorm3d_3d_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001, found 384 element(s) (out of 384) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 30.140776455402374 (0.9842235445976257 vs. 31.125), which occurred at index (1, 0, 2, 2, 3).",
+    "test_nn_LSTMCell": "Exception: TEXCPT_INVALID_ADDR",
 }
 
 HALF_PRECISION_EXCEPTIONS = {

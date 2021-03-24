@@ -917,6 +917,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::selu, seluHandler);
   registerHandler(c10::aten::selu_, seluHandler);
   registerHandler(c10::aten::sigmoid, sigmoidHandler);
+  registerHandler(c10::aten::sigmoid_, sigmoidHandler);
   registerHandler(c10::aten::sign, signHandler);
   registerHandler(c10::aten::silu, siluHandler);
   registerHandler(c10::aten::sin, sinHandler);
@@ -931,6 +932,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::t, tHandler);
   registerHandler(c10::aten::tan, tanHandler);
   registerHandler(c10::aten::tanh, tanhHandler);
+  registerHandler(c10::aten::tanh_, tanhHandler);
   registerHandler(c10::aten::threshold, thresholdHandler);
   registerHandler(c10::aten::topk, topkHandler);
   registerHandler(c10::aten::uniform_, uniformInPlaceHandler);

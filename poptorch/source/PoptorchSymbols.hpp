@@ -29,6 +29,8 @@ extern c10::Symbol one_hot;                     // NOLINT
 extern c10::Symbol amax;                        // NOLINT
 extern c10::Symbol amin;                        // NOLINT
 extern c10::Symbol pow_;                        // NOLINT
+extern c10::Symbol sigmoid_;                    // NOLINT
+extern c10::Symbol tanh_;                       // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {

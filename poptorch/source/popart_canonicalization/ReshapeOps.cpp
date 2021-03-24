@@ -216,6 +216,7 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   // aten::split(Tensor self, int[] split_sizes, int dim=0) -> Tensor[]"
   // aten::split(Tensor self, int split_sizes, int dim=0) -> Tensor[]"
   // aten::chunk(Tensor self, int chunks, int dim) -> Tensor[]
+  // aten::unsafe_chunk(Tensor self, int chunks, int dim) -> Tensor[]
 
   torch::jit::Symbol kind = node->kind();
   // Get the shape of the input.
@@ -239,7 +240,7 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
     split_size = constantToLong(node->input(1)->node());
   }
 
-  if (kind == c10::aten::chunk) {
+  if (kind == c10::aten::chunk || kind == c10::aten::unsafe_chunk) {
     // Chunk takes in the *number of chunks*. Canonicalise it to *size of
     // chunks*.
     ERROR_ON_MSG(!split_size,
@@ -442,6 +443,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::split, splitChunkHandler);
   registerHandler(c10::aten::split_with_sizes, splitChunkHandler);
   registerHandler(c10::aten::chunk, splitChunkHandler);
+  registerHandler(c10::aten::unsafe_chunk, splitChunkHandler);
   registerHandler(c10::aten::contiguous, contiguousHandler);
   registerHandler(c10::aten::permute, permuteHandler);
   registerHandler(c10::aten::transpose, transposeHandler);
