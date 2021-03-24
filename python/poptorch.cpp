@@ -602,7 +602,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   if (training) {
     poptorch::removeSurplusIdentityLosses(graph.get());
+    poptorch::addDetachOperations(graph.get());
   }
+
   // Warn the user if any operations couldn't be canonicalised.
   poptorch::warnOnUnsupportedAten(graph.get());
 

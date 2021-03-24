@@ -54,12 +54,14 @@ short_tests = [
     "precompilation_test.py",
     "random_sampling_test.py",
     "replicated_graph_test.py",
+    "requires_grad_test.py",
     "shape_inference_test.py",
     "sharding_test.py",
 ]
 
 long_tests = [
     "bert_small_and_medium_test.py::test_bert_medium_result",
+    "fine_tuning_test.py",
     "half_test.py::test_resnet",
     "torch_nn_test.py::test_pytorch_nn[False-test_nn_Conv2d_circular_stride2_pad2]",
     "torch_nn_test.py::test_pytorch_nn[True-test_nn_Conv2d_circular_stride2_pad2]",
