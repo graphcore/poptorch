@@ -18,7 +18,8 @@ _utils.set_logger(logger)
 
 
 def _default_cache_dir():
-    return os.path.join(_utils.sources_dir(), ".cache")
+    return os.environ.get("CONDA_CACHE_DIR",
+                          os.path.join(_utils.sources_dir(), ".cache"))
 
 
 def _system_conda_path():
@@ -56,6 +57,7 @@ _conda_linters_packages = [
 
 _protobuf_url = "https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-python-3.14.0.tar.gz"
 _onnx_url = "https://github.com/onnx/onnx/archive/v1.7.0.tar.gz"
+_trompeloeil_url = "https://github.com/rollbear/trompeloeil/archive/refs/tags/v35.tar.gz"
 _pip_requirements_file = os.path.join(_utils.sources_dir(), "requirements.txt")
 
 
@@ -71,6 +73,7 @@ class BuildenvManager:
                  poptorch_deps=True):
         python_version = python_version or platform.python_version()
         self.build_onnx = popart_deps
+        self.build_trompeloeil = popart_deps
         self.build_protobuf = popart_deps and build_protobuf
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
@@ -159,6 +162,20 @@ class BuildenvManager:
         )
         _utils.rmdir_if_exists("onnx")
 
+    def _build_trompeloeil(self):
+        os.chdir(self.output_dir)
+        os.makedirs(os.path.join("trompeloeil", "build"))
+        _utils.run_commands(
+            f". {self.activate_filename}",
+            "cd trompeloeil",
+            f"curl -sSL {_trompeloeil_url} | tar zx --strip-components=1",
+            "cd build",
+            "cmake ../ -GNinja \
+                -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX}",
+            "ninja install",
+        )
+        _utils.rmdir_if_exists("trompeloeil")
+
     def _build_protobuf(self):
         os.chdir(self.output_dir)
         os.makedirs("protobuf")
@@ -192,6 +209,9 @@ class BuildenvManager:
 
         if self.build_onnx:
             self._build_onnx()
+
+        if self.build_trompeloeil:
+            self._build_trompeloeil()
 
     def _clear_activate_buildenv(self):
         open(self.activate_filename, "w").close()
