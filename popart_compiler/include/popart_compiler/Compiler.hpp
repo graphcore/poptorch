@@ -180,11 +180,12 @@ public:
                                     const std::vector<std::int64_t> &dims);
 
 #define INT_VEC std::vector<std::int64_t>
-#define FLOAT_VEC std::vector<double>
+#define FLOAT_VEC std::vector<float>
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
 #define STRING const char *
+#define STRING_VEC std::vector<const char *>
 #define NONE
 #define ARG(Type, Name) , Type Name
 #define POPART_CONST_ARG(Name) , const PopartConstant &Name
@@ -213,6 +214,7 @@ public:
 #undef POPART_CONST_ARG
 #undef ARG
 #undef NONE
+#undef STRING_VEC
 #undef STRING
 #undef BOOL
 #undef INT

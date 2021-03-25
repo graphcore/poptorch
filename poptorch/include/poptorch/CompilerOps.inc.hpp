@@ -80,6 +80,7 @@ torch::jit::Node* createScatter(torch::jit::Graph *graph,  const std::vector<tor
 torch::jit::Node* createShrink(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float bias,float lambd);
 torch::jit::Node* createSign(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSinh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createTfidfvectorizer(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t max_gram_length,int64_t max_skip_count,int64_t min_gram_length,const std::string & mode,const std::vector<int64_t> & ngram_counts,const std::vector<int64_t> & ngram_indexes,const std::vector<int64_t> & pool_int64s,const std::vector<std::string> & pool_strings,std::vector<double> weights);
 torch::jit::Node* createWhere(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createExpand(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createMax(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
@@ -94,10 +95,12 @@ torch::jit::Node* createAtan(torch::jit::Graph *graph,  const std::vector<torch:
 torch::jit::Node* createCos(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDiv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createEqual(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createGru(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,std::vector<double> activation_alpha,std::vector<double> activation_beta,const std::vector<std::string> & activations,float clip,const std::string & direction,std::int32_t hidden_size,int64_t linear_before_reset);
 torch::jit::Node* createMul(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createMultinomial(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t dtype,int64_t sample_size,float seed);
 torch::jit::Node* createLogical_or(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createPow(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
+torch::jit::Node* createRnn(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,std::vector<double> activation_alpha,std::vector<double> activation_beta,const std::vector<std::string> & activations,float clip,const std::string & direction,std::int32_t hidden_size);
 torch::jit::Node* createSin(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSub(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createTan(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

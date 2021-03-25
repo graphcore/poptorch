@@ -23,6 +23,15 @@
 namespace poptorch {
 namespace {
 
+// Helper to let us filter string arguments into const char*s. This is to catch
+// the std::string produced by some attributes before they cross the ABI
+// boundary.
+template <typename T> T convertType(T &&t) { return t; }
+
+std::vector<std::string> convertType(std::vector<const char *> v) {
+  return std::vector<std::string>(v.begin(), v.end());
+}
+
 // Variadic output case. For now we will add all outputs to the graph and
 // allocate them on the same IPU but we will only return one. This means only
 // one output can be used by user IR (but can still be used by the backed via
@@ -155,18 +164,19 @@ Compiler::addInputTensor(const char *type,
 }
 
 #define INT_VEC std::vector<std::int64_t>
-#define FLOAT_VEC std::vector<double>
+#define FLOAT_VEC std::vector<float>
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
 #define STRING const char *
+#define STRING_VEC std::vector<const char *>
 #define NONE
 #define ARG(Type, Name) , Type Name
 #define POPART_CONST_ARG(Name) , const PopartConstant &Name
 #define HOST_SIDE_CONST_ARG(Name) , const HostSideConstant &Name
 #define POPART_ATTRIB_VEC_ARG(Name)                                            \
   , std::shared_ptr<std::vector<PopartAttribute>> Name
-#define BODY_ARG(Name) , Name
+#define BODY_ARG(Name) , convertType(Name)
 
 // Create a function decl with the given call and arguments.
 #define OP_DECL(ns, funcName, function, onnxImpl, Args, BodyArgs)              \
@@ -206,6 +216,7 @@ Compiler::addInputTensor(const char *type,
 #undef HOST_SIDE_CONST_ARG
 #undef ARG
 #undef NONE
+#undef STRING_VEC
 #undef STRING
 #undef BOOL
 #undef INT

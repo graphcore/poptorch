@@ -408,6 +408,19 @@ torch::jit::Node* createSinh(torch::jit::Graph *graph,  const std::vector<torch:
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::sinh, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
+torch::jit::Node* createTfidfvectorizer(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t max_gram_length,int64_t max_skip_count,int64_t min_gram_length,const std::string & mode,const std::vector<int64_t> & ngram_counts,const std::vector<int64_t> & ngram_indexes,const std::vector<int64_t> & pool_int64s,const std::vector<std::string> & pool_strings,std::vector<double> weights) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::tfidfvectorizer, args, ImplicitCast::None, OutputType::AlwaysFloat);
+new_node->i_(c10::Symbol::fromQualString("attr::max_gram_length"),max_gram_length);
+new_node->i_(c10::Symbol::fromQualString("attr::max_skip_count"),max_skip_count);
+new_node->i_(c10::Symbol::fromQualString("attr::min_gram_length"),min_gram_length);
+new_node->s_(c10::Symbol::fromQualString("attr::mode"),mode);
+new_node->is_(c10::Symbol::fromQualString("attr::ngram_counts"),ngram_counts);
+new_node->is_(c10::Symbol::fromQualString("attr::ngram_indexes"),ngram_indexes);
+new_node->is_(c10::Symbol::fromQualString("attr::pool_int64s"),pool_int64s);
+new_node->ss_(c10::Symbol::fromQualString("attr::pool_strings"),pool_strings);
+new_node->fs_(c10::Symbol::fromQualString("attr::weights"),weights);
+return new_node;
+}
 torch::jit::Node* createWhere(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::where, args, ImplicitCast::ExceptFirst, OutputType::AsImplicitCastPromoted);
 return new_node;
@@ -464,6 +477,18 @@ torch::jit::Node* createEqual(torch::jit::Graph *graph,  const std::vector<torch
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::equal, args, ImplicitCast::All, OutputType::AlwaysBool);
 return new_node;
 }
+torch::jit::Node* createGru(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,std::vector<double> activation_alpha,std::vector<double> activation_beta,const std::vector<std::string> & activations,float clip,const std::string & direction,std::int32_t hidden_size,int64_t linear_before_reset) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::gru, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted, 2);
+new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
+new_node->fs_(c10::Symbol::fromQualString("attr::activation_alpha"),activation_alpha);
+new_node->fs_(c10::Symbol::fromQualString("attr::activation_beta"),activation_beta);
+new_node->ss_(c10::Symbol::fromQualString("attr::activations"),activations);
+new_node->f_(c10::Symbol::fromQualString("attr::clip"),clip);
+new_node->s_(c10::Symbol::fromQualString("attr::direction"),direction);
+new_node->i_(c10::Symbol::fromQualString("attr::hidden_size"),hidden_size);
+new_node->i_(c10::Symbol::fromQualString("attr::linear_before_reset"),linear_before_reset);
+return new_node;
+}
 torch::jit::Node* createMul(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::mul, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
 return new_node;
@@ -482,6 +507,17 @@ return new_node;
 }
 torch::jit::Node* createPow(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::pow, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+return new_node;
+}
+torch::jit::Node* createRnn(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,std::vector<double> activation_alpha,std::vector<double> activation_beta,const std::vector<std::string> & activations,float clip,const std::string & direction,std::int32_t hidden_size) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::rnn, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
+new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
+new_node->fs_(c10::Symbol::fromQualString("attr::activation_alpha"),activation_alpha);
+new_node->fs_(c10::Symbol::fromQualString("attr::activation_beta"),activation_beta);
+new_node->ss_(c10::Symbol::fromQualString("attr::activations"),activations);
+new_node->f_(c10::Symbol::fromQualString("attr::clip"),clip);
+new_node->s_(c10::Symbol::fromQualString("attr::direction"),direction);
+new_node->i_(c10::Symbol::fromQualString("attr::hidden_size"),hidden_size);
 return new_node;
 }
 torch::jit::Node* createSin(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {

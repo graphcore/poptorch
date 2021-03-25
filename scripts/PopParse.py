@@ -132,6 +132,8 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
             if opt_type:
                 if opt_type.spelling in ["set", "vector", "map"]:
                     expected[c.spelling] = OptionType.Container
+                elif opt_type.spelling in ["function"]:
+                    continue
                 else:
                     assert False, f"Template not supported {opt_type.spelling}"
             else:
@@ -271,6 +273,7 @@ OutputTypeVariable = [
 ]
 
 MultipleOutputsOps = {
+    "gru": "2",
     "lstm": "2",
     "split": "num_outputs",
     "topk": "2",
@@ -301,7 +304,8 @@ CXXTypeToTypeClass = {
     "Attributes::Ints": "INT_VEC",
 
     # String
-    "std::string": "STRING"
+    "std::string": "STRING",
+    "std::vector<std::string>": "STRING_VEC"
 }
 
 
@@ -326,12 +330,13 @@ CXX_TYPE_CONV_TABLE = {
     "nonstd::optional<float>": "float",
     "nonstd::optional<std::vector<int64_t>>": "std::vector<int64_t>",
     "Attributes::Ints": "std::vector<int64_t>",
-    "Attributes::Int": "std::int32_t"
+    "Attributes::Int": "std::int32_t",
+    "std::vector<float>": "std::vector<double>"
 }
 
 CXX_NON_CONV_TYPES = [
     "bool", "float", "int64_t", "std::string", "std::vector<int64_t>",
-    "unsigned int"
+    "unsigned int", "std::vector<std::string>"
 ]
 
 
@@ -371,20 +376,16 @@ def convertCxxConvert(cxxType_orig):
 
 
 def attrTypeGetter(ty):
-    if ty == "INT":
-        return "i"
-
-    if ty == "INT_VEC":
-        return "is"
-
-    if ty == "FLOAT":
-        return "f"
-
-    if ty == "STRING":
-        return "s"
-
-    assert False, "Invalid type: " + ty
-    return None
+    typemap = {
+        "INT": "i",
+        "INT_VEC": "is",
+        "FLOAT": "f",
+        "FLOAT_VEC": "fs",
+        "STRING": "s",
+        "STRING_VEC": "ss"
+    }
+    assert ty in typemap, "Invalid type: " + ty
+    return typemap[ty]
 
 
 def addCastingOptStr(name):

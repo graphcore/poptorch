@@ -815,31 +815,34 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   }
 }
 
+namespace {
 // Helper to let us filter string arguments into const char*s. This is to catch
 // the std::string produced by some attributes before they cross the ABI
 // boundary.
-namespace {
 
-// Default template conversion, just return the type.
-template <typename T> struct StringConvertorHelper {
-  explicit StringConvertorHelper(T x) : value(std::move(x)) {}
-  T value;
-
-  operator T() { return value; } // NOLINT
-};
+template <typename T> T convertType(T &&t) { return t; }
 
 // String, return const char*.
-template <> struct StringConvertorHelper<std::string> {
-  explicit StringConvertorHelper(const std::string &x) : value(x) {}
-  const std::string &value;
+const char *convertType(const std::string &s) {
+  return s.c_str(); // NOLINT
+}
 
-  operator const char *() { return value.c_str(); } // NOLINT
-};
+// vector<string>, return vector<const char*>
+std::vector<const char *> convertType(const std::vector<std::string> &s) {
+  std::vector<const char *> result;
+  std::transform(s.begin(), s.end(), result.begin(),
+                 [](const std::string &str) {
+                   return str.c_str(); // NOLINT
+                 });
+  return result;
+}
 
-// Function to create the conversion helper. To allow template type deduction
-// and template specialization at the same time.
-template <typename T> StringConvertorHelper<T> convertString(T t) {
-  return StringConvertorHelper<T>{t};
+// vector<double, return vector<float>
+std::vector<float> convertType(const std::vector<double> &v) {
+  std::vector<float> result;
+  std::transform(v.begin(), v.end(), result.begin(),
+                 [](double d) { return static_cast<float>(d); });
+  return result;
 }
 
 PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
@@ -1000,6 +1003,7 @@ LowerToPopartImpl::LowerToPopartImpl(torch::jit::Graph *g,
 #define INT i
 #define BOOL i
 #define STRING s
+#define STRING_VEC ss
 
 // Useful NOP macro
 #define NONE
@@ -1008,7 +1012,7 @@ LowerToPopartImpl::LowerToPopartImpl(torch::jit::Graph *g,
 // accessors, the name is converted into "attr::NAME" which is what pytorch JIT
 // expects for attribute accessing.
 #define ARG(Type, Name)                                                        \
-  , convertString(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
+  , convertType(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
 
 #define POPART_CONST_ARG(unused) , convertTensorConstantNode(node)
 #define HOST_SIDE_CONST_ARG(unused)                                            \
@@ -1050,6 +1054,8 @@ LowerToPopartImpl::LowerToPopartImpl(torch::jit::Graph *g,
 #undef ARG
 #undef NONE
 #undef BOOL
+#undef STRING
+#undef STRING_VEC
 #undef INT
 #undef FLOAT
 #undef FLOAT_VEC
