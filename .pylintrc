@@ -2,7 +2,7 @@
 # Prevent pylint from incorrectly reporting 'has no member' for C modules
 # by allowing them to be loaded (does not happen by default due to security
 # concerns)
-extension-pkg-whitelist=numpy,torch,poptorch.poptorch_core
+extension-pkg-whitelist=numpy,torch
 
 # Specify a configuration file.
 #rcfile=
