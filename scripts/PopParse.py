@@ -275,6 +275,7 @@ OutputTypeVariable = [
 MultipleOutputsOps = {
     "gru": "2",
     "lstm": "2",
+    "rnn": "2",
     "split": "num_outputs",
     "topk": "2",
     "reducemedian": "2",

@@ -830,7 +830,7 @@ const char *convertType(const std::string &s) {
 // vector<string>, return vector<const char*>
 std::vector<const char *> convertType(const std::vector<std::string> &s) {
   std::vector<const char *> result;
-  std::transform(s.begin(), s.end(), result.begin(),
+  std::transform(s.begin(), s.end(), std::back_inserter(result),
                  [](const std::string &str) {
                    return str.c_str(); // NOLINT
                  });
@@ -840,7 +840,7 @@ std::vector<const char *> convertType(const std::vector<std::string> &s) {
 // vector<double, return vector<float>
 std::vector<float> convertType(const std::vector<double> &v) {
   std::vector<float> result;
-  std::transform(v.begin(), v.end(), result.begin(),
+  std::transform(v.begin(), v.end(), std::back_inserter(result),
                  [](double d) { return static_cast<float>(d); });
   return result;
 }
