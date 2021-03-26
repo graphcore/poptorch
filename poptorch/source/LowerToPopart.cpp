@@ -262,9 +262,11 @@ private:
   void lowerReturn();
 
   std::string tensorNames(std::int64_t first_tensor, std::int64_t num_tensors);
+  std::string tensorNames(const ValueMap::TensorList &tensors);
 
   std::string tensorTypesAndShapes(std::int64_t first_tensor,
                                    std::int64_t num_tensors);
+  std::string tensorTypesAndShapes(const ValueMap::TensorList &tensors);
 };
 
 /*
@@ -316,6 +318,7 @@ void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
 }
 
 void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
+  logging::debug("Graph lowered to Popart {");
   // Lower the tensor parameters of the _graph to OpInputs.
   lowerParameters(in_tensors);
 
@@ -323,6 +326,8 @@ void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
   lowerBody();
 
   lowerReturn();
+
+  logging::debug("}");
 }
 
 void LowerToPopartImpl::lowerReturn() {
@@ -356,14 +361,20 @@ void LowerToPopartImpl::lowerReturn() {
       ERROR("Unsupported output type '" << c10::typeKindToString(type->kind()));
     }
   };
+  logging::debug("  return (");
   for (torch::jit::Value *value : _graph.outputs()) {
+    auto tensors = _valueMap.tensors(value);
+    std::ostringstream ss;
+    ss << "    output: %" << value->debugName() << " : " << *value->type()
+       << " ->";
+    logging::debug("{} {} [{}]", ss.str(), tensorNames(tensors),
+                   tensorTypesAndShapes(tensors));
     if (value->type()->kind() == c10::TypeKind::ListType) {
       c10::TypeKind elt_kind =
           value->type()->expect<c10::ListType>()->getElementType()->kind();
       ERROR_ON_MSG(elt_kind != c10::TypeKind::TensorType,
                    "Unsupported list type " << c10::typeKindToString(elt_kind));
-      std::int64_t num_tensors =
-          static_cast<std::int64_t>(_valueMap.tensors(value).size());
+      std::int64_t num_tensors = static_cast<std::int64_t>(tensors.size());
       _compiler.addOutputType({OutputType::Type::List, num_tensors});
       for (std::int64_t i = 0; i < num_tensors; ++i) {
         _compiler.addOutputType({OutputType::Type::Tensor});
@@ -371,19 +382,29 @@ void LowerToPopartImpl::lowerReturn() {
     } else {
       process_type(value->type());
     }
-    for (auto id : _valueMap.tensors(value)) {
+    for (auto id : tensors) {
       _compiler.addOutputTensor(id);
       _outputTensorHooks.push_back(id);
     }
   }
+  logging::debug("  )");
 }
 
 std::string LowerToPopartImpl::tensorNames(std::int64_t first_tensor,
                                            std::int64_t num_tensors) {
+  ValueMap::TensorList tensors;
+  tensors.reserve(num_tensors);
+  for (int i = 0; i < num_tensors; i++) {
+    tensors.push_back(first_tensor + i);
+  }
+  return tensorNames(tensors);
+}
+std::string
+LowerToPopartImpl::tensorNames(const ValueMap::TensorList &tensors) {
   std::string sep{};
   std::string names;
-  for (std::int64_t i = 0; i < num_tensors; ++i) {
-    names += sep + _compiler.tensorName(first_tensor + i);
+  for (auto tensor : tensors) {
+    names += sep + _compiler.tensorName(tensor);
     sep = ", ";
   }
   return names;
@@ -391,18 +412,28 @@ std::string LowerToPopartImpl::tensorNames(std::int64_t first_tensor,
 
 std::string LowerToPopartImpl::tensorTypesAndShapes(std::int64_t first_tensor,
                                                     std::int64_t num_tensors) {
+  ValueMap::TensorList tensors;
+  tensors.reserve(num_tensors);
+  for (int i = 0; i < num_tensors; i++) {
+    tensors.push_back(first_tensor + i);
+  }
+  return tensorTypesAndShapes(tensors);
+}
+
+std::string
+LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
   std::string sep{};
   std::string shapes;
 
   const char *shape_inf_failed = "(shape inference failed)";
 
-  for (std::int64_t i = 0; i < num_tensors; ++i) {
+  for (auto tensor : tensors) {
     std::ostringstream shape_str;
 
     try {
-      auto tensor_shape = _compiler.getSize(first_tensor + i);
+      auto tensor_shape = _compiler.getSize(tensor);
 
-      auto dtype_chars = _compiler.getTensorDTypeString(first_tensor + i);
+      auto dtype_chars = _compiler.getTensorDTypeString(tensor);
       shape_str << dtype_chars.get();
 
       if (tensor_shape.empty()) {
@@ -429,7 +460,6 @@ std::string LowerToPopartImpl::tensorTypesAndShapes(std::int64_t first_tensor,
 
 // Lower the main body of the _graph.
 void LowerToPopartImpl::lowerBody() {
-  logging::debug("Graph lowered to Popart {");
   for (torch::jit::Node *node : _graph.nodes()) {
     logging::LogContext ctx("LowerToPopartImpl::lowerBody Processing " +
                             nodeToString(node));
@@ -464,7 +494,7 @@ void LowerToPopartImpl::lowerBody() {
 
       if (!_compiler.isHostSideConstant(first_output_tensor)) {
         logging::debug(
-            "{} was lowered to {} [{},{}]", nodeToString(node),
+            "  {} was lowered to {} [{},{}]", nodeToString(node),
             tensorNames(first_output_tensor, node->outputs().size()),
             tensorTypesAndShapes(first_output_tensor, node->outputs().size()),
             _compiler.getExecutionInfo().get());
@@ -724,7 +754,6 @@ void LowerToPopartImpl::lowerBody() {
       ERROR("Couldn't find a registered operation for node");
     }
   }
-  logging::debug("}");
 }
 
 void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
@@ -732,7 +761,6 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
       _graph.param_node()->outputs().size() - _parameters.size();
   std::size_t index = 0;
   auto tensor_it = in_tensors->begin();
-
   std::function<void(c10::TypePtr, ValueMap::TensorList &)> process_input;
   process_input = [&](const c10::TypePtr &type,
                       ValueMap::TensorList &tensorList) {
@@ -766,12 +794,18 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     }
   };
 
+  logging::debug("graph(");
   for (torch::jit::Value *value : _graph.inputs()) {
     if (index < num_inputs) {
       // Lower user provided input
       ERROR_ON(value->node()->kind() != c10::prim::Param);
       ValueMap::TensorList tensors;
       process_input(value->type(), tensors);
+      std::ostringstream ss;
+      ss << "      input: %" << value->debugName() << " : " << *value->type()
+         << " ->";
+      logging::debug("{} {} [{}]", ss.str(), tensorNames(tensors),
+                     tensorTypesAndShapes(tensors));
       switch (value->type()->kind()) {
       case c10::TypeKind::TensorType: {
         ERROR_ON(tensors.size() != 1);
@@ -799,9 +833,14 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
 
       // Unpack the elem type into its Popart type.
       std::string popart_type = typeToPopartStr(tensor_as_param.scalar_type());
-      _valueMap.setTensor(value, _compiler.addInitializedInputTensor(
-                                     name.c_str(), popart_type.c_str(), dims,
-                                     tensor_as_param.data_ptr()));
+      auto tensor = _compiler.addInitializedInputTensor(
+          name.c_str(), popart_type.c_str(), dims, tensor_as_param.data_ptr());
+      std::ostringstream ss;
+      ss << "      param: %" << value->debugName() << " : " << *value->type()
+         << " ->";
+      logging::debug("{} {} [{}]", ss.str(), tensorNames(tensor, 1),
+                     tensorTypesAndShapes(tensor, 1));
+      _valueMap.setTensor(value, tensor);
     } else {
       logging::trace("Skipping unused parameter: {}",
                      _parameter_names.at(index - num_inputs));
@@ -813,6 +852,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     }
     ++index;
   }
+  logging::debug("  ):");
 }
 
 namespace {
