@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace poptorch {
 
@@ -19,6 +20,17 @@ std::string nodeToString(const torch::jit::Node *node);
 std::string scalarTypeToOnnxString(at::ScalarType type);
 
 at::ScalarType onnxStrToScalarType(const char *type_str);
+
+// Returns a collapsed version of the graph input hierachy into a list of
+// tensor values by following any tuples/lists and their unpacking
+// N.B. if a tuple is not used (unpacked), the resulting values will be null
+// as a placeholder.
+std::vector<torch::jit::Value *>
+collapsedGraphInputHierachy(torch::jit::Graph *graph);
+
+// Return the number of tensors for a given type: in the case of a tensor
+// this is 1, but in case of nested tuples, this is the sum over all.
+size_t numTensorsForType(const c10::TypePtr &type);
 
 // Delete a node and also its users if they are also unused.
 void searchAndPossiblyDestroy(

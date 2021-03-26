@@ -239,11 +239,11 @@ private:
   std::vector<at::Tensor> _parameters;
   std::vector<std::string> _parameter_names;
 
-  std::vector<poptorch::TensorId> _inputTensorHooks;
+  std::vector<poptorch::TensorId> _input_tensor_hooks;
 
-  std::vector<poptorch::TensorId> _outputTensorHooks;
+  std::vector<poptorch::TensorId> _output_tensor_hooks;
 
-  ValueMap _valueMap;
+  ValueMap _value_map;
 
   // Optimizer from the user.
   const std::vector<Optimizer> _optimizers;
@@ -268,11 +268,29 @@ private:
   std::string tensorTypesAndShapes(const ValueMap::TensorList &tensors);
 };
 
+namespace {
+// Remove from vec all elements vec[i] for which mask[i] is false
+template <typename T>
+void maskVector(std::vector<T> *vec, const std::vector<bool> &mask,
+                size_t ignore_first = 0) {
+  auto predicate = [&mask, &vec, ignore_first](const T &val) {
+    auto idx = static_cast<size_t>(&val - &(*vec->begin()));
+    if (idx < ignore_first) {
+      return false;
+    }
+    return !mask.at(idx - ignore_first);
+  };
+
+  auto erase_begin = std::remove_if(vec->begin(), vec->end(), predicate);
+  vec->erase(erase_begin, vec->end());
+}
+} // namespace
+
 /*
  * Lower to popart impl.
  */
 std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
-  ERROR_ON_MSG(_outputTensorHooks.empty(),
+  ERROR_ON_MSG(_output_tensor_hooks.empty(),
                "You need to lower() the graph first");
 
   logging::LogContext ctx("LowerToPopart::compile ");
@@ -281,13 +299,13 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
   _compiler.compileAndPrepareDevice();
 
   std::vector<at::ScalarType> data_types;
-  for (auto id : _outputTensorHooks) {
+  for (auto id : _output_tensor_hooks) {
     data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
   }
 
   return std::make_shared<poptorch::PoplarExecutable>(
-      std::move(_compiler), std::move(_inputTensorHooks),
-      std::move(_outputTensorHooks), std::move(data_types), _parameter_names);
+      std::move(_compiler), std::move(_input_tensor_hooks),
+      std::move(_output_tensor_hooks), std::move(data_types), _parameter_names);
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
@@ -299,17 +317,17 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
   _compiler.loadExecutableAndPrepareDevice(input_filename.c_str(), offset);
 
   std::vector<at::ScalarType> data_types;
-  for (auto id : _outputTensorHooks) {
+  for (auto id : _output_tensor_hooks) {
     data_types.emplace_back(fromPopartType(_compiler.getPopartType(id)));
   }
 
   return std::make_shared<poptorch::PoplarExecutable>(
-      std::move(_compiler), std::move(_inputTensorHooks),
-      std::move(_outputTensorHooks), std::move(data_types), _parameter_names);
+      std::move(_compiler), std::move(_input_tensor_hooks),
+      std::move(_output_tensor_hooks), std::move(data_types), _parameter_names);
 }
 
 void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
-  ERROR_ON_MSG(_outputTensorHooks.empty(),
+  ERROR_ON_MSG(_output_tensor_hooks.empty(),
                "You need to lower() the graph first");
   logging::LogContext ctx("LowerToPopart::compileAndExport ");
   _compiler.initSession(_optimizers);
@@ -362,7 +380,7 @@ void LowerToPopartImpl::lowerReturn() {
   };
   logging::debug("  return (");
   for (torch::jit::Value *value : _graph.outputs()) {
-    auto tensors = _valueMap.tensors(value);
+    auto tensors = _value_map.tensors(value);
     std::ostringstream ss;
     ss << "    output: %" << value->debugName() << " : " << *value->type()
        << " ->";
@@ -383,7 +401,7 @@ void LowerToPopartImpl::lowerReturn() {
     }
     for (auto id : tensors) {
       _compiler.addOutputTensor(id);
-      _outputTensorHooks.push_back(id);
+      _output_tensor_hooks.push_back(id);
     }
   }
   logging::debug("  )");
@@ -474,7 +492,7 @@ void LowerToPopartImpl::lowerBody() {
                        // Tuples aren't supported here but it's ok because
                        // we don't support any operations which actually take in
                        // tuples.
-                       return _valueMap.tensor(val);
+                       return _value_map.tensor(val);
                      });
 
       // Call the callback
@@ -488,7 +506,7 @@ void LowerToPopartImpl::lowerBody() {
         poptorch::TensorId output_tensor = first_output_tensor + i;
         ERROR_ON_MSG(!_compiler.tensorIdIsValid(output_tensor),
                      "Output " << i << " doesn't exist of Node " << *node);
-        _valueMap.setTensor(output, output_tensor);
+        _value_map.setTensor(output, output_tensor);
       }
 
       if (!_compiler.isHostSideConstant(first_output_tensor)) {
@@ -510,7 +528,7 @@ void LowerToPopartImpl::lowerBody() {
       _compiler.startElseBlock();
     } else if (kind == symbols::poptorch::end_if) {
       // Process the if condition.
-      poptorch::TensorId condition = _valueMap.tensor(node->input(0));
+      poptorch::TensorId condition = _value_map.tensor(node->input(0));
 
       // Popart needs to know the number of outputs even though it's in the
       // graph.
@@ -530,14 +548,14 @@ void LowerToPopartImpl::lowerBody() {
         outs[i] = first_output_tensor + i;
       }
 
-      _valueMap.setTuple(node->output(), outs);
+      _value_map.setTuple(node->output(), outs);
 
     } else if (kind == symbols::poptorch::start_for_loop) {
       _compiler.startSubgraph();
     } else if (kind == symbols::poptorch::end_for_loop) {
       // Process the if condition.
       std::vector<poptorch::TensorId> inputs =
-          _valueMap.tensors(node->input(0));
+          _value_map.tensors(node->input(0));
 
       // Popart needs to know the number of outputs even though it's in the
       // graph.
@@ -560,10 +578,10 @@ void LowerToPopartImpl::lowerBody() {
         outs[i] = first_output_tensor + i;
       }
 
-      _valueMap.setTuple(node->output(), outs);
+      _value_map.setTuple(node->output(), outs);
     } else if (kind == symbols::poptorch::add_untyped_input_tensor) {
       poptorch::TensorId out = _compiler.addUntypedInputTensor();
-      _valueMap.setTensor(node->output(), out);
+      _value_map.setTensor(node->output(), out);
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       _compiler.setActiveIpu(
           node->i(c10::Symbol::fromQualString("attr::stage")),
@@ -575,17 +593,17 @@ void LowerToPopartImpl::lowerBody() {
     } else if (kind == symbols::poptorch::pop_name_scope) {
       _compiler.popNameScope();
     } else if (kind == symbols::poptorch::set_matmul_serialization) {
-      poptorch::TensorId input = _valueMap.tensor(node->input());
+      poptorch::TensorId input = _value_map.tensor(node->input());
       _compiler.setMatMulSerialization(
           input, node->s(c10::Symbol::fromQualString("attr::mode")).c_str(),
           node->i(c10::Symbol::fromQualString("attr::factor")),
           node->i(c10::Symbol::fromQualString("attr::keep_precision")));
-      _valueMap.setTensor(node->output(), input);
+      _value_map.setTensor(node->output(), input);
     } else if (kind == symbols::poptorch::optimizer_group) {
       std::vector<poptorch::TensorId> inputs;
       std::transform(node->inputs().begin(), node->inputs().end(),
                      std::back_inserter(inputs), [&](torch::jit::Value *val) {
-                       return _valueMap.tensor(val);
+                       return _value_map.tensor(val);
                      });
 
       std::uint64_t group = node->i(c10::Symbol::fromQualString("attr::group"));
@@ -599,7 +617,7 @@ void LowerToPopartImpl::lowerBody() {
                        // Tuples aren't supported here but it's ok because
                        // we don't support any operations which actually take in
                        // tuples.
-                       return _valueMap.tensor(val);
+                       return _value_map.tensor(val);
                      });
 
       _compiler.setAvailableMemoryProportion(
@@ -607,14 +625,14 @@ void LowerToPopartImpl::lowerBody() {
                       "attr::availableMemoryProportion")));
 
       for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
-        _valueMap.setTensor(node->output(i), inputs[i]);
+        _value_map.setTensor(node->output(i), inputs[i]);
       }
 
     } else if (kind == c10::prim::Constant) {
       ERROR_ON_MSG(node->hasAttribute(c10::attr::value),
                    "Only None constants should be left in the graph after the "
                    "CanonicaliseConstants pass");
-      _valueMap.setTensor(node->output(), NoneTensor);
+      _value_map.setTensor(node->output(), NoneTensor);
     } else if (kind == c10::prim::TupleConstruct ||
                kind == c10::prim::ListConstruct) {
       // Get the torch jit SSA for the input/output values.
@@ -623,15 +641,15 @@ void LowerToPopartImpl::lowerBody() {
       // Add the values to the value map.
       ValueMap::TensorList tuple;
       for (torch::jit::Value *ids : node->inputs()) {
-        for (auto tensor : _valueMap.tensors(ids)) {
+        for (auto tensor : _value_map.tensors(ids)) {
           tuple.push_back(tensor);
         }
       }
-      _valueMap.setTuple(output, tuple);
+      _value_map.setTuple(output, tuple);
     } else if (kind == c10::prim::TupleUnpack ||
                kind == c10::prim::ListUnpack) {
       // Get the torch jit SSA for the input/output values.
-      auto tensors = _valueMap.tuple(node->input());
+      auto tensors = _value_map.tuple(node->input());
       auto tensor_it = tensors.begin();
       std::function<void(c10::TypePtr, ValueMap::TensorList &)> process_output;
 
@@ -664,11 +682,11 @@ void LowerToPopartImpl::lowerBody() {
         switch (output->type()->kind()) {
         case c10::TypeKind::TensorType: {
           ERROR_ON(tensor_list.size() != 1);
-          _valueMap.setTensor(output, tensor_list.front());
+          _value_map.setTensor(output, tensor_list.front());
           break;
         }
         case c10::TypeKind::TupleType: {
-          _valueMap.setTuple(output, tensor_list);
+          _value_map.setTuple(output, tensor_list);
           break;
         }
         default:
@@ -679,19 +697,19 @@ void LowerToPopartImpl::lowerBody() {
       ERROR_ON_MSG(tensor_it != tensors.end(), "Didn't unpack all the tensors");
     } else if (kind == symbols::poptorch::host_side_cast) {
       // Map to the input value since the type will be cast host side
-      ERROR_ON_MSG(!_valueMap.hasTensor(node->input()),
+      ERROR_ON_MSG(!_value_map.hasTensor(node->input()),
                    "Input to host side cast has not been registered");
 
       ERROR_ON_MSG(node->inputs().size() != 1,
                    "Host side cast should only have one input.");
 
-      _valueMap.setTensor(node->output(), _valueMap.tensor(node->input()));
+      _value_map.setTensor(node->output(), _value_map.tensor(node->input()));
 
     } else if (kind == symbols::poptorch::multi_conv_part) {
       std::vector<poptorch::TensorId> inputs;
       std::transform(node->inputs().begin(), node->inputs().end(),
                      std::back_inserter(inputs), [&](torch::jit::Value *val) {
-                       return _valueMap.tensor(val);
+                       return _value_map.tensor(val);
                      });
 
       _compiler.addMultiConvPart(inputs,
@@ -741,7 +759,7 @@ void LowerToPopartImpl::lowerBody() {
                        << outputs.size() << " outputs.");
 
       for (size_t i = 0; i < outputs.size(); i++) {
-        _valueMap.setTensor(node_outputs[i], outputs[i]);
+        _value_map.setTensor(node_outputs[i], outputs[i]);
       }
 
       logging::debug("{} was lowered to {} [{},{}]", nodeToString(node),
@@ -756,100 +774,123 @@ void LowerToPopartImpl::lowerBody() {
 }
 
 void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
-  std::size_t num_inputs =
-      _graph.param_node()->outputs().size() - _parameters.size();
-  std::size_t index = 0;
-  auto tensor_it = in_tensors->begin();
-  std::function<void(c10::TypePtr, ValueMap::TensorList &)> process_input;
-  process_input = [&](const c10::TypePtr &type,
-                      ValueMap::TensorList &tensorList) {
-    switch (type->kind()) {
-    case c10::TypeKind::TensorType: {
-      ERROR_ON(tensor_it == in_tensors->end());
-      auto tensor = *tensor_it;
-      tensor_it++;
-      // Convert the tensor type to the correct vector size.
-      std::vector<int64_t> dims = getTensorDimensions(tensor);
+  // The "true" inputs are a mixture of tuples (which may be nested) and tensors
+  // The parameters are all tensors. "_graph.inputs()." contains the inputs
+  // first followed by the parameters at the end.
 
-      // Return the input tensor id for input tensor of given type and dims.
-      poptorch::TensorId id = _compiler.addInputTensor(
-          typeToPopartStr(tensor.scalar_type()).c_str(), dims);
+  // This will provide a view of all the tensors in _graph.inputs(), i.e.
+  // by collapsing tuples.
+  auto graph_t_inputs = collapsedGraphInputHierachy(&_graph);
+  std::size_t num_input_tensors = graph_t_inputs.size() - _parameters.size();
+  ERROR_ON(graph_t_inputs.size() != (in_tensors->size() + _parameters.size()));
+  ERROR_ON(num_input_tensors + _parameters.size() != graph_t_inputs.size());
 
-      // Record the id so we can map back to the pytorch tensor.
-      tensorList.push_back(id);
-      _inputTensorHooks.push_back(id);
-      break;
-    }
-    case c10::TypeKind::TupleType: {
-      auto tuple = type->expect<c10::TupleType>();
-      for (const auto &elt_type : tuple->elements()) {
-        process_input(elt_type, tensorList);
-      }
-      break;
-    }
-    default:
-      ERROR("Unsupported parameter type '"
-            << c10::typeKindToString(type->kind()) << "' for input " << index);
-    }
-  };
+  // Store the number of inputs in _graph.inputs() before _parameters shrinks
+  const size_t num_inputs = _graph.inputs().size() - _parameters.size();
 
-  logging::debug("graph(");
-  for (torch::jit::Value *value : _graph.inputs()) {
-    if (index < num_inputs) {
-      // Lower user provided input
-      ERROR_ON(value->node()->kind() != c10::prim::Param);
-      ValueMap::TensorList tensors;
-      process_input(value->type(), tensors);
-      std::ostringstream ss;
-      ss << "      input: %" << value->debugName() << " : " << *value->type()
-         << " ->";
-      logging::debug("{} {} [{}]", ss.str(), tensorNames(tensors),
-                     tensorTypesAndShapes(tensors));
-      switch (value->type()->kind()) {
-      case c10::TypeKind::TensorType: {
-        ERROR_ON(tensors.size() != 1);
-        _valueMap.setTensor(value, tensors.front());
-        break;
-      }
-      case c10::TypeKind::TupleType: {
-        _valueMap.setTuple(value, tensors);
-        break;
-      }
-      default:
-        ERROR("Unsupported parameter type '"
-              << c10::typeKindToString(value->type()->kind()) << "' for input "
-              << index);
-      }
-    } else if (!value->uses().empty()) {
-      ERROR_ON_MSG(tensor_it != in_tensors->end(),
-                   "Not all the input tensors have been used");
-      // Lower the other params (i.e the weights)
-      at::Tensor &tensor_as_param = _parameters[index - num_inputs];
-      const std::string &name = _parameter_names.at(index - num_inputs);
+  // Step 0, remove unused parameters
+  // graph_t_inputs is updated but _graph.inputs() will retain unused parameters
+  std::vector<bool> parameter_used(_parameters.size(), true);
+  for (size_t index = 0; index < _parameters.size(); index++) {
+    ERROR_ON(!parameter_used.at(index));
+    auto value = graph_t_inputs[num_input_tensors + index];
+    if (value->uses().empty()) {
+      parameter_used.at(index) = false;
 
-      // Convert the tensor type to the correct vector size.
-      std::vector<int64_t> dims = getTensorDimensions(tensor_as_param);
-
-      // Unpack the elem type into its Popart type.
-      std::string popart_type = typeToPopartStr(tensor_as_param.scalar_type());
-      auto tensor = _compiler.addInitializedInputTensor(
-          name.c_str(), popart_type.c_str(), dims, tensor_as_param.data_ptr());
-      std::ostringstream ss;
-      ss << "      param: %" << value->debugName() << " : " << *value->type()
-         << " ->";
-      logging::debug("{} {} [{}]", ss.str(), tensorNames(tensor, 1),
-                     tensorTypesAndShapes(tensor, 1));
-      _valueMap.setTensor(value, tensor);
-    } else {
       logging::trace("Skipping unused parameter: {}",
-                     _parameter_names.at(index - num_inputs));
-
-      size_t erase_at = index - num_inputs;
-      _parameters.erase(_parameters.begin() + erase_at);
-      _parameter_names.erase(_parameter_names.begin() + erase_at);
-      --index;
+                     _parameter_names.at(index));
     }
-    ++index;
+  }
+
+  // Use remove-erase idiom to remove parameters with linear complexity
+  maskVector(&_parameters, parameter_used);
+  maskVector(&_parameter_names, parameter_used);
+  maskVector(&graph_t_inputs, parameter_used, num_input_tensors);
+  ERROR_ON(num_input_tensors + _parameters.size() != graph_t_inputs.size());
+
+  // Step 1, add tensor inputs for all tensors in the hierachy and obtain the
+  // the resulting popart IDs. This can be done with collapsed hierachy.
+  // The collapsed hierachy has a 1 to 1 mapping with in_tensors, which contains
+  // both "true" inputs and parameters.
+  ValueMap::TensorList parameter_popart_ids;
+  for (size_t index = 0; index < graph_t_inputs.size(); index++) {
+    bool is_input_tensor = index < num_input_tensors;
+
+    at::Tensor &tensor(is_input_tensor
+                           ? (*in_tensors)[index]
+                           : _parameters.at(index - num_input_tensors));
+
+    std::vector<int64_t> dims = getTensorDimensions(tensor);
+
+    if (index < num_input_tensors) {
+      // Return the input tensor id for input tensor of given type and dims.
+      auto id = _compiler.addInputTensor(
+          typeToPopartStr(tensor.scalar_type()).c_str(), dims);
+      _input_tensor_hooks.push_back(id);
+    } else {
+      ERROR_ON(graph_t_inputs[index]->uses().empty());
+
+      const std::string &name = _parameter_names.at(index - num_input_tensors);
+      std::string popart_type = typeToPopartStr(tensor.scalar_type());
+      auto id = _compiler.addInitializedInputTensor(
+          name.c_str(), popart_type.c_str(), dims, tensor.data_ptr());
+      parameter_popart_ids.push_back(id);
+    }
+  }
+
+  ERROR_ON(parameter_popart_ids.size() != _parameters.size());
+
+  // Step 2, map the PopART tensor IDs to the JIT Value of the (not collapsed)
+  // graph inputs
+  logging::debug("graph(");
+  auto input_tensor_it = _input_tensor_hooks.begin();
+  size_t index = 0;
+  for (torch::jit::Value *value : _graph.inputs()) {
+    if (index == num_inputs) {
+      // The rest are parameters
+      break;
+    }
+    ERROR_ON(value->node()->kind() != c10::prim::Param);
+    size_t num_tensors = numTensorsForType(value->type());
+
+    ValueMap::TensorList tensors;
+    tensors.reserve(num_tensors);
+
+    for (size_t i = 0; i < num_tensors; i++) {
+      ERROR_ON(input_tensor_it == _input_tensor_hooks.end());
+      tensors.push_back(*input_tensor_it);
+      input_tensor_it++;
+    }
+
+    if (value->type()->kind() == c10::TypeKind::TensorType) {
+      ERROR_ON(tensors.size() != 1);
+      _value_map.setTensor(value, tensors.front());
+    } else {
+      ERROR_ON(value->type()->kind() != c10::TypeKind::TupleType);
+      _value_map.setTuple(value, tensors);
+    }
+
+    std::ostringstream ss;
+    ss << "      input: %" << value->debugName() << " : " << *value->type()
+       << " ->";
+    logging::debug("{} {} [{}]", ss.str(), tensorNames(tensors),
+                   tensorTypesAndShapes(tensors));
+
+    index++;
+  }
+  ERROR_ON(parameter_popart_ids.size() != _parameters.size());
+
+  // Step 3, map the PopART tensor IDs to the JIT Value of the parameters
+  for (index = 0; index < parameter_popart_ids.size(); index++) {
+    auto value = graph_t_inputs.at(num_input_tensors + index);
+    auto &tensor(parameter_popart_ids.at(index));
+
+    std::ostringstream ss;
+    ss << "      param: %" << value->debugName() << " : " << *value->type()
+       << " ->";
+    logging::debug("{} {} [{}]", ss.str(), tensorNames(tensor, 1),
+                   tensorTypesAndShapes(tensor, 1));
+    _value_map.setTensor(value, tensor);
   }
   logging::debug("  ):");
 }

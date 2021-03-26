@@ -132,6 +132,73 @@ at::ScalarType onnxStrToScalarType(const char *type_str) {
 }
 
 namespace {
+void processInput(torch::jit::Graph *graph, torch::jit::Value *input,
+                  std::vector<torch::jit::Value *> *tensors) {
+  switch (input->type()->kind()) {
+  case c10::TypeKind::TensorType:
+    ERROR_ON(input->node()->kind() != c10::prim::Param &&
+             input->node()->kind() != c10::prim::TupleUnpack);
+    tensors->push_back(input);
+    break;
+  case c10::TypeKind::TupleType: {
+    // Find the TupleUnpack node
+    if (input->hasUses()) {
+      ERROR_ON(input->uses().size() != 1);
+      auto unpack = input->uses()[0].user;
+      ERROR_ON(unpack->kind() != c10::prim::TupleUnpack);
+      for (auto element : unpack->outputs()) {
+        // Recurse for nested tuple support
+        processInput(graph, element, tensors);
+      }
+    } else {
+      // We need placeholders or the values will not align with input tensors
+      auto tuple_type = input->type()->expect<c10::TupleType>();
+      for (unsigned int i = 0; i < tuple_type->elements().size(); i++) {
+        tensors->push_back(nullptr);
+      }
+    }
+    break;
+  }
+
+  default:
+    ERROR("Unsupported input type '"
+          << c10::typeKindToString(input->type()->kind()) << "'");
+  }
+}
+} // namespace
+
+std::vector<torch::jit::Value *>
+collapsedGraphInputHierachy(torch::jit::Graph *graph) {
+  std::vector<torch::jit::Value *> tensors;
+
+  for (auto *input : graph->inputs()) {
+    processInput(graph, input, &tensors);
+  }
+
+  return tensors;
+}
+
+size_t numTensorsForType(const c10::TypePtr &type) {
+  switch (type->kind()) {
+  case c10::TypeKind::TensorType:
+    return 1;
+  case c10::TypeKind::ListType:
+    ERROR("Returning a list or tuples of lists is not supported.");
+  case c10::TypeKind::TupleType: {
+    size_t num_tensors = 0;
+    auto tuple = type->expect<c10::TupleType>();
+    for (auto &element_type : tuple->elements()) {
+      num_tensors += numTensorsForType(element_type);
+    }
+    return num_tensors;
+  }
+  default:
+    ERROR("Unsupported output type '" << c10::typeKindToString(type->kind())
+                                      << "'");
+  }
+}
+
+namespace {
 bool shouldDestroy(torch::jit::Node *node) {
   // Skip parameters and nodes with any uses.
   return !(node->kind() == c10::prim::Param || node->hasUses());
