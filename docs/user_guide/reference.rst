@@ -156,3 +156,12 @@ Enumerations
 
 .. autoclass:: poptorch.SharingStrategy
    :members:
+
+Autocasting
+===========
+
+.. autoclass:: poptorch.autocasting.autocast
+   :members:
+
+.. autoclass:: poptorch.autocasting.Policy
+   :members:

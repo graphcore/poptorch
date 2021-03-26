@@ -397,7 +397,11 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
   ERROR_ON_MSG(_device, "device already created");
   updateUseModelConfig();
 
-  num_ipus = used_ipus.size() * popart_options.replicatedGraphCount;
+  // Sometimes phased execution doesn't use all of the IPUs in a range, so check
+  // the Ids too.
+  auto max_ipu_id = *std::max_element(used_ipus.begin(), used_ipus.end());
+  num_ipus = std::max(used_ipus.size(), max_ipu_id + 1) *
+             popart_options.replicatedGraphCount;
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
                               "operations have been optimised out)");
   if (options.ipu_model) {
@@ -441,7 +445,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
 
       if (rounded_num_ipus != num_ipus) {
         std::string common_msg(", because PopTorch must reserve a power of 2 or"
-                               " a multiple of 64 IPUs.");
+                               " a multiple of 64 IPUs");
         if (options.auto_round_num_ipus) {
           logging::warn("Reserving {} IPUs when the model specifices the use "
                         "of only {}{}. {} will be reserved but not used.",
@@ -455,7 +459,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
                    "however PopTorch must reserve a minimum of "
                 << rounded_num_ipus << " in order to allow the model to run"
                 << common_msg
-                << " Please reconfigure your model to use a "
+                << ". Please reconfigure your model to use a "
                    "different number of IPUs or set "
                    "poptorch.Options().autoRoundNumIPUs(True).");
         }

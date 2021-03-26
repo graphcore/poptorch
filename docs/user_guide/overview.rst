@@ -40,22 +40,20 @@ Each line in the file must contain a single command corresponding to setting an 
 in :class:`poptorch.Options`. To set an option within the file, write the command as you
 would within a Python script but omit the ``options.`` prefix.
 
-.. code-block::
+.. literalinclude:: poptorch.conf
+    :language: python
     :caption: Example contents of a config file used to set :class:`poptorch.Options`.
-
-    deviceIterations(1)
-    setExecutionStrategy(poptorch.ShardedExecution())
-    replicationFactor(1)
-    enableSyntheticData(True)
+    :linenos:
 
 Then, instantiate :class:`poptorch.Options` and call :func:`poptorch.Options.loadFromFile`.
 
-.. code-block:: python
+.. literalinclude:: api.py
+    :language: python
     :caption: Setting :class:`poptorch.Options` using a config file named `"poptorch.conf"`.
+    :linenos:
+    :start-after: conf_load_start
+    :end-before: conf_load_end
     :emphasize-lines: 2
-
-    opts = poptorch.Options()
-    opts.loadFromFile("poptorch.conf")
 
 Model wrapping functions
 ========================
@@ -76,6 +74,7 @@ complete reference.
     :linenos:
     :emphasize-lines: 22
     :start-after: training_model_start
+    :end-before: training_model_end
 
 poptorch.inferenceModel
 -----------------------
@@ -107,21 +106,12 @@ the IPU.
 See :py:class:`~poptorch.PoplarExecutor` for a complete description of the IPU interface
 functionality.
 
-  .. code-block:: python
-
-    model = Model()
-    poptorch_train = poptorch.trainingModel(model)
-    poptorch_inf = poptorch.inferenceModel(model)
-
-    train(poptorch_train)
-    torch.save(model.state_dict(), "model.save") # OK
-    validate(poptorch_inf) # OK
-    validate(model) # OK
-
-    train(model)
-    # Explicit copy needed
-    poptorch_inf.copyWeightsToDevice()
-    validate(poptorch_inf)
+.. literalinclude:: trainingModel.py
+    :language: python
+    :caption: Example contents of when explicit copies are needed.
+    :linenos:
+    :start-after: explicit_copy_start
+    :end-before: explicit_copy_end
 
 poptorch.isRunningOnIpu
 -----------------------
@@ -313,13 +303,12 @@ It is not used in
 :py:class:`poptorch.ShardedExecution` and
 :py:class:`poptorch.PipelinedExecution`.
 
-  .. code-block:: python
-
-    with poptorch.Block("A"):
-        layer()
-    with poptorch.Block("B"):
-        layer()
-    p = Phase(poptorch.Stage("A").ipu(0), poptorch.Stage("B").ipu(1))
+.. literalinclude:: phased_execution.py
+    :language: python
+    :caption: Example of Stage declaration.
+    :linenos:
+    :start-after: stage_start
+    :end-before: stage_end
 
 In the code snippet above, "A" and "B" will run in parallel on IPU 0 and 1
 simultaneously since they are placed in two stages. They will run
@@ -337,8 +326,8 @@ they allow for a dynamic number of stages and phases.
 Here is an example below to use formatted strings(f-strings) in
 :py:class:`poptorch.ParallelPhasedExecution`.
 
-Inside the code example below, there are two lines that f-strings are
-used in the ``forward()`` class.
+Inside the code example below, there are two lines where f-strings are
+used.
 One is ``f"phase{phase}_ipu{ipu}"`` at Line 25,
 where ``phase`` is
 0, 1, 1, 2, 3, 3, 4, 5, and 5 respectively,
@@ -463,20 +452,15 @@ poptorch.SerialPhasedExecution
 In :py:class:`poptorch.SerialPhasedExecution`,
 phases execute on a single group of IPUs sequentially.
 
-  .. code-block:: python
-
-    strategy = poptorch.SerialPhasedExecution([
-      poptorch.Phase(poptorch.Stage("A"), poptorch.Stage("A2")),
-      poptorch.Phase(poptorch.Stage("B"), poptorch.Stage("B2")),
-      poptorch.Phase(poptorch.Stage("C"), poptorch.Stage("C2"))])
-
-    strategy.phase(0).ipus(0,1)
-    strategy.phase(1).ipus(0,1)
-    strategy.phase(2).ipus(0,1)
-
-    opts.setExecutionStrategy(strategy)
+.. literalinclude:: phased_execution.py
+    :language: python
+    :caption: How to use poptorch.SerialPhasedExecution
+    :linenos:
+    :start-after: serial_start
+    :end-before: serial_end
 
 The code above causes all phases to run serially on IPUs 0 and 1.
+(A,B and C on IPU 0, A2, B2, C2 on IPU 1).
 
 poptorch.ParallelPhasedExecution
 """"""""""""""""""""""""""""""""
@@ -488,24 +472,17 @@ Inter-phase cross-IPU copies can replace the memory transfers to and from
 the streaming memory, if the desired weights and activations are already
 available in another group of IPUs.
 
-  .. code-block:: python
-
-    strategy = poptorch.SerialPhasedExecution([
-      poptorch.Phase(poptorch.Stage("0"), poptorch.Stage("1")),
-      poptorch.Phase(poptorch.Stage("2"), poptorch.Stage("3")),
-      poptorch.Phase(poptorch.Stage("4"), poptorch.Stage("5"))])
-
-    strategy.phase(0).ipus(0,2)
-    strategy.phase(1).ipus(1,3)
-    strategy.phase(2).ipus(0,2)
-
-    opts.setExecutionStrategy(strategy)
-
+.. literalinclude:: phased_execution.py
+    :language: python
+    :caption: How to use poptorch.ParallelPhasedExecution
+    :linenos:
+    :start-after: parallel_start
+    :end-before: parallel_end
 
 In the code example above, there are three phases. Each phase has two stages
 and each IPU group has two IPUs, so the number of groups matches the number
 of IPUs. Even phases 0 and 2 run on IPU 0 and 2, while odd phase 1 runs on
-IPU 1 and as required. This allows for faster cross-IPU copies, both
+IPU 1 and 3. This allows for faster cross-IPU copies, both
 inter-phase and intra-phase.
 
 poptorch.Liveness

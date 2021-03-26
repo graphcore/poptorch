@@ -204,9 +204,9 @@ New features
     .. code-block:: python
 
         def forward(self, x, y):
-          x // Half
-          y // Float32
-          return x + y // Not supported.
+          x # Half
+          y # Float32
+          return x + y # Not supported.
 
 - Support for ``tensor.fill_``, ``torch.full``, ``torch.full_like``
 

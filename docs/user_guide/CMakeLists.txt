@@ -19,6 +19,8 @@ function(add_poptorch_py_user_guide_example name path)
   set_tests_properties("${name}_user_guide_example" PROPERTIES LABELS "user_guide_examples${extra_labels}")
 endfunction()
 
+install(FILES "poptorch.conf" DESTINATION "${PROJECT_BINARY_DIR}/tmp")
+
 file(GLOB EXAMPLES "${CMAKE_CURRENT_SOURCE_DIR}/*.py")
 if(COPY_TESTS)
   install(FILES ${EXAMPLES} DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")

@@ -107,3 +107,8 @@ opt = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
 # lr and momentum will both be marked as variable.
 opt = torch.optim.SGD(model.parameters(), lr=0.01, momentum=1.0)
 # torch_optim_const_end
+
+# conf_load_start
+opts = poptorch.Options()
+opts.loadFromFile("tmp/poptorch.conf")
+# conf_load_end

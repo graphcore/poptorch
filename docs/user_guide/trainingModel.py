@@ -45,3 +45,30 @@ native_out = model(input)
 # Models should be very close to native output although some operations are
 # numerically different and floating point differences can accumulate.
 torch.testing.assert_allclose(native_out, poptorch_out, rtol=1e-06, atol=1e-06)
+# training_model_end
+Model = ExampleModelWithLoss
+
+
+def train(_):
+    pass
+
+
+def validate(_):
+    pass
+
+
+# explicit_copy_start
+model = Model()
+poptorch_train = poptorch.trainingModel(model)
+poptorch_inf = poptorch.inferenceModel(model)
+
+train(poptorch_train)
+torch.save(model.state_dict(), "model.save")  # OK
+validate(poptorch_inf)  # OK
+validate(model)  # OK
+
+train(model)
+# Explicit copy needed
+poptorch_inf.copyWeightsToDevice()
+validate(poptorch_inf)
+# explicit_copy_end

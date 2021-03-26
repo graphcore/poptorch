@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import os
 import sys
+from typing import Optional, Union, Dict, Any, List, Set
 import torch
 from . import autocasting
 from . import enums
@@ -26,10 +27,10 @@ class _JitOptions(_options_impl.OptionsDict):
     >>> opts.Jit.traceModel(True)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(trace_model=True)
 
-    def traceModel(self, trace_model):
+    def traceModel(self, trace_model: bool) -> "poptorch.options._JitOptions":
         """
         Controls whether to use PyTorch's tracing or scripting.
 
@@ -37,7 +38,7 @@ class _JitOptions(_options_impl.OptionsDict):
         scripting (experimental). See ``torch.jit.trace`` and
         ``torch.jit.script`` for details about PyTorch's JIT implementations.
 
-        :param bool trace_model:
+        :param trace_model:
             * True: use torch.jit.trace
             * False: use torch.jit.script (experimental)
        """
@@ -56,7 +57,8 @@ class _PrecisionOptions(_options_impl.OptionsDict):
     ...   poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
     """
 
-    def __init__(self, popart_options):
+    def __init__(self,
+                 popart_options: "poptorch.options._PopartOptions") -> None:
         super().__init__(
             autocast_enabled=True,
             autocast_policy=autocasting.default,
@@ -66,10 +68,11 @@ class _PrecisionOptions(_options_impl.OptionsDict):
             running_variance_always_float=True)
         self._popart_options = popart_options
 
-    def autocastEnabled(self, autocast_enabled):
+    def autocastEnabled(self, autocast_enabled: bool
+                        ) -> "poptorch.options._PrecisionOptions":
         """ Controls whether automatic casting functionality is turned on.
 
-            :param bool autocast_enabled: if True, automatic casting is active.
+            :param autocast_enabled: if True, automatic casting is active.
                                           Default value is True.
         """
 
@@ -80,7 +83,8 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         self.set(autocast_enabled=autocast_enabled)
         return self
 
-    def autocastPolicy(self, autocast_policy):
+    def autocastPolicy(self, autocast_policy: "poptorch.autocasting.Policy"
+                       ) -> "poptorch.options._PrecisionOptions":
         """ Set the automatic casting policy.
 
             :param policy: the policy object.
@@ -94,7 +98,9 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         self.set(autocast_policy_dict=self.autocast_policy._dict())  # pylint: disable=protected-access
         return self
 
-    def halfFloatCasting(self, half_float_casting):
+    def halfFloatCasting(
+            self, half_float_casting: "poptorch.HalfFloatCastingBehavior"
+    ) -> "poptorch.options._PrecisionOptions":
         """ Changes the casting behaviour for ops involving a float16 (half) and
             a float32
 
@@ -106,7 +112,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         can change the behaviour to match PyTorch using option
         "HalfUpcastToFloat".
 
-        :param poptorch.HalfFloatCastingBehavior half_float_casting:
+        :param half_float_casting:
             * FloatDowncastToHalf:  Any op with operands (inputs) which are a
               mix of float32 and float16 (half) will cast all operands to half.
             * HalfUpcastToFloat: Implicit casting will follow PyTorch's rules,
@@ -123,7 +129,8 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         self.set(half_float_casting=half_float_casting)
         return self
 
-    def runningVarianceAlwaysFloat(self, value):
+    def runningVarianceAlwaysFloat(self, value: bool
+                                   ) -> "poptorch.options._PrecisionOptions":
         """Controls whether the running variance tensor of batch normalisation
         layers should be a float32 regardless of input type.
 
@@ -134,7 +141,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         reliable estimates by forcing all running estimates of variances to be
         stored as float32, at the cost of extra memory use.
 
-        :param bool value:
+        :param value:
             * True: Always store running estimates of variance as float32.
             * False: Store running estimates of variance as the same type as the
               layer input.
@@ -147,7 +154,8 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         self.set(running_variance_always_float=value)
         return self
 
-    def enableStochasticRounding(self, enabled):
+    def enableStochasticRounding(self, enabled: bool
+                                 ) -> "poptorch.options._PrecisionOptions":
         """Set whether stochastic rounding is enabled on the IPU.
 
         Stochastic rounding rounds up or down a values to half (float16)
@@ -162,14 +170,15 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         training where convergence is desirable, but not for inference where
         non-determinism may be undesirable.
 
-        :param bool enabled:
+        :param enabled:
             * True: Enable stochastic rounding on the IPU.
             * False: Disable stochastic rounding.
         """
         self._popart_options.set("enableStochasticRounding", enabled)
         return self
 
-    def setPartialsType(self, dtype):
+    def setPartialsType(self, dtype: torch.dtype
+                        ) -> "poptorch.options._PrecisionOptions":
         """Set the data type of partial results for matrix multiplication and
         convolution operators.
 
@@ -179,7 +188,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         reduces on-chop memory use at the cost of precsion.
 
 
-        :param torch.dtype type:
+        :param type:
             The type to store parials, which must be either torch.float or
             torch.half
         """
@@ -210,13 +219,14 @@ class _TrainingOptions(_options_impl.OptionsDict):
     >>> opts.Training.gradientAccumulation(4)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(gradient_accumulation=1,
                          accumulation_reduction_type=enums.ReductionType.Mean,
                          accumulation_and_replication_reduction_type=enums.
                          ReductionType.NoReduction)
 
-    def gradientAccumulation(self, gradient_accumulation):
+    def gradientAccumulation(self, gradient_accumulation: int
+                             ) -> "poptorch.options._TrainingOptions":
         """Number of micro-batches to accumulate for the gradient calculation.
 
         Accumulate the gradient ``gradient_accumulation`` times before updating
@@ -277,7 +287,9 @@ class _TrainingOptions(_options_impl.OptionsDict):
                              "poptorch.ReductionType.Mean or "
                              "poptorch.ReductionType.Sum")
 
-    def accumulationAndReplicationReductionType(self, reduction_type):
+    def accumulationAndReplicationReductionType(
+            self, reduction_type: "poptorch.ReductionType"
+    ) -> "poptorch.options._TrainingOptions":
         """Set the type of reduction applied to reductions in the graph.
 
         When using, a value for greater than one for
@@ -292,7 +304,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
         replicated graphs and of all of the gradients when using gradient
         accumulation.
 
-        :param poptorch.ReductionType reduction_type:
+        :param reduction_type:
             * Mean: Reduce gradients by calculating the mean of them.
             * Sum: Reduce gradients by calculating the sum of them.
         """
@@ -304,7 +316,9 @@ class _TrainingOptions(_options_impl.OptionsDict):
             "accumulation_and_replication_reduction_type")
         return self
 
-    def accumulationReductionType(self, reduction_type):
+    def accumulationReductionType(self,
+                                  reduction_type: "poptorch.ReductionType"
+                                  ) -> "poptorch.options._TrainingOptions":
         """The type of reduction (sum or mean) applied to accumulated gradients.
 
             When using a non-unity value for gradientAccumulation, you can
@@ -314,7 +328,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
             and changes due to the different compute batch size e.g. batch
             normalisation).
 
-            :param poptorch.ReductionType accumulation_reduction_type:
+            :param accumulation_reduction_type:
                 * Mean: Reduce gradients by calculating the mean of them.
                 * Sum: Reduce gradients by calculating the sum of them.
             """
@@ -322,6 +336,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
         self.set(accumulation_reduction_type=reduction_type)
         self._warnings_disabled.add("accumulation_reduction_type")
+        return self
 
 
 class _PopartOptions:
@@ -329,7 +344,7 @@ class _PopartOptions:
 
     Only for advanced users.
 
-    Any option from `popart.SessionOptions` can be set using this class.
+    Most options from `popart.SessionOptions` can be set using this class.
 
     .. note:: there is no mapping for the various PopART enums so integers need
     to be used instead.
@@ -342,26 +357,29 @@ class _PopartOptions:
     >>>                  int(popart.SyntheticDataMode.RandomNormal))
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.options = {}
         self.set("rearrangeAnchorsOnHost", False)
 
-    def set(self, key, value):
+    def set(self, key: str, value: Union[int, float, str, List[str], Set[str]]
+            ) -> "poptorch.options._PopartOptions":
         self.options[key] = value
         return self
 
-    def setPatterns(self, patterns, level=2):
+    def setPatterns(self, patterns: Dict[str, bool],
+                    level: int = 2) -> "poptorch.options._PopartOptions":
         """Override the default patterns of Popart's compiler.
 
-        :param dict(str,bool) patterns: Dictionary of pattern names to
+        :param patterns: Dictionary of pattern names to
             enable / disable.
-        :param int level: Integer value corresponding to the
+        :param level: Integer value corresponding to the
             ``popart::PatternsLevel`` to use to initialise the ``Patterns``.
         """
         assert isinstance(level, int)
         assert isinstance(patterns, dict)
         self.options["patterns_level"] = level
         self.options["patterns"] = patterns
+        return self
 
 
 class _DistributedOptions(_options_impl.OptionsDict):
@@ -376,21 +394,22 @@ class _DistributedOptions(_options_impl.OptionsDict):
     >>> opts.Distributed.configureProcessId(0, 2)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(num_distributed_processes=1,
                          distributed_process_id=0,
                          ipuof_configs={})
         self._gcd_mappings = {}
         self.setEnvVarNames("OMPI_COMM_WORLD_SIZE", "OMPI_COMM_WORLD_RANK")
 
-    def disable(self):
+    def disable(self) -> "poptorch.options._DistributedOptions":
         """Ignore the current options / environment variables and disable
         distributed execution.
         """
         self.set(num_distributed_processes=1, distributed_process_id=0)
         return self
 
-    def setEnvVarNames(self, var_num_processes, var_process_id):
+    def setEnvVarNames(self, var_num_processes: str, var_process_id: str
+                       ) -> "poptorch.options._DistributedOptions":
         """Utility to read and set `processId` and `numProcesses` from
         environment variables.
 
@@ -406,7 +425,8 @@ class _DistributedOptions(_options_impl.OptionsDict):
             int(os.environ.get(var_process_id, "0")),
             int(os.environ.get(var_num_processes, "1")))
 
-    def configureProcessId(self, process_id, num_processes):
+    def configureProcessId(self, process_id: int, num_processes: int
+                           ) -> "poptorch.options._DistributedOptions":
         """Manually set the current process ID and the total number of processes.
 
         :param int process_id: The ID of this process.
@@ -418,12 +438,12 @@ class _DistributedOptions(_options_impl.OptionsDict):
         return self
 
     @property
-    def processId(self):
+    def processId(self) -> int:
         """Id of the current process."""
         return self.distributed_process_id
 
     @property
-    def numProcesses(self):
+    def numProcesses(self) -> int:
         """Total number of processes the execution is distributed over."""
         return self.num_distributed_processes
 
@@ -436,21 +456,24 @@ class TensorLocationSettings(_options_impl.OptionsDict):
     ...     poptorch.TensorLocationSettings().useOnChipStorage(False))
     """
 
-    def minElementsForOffChip(self, min_elements):
+    def minElementsForOffChip(self, min_elements: int
+                              ) -> "poptorch.TensorLocationSettings":
         """A minimum number of elements below which offloading
         won't be considered."""
         assert isinstance(min_elements, int)
         self.createOrSet(minElementsForOffChip=min_elements)
         return self
 
-    def minElementsForReplicatedTensorSharding(self, min_elements):
+    def minElementsForReplicatedTensorSharding(
+            self, min_elements: int) -> "poptorch.TensorLocationSettings":
         """Only enable Replicated Tensor Sharding (RTS) for tensors with more
         than `min_elements` elements."""
         assert isinstance(min_elements, int)
         self.createOrSet(minElementsForReplicatedTensorSharding=min_elements)
         return self
 
-    def useOnChipStorage(self, use=True):
+    def useOnChipStorage(self, use: bool = True
+                         ) -> "poptorch.TensorLocationSettings":
         """Permanent tensor storage
 
         :param bool use:
@@ -465,7 +488,8 @@ class TensorLocationSettings(_options_impl.OptionsDict):
             self.createOrSet(onChip=int(use))
         return self
 
-    def useReplicatedTensorSharding(self, use=True):
+    def useReplicatedTensorSharding(self, use: bool = True
+                                    ) -> "poptorch.TensorLocationSettings":
         """Enable replicated tensor sharding
 
         (relevant for weights and optimiser states)
@@ -474,23 +498,25 @@ class TensorLocationSettings(_options_impl.OptionsDict):
         self.createOrSet(useReplicatedTensorSharding=int(use))
         return self
 
-    def useIOTilesToLoad(self, use=True):
+    def useIOTilesToLoad(self, use: bool = True
+                         ) -> "poptorch.TensorLocationSettings":
         """Load tensor through IO tiles
 
-        :param bool use: Use IO tiles if True,
-                         use Compute tiles if False.
+        :param use: Use IO tiles if True,
+                    use Compute tiles if False.
         """
         assert isinstance(use, bool)
         self.createOrSet(useIOTilesToLoad=int(use))
         return self
 
-    def useIOTilesToStore(self, use=True):
+    def useIOTilesToStore(self, use: bool = True
+                          ) -> "poptorch.TensorLocationSettings":
         """Use IO tiles to store tensors.
 
         (relevant for replicated tensor sharded tensors)
 
-        :param bool use: Use IO tiles if True,
-                         use Compute tiles if False.
+        :param use: Use IO tiles if True,
+                    use Compute tiles if False.
         """
         assert isinstance(use, bool)
         self.createOrSet(useIOTilesToStore=int(use))
@@ -507,34 +533,39 @@ class _TensorLocationOptions(_options_impl.OptionsDict):
     ...     poptorch.TensorLocationSettings().useOnChipStorage(False))
     """
 
-    def setActivationLocation(self, location):
+    def setActivationLocation(self, location: "poptorch.TensorLocationSettings"
+                              ) -> "poptorch.options._TensorLocationOptions":
         """
-        :param poptorch.TensorLocationSettings location:
+        :param location:
             Update tensor location settings for activations.
         """
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_activation=location.toDict())
         return self
 
-    def setWeightLocation(self, location):
+    def setWeightLocation(self, location: "poptorch.TensorLocationSettings"
+                          ) -> "poptorch.options._TensorLocationOptions":
         """
-        :param poptorch.TensorLocationSettings location:
+        :param location:
             Update tensor location settings for weights.
         """
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_weight=location.toDict())
         return self
 
-    def setOptimizerLocation(self, location):
+    def setOptimizerLocation(self, location: "poptorch.TensorLocationSettings"
+                             ) -> "poptorch.options._TensorLocationOptions":
         """
-        :param poptorch.TensorLocationSettings location:
+        :param location:
             Update tensor location settings for optimiser states.
         """
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_optimizer=location.toDict())
         return self
 
-    def setAccumulatorLocation(self, location):
+    def setAccumulatorLocation(self,
+                               location: "poptorch.TensorLocationSettings"
+                               ) -> "poptorch.options._TensorLocationOptions":
         """
         :param poptorch.TensorLocationSettings location:
             Update tensor location settings for accumulators.
@@ -542,6 +573,9 @@ class _TensorLocationOptions(_options_impl.OptionsDict):
         assert isinstance(location, TensorLocationSettings)
         self.createOrSet(location_accumulator=location.toDict())
         return self
+
+
+BlockId = str
 
 
 class Stage:
@@ -553,7 +587,7 @@ class Stage:
         :py:class:`ParallelPhasedExecution`, :py:class:`SerialPhasedExecution`.
     """
 
-    def __init__(self, *block_ids):
+    def __init__(self, *block_ids: BlockId) -> None:
         assert all(isinstance(b, str) for b in block_ids), (
             "Block IDs are "
             f"supposed to be strings but got {block_ids}")
@@ -563,30 +597,30 @@ class Stage:
         self._ipu = None
 
     @property
-    def blocks(self):
+    def blocks(self) -> List[BlockId]:
         """List of blocks this stage is made of."""
         return self._blocks
 
-    def ipu(self, ipu):
+    def ipu(self, ipu: int) -> "poptorch.Stage":
         """Set the IPU on which this stage will run"""
         assert isinstance(ipu, int)
         self._ipu = ipu
         return self
 
-    def _setStage(self, stage):
+    def _setStage(self, stage: int) -> "poptorch.Stage":
         if stage is not None:
             self._stage_id = stage
         return self
 
 
 class _DefaultStageManager(_options_impl.IStageManager):
-    def __init__(self, auto_stage):
+    def __init__(self, auto_stage: "poptorch.AutoStage") -> None:
         super().__init__()
         self._next_id = 1
         self._block_map = {}
         self._auto_stage = auto_stage
 
-    def getStage(self, block_id):
+    def getStage(self, block_id: BlockId) -> "poptorch.Stage":
         if block_id not in self._block_map:
             stage = Stage(block_id)
             if self._auto_stage == enums.AutoStage.SameAsIpu:
@@ -631,13 +665,12 @@ class _IExecutionStrategy:
 class Phase:
     """Represents an execution phase"""
 
-    def __init__(self, arg):
+    def __init__(self, *arg: Union[BlockId, "poptorch.Stage"]):
         """ Create a phase.
 
         :param arg: must either be one or more
             :py:class:`Stages<poptorch.Stage>`, or one or more
             blocks ``user_id``.
-        :type arg: str, poptorch.Stage, [poptorch.Stage], [str]
 
         If one or more strings are passed they will be interpreted as
         :py:class:`Block` ids representing a single :py:class:`Stage`.
@@ -653,15 +686,13 @@ class Phase:
         >>> p = Phase(poptorch.Stage("A").ipu(0), poptorch.Stage("B").ipu(1))
         >>> p = Phase("A","B") # One Stage made of 2 blocks
         """
-        if isinstance(arg, (Stage, str)):
-            arg = [arg]
-
         if all([isinstance(elt, Stage) for elt in arg]):
             self.stages = arg
         else:
-            assert all([isinstance(elt, str)
-                        for elt in arg]), ("All arguments"
-                                           "must either be strings or Stages")
+            assert all([isinstance(elt, str) for elt in arg
+                        ]), ("All arguments must either "
+                             "be block ids (strings) or Stages: " +
+                             str([type(elt) for elt in arg]))
             self.stages = [Stage(*arg)]
 
     def stage(self, idx):
@@ -782,7 +813,8 @@ class ShardedExecution(PipelinedExecution):
 class _IPhasedExecution(_IExecutionStrategy):
     """Common interface for Phased execution strategies"""
 
-    def __init__(self, *phases):
+    def __init__(self, *phases: Union["poptorch.Phase", List["poptorch.Stage"],
+                                      List[BlockId]]):
         """Execute the model's blocks in phases
 
         :param phases: Definition of phases must be either:
@@ -803,7 +835,9 @@ class _IPhasedExecution(_IExecutionStrategy):
             if isinstance(args, Phase):
                 phase = args
             else:
-                phase = Phase(args)
+                if not isinstance(args, list):
+                    args = [args]
+                phase = Phase(*args)
             self._phases.append(phase)
             for _, stage in enumerate(phase.stages):
                 stage._phase_id = phase_id
@@ -839,17 +873,17 @@ class _IPhasedExecution(_IExecutionStrategy):
 
         super().__init__(stages_manager, block_map)
 
-    def phase(self, phase):
+    def phase(self, phase: int) -> "poptorch.Phase":
         """Return the requested :py:class:`poptorch.Phase`
 
-        :param int phase: Index of the phase
+        :param phase: Index of the phase
         """
         assert isinstance(
             phase,
             int) and phase >= 0, "Phases are identified by positive integers"
         return self._phases[phase]
 
-    def useSeparateBackwardPhase(self, use=True):
+    def useSeparateBackwardPhase(self, use: bool = True):
         """Given a forward pass with 3 phases (0,1,2), by default the phases
         will run as follows: ::
 
@@ -874,7 +908,7 @@ class _IPhasedExecution(_IExecutionStrategy):
         self._separate_backward_phase = use
         return self
 
-    def backendOptions(self):
+    def backendOptions(self) -> Dict[str, Union[int, bool]]:
         return {
             "execution_mode": 2,
             "separate_backward_phase": self._separate_backward_phase,
@@ -905,7 +939,7 @@ class ParallelPhasedExecution(_IPhasedExecution):
     >>> with poptorch.Block(): # user_id = "5"
     ...     layer()
     >>> opts = poptorch.Options()
-    >>> strategy = poptorch.ParalellPhasedExecution([
+    >>> strategy = poptorch.ParallelPhasedExecution([
     ...     poptorch.Phase(poptorch.Stage("0"), poptorch.Stage("1")),
     ...     poptorch.Phase(poptorch.Stage("2"), poptorch.Stage("3")),
     ...     poptorch.Phase(poptorch.Stage("4"), poptorch.Stage("5"))])
@@ -915,10 +949,11 @@ class ParallelPhasedExecution(_IPhasedExecution):
     >>> opts.setExecutionStrategy(strategy)
     """
 
-    def backendOptions(self):
+    def backendOptions(self) -> Dict[str, Union[int, bool]]:
         return {**super().backendOptions(), "serial_phases_execution": False}
 
-    def sendTensorsOffChipAfterFwd(self, off_chip=True):
+    def sendTensorsOffChipAfterFwd(self, off_chip: bool = True
+                                   ) -> "poptorch.ParallelPhasedExecution":
         assert isinstance(off_chip, bool)
         if off_chip:
             self._tensors_liveness = enums.Liveness.OffChipAfterFwd
@@ -959,14 +994,15 @@ class SerialPhasedExecution(_IPhasedExecution):
     >>> opts.setExecutionStrategy(strategy)
     """
 
-    def setTensorsLiveness(self, liveness):
+    def setTensorsLiveness(self, liveness: "poptorch.Liveness"
+                           ) -> "poptorch.SerialPhasedExecution":
         """See :py:class:`poptorch.Liveness` for more information
         """
         assert isinstance(liveness, enums.Liveness)
         self._tensors_liveness = liveness
         return self
 
-    def backendOptions(self):
+    def backendOptions(self) -> Dict[str, Union[int, bool]]:
         return {**super().backendOptions(), "serial_phases_execution": True}
 
 
@@ -1019,14 +1055,15 @@ class Options(_options_impl.OptionsDict):
         # By default only enable the progress bar if we run in a terminal
         self.showCompilationProgressBar(runs_in_terminal)
 
-    def showCompilationProgressBar(self, show=True):
+    def showCompilationProgressBar(self,
+                                   show: bool = True) -> "poptorch.Options":
         """"Show / hide a progress bar while the model is being compiled.
         (The progress bar is shown by default)
         """
         self._show_compilation_progress_bar = show
         return self
 
-    def loadFromFile(self, filepath):
+    def loadFromFile(self, filepath: str) -> "poptorch.Options":
         """Load options from a config file where each line in the file
         corresponds to a single option being set. To set an option, simply
         specify how you would set the option within a Python script, but omit
@@ -1037,8 +1074,10 @@ class Options(_options_impl.OptionsDict):
         contents ``deviceIterations(1)``.
         """
         _options_config.parseAndSetOptions(self, filepath)
+        return self
 
-    def relaxOptimizerAttributesChecks(self, relax=True):
+    def relaxOptimizerAttributesChecks(self, relax: bool = True
+                                       ) -> "poptorch.Options":
         """Controls whether unexpeted attributes in
         :py:func:`~poptorch.PoplarExecutor.setOptimizer()` lead to warnings or
         debug messages.
@@ -1047,7 +1086,7 @@ class Options(_options_impl.OptionsDict):
         unexpected attributes in
         :py:func:`~poptorch.PoplarExecutor.setOptimizer()`.
 
-        :param bool relax:
+        :param relax:
             * True: Redirect warnings to the debug channel.
             * False: Print warnings about unexpected attributes (default
               behaviour).
@@ -1058,14 +1097,14 @@ class Options(_options_impl.OptionsDict):
         return self
 
     @property
-    def TensorLocations(self):
+    def TensorLocations(self) -> "poptorch.options._TensorLocationOptions":
         """Options related to tensor locations.
 
         .. seealso:: :py:class:`poptorch.options._TensorLocationOptions`"""
         return self._tensor_locations
 
     @property
-    def Distributed(self):
+    def Distributed(self) -> "poptorch.options._DistributedOptions":
         """Options specific to running on multiple IPU server (IPU-POD).
 
         You should not use these when using PopRun/PopDist. Instead use
@@ -1075,14 +1114,14 @@ class Options(_options_impl.OptionsDict):
         return self._distributed
 
     @property
-    def Jit(self):
+    def Jit(self) -> "poptorch.options._JitOptions":
         """Options specific to upstream PyTorch's JIT compiler.
 
         .. seealso:: :py:class:`poptorch.options._JitOptions`"""
         return self._jit
 
     @property
-    def Precision(self):
+    def Precision(self) -> "poptorch.options._PrecisionOptions":
         """Options specific to the processing of the JIT graph prior to lowering
         to Popart.
 
@@ -1090,7 +1129,7 @@ class Options(_options_impl.OptionsDict):
         return self._graphProcessing
 
     @property
-    def Training(self):
+    def Training(self) -> "poptorch.options._TrainingOptions":
         """Options specific to training.
 
         .. seealso:: :py:class:`poptorch.options._TrainingOptions`"""
@@ -1100,25 +1139,26 @@ class Options(_options_impl.OptionsDict):
     @deprecated(
         'poptorch.Options', '2.0',
         'Use poptorch.Options._Popart instead for experimental use only')
-    def Popart(self):
+    def Popart(self) -> "poptorch.options._PopartOptions":
         """(Deprecated) Options specific to the PopART backend. (Advanced users
         only).
         """
         return self._popart
 
     @property
-    def _Popart(self):
+    def _Popart(self) -> "poptorch.options._PopartOptions":
         """Options specific to the PopART backend.
         (Advanced users only)."""
         return self._popart
 
-    def autoRoundNumIPUs(self, auto_round_num_ipus):
+    def autoRoundNumIPUs(self, auto_round_num_ipus: bool = True
+                         ) -> "poptorch.Options":
         """Whether or not to round up the number of IPUs used automatically: the
         number of IPUs requested must be a power of 2. By default, an error
         occurs if the model uses an unsupported number of IPUs
         to prevent you unintentionally overbooking IPUs.
 
-        :param bool auto_round_num_ipus:
+        :param auto_round_num_ipus:
             * True: round up the number of IPUs to a power of 2 or multiple of
               64 automatically.
             * False: error if the number of IPUs is not supported.
@@ -1127,7 +1167,7 @@ class Options(_options_impl.OptionsDict):
         self.set(auto_round_num_ipus=auto_round_num_ipus)
         return self
 
-    def deviceIterations(self, device_iterations):
+    def deviceIterations(self, device_iterations: int) -> "poptorch.Options":
         """Number of iterations the device should run over the data before
         returning to the user (default: 1).
 
@@ -1139,7 +1179,10 @@ class Options(_options_impl.OptionsDict):
         self.set(device_iterations=device_iterations)
         return self
 
-    def setExecutionStrategy(self, strategy):
+    def setExecutionStrategy(
+            self, strategy: Union["poptorch.ParallelPhasedExecution",
+                                  "poptorch.SerialPhasedExecution"]
+    ) -> "poptorch.Options":
         """Set the execution strategy to use to partition the graph.
 
         :param strategy:
@@ -1153,7 +1196,8 @@ class Options(_options_impl.OptionsDict):
         self._execution_strategy = strategy
         return self
 
-    def setAvailableMemoryProportion(self, available_memory_proportion):
+    def setAvailableMemoryProportion(
+            self, available_memory_proportion: Dict[str, float]):
         """Memory is set on a per IPU basis, this should be a dictionary
         of IPU ids and float values between 0 and 1.
 
@@ -1174,7 +1218,7 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(available_memory_proportion=actual_memory)
         return self
 
-    def replicationFactor(self, replication_factor):
+    def replicationFactor(self, replication_factor: int) -> "poptorch.Options":
         """Number of times to replicate the model (default: 1).
 
         Replicating the model increases the data throughput of the model as
@@ -1183,27 +1227,27 @@ class Options(_options_impl.OptionsDict):
         a ``replication_factor`` of 2 will use 2 IPUs; if your model uses 4
         IPUs, a replication factor of 4 will use 16 IPUs in total.
 
-        :param int replication_factor:
+        :param replication_factor:
             Number of replicas of the model to create.
         """
         self.set(replication_factor=replication_factor)
         return self
 
-    def logDir(self, log_dir):
+    def logDir(self, log_dir: str) -> "poptorch.Options":
         """Set the log directoery
 
-        :param str log_dir:
+        :param log_dir:
             Directory where Poptorch saves log files (default: current
             directory)
         """
         self.set(log_dir=log_dir)
         return self
 
-    def enableExecutableCaching(self, path):
+    def enableExecutableCaching(self, path: str) -> "poptorch.Options":
         """Load/save Poplar executables to the specified ``path``, using it as
         a cache,  to avoid recompiling identical graphs.
 
-        :param str path:
+        :param path:
             File path for Poplar executation cache store; setting ``path`` to
             None`` disables executable caching.
         """
@@ -1214,7 +1258,7 @@ class Options(_options_impl.OptionsDict):
             self._Popart.set("enableEngineCaching", True)
         return self
 
-    def useIpuModel(self, use_model):
+    def useIpuModel(self, use_model: bool) -> "poptorch.Options":
         """Whether to use the IPU Model or physical hardware (default)
 
         The IPU model simulates the behaviour of IPU hardware but does not offer
@@ -1224,17 +1268,18 @@ class Options(_options_impl.OptionsDict):
         This setting takes precedence over the ``POPTORCH_IPU_MODEL``
         environment variable.
 
-        :param bool use_model:
+        :param use_model:
             * True: Use the IPU Model.
             * False: Use IPU hardware.
         """
         self.set(use_model=use_model)
         return self
 
-    def connectionType(self, connection_type):
+    def connectionType(self, connection_type: "poptorch.ConnectionType"
+                       ) -> "poptorch.Options":
         """When to connect to the IPU (if at all).
 
-        :param poptorch.ConnectionType connection_type:
+        :param connection_type:
             * Always: Attach to the IPU from the start (default).
             * OnDemand: Wait until the compilation is complete and the
               executable is ready to be run to attach to the IPU.
@@ -1251,7 +1296,8 @@ class Options(_options_impl.OptionsDict):
         self.set(connection_type=connection_type.value)
         return self
 
-    def syncPattern(self, sync_pattern):
+    def syncPattern(self, sync_pattern: "poptorch.SyncPattern"
+                    ) -> "poptorch.Options":
         """Set the IPU SyncPattern.
 
         :param poptorch.SyncPattern sync_pattern:
@@ -1263,7 +1309,7 @@ class Options(_options_impl.OptionsDict):
         self.set(sync_pattern=sync_pattern.value)
         return self
 
-    def useIpuId(self, ipu_id):
+    def useIpuId(self, ipu_id: int) -> "poptorch.Options":
         """ Use the IPU device specified by the ID (as provided by `gc-info`)
 
         A device ID may refer to a single or to a group of IPUs (a multi-IPU
@@ -1285,20 +1331,23 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(ipu_id=ipu_id)
         return self
 
-    def useOfflineIpuTarget(self, ipu_version=2):
+    def useOfflineIpuTarget(self, ipu_version: int = 2) -> "poptorch.Options":
         """Create an offline IPU target that can only be used for offline compilation.
 
         .. note:: the offline IPU target cannot be used if the IPU model is
             enabled.
 
-        :param int ipu_version: IPU version to target (1 for mk1, 2 for mk2).
+        :param ipu_version: IPU version to target (1 for mk1, 2 for mk2).
             Default: 2.
         """
         self.connectionType(enums.ConnectionType.Never)
         self.createOrSet(ipu_version=ipu_version)
         return self
 
-    def anchorMode(self, anchor_mode, anchor_return_period=None):
+    def anchorMode(self,
+                   anchor_mode: "poptorch.AnchorMode",
+                   anchor_return_period: Optional[int] = None
+                   ) -> "poptorch.Options":
         """ Specify which data to return from a model.
 
         :param poptorch.AnchorMode anchor_mode:
@@ -1333,7 +1382,7 @@ class Options(_options_impl.OptionsDict):
                  anchor_return_period=anchor_return_period or 1)
         return self
 
-    def defaultAnchorMode(self):
+    def defaultAnchorMode(self) -> bool:
         """
         :return:
             * True: :py:func:`~poptorch.Options.anchorMode` is currently set to
@@ -1343,10 +1392,10 @@ class Options(_options_impl.OptionsDict):
         """
         return self.anchor_mode == enums.AnchorMode.Default
 
-    def randomSeed(self, random_seed):
+    def randomSeed(self, random_seed: int) -> "poptorch.Options":
         """Set the seed for the random number generator on the IPU.
 
-        :param int random_seed:
+        :param random_seed:
             Random seed integer.
         """
         assert isinstance(random_seed, int)
@@ -1354,24 +1403,24 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(random_seed=random_seed)
         return self
 
-    def enableStableNorm(self, enabled):
+    def enableStableNorm(self, enabled: bool) -> "poptorch.Options":
         """Set whether a stable version of norm operators is used.
         This stable version is slower, but more accurate than its
         unstable counterpart.
 
-        :param bool enabled:
+        :param enabled:
             * True: Use stable norm calculation.
             * False: Do not use stable norm calculation.
         """
         self._Popart.set("enableStableNorm", enabled)
         return self
 
-    def enableSyntheticData(self, enabled):
+    def enableSyntheticData(self, enabled: bool) -> "poptorch.Options":
         """Set whether host I/O is disabled and synthetic data
         is generated on the IPU instead. This can be used to benchmark
         models whilst simulating perfect I/O conditions.
 
-        :param bool enabled:
+        :param enabled:
             * True: Use data generated from a random normal distribution
               on the IPU. Host I/O is disabled.
             * False: Host I/O is enabled and real data is used.
@@ -1384,7 +1433,7 @@ class Options(_options_impl.OptionsDict):
         self._Popart.set("syntheticDataMode", mode)
         return self
 
-    def toDict(self):
+    def toDict(self) -> Dict[str, Any]:
         """ Merge all the options, except for the JIT and Precision
         options, into a single dictionary to be serialised and passed to the C++
         backend.
