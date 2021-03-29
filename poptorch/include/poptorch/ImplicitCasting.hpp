@@ -19,10 +19,10 @@ namespace poptorch {
 enum class HalfFloatCasting { FloatDowncastToHalf = 0, HalfUpcastToFloat };
 
 void setHalfFloatCastingBehavior(HalfFloatCasting behavior);
-void setRunningVarianceAlwaysFloat(bool);
+void setRunningStatisticsAlwaysFloat(bool);
 HalfFloatCasting halfFloatCastingBehavior();
 
-bool runningVarianceAlwaysFloat();
+bool runningStatisticsAlwaysFloat();
 
 enum class ImplicitCast {
   None,

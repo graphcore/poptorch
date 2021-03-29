@@ -19,6 +19,8 @@ New features
 - Add support for ``torch.median``
 - Add support for ``torch.index_select``
 - Deprecated ``poptorch.Options.Training.accumulationReductionType`` in favour of ``poptorch.Options.Training.accumulationAndReplicationReductionType``
+- Deprecated ``runningVarianceAlwaysFloat`` in favour of ``runningStatisticsAlwaysFloat`` in ``poptorch.Options.Precision``,
+  as this new option computes both the running mean and variance in FP32 when this option is set to `True`.
 
 v2.0 (Poplar SDK 2.0)
 =====================
