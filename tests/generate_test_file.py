@@ -31,37 +31,54 @@ assert retval == pytest.ExitCode.OK, f"{str(retval)}: {list_tests.getvalue()}"
 # because they're small / short to run (Under 1 minute)
 # NB tests requring custom_ops libraries must go in here
 #pylint: disable=line-too-long
+# yapf: disable
 short_tests = [
-    "activations_test.py", "batching_test.py", "blas_test.py",
-    "buffers_test.py", "custom_loss_test.py", "custom_ops_attributes_test.py",
-    "custom_ops_test.py", "index_ops_test.py", "inputs_test.py",
-    "lstm_test.py", "loop_test.py", "misc_nn_layers_test.py",
-    "non_contiguous_tensors_test.py", "ops_test.py", "options_test.py",
-    "outputs_test.py", "pipelining_test.py", "poplar_executor_test.py",
-    "precompilation_test.py", "random_sampling_test.py",
-    "replicated_graph_test.py", "shape_inference_test.py", "sharding_test.py"
+    "activations_test.py",
+    "batching_test.py",
+    "blas_test.py",
+    "buffers_test.py",
+    "custom_loss_test.py",
+    "custom_ops_attributes_test.py",
+    "custom_ops_test.py",
+    "index_ops_test.py",
+    "inputs_test.py",
+    "loop_test.py",
+    "lstm_test.py",
+    "misc_nn_layers_test.py",
+    "non_contiguous_tensors_test.py",
+    "ops_test.py",
+    "options_test.py",
+    "outputs_test.py",
+    "pipelining_test.py",
+    "poplar_executor_test.py",
+    "precompilation_test.py",
+    "random_sampling_test.py",
+    "replicated_graph_test.py",
+    "shape_inference_test.py",
+    "sharding_test.py",
 ]
 
 long_tests = [
-    "torch_nn_test.py::test_pytorch_nn[True-test_nn_Conv2d_circular_stride2_pad2]",
     "bert_small_and_medium_test.py::test_bert_medium_result",
+    "half_test.py::test_resnet",
     "torch_nn_test.py::test_pytorch_nn[False-test_nn_Conv2d_circular_stride2_pad2]",
-    "torchvision_inference_test.py::test_mobilenet_v2",
-    "torchvision_inference_test.py::test_resnet18",
-    "torchvision_inference_test.py::test_mnasnet1_0",
-    "torchvision_inference_test.py::test_resnext50_32x4d",
+    "torch_nn_test.py::test_pytorch_nn[True-test_nn_Conv2d_circular_stride2_pad2]",
     "torchvision_inference_test.py::test_googlenet",
     "torchvision_inference_test.py::test_inception_v3",
+    "torchvision_inference_test.py::test_mnasnet1_0",
+    "torchvision_inference_test.py::test_mobilenet_v2",
+    "torchvision_inference_test.py::test_resnet18",
+    "torchvision_inference_test.py::test_resnext50_32x4d",
     "torchvision_inference_test.py::test_squeezenet1_1",
-    "half_test.py::test_resnet",
 ]
 
 # Tests depending on external data being downloaded to run.
 external_data_tests = [
+    "bert_small_and_medium_test.py::test_bert_medium_result",
     "bert_small_and_medium_test.py::test_bert_small",
     "bert_small_and_medium_test.py::test_bert_small_half",
-    "bert_small_and_medium_test.py::test_bert_medium_result",
 ]
+# yapf: enable
 
 # Tests that cannot run in parallel with other tests
 serial_tests = ["attach_detach_test.py", "attach_detach_wait_for_ipu_test.py"]
