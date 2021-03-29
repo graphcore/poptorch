@@ -364,10 +364,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
                 * Mean: Reduce gradients by calculating the mean of them.
                 * Sum: Reduce gradients by calculating the sum of them.
             """
-        self._check_reduction_arg(reduction_type, "accumulationReductionType")
-
-        self.set(accumulation_reduction_type=reduction_type)
-        self._warnings_disabled.add("accumulation_reduction_type")
+        self.accumulationAndReplicationReductionType(reduction_type)
         return self
 
 
