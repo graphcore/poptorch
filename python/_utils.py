@@ -13,8 +13,8 @@ def deprecated(domain, since_version, reason):
         def wrapped_func(*args, **kwargs):
             logger.warning(
                 "%s.%s is deprecated since version %s "
-                "and will be removed in a future release.\n%s.", domain,
-                func.__name__, since_version, reason)
+                "and will be removed in a future release.\nReason: %s.",
+                domain, func.__name__, since_version, reason)
             return func(*args, **kwargs)
 
         return wrapped_func

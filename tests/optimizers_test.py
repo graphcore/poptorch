@@ -630,7 +630,7 @@ def test_gradient_accum(reduction):
 
     opts = poptorch.Options()
     opts.Training.gradientAccumulation(accum)
-    opts.Training.accumulationReductionType(reduction)
+    opts.Training.accumulationAndReplicationReductionType(reduction)
 
     model = Model()
 

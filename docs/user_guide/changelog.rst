@@ -18,6 +18,7 @@ New features
 - Add support for ``torch.int8`` data types
 - Add support for ``torch.median``
 - Add support for ``torch.index_select``
+- Deprecated ``poptorch.Options.Training.accumulationReductionType`` in favour of ``poptorch.Options.Training.accumulationAndReplicationReductionType``
 
 v2.0 (Poplar SDK 2.0)
 =====================

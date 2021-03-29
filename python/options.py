@@ -315,6 +315,10 @@ class _TrainingOptions(_options_impl.OptionsDict):
             "accumulation_and_replication_reduction_type")
         return self
 
+    @deprecated(
+        'poptorch.Options.Training', '2.1',
+        'Use poptorch.Options.Training.accumulationAndReplicationReductionType'
+        ' instead')
     def accumulationReductionType(self,
                                   reduction_type: "poptorch.ReductionType"
                                   ) -> "poptorch.options._TrainingOptions":

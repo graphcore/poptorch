@@ -196,7 +196,8 @@ def run_gradient_accumulation_test(input, target, gradient_accumulations,
     opts.Training.gradientAccumulation(gradient_accumulations)
 
     if accumulation_reduction_type is not None:
-        opts.Training.accumulationReductionType(accumulation_reduction_type)
+        opts.Training.accumulationAndReplicationReductionType(
+            accumulation_reduction_type)
 
     poptorch_model = helpers.trainingModelWithLoss(
         model,
