@@ -158,3 +158,35 @@ def test_tensordot(dims):
     poptorch_out = poptorch_model(x, y)
 
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+@pytest.mark.parametrize("inplace", [True, False])
+@pytest.mark.parametrize("dim", range(-3, 3))
+def test_scatter_add(inplace, dim):
+    class Model(torch.nn.Module):
+        def __init__(self, dim, dim_size):
+            super().__init__()
+            self.dim = dim
+            self.dim_size = dim_size
+            self.inplace = inplace
+
+        def forward(self, src, index):
+            sz = list(src.shape)
+            sz[self.dim] = self.dim_size
+            out = torch.ones(sz)
+
+            if self.inplace:
+                return out.scatter_add_(self.dim, index, src)
+
+            return out.scatter_add(self.dim, index, src)
+
+    torch.manual_seed(0)
+    x = torch.randn(4, 16, 32)
+    dim_size = x.shape[dim] // 2
+    index = torch.randint_like(x, high=dim_size).long()
+    model = Model(dim, dim_size)
+
+    cpu_out = model(x, index)
+    pop_model = poptorch.inferenceModel(model)
+    ipu_out = pop_model(x, index)
+    helpers.assert_allclose(actual=ipu_out, expected=cpu_out)

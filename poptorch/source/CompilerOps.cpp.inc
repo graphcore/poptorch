@@ -175,6 +175,13 @@ new_node->is_(c10::Symbol::fromQualString("attr::axes"),axes);
 new_node->i_(c10::Symbol::fromQualString("attr::keepdims"),keepdims);
 return new_node;
 }
+torch::jit::Node* createScatterreduce(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t axis_size,std::int32_t axis,std::int32_t reduction) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::scatterreduce, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->i_(c10::Symbol::fromQualString("attr::axis_size"),axis_size);
+new_node->i_(c10::Symbol::fromQualString("attr::axis"),axis);
+new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
+return new_node;
+}
 torch::jit::Node* createAveragepool(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & kernel_shape,int64_t ceil_mode,int64_t count_include_pad,const std::vector<int64_t> & pads,const std::vector<int64_t> & strides) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::averagepool, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::kernel_shape"),kernel_shape);

@@ -237,11 +237,11 @@ OutputTypeSameAsFirstInput = [
     "reducelogsumexp", "reducemax", "reducemean", "reducemin", "reduceprod",
     "reducesum", "reducesumsquare", "relu", "remainder", "replicatedallreduce",
     "reshape", "resize", "reversesequence", "roialign", "round", "scale",
-    "scaledadd", "scatter", "selu", "sequenceerase", "shapeddropout", "shrink",
-    "sigmoid", "sign", "sin", "sinh", "slice", "softmax", "softplus",
-    "softsign", "spacetodepth", "split", "sqrt", "squeeze", "stringnormalizer",
-    "subsample", "tan", "tanh", "thresholdedrelu", "tile", "transpose",
-    "unique", "unsqueeze", "upsample"
+    "scaledadd", "scatter", "scatterreduce", "selu", "sequenceerase",
+    "shapeddropout", "shrink", "sigmoid", "sign", "sin", "sinh", "slice",
+    "softmax", "softplus", "softsign", "spacetodepth", "split", "sqrt",
+    "squeeze", "stringnormalizer", "subsample", "tan", "tanh",
+    "thresholdedrelu", "tile", "transpose", "unique", "unsqueeze", "upsample"
 ]
 
 FirstOutputTypeSameAsFirstInputButSecondAlwaysInt = ["topk", "reducemedian"]
@@ -288,6 +288,7 @@ CXXTypeToTypeClass = {
     "bool": "INT",
     "unsigned int": "INT",
     "popart::ReductionType": "INT",
+    "popart::ScatterReduction": "INT",
     "nonstd::optional<int64_t>": "INT",
     "nonstd::optional<int>": "INT",
     "Attributes::Int": "INT",
@@ -310,10 +311,15 @@ CXXTypeToTypeClass = {
 }
 
 
+# Cleans up raw C++ type to remove reference or const qualifiers
+def clean(cxxType):
+    return cxxType.replace("&", "").replace("const", "").strip().rstrip()
+
+
 # Convert the raw C++ type parsed from the header into the macro type.
 def toType(cxxType):
 
-    cleaned = cxxType.replace("&", "").replace("const", "").strip().rstrip()
+    cleaned = clean(cxxType)
 
     if cleaned in CXXTypeToTypeClass:
         return CXXTypeToTypeClass[cleaned]
@@ -328,6 +334,7 @@ CXX_TYPE_CONV_TABLE = {
     "nonstd::optional<int>": "std::int32_t",
     "nonstd::optional<int64_t>": "std::int32_t",
     "popart::ReductionType": "std::int32_t",
+    "popart::ScatterReduction": "std::int32_t",
     "nonstd::optional<float>": "float",
     "nonstd::optional<std::vector<int64_t>>": "std::vector<int64_t>",
     "Attributes::Ints": "std::vector<int64_t>",
@@ -485,8 +492,9 @@ for opset in classes:
 
             argVector += "ARG(" + macroType + "," + arg["name"] + ") "
 
-            if "ReductionType" in arg["type"]:
-                bodyArgVector += "BODY_ARG(static_cast<popart::ReductionType>("\
+            if any(arg["type"].endswith(s)
+                   for s in ["ReductionType", "ScatterReduction"]):
+                bodyArgVector += f"BODY_ARG(static_cast<{clean(arg['type'])}>("\
                 + arg["name"] + ")) "
             else:
                 bodyArgVector += "BODY_ARG(" + arg["name"] + ") "

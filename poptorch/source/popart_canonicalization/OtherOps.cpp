@@ -1,5 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "../PoptorchStaticInit.hpp"
+#include "../PoptorchSymbols.hpp"
 #include "EinsumOp.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
@@ -179,6 +180,20 @@ torch::jit::Node *tensordotHandler(torch::jit::Graph *graph,
   // Restore flattened dims
   return createReshape(graph, mm->output(), new_shape);
 }
+
+torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  auto output = node->input(0);
+  auto index = node->input(2);
+  auto src = node->input(3);
+  auto t = src->type()->expect<c10::TensorType>();
+  auto axis = handleDimensionParam(node->input(1), t);
+  auto shape = shapeFromTensor(node->output());
+  auto axissize = shape.at(axis);
+
+  auto sr = createScatterreduce(graph, {src, index}, axissize, axis, 0);
+  return createAdd(graph, {output, sr->output()});
+}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -186,6 +201,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::meshgrid, meshgridHandler);
   registerHandler(c10::aten::cartesian_prod, cartesianProdHandler);
   registerHandler(c10::aten::tensordot, tensordotHandler);
+  registerHandler(c10::aten::scatter_add, scatterAddHandler);
+  registerHandler(c10::aten::scatter_add_, scatterAddHandler);
 }
 
 } // namespace poptorch

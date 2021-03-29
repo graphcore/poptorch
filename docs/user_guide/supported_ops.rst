@@ -56,6 +56,7 @@ PyTorch functions
 * ``torch.chunk``
 * ``torch.index_select``
 * ``torch.reshape``
+* ``torch.scatter_add``
 * ``torch.stack``
 * ``torch.split``
 * ``torch.squeeze``

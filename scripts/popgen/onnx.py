@@ -203,6 +203,7 @@ def parse_signatures():
         'Attributes::Int': ['clong'],
         'Attributes::Ints': ['clong_list', 'empty_initializer'],
         'popart::ReductionType': ['cint', 'reduction'],
+        'popart::ScatterReduction': ['cint', 'scatter_reduction'],
         'popart::Builder':
         'ignore',
         'popart::ConstVoidData':
