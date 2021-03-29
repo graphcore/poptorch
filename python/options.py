@@ -1,6 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import os
-import sys
 from typing import Optional, Union, Dict, Any, List, Set
 import torch
 from . import autocasting
@@ -1050,10 +1049,7 @@ class Options(_options_impl.OptionsDict):
             self.enableExecutableCaching(path)
 
         self.relaxOptimizerAttributesChecks(False)
-        # tqdm prints to stderr, so only check stderr
-        runs_in_terminal = sys.stderr.isatty()
-        # By default only enable the progress bar if we run in a terminal
-        self.showCompilationProgressBar(runs_in_terminal)
+        self.showCompilationProgressBar(True)
 
     def showCompilationProgressBar(self,
                                    show: bool = True) -> "poptorch.Options":
