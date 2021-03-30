@@ -51,10 +51,6 @@ def test_einsum(params, implicit_rhs):
 
 
 def test_einsum_chained():
-    poptorch.setLogLevel("TRACE")  # TODO(T32513): Debug code to remove
-    torch.set_printoptions(
-        profile="full")  # TODO(T32513): Debug code to remove
-
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -69,14 +65,9 @@ def test_einsum_chained():
     y = torch.randn(1, 4, 16, 4, dtype=torch.float)
     z = torch.randn(1, 4, 16, 4, dtype=torch.float)
 
-    print("x=%s\n\ny=%s\n\nz=%s" %
-          (x, y, z))  # TODO(T32513): Debug code to remove
-
     native_out = model(x, y, z)
     poptorch_out = poptorch_model(x, y, z)
 
-    print("native_out=%s\n\npoptorch_out=%s" %
-          (native_out, poptorch_out))  # TODO(T32513): Debug code to remove
     assert native_out.size() == poptorch_out.size()
     helpers.assert_allclose(expected=native_out,
                             actual=poptorch_out,
