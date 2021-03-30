@@ -1541,14 +1541,11 @@ class AsynchronousWorker:
         self._process = _AsynchronousWorkerProcess(
             buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
             early_preload, sharing_strategy, rebatched_size)
-        self._previously_ready_element = None
-        self._ring_read_index = 0
-        self._buffer_size = buffer_size
         self._was_used = False
 
         # Keep end of file events in a special buffer shared between worker and device. This is due to the worker reseting automatically.
-        (self._command_pipe, self._ready_to_read_index, self._is_single_tensor,
-         self._eof_event_tensor, self._data_buffers) = self._process.start()
+        (self._command_pipe, self._is_single_tensor, self._eof_event_tensor,
+         self._data_buffers) = self._process.start()
 
     def terminate(self):
         if self._process.isAlive():
@@ -1572,28 +1569,21 @@ class AsynchronousWorker:
         self._was_used = False
 
     def dataIsAvailable(self):
-        return self._ready_to_read_index[self._ring_read_index]
+        return self._data_buffers.isAvailable()
 
     def endOfFile(self):
-        return self._eof_event_tensor[0] == self._ring_read_index
+        return self._eof_event_tensor[0] == self._data_buffers.currentIndex()
 
     def acquireElementIfAvailable(self):
-        assert self._previously_ready_element is None, (
+        assert not self._data_buffers.hasLock(), (
             "The current element "
             "must be released by calling releaseElement() before trying to "
             "acquire a new one")
         if not self.dataIsAvailable():
             return None
+        # Pull and lock the ready buffer.
+        data = self._data_buffers.lock()
         self._was_used = True
-        # Pull the ready buffer.
-        data = [buffer[self._ring_read_index] for buffer in self._data_buffers]
-
-        self._previously_ready_element = self._ring_read_index
-
-        self._ring_read_index += 1
-        # Ring back around.
-        if self._ring_read_index >= self._buffer_size:
-            self._ring_read_index = 0
 
         # Return either one tensor or the list.
         if self._is_single_tensor:
@@ -1610,9 +1600,7 @@ class AsynchronousWorker:
     def releaseElement(self):
         # Set the previous iteration to false so it can be pulled in now
         # avoiding any data races.
-        if self._previously_ready_element is not None:
-            self._ready_to_read_index[self._previously_ready_element] = False
-        self._previously_ready_element = None
+        self._data_buffers.unlockIfLocked()
 
     def _requestShutdown(self):
         # Send the exit signal if the worker is still alive.
@@ -1659,6 +1647,157 @@ class _HostCommandHandler:
         cmd = self.pipe.recv()
         assert isinstance(cmd,
                           _HostCommand) and cmd == _HostCommand.SetupComplete
+
+
+class _RingBufferIndex:
+    """The index ring buffer is a ``buffer_size`` list of booleans keeping track
+    which elements from the data ring buffers is ready to be written or ready to
+    be read.
+
+    * True: ready to write
+    * False: ready to read.
+
+    It is allocated using shared memory as it is shared between the worker
+    process (producer) and the main process (consumer).
+
+    The memory for the ring buffer will be allocated by the producer (Worker
+    process) and initialised to all False (i.e all ready to be written).
+    """
+
+    def __init__(self, buffer_size, indices_mem=None):
+        if indices_mem is not None:
+            self.buffers = indices_mem
+            assert len(indices_mem) == buffer_size
+        else:
+            self.buffers = torch.tensor([False] * buffer_size,
+                                        dtype=torch.bool).share_memory_()
+        self.buffer_size = buffer_size
+        self._index = 0
+
+    def increment(self):
+        self._index += 1
+        if self._index >= self.buffer_size:
+            self._index = 0
+
+    def reset(self):
+        self._index = 0
+
+    def set(self, value):
+        self.buffers[self._index] = value
+
+    def value(self):
+        return self.buffers[self._index]
+
+    def __call__(self):
+        return self._index
+
+
+class _IDataRingBuffer:
+    def __init__(self, buffer_size, data_len, indices_mem=None):
+        self._index = _RingBufferIndex(buffer_size, indices_mem)
+        D = data_len
+        B = buffer_size
+        assert buffer_size == self._index.buffer_size
+        # The structure of the allocated buffers is
+        # buffers[D][B][tensor] where:
+        # D = number of tensors in one tuple from the dataset
+        # B = number of buffers in ring buffer.
+        #
+        # but we're going to iterate over B so we will store
+        # the buffers as they get added to:
+        # buffers[B][D][tensor]
+        self._data = [[None] * D for _ in range(B)]
+
+    def setBuffer(self, buffer, data_idx):
+        """Add a new buffer to the ring
+        expecting the tensor to be of the shape
+        buffer[B][tensor] but we store tensors as:
+        buffers[B][D] so we need to shuffle the data.
+        """
+        assert len(buffer) == self._index.buffer_size
+        assert data_idx < len(self._data[0])
+        for d in range(self._index.buffer_size):
+            self._data[d][data_idx] = buffer[d]
+
+    @property
+    def current(self):
+        """Return the current buffer"""
+        return self._data[self._index()]
+
+    @property
+    def indices_mem(self):
+        """Return the shared memory buffer used
+        to store the indices"""
+        return self._index.buffers
+
+    def currentIndex(self):
+        return self._index()
+
+
+class _DataRingBufferWriter(_IDataRingBuffer):
+    """The writer's logic goes as follow:
+
+        - Wait for the current slot to become available for writing
+        - Fill the buffer
+        - Mark the buffer as ready to be read and move to the next one.
+
+        >>> while True:
+        ...     while not buffers.isAvailable():
+        ...         time.sleep()
+        ...     buffers.current.copy(data)
+        ...     buffers.markWriteComplete()
+    """
+
+    def markWriteComplete(self):
+        """Mark the current buffer as ready to
+        be read and move to the next buffer."""
+        self._index.set(True)
+        self._index.increment()
+
+    def isAvailable(self):
+        """Return True if the current index is available for writing,
+        or False if it contains a tensor which hasn't been read by the
+        consumer process yet."""
+        return not bool(self._index.value())
+
+
+class _DataRingBufferReader(_IDataRingBuffer):
+    """The reader's logic goes as follow:
+
+        - Wait for the current slot to become ready to read.
+        - Mark the buffer as locked for reading and move to next buffer.
+        - Read the locked buffer
+        - Release the locked buffer
+
+        Note: the consumer can check if the current buffer is available
+        while the previous one is still locked however it cannot lock
+        more than one buffer at any given time.
+    """
+
+    def __init__(self, buffer_size, data_len, indices_mem=None):
+        self._locked = None
+        super().__init__(buffer_size, data_len, indices_mem)
+
+    def isAvailable(self):
+        """Return True if the current buffer is ready to be read."""
+        return bool(self._index.value())
+
+    def hasLock(self):
+        """Return True if the ring buffer currently has a buffer
+        locked for reading."""
+        return self._locked is not None
+
+    def lock(self):
+        assert self._locked is None
+        self._locked = self.currentIndex()
+        data = self.current
+        self._index.increment()
+        return data
+
+    def unlockIfLocked(self):
+        if self._locked is not None:
+            self._index.buffers[self._locked] = False
+        self._locked = None
 
 
 class _AsynchronousWorkerProcess:
@@ -1735,22 +1874,23 @@ class _AsynchronousWorkerProcess:
         read_command_pipe.close()
 
         try:
-            ready_to_read_index = read_data_pipe.recv()
-            buffer_len = read_data_pipe.recv()
+            indices_mem = read_data_pipe.recv()
+            data_len = read_data_pipe.recv()
             is_single_tensor = read_data_pipe.recv()
             eof_event_tensor = read_data_pipe.recv()
-            data_buffers = []
+            buffers = _DataRingBufferReader(self._buffer_size, data_len,
+                                            indices_mem)
 
-            for _ in range(0, buffer_len):
+            for data_idx in range(0, data_len):
                 # Get the buffer from the host.
                 buffer = read_data_pipe.recv()
-                data_buffers.append(buffer)
+                buffers.setBuffer(buffer, data_idx)
 
             # We're all set: let the worker know.
             write_command_pipe.send(_HostCommand.SetupComplete)
             # We reuse the read_setup_complete_pipe pipe as a shutdown pipe
-            return (write_command_pipe, ready_to_read_index, is_single_tensor,
-                    eof_event_tensor, data_buffers)
+            return (write_command_pipe, is_single_tensor, eof_event_tensor,
+                    buffers)
         except EOFError:
             pass
         # Exit the except block before raising a cleaner exception otherwise the previous one will not be cleared.
@@ -1790,17 +1930,14 @@ class _AsynchronousWorkerProcess:
             is_single_tensor = True
             data = (data, )
 
+        # Tell the host how many tensors we will be sending.
+        data_length = len(data)
+
+        buffers = _DataRingBufferWriter(self._buffer_size, data_length)
         # We communicate with the host via an array of sentinel values to say
         # if the data is ready as this has much better latency than queue or
         # lock approaches.
-        ready_to_read_index = torch.tensor([False] * self._buffer_size,
-                                           dtype=torch.bool).share_memory_()
-        conn.send(ready_to_read_index)
-
-        data_buffers = []
-
-        # Tell the host how many tensors we will be sending.
-        data_length = len(data)
+        conn.send(buffers.indices_mem)
 
         conn.send(data_length)
         conn.send(is_single_tensor)
@@ -1836,8 +1973,8 @@ class _AsynchronousWorkerProcess:
             memory = tensor.expand(
                 self._buffer_size,
                 *tensor_size).clone().contiguous().share_memory_()
-            data_buffers.append(memory)
 
+            buffers.setBuffer(memory, index)
             # Send it to the host.
             conn.send(memory)
 
@@ -1845,10 +1982,7 @@ class _AsynchronousWorkerProcess:
         # If we're rebatching we need more than one element to make up a full
         # batch so we can't mark the first element as ready to be read yet.
         if not self._rebatched_size:
-            ready_to_read_index[0] = True
-            ring_write_index = 1
-        else:
-            ring_write_index = 0
+            buffers.markWriteComplete()
 
         host_handler = _HostCommandHandler(command_pipe)
 
@@ -1876,8 +2010,8 @@ class _AsynchronousWorkerProcess:
                 eof_reached = True
 
             # Wait for a writing slot to become available
-            while ready_to_read_index[
-                    ring_write_index] and not host_handler.shutdown_now:
+            while not buffers.isAvailable() \
+                    and not host_handler.shutdown_now:
                 # (Briefly) sleep the thread if we don't have a slot.
                 time.sleep(self._miss_sleep_time_in_ms)
                 host_handler.check_messages()
@@ -1888,7 +2022,7 @@ class _AsynchronousWorkerProcess:
             # We've got a writing slot
             if host_handler.reset_iterator:
                 # Tell the host where the last tensor is.
-                eof_tensor[0] = ring_write_index
+                eof_tensor[0] = buffers.currentIndex()
                 dataset_iterator = iter(self._dataset)
                 self._next_batch_idx = 0
 
@@ -1897,12 +2031,12 @@ class _AsynchronousWorkerProcess:
                 host_handler.reset_iterator = False
             elif eof_reached:
                 # Tell the host where the EOF occured.
-                eof_tensor[0] = ring_write_index
+                eof_tensor[0] = buffers.currentIndex()
                 # If we are not to load indefinitely we just kill the worker.
                 if not self._load_indefinitely:
                     logger.debug(
                         "AsynchronousDataAccessor worker: end of dataset"
-                        " reached signaled ot host: exiting")
+                        " reached signaled to host: exiting")
                     break
 
                 logger.debug(
@@ -1917,13 +2051,13 @@ class _AsynchronousWorkerProcess:
             else:
                 if self._rebatched_size:
                     for index, tensor in enumerate(data):
-                        data_buffers[index][ring_write_index].index_copy_(
+                        buffers.current[index].index_copy_(
                             0, torch.tensor([self._next_batch_idx]), tensor)
                     self._next_batch_idx += 1
                 else:
                     # Copy the tensor into the preallocated shared memory.
                     for index, tensor in enumerate(data):
-                        data_buffers[index][ring_write_index].copy_(tensor)
+                        buffers.current[index].copy_(tensor)
 
                 # If we're not rebatching: always notify the host an element is ready.
                 # Otherwise only notify the host if the full batch is ready.
@@ -1931,13 +2065,7 @@ class _AsynchronousWorkerProcess:
                         self._next_batch_idx == self._rebatched_size:
                     self._next_batch_idx = 0
                     # Tell the host this data is ready.
-                    ready_to_read_index[ring_write_index] = True
-
-                    ring_write_index += 1
-
-                    # Ring back around.
-                    if ring_write_index >= self._buffer_size:
-                        ring_write_index = 0
+                    buffers.markWriteComplete()
 
         logger.debug(
             "AsynchronousDataAccessor worker: ready to exit: checking parent"

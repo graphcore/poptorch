@@ -492,8 +492,9 @@ def test_early_preload():
 
     time.sleep(2)  # Give time for the worker to fill the buffer
 
-    assert sum(no_preload._accessor._worker._ready_to_read_index) == 1  # pylint: disable=protected-access
-    assert sum(preload._accessor._worker._ready_to_read_index) == num_buffers  # pylint: disable=protected-access
+    assert sum(no_preload._accessor._worker._data_buffers.indices_mem) == 1  # pylint: disable=protected-access, no-member
+    assert sum(
+        preload._accessor._worker._data_buffers.indices_mem) == num_buffers  # pylint: disable=protected-access, no-member
 
 
 def test_batch_size_None():
