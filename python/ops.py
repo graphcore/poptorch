@@ -3,7 +3,6 @@ from typing import Dict, List, Union
 import torch
 
 from . import enums
-from ._logging import logger
 
 _end_ipu_block = torch.ops.poptorch.end_ipu_block
 
@@ -540,31 +539,18 @@ class MultiConv():
         :returns: self, to support method chaining
         """
 
-        # TODO(T34238): enums.MultiConvPartialsType deprecated in 2.0
         def encode_dtype(dtype):
-            if dtype in [
-                    torch.float, torch.float32,
-                    enums.MultiConvPartialsType.Float
-            ]:
-                return enums.MultiConvPartialsType.Float.value
-            if dtype in [
-                    torch.half, torch.float16, enums.MultiConvPartialsType.Half
-            ]:
-                return enums.MultiConvPartialsType.Half.value
+            if dtype in [torch.float, torch.float32]:
+                return 0
+            if dtype in [torch.half, torch.float16]:
+                return 1
             raise ValueError(
                 'Invalid partials types. Expecting torch.float or torch.half')
 
         if isinstance(value, (list, tuple)):
             value = [encode_dtype(v) for v in value]
-            warn = any([not isinstance(v, torch.dtype) for v in value])
         else:
             value = (encode_dtype(value), )
-            warn = not isinstance(value, torch.dtype)
-
-        if warn:
-            logger.warning('Usage of enum.MultiConvPartialsType is now '
-                           'deprecated. Please use torch.float or '
-                           'torch.half instead')
 
         self._partials_types = value
         return self

@@ -87,35 +87,12 @@ def multiconv_harness(multiconv):
     assert_contains_multiconv(poptorch_model)
 
 
-def test_multiconv_options_broadcast_deprecated():
-    multiconv = (
-        poptorch.MultiConv().availableMemoryProportions(0.8).partialsTypes(
-            poptorch.MultiConvPartialsType.Float).planType(
-                poptorch.MultiConvPlanType.Parallel).perConvReservedTiles(
-                    100).cycleBackOff(0.3))
-
-    multiconv_harness(multiconv)
-
-
 def test_multiconv_options_broadcast():
     multiconv = (
         poptorch.MultiConv().availableMemoryProportions(0.8).partialsTypes(
             torch.float).planType(
                 poptorch.MultiConvPlanType.Parallel).perConvReservedTiles(
                     100).cycleBackOff(0.3))
-
-    multiconv_harness(multiconv)
-
-
-def test_multiconv_options_per_conv_deprecated():
-    partials_types = [
-        poptorch.MultiConvPartialsType.Float,
-        poptorch.MultiConvPartialsType.Float
-    ]
-    multiconv = (poptorch.MultiConv().availableMemoryProportions(
-        (0.8, 0.7)).partialsTypes(partials_types).planType(
-            poptorch.MultiConvPlanType.Parallel).perConvReservedTiles(
-                120).cycleBackOff(0.4))
 
     multiconv_harness(multiconv)
 
