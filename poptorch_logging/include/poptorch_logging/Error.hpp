@@ -2,10 +2,14 @@
 #ifndef INCLUDE_POPTORCH_LOGGING_ERROR_HPP
 #define INCLUDE_POPTORCH_LOGGING_ERROR_HPP
 
+#include <algorithm>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+
+#define ERROR_LOG "poptorch_error.log"
 
 namespace logging {
 
@@ -44,6 +48,18 @@ const char *shortPoptorchFilename(const char *filename);
   }                                                                            \
   catch (const std::out_of_range &e) {                                         \
     ERROR("'std::out_of_range' exception: " << e.what());                      \
+  }                                                                            \
+  catch (const std::runtime_error &e) {                                        \
+    const std::string &what = e.what();                                        \
+    if (std::count(what.begin(), what.end(), '\n') > 80) {                     \
+      std::ofstream log;                                                       \
+      log.open(ERROR_LOG);                                                     \
+      log << e.what();                                                         \
+      log.close();                                                             \
+      ERROR("'std::runtime_error' exception: See " ERROR_LOG " for "           \
+            "details");                                                        \
+    }                                                                          \
+    ERROR("'std::runtime_error' exception: " << e.what());                     \
   }                                                                            \
   catch (const std::exception &e) {                                            \
     ERROR("'std::exception' exception: " << e.what());                         \

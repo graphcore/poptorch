@@ -181,6 +181,29 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         self.set(running_statistics_always_float=value)
         return self
 
+    def enableFloatingPointExceptions(
+            self, enabled: bool) -> "poptorch.options._PrecisionOptions":
+        """Set whether floating point exceptions are enabled on the IPU.
+
+        When enabled, an exception will be generated when the IPU encounters
+        any one of the following:
+        * Operation resulting in subtraction of infinities
+        * Divisions by zero or by infinity
+        * Multiplications between zero and infinity
+        * Real operations producing complex results
+        * Comparison where any one operand is Not-a-Number
+
+       :param enabled:
+           * True: raise RuntimeError on floating point exception
+           * False: do not raise RuntimeError (default)
+        """
+
+        assert isinstance(enabled, bool), \
+            "enableFloatingPointExceptions needs to be set to a bool"
+
+        self._popart_options.set("enableFloatingPointChecks", enabled)
+        return self
+
     def enableStochasticRounding(self, enabled: bool
                                  ) -> "poptorch.options._PrecisionOptions":
         """Set whether stochastic rounding is enabled on the IPU.
