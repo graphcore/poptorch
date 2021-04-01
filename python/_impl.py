@@ -1610,9 +1610,16 @@ class AsynchronousWorker:
         # we'll miss eof and iterate over the ring buffer an extra time.
         if not self.dataIsAvailable() or self.endOfFile():
             return None
+        left_over = self._eof.leftOver(self._data_buffers.currentIndex())
         # Pull and lock the ready buffer.
         data = self._data_buffers.lock()
         self._was_used = True
+
+        if left_over > 0:
+            data = [d.narrow(0, 0, left_over) for d in data]
+            # Update the EOF flag to the real index and clear the
+            # left over value.
+            self._eof.setFlag(self._data_buffers.currentIndex())
 
         # Return either one tensor or the list.
         if self._is_single_tensor:
@@ -1766,12 +1773,13 @@ class _EndOfFileFlag:
             pass
 
     def isEofIndex(self, index):
-        return self.eof_mem[0] == index
+        return self.eof_mem[0] == index and self.eof_mem[1] == 0
 
-    def leftOver(self):
+    def leftOver(self, index):
         """Batch size of the tensor at the end of file index.
 
-        0 means there is no left over batches, the end of file index is empty.
+        0 either means it's not the end of the dataset yet or
+        there is no left over batches, the end of file index is empty.
         (It will contain the first element from the next iteration if a new
         iterator is created).
 
@@ -1779,7 +1787,9 @@ class _EndOfFileFlag:
         (The first element from the next iteration if a new iterator is
         created will be located at the next index).
         """
-        return self.eof_mem[1]
+        if self.eof_mem[0] == index:
+            return self.eof_mem[1]
+        return 0
 
     def clearFlag(self):
         self.eof_mem[1] = 0
@@ -1970,9 +1980,7 @@ class _AsynchronousWorkerProcess:
         self._process = None
         self._sharing_strategy = sharing_strategy
         self._rebatched_size = rebatched_size
-        # Only used when rebatch is used: index of the next batch to copy
-        # Start from 1, because 0 will be filled when creating the buffer
-        self._next_batch_idx = 1
+        self._next_batch_idx = 0
 
     def isAlive(self):
         return self._process.exitcode is None
@@ -2070,6 +2078,7 @@ class _AsynchronousWorkerProcess:
             with open(self._dataset, "rb") as f:
                 self._dataset = pickle.load(f)
         dataset_iterator = iter(self._dataset)
+        rebatched_drop_last = getattr(self._dataset, "drop_last", True)
 
         data = None
         try:
@@ -2097,20 +2106,6 @@ class _AsynchronousWorkerProcess:
         conn.send(data_length)
         conn.send(is_single_tensor)
 
-        # Share a small buffer with host to signal EOF and where in ring
-        # buffer the event occured.
-        #
-        # First value:
-        # -1 means no event and the worker will keep loading until EOF is
-        # reached or the buffer is full.
-        #
-        # Any other value: wait for an iterator to be created to start
-        # loading more data.
-        #
-        # Second value: (Only used when rebatching + drop_last=False):
-        #
-        # 0: Full tensor (Same as the previous ones)
-        # 0 < N < rebatch_size: Number of tensors in the left-over batch
         eof = _EndOfFileFlag(eof_mem=None)
         conn.send(eof.eof_mem)
 
@@ -2140,7 +2135,9 @@ class _AsynchronousWorkerProcess:
         # We've loaded the first element as part of the spin up process.
         # If we're rebatching we need more than one element to make up a full
         # batch so we can't mark the first element as ready to be read yet.
-        if not self._rebatched_size:
+        if self._rebatched_size is not None:
+            self._next_batch_idx = 1
+        else:
             buffers.markWriteComplete()
 
         host_handler = _HostCommandHandler(command_pipe)
@@ -2223,7 +2220,16 @@ class _AsynchronousWorkerProcess:
                     if not host_handler.waitUntilStartIteration():
                         continue  # reset or shutdown
 
-                eof.setFlag(buffers.currentIndex(), self._next_batch_idx)
+                if self._rebatched_size and not rebatched_drop_last \
+                    and self._next_batch_idx != 0:
+                    eof.setFlag(buffers.currentIndex(), self._next_batch_idx)
+                    # We're in the middle of a rebatch so the buffer
+                    # should already be available from previous
+                    # batch indices.
+                    assert buffers.isAvailable()
+                    buffers.markWriteComplete()
+                else:
+                    eof.setFlag(buffers.currentIndex(), 0)
 
                 # If we are not to load indefinitely we wait for the host
                 # to explicitly ask for a new iterator to be created.

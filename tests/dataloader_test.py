@@ -845,3 +845,56 @@ def test_iterable_dataloader_len(mode):
     for n, _ in enumerate(loader):
         pass
     assert n + 1 == num_iterations_expected
+
+
+@pytest.mark.parametrize(
+    "mode",
+    {poptorch.DataLoaderMode.AsyncRebatched, poptorch.DataLoaderMode.Sync})
+def test_iterable_leftover(mode):
+    shape = [2, 3]
+    num_tensors = 101
+    num_workers = 7
+    batch_size = 6
+    # Note: Upstream torch returns the theoretical length
+    # it doesn't take into account the items lost per worker.
+    expected_len = math.ceil(num_tensors / batch_size)
+    if mode != poptorch.DataLoaderMode.AsyncRebatched:
+        # Expected tensors
+        # tensors per worker = ceil(101/7) = 15
+        # last worker = 11 tensor
+        # batch size = 6
+        # Total = 6 * floor(15 / 6) + floor(11/6)
+        #       = 6 * 2 + 1 = 13
+        # Left over per worker: 3, 5 for the first one
+        num_full_iterations_expected = 13
+        left_over_batches = [5] + [3] * 6
+    else:
+        # Best case expected: floor(101/6) = 16 -> unused = 5
+        num_full_iterations_expected = 16
+        left_over_batches = [5]
+    ds = IncrementIterableDatasetWithLen(shape, num_tensors)
+    assert len(ds) == num_tensors
+    n = 0
+    for n, d in enumerate(ds):
+        assert d.shape == torch.Size(shape)
+
+    assert n + 1 == num_tensors
+    opts = poptorch.Options()
+    loader = poptorch.DataLoader(opts,
+                                 ds,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 worker_init_fn=_worker_init_fn,
+                                 drop_last=False,
+                                 mode=mode)
+
+    assert len(loader) == expected_len
+    for n, d in enumerate(loader):
+        if n >= num_full_iterations_expected:
+            batch = left_over_batches[n - num_full_iterations_expected]
+        else:
+            batch = batch_size
+        assert d.shape == torch.Size([batch, *shape])
+    num_iterations_expected = num_full_iterations_expected + len(
+        left_over_batches)
+    assert n + 1 == num_iterations_expected

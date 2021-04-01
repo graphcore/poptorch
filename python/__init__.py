@@ -270,6 +270,9 @@ class DataLoader(torch.utils.data.DataLoader):
         # adjust the dataset's length.
         dataset_len = super().__len__()
         if self._accessor is not None and self._accessor.rebatched_size:
+            if not self.drop_last:
+                # Round up
+                dataset_len += self._accessor.rebatched_size - 1
             dataset_len = dataset_len // self._accessor.rebatched_size
         return dataset_len
 
@@ -362,25 +365,38 @@ class AsynchronousDataAccessor:
         :param rebatched_size: If not None: return N batched tensors from
             the dataset per iteration. (The passed dataset must have a
             batch_size of 1).
-        """
 
-        self._dataset = dataset
-        # To avoid hangs when the application exits: implicitly call terminate().
-        atexit.register(self.terminate)
+        .. note :: If dataset is an iterable-type ``poptorch.DataLoader``
+            configured with ``drop_last=False`` then ``rebatched_size``
+            must be used.
+        """
 
         # Ensure the DataLoader doesn't already have an AsynchronousDataAccessor
         if isinstance(dataset, DataLoader) and dataset._accessor is not None:
             raise RuntimeError(
-                'The DataLoader already uses an '
-                'AsynchronousDataAccessor internally. Either use '
-                'the existing one or set mode=\'poptorch.DataLoaderMode.Sync\''
-                ' in the DataLoader.')
+                "The DataLoader already uses an "
+                "AsynchronousDataAccessor internally. Either use "
+                "the existing one or set mode='poptorch.DataLoaderMode.Sync'"
+                " in the DataLoader.")
 
-        # Set _worker to None  in case something goes wrong in the AsynchronousWorker constructor
-        self._worker = None
+        if isinstance(dataset, DataLoader) and not dataset.drop_last and \
+                rebatched_size is None and dataset._is_iterable:
+            # Otherwise we'll end up with one left over tensor per worker
+            # to return to the main process and we don't currently
+            # support that.
+            assert dataset.combinedBatchSize is None or \
+                   dataset.combinedBatchSize == 1, (
+                       "The 'drop_last=False' option from the DataLoader only "
+                       "works if 'rebatched_size' is specified too.")
         if rebatched_size is not None:
             assert rebatched_size > 1, ("rebatched_size"
                                         " must be None or greater than 1")
+
+        self._dataset = dataset
+        # Set _worker to None  in case something goes wrong in the AsynchronousWorker constructor
+        self._worker = None
+        # To avoid hangs when the application exits: implicitly call terminate().
+        atexit.register(self.terminate)
         self.rebatched_size = rebatched_size
         self._worker = _impl.AsynchronousWorker(
             buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
