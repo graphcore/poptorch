@@ -2,6 +2,7 @@
 import datetime as dt
 import logging
 import os
+import signal
 import sys
 import subprocess
 import traceback
@@ -9,6 +10,7 @@ import faulthandler
 
 # Print tracebacks even when Python dies (e.g Segfault)
 faulthandler.enable()
+faulthandler.register(signal.SIGTERM.value, chain=True)  # pylint: disable=no-member
 
 # Create a poptorch logger which outputs to the console INFO messages and above
 logger = logging.getLogger("poptorch::python")
