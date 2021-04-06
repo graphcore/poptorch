@@ -326,6 +326,11 @@ class AsynchronousDataAccessor:
         method which means your dataset must be serializable by ``pickle``.
         For more information see
         https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
+
+    .. note:: When using a ``torch.utils.data.Dataset`` with ``rebatched_size``
+        the accessor will default to ``drop_last=True``, to change that
+        behaviour wrap the dataset into a
+        ``poptorch.DataLoader(..., drop_last=False)``.
     """
 
     def __init__(
@@ -373,10 +378,9 @@ class AsynchronousDataAccessor:
 
         # Set _worker to None  in case something goes wrong in the AsynchronousWorker constructor
         self._worker = None
-
-        assert rebatched_size is None or rebatched_size > 1, (
-            "rebatched_size"
-            " must be None or greater than 1")
+        if rebatched_size is not None:
+            assert rebatched_size > 1, ("rebatched_size"
+                                        " must be None or greater than 1")
         self.rebatched_size = rebatched_size
         self._worker = _impl.AsynchronousWorker(
             buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
@@ -415,8 +419,7 @@ class AsynchronousDataAccessor:
             data = self._worker.acquireElementIfAvailable()
             if data is not None:
                 return data
-
-        self._worker.assertNoError()
+            self._worker.assertNoError()
         # EOF event
         raise StopIteration
 

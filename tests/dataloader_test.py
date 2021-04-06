@@ -237,17 +237,17 @@ def _run_process_label_test(shape=None,
 
     total = torch.zeros(shape)
     label_out = torch.zeros(1, dtype=torch.int)
-    for _, (data, label) in enumerate(loader):
+    for (data, label) in loader:
         out, label = model(data, label)
         total += torch.sum(out, dim=0)
         label_out += torch.sum(label, dim=0)
 
-    actual = 0
+    expected = 0
     for i in range(0, num_tensors):
-        actual += i * 2
+        expected += i * 2
 
-    numpy.testing.assert_array_equal(total[0][0].numpy(), [actual])
-    numpy.testing.assert_array_equal(label_out[0].item(), [actual])
+    numpy.testing.assert_array_equal(total[0][0].numpy(), [expected])
+    numpy.testing.assert_array_equal(label_out[0].item(), [expected])
 
 
 def test_multithreaded4():

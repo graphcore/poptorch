@@ -1413,7 +1413,7 @@ class PoplarExecutor:
 
         self._options._execution_strategy.onEndTracing()
 
-        if self._RestoreInputsIfRequired(in_tensors_backup,
+        if self._restoreInputsIfRequired(in_tensors_backup,
                                          in_tensors_trace_view_tuple):
             logger.warning(
                 "An input tensor is modified in-place by the model. This is "
@@ -1504,7 +1504,7 @@ class PoplarExecutor:
         self._dict_optimizer = {}
 
     @classmethod
-    def _RestoreInputsIfRequired(cls, backup, post_trace):
+    def _restoreInputsIfRequired(cls, backup, post_trace):
         if isinstance(backup, torch.Tensor):
             assert isinstance(post_trace, torch.Tensor)
 
@@ -1521,7 +1521,7 @@ class PoplarExecutor:
             assert isinstance(post_trace, (tuple, list))
             assert len(backup) == len(post_trace)
             for idx, backup_val in enumerate(backup):
-                if cls._RestoreInputsIfRequired(backup_val, post_trace[idx]):
+                if cls._restoreInputsIfRequired(backup_val, post_trace[idx]):
                     restore_required = True
 
             return restore_required
@@ -1542,9 +1542,10 @@ class AsynchronousWorker:
             buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
             early_preload, sharing_strategy, rebatched_size)
         self._was_used = False
+        self._worker_started = False
 
         # Keep end of file events in a special buffer shared between worker and device. This is due to the worker reseting automatically.
-        (self._command_pipe, self._is_single_tensor, self._eof_event_tensor,
+        (self._command_pipe, self._is_single_tensor, self._eof,
          self._data_buffers) = self._process.start()
 
     def terminate(self):
@@ -1554,32 +1555,60 @@ class AsynchronousWorker:
         self._process.join()
 
     def resetIterator(self):
-        if self._was_used and not self.endOfFile():
+        if self._worker_started and not self._was_used:
+            # The current iterator hasn't been used: nothing to do.
+            return
+
+        # Reset if:
+        # - The EOF was reached and the worker is waiting to know if it
+        #   should create a new iterator (load_indefinitely=False)
+        # - We're partway through an iteration and we want to restart.
+        #
+        # Note: there is a race condition where the worker reaches EOF
+        # after endOfFile() returned False.
+        # The consequence is that reset will be called when it wasn't
+        # actually needed. (i.e it won't break anything)
+
+        if self._was_used and (not self.endOfFile() or
+                               (self.endOfFile()
+                                and not self._process.load_indefinitely)):
             # Request reset:
             self._command_pipe.send(_HostCommand.ResetIterator)
-
-            # Flush the ring buffer
-            while not self.endOfFile():
-                self.releaseElement()
-                self.acquireElementIfAvailable()
             self.releaseElement()
+            # Wait for the worker to acknowledge
+            self._eof.waitForReset()
+            self._data_buffers.reset()
 
-        # Let worker know it can start reading again
-        self._eof_event_tensor[0] = -1
+        self._eof.clearFlag()
+        # Let the worker know it can start loading
+        self._command_pipe.send(_HostCommand.StartIterating)
         self._was_used = False
+        self._worker_started = True
 
     def dataIsAvailable(self):
         return self._data_buffers.isAvailable()
 
     def endOfFile(self):
-        return self._eof_event_tensor[0] == self._data_buffers.currentIndex()
+        return self._eof.isEofIndex(self._data_buffers.currentIndex())
 
     def acquireElementIfAvailable(self):
         assert not self._data_buffers.hasLock(), (
             "The current element "
             "must be released by calling releaseElement() before trying to "
             "acquire a new one")
-        if not self.dataIsAvailable():
+
+        # Important: eof must be checked **after** dataIsAvailable.
+        #
+        # The worker does:
+        # 1. setEOFflag()
+        # 2. if load_indefinitely -> start prefetching the next iteration.
+        # 3. mark data as available.
+        #
+        # So in the consumer / reader we need to check the flags in reverse
+        # order otherwise there is a risk that eof will be False, then by
+        # the time data is checked both eof and data are now True but
+        # we'll miss eof and iterate over the ring buffer an extra time.
+        if not self.dataIsAvailable() or self.endOfFile():
             return None
         # Pull and lock the ready buffer.
         data = self._data_buffers.lock()
@@ -1614,6 +1643,13 @@ class _HostCommand(enum.IntEnum):
     SetupComplete = 0
     Shutdown = 1
     ResetIterator = 2
+    StartIterating = 3
+
+
+class _WorkerState(enum.IntEnum):
+    Stopped = 0
+    Prefetching = 1
+    Loading = 2
 
 
 class _HostCommandHandler:
@@ -1621,32 +1657,146 @@ class _HostCommandHandler:
         self.pipe = command_pipe
         self.setup_complete = False
         self.shutdown_now = False
-        self.reset_iterator = False
+        self._reset_iterator = False
+        self._start_iterating = False
 
-    def check_messages(self):
+    def checkMessages(self, blocking=False, ignore_setup_complete=True):
+        """
+        ignore_setup_complete: setup complete is usually just noise. (We only
+        care about the setup being complete if we're trying trying to shutdown
+        the worker process), so when asked to wait for a message, if the first
+        one we receive is setup complete, usually we'll want to wait some more
+        for the one we actually are interested in.
+        """
         # Check for messages from the parent process:
-        if self.pipe.poll():
+        if self.pipe.poll() or blocking:
             cmd = self.pipe.recv()  # remove the data
             assert isinstance(cmd, _HostCommand)
             if cmd == _HostCommand.SetupComplete:
                 logger.debug("SetupComplete command received")
+                assert not self.setup_complete, ("More than one SetupComplete "
+                                                 "event received")
                 self.setup_complete = True
+                if ignore_setup_complete:
+                    self.checkMessages(blocking)
             elif cmd == _HostCommand.Shutdown:
                 logger.debug("Shutdown command received")
                 self.shutdown_now = True
             elif cmd == _HostCommand.ResetIterator:
                 logger.debug("ResetIterator command received")
-                self.reset_iterator = True
+                self._reset_iterator = True
+            elif cmd == _HostCommand.StartIterating:
+                logger.debug("StartIterating command received")
+                self._start_iterating = True
             else:
                 raise RuntimeError(f"Unknown command received {cmd}")
 
-    def wait_until_setup_complete(self):
-        if self.setup_complete:
-            return
-        # Blocking wait
-        cmd = self.pipe.recv()
-        assert isinstance(cmd,
-                          _HostCommand) and cmd == _HostCommand.SetupComplete
+    def priorityCommandWaiting(self):
+        return self.shutdown_now or self._reset_iterator
+
+    def waitUntilSetupComplete(self):
+        if not self.setup_complete:
+            self.checkMessages(blocking=True, ignore_setup_complete=False)
+        # Shutdown has been requested: there is no other valid command the host
+        # can send at that point
+        assert self.setup_complete
+
+    def startIteratingPending(self):
+        """Note: returns state and reset the value to False"""
+        if self._start_iterating:
+            self._start_iterating = False
+            return True
+        return False
+
+    def resetIteratorPending(self):
+        """Note: returns state and reset the value to False"""
+        if self._reset_iterator:
+            self._reset_iterator = False
+            return True
+        return False
+
+    def waitUntilStartIteration(self):
+        """Wait until a start iteration message is received.
+
+        Return True if we successfully received a start iteration message.
+        False if it was a reset or shutdown command.
+        """
+        if self.priorityCommandWaiting():
+            return False
+        if not self._start_iterating:
+            self.checkMessages(blocking=True)
+
+        return self.startIteratingPending()
+
+
+class _EndOfFileFlag:
+    """
+    Share a small 2 values buffer with host to signal EOF and where in ring
+    buffer the event occured.
+
+    First value:
+    -1 means no event and the worker will keep loading until EOF is
+    reached or the buffer is full.
+
+    -2 means iterator reset complete. (Will be cleared by the worker once it's
+    received the start iterating command from the host)
+
+    Any other value: wait for an iterator to be created to start
+    loading more data.
+
+    Second value: when rebatching + drop_last=False:
+    Indicate the batch size of the left over tensor
+
+    0: No left over
+    0 < N < rebatch_size: left-over batch size
+
+    """
+
+    def __init__(self, eof_mem=None):
+        if eof_mem is None:
+            eof_mem = torch.tensor([-1, 0], dtype=torch.int).share_memory_()
+        self.eof_mem = eof_mem
+
+    def setResetFlag(self):
+        """Called by the worker once the iterator has been reset"""
+        self.eof_mem[0] = -2
+
+    def waitForReset(self):
+        while self.eof_mem[0] != -2:
+            pass
+
+    def isEofIndex(self, index):
+        return self.eof_mem[0] == index
+
+    def leftOver(self):
+        """Batch size of the tensor at the end of file index.
+
+        0 means there is no left over batches, the end of file index is empty.
+        (It will contain the first element from the next iteration if a new
+        iterator is created).
+
+        N means the element at the end of file index has a reduced batch of N.
+        (The first element from the next iteration if a new iterator is
+        created will be located at the next index).
+        """
+        return self.eof_mem[1]
+
+    def clearFlag(self):
+        self.eof_mem[1] = 0
+        self.eof_mem[0] = -1
+
+    def setFlag(self, buffer_idx, last_batch_size=0):
+        """If ``last_batch_size`` is 0 then ``buffer_idx`` is the index of the
+        first buffer after the end of file.
+
+        Otherwise the buffer at ``buffer_idx`` will contain a tensor of reduced
+        batch size ``last_batch_size`` elements. (Only used when drop_last=False
+        and rebatched_size > 0).
+        """
+        # Important: eof_tensor[1] must be set before eof_tensor[0]
+        # to avoid race conditions with the consumer.
+        self.eof_mem[1] = last_batch_size
+        self.eof_mem[0] = buffer_idx
 
 
 class _RingBufferIndex:
@@ -1680,6 +1830,7 @@ class _RingBufferIndex:
             self._index = 0
 
     def reset(self):
+        self.buffers.fill_(False)
         self._index = 0
 
     def set(self, value):
@@ -1732,6 +1883,11 @@ class _IDataRingBuffer:
 
     def currentIndex(self):
         return self._index()
+
+    def reset(self):
+        """Reset the state of the ring buffer
+        (All the buffers become available to write again)"""
+        self._index.reset()
 
 
 class _DataRingBufferWriter(_IDataRingBuffer):
@@ -1809,7 +1965,7 @@ class _AsynchronousWorkerProcess:
         self._buffer_size = buffer_size
         self._miss_sleep_time_in_ms = miss_sleep_time_in_ms
         self._dataset = dataset
-        self._load_indefinitely = load_indefinitely
+        self.load_indefinitely = load_indefinitely
         self._early_preload = early_preload
         self._process = None
         self._sharing_strategy = sharing_strategy
@@ -1867,7 +2023,7 @@ class _AsynchronousWorkerProcess:
         logger.debug("AsynchronousDataAccessor parent process: %d",
                      os.getpid())
 
-        self._process = ctx.Process(target=self._main_loop,
+        self._process = ctx.Process(target=self._mainLoop,
                                     args=(write_data_pipe, read_command_pipe))
         self._process.start()
         write_data_pipe.close()
@@ -1877,7 +2033,7 @@ class _AsynchronousWorkerProcess:
             indices_mem = read_data_pipe.recv()
             data_len = read_data_pipe.recv()
             is_single_tensor = read_data_pipe.recv()
-            eof_event_tensor = read_data_pipe.recv()
+            eof_mem = read_data_pipe.recv()
             buffers = _DataRingBufferReader(self._buffer_size, data_len,
                                             indices_mem)
 
@@ -1888,9 +2044,8 @@ class _AsynchronousWorkerProcess:
 
             # We're all set: let the worker know.
             write_command_pipe.send(_HostCommand.SetupComplete)
-            # We reuse the read_setup_complete_pipe pipe as a shutdown pipe
-            return (write_command_pipe, is_single_tensor, eof_event_tensor,
-                    buffers)
+            return (write_command_pipe, is_single_tensor,
+                    _EndOfFileFlag(eof_mem), buffers)
         except EOFError:
             pass
         # Exit the except block before raising a cleaner exception otherwise the previous one will not be cleared.
@@ -1898,7 +2053,7 @@ class _AsynchronousWorkerProcess:
             "AsynchronousDataAccessor worker thread failed to start "
             "(Check above for details)")
 
-    def _main_loop(self, conn, command_pipe):  # pylint: disable=too-many-statements
+    def _mainLoop(self, conn, command_pipe):  # pylint: disable=too-many-statements
         # Make sure this process's output gets printed (In case of error)
         sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0),
                                       write_through=True)
@@ -1944,16 +2099,20 @@ class _AsynchronousWorkerProcess:
 
         # Share a small buffer with host to signal EOF and where in ring
         # buffer the event occured.
+        #
+        # First value:
         # -1 means no event and the worker will keep loading until EOF is
         # reached or the buffer is full.
         #
         # Any other value: wait for an iterator to be created to start
         # loading more data.
-        if self._early_preload:
-            eof_tensor = torch.tensor([-1], dtype=torch.int).share_memory_()
-        else:
-            eof_tensor = torch.tensor([-2], dtype=torch.int).share_memory_()
-        conn.send(eof_tensor)
+        #
+        # Second value: (Only used when rebatching + drop_last=False):
+        #
+        # 0: Full tensor (Same as the previous ones)
+        # 0 < N < rebatch_size: Number of tensors in the left-over batch
+        eof = _EndOfFileFlag(eof_mem=None)
+        conn.send(eof.eof_mem)
 
         # Send the tensors to the host.
         for index, tensor in enumerate(data):
@@ -1986,21 +2145,47 @@ class _AsynchronousWorkerProcess:
 
         host_handler = _HostCommandHandler(command_pipe)
 
+        if self._early_preload:
+            state = _WorkerState.Prefetching
+        else:
+            state = _WorkerState.Stopped
+
         while not host_handler.shutdown_now:
-            eof_reached = False
             # Check for messages from the parent process:
-            host_handler.check_messages()
-
-            # If we hit EOF sleep till re-awakened by host
-            if eof_tensor[0] != -1:
-                if self._miss_sleep_time_in_ms > 0.0:
-                    time.sleep(self._miss_sleep_time_in_ms)
+            host_handler.checkMessages()
+            if state == _WorkerState.Stopped:
+                if host_handler.waitUntilStartIteration():
+                    state = _WorkerState.Loading
+                # else reset or shutdown received: fallthrough
+            elif state == _WorkerState.Prefetching and \
+                    host_handler.startIteratingPending():
+                # The host sent a request to start loading so transition from prefetching
+                # to loading.
+                state = _WorkerState.Loading
+            if host_handler.shutdown_now:
                 continue
+            if host_handler.resetIteratorPending():
+                logger.debug("AsynchronousDataAccessor worker: reset command "
+                             "received. Creating a new iterator")
+                buffers.reset()
+                dataset_iterator = iter(self._dataset)
+                self._next_batch_idx = 0
 
+                # Let the host know everything has been reset
+                eof.setResetFlag()
+
+                # Wait for the host to ask for the new iteration to start
+                if not host_handler.waitUntilStartIteration():
+                    continue  # received a shutdown command
+
+                logger.debug("AsynchronousDataAccessor worker: the iterator "
+                             "has been reset")
+                state = _WorkerState.Loading
+
+            # We're now guaranteed to be either loading or prefetching
+            eof_reached = False
             try:
-
-                # Only pull the next iteration if we sent data the last one,
-                # otherwise try send the old one again.
+                # Retrieve data from the dataset
                 data = next(dataset_iterator)
                 if isinstance(data, torch.Tensor):
                     data = (data, )
@@ -2010,67 +2195,81 @@ class _AsynchronousWorkerProcess:
                 eof_reached = True
 
             # Wait for a writing slot to become available
-            while not buffers.isAvailable() \
-                    and not host_handler.shutdown_now:
-                # (Briefly) sleep the thread if we don't have a slot.
-                time.sleep(self._miss_sleep_time_in_ms)
-                host_handler.check_messages()
+            while not buffers.isAvailable(
+            ) and not host_handler.priorityCommandWaiting():
+                # (Briefly) sleep the thread if we neither is True.
+                if self._miss_sleep_time_in_ms > 0.0:
+                    time.sleep(self._miss_sleep_time_in_ms)
+                host_handler.checkMessages()
+            if host_handler.priorityCommandWaiting():
+                continue
 
-            if host_handler.shutdown_now:
-                break
+            if eof_reached:
+                # Note: it's important to have a writing slot before signaling
+                # the end of the dataset or we might encounter the case where
+                # the whole ring buffer is ready to read:
+                # [ True, True, True]
+                # At that point the read and write indices point at the same
+                # index so if we set the EOF as the current write index then
+                # the consumer will discard the whole ring buffer instead of
+                # consuming the ready to read elements first.
+                # Having a writing slot available ensures the read and write
+                # indices never match (Even though the slot might not be used).
 
-            # We've got a writing slot
-            if host_handler.reset_iterator:
-                # Tell the host where the last tensor is.
-                eof_tensor[0] = buffers.currentIndex()
-                dataset_iterator = iter(self._dataset)
-                self._next_batch_idx = 0
+                # If we reach the EOF before the host asked us to start loading,
+                # wait here to avoid potentially overwriting a pending
+                # EOF event.
+                if state == _WorkerState.Prefetching:
+                    if not host_handler.waitUntilStartIteration():
+                        continue  # reset or shutdown
 
-                logger.debug("AsynchronousDataAccessor worker: the iterator "
-                             "has been reset")
-                host_handler.reset_iterator = False
-            elif eof_reached:
-                # Tell the host where the EOF occured.
-                eof_tensor[0] = buffers.currentIndex()
-                # If we are not to load indefinitely we just kill the worker.
-                if not self._load_indefinitely:
+                eof.setFlag(buffers.currentIndex(), self._next_batch_idx)
+
+                # If we are not to load indefinitely we wait for the host
+                # to explicitly ask for a new iterator to be created.
+                if not self.load_indefinitely:
                     logger.debug(
                         "AsynchronousDataAccessor worker: end of dataset"
-                        " reached signaled to host: exiting")
-                    break
+                        " reached signaled to host: waiting for command from"
+                        " host")
+                    state = _WorkerState.Stopped
+                    continue  # Go back to the wait for reset
 
-                logger.debug(
-                    "AsynchronousDataAccessor worker: end of dataset reached."
-                    " Creating a new iterator")
-                # We always reset and will keep the worker thread running.
+                logger.debug("AsynchronousDataAccessor worker: end of dataset "
+                             "reached. Creating a new iterator")
+                state = _WorkerState.Prefetching
+
+                # We reset and keep the worker thread prefetching.
                 dataset_iterator = iter(self._dataset)
                 self._next_batch_idx = 0
 
                 logger.debug(
                     "AsynchronousDataAccessor worker: new iterator ready")
-            else:
-                if self._rebatched_size:
-                    for index, tensor in enumerate(data):
-                        buffers.current[index].index_copy_(
-                            0, torch.tensor([self._next_batch_idx]), tensor)
-                    self._next_batch_idx += 1
-                else:
-                    # Copy the tensor into the preallocated shared memory.
-                    for index, tensor in enumerate(data):
-                        buffers.current[index].copy_(tensor)
+                continue
 
-                # If we're not rebatching: always notify the host an element is ready.
-                # Otherwise only notify the host if the full batch is ready.
-                if self._rebatched_size is None or \
-                        self._next_batch_idx == self._rebatched_size:
-                    self._next_batch_idx = 0
-                    # Tell the host this data is ready.
-                    buffers.markWriteComplete()
+            # We've got a writing slot
+            if self._rebatched_size:
+                for index, tensor in enumerate(data):
+                    buffers.current[index].index_copy_(
+                        0, torch.tensor([self._next_batch_idx]), tensor)
+                self._next_batch_idx += 1
+            else:
+                # Copy the tensor into the preallocated shared memory.
+                for index, tensor in enumerate(data):
+                    buffers.current[index].copy_(tensor)
+
+            # If we're not rebatching: always notify the host an element is ready.
+            # Otherwise only notify the host if the full batch is ready.
+            if self._rebatched_size is None or \
+                    self._next_batch_idx == self._rebatched_size:
+                self._next_batch_idx = 0
+                # Tell the host this data is ready.
+                buffers.markWriteComplete()
 
         logger.debug(
             "AsynchronousDataAccessor worker: ready to exit: checking parent"
             " is ready")
         # In the unlikely event the worker is done reading the dataset
         # before the parent is done setting the buffers up: wait here.
-        host_handler.wait_until_setup_complete()
+        host_handler.waitUntilSetupComplete()
         logger.debug("AsynchronousDataAccessor worker: clean exit")
