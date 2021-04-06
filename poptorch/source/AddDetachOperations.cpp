@@ -7,30 +7,31 @@
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
 using UsesToReplace =
     std::vector<std::pair<torch::jit::Value *, torch::jit::Value *>>;
 
-const c10::Symbol detached_node_attr =
-    c10::Symbol::fromQualString("attr::detached_node");
+const c10::Symbol visited_node_attr =
+    c10::Symbol::fromQualString("attr::visited_node");
 
-void markNodeDetached(torch::jit::Node *node) {
-  if (!node->hasAttribute(detached_node_attr)) {
-    node->i_(detached_node_attr, 1);
+void markNodeVisited(torch::jit::Node *node) {
+  if (!node->hasAttribute(visited_node_attr)) {
+    node->i_(visited_node_attr, 1);
   }
 }
 
-void unmarkNodeDetached(torch::jit::Node *node) {
-  if (node->hasAttribute(detached_node_attr)) {
-    node->removeAttribute(detached_node_attr);
+void unmarkNodeVisited(torch::jit::Node *node) {
+  if (node->hasAttribute(visited_node_attr)) {
+    node->removeAttribute(visited_node_attr);
   }
 }
 
-bool isMarkedDetached(torch::jit::Node *node) {
-  return node->hasAttribute(detached_node_attr) &&
-         node->i(detached_node_attr) == 1;
+bool isMarkedVisited(torch::jit::Node *node) {
+  return node->hasAttribute(visited_node_attr) &&
+         node->i(visited_node_attr) == 1;
 }
 
 void maybeInsertDetachOp(torch::jit::Graph *graph, torch::jit::Value *value,
@@ -41,15 +42,16 @@ void maybeInsertDetachOp(torch::jit::Graph *graph, torch::jit::Value *value,
 
   auto producer_kind = producer->kind();
 
-  if (producer_kind == c10::prim::Constant ||
+  if (isMarkedVisited(producer) || producer_kind == c10::prim::Constant ||
       producer_kind == symbols::poptorch::tensor_constant ||
       producer_kind == symbols::poptorch::host_side_tensor_constant) {
     return;
   }
 
-  if (!isMarkedDetached(producer) && !value->requires_grad() &&
-      !(producer_kind == c10::prim::TupleConstruct ||
-        producer_kind == c10::prim::ListConstruct)) {
+  markNodeVisited(producer);
+
+  if (!value->requires_grad() && !(producer_kind == c10::prim::TupleConstruct ||
+                                   producer_kind == c10::prim::ListConstruct)) {
     // All node's outputs either requires_grad=True or don't, so we process all
     // of them now and skip processing the next time they are potentially
     // encountered.
@@ -58,7 +60,6 @@ void maybeInsertDetachOp(torch::jit::Graph *graph, torch::jit::Value *value,
       detach->moveAfter(producer);
       uses_to_replace->emplace_back(output, detach->output(0));
     }
-    markNodeDetached(producer);
     return;
   }
 
@@ -69,9 +70,9 @@ void maybeInsertDetachOp(torch::jit::Graph *graph, torch::jit::Value *value,
 
 void addDetachOperations(torch::jit::Graph *graph) {
   // Special prim::Param nodes that correspond to graph inputs should not be
-  // detached so we superficially mark them as detached before processing.
+  // visited so we superficially mark them as visited before processing.
   for (torch::jit::Value *input : graph->inputs()) {
-    markNodeDetached(input->node());
+    markNodeVisited(input->node());
   }
 
   // Process the graph recursively and replace the uses at the end.
@@ -81,12 +82,11 @@ void addDetachOperations(torch::jit::Graph *graph) {
   }
   for (const auto &use : uses_to_replace) {
     use.first->replaceAllUsesAfterNodeWith(use.second->node(), use.second);
-    unmarkNodeDetached(use.first->node());
   }
 
   // Cleaning up.
-  for (torch::jit::Value *input : graph->inputs()) {
-    unmarkNodeDetached(input->node());
+  for (torch::jit::Node *node : graph->nodes()) {
+    unmarkNodeVisited(node);
   }
 }
 
