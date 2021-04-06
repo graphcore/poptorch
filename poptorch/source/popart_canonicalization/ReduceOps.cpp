@@ -221,6 +221,15 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
   } else {
     axes = constantToLongVec(node->input(2)->node());
     keepdim = constantToLong(node->input(3)->node());
+    auto shape = shapeFromTensor(input);
+    // If we're reducing over singleton dims and keeping them, the
+    // behaviour of PopART reduce ops is to do nothing, but PyTorch will
+    // still take the absolute value of the tensor, so we need to
+    // do the same
+    if (keepdim && std::all_of(axes.begin(), axes.end(),
+                               [&](std::int64_t i) { return shape[i] == 1; })) {
+      return createAbs(graph, {input});
+    }
   }
 
   constexpr float pos_inf = std::numeric_limits<float>::infinity();
@@ -263,6 +272,39 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
   return createPow(graph, {sum->output(), one_over_p->output()});
 }
 
+torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
+                                       torch::jit::Node *node) {
+  if (node->inputs().size() == 1) {
+    auto x = node->input(0);
+    auto t0 = reduceHelperDimensionCreator(x);
+    return createReducel2(graph, {x}, t0, 0);
+  }
+  if (node->inputs().size() == 3) {
+    auto x = node->input(0);
+    auto l = node->input(1);
+    auto t0 = constantToLongVec(l->node());
+    auto t1 = reduceHelperDimensionCreator(x, t0);
+    auto c = node->input(2);
+    auto t2 = constantToLong(c->node());
+    auto shape = shapeFromTensor(x);
+    // If we're reducing over singleton dims and keeping them, the
+    // behaviour of PopART reduce ops is to do nothing, but PyTorch will
+    // still take the absolute value of the tensor, so we need to
+    // do the same
+    if (t2 && std::all_of(t1.begin(), t1.end(),
+                          [&](std::int64_t i) { return shape[i] == 1; })) {
+      return createAbs(graph, {x});
+    }
+    return createReducel2(graph, {x}, t1, t2);
+  }
+
+  ERROR("Incorrect number of arguments for operator "
+        << "c10::aten::frobenius_norm. "
+        << "Expecting 1 or 3 operands, "
+        << "got " << node->inputs().size() << " operand(s).");
+  return nullptr;
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -276,6 +318,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::sum, reduceHandler);
   registerHandler(c10::aten::logsumexp, reduceHandler);
   registerHandler(c10::aten::norm, tensorNormHandler);
+  registerHandler(c10::aten::frobenius_norm, frobeniusnormHandler);
   registerHandler(c10::aten::min, minHandler);
   registerHandler(c10::aten::max, maxHandler);
 }

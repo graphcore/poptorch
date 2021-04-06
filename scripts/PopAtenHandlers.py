@@ -4,9 +4,9 @@
 import math
 from popgen.api import convert, expand, forward, generate, simplify
 from popgen.helpers import as_ir, alpha, cfloat, cint, clong, clong_list, \
-                           cstr, dimension, dimension_list, empty_initializer, \
-                           output_shape, output_type, reduction, tensor_list, \
-                           tensor_long, tensor_shape, tensor_type
+                           cstr, dimension, empty_initializer, output_shape, \
+                           output_type, reduction, tensor_list, tensor_long, \
+                           tensor_shape, tensor_type
 from popgen.operatorfactory import op
 
 script = "PopAtenHandlers.py"
@@ -35,7 +35,6 @@ for oper in opers:
 convert("t", 1, "transpose")
 
 expand("erfc", lambda x: 1. - op.erf(x))
-expand("frobenius_norm", lambda x: op.reducel2(x, dimension_list(x), clong(0)))
 expand("log2", lambda x: op.log(x) / math.log(2))
 expand("log10", lambda x: op.log(x) / math.log(10))
 expand("log_sigmoid", lambda x: op.log(op.sigmoid(x)))
@@ -113,9 +112,6 @@ convert("where", 3)
 
 expand("constant_pad_nd", lambda x, l, c: op.constantPad(
     x, clong_list(l), cfloat(c)))
-expand(
-    "frobenius_norm", lambda x, l, c: op.reducel2(
-        x, dimension_list(x, clong_list(l)), clong(c)))
 expand("hardtanh", lambda x, a, b: op.clip(x, cfloat(b), cfloat(a)))
 expand(
     "normal_", lambda x, c1, c2: op.randomNormal(x, tensor_shape(x), cfloat(

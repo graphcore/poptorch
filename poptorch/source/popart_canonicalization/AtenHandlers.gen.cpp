@@ -217,34 +217,6 @@ torch::jit::Node *fmodHandler(torch::jit::Graph *graph,
   return createFmod(graph, {i0, i1});
 }
 
-torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
-                                       torch::jit::Node *node) {
-  if (node->inputs().size() == 1) {
-    auto x = node->input(0);
-    auto t0 = reduceHelperDimensionCreator(x);
-    // reducel2(x, dimension_list(x), 0)
-    return createReducel2(graph, {x}, t0, 0);
-  }
-  if (node->inputs().size() == 3) {
-    auto x = node->input(0);
-    auto l = node->input(1);
-    auto t0 = constantToLongVec(l->node());
-    auto t1 = reduceHelperDimensionCreator(x, t0);
-    auto c = node->input(2);
-    auto t2 = constantToLong(c->node());
-    // reducel2(x, dimension_list(x, clong_list(l)), clong(c))
-    return createReducel2(graph, {x}, t1, t2);
-  }
-
-  std::stringstream errmsg;
-  errmsg << "Incorrect number of arguments for operator ";
-  errmsg << "c10::aten::frobenius_norm. ";
-  errmsg << "Expecting 1 or 3 operands, ";
-  errmsg << "got " << node->inputs().size() << " operand(s).";
-  ERROR(&errmsg);
-  return nullptr;
-}
-
 torch::jit::Node *fullHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto y = node->input(1);
@@ -864,7 +836,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::expm1, expm1Handler);
   registerHandler(c10::aten::floor, floorHandler);
   registerHandler(c10::aten::fmod, fmodHandler);
-  registerHandler(c10::aten::frobenius_norm, frobeniusnormHandler);
   registerHandler(c10::aten::full, fullHandler);
   registerHandler(c10::aten::full_like, fulllikeHandler);
   registerHandler(c10::aten::ge, geHandler);

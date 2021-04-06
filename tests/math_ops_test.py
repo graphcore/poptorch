@@ -456,11 +456,6 @@ def test_reduction_ops_float(op):
 @pytest.mark.parametrize("dim", range(4))
 @pytest.mark.parametrize("keepdim", [False, True])
 def test_reduction_ops_float_api2(op, dim, keepdim):
-    if op is torch.norm and keepdim and dim == 0:
-        # TODO: T36427
-        pytest.skip("Test test_reduction_ops_float_api2[True-0-norm]"
-                    " is failing and needs investigation.")
-
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 200])
