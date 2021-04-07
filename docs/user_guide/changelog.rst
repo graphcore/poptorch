@@ -23,6 +23,7 @@ New features
   as this new option computes both the running mean and variance in FP32 when this option is set to `True`.
 - Add support for ``torch.scatter_add``
 - Add ``poptorch.Options.Precision.enableFloatingPointExceptions`` to control floating point exception behavior
+- Add option to log the number of IPU cycles used in executing the main graph
 
 v2.0 (Poplar SDK 2.0)
 =====================

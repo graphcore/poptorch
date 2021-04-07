@@ -347,3 +347,28 @@ def test_ipu_context_flag():
 
     assert inference_model(x, y) == 52
     assert model(x, y) == 100
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed to count IPU cycles")
+def test_log_cycle_count(capfd):
+    poptorch.setLogLevel("INFO")
+
+    class LogChecker(helpers.LogChecker):
+        def validate(self):
+            self.assert_contains("Total number of IPU cycles: ")
+
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    opts = poptorch.Options().logCycleCount(True)
+    inference_model = poptorch.inferenceModel(Network(), opts)
+
+    x = torch.tensor([1])
+    y = torch.tensor([2])
+
+    inference_model(x, y)
+
+    log = LogChecker(capfd)
+    log.validate()

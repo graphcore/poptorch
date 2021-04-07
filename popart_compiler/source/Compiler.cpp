@@ -667,6 +667,13 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
   _impl->popart_outgoing.clear();
   _impl->outgoing_duplicates.clear();
   _impl->memory_manager.clear();
+
+  // Log the number of cycles if instrumentation is enabled
+  popart::SessionOptions &options = _impl->popart_options;
+  if (options.instrumentWithHardwareCycleCounter) {
+    logging::info("Total number of IPU cycles: {}",
+                  _impl->session->getCycleCount());
+  }
 }
 
 poptorch::PopartType Compiler::getPopartType(poptorch::TensorId id) const {

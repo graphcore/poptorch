@@ -1273,7 +1273,7 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def logDir(self, log_dir: str) -> "poptorch.Options":
-        """Set the log directoery
+        """Set the log directory
 
         :param log_dir:
             Directory where Poptorch saves log files (default: current
@@ -1470,6 +1470,20 @@ class Options(_options_impl.OptionsDict):
         #   2 = RandomNormal
         mode = 2 if enabled else 0
         self._Popart.set("syntheticDataMode", mode)
+        return self
+
+    def logCycleCount(self, log_cycle_count: bool) -> "poptorch.Options":
+        """Log the number of IPU cycles used in executing the main graph, which is
+        printed by setting the environment variable ``POPTORCH_LOG_LEVEL=INFO``.
+        This option requires IPU hardware to run.
+
+        Note: This will have a small detrimental impact on performance.
+
+        :param log_cycle_count:
+            * True: Enable logging the IPU cycle count.
+            * False: Do not enable IPU cycle count logging.
+        """
+        self._Popart.set("instrumentWithHardwareCycleCounter", log_cycle_count)
         return self
 
     def toDict(self) -> Dict[str, Any]:
