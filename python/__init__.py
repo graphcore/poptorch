@@ -208,16 +208,20 @@ class DataLoader(torch.utils.data.DataLoader):
                     num_workers)
         else:
             num_elts = len(dataset)
-            assert drop_last or self._combined_batch_size is None or \
+            if not drop_last and self._combined_batch_size is not None and \
                 num_elts % (self._combined_batch_size *
-                            options.Distributed.numProcesses) == 0, (
-                                f"The number of elements in the dataset "
-                                "({num_elts}) is not divisible by the number of"
-                                " elements processed per step "
-                                f'''({self._combined_batch_size *
-                                options.Distributed.numProcesses})'''
-                                " and drop_last=False. Switch to "
-                                "drop_last=True.")
+                            options.Distributed.numProcesses) != 0:
+                logger.warning(
+                    "The number of elements in the dataset "
+                    "(%d) is not divisible by the number of"
+                    " elements processed per step (%d)"
+                    " and drop_last=False. The last tensor will have "
+                    "a batch size of %d. To avoid having to handle "
+                    "this special case switch to drop_last=True", num_elts,
+                    self._combined_batch_size *
+                    options.Distributed.numProcesses,
+                    num_elts % (self._combined_batch_size *
+                                options.Distributed.numProcesses))
 
             if options.Distributed.numProcesses > 1:
                 if auto_distributed_partitioning:
@@ -388,6 +392,15 @@ class AsynchronousDataAccessor:
                    dataset.combinedBatchSize == 1, (
                        "The 'drop_last=False' option from the DataLoader only "
                        "works if 'rebatched_size' is specified too.")
+        if isinstance(dataset, DataLoader
+                      ) and not dataset.drop_last and not dataset._is_iterable:
+            # We don't currently support returning a partial batch through the ring buffer
+            # for map-style datasets
+            assert dataset.combinedBatchSize is None or \
+                   dataset.combinedBatchSize == 1, (
+                       "The 'drop_last=False' option from the DataLoader is"
+                       " not currently supported by the "
+                       "AsynchronousDataAccessor for map-style datasets")
         if rebatched_size is not None:
             assert rebatched_size > 1, ("rebatched_size"
                                         " must be None or greater than 1")

@@ -850,7 +850,9 @@ def test_iterable_dataloader_len(mode):
 @pytest.mark.parametrize(
     "mode",
     {poptorch.DataLoaderMode.AsyncRebatched, poptorch.DataLoaderMode.Sync})
-def test_iterable_leftover(mode):
+@pytest.mark.parametrize("DatasetType",
+                         [IncrementDataset, IncrementIterableDatasetWithLen])
+def test_iterable_leftover(mode, DatasetType):
     shape = [2, 3]
     num_tensors = 101
     num_workers = 7
@@ -858,7 +860,10 @@ def test_iterable_leftover(mode):
     # Note: Upstream torch returns the theoretical length
     # it doesn't take into account the items lost per worker.
     expected_len = math.ceil(num_tensors / batch_size)
-    if mode != poptorch.DataLoaderMode.AsyncRebatched:
+
+    ds = DatasetType(shape, num_tensors)
+    if isinstance(ds, torch.utils.data.IterableDataset
+                  ) and mode != poptorch.DataLoaderMode.AsyncRebatched:
         # Expected tensors
         # tensors per worker = ceil(101/7) = 15
         # last worker = 11 tensor
@@ -872,7 +877,6 @@ def test_iterable_leftover(mode):
         # Best case expected: floor(101/6) = 16 -> unused = 5
         num_full_iterations_expected = 16
         left_over_batches = [5]
-    ds = IncrementIterableDatasetWithLen(shape, num_tensors)
     assert len(ds) == num_tensors
     n = 0
     for n, d in enumerate(ds):
@@ -880,11 +884,26 @@ def test_iterable_leftover(mode):
 
     assert n + 1 == num_tensors
     opts = poptorch.Options()
+    worker_init_fn = None
+    if isinstance(ds, torch.utils.data.IterableDataset):
+        worker_init_fn = _worker_init_fn
+    if not isinstance(ds, torch.utils.data.IterableDataset
+                      ) and mode == poptorch.DataLoaderMode.AsyncRebatched:
+        # Not currently supported
+        with pytest.raises(AssertionError, match="not currently supported"):
+            poptorch.DataLoader(opts,
+                                ds,
+                                batch_size=batch_size,
+                                num_workers=num_workers,
+                                worker_init_fn=worker_init_fn,
+                                drop_last=False,
+                                mode=mode)
+        return
     loader = poptorch.DataLoader(opts,
                                  ds,
                                  batch_size=batch_size,
                                  num_workers=num_workers,
-                                 worker_init_fn=_worker_init_fn,
+                                 worker_init_fn=worker_init_fn,
                                  drop_last=False,
                                  mode=mode)
 
