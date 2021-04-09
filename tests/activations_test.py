@@ -93,7 +93,7 @@ def test_logsoftmax_numerics():
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings("ignore:Output nr 1. of the traced function")
 def test_rrelu_training():
-    torch.manual_seed(42)
+    opts = poptorch.Options().randomSeed(0)
     input = torch.randn([30000])
 
     model = torch.nn.RReLU()
@@ -101,7 +101,6 @@ def test_rrelu_training():
     # in training negative inputs are multiplied by a random parameter
     # we'll check positive outputs and distribution of negative outputs
     native_out = model(input)
-    opts = poptorch.Options().randomSeed(0)
     poptorch_model = poptorch.inferenceModel(model, options=opts)
     poptorch_out = poptorch_model(input)
 
@@ -111,7 +110,7 @@ def test_rrelu_training():
 
     ref = native_out[native_out < 0]
     out = poptorch_out[poptorch_out < 0]
-    for stat in [torch.min, torch.max, torch.mean]:
+    for stat in [torch.mean, torch.var]:
         helpers.assert_allclose(actual=stat(out),
                                 expected=stat(ref),
                                 atol=0.1,
