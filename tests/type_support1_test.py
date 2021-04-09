@@ -209,15 +209,16 @@ def test_many_implicit_cast_one_less_than(input_type):
         model(t).numpy(), np.array([True, False, True, True]))
 
 
-def test_int8():
+@pytest.mark.parametrize("input_type", [torch.int8, torch.uint8])
+def test_int8(input_type):
     class Model(nn.Module):
         def forward(self, x):
             return x.float()
 
     input = torch.arange(100)
 
-    # Convert to int8
-    input = input.char()
+    # Convert to int8/uint8
+    input = input.to(input_type)
 
     model = poptorch.inferenceModel(Model())
 
@@ -225,23 +226,3 @@ def test_int8():
 
     assert output.dtype == torch.float
     helpers.assert_allequal(actual=output, expected=input.float())
-
-
-def test_uint8():
-    class Model(nn.Module):
-        def forward(self, x):
-            return x.float()
-
-    input = torch.arange(100)
-
-    expected_error = ("Uint8 tensors are not currently supported. "
-                      "Int8 tensor are supported so may be viable"
-                      " alternative.")
-
-    # Convert to uint8
-    input = input.byte()
-
-    model = poptorch.inferenceModel(Model())
-
-    with pytest.raises(RuntimeError, match=expected_error):
-        model(input)

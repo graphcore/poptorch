@@ -110,10 +110,9 @@ std::string typeToPopartStr(at::ScalarType type) {
   if (type == at::ScalarType::Char) {
     return "INT8";
   }
-
-  ERROR_ON_MSG(type == at::ScalarType::Byte,
-               "Uint8 tensors are not currently supported. Int8 tensor are "
-               "supported so may be viable alternative.");
+  if (type == at::ScalarType::Byte) {
+    return "UINT8";
+  }
 
   logging::err("Unimplemented type '{}'", type);
   return "UNIMPLEMENTED";
