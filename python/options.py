@@ -271,9 +271,8 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
     def __init__(self) -> None:
         super().__init__(gradient_accumulation=1,
-                         accumulation_reduction_type=enums.ReductionType.Mean,
                          accumulation_and_replication_reduction_type=enums.
-                         ReductionType.NoReduction)
+                         ReductionType.Mean)
 
     def gradientAccumulation(self, gradient_accumulation: int
                              ) -> "poptorch.options._TrainingOptions":
