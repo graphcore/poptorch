@@ -295,7 +295,7 @@ def test_tensor_location():
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("setting", [True, False, None])
-def test_running_statistics(capfd, dtype, setting):
+def test_running_variance(capfd, dtype, setting):
     x = torch.randn((16, 16), dtype=dtype)
 
     model = torch.nn.Sequential()
@@ -308,17 +308,17 @@ def test_running_statistics(capfd, dtype, setting):
     poptorch.setLogLevel(0)
     opts = poptorch.Options()
     if setting is not None:
-        opts.Precision.runningStatisticsAlwaysFloat(setting)
+        opts.Precision.runningVarianceAlwaysFloat(setting)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x)
 
     log = helpers.LogChecker(capfd)
     if setting is None or setting:
         log.assert_contains(
-            "poptorch.Options set runningStatisticsAlwaysFloat to true")
+            "poptorch.Options set runningVarianceAlwaysFloat to true")
     else:
         log.assert_contains(
-            "poptorch.Options set runningStatisticsAlwaysFloat to false")
+            "poptorch.Options set runningVarianceAlwaysFloat to false")
 
     if dtype == torch.float:
         log.assert_contains("%24 : Float(16:1, requires_grad=0, device=cpu)):")

@@ -64,7 +64,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
             autocast_policy_dict=autocasting.default._dict(),  # pylint: disable=protected-access
             half_float_casting=enums.HalfFloatCastingBehavior.
             FloatDowncastToHalf,
-            running_statistics_always_float=True)
+            running_variance_always_float=True)
         self._popart_options = popart_options
 
     def autocastEnabled(self, autocast_enabled: bool
@@ -128,12 +128,6 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         self.set(half_float_casting=half_float_casting)
         return self
 
-    # TODO(T36755): Remove this entrypoint
-    @deprecated(
-        "poptorch.Options.Precision", "2.1",
-        "Use poptorch.Options.Precision.runningStatisticsAlwaysFloat instead, "
-        "which also calculates the running mean in float32 regardless of input "
-        "type")
     def runningVarianceAlwaysFloat(self, value: bool
                                    ) -> "poptorch.options._PrecisionOptions":
         """Controls whether the running variance tensor of batch normalisation
@@ -152,33 +146,11 @@ class _PrecisionOptions(_options_impl.OptionsDict):
               layer input.
         """
 
-        self.runningStatisticsAlwaysFloat(value)
-        return self
-
-    def runningStatisticsAlwaysFloat(self, value: bool
-                                     ) -> "poptorch.options._PrecisionOptions":
-        """Controls whether the running mean and variance tensors of batch
-        normalisation layers should be a float32 regardless of input type.
-
-        A batch normalisation layer stores a running estimate of the means and
-        variances of each channel during training, for use at inference in lieu
-        of batch statistics. Storing the values as half (float16) can result in
-        poor performance due to the low precision. Enabling this option yields
-        more reliable estimates by forcing all running estimates of variances to
-        be stored as float32, at the cost of extra memory use.
-
-        :param value:
-            * True: Always store running estimates of mean and variance as
-              float32.
-            * False: Store running estimates of mean and variance as the same
-              type as the layer input.
-        """
-
         if not isinstance(value, bool):
             raise ValueError(
-                "runningStatisticsAlwaysFloat needs to be set to a bool")
+                "runningVarianceAlwaysFloat needs to be set to a bool")
 
-        self.set(running_statistics_always_float=value)
+        self.set(running_variance_always_float=value)
         return self
 
     def enableFloatingPointExceptions(
@@ -365,7 +337,6 @@ class _TrainingOptions(_options_impl.OptionsDict):
             "accumulation_and_replication_reduction_type")
         return self
 
-    # TODO(T36755): Remove this entrypoint
     @deprecated(
         'poptorch.Options.Training', '2.1',
         'Use poptorch.Options.Training.accumulationAndReplicationReductionType'

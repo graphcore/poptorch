@@ -38,13 +38,12 @@ void maybeInitializeRunningParamConstants(
   }
   case c10::ScalarType::Half:
   case c10::ScalarType::Float: {
-    if (runningStatisticsAlwaysFloat()) {
-      *running_mean =
-          createConstantFloat32(graph, {0}, running_shape)->output();
+    *running_mean =
+        createConstantFloatLike(graph, input, {0}, running_shape)->output();
+
+    if (runningVarianceAlwaysFloat()) {
       *running_var = createConstantFloat32(graph, {1}, running_shape)->output();
     } else {
-      *running_mean =
-          createConstantFloatLike(graph, input, {0}, running_shape)->output();
       *running_var =
           createConstantFloatLike(graph, input, {1}, running_shape)->output();
     }
@@ -105,7 +104,7 @@ torch::jit::Node *normalizeReshapeIfNeeded(torch::jit::Graph *graph,
 torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   // aten::batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor?
-  // running_mean, Tensor? running_var, bool training, float momentum, float
+  // running_mean, Tensor?  , bool training, float momentum, float
   // eps, bool cudnn_enabled) -> Tensor
 
   // Input is value at 0th position.
@@ -120,16 +119,10 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   float momentum = constantToFloat(node->input(6)->node());
   float epsilon = constantToFloat(node->input(7)->node());
 
-  if (runningStatisticsAlwaysFloat()) {
-    auto fn_ensure_float = [&](torch::jit::Value *stat_tensor) {
-      if (!isNone(stat_tensor)) {
-        // make sure the running statistics tensor is of type float
-        auto old_type = stat_tensor->type()->cast<c10::TensorType>();
-        stat_tensor->setType(old_type->withScalarType(at::ScalarType::Float));
-      }
-    };
-    fn_ensure_float(running_mean);
-    fn_ensure_float(running_var);
+  if (!isNone(running_var) && runningVarianceAlwaysFloat()) {
+    // make sure the variance tensor is of type float
+    auto old_type = running_var->type()->cast<c10::TensorType>();
+    running_var->setType(old_type->withScalarType(at::ScalarType::Float));
   }
 
   bool training = constantToBool(node->input(5)->node());
