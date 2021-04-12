@@ -503,6 +503,22 @@ void constantPropagation(torch::jit::Graph *graph) {
   ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
 }
 
+void identifyZeroSizedTensors(const std::vector<at::Tensor> &tensors) {
+  for (const at::Tensor &tensor : tensors) {
+    auto sizes = tensor.sizes();
+    if (std::any_of(sizes.begin(), sizes.end(),
+                    [](auto dim) { return dim == 0; })) {
+      std::stringstream err;
+      err << "Zero-sized tensors are unsupported (Got shape [";
+      for (std::size_t i = 0; i < sizes.size() - 1; i++) {
+        err << sizes[i] << ", ";
+      }
+      err << sizes[sizes.size() - 1] << "]).";
+      ERROR(err.str());
+    }
+  }
+}
+
 poptorch::LowerToPopart lowerToPopartFromTrace(
     py::handle h, const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
@@ -529,6 +545,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   for (const torch::jit::IValue &value : graph_and_tensors.second) {
     buildTensorList(value, &traced_tensors);
   }
+
+  identifyZeroSizedTensors(input_tensors);
+  identifyZeroSizedTensors(traced_tensors);
 
   std::vector<std::string> parameters =
       getParameterNames(parameter_names, parameter_tensors, traced_tensors);
