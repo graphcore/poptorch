@@ -51,6 +51,21 @@ void whileLoopEnd() {}
 
 at::Tensor castOp(at::Tensor tensor, std::string &&type) {
   UNUSED(type);
+
+  // If the type to cast to is f16 then we need to cast to f32. The reason being
+  // is that by default we will just ignore the type, however this will only
+  // work if the original type was f32.
+
+  // Consider:
+  /* MyTensor = MyTensor.as(INT8)
+
+     MyTensor = MyTensor.half() # Convert to half.
+
+     out = conv(MyTensor) # This would be an illegal INT8 convolution.
+  */
+  if (type == "FLOAT16" || type == "FLOAT32") {
+    return tensor.to(at::ScalarType::Float);
+  }
   return tensor;
 }
 
