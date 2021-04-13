@@ -226,3 +226,22 @@ def test_int8(input_type):
 
     assert output.dtype == torch.float
     helpers.assert_allequal(actual=output, expected=input.float())
+
+
+@pytest.mark.parametrize("input_type", [torch.int8, torch.uint8])
+def test_int8_return(input_type):
+    class Model(nn.Module):
+        def forward(self, x):
+            return x, x.float() + x.float()
+
+    input = torch.arange(100)
+
+    # Convert to int8/uint8
+    input = input.to(input_type)
+
+    model = poptorch.inferenceModel(Model())
+
+    output, _ = model(input)
+
+    assert output.dtype == input_type
+    helpers.assert_allequal(actual=output, expected=input)

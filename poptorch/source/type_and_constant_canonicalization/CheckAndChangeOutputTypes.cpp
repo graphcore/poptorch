@@ -21,7 +21,8 @@ constexpr bool supportedType(const at::ScalarType type) {
   return (type == at::ScalarType::Int || type == at::ScalarType::Long ||
           type == at::ScalarType::Half || type == at::ScalarType::Float ||
           type == at::ScalarType::Double || type == at::ScalarType::Bool ||
-          type == at::ScalarType::BFloat16);
+          type == at::ScalarType::BFloat16 || type == at::ScalarType::Char ||
+          type == at::ScalarType::Byte);
 }
 
 void warnNonNativeSupport(torch::jit::Node *node,

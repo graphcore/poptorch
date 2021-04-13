@@ -268,6 +268,14 @@ public:
   void setUpInputOp(poptorch::TensorId id, std::int8_t *ptr,
                     const std::vector<std::int64_t> &dims);
 
+  // at::ScalarType::Byte
+  void setUpOutputOp(poptorch::TensorId id, std::uint8_t *ptr,
+                     const std::vector<std::int64_t> &dims);
+
+  // at::ScalarType::Char
+  void setUpOutputOp(poptorch::TensorId id, std::int8_t *ptr,
+                     const std::vector<std::int64_t> &dims);
+
   void setUpOutputOp(poptorch::TensorId id, float *ptr,
                      const std::vector<std::int64_t> &dims);
 

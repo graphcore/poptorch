@@ -118,6 +118,14 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
     auto data_ptr = returnees.back().toTensor().data_ptr();
 
     switch (type) {
+    case at::ScalarType::Byte:
+      _compiler.setUpOutputOp(popart_id, static_cast<std::uint8_t *>(data_ptr),
+                              dims);
+      break;
+    case at::ScalarType::Char:
+      _compiler.setUpOutputOp(popart_id, static_cast<std::int8_t *>(data_ptr),
+                              dims);
+      break;
     case at::ScalarType::Float:
       _compiler.setUpOutputOp(popart_id, static_cast<float *>(data_ptr), dims);
       break;

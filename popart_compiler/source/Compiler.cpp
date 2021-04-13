@@ -326,40 +326,45 @@ void Compiler::setUpInputOp(poptorch::TensorId id, std::int16_t *ptr,
       {_impl->ids[id], *_impl->memory_manager.back().get()});
 }
 
+template <typename T>
+static void addOutput(poptorch::TensorId id, T *ptr,
+                      const std::vector<std::int64_t> &dims,
+                      detail::CompilerImpl *impl) {
+  // Popart wrapper around the tensor pointer.
+  auto memory =
+      std::make_unique<popart::NDArrayWrapper<T>>(static_cast<T *>(ptr), dims);
+
+  impl->addMemoryToOutput(id, ptr, std::move(memory));
+}
+
+void Compiler::setUpOutputOp(poptorch::TensorId id, std::uint8_t *ptr,
+                             const std::vector<std::int64_t> &dims) {
+  addOutput(id, ptr, dims, _impl.get());
+}
+
+void Compiler::setUpOutputOp(poptorch::TensorId id, std::int8_t *ptr,
+                             const std::vector<std::int64_t> &dims) {
+  addOutput(id, ptr, dims, _impl.get());
+}
+
 void Compiler::setUpOutputOp(poptorch::TensorId id, float *ptr,
                              const std::vector<std::int64_t> &dims) {
-  // Popart wrapper around the tensor pointer.
-  auto memory = std::make_unique<popart::NDArrayWrapper<float>>(
-      static_cast<float *>(ptr), dims);
-
-  _impl->addMemoryToOutput(id, ptr, std::move(memory));
+  addOutput(id, ptr, dims, _impl.get());
 }
 
 void Compiler::setUpOutputOp(poptorch::TensorId id, std::int32_t *ptr,
                              const std::vector<std::int64_t> &dims) {
-  // Popart wrapper around the tensor pointer.
-  auto memory = std::make_unique<popart::NDArrayWrapper<std::int32_t>>(
-      static_cast<std::int32_t *>(ptr), dims);
-
-  _impl->addMemoryToOutput(id, ptr, std::move(memory));
+  addOutput(id, ptr, dims, _impl.get());
 }
 
 void Compiler::setUpOutputOp(poptorch::TensorId id, bool *ptr,
                              const std::vector<std::int64_t> &dims) {
-  // Popart wrapper around the tensor pointer.
-  auto memory = std::make_unique<popart::NDArrayWrapper<bool>>(
-      static_cast<bool *>(ptr), dims);
-
-  _impl->addMemoryToOutput(id, ptr, std::move(memory));
+  addOutput(id, ptr, dims, _impl.get());
 }
 
 void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
                              const std::vector<std::int64_t> &dims) {
-  // Popart wrapper around the tensor pointer.
-  auto memory = std::make_unique<popart::NDArrayWrapper<std::int16_t>>(
-      static_cast<std::int16_t *>(ptr), dims);
-
-  _impl->addMemoryToOutput(id, ptr, std::move(memory));
+  addOutput(id, ptr, dims, _impl.get());
 }
 
 void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
