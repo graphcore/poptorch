@@ -1425,16 +1425,6 @@ class PoplarExecutor:
                 "not ending in \"_\" matching the in-place variant, on all "
                 "model inputs.")
 
-        # Save the inputs of the traced graph printout as it will be
-        # different after getting originals back.
-        # NB empty if log level is not TRACE.
-        if has_converted_any_half[0]:
-            # pylint: disable=protected-access
-            trace_input_string = poptorch_core.getTraceInputStr(
-                self._trace._c).strip()
-        else:
-            trace_input_string = ""
-
         # Some of the trace layers of tuple float should be of type half.
         # The following works because the iterator is hierarchic,
         # yielding containers before contents.
@@ -1455,12 +1445,12 @@ class PoplarExecutor:
             # Compile using the actual halves.
             return (self._trace._c, tuple(parameters.keys()),
                     tuple(parameters.values()), in_tensors_as_half.asTuple(),
-                    trace_input_string, self._options.toDict(), self._training,
-                    self._dict_optimizer, accessAttributes)
+                    has_converted_any_half[0], self._options.toDict(),
+                    self._training, self._dict_optimizer, accessAttributes)
         return (self._trace._c, tuple(parameters.keys()),
                 tuple(parameters.values()), in_tensors_trace_view.asTuple(),
-                trace_input_string, self._options.toDict(), self._training,
-                self._dict_optimizer, accessAttributes)
+                has_converted_any_half[0], self._options.toDict(),
+                self._training, self._dict_optimizer, accessAttributes)
 
     def isAttachedToDevice(self) -> bool:
         """Returns true, if the target device has been attached. False,

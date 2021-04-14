@@ -3,6 +3,7 @@
 import pytest
 import torch
 import poptorch
+import helpers
 
 
 def test_set_log_level():
@@ -29,6 +30,9 @@ def test_set_log_level():
 def test_zero_size_tensor_error():
     class Model(torch.nn.Module):
         def forward(self, x):
+            # The operation doesn't matter, we just want to produce the
+            # failure on an operation that works with zero-sized tensors
+            # in native Torch
             return torch.nn.functional.interpolate(x, size=(10, 10))
 
     x = torch.randn(0, 2, 5, 5)
@@ -40,3 +44,65 @@ def test_zero_size_tensor_error():
             r"Zero-sized tensors are unsupported \(Got shape \[0, 2, 5, 5\]\)"
     ):
         poptorch_model(x)
+
+
+orig_input_trace_tensors = [
+    torch.tensor([1.], dtype=torch.half),
+    torch.tensor([2.]),
+    torch.tensor([3], dtype=torch.int32)
+]
+
+
+def print_orig_input_trace_harness(capfd, model, orig_types, *input_args):
+    # Only printed in log level TRACE
+    poptorch.setLogLevel("TRACE")
+
+    inference_model = poptorch.inferenceModel(model)
+    inference_model(*input_args)
+
+    testlog = helpers.LogChecker(capfd)
+
+    orig_str = "[orig:" + orig_types + "]"
+    trace_types = orig_types.replace("Half", "Float")
+    trace_str = "graph(" + trace_types + "):\n"
+    testlog.assert_contains(trace_str + orig_str)
+
+
+def test_print_orig_input_trace_nested_tuple_tensors(capfd):
+    class Model(torch.nn.Module):
+        def forward(self, xss):
+            return xss[0][0] + xss[0][1] + xss[1][0]
+
+    print_orig_input_trace_harness(
+        capfd, Model(), "%1 : ((Half(1:1, requires_grad=0, device=cpu), " +
+        "Float(1:1, requires_grad=0, device=cpu)), " +
+        "(Int(1:1, requires_grad=0, device=cpu)))",
+        ((orig_input_trace_tensors[0], orig_input_trace_tensors[1]),
+         (orig_input_trace_tensors[2], )))
+
+
+def test_print_orig_input_trace_tuple_tensors(capfd):
+    class Model(torch.nn.Module):
+        def forward(self, xs):
+            return xs[0] + xs[1] + xs[2]
+
+    print_orig_input_trace_harness(
+        capfd, Model(), "%1 : (Half(1:1, requires_grad=0, device=cpu), " +
+        "Float(1:1, requires_grad=0, device=cpu), " +
+        "Int(1:1, requires_grad=0, device=cpu))",
+        (orig_input_trace_tensors[0], orig_input_trace_tensors[1],
+         orig_input_trace_tensors[2]))
+
+
+def test_print_orig_input_trace_tensors(capfd):
+    class Model(torch.nn.Module):
+        def forward(self, x, y, z):
+            return x + y + z
+
+    print_orig_input_trace_harness(
+        capfd, Model(),
+        "%x : Half(1:1, requires_grad=0, device=cpu),\n      " +
+        "%y : Float(1:1, requires_grad=0, device=cpu),\n      " +
+        "%z : Int(1:1, requires_grad=0, device=cpu)",
+        orig_input_trace_tensors[0], orig_input_trace_tensors[1],
+        orig_input_trace_tensors[2])
