@@ -63,6 +63,7 @@ long_tests = [
     "bert_small_and_medium_test.py::test_bert_medium_result",
     "fine_tuning_test.py",
     "half_test.py::test_resnet",
+    "io_performance_test.py::test_compare_io_performance",
     "torch_nn_test.py::test_pytorch_nn[False-test_nn_Conv2d_circular_stride2_pad2]",
     "torch_nn_test.py::test_pytorch_nn[True-test_nn_Conv2d_circular_stride2_pad2]",
     "torchvision_inference_test.py::test_googlenet",

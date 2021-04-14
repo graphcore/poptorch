@@ -163,6 +163,15 @@ class LogIterator:
             if all([re.search(e, line) for e in exprs]):
                 return line
 
+    def findAll(self, expr):
+        """Return all lines in the log matching the provided regular expression"""
+        matching_lines = []
+        for line in self._lines:
+            match = re.search(expr, line)
+            if match is not None:
+                matching_lines.append(match)
+        return matching_lines
+
 
 class LogChecker:
     def __init__(self, capfd):
