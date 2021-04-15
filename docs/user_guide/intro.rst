@@ -44,7 +44,7 @@ below. The :py:class:`poptorch.DataLoader` is used to efficiently load data batc
 on the IPU.  PopTorch follows the data batching semantics of PopART. By default,
 this means you will just pass in data of the normal batch size. However, there are a
 number of options provided in PopTorch which will enable more efficient data
-loading. See :ref:`efficient_data_batching` for more information.
+loading. See :numref:`efficient_data_batching` for more information.
 
 Notice that the `torch.optim.AdamW <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.AdamW>`_ optimiser is passed as an input argument to the
 :py:func:`poptorch.trainingModel` wrapper which applies the optimiser algorithm
@@ -100,7 +100,7 @@ constraints of that API. These include:
 .. note:: All tensor data types and shapes must be constant for the entire dataset.
 
 Not all PyTorch operations have been implemented by the PopTorch compiler yet.  See
-:ref:`supported_ops` for a list of operators that are supported on the IPU.
+:numref:`supported_ops` for a list of operators that are supported on the IPU.
 Please also report any unsupported operators to support@graphcore.ai so that these
 ops may be incorporated into a future release.
 

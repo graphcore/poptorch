@@ -9,7 +9,7 @@ Options
 =======
 
 You can change how PopTorch compiles and executes models using :class:`poptorch.Options`.
-You can find a full list of options in the :ref:`options` section of the :ref:`reference` chapter.
+You can find a full list of options in :numref:`options`.
 Broadly speaking, the options fall into the following catagories:
 
 #. General options (See :class:`poptorch.Options`)
@@ -23,7 +23,7 @@ Broadly speaking, the options fall into the following catagories:
    `PopRun <https://docs.graphcore.ai/projects/poprun-user-guide/>`_
    (see :class:`opts.Distributed.* <poptorch.options._DistributedOptions>`)
 
-See :ref:`efficient_data_batching`  for a full
+See :numref:`efficient_data_batching`  for a full
 explanation of how ``device_iterations`` greater than 1, ``gradient_accumulation``, and
 ``replication_factor`` interact with the output and input sizes.
 
@@ -405,7 +405,7 @@ IPUs.
 Parallelisation in :py:class:`poptorch.PipelinedExecution`
 requires :py:meth:`~poptorch.Options.deviceIterations`
 and :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
-as explained in :ref:`efficient_data_batching`.
+as explained in :numref:`efficient_data_batching`.
 After one :py:class:`poptorch.Stage` is finished with processing a batch
 on one IPU, it starts immediately processing the next batch.
 This creates a pipeline where multiple batches are processed in parallel.
@@ -661,7 +661,7 @@ in PopTorch.
 It takes three steps to enable a PopART custom op in PopTorch.
 
 First, set Poplar and PopART environment varibles as shown in
-:ref:`setting_env` and compile the PopART custom op.
+:numref:`setting_env` and compile the PopART custom op.
 You can compile your custom op C++ code and link with Poplar and PopART to
 generate a dynamic library.
 Please refer to the custom op code custom_cube_op.cpp
@@ -813,7 +813,7 @@ Because PopTorch relies on the `torch.jit.trace <https://pytorch.org/docs/1.7.1/
 Many of these operations do not support float 16 inputs.
 To allow the full range of operations, PopTorch converts all float 16 inputs to float 32 before tracing and then restores the inputs to float 16 as part of the canonicalization process.
 Some operations may result in the model running in float 32 where float 16 would
-be expected, or vice versa (see :ref:`float_16_op_support` for full details).
+be expected, or vice versa (see :numref:`float_16_op_support` for full details).
 
 
 Automatic mixed-precision casting

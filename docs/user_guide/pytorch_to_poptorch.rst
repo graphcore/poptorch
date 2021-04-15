@@ -30,7 +30,7 @@ Instantiation is almost identical to PyTorch, but you must remember to pass an i
 |   :dedent: 4                                    |
 +-------------------------------------------------+
 
-For more information about how to set :py:class:`poptorch.Options`, see :ref:`efficient_data_batching`.
+For more information about how to set :py:class:`poptorch.Options`, see :numref:`efficient_data_batching`.
 
 Creating your model
 ===================
