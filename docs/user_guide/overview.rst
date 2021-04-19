@@ -220,12 +220,11 @@ need to follow a set of rules:
   It is to avoid missing annotation. :py:class:`poptorch.BeginBlock`
   doesn't have the same constraint because all the layers called after will
   automatically be added to the last :py:class:`poptorch.BeginBlock`.
-* Please note that PopTorch needs to reserve IPUs in powers of 2 or
-  multiples of 64. You are advised to configure your model accordingly
-  to take full advantage of the IPUs available. However, if you need to run
-  with a different number of IPUs, you can use
-  ``poptorch.Options().autoRoundNumIPUs(True)`` to allow
-  PopTorch to reserve more IPUs than the model specifies.
+* Please note that PopTorch needs to reserve IPUs in powers of 2. You are
+  advised to configure your model accordingly to take full advantage of the IPUs
+  available. However, if you need to run with a different number of IPUs, you
+  can use ``poptorch.Options().autoRoundNumIPUs(True)`` to allow PopTorch to
+  reserve more IPUs than the model specifies.
 * Unused or dead layers should NOT be included in any
   :py:class:`poptorch.BeginBlock` or :py:class:`poptorch.Block`.
 * If layer A happens before layer B inside the model and each layer has

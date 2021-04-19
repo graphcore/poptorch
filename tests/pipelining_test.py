@@ -370,10 +370,9 @@ def test_ipu_round_up_error():
     error_msg = (
         ".+The model specifies the use of 3 IPUs, however PopTorch must "
         "reserve a minimum of 4 in order to allow the model to run, "
-        "because PopTorch must reserve a power of 2 or a multiple of 64"
-        r" IPUs\. Please reconfigure your model to use a different "
-        r"number of IPUs or set poptorch\.Options\(\)\."
-        r"autoRoundNumIPUs\(True\)\.")
+        "because PopTorch must reserve a power of 2 or maximum of 64 IPUs per "
+        r"process\. Please reconfigure your model to use a different number of "
+        r"IPUs or set poptorch\.Options\(\)\.autoRoundNumIPUs\(True\)\.")
     with pytest.raises(RuntimeError, match=error_msg):
         m(torch.randn(4, 5))
 

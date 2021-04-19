@@ -97,3 +97,41 @@ def test_weight_update_replicas(process_id=0, num_processes=1):
                                 expected=ref,
                                 rtol=1e-03,
                                 atol=1e-03)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_too_many_ipus():
+    localReplicationFactor = 128
+
+    opts = poptorch.Options()
+    opts.replicationFactor(localReplicationFactor)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.layer = torch.nn.Linear(128, 4)
+
+        def forward(self, input):
+            return self.layer(input)
+
+    model = Model()
+    poptorch_model = helpers.trainingModelWithLoss(
+        model,
+        options=opts,
+        loss=torch.nn.L1Loss(reduction="mean"),
+        optimizer=torch.optim.SGD(model.parameters(),
+                                  lr=0.01,
+                                  weight_decay=0.0,
+                                  momentum=0.0))
+
+    np.random.seed(42)
+    input = np.random.rand(512, 128).astype(np.float32)
+    labels = np.ones((128, 4)).astype(np.float32)
+
+    with pytest.raises(
+            RuntimeError,
+            match=r"Too many IPUs requested \(128\)\. Experiments that need .*"
+    ):
+        poptorch_model(torch.tensor(input, requires_grad=True),
+                       torch.tensor(labels))

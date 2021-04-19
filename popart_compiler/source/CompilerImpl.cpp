@@ -204,6 +204,13 @@ OptimizerParameters::OptimizerParameters(const Optimizer &opt, bool is_default)
                    << toString(vectorDiff(provided_names, poptorch_names)));
 }
 
+void assertSingleInstanceMaxNumIPUs(std::size_t num_ipus) {
+  ERROR_ON_MSG(num_ipus > 64, "Too many IPUs requested ("
+                                  << num_ipus
+                                  << "). Experiments that need more than 64 "
+                                     "IPUs require distributed execution.");
+}
+
 } // namespace
 
 namespace detail {
@@ -404,6 +411,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
              popart_options.replicatedGraphCount;
   ERROR_ON_MSG(num_ipus == 0, "Your compiled model is empty (All the "
                               "operations have been optimised out)");
+  assertSingleInstanceMaxNumIPUs(num_ipus);
   if (options.ipu_model) {
     if (popart_options.enableEngineCaching) {
       logging::warn("enableExecutableCaching doesn't work with the IPU model");
@@ -439,13 +447,12 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
               device_options);
       ERROR_ON_MSG(!_device, "Failed to create offline IPU device");
     } else {
-      // Round up number of ipus to a power of 2
-      // or a multiple of 64 (number of POD-64s)
+      // Round up number of ipus to a power of 2.
       auto rounded_num_ipus = roundUpNumIPUs(num_ipus);
 
       if (rounded_num_ipus != num_ipus) {
         std::string common_msg(", because PopTorch must reserve a power of 2 or"
-                               " a multiple of 64 IPUs");
+                               " maximum of 64 IPUs per process");
         if (options.auto_round_num_ipus) {
           logging::warn("Reserving {} IPUs when the model specifices the use "
                         "of only {}{}. {} will be reserved but not used.",
@@ -464,7 +471,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
                    "poptorch.Options().autoRoundNumIPUs(True).");
         }
       }
-
+      assertSingleInstanceMaxNumIPUs(num_ipus);
       do {
         // Regular IPU hardware target
         if (!options_set.count("ipu_id")) {

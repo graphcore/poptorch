@@ -1200,8 +1200,7 @@ class Options(_options_impl.OptionsDict):
         to prevent you unintentionally overbooking IPUs.
 
         :param auto_round_num_ipus:
-            * True: round up the number of IPUs to a power of 2 or multiple of
-              64 automatically.
+            * True: round up the number of IPUs to a power of 2.
             * False: error if the number of IPUs is not supported.
 
         """

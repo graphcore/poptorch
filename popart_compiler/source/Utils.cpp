@@ -66,19 +66,12 @@ int getNumTilesPerIpu(const std::string &ipu_model_version) {
 // Round up the number of IPUs, if required, to the minimum number which need
 // to be reservered
 std::uint64_t roundUpNumIPUs(std::uint64_t num_ipus) {
-  std::uint64_t rounded_num_ipus;
+  std::uint64_t rounded_num_ipus = 1;
 
-  if (num_ipus < 64) {
-    // If fewer than 64, find the next power of 2
-    rounded_num_ipus = 1;
-    while (rounded_num_ipus < num_ipus) {
-      rounded_num_ipus *= 2;
-    }
-  } else {
-    // Otherwise, find the next multiple of 64
-    rounded_num_ipus = ((num_ipus - 1) / 64 + 1) * 64;
+  // If fewer than 64, find the next power of 2
+  while (rounded_num_ipus < num_ipus) {
+    rounded_num_ipus *= 2;
   }
-
   return rounded_num_ipus;
 }
 
