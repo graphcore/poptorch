@@ -7,6 +7,21 @@ on Graphcore IPU hardware. PopTorch has been designed to require as few changes 
 possible to your models in order to run on the IPU. However, it does have some
 differences from native PyTorch execution, to get the most out of IPU hardware.
 
+See the “Getting Started” guide for your IPU system on the Graphcore
+`documentation portal <https://docs.graphcore.ai/>`_ for information on
+installing the Poplar SDK and PopTorch.
+
+In the Graphcore software stack, PyTorch sits at the highest level of
+abstraction. Poplar and PopLibs provide a software interface to operations
+running on the IPU. PopTorch compiles PyTorch models into Poplar executables and
+also provides IPU-specific functions.
+
+.. figure:: pytorch-software-stack.png
+    :align: center
+    :width: 100%
+
+    PyTorch, PopTorch and the Poplar software stack
+
 PopTorch supports executing native PyTorch models for both inference and training.
 To run a PyTorch model on the IPU, you must wrap your model with either:
 
