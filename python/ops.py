@@ -224,11 +224,19 @@ def _assertIdIsValid(name, value, expected_type):
 
 
 class Block(torch.nn.Module):
-    """Runs all layers called inside this scope on a specified IPU.
+    """ A context manager to define blocks of the model.
 
+    You can use ``Block`` as a context manager. This means you use Python's
+    "with" statement as follows:
 
-    >>> with poptorch.Block("IPU0"):
+    >>> with poptorch.Block("Encoder"):
     ...     self.layer = MyLayer(x)
+
+    All layers called inside this scope will run on the specified IPU, if
+    one is specicfied. In addition, you can combines multiple blocks into
+    a stage.
+
+    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
 
     """
     # Will be set by the ExecutionStrategy before the graph is traced.
@@ -281,54 +289,58 @@ class Block(torch.nn.Module):
         _end_ipu_block()
 
 
-class BeginBlock(torch.nn.Module):
-    """Runs all layers from the given layer until the beginning of the next
-    block on a specified IPU.
+def BeginBlock(module: torch.nn.Module,
+               user_id: str = None,
+               ipu_id: int = None):
+    """
+    Define a block by modifying an existing PyTorch module.
 
-    All layers after this layer will also run on
-    the same IPU until another ``BeginBlock`` is encountered.
+    You can use this with an existing Pytorch module instance, as follows:
 
-    By default :py:class:`PipelinedExecution` will be used, however this
-    can be overridden in the `poptorch.Options`.
+    >>> poptorch.BeginBlock(myModel.a_layer)
+    >>> poptorch.BeginBlock(MyNewLayer())
+
+    The wrapped module and all sub-modules will be part of this block until
+    a sub-module is similar modified to be another block. In addition, if an IPU
+    is specified, the module and its submodules will run on the specified IPU.
+
+    You can combines multiple blocks into a stage.
+
+    :param user_id: A user defined identifier for the block.
+            Blocks with the same id are considered as being a single block.
+            Block identifiers are also used to manually specify pipelines or
+            phases.
+    :param ipu_id: The id of the IPU to run on.
+                   Note that the ``ipu_id`` is an index in a multi-IPU device
+                   within PopTorch, and is separate and distinct from the device
+                   ids used by ``gc-info``.
 
     .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
-
-    >>> self.layer = poptorch.BeginBlock(MyLayer(x))
-
     """
+    if not isinstance(module, torch.nn.Module):
+        raise RuntimeError("module is not an instance of torch.nn.Module.")
 
-    def __init__(self, layer_to_call, user_id=None, ipu_id=None):
-        """
-        All subsequent layers of the network will be part of this block until
-        another layer is wrapped.
+    class BlockModule(type(module)):
+        def __call__(self, *input, **kwargs):
+            if Block._stages_manager is not None:
+                if self._user_id is None:
+                    self.__dict__['_user_id'] = (
+                        Block._stages_manager.nextAutoId())
+                Block._stages_manager.beginStage(self._user_id, self._ipu_id)
 
-        :param torch.nn.Module layer_to_call: The layer to run on the
-            specified IPU.
-        :param user_id: A user defined identifier for the block.
-            Blocks with the same id are considered as being a single block.
-            Block identifiers are also used to manually create
-            :py:class:`Stages<poptorch.Stage>` and
-            :py:class:`Phases<poptorch.Phase>`.
-        :type user_id: str, optional
-        :param int, optional ipu_id: The id of the IPU to run on.
-                       Note that the ``ipu_id`` is an index
-                       in a multi-IPU device within PopTorch, and is
-                       separate and distinct from the device ids used by
-                       ``gc-info``.
-        """
-        super().__init__()
-        self._user_id = user_id
-        self._layer_to_call = layer_to_call
-        self._ipu_id = ipu_id
+            return super().__call__(*input, **kwargs)
 
-    def __call__(self, *input, **kwargs):
-        if Block._stages_manager is not None:
-            if self._user_id is None:
-                self._user_id = Block._stages_manager.nextAutoId()
-            Block._stages_manager.beginStage(self._user_id, self._ipu_id)
+    if str(module.__class__) == str(BlockModule):
+        raise RuntimeError("module has already been assigned to a block.")
 
-        out = self._layer_to_call(*input, **kwargs)
-        return out
+    BlockModule.__name__ = type(module).__name__
+    module.__class__ = BlockModule
+    module.__dict__['_user_id'] = user_id
+    module.__dict__['_ipu_id'] = ipu_id
+
+    # There is no need to return as it is passed by refence, but this is for
+    # backward compatibility
+    return module
 
 
 # pylint: enable=abstract-method

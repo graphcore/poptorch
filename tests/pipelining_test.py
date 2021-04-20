@@ -200,8 +200,8 @@ def test_api_wrap(capfd):
             return x
 
     m = Model()
-    m.l1 = poptorch.BeginBlock(m.l1, ipu_id=0)
-    m.l2 = poptorch.BeginBlock(m.l2, ipu_id=0)
+    poptorch.BeginBlock(m.l1, ipu_id=0)
+    poptorch.BeginBlock(m.l2, ipu_id=0)
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
@@ -241,8 +241,8 @@ def test_api_wrap_2stages(capfd):
             return x
 
     m = Model()
-    m.l1 = poptorch.BeginBlock(m.l1, ipu_id=1)
-    m.l2 = poptorch.BeginBlock(m.l2, ipu_id=1)
+    poptorch.BeginBlock(m.l1, ipu_id=1)
+    poptorch.BeginBlock(m.l2, ipu_id=1)
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
@@ -357,9 +357,9 @@ def test_ipu_round_up_error():
             return x
 
     m = Model()
-    m.l1 = poptorch.BeginBlock(m.l2, ipu_id=0)
-    m.l2 = poptorch.BeginBlock(m.l2, ipu_id=1)
-    m.l3 = poptorch.BeginBlock(m.l3, ipu_id=2)
+    poptorch.BeginBlock(m.l1, ipu_id=0)
+    poptorch.BeginBlock(m.l2, ipu_id=1)
+    poptorch.BeginBlock(m.l3, ipu_id=2)
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(
@@ -376,3 +376,79 @@ def test_ipu_round_up_error():
         r"autoRoundNumIPUs\(True\)\.")
     with pytest.raises(RuntimeError, match=error_msg):
         m(torch.randn(4, 5))
+
+
+def test_begin_block_names_invariant():
+    class Block(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.relu = torch.nn.ReLU()
+
+            self.l1 = torch.nn.Linear(3, 5)
+            self.l2 = torch.nn.Linear(5, 5)
+            self.l3 = torch.nn.Linear(5, 3)
+
+        def forward(self, x):
+            x = self.relu(self.l1(x))
+            x = self.relu(self.l2(x))
+            x = self.relu(self.l3(x))
+            return x
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.l1 = Block()
+            self.l2 = Block()
+
+        def forward(self, x):
+            x = self.l1(x)
+            with poptorch.Block(ipu_id=2):
+                x = self.l2(x)
+            return x
+
+    m = Model()
+
+    old_all_names = [n for n, _ in m.named_parameters()]
+    old_state_dict = m.state_dict()
+
+    m_l1_wrapped = poptorch.BeginBlock(m.l1, ipu_id=1)
+
+    # The return is for backward compatibility
+    assert m_l1_wrapped is m.l1
+
+    print(m.l2.__class__)
+    assert m.l2.__class__ is Block
+    poptorch.BeginBlock(m.l2, ipu_id=2)
+    assert m.l2.__class__ is not Block
+
+    new_all_names = [n for n, _ in m.named_parameters()]
+    new_state_dict = m.state_dict()
+
+    assert old_all_names == new_all_names
+
+    sorted_state_dict_keys = sorted(old_state_dict.keys())
+    assert sorted_state_dict_keys == sorted(new_state_dict.keys())
+
+    for k in sorted_state_dict_keys:
+        helpers.assert_allequal(expected=old_state_dict[k],
+                                actual=new_state_dict[k])
+
+    # Strict=True is a sufficient test in itself
+    m.load_state_dict(old_state_dict, strict=True)
+
+    # Test dir does not raise an exception
+    dir(m.l1)
+
+    # Test registering a buffer
+    m.l1.register_buffer("a_buff",
+                         torch.nn.parameter.Parameter(torch.zeros(2, 2)))
+
+    buffer_names = [b[0] for b in m.named_buffers()]
+    assert "l1.a_buff" in buffer_names
+
+    # Test registering a param
+    m.l1.register_parameter("a_param",
+                            torch.nn.parameter.Parameter(torch.zeros(2, 2)))
+
+    param_names = [p[0] for p in m.named_parameters()]
+    assert "l1.a_param" in param_names
