@@ -183,6 +183,6 @@ if(${CMAKE_VERSION} VERSION_GREATER "3.15.0")
   # module cannot be used so always install after a build.
   add_custom_target(install_poptorch ALL
       COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
-      DEPENDS poptorch_core
+      DEPENDS poptorch_core custom_cube_op custom_leaky_relu_op custom_add_scalar_op custom_add_scalar_vec_op custom_add_vec_scalar_mul_op custom_reduce_op custom_three_input_reduce_op custom_many_attribute_op
   )
 endif()

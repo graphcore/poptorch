@@ -15,10 +15,7 @@ import helpers
 myso = list(pathlib.Path("tests").rglob("libcustom_*.*"))
 assert myso, "Failed to find libcustom_* libraries"
 for single_so in myso:
-    myop = ctypes.cdll.LoadLibrary(single_so)
-
-for lib in myso:
-    ctypes.cdll.LoadLibrary(lib)
+    ctypes.cdll.LoadLibrary(single_so)
 
 
 def test_float_attribute():
