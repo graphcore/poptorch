@@ -22,7 +22,7 @@ HalfFloatCasting &getHalfFloatCastingBehavior() {
   return behavior;
 }
 
-bool &getRunningVarianceAlwaysFloat() {
+bool &getRunningStatisticsAlwaysFloat() {
   static bool always_float = true;
 
   return always_float;
@@ -38,13 +38,15 @@ HalfFloatCasting halfFloatCastingBehavior() {
   return getHalfFloatCastingBehavior();
 }
 
-void setRunningVarianceAlwaysFloat(bool value) {
-  logging::debug("poptorch.Options set runningVarianceAlwaysFloat to {}",
+void setRunningStatisticsAlwaysFloat(bool value) {
+  logging::debug("poptorch.Options set runningStatisticsAlwaysFloat to {}",
                  value);
-  getRunningVarianceAlwaysFloat() = value;
+  getRunningStatisticsAlwaysFloat() = value;
 }
 
-bool runningVarianceAlwaysFloat() { return getRunningVarianceAlwaysFloat(); }
+bool runningStatisticsAlwaysFloat() {
+  return getRunningStatisticsAlwaysFloat();
+}
 
 namespace {
 bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
@@ -59,7 +61,8 @@ bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
   if (implicit_cast == ImplicitCast::ExceptThird && input_num == 2) {
     return true;
   }
-  if (implicit_cast == ImplicitCast::ExceptFifth && input_num == 4) {
+  if (implicit_cast == ImplicitCast::ExceptFourthFifth &&
+      (input_num == 3 || input_num == 4)) {
     return true;
   }
 

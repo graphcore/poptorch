@@ -852,8 +852,8 @@ void processPrecisionOptions(py::handle h) {
   poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
       values_dict["half_float_casting"].cast<uint64_t>()));
 
-  poptorch::setRunningVarianceAlwaysFloat(
-      values_dict["running_variance_always_float"].cast<bool>());
+  poptorch::setRunningStatisticsAlwaysFloat(
+      values_dict["running_statistics_always_float"].cast<bool>());
 }
 
 void compileWithTraceAndExport(

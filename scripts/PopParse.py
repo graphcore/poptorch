@@ -237,7 +237,7 @@ CastingExceptSecondArgsOps = [
 ]
 # Also Pad but only after >= 11
 CastingExceptThirdArgsOps = ["roialign"]
-CastingExceptFifthArgsOps = ["batchnormalization"]
+CastingExceptFourthFifthArgsOps = ["batchnormalization"]
 
 # Implicit casting ops not in these catagories:
 # QLinearConv, QLinearMatMul
@@ -259,7 +259,6 @@ CastingAlwaysIntOutput = ["convinteger", "matmulinteger"]
 
 # yapf: disable
 OutputTypeSameAsFirstInput = [
-     "scatterreduce",
     "_ctcloss",
     "abs",
     "acos",
@@ -345,6 +344,7 @@ OutputTypeSameAsFirstInput = [
     "scale",
     "scaledadd",
     "scatter",
+    "scatterreduce",
     "selu",
     "sequenceerase",
     "shapeddropout",
@@ -535,8 +535,8 @@ def addCastingOptStr(name):
         return "ImplicitCast::ExceptSecond"
     if name in CastingExceptThirdArgsOps:
         return "ImplicitCast::ExceptThird"
-    if name in CastingExceptFifthArgsOps:
-        return "ImplicitCast::ExceptFifth"
+    if name in CastingExceptFourthFifthArgsOps:
+        return "ImplicitCast::ExceptFourthFifth"
     return "ImplicitCast::None"
 
 

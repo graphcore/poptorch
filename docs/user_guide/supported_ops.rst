@@ -418,18 +418,18 @@ The following examples show cases where the type output differs from PyTorch:
 Normalization
 -------------
 
-Some normalization layers require the computation of a running variance. The tensor will be computed as float32 even though the input to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy.
+Some normalization layers require the computation of running statistics - mean and variance. These tensors will be computed as float32 even though the inputs to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy.
 
 The following operators are affected:
 * ``torch.nn.BatchNorm1d``
 * ``torch.nn.BatchNorm2d``
 * ``torch.nn.BatchNorm3d``
 
-The type of running variance computations may be controlled via ``opts.Precision.runningVarianceAlwaysFloat(bool)``. For example, in the script below, variance computations will be performed in half precision:
+The type of running statistics computations may be controlled via ``opts.Precision.runningStatisticsAlwaysFloat(bool)``. For example, in the script below, mean and variance computations will be performed in half precision:
 
-.. literalinclude:: running_variance_half.py
+.. literalinclude:: running_statistics_half.py
     :language: python
-    :caption: Controlling type of running variance computations
+    :caption: Controlling type of running mean and variance computations
     :linenos:
-    :start-after: half_var_begin
-    :end-before: half_var_end
+    :start-after: half_stats_begin
+    :end-before: half_stats_end

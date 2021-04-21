@@ -89,8 +89,9 @@ torch::jit::Node* createSequenceslice(torch::jit::Graph *graph,  const std::vect
 new_node->i_(c10::Symbol::fromQualString("attr::zeroUnused"),zeroUnused);
 return new_node;
 }
-torch::jit::Node* createReplicatedallreduce(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+torch::jit::Node* createReplicatedallreduce(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> commGroup) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::replicatedallreduce, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->is_(c10::Symbol::fromQualString("attr::commGroup"),commGroup);
 return new_node;
 }
 torch::jit::Node* createL1loss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const float lambda,std::int32_t reduction) {
@@ -310,7 +311,7 @@ torch::jit::Node* createAtanh(torch::jit::Graph *graph,  const std::vector<torch
 return new_node;
 }
 torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFifth, OutputType::AsFirstInput);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFourthFifth, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
 new_node->f_(c10::Symbol::fromQualString("attr::epsilon"),epsilon);
 new_node->f_(c10::Symbol::fromQualString("attr::momentum"),momentum);
