@@ -629,6 +629,24 @@ class ArgsParser:
         if in_tensors.first_none is None:
             in_tensors.first_none = len(self._varnames)
 
+        # filter-out trailing None arguments when they default to None
+        # Extending this to any argument set to its default value has
+        # proven problematic - the trace may be computed with fewer
+        # inputs than intended.
+        for i in reversed(range(len(in_tensors._args))):
+            if in_tensors._args[i] is not None:
+                break
+            if self._defaults[i] is not None:
+                break
+            in_tensors._args.pop()
+            if in_tensors.first_none == i:
+                in_tensors.first_none = None
+
+        # assert we are not passing None parameters to avoid a cryptic error
+        assert None not in in_tensors._args, \
+            "'None' may not be passed as explicit model argument. It may " + \
+            "only be used as default initialiser"
+
         if in_tensors.forEachMatchedAtLeastOnce(
                 condition=lambda t: isinstance(t, torch.Tensor
                                                ) and not t.is_contiguous(),

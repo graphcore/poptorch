@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import pytest
 import poptorch
+import helpers
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -242,3 +243,100 @@ def test_input_three_agg_nested_dict():
             "arguments, including when nested in tuples."
             "\nReceived dict y[2][1] = "
             "{'c': tensor([4])}")
+
+
+torch.manual_seed(42)
+ones = torch.ones(5, 5)
+x = torch.randn(5, 5)
+y = torch.randn(5, 5)
+z = torch.randn(5, 5)
+t = torch.randn(5, 5)
+
+
+class Model(torch.nn.Module):
+    def forward(self, x, y=ones, z=None, t=None):
+        r = x
+        if y is not None:
+            r = torch.add(r, y)
+        if z is not None:
+            r = torch.add(r, z)
+        if t is not None:
+            r = torch.add(r, t)
+        return torch.tanh(x)
+
+
+def test_none_input_pass_one_kwarg():
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    native_out = model(x, y, z, t=None)
+    poptorch_out = poptorch_model(x, y, z, t=None)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+def test_none_input_pass_two_kwarg():
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    native_out = model(x, y, z=None, t=None)
+    poptorch_out = poptorch_model(x, y, z=None, t=None)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+def test_none_input_pass_skip_one_kwarg():
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    native_out = model(x, y, z=None)
+    poptorch_out = poptorch_model(x, y, z=None)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+def test_none_input_fail_non_default_kwarg():
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(AssertionError):
+        poptorch_model(x, y=None)
+
+
+def test_none_input_pass_last_arg():
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    native_out = model(x, y, z, None)
+    poptorch_out = poptorch_model(x, y, z, None)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+def test_none_input_pass_two_arg():
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    native_out = model(x, y, None, None)
+    poptorch_out = poptorch_model(x, y, None, None)
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+def test_none_input_fail_non_default_arg():
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(AssertionError):
+        poptorch_model(x, None, None, None)
+
+
+def test_none_input_fail():
+    class Model(torch.nn.Module):
+        def forward(self, x=None, y=ones):
+            if x is None:
+                return y
+            if y is None:
+                return ones
+            return torch.add(x, y)
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    with pytest.raises(AssertionError):
+        poptorch_model(x, None)
