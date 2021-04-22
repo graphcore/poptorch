@@ -46,3 +46,20 @@ OP_DECL(poptorch, zeros, zeros, _impl->zeros,
         BODY_ARG(shape) BODY_ARG(dtype))
 
 OP_DECL(poptorch, recomputation_checkpoint, recomputation_checkpoint, _impl->recomputationCheckpoint, NONE, NONE)
+
+// Operations which need extra types
+
+#define EMPTY_FLOAT_VEC std::vector<float>()
+#define EMPTY_STRING_VEC std::vector<std::string>()
+#define OPTIONAL_FLOAT  nonstd::optional<float>()
+#define OPTIONAL_INT nonstd::optional<int64_t>()
+
+OP_DECL(poptorch, gru, gru, AiOnnxOpset10.gru, NONE,
+        BODY_ARG(2)  BODY_ARG(EMPTY_FLOAT_VEC) BODY_ARG(EMPTY_FLOAT_VEC)
+        BODY_ARG(EMPTY_STRING_VEC) BODY_ARG(OPTIONAL_FLOAT) BODY_ARG("forward")
+        BODY_ARG(OPTIONAL_INT) BODY_ARG(1))
+
+#undef EMPTY_STRING_VEC
+#undef OPTIONAL_INT
+#undef OPTIONAL_FLOAT
+#undef EMPTY_FLOAT_VEC

@@ -96,7 +96,6 @@ torch::jit::Node* createAtan(torch::jit::Graph *graph,  const std::vector<torch:
 torch::jit::Node* createCos(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createDiv(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createEqual(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createGru(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,std::vector<double> activation_alpha,std::vector<double> activation_beta,const std::vector<std::string> & activations,float clip,const std::string & direction,std::int32_t hidden_size,int64_t linear_before_reset);
 torch::jit::Node* createMul(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createMultinomial(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t dtype,int64_t sample_size,float seed);
 torch::jit::Node* createLogical_or(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

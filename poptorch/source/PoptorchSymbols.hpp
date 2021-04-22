@@ -37,6 +37,7 @@ extern c10::Symbol scatter_add_;                // NOLINT
 namespace poptorch {
 
 namespace symbols {
+
 #define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
   namespace Namespace {                                                        \
   extern c10::Symbol FuncName;                                                 \

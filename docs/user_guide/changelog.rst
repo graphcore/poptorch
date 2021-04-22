@@ -24,6 +24,7 @@ New features
 - Add option to log the number of IPU cycles used in executing the main graph
 - Deprecated ``runningVarianceAlwaysFloat`` in favour of ``runningStatisticsAlwaysFloat`` in ``poptorch.Options.Precision``,
   as this new option computes both the running mean and variance in FP32 when this option is set to `True`.
+- Add support for ``torch.nn.GRU``
 
 v2.0 (Poplar SDK 2.0)
 =====================

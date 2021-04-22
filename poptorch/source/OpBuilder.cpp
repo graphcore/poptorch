@@ -542,6 +542,14 @@ torch::jit::Node *createMultiConvPart(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createGru(torch::jit::Graph *graph,
+                            const std::vector<torch::jit::Value *> &args) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::gru, args, ImplicitCast::All,
+      OutputType::AsImplicitCastPromoted, 2);
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */
