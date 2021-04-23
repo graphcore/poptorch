@@ -61,18 +61,19 @@ def get_mean_cycle_count(io_dtype, capfd):
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-@pytest.mark.parametrize("io_dtype1,io_dtype2,min_dtype1_div_dtype2_ratio",
-                         [(torch.float32, torch.int8, 2.6),
-                          (torch.float32, torch.uint8, 2.6),
-                          (torch.float32, torch.float16, 1.2)])
+@pytest.mark.parametrize("io_dtype1,io_dtype2",
+                         [(torch.float32, torch.int8),
+                          (torch.float32, torch.uint8),
+                          (torch.float32, torch.float16)])
 @helpers.printCapfdOnExit
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
-def test_compare_io_performance(capfd, io_dtype1, io_dtype2,
-                                min_dtype1_div_dtype2_ratio):
+def test_compare_io_performance(capfd, io_dtype1, io_dtype2):
     poptorch.setLogLevel('INFO')
     cycle_count_1 = get_mean_cycle_count(io_dtype1, capfd)
     cycle_count_2 = get_mean_cycle_count(io_dtype2, capfd)
-
-    # We allow quite large differences as performance has large variance between
-    # the runs. This test should thus only indicate serious regressions.
-    assert cycle_count_1 / cycle_count_2 >= min_dtype1_div_dtype2_ratio
+    # We only log the resulting cycle counts and ratios due to high variance
+    # between the runs.
+    print("test_compare_io_performance[{},{}],"
+          "cycle_count1={}, cycle_count2={}, ratio={:.4f}".format(
+              io_dtype1, io_dtype2, cycle_count_1, cycle_count_2,
+              cycle_count_1 / cycle_count_2))
