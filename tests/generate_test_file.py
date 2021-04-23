@@ -84,7 +84,11 @@ external_data_tests = [
 # yapf: enable
 
 # Tests that cannot run in parallel with other tests
-serial_tests = ["attach_detach_test.py", "attach_detach_wait_for_ipu_test.py"]
+serial_tests = [
+    "attach_detach_test.py",
+    "attach_detach_wait_for_ipu_test.py",
+    "io_performance_test.py::test_compare_io_performance",
+]
 #pylint: enable=line-too-long
 
 
