@@ -22,10 +22,11 @@ class BrokenDataset(torch.utils.data.Dataset):
 
 
 class IncrementDataset(torch.utils.data.Dataset):
-    def __init__(self, shape, length):
+    def __init__(self, shape, length, dtype=torch.float32):
         super().__init__()
         self._shape = shape
         self._length = length
+        self._dtype = dtype
 
     def __len__(self):
         return self._length
@@ -33,21 +34,22 @@ class IncrementDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         if index >= self._length:
             raise StopIteration
-        return torch.full(self._shape, index, dtype=torch.float32)
+        return torch.full(self._shape, index, dtype=self._dtype)
 
 
 class IncrementIterableDataset(torch.utils.data.IterableDataset):
-    def __init__(self, shape, length, start=0):
+    def __init__(self, shape, length, start=0, dtype=torch.float32):
         super().__init__()
         self._shape = shape
         self.length = length
         self.start = start
+        self._dtype = dtype
 
     def __iter__(self):
         for index in range(self.length):
             yield torch.full(self._shape,
                              self.start + index,
-                             dtype=torch.float32)
+                             dtype=self._dtype)
 
 
 class IncrementIterableDatasetWithLen(IncrementIterableDataset):
@@ -577,18 +579,21 @@ def test_subprocess_broken_dataset():
 
 @pytest.mark.parametrize("DatasetType",
                          [IncrementDataset, IncrementIterableDataset])
-def test_reuse_workers(DatasetType):
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
+def test_reuse_workers(DatasetType, dtype):
     shape = [2, 3]
     num_tensors = 10
 
     opts = poptorch.Options()
     loader = poptorch.DataLoader(opts,
-                                 DatasetType(shape, num_tensors),
+                                 DatasetType(shape, num_tensors, dtype=dtype),
                                  batch_size=1,
                                  num_workers=2,
                                  mode=poptorch.DataLoaderMode.Async)
     loader_no_reuse = poptorch.DataLoader(opts,
-                                          DatasetType(shape, num_tensors),
+                                          DatasetType(shape,
+                                                      num_tensors,
+                                                      dtype=dtype),
                                           batch_size=1,
                                           persistent_workers=False,
                                           num_workers=2,
@@ -648,7 +653,8 @@ def _worker_init_fn(worker_id):
         poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
         poptorch.DataLoaderMode.Sync
     })
-def test_iterable_dataloader_drop_last(mode):
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
+def test_iterable_dataloader_drop_last(mode, dtype):
     shape = [2, 3]
     num_tensors = 101
     num_workers = 7
@@ -668,7 +674,9 @@ def test_iterable_dataloader_drop_last(mode):
 
     opts = poptorch.Options()
     loader = poptorch.DataLoader(opts,
-                                 IncrementIterableDataset(shape, num_tensors),
+                                 IncrementIterableDataset(shape,
+                                                          num_tensors,
+                                                          dtype=dtype),
                                  batch_size=batch_size,
                                  num_workers=num_workers,
                                  mode=mode,
@@ -705,7 +713,8 @@ def test_iterable_dataloader_drop_last(mode):
         poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
         poptorch.DataLoaderMode.Sync
     })
-def test_indexable_dataloader_drop_last(mode):
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
+def test_indexable_dataloader_drop_last(mode, dtype):
     shape = [2, 3]
     num_tensors = 101
     num_workers = 7
@@ -716,7 +725,9 @@ def test_indexable_dataloader_drop_last(mode):
 
     opts = poptorch.Options()
     loader = poptorch.DataLoader(opts,
-                                 IncrementDataset(shape, num_tensors),
+                                 IncrementDataset(shape,
+                                                  num_tensors,
+                                                  dtype=dtype),
                                  batch_size=batch_size,
                                  num_workers=num_workers,
                                  mode=mode)
@@ -752,12 +763,13 @@ def test_indexable_dataloader_drop_last(mode):
         poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
         poptorch.DataLoaderMode.Sync
     })
-def test_indexable_dataloader_len(mode):
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
+def test_indexable_dataloader_len(mode, dtype):
     shape = [2, 3]
     num_tensors = 101
     num_workers = 7
     batch_size = 4
-    ds = IncrementDataset(shape, num_tensors)
+    ds = IncrementDataset(shape, num_tensors, dtype=dtype)
     assert len(ds) == num_tensors
     n = 0
     for n, _ in enumerate(ds):
@@ -796,7 +808,8 @@ def test_indexable_dataloader_len(mode):
         poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
         poptorch.DataLoaderMode.Sync
     })
-def test_iterable_dataloader_len(mode):
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
+def test_iterable_dataloader_len(mode, dtype):
     shape = [2, 3]
     num_tensors = 101
     num_workers = 7
@@ -816,7 +829,7 @@ def test_iterable_dataloader_len(mode):
     else:
         # Best case expected: floor(101/4) = 25 -> unused = 1
         num_iterations_expected = expected_len
-    ds = IncrementIterableDatasetWithLen(shape, num_tensors)
+    ds = IncrementIterableDatasetWithLen(shape, num_tensors, dtype=dtype)
     assert len(ds) == num_tensors
     n = 0
     for n, _ in enumerate(ds):
@@ -852,7 +865,8 @@ def test_iterable_dataloader_len(mode):
     {poptorch.DataLoaderMode.AsyncRebatched, poptorch.DataLoaderMode.Sync})
 @pytest.mark.parametrize("DatasetType",
                          [IncrementDataset, IncrementIterableDatasetWithLen])
-def test_iterable_leftover(mode, DatasetType):
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
+def test_iterable_leftover(mode, DatasetType, dtype):
     shape = [2, 3]
     num_tensors = 101
     num_workers = 7
@@ -861,7 +875,7 @@ def test_iterable_leftover(mode, DatasetType):
     # it doesn't take into account the items lost per worker.
     expected_len = math.ceil(num_tensors / batch_size)
 
-    ds = DatasetType(shape, num_tensors)
+    ds = DatasetType(shape, num_tensors, dtype=dtype)
     if isinstance(ds, torch.utils.data.IterableDataset
                   ) and mode != poptorch.DataLoaderMode.AsyncRebatched:
         # Expected tensors

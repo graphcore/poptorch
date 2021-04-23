@@ -2275,8 +2275,14 @@ class _AsynchronousWorkerProcess:
             # We've got a writing slot
             if self._rebatched_size:
                 for index, tensor in enumerate(data):
-                    buffers.current[index].index_copy_(
-                        0, torch.tensor([self._next_batch_idx]), tensor)
+                    # Note _index_copy_ doesn't work for FP16, it causes
+                    # the following error:
+                    # RuntimeError: _th_index_copy_ not supported on CPUType
+                    # for Half"
+                    #
+                    # That's why we instead use a regular copy_
+                    buffers.current[index][self._next_batch_idx].copy_(
+                        tensor[0])
                 self._next_batch_idx += 1
             else:
                 # Copy the tensor into the preallocated shared memory.
