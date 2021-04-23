@@ -289,7 +289,7 @@ class Block(torch.nn.Module):
         _end_ipu_block()
 
 
-def BeginBlock(module: torch.nn.Module,
+def BeginBlock(layer_to_call: torch.nn.Module,
                user_id: str = None,
                ipu_id: int = None):
     """
@@ -306,6 +306,7 @@ def BeginBlock(module: torch.nn.Module,
 
     You can combines multiple blocks into a stage.
 
+    :param layer_to_call: PyTorch module to assign to the block.
     :param user_id: A user defined identifier for the block.
             Blocks with the same id are considered as being a single block.
             Block identifiers are also used to manually specify pipelines or
@@ -317,10 +318,10 @@ def BeginBlock(module: torch.nn.Module,
 
     .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
     """
-    if not isinstance(module, torch.nn.Module):
+    if not isinstance(layer_to_call, torch.nn.Module):
         raise RuntimeError("module is not an instance of torch.nn.Module.")
 
-    class BlockModule(type(module)):
+    class BlockModule(type(layer_to_call)):
         def __call__(self, *input, **kwargs):
             if Block._stages_manager is not None:
                 if self._user_id is None:
@@ -330,17 +331,17 @@ def BeginBlock(module: torch.nn.Module,
 
             return super().__call__(*input, **kwargs)
 
-    if str(module.__class__) == str(BlockModule):
+    if str(layer_to_call.__class__) == str(BlockModule):
         raise RuntimeError("module has already been assigned to a block.")
 
-    BlockModule.__name__ = type(module).__name__
-    module.__class__ = BlockModule
-    module.__dict__['_user_id'] = user_id
-    module.__dict__['_ipu_id'] = ipu_id
+    BlockModule.__name__ = type(layer_to_call).__name__
+    layer_to_call.__class__ = BlockModule
+    layer_to_call.__dict__['_user_id'] = user_id
+    layer_to_call.__dict__['_ipu_id'] = ipu_id
 
-    # There is no need to return as it is passed by refence, but this is for
+    # There is no need to return as it is passed by reference, but this is for
     # backward compatibility
-    return module
+    return layer_to_call
 
 
 # pylint: enable=abstract-method
