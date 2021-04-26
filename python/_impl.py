@@ -8,6 +8,7 @@ import enum
 import fcntl
 import hashlib
 import io
+import math
 import numbers
 import os
 import weakref
@@ -2115,7 +2116,8 @@ class _AsynchronousWorkerProcess:
             with open(self._dataset, "rb") as f:
                 self._dataset = pickle.load(f)
         dataset_iterator = iter(self._dataset)
-        rebatched_drop_last = getattr(self._dataset, "drop_last", True)
+        rebatched_drop_last = getattr(self._dataset, "rebatched_drop_last",
+                                      True)
 
         data = None
         try:
@@ -2158,9 +2160,16 @@ class _AsynchronousWorkerProcess:
             # Shared with parent process.
             tensor_size = [*tensor.size()]
             if self._rebatched_size:
-                assert tensor_size[0] == 1, ("Rebatching can only be used if "
-                                             "the dataset has batch_size == 1")
-                tensor_size[0] = self._rebatched_size
+                self._next_batch_idx = tensor_size[0]
+                # Reshape with repeat if expand is not working in batch dimension
+                if tensor_size[0] != self._rebatched_size:
+                    repeat_count = math.ceil(self._rebatched_size /
+                                             tensor_size[0])
+                    # Repeat then shrink to the right size
+                    tensor = tensor.repeat(
+                        repeat_count,
+                        *[1] * (len(tensor_size) - 1))[:self._rebatched_size]
+                    tensor_size[0] = self._rebatched_size
             memory = tensor.expand(
                 self._buffer_size,
                 *tensor_size).clone().contiguous().share_memory_()
@@ -2170,11 +2179,10 @@ class _AsynchronousWorkerProcess:
             conn.send(memory)
 
         # We've loaded the first element as part of the spin up process.
-        # If we're rebatching we need more than one element to make up a full
-        # batch so we can't mark the first element as ready to be read yet.
-        if self._rebatched_size is not None:
-            self._next_batch_idx = 1
-        else:
+        if self._rebatched_size is None or \
+                self._next_batch_idx == self._rebatched_size:
+            self._next_batch_idx = 0
+            # Tell the host this data is ready.
             buffers.markWriteComplete()
 
         host_handler = _HostCommandHandler(command_pipe)
@@ -2184,6 +2192,7 @@ class _AsynchronousWorkerProcess:
         else:
             state = _WorkerState.Stopped
 
+        rebatch_leftover = []
         while not host_handler.shutdown_now:
             # Check for messages from the parent process:
             host_handler.checkMessages()
@@ -2204,6 +2213,7 @@ class _AsynchronousWorkerProcess:
                 buffers.reset()
                 dataset_iterator = iter(self._dataset)
                 self._next_batch_idx = 0
+                rebatch_leftover = []
 
                 # Let the host know everything has been reset
                 eof.setResetFlag()
@@ -2218,15 +2228,21 @@ class _AsynchronousWorkerProcess:
 
             # We're now guaranteed to be either loading or prefetching
             eof_reached = False
-            try:
-                # Retrieve data from the dataset
-                data = next(dataset_iterator)
-                if isinstance(data, torch.Tensor):
-                    data = (data, )
-            except StopIteration:
-                logger.debug("AsynchronousDataAccessor worker: end of dataset"
-                             " reached")
-                eof_reached = True
+            # Handle the left overs if any before asking for more data.
+            if rebatch_leftover:
+                data = rebatch_leftover
+                rebatch_leftover = []
+            else:
+                try:
+                    # Retrieve data from the dataset
+                    data = next(dataset_iterator)
+                    if isinstance(data, torch.Tensor):
+                        data = (data, )
+                except StopIteration:
+                    logger.debug(
+                        "AsynchronousDataAccessor worker: end of dataset"
+                        " reached")
+                    eof_reached = True
 
             # Wait for a writing slot to become available
             while not buffers.isAvailable(
@@ -2292,6 +2308,9 @@ class _AsynchronousWorkerProcess:
 
             # We've got a writing slot
             if self._rebatched_size:
+                assert not rebatch_leftover, (
+                    "Rebatch data should be empty and"
+                    " ready to be used if needed")
                 for index, tensor in enumerate(data):
                     # Note _index_copy_ doesn't work for FP16, it causes
                     # the following error:
@@ -2299,9 +2318,17 @@ class _AsynchronousWorkerProcess:
                     # for Half"
                     #
                     # That's why we instead use a regular copy_
-                    buffers.current[index][self._next_batch_idx].copy_(
-                        tensor[0])
-                self._next_batch_idx += 1
+                    in_size = len(tensor)
+                    out_size = self._rebatched_size - self._next_batch_idx
+                    copy_size = min(in_size, out_size)
+                    if in_size > out_size:
+                        rebatch_leftover.append(tensor[copy_size:])
+
+                    buffers.current[index][self._next_batch_idx:self.
+                                           _next_batch_idx + copy_size].copy_(
+                                               tensor[:copy_size])
+
+                self._next_batch_idx += copy_size
             else:
                 # Copy the tensor into the preallocated shared memory.
                 for index, tensor in enumerate(data):

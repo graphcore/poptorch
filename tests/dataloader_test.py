@@ -680,13 +680,14 @@ def test_iterable_dataloader_drop_last(mode, dtype):
                                  batch_size=batch_size,
                                  num_workers=num_workers,
                                  mode=mode,
+                                 drop_last=True,
                                  worker_init_fn=_worker_init_fn)
 
     values = set()
     for t in loader:
         assert t.shape == torch.Size([4, 2, 3])
-        for b in range(4):
-            v = int(t[b][0][0])
+        for b in t:
+            v = int(b[0][0])
             assert v not in values
             values.add(v)
 
@@ -700,8 +701,8 @@ def test_iterable_dataloader_drop_last(mode, dtype):
     values = set()
     for t in loader:
         assert t.shape == torch.Size([4, 2, 3])
-        for b in range(4):
-            v = int(t[b][0][0])
+        for b in t:
+            v = int(b[0][0])
             assert v not in values
             values.add(v)
 
@@ -735,8 +736,8 @@ def test_indexable_dataloader_drop_last(mode, dtype):
     values = set()
     for t in loader:
         assert t.shape == torch.Size([4, 2, 3])
-        for b in range(4):
-            v = int(t[b][0][0])
+        for b in t:
+            v = int(b[0][0])
             assert v not in values
             values.add(v)
 
@@ -750,8 +751,8 @@ def test_indexable_dataloader_drop_last(mode, dtype):
     values = set()
     for t in loader:
         assert t.shape == torch.Size([4, 2, 3])
-        for b in range(4):
-            v = int(t[b][0][0])
+        for b in t:
+            v = int(b[0][0])
             assert v not in values
             values.add(v)
 
@@ -866,7 +867,7 @@ def test_iterable_dataloader_len(mode, dtype):
 @pytest.mark.parametrize("DatasetType",
                          [IncrementDataset, IncrementIterableDatasetWithLen])
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
-def test_iterable_leftover(mode, DatasetType, dtype):
+def test_leftover(mode, DatasetType, dtype):
     shape = [2, 3]
     num_tensors = 101
     num_workers = 7
@@ -901,18 +902,6 @@ def test_iterable_leftover(mode, DatasetType, dtype):
     worker_init_fn = None
     if isinstance(ds, torch.utils.data.IterableDataset):
         worker_init_fn = _worker_init_fn
-    if not isinstance(ds, torch.utils.data.IterableDataset
-                      ) and mode == poptorch.DataLoaderMode.AsyncRebatched:
-        # Not currently supported
-        with pytest.raises(AssertionError, match="not currently supported"):
-            poptorch.DataLoader(opts,
-                                ds,
-                                batch_size=batch_size,
-                                num_workers=num_workers,
-                                worker_init_fn=worker_init_fn,
-                                drop_last=False,
-                                mode=mode)
-        return
     loader = poptorch.DataLoader(opts,
                                  ds,
                                  batch_size=batch_size,
@@ -922,12 +911,82 @@ def test_iterable_leftover(mode, DatasetType, dtype):
                                  mode=mode)
 
     assert len(loader) == expected_len
-    for n, d in enumerate(loader):
-        if n >= num_full_iterations_expected:
-            batch = left_over_batches[n - num_full_iterations_expected]
-        else:
-            batch = batch_size
-        assert d.shape == torch.Size([batch, *shape])
-    num_iterations_expected = num_full_iterations_expected + len(
-        left_over_batches)
-    assert n + 1 == num_iterations_expected
+    for _ in range(2):
+        # There is no guarantee about the order in which
+        # the full vs partial batches will be returned
+        # so we need to keep track of which ones we've seen so far
+        # and assert at the end.
+        full_iterations_left = num_full_iterations_expected
+        left_overs_left = left_over_batches.copy()
+
+        for n, d in enumerate(loader):
+            print("Dequeued tensor shape ", d.shape)
+            if d.shape[0] == batch_size:
+                full_iterations_left -= 1
+            else:
+                assert d.shape[0] in left_overs_left
+                left_overs_left.remove(d.shape[0])
+
+        num_iterations_expected = num_full_iterations_expected + len(
+            left_over_batches)
+        assert full_iterations_left == 0
+        assert not left_overs_left
+        assert n + 1 == num_iterations_expected
+
+
+@pytest.mark.parametrize("DatasetType",
+                         [IncrementDataset, IncrementIterableDatasetWithLen])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.float16])
+@pytest.mark.parametrize("drop_last", [True, False])
+@pytest.mark.parametrize("rebatched_worker_size", [1, 2, 3, 4, None])
+def test_rebatched_worker_size(DatasetType, dtype, drop_last,
+                               rebatched_worker_size):
+    shape = [2, 3]
+    num_tensors = 101
+    num_workers = 7
+    batch_size = 4
+    ds = DatasetType(shape, num_tensors, dtype=dtype)
+    worker_init_fn = None
+    if isinstance(ds, torch.utils.data.IterableDataset):
+        worker_init_fn = _worker_init_fn
+
+    if drop_last:
+        # Best case expected: floor(101/4) = 25 -> unused = 1
+        num_expected = math.floor(num_tensors / batch_size) * batch_size
+    else:
+        num_expected = num_tensors
+
+    opts = poptorch.Options()
+    loader = poptorch.DataLoader(opts,
+                                 ds,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers,
+                                 mode=poptorch.DataLoaderMode.AsyncRebatched,
+                                 drop_last=drop_last,
+                                 rebatched_worker_size=rebatched_worker_size,
+                                 worker_init_fn=worker_init_fn)
+
+    values = set()
+    for t in loader:
+        assert not drop_last or t.shape == torch.Size([4, 2, 3])
+        for b in t:
+            v = int(b[0][0])
+            assert v not in values
+            values.add(v)
+
+    assert len(values) == num_expected
+    print("Missing tensors:")
+    for i in range(num_tensors):
+        if i not in values:
+            print(i)
+
+    # Make sure it works for more than 1 epoch
+    values = set()
+    for t in loader:
+        assert not drop_last or t.shape == torch.Size([4, 2, 3])
+        for b in t:
+            v = int(b[0][0])
+            assert v not in values
+            values.add(v)
+
+    assert len(values) == num_expected

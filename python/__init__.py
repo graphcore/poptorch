@@ -76,17 +76,29 @@ class _SubDataset:
     is created in order to make sure all the tensors get used.
     """
 
-    def __init__(self, dataset, opts, step, shuffle):
+    def __init__(self, dataset, opts, step, shuffle, drop_last):
         num_elts = len(dataset)
         # Note: all the processes must have the same number of batches
         # or it will hang.
-        per_proc = step * (num_elts // (step * opts.Distributed.numProcesses))
-        self._offset = opts.Distributed.processId * per_proc
-        self._base_offset = self._offset
-        self._length = min(per_proc, num_elts - self._offset)
-        self._dataset = dataset
-        self._leftovers = num_elts % per_proc
+        if drop_last:
+            per_proc = step * (num_elts //
+                               (step * opts.Distributed.numProcesses))
+            self._offset = opts.Distributed.processId * per_proc
+            self._length = min(per_proc, num_elts - self._offset)
+            self._leftovers = num_elts % per_proc
+        else:
+            # If the user explicitly requested to not drop the left over elements
+            # then evenly distribute them across all the processes and let the user
+            # take care of padding the tensors.
+            per_proc = [(num_elts // opts.Distributed.numProcesses) +
+                        (num_elts % opts.Distributed.numProcesses > proc)
+                        for proc in range(opts.Distributed.numProcesses)]
+            self._offset = sum(per_proc[:opts.Distributed.processId])
+            self._length = per_proc[opts.Distributed.processId]
+            self._leftovers = 0
 
+        self._base_offset = self._offset
+        self._dataset = dataset
         self._shuffled_indices = None
         if shuffle:
             generator = torch.Generator()
@@ -144,6 +156,7 @@ class DataLoader(torch.utils.data.DataLoader):
                  auto_distributed_partitioning: bool = True,
                  mode: 'poptorch.DataLoaderMode' = DataLoaderMode.Sync,
                  async_options: Optional[Dict[str, Any]] = None,
+                 rebatched_worker_size: Optional[int] = None,
                  **kwargs):
         """
         :param options: Options that will be used to compile
@@ -169,6 +182,11 @@ class DataLoader(torch.utils.data.DataLoader):
             synchronously.
         :param async_options: Options to pass to
             :py:class:`~poptorch.AsynchronousDataAccessor`.
+        :param rebatched_worker_size: When using AsyncRebatched: batch
+            size of the tensors loaded by the workers.
+            Default to the combined batch size.
+            If specified the ``rebatched_worker_size`` must be less than
+            or equal to the combined batch size.
         :param kwargs: Other options to pass to PyTorch's ``DataLoader``
             constructor.
         """
@@ -233,7 +251,8 @@ class DataLoader(torch.utils.data.DataLoader):
                         "auto_distributed_partitioning.")
 
                     dataset = _SubDataset(dataset, options,
-                                          self._combined_batch_size, shuffle)
+                                          self._combined_batch_size, shuffle,
+                                          drop_last)
                     if shuffle:
                         self._swap_range = dataset.swap_range
         if not self._is_iterable:
@@ -244,12 +263,17 @@ class DataLoader(torch.utils.data.DataLoader):
         dataset_batch_size = self._combined_batch_size
         if mode == DataLoaderMode.AsyncRebatched:
             mode = DataLoaderMode.Async
-            if self._is_iterable:
-                # If we're rebatching then we force the dataset to use a
-                # batch size of 1 and the AsynchronousDataAccessor will
-                # build the batched tensor.
-                rebatched_size = self._combined_batch_size
-                dataset_batch_size = 1
+            rebatched_size = self._combined_batch_size
+            # When we rebatch: always let the worker process handle the
+            # leftovers instead of the Dataloader.
+            self.rebatched_drop_last = drop_last
+            drop_last = False
+            if rebatched_worker_size is not None:
+                assert rebatched_worker_size <= self._combined_batch_size, (
+                    f"The rebatched_worker_size ({rebatched_worker_size})"
+                    " must be <= to the combined batch size ("
+                    "{self._combined_batch_size})")
+                dataset_batch_size = rebatched_worker_size
         super().__init__(dataset,
                          batch_size=dataset_batch_size,
                          shuffle=shuffle,
@@ -271,12 +295,15 @@ class DataLoader(torch.utils.data.DataLoader):
     def __len__(self) -> int:
         # If we're rebatching in the AsynchronousDataAccessor we need to
         # adjust the dataset's length.
-        dataset_len = super().__len__()
         if self._accessor is not None and self._accessor.rebatched_size:
-            if not self.drop_last:
+            num_elts = len(self.dataset)
+            dataset_len = num_elts // self._accessor.rebatched_size
+            if not self.rebatched_drop_last and \
+                    num_elts % self._accessor.rebatched_size:
                 # Round up
-                dataset_len += self._accessor.rebatched_size - 1
-            dataset_len = dataset_len // self._accessor.rebatched_size
+                dataset_len += 1
+        else:
+            dataset_len = super().__len__()
         return dataset_len
 
     @property
@@ -361,7 +388,7 @@ class AsynchronousDataAccessor:
         :param early_preload: If True, start loading data in the ring buffer
             as soon as the worker is created.
             If False, wait for an iterator to be created before loading data.
-        :param poptorch.SharingStrategy sharing_strategy:
+        :param sharing_strategy:
             Method to use to pass the dataset object when the child process
             is spawned.
 
@@ -369,7 +396,7 @@ class AsynchronousDataAccessor:
             * `FileSystem` will serialise the dataset to file and reload it
               which will be slower.
 
-        :param int rebatched_size: If not None: return N batched tensors from
+        :param rebatched_size: If not None: return N batched tensors from
             the dataset per iteration. (The passed dataset must have a
             batch_size of 1).
 
@@ -377,6 +404,8 @@ class AsynchronousDataAccessor:
             configured with ``drop_last=False`` then ``rebatched_size``
             must be used.
         """
+        # Set _worker to None  in case something goes wrong and terminate is called
+        self._worker = None
 
         # Ensure the DataLoader doesn't already have an AsynchronousDataAccessor
         if isinstance(dataset, DataLoader) and dataset._accessor is not None:
@@ -387,7 +416,7 @@ class AsynchronousDataAccessor:
                 " in the DataLoader.")
 
         if isinstance(dataset, DataLoader) and not dataset.drop_last and \
-                rebatched_size is None and dataset._is_iterable:
+                rebatched_size is None:
             # Otherwise we'll end up with one left over tensor per worker
             # to return to the main process and we don't currently
             # support that.
@@ -395,22 +424,11 @@ class AsynchronousDataAccessor:
                    dataset.combinedBatchSize == 1, (
                        "The 'drop_last=False' option from the DataLoader only "
                        "works if 'rebatched_size' is specified too.")
-        if isinstance(dataset, DataLoader
-                      ) and not dataset.drop_last and not dataset._is_iterable:
-            # We don't currently support returning a partial batch through the ring buffer
-            # for map-style datasets
-            assert dataset.combinedBatchSize is None or \
-                   dataset.combinedBatchSize == 1, (
-                       "The 'drop_last=False' option from the DataLoader is"
-                       " not currently supported by the "
-                       "AsynchronousDataAccessor for map-style datasets")
         if rebatched_size is not None:
             assert rebatched_size > 1, ("rebatched_size"
                                         " must be None or greater than 1")
 
         self._dataset = dataset
-        # Set _worker to None  in case something goes wrong in the AsynchronousWorker constructor
-        self._worker = None
         # To avoid hangs when the application exits: implicitly call terminate().
         atexit.register(self.terminate)
         self.rebatched_size = rebatched_size
@@ -422,8 +440,9 @@ class AsynchronousDataAccessor:
         """
         An override function to kill the worker process manually.
         """
-        if self._worker:
+        if self._worker is not None:
             self._worker.terminate()
+            self._worker = None
 
     def __del__(self) -> None:
         self.terminate()
@@ -434,18 +453,19 @@ class AsynchronousDataAccessor:
         # length has already been adjusted.
         if self.rebatched_size and getattr(self._dataset, "_accessor",
                                            None) != self:
-            dataset_len = dataset_len // self.rebatched_size
+            num_elts = dataset_len * self._dataset.batch_size
+            dataset_len = num_elts // self.rebatched_size
         return dataset_len
 
     def __iter__(self) -> 'poptorch.AsynchronousDataAccessor':
-        assert self._worker
+        assert self._worker is not None
         self._worker.resetIterator()
         return self
 
     def __next__(self) -> Any:
         # We return shared memory to the user so we can't tell the worker to
         # refill it until the next item is requested.
-        assert self._worker
+        assert self._worker is not None
         self._worker.releaseElement()
         while not self._worker.endOfFile():
             data = self._worker.acquireElementIfAvailable()
