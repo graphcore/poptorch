@@ -293,49 +293,68 @@ torch::jit::Node *dynamicSliceHandler(torch::jit::Graph *graph,
   return new_node;
 }
 
+// implements slicing with step by subsampling a slice with unit step
+torch::jit::Node *subsampleSlice(torch::jit::Graph *graph,
+                                 torch::jit::Node *slice, int dims, int dim,
+                                 int step) {
+  if (step != 1) {
+    std::vector<int64_t> strides(dims, static_cast<int64_t>(1));
+    strides[dim] = step;
+    slice = createSubsample(graph, {slice->output()}, strides);
+  }
+
+  return slice;
+}
+
 torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor
   // // NOLINT
 
+  auto input = node->input(0);
+  auto dim = constantToLong(node->input(1)->node());
   auto start_node = node->input(2)->node();
   auto end_node = node->input(3)->node();
+  auto step_node = node->input(4)->node();
+
+  ERROR_ON_MSG(!isTensorConstant(step_node), "Slicing step must be a constant");
+
+  auto step = constantToLong(step_node);
+  ERROR_ON_MSG(step < 1, "Slicing step must be at least 1");
+
+  auto dims = shapeFromTensor(input);
 
   // If any of the inputs are not constants, dynamicSlice is required
   if (!isTensorConstant(start_node) || !isTensorConstant(end_node)) {
-    return dynamicSliceHandler(graph, node, start_node, end_node);
+    auto slice = dynamicSliceHandler(graph, node, start_node, end_node);
+    return subsampleSlice(graph, slice, dims.size(), dim, step);
   }
-
-  std::int64_t dim = constantToLong(node->input(1)->node());
 
   std::int64_t start = constantToLong(start_node);
   std::int64_t end = constantToLong(end_node);
 
-  c10::TensorTypePtr as_tensor =
-      node->input(0)->type()->cast<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-
   // Based on aten/src/ATen/native/TensorShape.cpp slice()
   if (start < 0) {
-    start += *dims[dim];
+    start += dims[dim];
   }
   if (end < 0) {
-    end += *dims[dim];
+    end += dims[dim];
   }
   if (start < 0) {
     start = 0;
-  } else if (start >= *dims[dim]) {
-    start = *dims[dim];
+  } else if (start >= dims[dim]) {
+    start = dims[dim];
   }
   if (end < start) {
     end = start;
-  } else if (end >= *dims[dim]) {
-    end = *dims[dim];
+  } else if (end >= dims[dim]) {
+    end = dims[dim];
   }
 
-  return createSlice(graph, {node->input(0), wrapInConstant1D(graph, start),
-                             wrapInConstant1D(graph, end),
-                             wrapInConstant1D(graph, dim)});
+  auto slice = createSlice(
+      graph, {node->input(0), wrapInConstant1D(graph, start),
+              wrapInConstant1D(graph, end), wrapInConstant1D(graph, dim)});
+  return subsampleSlice(graph, slice, dims.size(), dim, step);
 }
 
 torch::jit::Node *unbindHandler(torch::jit::Graph *graph,

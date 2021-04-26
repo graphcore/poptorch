@@ -8,10 +8,10 @@ import poptorch
 import helpers
 
 
-def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn):
+def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn, step):
     class SliceModel(torch.nn.Module):
         def forward(self, x, y):
-            return x[start_fn(x):end_fn(x)] + y
+            return x[start_fn(x):end_fn(x):step] + y
 
     model = SliceModel()
 
@@ -25,7 +25,8 @@ def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn):
     helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
-def test_slice_idx_size_of():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_slice_idx_size_of(step):
     def start_fn(tensor_in):
         return tensor_in.shape[0] // 2
 
@@ -33,10 +34,11 @@ def test_slice_idx_size_of():
         return tensor_in.shape[0] - 1
 
     slice_test_harness(torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-                       torch.tensor([3.0]), start_fn, end_fn)
+                       torch.tensor([3.0]), start_fn, end_fn, step)
 
 
-def test_slice_with_sum():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_slice_with_sum(step):
     def start_fn(tensor_in):
         del tensor_in
         return torch.sum(torch.tensor([1, 2, 3])) // 3 - 2
@@ -46,10 +48,11 @@ def test_slice_with_sum():
         return torch.sum(torch.tensor([1, 2, 3])) // 3 + 1
 
     slice_test_harness(torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-                       torch.tensor([-3.0]), start_fn, end_fn)
+                       torch.tensor([-3.0]), start_fn, end_fn, step)
 
 
-def test_slice_with_branch():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_slice_with_branch(step):
     def start_fn(tensor_in):
         del tensor_in
         a = torch.sum(torch.tensor([1, 2, 3])) // 3 - 2
@@ -63,13 +66,13 @@ def test_slice_with_branch():
         return a - 1 + b
 
     slice_test_harness(torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-                       torch.tensor([-3.0]), start_fn, end_fn)
+                       torch.tensor([-3.0]), start_fn, end_fn, step)
 
 
-def dynamic_slice_harness(tensor_in, extra_in, start_fn, end_fn):
+def dynamic_slice_harness(tensor_in, extra_in, start_fn, end_fn, step):
     class DynamicSliceModel(torch.nn.Module):
         def forward(self, tensor_in, extra_in):
-            return tensor_in[start_fn(extra_in):end_fn(extra_in)]
+            return tensor_in[start_fn(extra_in):end_fn(extra_in):step]
 
     model = DynamicSliceModel()
 
@@ -83,7 +86,8 @@ def dynamic_slice_harness(tensor_in, extra_in, start_fn, end_fn):
     helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
-def test_dynamic_slice_one_dim_add():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_dynamic_slice_one_dim_add(step):
     def start_fn(extra_in):
         return extra_in
 
@@ -92,10 +96,11 @@ def test_dynamic_slice_one_dim_add():
 
     dynamic_slice_harness(
         torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-        torch.tensor([1]), start_fn, end_fn)
+        torch.tensor([1]), start_fn, end_fn, step)
 
 
-def test_dynamic_slice_one_dim_subtract():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_dynamic_slice_one_dim_subtract(step):
     def start_fn(extra_in):
         return extra_in - 4
 
@@ -104,10 +109,11 @@ def test_dynamic_slice_one_dim_subtract():
 
     dynamic_slice_harness(
         torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-        torch.tensor([5]), start_fn, end_fn)
+        torch.tensor([5]), start_fn, end_fn, step)
 
 
-def test_dynamic_slice_one_dim_mix_up():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_dynamic_slice_one_dim_mix_up(step):
     def start_fn(extra_in):
         tmp = extra_in + 3
         tmp = tmp - 10
@@ -122,10 +128,11 @@ def test_dynamic_slice_one_dim_mix_up():
 
     dynamic_slice_harness(
         torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-        torch.tensor([5]), start_fn, end_fn)
+        torch.tensor([5]), start_fn, end_fn, step)
 
 
-def test_dynamic_slice_two_dims():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_dynamic_slice_two_dims(step):
     def start_fn(extra_in):
         return extra_in.to(torch.int32)
 
@@ -135,14 +142,15 @@ def test_dynamic_slice_two_dims():
     dynamic_slice_harness(
         torch.tensor([[2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
                       [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]]),
-        torch.tensor([0]), start_fn, end_fn)
+        torch.tensor([0]), start_fn, end_fn, step)
 
 
-def test_dynamic_slice_two_dims_twice_sliced():
+@pytest.mark.parametrize("step", [1, 2, 3])
+def test_dynamic_slice_two_dims_twice_sliced(step):
     class Model(torch.nn.Module):
         def forward(self, tensor_in, start_dim_one, start_dim_two):
             return tensor_in[start_dim_one:start_dim_one +
-                             2, start_dim_two:start_dim_two + 4]
+                             2:step, start_dim_two:start_dim_two + 4:step]
 
     tensor_in = torch.tensor([[2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
                               [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
@@ -174,7 +182,7 @@ def test_dynamic_slice_one_dim_equal():
     with pytest.raises(RuntimeError, match=error_msg):
         dynamic_slice_harness(
             torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn)
+            torch.tensor([5]), start_fn, end_fn, 1)
 
 
 def test_dynamic_slice_one_dim_less_than():
@@ -190,7 +198,7 @@ def test_dynamic_slice_one_dim_less_than():
     with pytest.raises(RuntimeError, match=error_msg):
         dynamic_slice_harness(
             torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn)
+            torch.tensor([5]), start_fn, end_fn, 2)
 
 
 def test_dynamic_slice_one_dim_multiply():
@@ -207,7 +215,7 @@ def test_dynamic_slice_one_dim_multiply():
     with pytest.raises(RuntimeError, match=error_msg):
         dynamic_slice_harness(
             torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn)
+            torch.tensor([5]), start_fn, end_fn, 3)
 
 
 def test_dynamic_slice_one_dim_add_non_factor():
@@ -223,7 +231,7 @@ def test_dynamic_slice_one_dim_add_non_factor():
     with pytest.raises(RuntimeError, match=error_msg):
         dynamic_slice_harness(
             torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([1]), start_fn, end_fn)
+            torch.tensor([1]), start_fn, end_fn, 1)
 
 
 def test_dynamic_slice_one_dim_mix_up_float():
@@ -248,7 +256,7 @@ def test_dynamic_slice_one_dim_mix_up_float():
     with pytest.raises(RuntimeError, match=error_msg):
         dynamic_slice_harness(
             torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn)
+            torch.tensor([5]), start_fn, end_fn, 2)
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2])
