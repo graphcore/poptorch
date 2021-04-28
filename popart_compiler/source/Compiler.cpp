@@ -686,6 +686,10 @@ poptorch::PopartType Compiler::getPopartType(poptorch::TensorId id) const {
     return _impl->getHostSideConstant(id).popartType();
   }
 
+  if (!_impl->session->hasInfo(_impl->ids[id])) {
+    return PopartType::UNDEFINED;
+  }
+
   popart::TensorInfo info = _impl->session->getInfo(_impl->ids[id]);
 
 #define DEFINE_CASE(value)                                                     \
@@ -717,11 +721,11 @@ std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
   }
 
   auto popart_id = _impl->ids.at(id);
-  try {
-    return _impl->active_builder->getTensorShape(popart_id);
-  } catch (const popart::error &e) {
+
+  if (!_impl->active_builder->hasValueInfo(popart_id)) {
     return {};
   }
+  return _impl->active_builder->getTensorShape(popart_id);
 }
 
 std::unique_ptr<char[]>
@@ -732,9 +736,9 @@ Compiler::getTensorDTypeString(poptorch::TensorId id) const {
     type_str = _impl->session->getInfo(_impl->ids[id]).data_type();
   } else {
     auto popart_id = _impl->ids.at(id);
-    try {
+    if (_impl->active_builder->hasValueInfo(popart_id)) {
       type_str = _impl->active_builder->getTensorDtypeString(popart_id);
-    } catch (const popart::error &e) {
+    } else {
       type_str = "unknown";
     }
   }
@@ -963,9 +967,9 @@ poptorch::TensorId Compiler::addUntypedInputTensor() {
 void Compiler::assertTensorIs(PopartType dataType,
                               poptorch::TensorId id) const {
   PopartType actual_type;
-  try {
-    actual_type = getPopartType(id);
-  } catch (const popart::error &) {
+  actual_type = getPopartType(id);
+
+  if (actual_type == PopartType::UNDEFINED) {
     // Rare case of input tensor never used, so not in IR
     return;
   }
