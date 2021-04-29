@@ -26,6 +26,7 @@ New features
 - Deprecated ``runningVarianceAlwaysFloat`` in favour of ``runningStatisticsAlwaysFloat`` in ``poptorch.Options.Precision``,
   as this new option computes both the running mean and variance in FP32 when this option is set to `True`.
 - Add support for ``torch.nn.GRU``
+- Add automatic loss scaling option which can be enabled via ``poptorch.Options.Training.setAutomaticLossScaling``.
 
 v2.0 (Poplar SDK 2.0)
 =====================

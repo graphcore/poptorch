@@ -340,7 +340,7 @@ class _OptimizerAttrTracker:
 
 
 # pylint: disable=too-many-statements
-def _convertOptimizerToDict(optimizer, attr_tracker):
+def _convertOptimizerToDict(optimizer, attr_tracker, options):
     optimizer_type = _toPoptorchOptimizer(optimizer)
     attr_tracker.setType(optimizer_type)
 
@@ -401,8 +401,14 @@ def _convertOptimizerToDict(optimizer, attr_tracker):
     # Optimizer variables: global, can change over time.
     #     source: opt.name
     #     format: {name: (value, is_const)}
-    _AttrReader(attr_readers, "loss_scaling", _OptimizerGetter(1.0),
-                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(1.0)))
+    auto_loss_scaling = options.Training.enableAutomaticLossScaling
+    if variable_attrs and auto_loss_scaling:
+        # Automatic loss scaling requires loss scaling to be variable
+        variable_attrs.markAsVariable("loss_scaling")
+    _AttrReader(
+        attr_readers, "loss_scaling", _OptimizerGetter(1.0),
+        _ValueConstPairFormatter(
+            variable_attrs, lambda v: v == 1.0 and not auto_loss_scaling))
     _AttrReader(attr_readers, "max_weight_norm", _OptimizerGetter(),
                 _ValueConstPairFormatter(variable_attrs, isAlwaysConst))
     # Group variables: per group, can change over time.
@@ -901,7 +907,7 @@ class PoplarExecutor:
         self._training = training
         if optimizer:
             self._dict_optimizer = _convertOptimizerToDict(
-                optimizer, self._attribute_tracker)
+                optimizer, self._attribute_tracker, options)
         else:
             self._dict_optimizer = {}
 
@@ -1053,7 +1059,7 @@ class PoplarExecutor:
         """
         self._new_optimizer = optimizer
         self._dict_new_optimizer = _convertOptimizerToDict(
-            optimizer, self._attribute_tracker)
+            optimizer, self._attribute_tracker, self._options)
 
     def _compileWithTrace(self, trace_args):
         """On POD we want to separate compilation from device

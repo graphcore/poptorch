@@ -273,7 +273,8 @@ class _TrainingOptions(_options_impl.OptionsDict):
     def __init__(self) -> None:
         super().__init__(gradient_accumulation=1,
                          accumulation_and_replication_reduction_type=enums.
-                         ReductionType.Mean)
+                         ReductionType.Mean,
+                         enableAutomaticLossScaling=False)
 
     def gradientAccumulation(self, gradient_accumulation: int
                              ) -> "poptorch.options._TrainingOptions":
@@ -390,6 +391,22 @@ class _TrainingOptions(_options_impl.OptionsDict):
                 * Sum: Reduce gradients by calculating the sum of them.
             """
         self.accumulationAndReplicationReductionType(reduction_type)
+        return self
+
+    def setAutomaticLossScaling(self, enabled: bool
+                                ) -> "poptorch.options._TrainingOptions":
+        """Set whether automatic loss scaling is enabled on the IPU.
+
+        When using float16/half values for activations, gradients, and weights,
+        the loss value needs to be scaled by a constant factor to avoid
+        underflow/overflow. This adjustment is known as loss scaling. This
+        setting automatically sets a global loss scaling factor during training.
+
+        :param enabled:
+            * True: Enable automatic loss scaling on the IPU.
+            * False: Disable automatic loss scaling.
+        """
+        self.set(enableAutomaticLossScaling=enabled)
         return self
 
 

@@ -6,6 +6,7 @@ import tempfile
 import os
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import pytest
 import poptorch
 import helpers
@@ -210,6 +211,47 @@ def test_popart_partials(capfd, dtype, ptype):
             'poptorch.Options set convolutionOptions[partialsType] to half')
         log.assert_contains('"partialsType":"MatMulPartialsType::HALF"')
         log.assert_contains('"partialsType[0]":"half"')
+
+
+@helpers.printCapfdOnExit
+@pytest.mark.parametrize("optim", [
+    optim.SGD,
+    optim.Adam,
+    optim.AdamW,
+    optim.RMSprop,
+    poptorch.optim.SGD,
+    poptorch.optim.Adam,
+    poptorch.optim.AdamW,
+    poptorch.optim.RMSprop,
+    poptorch.optim.LAMB,
+])
+def test_automatic_loss_scaling(capfd, optim):
+    poptorch.setLogLevel('DEBUG')
+
+    # Just a simple model with weights and a loss function
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(5, 2)
+
+        def forward(self, x):
+            x = self.lin(x)
+            return poptorch.identity_loss(x, reduction='mean')
+
+    # Create our model.
+    model = Model()
+    opts = poptorch.Options()
+    opts.Training.setAutomaticLossScaling(True)
+
+    # The lr value doesn't matter here, we just want to ensure the option is set
+    optimizer = optim(model.parameters(), lr=0.0)
+    training_model = poptorch.trainingModel(model, opts, optimizer)
+
+    training_model(torch.ones(5))
+
+    log = helpers.LogChecker(capfd)
+    log.assert_contains(
+        'poptorch.Options set enableAutomaticLossScaling to value true')
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
