@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import copy
+import io
 import json
+import subprocess
+import tempfile
 import torch
 import pytest
 import helpers
@@ -377,7 +381,7 @@ def test_ipu_round_up_error():
         m(torch.randn(4, 5))
 
 
-def test_begin_block_names_invariant():
+def test_begin_block_functionality():
     class Block(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -415,7 +419,6 @@ def test_begin_block_names_invariant():
     # The return is for backward compatibility
     assert m_l1_wrapped is m.l1
 
-    print(m.l2.__class__)
     assert m.l2.__class__ is Block
     poptorch.BeginBlock(m.l2, ipu_id=2)
     assert m.l2.__class__ is not Block
@@ -451,3 +454,91 @@ def test_begin_block_names_invariant():
 
     param_names = [p[0] for p in m.named_parameters()]
     assert "l1.a_param" in param_names
+
+    # Test the model can still be saved
+    f = io.BytesIO()
+    torch.save(m.state_dict(), f)
+
+
+def run_in_python_and_print_class(model_file_path):
+    python_script = b"import poptorch\nimport torch\n"
+    python_script += b"with open(\"" + model_file_path.encode('utf-8')
+    python_script += b"\", \"rb\") as f:\n"
+    python_script += b"    m = torch.load(f)\nprint(m.__class__)\n"
+    python_script += b"print(m.__dict__['_user_id'])\n"
+    python_script += b"print(m.__dict__['_ipu_id'])"
+
+    s = subprocess.Popen(["python3"],
+                         stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE)
+
+    return s.communicate(python_script, timeout=10)[0].decode("utf-8")
+
+
+def test_saving_of_begin_block():
+    m = torch.nn.Sequential(torch.nn.Conv2d(3, 10, 5), torch.nn.ReLU(),
+                            torch.nn.Conv2d(10, 10, 5), torch.nn.ReLU())
+
+    with tempfile.NamedTemporaryFile() as f:
+        torch.save(m, f)
+
+        out = run_in_python_and_print_class(f.name)
+        assert 'torch.nn.modules.container.Sequential' in out
+        poptorch.BeginBlock(m, user_id=1, ipu_id=2)
+
+        model_class_before_save = m.__class__
+
+        after_block_save = io.BytesIO()
+        torch.save(m, after_block_save)
+        assert m.__class__ == model_class_before_save
+
+    with tempfile.NamedTemporaryFile() as f:
+        torch.save(m, f)
+
+        out = run_in_python_and_print_class(f.name)
+        assert 'poptorch.ops.BeginBlock.<locals>.BlockModule' in out
+
+        # Check ipu_id and user_id
+        # NB the class may span two lines so take the last two lines
+        out = out.strip().split()
+        assert out[-2] == "1"
+        assert out[-1] == "2"
+
+
+def test_begin_block_copy():
+    b_1 = torch.nn.Sequential(torch.nn.Conv2d(4, 8, 3), torch.nn.ReLU(),
+                              torch.nn.Conv2d(8, 10, 3), torch.nn.ReLU())
+    b_2 = torch.nn.Sequential(torch.nn.Conv2d(10, 5, 5), torch.nn.ReLU(),
+                              torch.nn.Conv2d(5, 10, 5), torch.nn.ReLU())
+
+    poptorch.BeginBlock(b_1, user_id=1, ipu_id=1)
+    poptorch.BeginBlock(b_2, user_id=2, ipu_id=2)
+
+    m = torch.nn.Sequential(b_1, b_2)
+
+    block_model_cls_str = "poptorch.ops.BeginBlock.<locals>.BlockModule"
+
+    assert block_model_cls_str in str(m[0].__class__)
+    assert block_model_cls_str in str(m[1].__class__)
+    assert m[0].__dict__['_user_id'] == 1
+    assert m[0].__dict__['_ipu_id'] == 1
+    assert m[1].__dict__['_user_id'] == 2
+    assert m[1].__dict__['_ipu_id'] == 2
+
+    m_copy = copy.copy(m)
+
+    assert block_model_cls_str in str(m_copy[0].__class__)
+    assert block_model_cls_str in str(m_copy[1].__class__)
+    assert m_copy[0].__dict__['_user_id'] == 1
+    assert m_copy[0].__dict__['_ipu_id'] == 1
+    assert m_copy[1].__dict__['_user_id'] == 2
+    assert m_copy[1].__dict__['_ipu_id'] == 2
+
+    m_deep_copy = copy.deepcopy(m)
+
+    assert block_model_cls_str in str(m_deep_copy[0].__class__)
+    assert block_model_cls_str in str(m_deep_copy[1].__class__)
+    assert m_deep_copy[0].__dict__['_user_id'] == 1
+    assert m_deep_copy[0].__dict__['_ipu_id'] == 1
+    assert m_deep_copy[1].__dict__['_user_id'] == 2
+    assert m_deep_copy[1].__dict__['_ipu_id'] == 2

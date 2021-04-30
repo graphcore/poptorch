@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 from typing import Dict, List, Union
+import copy
+import copyreg
 import torch
 
 from . import enums
@@ -289,6 +291,23 @@ class Block(torch.nn.Module):
         _end_ipu_block()
 
 
+# The pickle handler is needed for torch.save and for any copying.
+# As the BlockModule class is defined within a function, it does not exist
+# in a fresh python process. Hence, the easier way to recreate the object is to
+# store the original model and call BeginBlock again
+def _pickle_reduce_block(model):
+    print(model.__class__)
+    user_id = model.__dict__['_user_id']
+    ipu_id = model.__dict__['_ipu_id']
+
+    orig_model_class = model.__class__
+    model.__class__ = model.__class__.__bases__[0]
+    model_orig = copy.copy(model)
+    model.__class__ = orig_model_class
+
+    return BeginBlock, (model_orig, user_id, ipu_id)
+
+
 def BeginBlock(layer_to_call: torch.nn.Module,
                user_id: str = None,
                ipu_id: int = None):
@@ -338,6 +357,9 @@ def BeginBlock(layer_to_call: torch.nn.Module,
     layer_to_call.__class__ = BlockModule
     layer_to_call.__dict__['_user_id'] = user_id
     layer_to_call.__dict__['_ipu_id'] = ipu_id
+
+    # Register custom function to copy / serialize wrappers
+    copyreg.pickle(BlockModule, _pickle_reduce_block)
 
     # There is no need to return as it is passed by reference, but this is for
     # backward compatibility
