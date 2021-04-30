@@ -753,5 +753,11 @@ void CompilerImpl::attachToDevice() {
   device.loadEngineAndConnectStreams();
 }
 
+std::string CompilerImpl::getPopartIR() const {
+  if (session->getExecutable().isDeserialized()) {
+    return "unavailable (Cached executable)";
+  }
+  return session->serializeIr(popart::IrSerializationFormat::JSON);
+}
 } // namespace detail
 } // namespace poptorch

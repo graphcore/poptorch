@@ -233,6 +233,7 @@ public:
   template <typename OptimizerType>
   void updateGroups(OptimizerType *optimizer,
                     const std::vector<Optimizer> &optimizers);
+  std::string getPopartIR() const;
 
 private:
   // Constants which are simply returned (possibly as part of a tuple/list) and

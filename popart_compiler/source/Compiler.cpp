@@ -574,9 +574,7 @@ void Compiler::compileAndPrepareDevice() {
 
     // serializeIr must be called after prepareDevice in some cases (e.g.
     // when loading from execution cache)
-    logging::trace(
-        "Popart serialised IR:\n{}",
-        _impl->session->serializeIr(popart::IrSerializationFormat::JSON));
+    logging::trace("Popart serialised IR:\n{}", _impl->getPopartIR());
   } catch (popart::memory_allocation_err &e) {
     std::ofstream stream;
     stream.open("OOMReport.json");
@@ -615,8 +613,7 @@ std::unique_ptr<char[]> Compiler::getExecutionInfo() const {
 }
 
 std::unique_ptr<char[]> Compiler::getPopartIR() const {
-  const std::string as_string =
-      _impl->session->serializeIr(popart::IrSerializationFormat::JSON);
+  const std::string as_string = _impl->getPopartIR();
 
   // Copy into a memory managed array to get around ABI.
   return stringToUniquePtr(as_string);
