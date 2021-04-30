@@ -175,8 +175,8 @@ IPUs.
 Annotation tools
 ----------------
 
-poptorch.Block and poptorch.BeginBlock
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+poptorch.Block, poptorch.BeginBlock and poptorch.BlockFunction
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 :py:class:`poptorch.BeginBlock` and :py:class:`poptorch.Block` are wrapper
 classes used to define model parallelism in a multi-IPU device. They partition
@@ -209,12 +209,23 @@ interchangeably.
     :emphasize-lines: 16, 19, 22, 26
     :caption: Annotating a model directly.
 
+In addition, :py:func:`poptorch.BlockFunction` is a decorator which can
+decorate an existing function.
+
+.. literalinclude:: pipeline_simple.py
+    :language: python
+    :linenos:
+    :start-after: annotations_decorator_start
+    :end-before: annotations_decorator_end
+    :emphasize-lines: 19, 25
+    :caption: Annotating functions.
+
 Either annotation is enough to enable parallel execution in the simple cases.
 By default, the layers before the first :py:class:`poptorch.BeginBlock` will be
 placed on IPU 0.
 
-Both :py:class:`poptorch.BeginBlock` and :py:class:`poptorch.Block`
-need to follow a set of rules:
+:py:class:`poptorch.BeginBlock`, :py:class:`poptorch.Block` and
+:py:func:`poptorch.BlockFunction`  need to follow a set of rules:
 
 * All the layers must be declared inside a :py:class:`poptorch.Block` scope.
   It is to avoid missing annotation. :py:class:`poptorch.BeginBlock`

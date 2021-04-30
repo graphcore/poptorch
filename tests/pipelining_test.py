@@ -381,6 +381,48 @@ def test_ipu_round_up_error():
         m(torch.randn(4, 5))
 
 
+class BlockFnModel(torch.nn.Module):
+    def forward(self, x):
+        poptorch.Block.useAutoId()
+        x = self.mult_4(x)
+        x = self.mult_2(x)
+        return x
+
+    @poptorch.BlockFunction(ipu_id=0)
+    def mult_4(self, x):
+        return x * 4
+
+    @poptorch.BlockFunction(ipu_id=1)
+    def mult_2(self, x):
+        return x * 2
+
+
+@helpers.printCapfdOnExit
+def test_block_function(capfd):
+    poptorch.setLogLevel(1)  # Force debug logging
+
+    m = BlockFnModel()
+
+    opts = poptorch.Options()
+    opts.deviceIterations(2)
+
+    m = poptorch.inferenceModel(m, opts)
+    m(torch.randn(2, 5))
+
+    log = helpers.LogChecker(capfd)
+    log.assert_contains("enablePipelining set to value 1")
+    log.assert_contains(" Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
+    log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
+
+
+def test_block_function_saving():
+    m = BlockFnModel()
+    m = poptorch.inferenceModel(m)
+
+    with tempfile.TemporaryFile() as f:
+        torch.save(m, f)
+
+
 def test_begin_block_functionality():
     class Block(torch.nn.Module):
         def __init__(self):
@@ -460,7 +502,7 @@ def test_begin_block_functionality():
     torch.save(m.state_dict(), f)
 
 
-def run_in_python_and_print_class(model_file_path):
+def run_in_python_and_get_block_details(model_file_path):
     python_script = b"import poptorch\nimport torch\n"
     python_script += b"with open(\"" + model_file_path.encode('utf-8')
     python_script += b"\", \"rb\") as f:\n"
@@ -482,7 +524,7 @@ def test_saving_of_begin_block():
     with tempfile.NamedTemporaryFile() as f:
         torch.save(m, f)
 
-        out = run_in_python_and_print_class(f.name)
+        out = run_in_python_and_get_block_details(f.name)
         assert 'torch.nn.modules.container.Sequential' in out
         poptorch.BeginBlock(m, user_id=1, ipu_id=2)
 
@@ -495,7 +537,7 @@ def test_saving_of_begin_block():
     with tempfile.NamedTemporaryFile() as f:
         torch.save(m, f)
 
-        out = run_in_python_and_print_class(f.name)
+        out = run_in_python_and_get_block_details(f.name)
         assert 'poptorch.ops.BeginBlock.<locals>.BlockModule' in out
 
         # Check ipu_id and user_id
@@ -542,3 +584,19 @@ def test_begin_block_copy():
     assert m_deep_copy[0].__dict__['_ipu_id'] == 1
     assert m_deep_copy[1].__dict__['_user_id'] == 2
     assert m_deep_copy[1].__dict__['_ipu_id'] == 2
+
+
+def model_fn(inputs):
+    return inputs + 1.0
+
+
+def test_begin_block_with_function():
+    # Legacy use
+    block = poptorch.BeginBlock(model_fn, 1, 2)
+
+    # pylint: disable=protected-access
+    assert block._user_id == 1
+    assert block._ipu_id == 2
+
+    with tempfile.TemporaryFile() as f:
+        torch.save(block, f)

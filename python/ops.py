@@ -235,7 +235,7 @@ class Block(torch.nn.Module):
     ...     self.layer = MyLayer(x)
 
     All layers called inside this scope will run on the specified IPU, if
-    one is specicfied. In addition, you can combines multiple blocks into
+    one is specfied. In addition, you can combine multiple blocks into
     a stage.
 
     .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
@@ -308,6 +308,23 @@ def _pickle_reduce_block(model):
     return BeginBlock, (model_orig, user_id, ipu_id)
 
 
+# Used to allow BeginBlock to be used with a function
+class LegacyBeginBlockFn(torch.nn.Module):
+    def __init__(self, layer_to_call, user_id=None, ipu_id=None):
+        super().__init__()
+        self._user_id = user_id
+        self._layer_to_call = layer_to_call
+        self._ipu_id = ipu_id
+
+    def __call__(self, *input, **kwargs):
+        if Block._stages_manager is not None:
+            if self._user_id is None:
+                self._user_id = Block._stages_manager.nextAutoId()
+            Block._stages_manager.beginStage(self._user_id, self._ipu_id)
+        out = self._layer_to_call(*input, **kwargs)
+        return out
+
+
 def BeginBlock(layer_to_call: torch.nn.Module,
                user_id: str = None,
                ipu_id: int = None):
@@ -337,8 +354,16 @@ def BeginBlock(layer_to_call: torch.nn.Module,
 
     .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
     """
+
     if not isinstance(layer_to_call, torch.nn.Module):
-        raise RuntimeError("module is not an instance of torch.nn.Module.")
+        # Previously, the function returned a new model so would work for any
+        # callable. This was never documented but should still be permitted to
+        # work.
+        if callable(layer_to_call):
+            return LegacyBeginBlockFn(layer_to_call, user_id, ipu_id)
+
+        raise RuntimeError("module is not an instance of torch.nn.Module or " +
+                           "function.")
 
     class BlockModule(type(layer_to_call)):
         def __call__(self, *input, **kwargs):
@@ -367,6 +392,34 @@ def BeginBlock(layer_to_call: torch.nn.Module,
 
 
 # pylint: enable=abstract-method
+
+
+def BlockFunction(user_id=None, ipu_id=None):
+    """ A decorator to define blocks of the model.
+
+    You can use ``BlockFunction`` as a decorator for an existing function, as
+    follows:
+
+    >>> @BlockFunction("Decoder", ipu_id=1)
+    ... def decoder(self, encoder_output):
+    ...     self.decoder_b1(encoder_output)
+
+    All layers inside the function and any functions called by the function will
+    run on the specified IPU, if one is specified. In addition, you can combine
+    multiple blocks into a stage.
+
+    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
+    """
+
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            with Block(user_id, ipu_id):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
 
 # Store all attributes to prevent garbage collection
 attributes_lists: List[Dict[str, Union[float, int, str, list, tuple]]] = []

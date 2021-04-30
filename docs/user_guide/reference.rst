@@ -86,6 +86,8 @@ Parallel execution
 .. autoclass:: poptorch.BeginBlock
    :special-members: __init__
 
+.. autofunction:: poptorch.BlockFunction
+
 .. autoclass:: poptorch.Stage
    :special-members: __init__
 

@@ -27,6 +27,8 @@ New features
   as this new option computes both the running mean and variance in FP32 when this option is set to `True`.
 - Add support for ``torch.nn.GRU``
 - Add automatic loss scaling option which can be enabled via ``poptorch.Options.Training.setAutomaticLossScaling``.
+- Add ``poptorch.BlockFunction`` decorating for assigning an existing function
+  to a block.
 
 v2.0 (Poplar SDK 2.0)
 =====================

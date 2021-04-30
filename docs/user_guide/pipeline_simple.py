@@ -136,4 +136,50 @@ opts = poptorch.Options()
 opts.deviceIterations(4)
 poptorch_model = poptorch.inferenceModel(model, options=opts)
 print(poptorch_model(torch.rand((4, 5))))
+
 # annotations_inline_end
+
+
+# pylint: disable=function-redefined
+# annotations_decorator_start
+class Network(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer1 = torch.nn.Linear(5, 10)
+        self.layer2 = torch.nn.Linear(10, 5)
+        self.layer3 = torch.nn.Linear(5, 5)
+        self.layer4 = torch.nn.Linear(5, 5)
+
+        self.act = torch.nn.ReLU()
+        self.softmax = torch.nn.Softmax(dim=1)
+
+    def forward(self, x):
+        poptorch.Block.useAutoId()
+        x = self.block_one(x)
+        x = self.block_two(x)
+        x = self.final_activation(x)
+        return x
+
+    @poptorch.BlockFunction(ipu_id=0)
+    def block_one(self, x):
+        x = self.act(self.layer1(x))
+        x = self.act(self.layer2(x))
+        return x
+
+    @poptorch.BlockFunction(ipu_id=1)
+    def block_two(self, x):
+        x = self.act(self.layer3(x))
+        x = self.act(self.layer4(x))
+        return x
+
+    @poptorch.BlockFunction(ipu_id=1)
+    def final_activation(self, x):
+        return self.softmax(x)
+
+
+model = Network()
+opts = poptorch.Options()
+opts.deviceIterations(4)
+poptorch_model = poptorch.inferenceModel(model, options=opts)
+print(poptorch_model(torch.rand((4, 5))))
+# annotations_decorator_end
