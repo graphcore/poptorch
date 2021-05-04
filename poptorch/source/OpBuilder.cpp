@@ -255,12 +255,12 @@ convertPytorchPads(const std::vector<int64_t> &tensor_shape,
 
   // Converting from PyTorch to PopART requires two steps:
   // 1. Reverse the order
-  // (begin1, end1, ..., beginN, endN) ->
-  // (endN, beginN, ..., end1, begin1)
+  // (beginN, endN, ..., begin1, end1) ->
+  // (end1, begin1, ..., endN, beginN)
   std::reverse(pad_shape.begin(), pad_shape.end());
   // 2. Order padding dims by begin/end
-  // (endN, beginN, ..., end1, begin1) ->
-  // (beginN, ..., begin1, endN, ..., end1)
+  // (end1, begin1, ..., endN, beginN) ->
+  // (begin1, ..., beginN, end1, ..., endN)
   //
   // This can be done with a single partition because begin and end
   // dims are at odd and even indices respectively. A stable partition
