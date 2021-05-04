@@ -249,6 +249,8 @@ def _compile_model_offline(cache, pid, num_processes):
     poptorch.setLogLevel(1)  # Force debug logging
     opts = poptorch.Options().useOfflineIpuTarget()
     opts.enableExecutableCaching(cache)
+    # Disable compilation bar to avoid issues with capfd
+    opts.showCompilationProgressBar(False)
     opts.deviceIterations(10)
     opts.Distributed.configureProcessId(pid, num_processes)
 
