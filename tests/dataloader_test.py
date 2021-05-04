@@ -1,4 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import itertools
 import math
 import time
 import subprocess
@@ -362,6 +363,34 @@ def test_shuffle_subdataset():
 
 def test_shuffle_subdataset2():
     _run_shuffle_subdataset_test(batch_size=2, num_hosts=2, num_workers=3)
+
+
+@pytest.mark.parametrize("num_processes", [2, 3, 4, 5])
+def test_global_shuffle_each_epoch(num_processes):
+    each_process_data = []
+    for process_id in range(num_processes):
+        each_process_data.append(list())
+        opts = poptorch.Options()
+        opts.randomSeed(0)
+        opts.Distributed.configureProcessId(process_id, num_processes)
+        dataloader = poptorch.DataLoader(
+            opts,
+            IncrementDataset((), 100),
+            batch_size=16,
+            shuffle=True,
+        )
+        for _ in range(5):
+            each_epoch_data = []
+            for batch in dataloader:
+                each_epoch_data += batch.tolist()
+            each_process_data[process_id].append(sorted(each_epoch_data))
+
+    # Make sure data between epochs differs within the same process
+    # for all processes.
+    for process_data in each_process_data:
+        for epoch_data_i, epoch_data_j in itertools.combinations(
+                process_data, 2):
+            assert epoch_data_i != epoch_data_j
 
 
 def test_interrupt_async_loader():

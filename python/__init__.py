@@ -71,12 +71,12 @@ class _SubDataset:
 
     [p0, p0, p0, ..., p1, p1, p1, ..., p2,p2, p2]
 
-    If ``shuffle`` is enabled, then the indices in the parent dataset are
+    If shuffling is used, then the indices in the parent (entire) dataset are
     randomised and ``swap_range`` will be called every time a new iterator
     is created in order to make sure all the tensors get used.
     """
 
-    def __init__(self, dataset, opts, step, shuffle, drop_last):
+    def __init__(self, dataset, opts, step, drop_last):
         num_elts = len(dataset)
         # Note: all the processes must have the same number of batches
         # or it will hang.
@@ -99,12 +99,23 @@ class _SubDataset:
 
         self._base_offset = self._offset
         self._dataset = dataset
-        self._shuffled_indices = None
-        if shuffle:
-            generator = torch.Generator()
-            generator.manual_seed(opts.random_seed)
-            self._shuffled_indices = torch.randperm(num_elts,
-                                                    generator=generator)
+        self._seed = opts.random_seed if opts.exists('random_seed') else None
+        self._shuffling_generator_state = None
+        self._shuffled_global_indices = None
+
+    def shuffle_global_indices(self):
+        """Shuffles the indices across the entire dataset."""
+        generator = torch.Generator()
+        if self._shuffling_generator_state is None:
+            assert self._seed is not None, (
+                "Seed must be set when shuffling so that all "
+                "instances end up with the same shuffled global indices.")
+            generator.manual_seed(self._seed)
+        else:
+            generator.set_state(self._shuffling_generator_state)
+        self._shuffled_global_indices = torch.randperm(len(self._dataset),
+                                                       generator=generator)
+        self._shuffling_generator_state = generator.get_state()
 
     def swap_range(self):
         """If there are leftovers in the randomly sampled dataset make sure
@@ -130,8 +141,8 @@ class _SubDataset:
 
     def __getitem__(self, index):
         global_index = index + self._offset
-        if self._shuffled_indices is not None:
-            global_index = self._shuffled_indices[global_index]
+        if self._shuffled_global_indices is not None:
+            global_index = self._shuffled_global_indices[global_index]
         return self._dataset[global_index]
 
 
@@ -208,7 +219,7 @@ class DataLoader(torch.utils.data.DataLoader):
         # __getitem__ and __len__
         self._is_iterable = isinstance(dataset,
                                        torch.utils.data.IterableDataset)
-        self._swap_range = None
+        self._shuffle_map_style_data_in_distributed_env = False
 
         if self._is_iterable:
             if auto_distributed_partitioning:
@@ -251,10 +262,14 @@ class DataLoader(torch.utils.data.DataLoader):
                         "auto_distributed_partitioning.")
 
                     dataset = _SubDataset(dataset, options,
-                                          self._combined_batch_size, shuffle,
-                                          drop_last)
+                                          self._combined_batch_size, drop_last)
                     if shuffle:
-                        self._swap_range = dataset.swap_range
+                        # In a distributed environment we handle the shuffling
+                        # ourselves (take a look at _SubDataset and __iter__)
+                        # so no need for parent class to shuffle within each of
+                        # the subsets again.
+                        self._shuffle_map_style_data_in_distributed_env = True
+                        shuffle = False
         if not self._is_iterable:
             dataset = profiling.Channel("dataset").instrument(
                 dataset, "__getitem__")
@@ -335,8 +350,9 @@ class DataLoader(torch.utils.data.DataLoader):
         self.terminate()
 
     def __iter__(self) -> "torch.utils.data.dataloader._BaseDataLoaderIter":
-        if self._swap_range is not None:
-            self._swap_range()
+        if self._shuffle_map_style_data_in_distributed_env:
+            self.dataset.shuffle_global_indices()
+            self.dataset.swap_range()
         if self._accessor is not None:
             return self._accessor.__iter__()
 
