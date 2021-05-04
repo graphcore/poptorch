@@ -6,6 +6,7 @@
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
 
 namespace poptorch {
 namespace {

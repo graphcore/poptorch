@@ -8,6 +8,7 @@
 #include "poptorch_logging/Error.hpp"
 
 #include "../PoptorchSymbols.hpp"
+#include "poptorch/Utils.hpp"
 
 namespace poptorch {
 namespace {

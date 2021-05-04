@@ -42,6 +42,9 @@ const auto HALF_OR_FLOAT = at::ScalarType::BFloat16;
 
 std::unique_ptr<char[]> stringToUniquePtr(const std::string &str);
 
+// Get the tensor shape as a vector of ints.
+std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value);
+
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_UTILS_HPP

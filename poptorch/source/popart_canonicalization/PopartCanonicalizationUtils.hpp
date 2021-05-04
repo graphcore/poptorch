@@ -38,9 +38,6 @@ bool allInputsBool(torch::jit::Node *node, int ignore_input = -1);
 // Returns true if all inputs are Bools
 bool allInputsInteger(torch::jit::Node *node, int ignore_input = -1);
 
-// Get the tensor shape as a vector of ints.
-std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value);
-
 // Get the tensor shape and add it to the IR as a constant primative.
 torch::jit::Value *shapeFromTensorAsIR(torch::jit::Graph *graph,
                                        torch::jit::Value *value);

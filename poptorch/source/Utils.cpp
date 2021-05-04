@@ -250,4 +250,20 @@ std::unique_ptr<char[]> stringToUniquePtr(const std::string &str) {
   return ptr;
 }
 
+// Convert that IR type into a C++ vector of ints.
+std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
+  // Extract the type from the pytorch IR.
+  c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
+  c10::VaryingShape dims = as_tensor->sizes();
+
+  // Convert that IR type into a C++ vector of ints.
+  std::vector<std::int64_t> shape;
+  if (dims.sizes()) {
+    for (auto optional_int : *dims.sizes()) {
+      shape.push_back(*optional_int);
+    }
+  }
+  return shape;
+}
+
 } // namespace poptorch

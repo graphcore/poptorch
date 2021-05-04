@@ -83,22 +83,6 @@ std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node) {
   return result;
 }
 
-// Convert that IR type into a C++ vector of ints.
-std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
-  // Extract the type from the pytorch IR.
-  c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
-  c10::VaryingShape dims = as_tensor->sizes();
-
-  // Convert that IR type into a C++ vector of ints.
-  std::vector<std::int64_t> shape;
-  if (dims.sizes()) {
-    for (auto optional_int : *dims.sizes()) {
-      shape.push_back(*optional_int);
-    }
-  }
-  return shape;
-}
-
 // Add a vector of ints to the IR as a constant.
 torch::jit::Value *
 intVectorToIrConstant(torch::jit::Graph *graph,

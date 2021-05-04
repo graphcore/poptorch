@@ -179,3 +179,29 @@ def test_3D_pads(op):
     else:
         model = op((3, 2, 1, 5, 3, 4))
     execute_and_check_wrapper(model, threeDTensor)
+
+
+def test_constant_pad_less_dims():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            # Only pad the last dimension of input
+            return torch.nn.functional.pad(x, [1, 2])
+
+    x = torch.randn(1, 2, 3, 4)
+
+    execute_and_check_wrapper(Model(), x)
+
+
+def test_constant_pad_n_dims():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            # Pad left/right dims by 1 and 2 respectively, for every dim
+            return torch.nn.functional.pad(x, [(i % 2) + 1 for i in range(8)])
+
+    x = torch.randn(1, 2, 3, 4)
+
+    execute_and_check_wrapper(Model(), x)

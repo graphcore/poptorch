@@ -5,6 +5,7 @@
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
