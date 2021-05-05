@@ -251,7 +251,8 @@ def test_automatic_loss_scaling(capfd, optim):
 
     log = helpers.LogChecker(capfd)
     log.assert_contains(
-        'poptorch.Options set enableAutomaticLossScaling to value true')
+        'poptorch.Options set automaticLossScalingSettings.enabled '
+        'to value true')
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),

@@ -270,11 +270,12 @@ class _TrainingOptions(_options_impl.OptionsDict):
     >>> opts.Training.gradientAccumulation(4)
     """
 
-    def __init__(self) -> None:
+    def __init__(self,
+                 popart_options: "poptorch.options._PopartOptions") -> None:
         super().__init__(gradient_accumulation=1,
                          accumulation_and_replication_reduction_type=enums.
-                         ReductionType.Mean,
-                         enableAutomaticLossScaling=False)
+                         ReductionType.Mean)
+        self._popart_options = popart_options
 
     def gradientAccumulation(self, gradient_accumulation: int
                              ) -> "poptorch.options._TrainingOptions":
@@ -406,7 +407,8 @@ class _TrainingOptions(_options_impl.OptionsDict):
             * True: Enable automatic loss scaling on the IPU.
             * False: Disable automatic loss scaling.
         """
-        self.set(enableAutomaticLossScaling=enabled)
+        self._popart_options.set("automaticLossScalingSettings.enabled",
+                                 enabled)
         return self
 
 
@@ -1099,7 +1101,7 @@ class Options(_options_impl.OptionsDict):
         self._jit = _JitOptions()
         self._popart = _PopartOptions()
         self._graphProcessing = _PrecisionOptions(self._popart)
-        self._training = _TrainingOptions()
+        self._training = _TrainingOptions(self._popart)
         self._distributed = _DistributedOptions()
         self._tensor_locations = _TensorLocationOptions()
         self._execution_strategy = PipelinedExecution()

@@ -401,7 +401,10 @@ def _convertOptimizerToDict(optimizer, attr_tracker, options):
     # Optimizer variables: global, can change over time.
     #     source: opt.name
     #     format: {name: (value, is_const)}
-    auto_loss_scaling = options.Training.enableAutomaticLossScaling
+
+    # pylint: disable=protected-access
+    auto_loss_scaling = options._Popart.options.get(
+        "automaticLossScalingSettings.enabled", False)
     if variable_attrs and auto_loss_scaling:
         # Automatic loss scaling requires loss scaling to be variable
         variable_attrs.markAsVariable("loss_scaling")

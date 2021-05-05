@@ -346,13 +346,16 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(decomposeGradSum);
   ADD_POPART_BOOL_OPTION(enableDistributedReplicatedGraphs);
   ADD_POPART_BOOL_OPTION(groupHostSync);
-  ADD_POPART_BOOL_OPTION(enableAutomaticLossScaling);
+  ADD_POPART_BOOL_OPTION(automaticLossScalingSettings.enabled);
   ADD_POPART_BOOL_OPTION(instrumentWithHardwareCycleCounter);
   ADD_POPART_BOOL_OPTION(enableSupportedDataTypeCasting);
 
   ADD_POPART_DOUBLE_OPTION(outlineSequenceBreakCost);
   ADD_POPART_DOUBLE_OPTION(outlineThreshold);
   ADD_POPART_DOUBLE_OPTION(timeLimitScheduler);
+  ADD_POPART_DOUBLE_OPTION(automaticLossScalingSettings.binEdgeLocation);
+  ADD_POPART_DOUBLE_OPTION(
+      automaticLossScalingSettings.thresholdUpperCountProportion);
 
 #undef ADD_POPART_STRING_OPTION
 #undef ADD_POPART_UINT64_OPTION
