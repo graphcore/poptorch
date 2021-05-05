@@ -20,6 +20,22 @@ For more information about installing the Poplar SDK, see the relevant
 "Getting Started" guide for your IPU system on the Graphcore
 `documentation portal <https://docs.graphcore.ai>`_.
 
+Version compatibility
+=====================
+
+The following is the corresponding ``torch`` and ``torchvision`` versions and
+supported Python versions.
+
++--------------+-----------+-----------------+------------+
+| ``poptorch`` | ``torch`` | ``torchvision`` | ``python`` |
++==============+===========+=================+============+
+|   ``2.0``    | ``1.7.1`` |    ``0.8.2``    |  ``>=3.6`` |
++--------------+-----------+-----------------+------------+
+|   ``1.4``    | ``1.6.0`` |    ``0.7.0``    |  ``>=3.6`` |
++--------------+-----------+-----------------+------------+
+
+Based on https://github.com/pytorch/vision/blob/master/README.rst
+
 Using a Python virtual environment
 ==================================
 
