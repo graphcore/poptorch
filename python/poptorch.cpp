@@ -715,6 +715,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
       inplace_op_handler, training, std::move(optimizers),
       parseSessionOptions(options), attribute_accessor);
   lower.lower(&input_tensors);
+
   return lower;
 }
 

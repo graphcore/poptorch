@@ -239,6 +239,8 @@ public:
 private:
   torch::jit::Graph &_graph;
 
+  bool _lowered;
+
   std::vector<at::Tensor> _parameters;
   std::vector<std::string> _parameter_names;
   std::shared_ptr<InplaceOpHandler> _inplace_op_handler;
@@ -294,12 +296,12 @@ void maskVector(std::vector<T> *vec, const std::vector<bool> &mask,
  * Lower to popart impl.
  */
 std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
-  ERROR_ON_MSG(_output_tensor_hooks.empty(),
-               "You need to lower() the graph first");
+  ERROR_ON_MSG(!_lowered, "You need to lower() the graph first");
 
   logging::LogContext ctx("LowerToPopart::compile ");
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizers);
+
   _compiler.compileAndPrepareDevice();
 
   std::vector<at::ScalarType> data_types;
@@ -333,8 +335,8 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
 }
 
 void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
-  ERROR_ON_MSG(_output_tensor_hooks.empty(),
-               "You need to lower() the graph first");
+  ERROR_ON_MSG(!_lowered, "You need to lower() the graph first");
+
   logging::LogContext ctx("LowerToPopart::compileAndExport ");
   _compiler.initSession(_optimizers);
   _compiler.compileAndExport(export_filename.c_str());
@@ -351,6 +353,7 @@ void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
   lowerReturn();
 
   logging::debug("}");
+  _lowered = true;
 }
 
 void LowerToPopartImpl::lowerReturn() {
@@ -1071,7 +1074,7 @@ LowerToPopartImpl::LowerToPopartImpl(
     std::shared_ptr<InplaceOpHandler> inplace_op_handler, bool training,
     std::vector<Optimizer> &&opt, const SessionOptions &options,
     const py::function &attribute_accessor)
-    : _graph(*g), _parameters(std::move(params)),
+    : _graph(*g), _lowered(false), _parameters(std::move(params)),
       _parameter_names(std::move(parameter_names)),
       _inplace_op_handler(std::move(inplace_op_handler)), _optimizers(opt),
       _compiler({training, options}) {

@@ -45,8 +45,6 @@ public:
 private:
   void copyAllConstNodesToToConstexprGraph();
 
-  void errorOnWholeGraphConstExpr() const;
-
   void removeLoneConstants();
 
   void evalutateConstExprGraph(torch::jit::Stack *stack);
@@ -85,7 +83,6 @@ void ConstExprEvaluator::evaluate() {
   // Copy all nodes which can be evaluated as a constant expression into a new
   // graph. In addition, set outputs of the new graph where required
   copyAllConstNodesToToConstexprGraph();
-  errorOnWholeGraphConstExpr();
 
   // We do not want to evaluate lone constants only to replace them with an
   // identical constants
@@ -128,16 +125,6 @@ void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
     }
   }
   logging::trace("Constexpr graph: {}", *_constexpr_graph);
-}
-
-void ConstExprEvaluator::errorOnWholeGraphConstExpr() const {
-  if (_ins_to_make_consts.empty() && _nodes_map.size() > 1) {
-    ERROR("The entire traced graph is a constant expression. "
-          "It will give the same result for any input. "
-          "Please note that the use of torch.jit.trace means that conditionals "
-          "on data including the shape of data will not be reflected in the "
-          "graph and could lead to this result.");
-  }
 }
 
 void ConstExprEvaluator::removeLoneConstants() {

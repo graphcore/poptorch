@@ -340,3 +340,63 @@ def test_none_input_fail():
 
     with pytest.raises(AssertionError):
         poptorch_model(x, None)
+
+
+def test_no_inputs():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.x = torch.tensor([1.], dtype=torch.float)
+
+        def forward(self):
+            print("Called forward")
+            self.x += 1.0
+            return self.x
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    # It appears that forward is called enough time as to make the value 7 as
+    # part of the tracing.
+
+    assert poptorch_model() == 7.
+    assert poptorch_model() == 7.
+
+
+def test_no_inputs_no_output():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.x = torch.tensor([1.], dtype=torch.float)
+
+        def forward(self):
+            self.x += self.x
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model()
+    poptorch_model()
+
+
+def test_no_but_one_buffer():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("x", torch.tensor([1.], dtype=torch.float))
+
+        def forward(self):
+            # pylint: disable=attribute-defined-outside-init
+            self.x = self.x + 1.0
+            return self.x
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    # It appears that forward is called enough time as to make the value 7 as
+    # part of the tracing.
+    print(poptorch_model.state_dict())
+    print(poptorch_model())
+    print(poptorch_model())
+
+    assert poptorch_model() == 2.
+    assert poptorch_model() == 2.

@@ -1120,6 +1120,7 @@ class PoplarExecutor:
                     narrow_tensor_fn)
 
                 self._compileWithTrace(trace_args)
+                print("Called _compileWithTrace")
             else:
                 logger.info('Compiling the model using scripting')
                 self._trace = torch.jit.script(self._model)

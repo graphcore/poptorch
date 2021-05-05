@@ -403,6 +403,7 @@ poptorch::TensorId CompilerImpl::hostSideTensorConstant(
 std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
   ERROR_ON_MSG(_device, "device already created");
   updateUseModelConfig();
+  ERROR_ON(used_ipus.empty());
 
   // Sometimes phased execution doesn't use all of the IPUs in a range, so check
   // the Ids too.
@@ -522,6 +523,10 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
 }
 
 void CompilerImpl::detachFromDevice() {
+  if (used_ipus.empty()) {
+    return;
+  }
+
   logging::trace("Begin detaching device");
   ERROR_ON_MSG(!_device, "Cannot find a valid device");
   ERROR_ON_MSG(!_device->isAttached(), "The device has already been detached");
@@ -530,6 +535,11 @@ void CompilerImpl::detachFromDevice() {
 }
 
 bool CompilerImpl::isAttachedToDevice() const {
+  if (used_ipus.empty()) {
+    // We are always attached to at least 0 IPUs.
+    return true;
+  }
+
   ERROR_ON_MSG(!_device, "Cannot find a valid device");
   return _device->isAttached();
 }
@@ -737,6 +747,12 @@ bool CompilerImpl::waitIfUnavailable() const {
 }
 
 void CompilerImpl::attachToDevice() {
+  if (used_ipus.empty()) {
+    // We are always attached to at least 0 IPUs.
+    return;
+  }
+
+  logging::trace("Begin attaching device");
   popart::popx::Devicex &device = session->getDevice();
   auto *device_info = device.getDeviceInfo();
   ERROR_ON_MSG(!device_info, "Cannot find a valid device");
@@ -751,9 +767,15 @@ void CompilerImpl::attachToDevice() {
                                                 << checkSystemConfig());
   } while (!has_attached && waitForAWhile());
   device.loadEngineAndConnectStreams();
+
+  logging::trace("Finished attaching device");
 }
 
 std::string CompilerImpl::getPopartIR() const {
+  if (used_ipus.empty()) {
+    return "unavailable (No IPUs used)";
+  }
+
   if (session->getExecutable().isDeserialized()) {
     return "unavailable (Cached executable)";
   }

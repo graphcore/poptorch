@@ -368,6 +368,15 @@ void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
 }
 
 void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
+  // Some simple PyTorch models will not need an IPU at all. However, we do not
+  // want users to experience error messages as these may be trivial models
+  // which users try in their first use of PopTorch.
+  if (_impl->used_ipus.empty()) {
+    logging::info("No IPUs are used by this model. This may happen if the "
+                  "model is trivial");
+    return;
+  }
+
   auto device = _impl->createDevice();
   popart::SessionOptions &options = _impl->popart_options;
 
@@ -515,6 +524,10 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
 }
 
 void Compiler::compileAndExport(const char *filename) {
+  ERROR_ON_MSG(!_impl->session,
+               "Nothing to export. This may be because the model does not run "
+               "any op on the IPU.");
+
   logging::LogContext ctx{
       "Compiler::compileAndExport popart::Session::compileAndExport: Poplar "
       "compilation"};
@@ -536,6 +549,9 @@ void Compiler::compileAndExport(const char *filename) {
 
 void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
                                               std::int64_t offset) {
+  ERROR_ON_MSG(!_impl->session, "Nothing to import. This may be because the "
+                                "model does not run any op on an IPU.");
+
   logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice "};
   std::ifstream stream(import_filename, std::ifstream::binary);
   ERROR_ON_MSG(!stream.is_open(), "Failed to open " +
@@ -550,6 +566,12 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
 }
 
 void Compiler::loadEngineAndConnectStreams() {
+  if (!_impl->session) {
+    logging::trace("Skipping loading engine");
+    return;
+  }
+
+  logging::trace("Loading engine");
   _impl->session->loadEngineAndConnectStreams();
 
   // Set the random seed (if one was provided) following compilation
@@ -560,6 +582,11 @@ void Compiler::loadEngineAndConnectStreams() {
 }
 
 void Compiler::compileAndPrepareDevice() {
+  if (!_impl->session) {
+    logging::trace("Skipping Poplar compilation");
+    return;
+  }
+
   // Poplar compilation.
   try {
     logging::LogContext ctx{"Compiler::compileAndPrepareDevice "
@@ -622,6 +649,11 @@ std::unique_ptr<char[]> Compiler::getPopartIR() const {
 // Write the weights into IPU memory from the pytorch tensor buffers in the
 // model.
 void Compiler::copyWeightsToDevice(const std::vector<void *> &host_buffers) {
+  if (!_impl->session) {
+    logging::trace("Skipping writing weights from host to IPU memory.");
+    return;
+  }
+
   logging::info("Writing weights from host to IPU memory.");
   _impl->weights.updateData(host_buffers);
   _impl->session->writeWeights(_impl->weights);
@@ -630,6 +662,11 @@ void Compiler::copyWeightsToDevice(const std::vector<void *> &host_buffers) {
 
 // Read the weights from IPU memory into the pytorch tensor buffers.
 void Compiler::copyWeightsToHost(const std::vector<void *> &host_buffers) {
+  if (!_impl->session) {
+    logging::trace("Skipping writing weights from IPU to host.");
+    return;
+  }
+
   logging::info("Writing weights from IPU to host.");
   _impl->session->weightsToHost();
   _impl->weights.updateData(host_buffers);
@@ -637,11 +674,20 @@ void Compiler::copyWeightsToHost(const std::vector<void *> &host_buffers) {
 }
 
 void Compiler::run(const std::vector<Optimizer> &optimizers) {
+  if (!_impl->session) {
+    // Nothing to run on IPU
+    ERROR_ON(!_impl->popart_incoming.empty());
+    ERROR_ON(!_impl->popart_outgoing.empty());
+    ERROR_ON(!_impl->outgoing_duplicates.empty());
+    ERROR_ON(!_impl->memory_manager.empty());
+    return;
+  }
+
   if (!optimizers.empty() && _impl->is_training) {
     std::unique_ptr<popart::Optimizer> optimizer =
         _impl->getOptimizer(optimizers);
 
-    // Update the popart graph/poplar executable with the new optimizer.
+    // Update the popart graph/poplar executable with t::attache new optimizer.
     popart::TrainingSession &session =
         dynamic_cast<popart::TrainingSession &>(*_impl->session);
     session.updateOptimizerFromHost(optimizer.get());
@@ -1031,11 +1077,7 @@ std::vector<poptorch::TensorId> Compiler::endMultiConv() {
 
 void Compiler::detachFromDevice() { _impl->detachFromDevice(); }
 
-void Compiler::attachToDevice() {
-  logging::trace("Begin attaching device");
-  _impl->attachToDevice();
-  logging::trace("Finished attaching device");
-}
+void Compiler::attachToDevice() { _impl->attachToDevice(); }
 
 bool Compiler::isAttachedToDevice() const {
   return _impl->isAttachedToDevice();
