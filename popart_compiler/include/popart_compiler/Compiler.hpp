@@ -164,6 +164,8 @@ public:
   void insertStringPairOption(const char *option, const char *key,
                               const char *value);
 
+  std::uint64_t replicationFactor() const;
+
 private:
   std::unique_ptr<detail::SessionOptionsImpl> _impl;
   friend Compiler;

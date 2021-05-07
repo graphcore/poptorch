@@ -133,11 +133,14 @@ c10::Symbol optimizer_group;
 c10::Symbol begin_multi_conv;
 c10::Symbol multi_conv_part;
 c10::Symbol end_multi_conv;
-c10::Symbol host_side_cast;
 c10::Symbol begin_autocast;
 c10::Symbol suppress_autocast;
 c10::Symbol restore_autocast;
 c10::Symbol autocast;
+
+c10::Symbol update_param_inplace;
+
+c10::Symbol host_side_cast;
 
 c10::Symbol end_if;
 c10::Symbol start_if_true;
@@ -179,6 +182,8 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, restore_autocast);
   SYMBOL_INIT(poptorch, host_side_cast);
   SYMBOL_INIT(poptorch, autocast);
+
+  SYMBOL_INIT(poptorch, update_param_inplace);
 
   SYMBOL_INIT(poptorch, end_if);
   SYMBOL_INIT(poptorch, start_if_true);

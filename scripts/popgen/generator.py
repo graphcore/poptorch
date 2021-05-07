@@ -117,8 +117,12 @@ def generate(script, namespace, filename, global_symbols):
         list(registry.handlers.keys()) + list(registry.forwardings.keys()))
     for aten in to_register:
         opname = get_op_name(registry.forwardings.get(aten, aten))
-        f.write("  registerHandler(" + namespace + "::" + aten + ", " +
-                opname + "Handler);\n")
+        reg_handler_line = ("  registerHandler(" + namespace + "::" + aten +
+                            ", " + opname + "Handler);\n")
+        if len(reg_handler_line) > 81:
+            reg_handler_line = reg_handler_line.replace(
+                ", ", ",\n                  ")
+        f.write(reg_handler_line)
     f.write("}\n\n")
 
     f.write("} // namespace poptorch\n")

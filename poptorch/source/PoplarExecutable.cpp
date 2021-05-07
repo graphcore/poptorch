@@ -150,7 +150,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
   // Execute the compiled poplar graph.
   _compiler.run(optimizers);
 
-  auto &mapping = _inplace_op_handler->getMapping();
+  auto &mapping = _inplace_op_handler->getInputMapping();
   for (size_t i = 0; i < mapping.size(); i++) {
     if (mapping[i] == InplaceOpHandler::no_mapping) {
       continue;

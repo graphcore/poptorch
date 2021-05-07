@@ -373,30 +373,6 @@ def test_no_inputs_no_output():
     poptorch_model()
 
 
-def test_no_but_one_buffer():
-    class Model(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.register_buffer("x", torch.tensor([1.], dtype=torch.float))
-
-        def forward(self):
-            # pylint: disable=attribute-defined-outside-init
-            self.x = self.x + 1.0
-            return self.x
-
-    model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
-
-    # It appears that forward is called enough time as to make the value 7 as
-    # part of the tracing.
-    print(poptorch_model.state_dict())
-    print(poptorch_model())
-    print(poptorch_model())
-
-    assert poptorch_model() == 2.
-    assert poptorch_model() == 2.
-
-
 def test_return_and_use_input():
     class Model(torch.nn.Module):
         def forward(self, input):

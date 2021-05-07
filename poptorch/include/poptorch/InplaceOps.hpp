@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 namespace torch {
@@ -27,12 +28,12 @@ namespace poptorch {
 class InplaceOpHandler {
 public:
   InplaceOpHandler(const std::shared_ptr<torch::jit::Graph> &graph,
-                   size_t num_parameters, size_t num_anchors = 0);
+                   size_t num_parameters, size_t num_anchors, bool replicas);
 
   // Returns the mapping between each input tensor and the output tensor used
   // to update the input. If the input tensor is not changed in place, it will
   // be equal to InplaceOpHandler::no_mapping
-  const std::vector<size_t> &getMapping() const {
+  const std::vector<size_t> &getInputMapping() const {
     return _input_output_mapping;
   }
 
@@ -74,6 +75,9 @@ private:
   // be used to update the input
   std::vector<size_t> _input_output_mapping;
 
+  // The number of tensors which are (real) inputs
+  std::size_t _num_tensor_inputs;
+
   // The number of outputs which should be returned in PyTorch. This is the
   // first "num_normal_outputs" in the graph. The rest are used to update inputs
   // which, in the PyTorch model, should be modified in place.
@@ -87,6 +91,10 @@ private:
   // (possibly nested) tuples to include the number of tensors retuurned,
   // including those which are elements of tuples.
   size_t _num_normal_tensor_outputs;
+
+  // Whether or not there is at least one replica: this is relevant in the case
+  // of buffers modified in place, which is not supported with replicas
+  bool _replicas;
 };
 
 } // namespace poptorch

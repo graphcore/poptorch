@@ -406,10 +406,8 @@ void LowerToPopartImpl::lowerReturn() {
   // [ Tuple3, Tensor, Tensor, Tuple2, Tensor, Tensor, Tensor]
 
   // Only lower the outputs not used for tensors modified inplace.
-  size_t num_added = 0;
-
   std::function<void(c10::TypePtr)> process_type;
-  process_type = [this, &process_type, &num_added](const c10::TypePtr &type) {
+  process_type = [this, &process_type](const c10::TypePtr &type) {
     switch (type->kind()) {
     case c10::TypeKind::TensorType: {
       _compiler.addOutputType({OutputElemType::Tensor});

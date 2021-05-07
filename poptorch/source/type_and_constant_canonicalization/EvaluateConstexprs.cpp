@@ -194,6 +194,11 @@ bool ConstExprEvaluator::nodeIsConstExpr(const torch::jit::Node &node) const {
     return false;
   }
 
+  // update_param_inplace has an output but will fail on node.hasSideEffects()
+  if (node.kind() == symbols::poptorch::update_param_inplace) {
+    return false;
+  }
+
   // Random nodes or nodes with side effects cannot be constants
   if (isNondeterministic(node) || node.hasSideEffects()) {
     return false;

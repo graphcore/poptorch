@@ -813,6 +813,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
       python_traced_params, model_parameters, traced_parameter_tensors);
 
   std::vector<Optimizer> optimizers = parseOptimizer(optimizer_dict);
+  SessionOptions parsed_options = parseSessionOptions(options);
 
   logGraph("Lowered graph:", *graph, has_converted_any_half, input_tensors);
 
@@ -835,7 +836,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::type_and_constant_canonicalization::addListNumElements(graph.get());
 
   auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
-      graph, traced_parameter_tensors.size(), anchors.size());
+      graph, traced_parameter_tensors.size(), anchors.size(),
+      parsed_options.replicationFactor() > 1);
 
   // Any types with ListTypeWithNumElements must be revereted (revert = true)
   // to allow constant evaluation to proceed
@@ -926,9 +928,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   poptorch::LowerToPopart lower(
       graph.get(), std::move(traced_parameter_tensors), std::move(parameters),
-      inplace_op_handler, training, std::move(optimizers),
-      parseSessionOptions(options), attribute_accessor, callbacks,
-      std::move(anchors_list));
+      inplace_op_handler, training, std::move(optimizers), parsed_options,
+      attribute_accessor, callbacks, std::move(anchors_list));
   lower.lower(&input_tensors);
 
   // Clear the callbacks after compilation.
@@ -1258,10 +1259,13 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
       loop_count++;
     }
 
+    SessionOptions parsed_options = parseSessionOptions(options);
+
     logging::trace("Graph before handling inplace ops:\n{}", *graph);
 
     auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
-        graph, parameter_data.size(), anchors.size());
+        graph, parameter_data.size(), anchors.size(),
+        parsed_options.replicationFactor() > 1);
 
     logging::trace("Graph right before casting unsupported inputs:\n{}",
                    *graph);
@@ -1307,8 +1311,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
 
     poptorch::LowerToPopart lower(
         graph.get(), std::move(parameter_data), std::move(parameters),
-        inplace_op_handler, training, {}, parseSessionOptions(options),
-        attribute_accessor, callbacks, std::move(anchors_list));
+        inplace_op_handler, training, {}, parsed_options, attribute_accessor,
+        callbacks, std::move(anchors_list));
     lower.lower(&input_tensors);
     auto o = lower.compile();
     // Clear the callbacks after compilation.

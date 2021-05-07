@@ -51,6 +51,16 @@ def accessAttributes(attribute_id_str):
 
 NO_EXECUTABLE_ERR = "Model has not been compiled or has been destroyed."
 
+# Some modules will still work even if the buffer address changes during tracing
+BUFFERS_CAN_CHANGE = (
+    torch.nn.BatchNorm1d,
+    torch.nn.modules.batchnorm.BatchNorm1d,
+    torch.nn.BatchNorm2d,
+    torch.nn.modules.batchnorm.BatchNorm2d,
+    torch.nn.BatchNorm3d,
+    torch.nn.modules.batchnorm.BatchNorm3d,
+)
+
 
 class PoplarExecutor:
     """ This class should not be created directly but is a wrapper around
@@ -893,6 +903,48 @@ class PoplarExecutor:
 
         return traced
 
+    def _buffer_parameter_addresses(self):
+        # Obtains dictionaries of the data ptr addresses of every buffer
+        # and parameter
+
+        buffer_addresses = {}
+        for module_name, module in self._model.named_modules():
+            if isinstance(module, BUFFERS_CAN_CHANGE):
+                continue
+
+            for name, buff in module.named_buffers(prefix=module_name,
+                                                   recurse=False):
+                buffer_addresses[name] = buff.data_ptr()
+
+        parameter_addresses = {}
+        for name, param in self._model.named_parameters():
+            parameter_addresses[name] = param.data_ptr()
+
+        return buffer_addresses, parameter_addresses
+
+    def _error_on_buffer_parameter_address_change(self, old_addresses):
+        new_addresses = self._buffer_parameter_addresses()
+
+        # Do the buffers first then paramters
+        order = ["Buffer", "Parameter"]
+        for idx, dic in enumerate(old_addresses):
+            for name, address in dic.items():
+                if name not in new_addresses[idx]:
+                    err_msg = (order[idx] + " " + name + " is removed from " +
+                               "the model when calling the forward method.")
+
+                    raise _impl.createPoptorchError(err_msg)
+
+                if address != new_addresses[idx][name]:
+                    err_msg = (
+                        order[idx] + " " + name + " is reassigned " +
+                        "within the model when calling the forward " +
+                        "method. This is not supported. Consider using self." +
+                        name + ".copy_(src)" +
+                        " to copy data from a source tensor, where src is " +
+                        "the name of the source tensor.")
+                    raise _impl.createPoptorchError(err_msg)
+
     def _trace_model_and_get_compile_args(self, in_tensors,
                                           in_tensors_trace_view,
                                           has_converted_any_half,
@@ -950,6 +1002,11 @@ class PoplarExecutor:
 
         added_dummy_output = False
 
+        # Store buffer and paramter memory addresses to make sure that these do
+        # not change during tracing (which would give wrong results in a Jit
+        # trace)
+        buff_param_addresses = self._buffer_parameter_addresses()
+
         try:
             self._trace = self._trace_with_warning_filter(
                 in_tensors_trace_view_tuple)
@@ -960,6 +1017,8 @@ class PoplarExecutor:
                 added_dummy_output = True
             else:
                 raise e
+
+        self._error_on_buffer_parameter_address_change(buff_param_addresses)
 
         # Restore half to its old meaning.
         torch.Tensor.half = old_half

@@ -5,6 +5,7 @@
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -111,6 +112,14 @@ torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
   return createSetMatMulSerialization(graph, x, t0, t1, t2);
 }
 
+torch::jit::Node *updateparaminplaceHandler(torch::jit::Graph *graph,
+                                            torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  auto i1 = node->input(1);
+  // copyvarupdate(i0, i1)
+  return createCopyvarupdate(graph, {i0, i1});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -127,6 +136,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
                   setavailablememoryHandler);
   registerHandler(symbols::poptorch::set_matmul_serialization,
                   setmatmulserializationHandler);
+  registerHandler(symbols::poptorch::update_param_inplace,
+                  updateparaminplaceHandler);
 }
 
 } // namespace poptorch

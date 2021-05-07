@@ -10,6 +10,7 @@ script = "PopTorchHandlers.py"
 output_dir = "poptorch/source/popart_canonicalization"
 
 convert("recomputation_checkpoint", 1, "recomputationCheckpoint")
+convert("update_param_inplace", 2, "copyvarupdate")
 
 expand("begin_ipu_block", lambda x, y, z: op.beginIpuBlock(
     clong(x), clong(y), clong(z)))

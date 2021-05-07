@@ -905,6 +905,51 @@ promoted to float32 when operands have mixed precision.
     :end-before: policy_autocast_end
     :emphasize-lines: 5, 8
 
+
+PyTorch buffers
+===============
+
+PopTorch supports PyTorch buffers in some circumstances.
+You can use buffers to make tensors persistent,
+that is to allow tensors to keep their values from the previous run on each new run,
+without making them model parameters.
+However, you must make sure that you only make in-place modifications to the
+buffer using PyTorch in-place operations (such as `+=` or those ending in  `_`).
+For example, you can  ``torch.Tensor.copy_`` to copy the contents of a another
+tensor to the buffer.
+
+Unlike when running on the CPU, the following PyTorch code does not increment
+``model.i`` each time, when running on the IPU:
+
+.. literalinclude:: buffers.py
+    :language: python
+    :caption: The wrong way to have a persistent tensor
+    :linenos:
+    :start-after: counter_model_wrong_start
+    :end-before: counter_model_wrong_end
+
+This is because the PyTorch tracer will capture the value for ``model.i`` when
+tracing happens and then freeze the value as a constant.
+In fact, the value captured is `6.0` as the PyTorch has traced or called the
+forward method five times before it captures the constant.
+
+You can keep the value of a tensor between runs by registering it as a buffer
+in PyTorch, as the following examples shows:
+
+.. literalinclude:: buffers.py
+    :language: python
+    :caption: An example showing a tensor which is incremented on each iteration by registering it as a tensor.
+    :linenos:
+    :start-after: counter_model_correct_start
+    :end-before: counter_model_correct_end
+
+.. note:: When running an inference model
+  (with :py:func:`~poptorch.inferenceModel`), any buffers which your model
+  modifies will not be implicitly copied to the host. You will need to call
+  :py:func:`~poptorch.PoplarExecutor.copyWeightsToHost` before reading the value
+  of a buffer which has been changed as a result of a model call.
+
+
 .. _creating_custom_ops:
 
 Creating custom ops

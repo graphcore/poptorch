@@ -15,6 +15,8 @@ New features
 - Support for ``torch.bool`` in ``torch.zeros``, ``torch.zeros_like``, ``torch.ones``, ``torch.ones_like``
 - Support for ``torch.scatter`` and its in-place variant
 
+- Support for in-place modification to buffers on IPU
+
 API changes
 -----------
 

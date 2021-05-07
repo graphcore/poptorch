@@ -29,10 +29,10 @@ const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
 
 InplaceOpHandler::InplaceOpHandler(
     const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters,
-    size_t num_anchors)
-    : _graph(graph.get()), _num_anchors(num_anchors) {
+    size_t num_anchors, bool replicas)
+    : _graph(graph.get()), _num_anchors(num_anchors), _replicas(replicas) {
   _collapsed_inputs = collapsedGraphInputHierachy(graph.get());
-  std::size_t num_tensor_inputs = _collapsed_inputs.size() - num_parameters;
+  _num_tensor_inputs = _collapsed_inputs.size() - num_parameters;
 
   // To begin with, none of the outputs are used for emulating inplacing.
   // Store the number of outputs (which may be nested) and the total number
@@ -42,7 +42,7 @@ InplaceOpHandler::InplaceOpHandler(
   storeNumTensorOutputs();
 
   // Now process each input and make changes if it is modified in place.
-  for (size_t input = 0; input < num_tensor_inputs; input++) {
+  for (size_t input = 0; input < _collapsed_inputs.size(); input++) {
     processInput(input);
   }
 
@@ -69,7 +69,8 @@ void InplaceOpHandler::processInput(size_t input_num) {
   torch::jit::Value *current_alias = _collapsed_inputs[input_num];
   std::vector<torch::jit::Node *> to_delete;
 
-  // Pass through the nodes in topological order rather than jumping to inputs
+  // Pass through the nodes in topological order rather than jumping through
+  // outputs
   for (auto node : _graph->nodes()) {
     // Skip if not in-place
     if (!torch::jit::isInplaceOp(node)) {
@@ -93,26 +94,59 @@ void InplaceOpHandler::processInput(size_t input_num) {
     current_alias = new_node->output();
   }
 
-  for (auto node : to_delete) {
-    node->destroy();
+  // Handle differently for normal inputs and parameters
+  bool is_parameter = input_num >= _num_tensor_inputs;
+
+  // Check if it is not modified in place at all
+  bool is_modified_inplace = current_alias != _collapsed_inputs[input_num];
+  if (!is_modified_inplace) {
+    if (!is_parameter) {
+      _input_output_mapping.push_back(InplaceOpHandler::no_mapping);
+    }
+
+    ERROR_ON(!to_delete.empty());
+    return;
   }
 
-  size_t output_mapping = InplaceOpHandler::no_mapping;
+  if (is_parameter) {
+    // This is not supported with replicas
+    ERROR_ON_MSG(_replicas, "Model modifies a buffer in place. This is not "
+                            "supported when using replication i.e. "
+                            "replicationFactor > 1 with poptorch.Options.\n"
+                            "Last modification: "
+                                << *to_delete.back());
 
-  if (current_alias != _collapsed_inputs[input_num]) {
-    bool already_output = false;
-    for (size_t output = 0; output < _graph->outputs().size(); output++) {
-      if (_graph->outputs()[output] == current_alias) {
-        already_output = true;
-        output_mapping = output;
+    // Updating a variable means that the original variable matches
+    ERROR_ON(*_collapsed_inputs[input_num]->type() != *current_alias->type());
+
+    auto new_node = _graph->create(symbols::poptorch::update_param_inplace, 1);
+    new_node->addInput(_collapsed_inputs[input_num]);
+    new_node->addInput(current_alias);
+    new_node->insertAfter(current_alias->node());
+    new_node->output()->setType(current_alias->type());
+
+  } else {
+    // Not a parameter : handle by adding it as an output which will be used
+    // to update the input tensor
+    size_t output_mapping = InplaceOpHandler::no_mapping;
+
+    if (is_modified_inplace) {
+      for (size_t output = 0; output < _graph->outputs().size(); output++) {
+        if (_graph->outputs()[output] == current_alias) {
+          output_mapping = output;
+        }
       }
     }
 
-    if (!already_output) {
+    if (output_mapping == InplaceOpHandler::no_mapping) {
       output_mapping = _graph->registerOutput(current_alias);
     }
+    _input_output_mapping.push_back(output_mapping);
   }
-  _input_output_mapping.push_back(output_mapping);
+
+  for (auto node : to_delete) {
+    node->destroy();
+  }
 }
 
 void InplaceOpHandler::removeRemainingInplaceOps() {

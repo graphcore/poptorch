@@ -40,7 +40,6 @@
 #include "poptorch_logging/Logging.hpp"
 
 namespace {
-
 // Wrapper functor used to print to the debug channel the value
 // of the options set by poptorch.Options
 template <typename Value> class Setter {
@@ -415,6 +414,10 @@ void SessionOptions::insertStringPairOption(const char *option, const char *key,
                                             const char *value) {
   _impl->set(option, std::pair<std::string, std::string>(key, value),
              _impl->container_options, "map");
+}
+
+std::uint64_t SessionOptions::replicationFactor() const {
+  return _impl->popart_options.replicatedGraphCount;
 }
 
 void SessionOptions::setMemoryProportion(std::uint32_t ipu, float memory) {
