@@ -20,7 +20,7 @@ InplaceOpHandler::InplaceOpHandler(
     const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters)
     : _graph(graph.get()) {
   _collapsed_inputs = collapsedGraphInputHierachy(graph.get());
-  std::size_t num_inputs = graph->inputs().size() - num_parameters;
+  std::size_t num_tensor_inputs = _collapsed_inputs.size() - num_parameters;
 
   // To begin with, none of the outputs are used for emulating inplacing.
   // Store the number of outputs (which may be nested) and the total number
@@ -28,10 +28,9 @@ InplaceOpHandler::InplaceOpHandler(
   // from PopART to separate the original from additional outputs.
   _num_normal_outputs = graph->outputs().size();
   storeNumTensorOutputs();
-  ERROR_ON(_collapsed_inputs.size() < num_inputs);
 
   // Now process each input and make changes if it is modified in place.
-  for (size_t input = 0; input < num_inputs; input++) {
+  for (size_t input = 0; input < num_tensor_inputs; input++) {
     processInput(input);
   }
 

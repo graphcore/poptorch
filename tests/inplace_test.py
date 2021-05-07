@@ -31,6 +31,20 @@ def test_inplace_add():
     assert list_in[0] == 3.0
 
 
+def test_inplace_add_multi_elements():
+    class Model(torch.nn.Module):
+        def forward(self, _x, y):
+            y += 1
+
+    poptorch_model = poptorch.inferenceModel(Model())
+    nested_tuple_in = ((torch.Tensor([1.0]), torch.Tensor([1.0])),
+                       (torch.Tensor([1.0])))
+    tensor_in = torch.Tensor([1.0])
+
+    assert poptorch_model(nested_tuple_in, tensor_in) is None
+    assert tensor_in == 2.0
+
+
 def test_inplace_sub():
     class Model(torch.nn.Module):
         def forward(self, x):

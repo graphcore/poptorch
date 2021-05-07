@@ -132,6 +132,28 @@ at::ScalarType onnxStrToScalarType(const char *type_str) {
 }
 
 namespace {
+// Adds a null pointers for every unused tensor in an unused tuple
+void addNullPtrsForUnusedTuple(const c10::TupleType *tuple_type,
+                               std::vector<torch::jit::Value *> *tensors) {
+  for (const auto &element : tuple_type->elements()) {
+    switch (element->kind()) {
+    case c10::TypeKind::TensorType: {
+      tensors->push_back(nullptr);
+      break;
+    }
+    case c10::TypeKind::TupleType: {
+      auto type = element->expect<c10::TupleType>();
+      addNullPtrsForUnusedTuple(type.get(), tensors);
+      break;
+    }
+    default: {
+      ERROR("Unsupported input type '" << c10::typeKindToString(element->kind())
+                                       << "'");
+    }
+    }
+  }
+}
+
 void processInput(torch::jit::Graph *graph, torch::jit::Value *input,
                   std::vector<torch::jit::Value *> *tensors) {
   switch (input->type()->kind()) {
@@ -153,9 +175,7 @@ void processInput(torch::jit::Graph *graph, torch::jit::Value *input,
     } else {
       // We need placeholders or the values will not align with input tensors
       auto tuple_type = input->type()->expect<c10::TupleType>();
-      for (unsigned int i = 0; i < tuple_type->elements().size(); i++) {
-        tensors->push_back(nullptr);
-      }
+      addNullPtrsForUnusedTuple(tuple_type.get(), tensors);
     }
     break;
   }
