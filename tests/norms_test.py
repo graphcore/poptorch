@@ -100,6 +100,46 @@ def test_batchNorm3D(running_stats, training):
                             rtol=0.1)
 
 
+def test_batchNorm_eval_during_training():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.bn = nn.BatchNorm1d(100)
+            self.loss = torch.nn.MSELoss()
+
+        def forward(self, x, target):
+            y = self.bn(x)
+            return y, self.loss(y, target)
+
+    input = torch.randn([16, 100])
+    target = torch.randn([16, 100])
+
+    model = Model()
+    for param in model.parameters():
+        param.requires_grad = False
+    model.bn.eval()
+
+    running_mean_init = model.bn.running_mean.clone().detach()
+    running_var_init = model.bn.running_var.clone().detach()
+
+    # Run pytorch native on CPU.
+    native_out, _ = model(input, target)
+    # Run on IPU.
+    ipu_model = poptorch.trainingModel(model)
+    poptorch_out, _ = ipu_model(input, target)
+    # TODO: T38684
+    # Implicit copy only happens when we touch the params so copy explicitly.
+    ipu_model.copyWeightsToHost()
+
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+    helpers.assert_allequal(actual=model.bn.running_mean,
+                            expected=running_mean_init)
+    helpers.assert_allequal(actual=model.bn.running_var,
+                            expected=running_var_init)
+
+
 def test_layerNorm():
     torch.manual_seed(42)
 

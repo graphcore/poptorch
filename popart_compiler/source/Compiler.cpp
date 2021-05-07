@@ -526,17 +526,12 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
     std::unique_ptr<popart::Optimizer> optimizer =
         _impl->getOptimizer(optimizers);
 
-    // Transform nodes which have training/inference variants. I.E BatchNorm.
-    popart::GraphTransformer transformer{
-        _impl->active_builder->getModelProto()};
-    transformer.prepareNodesForTraining();
-
     // Create the training session.
     logging::LogContext ctx{
         "Compiler::initSession popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
-        transformer.getModelProto(), data_flow, _impl->loss, *optimizer, device,
-        {}, options, _impl->options.patterns);
+        _impl->active_builder->getModelProto(), data_flow, _impl->loss,
+        *optimizer, device, {}, options, _impl->options.patterns);
   }
 }
 
