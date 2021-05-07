@@ -24,6 +24,11 @@ class SessionOptions;
 namespace detail {
 class LowerToPopartImpl;
 } // namespace detail
+
+// CallbackMetadata is used to pass information from python to the poplar custom
+// op for CPU ops. The string is the ID given by the user to each op.
+using CPUCallbackMap = std::unordered_map<std::string, CallbackMetadata>;
+
 /*
  * Take the transformed graph and create a poponnx graph from it.
  */
@@ -37,7 +42,8 @@ public:
                 const std::shared_ptr<InplaceOpHandler> &inplace_op_handler,
                 bool training, std::vector<Optimizer> &&opt,
                 const SessionOptions &options,
-                const py::function &attribute_accessor);
+                const py::function &attribute_accessor,
+                CPUCallbackMap callback);
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();
 

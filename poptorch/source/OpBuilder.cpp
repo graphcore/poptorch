@@ -446,11 +446,32 @@ torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createCallCpuOp(torch::jit::Graph *graph,
+                                  const std::vector<torch::jit::Value *> &value,
+                                  const std::string &id,
+                                  torch::jit::Node *original_node) {
+  const std::uint32_t num_outputs = original_node->outputs().size();
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::canonicalised_cpu_call, {value},
+      ImplicitCast::None, OutputType::AsDtypeOrAsPromoted, num_outputs);
+
+  new_node->s_(c10::Symbol::fromQualString("attr::ID"), id);
+
+  for (std::uint32_t i = 0; i < num_outputs; ++i) {
+    torch::jit::Value *old_out = original_node->output(i);
+    torch::jit::Value *new_out = new_node->output(i);
+
+    new_out->copyMetadata(old_out);
+  }
+
+  return new_node;
+}
+
 torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,
                                            float proportion) {
   torch::jit::Node *new_node = createAndInsertNode(
-      graph, symbols::poptorch::set_available_memory, {value});
+      graph, symbols::poptorch::set_available_memory, value);
   new_node->f_(c10::Symbol::fromQualString("attr::availableMemoryProportion"),
                proportion);
 

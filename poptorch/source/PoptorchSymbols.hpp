@@ -84,6 +84,9 @@ extern c10::Symbol end_for_loop;
 extern c10::Symbol push_name_scope;
 extern c10::Symbol pop_name_scope;
 extern c10::Symbol add_untyped_input_tensor;
+extern c10::Symbol call_cpu_op;
+extern c10::Symbol end_cpu_op;
+extern c10::Symbol canonicalised_cpu_call;
 
 } // namespace symbols::poptorch
 

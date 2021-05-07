@@ -213,6 +213,24 @@ PopartType toPopartType(const at::ScalarType type) {
   }
 }
 
+void platformAgnosticTypeInfoFromIRType(
+    torch::jit::Value *value, std::vector<poptorch::PopartType> *types,
+    std::vector<std::vector<std::size_t>> *shapes) {
+  std::shared_ptr<c10::TensorType> tensor_type =
+      value->type()->expect<c10::TensorType>();
+  c10::ScalarType as_scalar = *tensor_type->scalarType();
+
+  types->push_back(toPopartType(as_scalar));
+
+  c10::VaryingShape shape = tensor_type->sizes();
+
+  shapes->emplace_back();
+
+  for (std::uint32_t i = 0; i < *shape.size(); ++i) {
+    shapes->back().push_back(*shape[i]);
+  }
+}
+
 } // namespace
 
 namespace detail {
@@ -226,7 +244,8 @@ public:
                     std::shared_ptr<InplaceOpHandler> inplace_op_handler,
                     bool training, std::vector<Optimizer> &&opt,
                     const SessionOptions &options,
-                    const py::function &attribute_accessor);
+                    const py::function &attribute_accessor,
+                    CPUCallbackMap &&callback);
 
   void lower(std::vector<at::Tensor> *in_tensors);
 
@@ -259,6 +278,8 @@ private:
   std::unordered_map<c10::Symbol, FunctionType> _functionToImplementation;
 
   poptorch::Compiler _compiler;
+
+  CPUCallbackMap _callbacks;
 
   void lowerParameters(std::vector<at::Tensor> *in_tensors);
 
@@ -783,6 +804,43 @@ void LowerToPopartImpl::lowerBody() {
                      tensorTypesAndShapes(outputs[0], outputs.size()),
                      _compiler.getExecutionInfo().get());
 
+    } else if (kind == symbols::poptorch::canonicalised_cpu_call) {
+      // CPU callbacks are referenced by an string identifier.
+      std::string id = node->s(c10::Symbol::fromQualString("attr::ID"));
+
+      std::vector<poptorch::PopartType> input_types;
+      std::vector<std::vector<std::size_t>> input_shapes;
+
+      // Get the torch jit SSA for the input/output values.
+      std::vector<poptorch::TensorId> inputs;
+      std::transform(node->inputs().begin(), node->inputs().end(),
+                     std::back_inserter(inputs), [&](torch::jit::Value *val) {
+                       // Append type info from the inputs.
+                       platformAgnosticTypeInfoFromIRType(val, &input_types,
+                                                          &input_shapes);
+
+                       return _value_map.tensor(val);
+                     });
+
+      std::vector<poptorch::PopartType> output_types;
+      std::vector<std::vector<std::size_t>> output_shapes;
+
+      for (torch::jit::Value *value : node->outputs()) {
+        platformAgnosticTypeInfoFromIRType(value, &output_types,
+                                           &output_shapes);
+      }
+
+      poptorch::TensorId first_output_tensor =
+          _compiler.addCPUCallback(inputs, _callbacks[id], input_types,
+                                   input_shapes, output_types, output_shapes);
+
+      for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
+        torch::jit::Value *output = node->output(i);
+        poptorch::TensorId output_tensor = first_output_tensor + i;
+        ERROR_ON_MSG(!_compiler.tensorIdIsValid(output_tensor),
+                     "Output " << i << " doesn't exist of Node " << *node);
+        _value_map.setTensor(output, output_tensor);
+      }
     } else {
       ERROR("Couldn't find a registered operation for node");
     }
@@ -1073,11 +1131,11 @@ LowerToPopartImpl::LowerToPopartImpl(
     std::vector<std::string> parameter_names,
     std::shared_ptr<InplaceOpHandler> inplace_op_handler, bool training,
     std::vector<Optimizer> &&opt, const SessionOptions &options,
-    const py::function &attribute_accessor)
+    const py::function &attribute_accessor, CPUCallbackMap &&callback)
     : _graph(*g), _lowered(false), _parameters(std::move(params)),
       _parameter_names(std::move(parameter_names)),
       _inplace_op_handler(std::move(inplace_op_handler)), _optimizers(opt),
-      _compiler({training, options}) {
+      _compiler({training, options}), _callbacks(callback) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
   /* {"popart::Foo", [&](const std::vector<poptorch::TensorId> &inputs,
@@ -1165,12 +1223,12 @@ LowerToPopart::LowerToPopart(
     std::vector<std::string> parameter_names,
     const std::shared_ptr<InplaceOpHandler> &inplace_op_handler, bool training,
     std::vector<Optimizer> &&opt, const SessionOptions &options,
-    const py::function &attribute_accessor) {
+    const py::function &attribute_accessor, CPUCallbackMap callbacks) {
   std::srand(std::time(nullptr));
   _impl = std::make_unique<detail::LowerToPopartImpl>(
       graph, std::move(parameters), std::move(parameter_names),
       inplace_op_handler, training, std::move(opt), std::move(options),
-      attribute_accessor);
+      attribute_accessor, std::move(callbacks));
 }
 
 void LowerToPopart::lower(std::vector<at::Tensor> *in_tensors) {

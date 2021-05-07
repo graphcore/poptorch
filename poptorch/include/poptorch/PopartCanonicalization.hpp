@@ -49,6 +49,9 @@ void canonicaliseHalfInputs(torch::jit::Graph *graph,
 // Resolve types which are ambiguiously between half or float
 void resolveHalfOrFloat(torch::jit::Graph *graph);
 
+// Clean up the graph if it is using CPU offloading.
+void cpuOffloadingCleanup(torch::jit::Graph *graph);
+
 // Handle the 'requires_grad=False' flag on tensors.
 void addDetachOperations(torch::jit::Graph *graph);
 } // namespace poptorch

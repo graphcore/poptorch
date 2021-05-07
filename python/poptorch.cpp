@@ -111,6 +111,16 @@ customOperation(c10::List<at::Tensor> inputs,          // NOLINT
   return example_outputs;
 }
 
+void callCpuOp(const c10::List<at::Tensor> &inputs, const std::string &name) {
+  UNUSED(inputs);
+  UNUSED(name);
+}
+
+c10::List<at::Tensor> endCPUOp(c10::List<at::Tensor> output) {
+  UNUSED(output);
+  return output;
+}
+
 void ifElse() {}
 
 // We track the outputs of the if in this brach as it is easier to add them
@@ -196,10 +206,75 @@ static auto registry =
         .op("poptorch::pop_name_scope", &popNameScope)
         .op("poptorch::begin_autocast", &beginAutocast)
         .op("poptorch::suppress_autocast", &suppressAutocast)
-        .op("poptorch::restore_autocast", &restoreAutocast);
+        .op("poptorch::restore_autocast", &restoreAutocast)
+        .op("poptorch::end_cpu_op", &endCPUOp)
+        .op("poptorch::call_cpu_op", &callCpuOp);
 
 namespace poptorch {
 namespace {
+
+// Keep a static map to gather up all the cpu calls.
+CPUCallbackMap callbacks;
+
+bool alreadyRegistered(const std::string &ID) {
+  return callbacks.find(ID) != callbacks.end();
+}
+
+void registerBuffersWithCallback(
+    const std::string &ID,
+    std::vector<at::Tensor> &input_tensors, // NOLINT
+    std::vector<at::Tensor> &output_tensors // NOLINT
+) {
+  auto itr = callbacks.find(ID);
+
+  ERROR_ON_MSG(itr == callbacks.end(), "Callback has not been registered.");
+
+  CallbackMetadata &metadata = itr->second;
+
+  // Track the input tensors. Our python creates a persistent storage location
+  // for the inputs and outputs.
+  for (at::Tensor &tensor : input_tensors) {
+    metadata.input_pointers.push_back(tensor.data_ptr());
+  }
+
+  // Same for output.
+  for (at::Tensor &tensor : output_tensors) {
+    tensor = tensor.contiguous();
+    metadata.output_pointers.push_back(tensor.data_ptr());
+  }
+}
+
+// Python interface to map a given CPU op with the IR calls.
+void registerCPUCallBack(const py::object &obj, const std::string &ID) {
+  // Skip if we've already added a callback for this function.
+  if (callbacks.find(ID) != callbacks.end()) {
+    return;
+  }
+
+  // Structure to store the information given by python to be forwarded to the
+  // backend.
+  CallbackMetadata metadata;
+
+  // Wrap that in a lambda so we don't have to expose the naked pytorch function
+  // pointer thing.
+  metadata.the_callback = [=]() {
+    // We wrap the user call in a function called "execute"
+    obj.attr("execute")();
+  };
+
+  metadata.buffer_registration_callback = [=]() {
+    obj.attr("registerPersistentData")();
+  };
+
+  // Map the string identifier to the metadata.
+  callbacks.insert({ID, metadata});
+}
+
+void initCallbackBuffers() {
+  for (auto &pair : callbacks) {
+    pair.second.buffer_registration_callback();
+  }
+}
 
 template <typename T>
 T getOptimizerValue(const py::dict &d, const std::string &key) {
@@ -384,7 +459,8 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
                                       option.second.cast<float>());
         }
       } else if (id == "patterns") {
-        options.setPatternsLevel(opt["patterns_level"].cast<std::uint64_t>());
+        options.setPatternsLevel(
+            opt.cast<py::dict>()["patterns_level"].cast<std::uint64_t>());
 
         for (auto option : element.second.cast<py::dict>()) {
           options.addPattern(option.first.cast<std::string>().c_str(),
@@ -684,6 +760,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   poptorch::automaticCasting(graph.get());
 
+  poptorch::cpuOffloadingCleanup(graph.get());
+
   logging::trace("Graph right before canonicalization:\n{}", *graph);
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.
@@ -710,11 +788,18 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   logging::trace("Graph right before popart:\n{}", *graph);
 
+  // Get the callback buffers from python, we have to do this at the last
+  // possible moment due to tracing.
+  initCallbackBuffers();
+
   poptorch::LowerToPopart lower(
       graph.get(), std::move(traced_parameter_tensors), std::move(parameters),
       inplace_op_handler, training, std::move(optimizers),
-      parseSessionOptions(options), attribute_accessor);
+      parseSessionOptions(options), attribute_accessor, callbacks);
   lower.lower(&input_tensors);
+
+  // Clear the callbacks after compilation.
+  callbacks.clear();
 
   return lower;
 }
@@ -1022,9 +1107,13 @@ compileWithScript(py::handle h, py::handle g,
     poptorch::LowerToPopart lower(graph.get(), std::move(parameter_data),
                                   std::move(parameters), inplace_op_handler,
                                   training, {}, parseSessionOptions(options),
-                                  attribute_accessor);
+                                  attribute_accessor, callbacks);
     lower.lower(&input_tensors);
-    return lower.compile();
+    auto o = lower.compile();
+    // Clear the callbacks after compilation.
+    callbacks.clear();
+
+    return o;
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
@@ -1089,4 +1178,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("detachFromDevice", poptorch::detachFromDevice);
   m.def("attachToDevice", poptorch::attachToDevice);
   m.def("isAttachedToDevice", poptorch::isAttachedToDevice);
+  m.def("registerCPUCallBack", poptorch::registerCPUCallBack);
+  m.def("isAlreadyRegistered", poptorch::alreadyRegistered);
+  m.def("registerBuffersWithCallback", poptorch::registerBuffersWithCallback);
 }

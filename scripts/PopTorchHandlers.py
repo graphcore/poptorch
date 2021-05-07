@@ -3,6 +3,7 @@
 
 from popgen.api import expand, convert, generate
 from popgen.helpers import cfloat, cint, clong, cstr, tensor_list
+from popgen.values import OriginalNode
 from popgen.operatorfactory import op
 
 script = "PopTorchHandlers.py"
@@ -16,6 +17,8 @@ expand("begin_ipu_block", lambda x, y, z: op.beginIpuBlock(
 expand("internal_cast", lambda tensor, dtype: op.internalCast(
     tensor, cstr(dtype)))
 expand("ipu_print_tensor", lambda x, s: op.printIpuTensor(x, cstr(s)))
+expand("call_cpu_op", lambda x, s: op.callCpuOp(tensor_list(x), cstr(s),
+                                                OriginalNode()))
 expand("identity_loss", lambda x, r: op.identityloss(x, cint(r)))
 expand("optimizer_group", lambda x, l: op.optimizerGroup(
     clong(x), tensor_list(l)))

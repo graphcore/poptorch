@@ -9,6 +9,7 @@ signatures = {
     'edgePad': ['Args', ['clong_list']],
     'optimizerGroup': [['clong'], ['tensor_list']],
     'printIpuTensor': ['Args', ['cstr']],
+    'callCpuOp': [['tensor_list'], ['cstr'], ['node']],
     'randomNormal': [
         'Args', ['tensor_shape'], ['cfloat'], ['cfloat'],
         ['scalar_type', 'None']

@@ -100,6 +100,11 @@ class OperatorFactory:
         check_operator_signature(value, poptorch.signatures)
         return value
 
+    def callCpuOp(self, t, s, n):
+        value = no_tensor_braces(Value('callCpuOp', [t, s, n]))
+        check_operator_signature(value, poptorch.signatures)
+        return value
+
     def transpose(self, t):
         value = Value('transpose', [t, empty_initializer()])
         check_operator_signature(value, onnx.signatures)

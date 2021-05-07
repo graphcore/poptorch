@@ -132,6 +132,12 @@ c10::Symbol end_for_loop;
 c10::Symbol push_name_scope;
 c10::Symbol pop_name_scope;
 c10::Symbol add_untyped_input_tensor;
+
+c10::Symbol call_cpu_op;
+c10::Symbol end_cpu_op;
+
+c10::Symbol canonicalised_cpu_call;
+
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializePoptorchSymbols() {
@@ -161,6 +167,10 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, push_name_scope);
   SYMBOL_INIT(poptorch, pop_name_scope);
   SYMBOL_INIT(poptorch, add_untyped_input_tensor);
+  SYMBOL_INIT(poptorch, call_cpu_op);
+  SYMBOL_INIT(poptorch, end_cpu_op);
+
+  SYMBOL_INIT(poptorch, canonicalised_cpu_call)
 }
 
 } // namespace poptorch::symbols::poptorch

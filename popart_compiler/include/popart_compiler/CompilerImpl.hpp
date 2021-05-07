@@ -2,6 +2,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <list>
 #include <map>
 #include <memory>
@@ -14,6 +15,7 @@
 
 #include <popart/builder.hpp>
 #include <popart/session.hpp>
+#include <poplar/Tensor.hpp>
 
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerOptions.hpp"
@@ -24,6 +26,40 @@ namespace poptorch {
 class Compiler;
 
 namespace detail {
+
+/*
+  We use this structure to maintain all the information related to a CPU
+  callback. This is used by the custom op to create the poplar tensors and by
+  the compiler to create the poplar callbacks.
+*/
+struct CallbackInternalMetadata {
+  // We need a unique ID for each so we can track how many we've added.
+  static std::uint32_t number_of_added_ops;
+
+  // The thing we are calling back.
+  std::function<void()> the_callback;
+
+  // Pointers to the buffers on host.
+  std::vector<void *> input_pointers;
+  std::vector<void *> output_pointers;
+
+  // The names of each buffer which we make on creation. The custom op needs to
+  // see these to create the FIFOs and the compiler needs to see them to create
+  // the callbacks.
+  std::vector<std::string> input_handles;
+  std::vector<std::string> output_handles;
+
+  // Type and shape info for the input and outputs.
+  std::vector<poptorch::PopartType> input_types;
+  std::vector<std::vector<std::size_t>> input_shapes;
+  std::vector<poptorch::PopartType> output_types;
+  std::vector<std::vector<std::size_t>> output_shapes;
+
+  // The callbacks are called in random order so we need to track how many have
+  // copied their data to make sure we only call the host function once all of
+  // them have copied it.
+  std::atomic<std::uint32_t> number_of_input_streams_inited;
+};
 
 class WeightsIO : public popart::IWeightsIO {
 public:
@@ -112,6 +148,9 @@ public:
   std::map<std::uint64_t, std::vector<popart::TensorId>> grad_update_groups;
 
   std::unique_ptr<MultiConvBuilder> multi_conv_builder;
+
+  // Dynamic container for all the callbacks to live in.
+  std::list<CallbackInternalMetadata> callbacks;
 
   // General helpers.
 
@@ -243,4 +282,9 @@ private:
 };
 
 } // namespace detail
+
+popart::DataType popartTypeFromPoptorch(poptorch::PopartType);
+
+poplar::Type poplarTypeFromPoptorch(poptorch::PopartType);
+
 } // namespace poptorch

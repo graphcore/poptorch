@@ -5,6 +5,7 @@ import copyreg
 import torch
 
 from . import enums
+from . import poptorch_core
 
 _end_ipu_block = torch.ops.poptorch.end_ipu_block
 
@@ -530,6 +531,62 @@ def custom_op(inputs,
                                                len(transformed_outputs),
                                                transformed_outputs,
                                                attributes_id_str)
+
+
+class CPU:
+    def __init__(self, layer_to_call, ID):
+        self._layer_to_call = layer_to_call
+
+        self._ID = ID
+        self.inputs = None
+        self.outputs = None
+
+    def execute(self):
+        outs = self._layer_to_call(*self.inputs)
+
+        if isinstance(outs, (list, tuple)):
+            for persistent_output, output in zip(self.outputs, outs):
+                persistent_output.copy_(output)
+        else:
+            self.outputs[0].copy_(outs)
+
+    def createPersistentData(self, input, outputs):
+        self.inputs = input
+        self.outputs = [output.clone().contiguous() for output in outputs]
+
+    def registerPersistentData(self):
+        poptorch_core.registerBuffersWithCallback(self._ID, self.inputs,
+                                                  self.outputs)
+
+    def __call__(self, *input, **kwargs):
+        # Mark all subsquent ops as happening on the host.
+        torch.ops.poptorch.call_cpu_op([*input], self._ID)
+
+        # Keep the trace happy by actually calling the layer.
+        outputs = self._layer_to_call(*input)
+
+        # Did we originally just output a single tensor?
+        originally_single_tensor = False
+
+        # Slight fixup for single tensor outputs.
+        if not isinstance(outputs, (list, tuple)):
+            originally_single_tensor = True
+            outputs = [outputs]
+
+        # Move the outputs and inputs into a permanent buffer.
+        self.createPersistentData(input, outputs)
+
+        # End CPU host execution and show the JIT what the output looks like.
+        outputs = torch.ops.poptorch.end_cpu_op(outputs)
+
+        # Register this callback with poptorch so it knows what to call.
+        poptorch_core.registerCPUCallBack(self, self._ID)
+
+        # Just return one tensor if it was supposed to be just one.
+        if originally_single_tensor:
+            return outputs[0]
+
+        return outputs
 
 
 def identity_loss(x, reduction):

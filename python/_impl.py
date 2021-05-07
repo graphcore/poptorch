@@ -1327,6 +1327,7 @@ class PoplarExecutor:
             "(ConnectionType.Never): use model.compile(inputs) instead of"
             " model(inputs)")
         in_tensors = self._args_parser(args, kwargs)
+
         if self._executable is None:
             self._compile(in_tensors)
 

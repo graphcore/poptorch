@@ -493,9 +493,13 @@ class ClangTidy(ILinter):
         self.configs = []
         self.python_includes = ""
         self.includes = [
-            "${CONDA_PREFIX}/include", "${CONDA_PREFIX}/../poplar",
-            "${CONDA_PREFIX}/../popart", "popart_compiler/include",
-            "poptorch/include", "poptorch_logging/include"
+            "${CONDA_PREFIX}/include",
+            "${CONDA_PREFIX}/../poplar",
+            "${CONDA_PREFIX}/../popart",
+            "popart_compiler/include",
+            "poptorch/include",
+            "poptorch_logging/include",
+            "popart_compiler/source/include",
         ]
 
         self._assert_poplibs_available()

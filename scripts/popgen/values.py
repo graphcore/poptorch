@@ -272,3 +272,26 @@ class EmptyInitializer(NonTensorValue):
 
     def render(self):
         return "{}"
+
+
+class OriginalNode(Value):
+    def __init__(self):
+        Value.__init__(self, 'input', [])
+        self.name = "original_node"
+
+    def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
+        if self in values:
+            return val_id
+
+        self.emit_assign_return(values, self.name, root, tabs, f)
+        f.write("node;\n")
+        return val_id
+
+    def vn(self):
+        return self.name
+
+    def same(self, other):
+        return True
+
+    def render(self):
+        return self.name

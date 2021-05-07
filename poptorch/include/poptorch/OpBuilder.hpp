@@ -193,6 +193,11 @@ torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
                                        torch::jit::Value *value,
                                        const std::string &title);
 
+torch::jit::Node *createCallCpuOp(torch::jit::Graph *graph,
+                                  const std::vector<torch::jit::Value *> &value,
+                                  const std::string &id,
+                                  torch::jit::Node *node);
+
 torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            torch::jit::Value *value,
                                            float proportion);

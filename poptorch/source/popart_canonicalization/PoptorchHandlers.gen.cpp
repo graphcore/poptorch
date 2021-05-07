@@ -24,6 +24,17 @@ torch::jit::Node *beginipublockHandler(torch::jit::Graph *graph,
   return createBeginIpuBlock(graph, t0, t1, t2);
 }
 
+torch::jit::Node *callcpuopHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto t0 = handleTensorList(x->node());
+  auto s = node->input(1);
+  auto t1 = constantToString(s->node());
+  auto original_node = node;
+  // callCpuOp(TensorList(x), cstr(s), original_node)
+  return createCallCpuOp(graph, t0, t1, original_node);
+}
+
 torch::jit::Node *endforloopHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto output = node->input(0);
@@ -104,6 +115,7 @@ torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::begin_ipu_block, beginipublockHandler);
+  registerHandler(symbols::poptorch::call_cpu_op, callcpuopHandler);
   registerHandler(symbols::poptorch::end_for_loop, endforloopHandler);
   registerHandler(symbols::poptorch::identity_loss, identitylossHandler);
   registerHandler(symbols::poptorch::internal_cast, internalcastHandler);

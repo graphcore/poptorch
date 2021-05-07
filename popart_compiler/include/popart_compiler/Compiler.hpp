@@ -17,6 +17,25 @@ class ConstVoidData;
 
 namespace poptorch {
 
+/*
+  We use this callback structure to capture data from the poptorch python
+  frontend. We get the function to call as well as pointers to the output/input
+  storage waiting on CPU. From this we derive more data, see
+  CallbackInternalMetadata in CompilerImpl.hpp.
+*/
+struct CallbackMetadata {
+  // The thing we are calling back.
+  std::function<void()> the_callback;
+
+  // Due to tracing complexities we have to register the buffers as a seperate
+  // step after the model has been traced.
+  std::function<void()> buffer_registration_callback;
+
+  // Pointers to the buffers we created on host.
+  std::vector<void *> input_pointers;
+  std::vector<void *> output_pointers;
+};
+
 using TensorId = std::size_t;
 
 static constexpr TensorId NoneTensor = 0; // NOLINT
@@ -311,6 +330,14 @@ public:
   void startElseBlock();
 
   void startSubgraph();
+
+  poptorch::TensorId
+  addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
+                 const CallbackMetadata &callback,
+                 std::vector<poptorch::PopartType> input_types,
+                 std::vector<std::vector<std::size_t>> input_shapes,
+                 std::vector<poptorch::PopartType> output_types,
+                 std::vector<std::vector<std::size_t>> output_shapes);
 
   poptorch::TensorId endIf(const poptorch::TensorId &condition,
                            std::size_t num_outputs);
