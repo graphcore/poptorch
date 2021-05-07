@@ -47,6 +47,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/TensorOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/AddDetachOperations.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/AddSubgraphConnectionNodes.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/AliasProcessing.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/AutomaticCasting.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CanonicalizeLists.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CPUOffloadingCleanUp.cpp"

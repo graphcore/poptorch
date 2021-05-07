@@ -958,7 +958,7 @@ class PoplarExecutor:
                         if not parent():
                             return None
                         return parent()._host_weights_version
-                    if name in ("_parameters", "forward"):
+                    if name in ("_buffers", "_parameters", "forward"):
                         self.copyWeightsToHostIfNeeded()
                     return object.__getattribute__(self, name)
 
@@ -990,6 +990,26 @@ class PoplarExecutor:
 
             for p in self._user_model.parameters():
                 p.__class__ = PoptorchParameter
+
+            class PoptorchBuffer(torch.Tensor):
+                def __getattribute__(self, name):
+                    if parent():
+                        parent()._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
+
+                    return super().__getattribute__(name)
+
+                def __torch_function__(self, func, types, args=(),
+                                       kwargs=None):
+                    if kwargs is None:
+                        kwargs = {}
+                    return super().__torch_function__(func, types, args,
+                                                      kwargs)
+
+            for b in self._user_model.buffers():
+                if b.__class__ != torch.Tensor:
+                    raise RuntimeError("All buffers must be an instance of " +
+                                       "torch.Tensor")
+                b.__class__ = PoptorchBuffer
 
             # __getattr__ and __getattribute__ are attributes, not methods,
             # unfortunately we cannot just replace them in the model object: we

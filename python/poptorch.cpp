@@ -25,6 +25,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/AliasProcessing.hpp"
 #include "poptorch/AutomaticCasting.hpp"
 #include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/ImplicitCasting.hpp"
@@ -723,6 +724,10 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   torch::jit::LowerSimpleTuples(graph);
   torch::jit::PeepholeOptimize(graph);
+
+  logGraph("Graph before handling aliases:", *graph, has_converted_any_half,
+           input_tensors);
+  poptorch::resolveAliases(graph.get());
 
   logGraph("Graph before handling inplace ops:", *graph, has_converted_any_half,
            input_tensors);
