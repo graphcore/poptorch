@@ -18,6 +18,7 @@ import tempfile
 import time
 from typing import Dict, Any, List, Optional
 import inspect
+import json
 import torch
 import torch.multiprocessing as multiprocessing
 
@@ -906,6 +907,7 @@ class PoplarExecutor:
         self._args_parser = ArgsParser(model)
         # Inputs used to compile the executable
         self._executable_inputs = None
+        self._anchor_memory = {}
 
         self._training = training
         if optimizer:
@@ -1019,6 +1021,27 @@ class PoplarExecutor:
 
     def _debugGetPopartIR(self) -> str:
         return poptorch_core._getPopartIR(self._executable)  # pylint: disable=protected-access
+
+    def getTensorNames(self) -> List[str]:
+        """Returns a list of all tensor names within the computational
+        graph. Model must be compiled in advance.
+        """
+
+        assert self._executable is not None, "Model must be compiled " \
+            "before calling getTensorNames"
+
+        tensors = set()
+        ir = json.loads(self._debugGetPopartIR())
+        for op in ir.get('maingraph', {}):
+            for t in op['inputs'] + op['outputs']:
+                tensors.add(t['name'])
+
+        return list(tensors)
+
+    def getAnchoredTensor(self, short_name: str) -> torch.Tensor:
+        assert short_name in self._anchor_memory, \
+            "No tensor with name " + short_name + " found."
+        return self._anchor_memory[short_name]
 
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self) -> None:
@@ -1139,7 +1162,8 @@ class PoplarExecutor:
                     self._trace._c, self._trace.graph,
                     tuple(parameters.keys()), tuple(parameters.values()),
                     in_tensors_trace_view.asTuple(), self._options.toDict(),
-                    self._training, accessAttributes)
+                    self._training, accessAttributes,
+                    list(self._options.anchored_tensors.values()))
 
             self._is_attached = self.isAttachedToDevice()
 
@@ -1367,6 +1391,18 @@ class PoplarExecutor:
                 output = poptorch_core.execute(self._executable,
                                                in_tensors.asTuple(), {})
 
+        # Any anchored tensors will be returned at the end of the list
+        # Pop them out and populate the anchor memory
+        long_names = list(self._options.anchored_tensors.values())
+        for long_name in reversed(long_names):
+            tensor = output.pop()
+            keys = [
+                key for key, value in self._options.anchored_tensors.items()
+                if value == long_name
+            ]
+            for key in keys:
+                self._anchor_memory[key] = tensor
+
         if self._training:
             self._dirty_host_weights = True
 
@@ -1510,12 +1546,14 @@ class PoplarExecutor:
                     tuple(parameters.values()),
                     in_tensors_as_half.asTuple(), has_converted_any_half[0],
                     self._options.toDict(), self._training,
-                    self._dict_optimizer, accessAttributes, added_dummy_output)
+                    self._dict_optimizer, accessAttributes, added_dummy_output,
+                    list(self._options.anchored_tensors.values()))
         return (self._trace._c, tuple(parameters.keys()),
                 tuple(parameters.values()),
                 in_tensors_trace_view.asTuple(), has_converted_any_half[0],
                 self._options.toDict(), self._training, self._dict_optimizer,
-                accessAttributes, added_dummy_output)
+                accessAttributes, added_dummy_output,
+                list(self._options.anchored_tensors.values()))
 
     def isAttachedToDevice(self) -> bool:
         """Returns true, if the target device has been attached. False,

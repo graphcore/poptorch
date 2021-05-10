@@ -165,6 +165,12 @@ Compiler::addInputTensor(const char *type,
   return _impl->ids.size() - 1;
 }
 
+poptorch::TensorId Compiler::createTensorId(const char *name) {
+  popart::TensorId tensor(name);
+  _impl->ids.push_back(tensor);
+  return _impl->ids.size() - 1;
+}
+
 #define INT_VEC std::vector<std::int64_t>
 #define FLOAT_VEC std::vector<float>
 #define FLOAT float

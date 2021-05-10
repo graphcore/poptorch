@@ -428,7 +428,7 @@ SessionOptions parseSessionOptions(const py::dict &opt) {
     auto option_name = element.first.cast<std::string>();
     logging::LogContext ctx("parseSessionOptions option: " + option_name);
     // Exception patterns_level is handled at the same time as "patterns"
-    if (option_name == "patterns_level") {
+    if (option_name == "patterns_level" || option_name == "anchored_tensors") {
       continue;
     }
     if (option_name == "compilation_progress_bar_fn") {
@@ -664,7 +664,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
     bool has_converted_any_half, const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output) {
+    const bool added_dummy_output, const py::list &anchors) {
   auto module = asModule(h);
 
   auto forward = module->get_method("forward");
@@ -718,7 +718,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   logGraph("Graph before handling inplace ops:", *graph, has_converted_any_half,
            input_tensors);
   auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
-      graph, traced_parameter_tensors.size());
+      graph, traced_parameter_tensors.size(), anchors.size());
 
   logGraph("Graph right before evaluating constant expressions:", *graph,
            has_converted_any_half, input_tensors);
@@ -795,7 +795,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::LowerToPopart lower(
       graph.get(), std::move(traced_parameter_tensors), std::move(parameters),
       inplace_op_handler, training, std::move(optimizers),
-      parseSessionOptions(options), attribute_accessor, callbacks);
+      parseSessionOptions(options), attribute_accessor, callbacks,
+      anchors.cast<std::vector<std::string>>());
   lower.lower(&input_tensors);
 
   // Clear the callbacks after compilation.
@@ -971,12 +972,13 @@ void compileWithTraceAndExport(
 
     bool has_converted_any_half, const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output, const std::string &export_filename) {
+    const bool added_dummy_output, const py::list &anchors,
+    const std::string &export_filename) {
   try {
-    auto lower = lowerToPopartFromTrace(h, parameter_names, parameter_tensors,
-                                        inputs, has_converted_any_half, options,
-                                        training, optimizer_dict,
-                                        attribute_accessor, added_dummy_output);
+    auto lower = lowerToPopartFromTrace(
+        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
+        options, training, optimizer_dict, attribute_accessor,
+        added_dummy_output, anchors);
     return lower.compileAndExport(export_filename);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -987,13 +989,13 @@ std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
     bool has_converted_any_half, const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output, const std::string &import_filename,
-    std::int64_t offset) {
+    const bool added_dummy_output, const py::list &anchors,
+    const std::string &import_filename, std::int64_t offset) {
   try {
-    auto lower = lowerToPopartFromTrace(h, parameter_names, parameter_tensors,
-                                        inputs, has_converted_any_half, options,
-                                        training, optimizer_dict,
-                                        attribute_accessor, added_dummy_output);
+    auto lower = lowerToPopartFromTrace(
+        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
+        options, training, optimizer_dict, attribute_accessor,
+        added_dummy_output, anchors);
     return lower.loadExecutableFromFile(import_filename, offset);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -1004,23 +1006,22 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
     const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
     bool has_converted_any_half, const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output) {
+    const bool added_dummy_output, const py::list &anchors) {
   try {
-    auto lower = lowerToPopartFromTrace(h, parameter_names, parameter_tensors,
-                                        inputs, has_converted_any_half, options,
-                                        training, optimizer_dict,
-                                        attribute_accessor, added_dummy_output);
+    auto lower = lowerToPopartFromTrace(
+        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
+        options, training, optimizer_dict, attribute_accessor,
+        added_dummy_output, anchors);
     return lower.compile();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-std::shared_ptr<poptorch::PoplarExecutable>
-compileWithScript(py::handle h, py::handle g,
-                  const pybind11::tuple &parameter_names,
-                  const pybind11::tuple &parameter_tensors,
-                  const pybind11::tuple &inputs, const pybind11::dict &options,
-                  bool training, const py::function &attribute_accessor) {
+std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
+    py::handle h, py::handle g, const pybind11::tuple &parameter_names,
+    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
+    const pybind11::dict &options, bool training,
+    const py::function &attribute_accessor, const pybind11::list &anchors) {
   try {
     auto module = asModule(h);
     auto arg_graph = asGraph(g);
@@ -1062,8 +1063,8 @@ compileWithScript(py::handle h, py::handle g,
 
     logging::trace("Graph before handling inplace ops:\n{}", *graph);
 
-    auto inplace_op_handler =
-        std::make_shared<InplaceOpHandler>(graph, parameter_data.size());
+    auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
+        graph, parameter_data.size(), anchors.size());
 
     logging::trace("Graph right before casting unsupported inputs:\n{}",
                    *graph);
@@ -1107,7 +1108,8 @@ compileWithScript(py::handle h, py::handle g,
     poptorch::LowerToPopart lower(graph.get(), std::move(parameter_data),
                                   std::move(parameters), inplace_op_handler,
                                   training, {}, parseSessionOptions(options),
-                                  attribute_accessor, callbacks);
+                                  attribute_accessor, callbacks,
+                                  anchors.cast<std::vector<std::string>>());
     lower.lower(&input_tensors);
     auto o = lower.compile();
     // Clear the callbacks after compilation.

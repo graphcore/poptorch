@@ -1110,6 +1110,7 @@ class Options(_options_impl.OptionsDict):
                          device_iterations=1,
                          log_dir=".",
                          auto_round_num_ipus=False,
+                         anchored_tensors={},
                          anchor_mode=enums.AnchorMode.Default.value,
                          anchor_return_period=1,
                          use_model=False,
@@ -1402,6 +1403,14 @@ class Options(_options_impl.OptionsDict):
         self.connectionType(enums.ConnectionType.Never)
         self.createOrSet(ipu_version=ipu_version)
         return self
+
+    def anchorTensor(self, short_name: str, long_name: str):
+        """Anchor a tensor such that it may be retrieved after a model run.
+
+        :param short_name: user defined name to be used for retrieval
+        :param long_name: the PopArt name of the tensor to be anchored
+        """
+        self.anchored_tensors[short_name] = long_name
 
     def anchorMode(self,
                    anchor_mode: "poptorch.AnchorMode",

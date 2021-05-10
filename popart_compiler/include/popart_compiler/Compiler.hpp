@@ -198,6 +198,8 @@ public:
   poptorch::TensorId addInputTensor(const char *type,
                                     const std::vector<std::int64_t> &dims);
 
+  poptorch::TensorId createTensorId(const char *name);
+
 #define INT_VEC std::vector<std::int64_t>
 #define FLOAT_VEC std::vector<float>
 #define FLOAT float

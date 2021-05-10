@@ -42,8 +42,8 @@ public:
                 const std::shared_ptr<InplaceOpHandler> &inplace_op_handler,
                 bool training, std::vector<Optimizer> &&opt,
                 const SessionOptions &options,
-                const py::function &attribute_accessor,
-                CPUCallbackMap callback);
+                const py::function &attribute_accessor, CPUCallbackMap callback,
+                std::vector<std::string> &&anchors);
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();
 

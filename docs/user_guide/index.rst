@@ -11,6 +11,7 @@ PyTorch for the IPU: User Guide
     overview
     batching
     supported_ops
+    debugging
     example
     experimental
     reference

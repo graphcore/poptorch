@@ -245,7 +245,8 @@ public:
                     bool training, std::vector<Optimizer> &&opt,
                     const SessionOptions &options,
                     const py::function &attribute_accessor,
-                    CPUCallbackMap &&callback);
+                    CPUCallbackMap &&callback,
+                    std::vector<std::string> &&anchors);
 
   void lower(std::vector<at::Tensor> *in_tensors);
 
@@ -272,6 +273,9 @@ private:
 
   // Optimizer from the user.
   const std::vector<Optimizer> _optimizers;
+
+  // Tensors to be anchored other than outputs
+  const std::vector<std::string> _anchors;
 
   using FunctionType = std::function<poptorch::TensorId(
       const std::vector<poptorch::TensorId> &inputs, torch::jit::Node *)>;
@@ -442,6 +446,18 @@ void LowerToPopartImpl::lowerReturn() {
     }
   }
   logging::debug("  )");
+
+  if (!_anchors.empty()) {
+    std::ostringstream ss;
+    for (const auto &str : _anchors) {
+      ss << " " << str << " ";
+      auto id = _compiler.createTensorId(str.c_str());
+      _compiler.addOutputType({OutputType::Type::Tensor});
+      _compiler.addOutputTensor(id);
+      _output_tensor_hooks.push_back(id);
+    }
+    logging::debug("    anchor ( {} )", ss.str());
+  }
 }
 
 std::string LowerToPopartImpl::tensorNames(std::int64_t first_tensor,
@@ -1131,11 +1147,13 @@ LowerToPopartImpl::LowerToPopartImpl(
     std::vector<std::string> parameter_names,
     std::shared_ptr<InplaceOpHandler> inplace_op_handler, bool training,
     std::vector<Optimizer> &&opt, const SessionOptions &options,
-    const py::function &attribute_accessor, CPUCallbackMap &&callback)
+    const py::function &attribute_accessor, CPUCallbackMap &&callback,
+    std::vector<std::string> &&anchors)
     : _graph(*g), _lowered(false), _parameters(std::move(params)),
       _parameter_names(std::move(parameter_names)),
       _inplace_op_handler(std::move(inplace_op_handler)), _optimizers(opt),
-      _compiler({training, options}), _callbacks(callback) {
+      _anchors(std::move(anchors)), _compiler({training, options}),
+      _callbacks(callback) {
   // Init the function implementation map. This map will be populated by
   // elements which look something like:
   /* {"popart::Foo", [&](const std::vector<poptorch::TensorId> &inputs,
@@ -1223,12 +1241,13 @@ LowerToPopart::LowerToPopart(
     std::vector<std::string> parameter_names,
     const std::shared_ptr<InplaceOpHandler> &inplace_op_handler, bool training,
     std::vector<Optimizer> &&opt, const SessionOptions &options,
-    const py::function &attribute_accessor, CPUCallbackMap callbacks) {
+    const py::function &attribute_accessor, CPUCallbackMap callbacks,
+    std::vector<std::string> &&anchors) {
   std::srand(std::time(nullptr));
   _impl = std::make_unique<detail::LowerToPopartImpl>(
       graph, std::move(parameters), std::move(parameter_names),
       inplace_op_handler, training, std::move(opt), std::move(options),
-      attribute_accessor, std::move(callbacks));
+      attribute_accessor, std::move(callbacks), std::move(anchors));
 }
 
 void LowerToPopart::lower(std::vector<at::Tensor> *in_tensors) {

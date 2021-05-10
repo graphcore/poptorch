@@ -159,7 +159,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
     (*inTensors)[i].copy_(out_tensor, false);
   }
 
-  returnees.resize(_inplace_op_handler->getNumTensorOuputs());
+  returnees.resize(_inplace_op_handler->getNumTensorOutputs());
 
   return returnees;
 }

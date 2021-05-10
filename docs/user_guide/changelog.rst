@@ -26,6 +26,7 @@ New features
 - Add automatic loss scaling option which can be enabled via ``poptorch.Options.Training.setAutomaticLossScaling``.
 - Add ``poptorch.BlockFunction`` decorating for assigning an existing function
   to a block.
+- Add mechanism for inspecting arbitrary tensors
 
 API changes
 -----------

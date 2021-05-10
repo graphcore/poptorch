@@ -17,8 +17,9 @@
 namespace poptorch {
 
 InplaceOpHandler::InplaceOpHandler(
-    const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters)
-    : _graph(graph.get()) {
+    const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters,
+    size_t num_anchors)
+    : _graph(graph.get()), _num_anchors(num_anchors) {
   _collapsed_inputs = collapsedGraphInputHierachy(graph.get());
   std::size_t num_tensor_inputs = _collapsed_inputs.size() - num_parameters;
 

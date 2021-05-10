@@ -26,7 +26,7 @@ namespace poptorch {
 class InplaceOpHandler {
 public:
   InplaceOpHandler(const std::shared_ptr<torch::jit::Graph> &graph,
-                   size_t num_parameters);
+                   size_t num_parameters, size_t num_anchors = 0);
 
   // Returns the mapping between each input tensor and the output tensor used
   // to update the input. If the input tensor is not changed in place, it will
@@ -37,12 +37,16 @@ public:
 
   // Return the number of outputs from the graph which are not used to emulate
   // inplace ops. (An output may be a list or tuple as well as a tensor).
-  size_t getNumNormalOutputs() const { return _num_normal_outputs; }
+  size_t getNumNormalOutputs() const {
+    return _num_normal_outputs + _num_anchors;
+  }
 
   // Return the number of tensors output from the graph which are not used to
   // emulate inplace ops. (This differs from the previous if the graph returns
   // one or more tuples/lists.)
-  size_t getNumTensorOuputs() const { return _num_normal_tensor_outputs; }
+  size_t getNumTensorOutputs() const {
+    return _num_normal_tensor_outputs + _num_anchors;
+  }
 
   static constexpr size_t no_mapping = std::numeric_limits<size_t>::max();
 
@@ -65,6 +69,10 @@ private:
   // first "num_normal_outputs" in the graph. The rest are used to update inputs
   // which, in the PyTorch model, should be modified in place.
   size_t _num_normal_outputs;
+
+  // The number of tensors which are not model outputs but which should be
+  // returned to the user. Not affected by inplacing rules.
+  size_t _num_anchors;
 
   // Number of tensors: this will differ from the previous in the case of
   // (possibly nested) tuples to include the number of tensors retuurned,
