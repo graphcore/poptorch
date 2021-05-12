@@ -289,7 +289,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_STRING_OPTION(cachePath);
   ADD_POPART_STRING_OPTION(partialsTypeMatMuls);
   ADD_POPART_STRING_OPTION(customCodeletCompileFlags);
-  ADD_POPART_STRING_OPTION(serializedPoprithmsAnnealGraphsDir);
+  ADD_POPART_STRING_OPTION(serializedPoprithmsShiftGraphsDir);
   ADD_POPART_STRING_OPTION(kahnTieBreaker);
 
   ADD_POPART_UINT64_OPTION(executionPhaseSettings.phases);
