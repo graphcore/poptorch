@@ -254,20 +254,29 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
   return _impl->ids.size() - 1;
 }
 
-void Compiler::addOutputTensor(poptorch::TensorId output) {
+void Compiler::addOutputTensor(poptorch::TensorId output,
+                               PopartAnchorTypes anchor_mode,
+                               size_t anchor_return_period) {
   _impl->outputs.push_back(_impl->ids[output]);
 
   if (isHostSideConstant(output)) {
     return; // Nothing more to do
   }
 
-  const char *as_str = anchorTypeToString(_impl->options.anchor_mode);
+  if (anchor_mode == PopartAnchorTypes::N) {
+    anchor_mode = _impl->options.anchor_mode;
+    if (anchor_mode == PopartAnchorTypes::EveryN) {
+      anchor_return_period = _impl->options.anchor_return_period;
+    }
+  }
+
+  const char *as_str = anchorTypeToString(anchor_mode);
 
   // If we are returning EveryN we need to pass in the return period.
-  if (_impl->options.anchor_mode == PopartAnchorTypes::EveryN) {
+  if (anchor_mode == PopartAnchorTypes::EveryN) {
     _impl->anchors.insert(
-        {_impl->ids[output], popart::AnchorReturnType(
-                                 as_str, _impl->options.anchor_return_period)});
+        {_impl->ids[output],
+         popart::AnchorReturnType(as_str, anchor_return_period)});
   } else {
     _impl->anchors.insert(
         {_impl->ids[output], popart::AnchorReturnType(as_str)});

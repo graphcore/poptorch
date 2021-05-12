@@ -1404,13 +1404,28 @@ class Options(_options_impl.OptionsDict):
         self.createOrSet(ipu_version=ipu_version)
         return self
 
-    def anchorTensor(self, short_name: str, long_name: str):
+    def anchorTensor(self,
+                     short_name: str,
+                     long_name: str,
+                     anchor_mode: Optional["poptorch.AnchorMode"] = None,
+                     anchor_return_period: Optional[int] = 1):
         """Anchor a tensor such that it may be retrieved after a model run.
 
-        :param short_name: user defined name to be used for retrieval
-        :param long_name: the PopArt name of the tensor to be anchored
+        :param str short_name: user defined name to be used for retrieval
+        :param str long_name: the PopArt name of the tensor to be anchored
+        :param poptorch.AnchorMode anchor_mode: specifie when data should
+          be returned. Default to None, in which case the tensor will use
+          the same anchor mode used for model outputs.
+        :param int anchor_return_period: return period if anchor type is
+          ``EveryN``. Defaults to 1.
         """
-        self.anchored_tensors[short_name] = long_name
+
+        if anchor_mode != enums.AnchorMode.EveryN:
+            anchor_return_period = 1
+
+        value = [long_name, anchor_mode is None]
+        value += [anchor_mode, anchor_return_period]
+        self.anchored_tensors[short_name] = value
 
     def anchorMode(self,
                    anchor_mode: "poptorch.AnchorMode",

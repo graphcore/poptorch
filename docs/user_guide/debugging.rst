@@ -29,9 +29,10 @@ Anchoring enables a tensor to be observed by the application without it having t
 be a model output.
 
 You can create an anchor by calling :py:func:`~poptorch.Options.anchorTensor`.
-It takes two string parameters: a convenient user-defined name for the anchor
-and the name of the chosen tensor. In order for anchors to take effect, they
-must be set before model compilation.
+It takes two mandatory string parameters: a convenient user-defined name for
+the anchor and the name of the chosen tensor. Optionally, you may spacify the
+anchor mode as well as the anchor return period. In order for this option setting
+to take effect, they must be set before model compilation.
 
 In the example below, two anchors are created: one for a bias gradient tensor
 and one for the updated weights of a linear layer.

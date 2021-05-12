@@ -420,6 +420,15 @@ std::string castToString(py::handle obj) {
   ERROR("Don't know how to convert type " << obj.get_type() << " to string");
 }
 
+void parseAnchors(AnchorList *map, const py::list &list) {
+  for (auto elem : list) {
+    auto anchor = elem.cast<py::list>();
+    Anchor a(anchor[0].cast<std::string>(), anchor[2].cast<std::uint64_t>(),
+             anchor[3].cast<std::uint64_t>());
+    map->push_back(a);
+  }
+}
+
 SessionOptions parseSessionOptions(const py::dict &opt) {
   // steps, replicationFactor, profile
   SessionOptions options;
@@ -792,11 +801,14 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   // possible moment due to tracing.
   initCallbackBuffers();
 
+  AnchorList anchors_list;
+  parseAnchors(&anchors_list, anchors);
+
   poptorch::LowerToPopart lower(
       graph.get(), std::move(traced_parameter_tensors), std::move(parameters),
       inplace_op_handler, training, std::move(optimizers),
       parseSessionOptions(options), attribute_accessor, callbacks,
-      anchors.cast<std::vector<std::string>>());
+      std::move(anchors_list));
   lower.lower(&input_tensors);
 
   // Clear the callbacks after compilation.
@@ -1105,11 +1117,13 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
 
     logging::debug("Graph right before popart:\n{}", *graph);
 
-    poptorch::LowerToPopart lower(graph.get(), std::move(parameter_data),
-                                  std::move(parameters), inplace_op_handler,
-                                  training, {}, parseSessionOptions(options),
-                                  attribute_accessor, callbacks,
-                                  anchors.cast<std::vector<std::string>>());
+    AnchorList anchors_list;
+    parseAnchors(&anchors_list, anchors);
+
+    poptorch::LowerToPopart lower(
+        graph.get(), std::move(parameter_data), std::move(parameters),
+        inplace_op_handler, training, {}, parseSessionOptions(options),
+        attribute_accessor, callbacks, std::move(anchors_list));
     lower.lower(&input_tensors);
     auto o = lower.compile();
     // Clear the callbacks after compilation.

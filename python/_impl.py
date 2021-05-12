@@ -909,6 +909,14 @@ class PoplarExecutor:
         self._executable_inputs = None
         self._anchor_memory = {}
 
+        # any anchors with unspecified anchor mode should receive the anchor
+        # mode used for graph outputs
+        for _, anchor in options.anchored_tensors.items():
+            if anchor[1]:
+                anchor[2] = options.anchor_mode
+                if anchor[2] == enums.AnchorMode.EveryN:
+                    anchor[3] = options.anchor_return_period
+
         self._training = training
         if optimizer:
             self._dict_optimizer = _convertOptimizerToDict(

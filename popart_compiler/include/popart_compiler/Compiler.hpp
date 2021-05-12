@@ -266,7 +266,9 @@ public:
   // "EVERYN": Will return every N batch
   // "FINAL": Will return the last batch only
   // clang-format on
-  void addOutputTensor(poptorch::TensorId output);
+  void addOutputTensor(poptorch::TensorId output,
+                       PopartAnchorTypes anchor_mode = PopartAnchorTypes::N,
+                       size_t anchor_return_period = 1);
 
   void setUpInputOp(poptorch::TensorId id, float *ptr,
                     const std::vector<std::int64_t> &dims);

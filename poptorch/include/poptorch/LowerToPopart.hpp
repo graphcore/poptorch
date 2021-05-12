@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/PopartEnums.hpp"
 #include "poptorch/PoplarExecutable.hpp"
 
@@ -29,6 +30,17 @@ class LowerToPopartImpl;
 // op for CPU ops. The string is the ID given by the user to each op.
 using CPUCallbackMap = std::unordered_map<std::string, CallbackMetadata>;
 
+struct Anchor {
+  Anchor(std::string n, std::uint8_t m, size_t p)
+      : name(std::move(n)), mode(m), period(p) {}
+
+  std::string name;
+  std::uint8_t mode;
+  size_t period;
+};
+
+using AnchorList = std::vector<Anchor>;
+
 /*
  * Take the transformed graph and create a poponnx graph from it.
  */
@@ -43,7 +55,7 @@ public:
                 bool training, std::vector<Optimizer> &&opt,
                 const SessionOptions &options,
                 const py::function &attribute_accessor, CPUCallbackMap callback,
-                std::vector<std::string> &&anchors);
+                AnchorList &&anchors);
   LowerToPopart(LowerToPopart &&lower);
   ~LowerToPopart();
 

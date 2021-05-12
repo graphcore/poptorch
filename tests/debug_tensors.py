@@ -4,6 +4,7 @@
 import pytest
 import torch
 import poptorch
+import helpers
 
 
 class Model(torch.nn.Module):
@@ -66,3 +67,28 @@ def test_tensor_values():
 
     assert not torch.equal(grad1, grad2)
     assert not torch.equal(update1, update2)
+
+
+anchor_modes = [[poptorch.AnchorMode.All, 3, "ALL/1"],
+                [poptorch.AnchorMode.EveryN, 4, "EVERYN/4"],
+                [poptorch.AnchorMode.Final, 1, "FINAL/1"],
+                [poptorch.AnchorMode.Sum, 1, "Sum/1"]]
+
+
+@pytest.mark.parametrize("mode", anchor_modes)
+@helpers.printCapfdOnExit
+def test_tensor_modes(capfd, mode):
+    model = Model()
+    tensor_name = 'Gradient___model.fc2.bias'
+
+    poptorch.setLogLevel("DEBUG")
+    opts = poptorch.Options()
+    opts.anchorTensor('grad_bias', tensor_name, mode[0], mode[1])
+    poptorch_model = poptorch.trainingModel(model, opts)
+
+    input = torch.rand(10, 10)
+    label = torch.rand(10, 10)
+    poptorch_model(input, label)
+
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_contains(tensor_name + ' ' + mode[2])
