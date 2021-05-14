@@ -684,11 +684,8 @@ void Compiler::compileAndPrepareDevice() {
     // when loading from execution cache)
     logging::trace("Popart serialised IR:\n{}", _impl->getPopartIR());
   } catch (popart::memory_allocation_err &e) {
-    std::ofstream stream;
-    stream.open("OOMReport.json");
-    stream << e.getGraphReport(true);
-    stream.close();
-
+    logging::err("Out of memory, the graph profile is available here: {}",
+                 e.getProfilePath());
     std::rethrow_exception(std::current_exception());
   }
 }
