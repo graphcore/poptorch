@@ -81,6 +81,7 @@ public:
 
   CompilerImpl() : op_builder(popart::Builder::create()), loss("") {
     ids.emplace_back(""); // None tensor
+    ids_types.push_back(PopartType::UNDEFINED);
     active_builder = op_builder.get();
   }
   ~CompilerImpl();
@@ -98,6 +99,7 @@ public:
   std::map<popart::TensorId, popart::AnchorReturnType> anchors;
 
   std::vector<popart::TensorId> ids;
+  std::vector<PopartType> ids_types;
 
   // Input tensors to the session.
   std::map<popart::TensorId, popart::IArray &> popart_incoming;
@@ -274,6 +276,19 @@ public:
                     const std::vector<Optimizer> &optimizers);
   std::string getPopartIR() const;
 
+  // Returns the PopART type for specified id
+  PopartType getPopartType(poptorch::TensorId id) const;
+
+  // Caches all PopART types
+  void cachePopartTypes();
+
+  // Returns cached PopART type for the specified id
+  // Caution: no bounds checking as this is called for each input, each run.
+  // cachePopartType must be called once first.
+  PopartType getCachedPopartType(poptorch::TensorId id) const {
+    return ids_types[id];
+  }
+
 private:
   // Constants which are simply returned (possibly as part of a tuple/list) and
   // do not need to be input into Popart
@@ -283,8 +298,8 @@ private:
 
 } // namespace detail
 
-popart::DataType popartTypeFromPoptorch(poptorch::PopartType);
+popart::DataType popartTypeFromPoptorch(PopartType);
 
-poplar::Type poplarTypeFromPoptorch(poptorch::PopartType);
+poplar::Type poplarTypeFromPoptorch(PopartType);
 
 } // namespace poptorch

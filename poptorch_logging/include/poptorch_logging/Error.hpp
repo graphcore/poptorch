@@ -34,7 +34,7 @@ const char *shortPoptorchFilename(const char *filename);
 
 #define ERROR_ON_MSG(condition, msg)                                           \
   do {                                                                         \
-    if (condition) {                                                           \
+    if (__builtin_expect(static_cast<bool>(condition), 0)) {                   \
       ERROR(msg);                                                              \
     }                                                                          \
   } while (0)

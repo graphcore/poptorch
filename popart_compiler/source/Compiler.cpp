@@ -385,6 +385,8 @@ void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
 }
 
 void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
+  logging::trace("Initializing session");
+
   // Some simple PyTorch models will not need an IPU at all. However, we do not
   // want users to experience error messages as these may be trivial models
   // which users try in their first use of PopTorch.
@@ -575,6 +577,7 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
   // to make sure it happens at the same time in distributed environments.
   constexpr bool load_engine = false;
   _impl->session->prepareDevice(load_engine);
+  _impl->cachePopartTypes();
 }
 
 void Compiler::loadEngineAndConnectStreams() {
@@ -665,6 +668,10 @@ void Compiler::loadEngineAndConnectStreams() {
 void Compiler::compileAndPrepareDevice() {
   if (!_impl->session) {
     logging::trace("Skipping Poplar compilation");
+
+    // This includes host side tensors, so has to be run even without a session.
+    _impl->cachePopartTypes();
+
     return;
   }
 
@@ -688,6 +695,8 @@ void Compiler::compileAndPrepareDevice() {
                  e.getProfilePath());
     std::rethrow_exception(std::current_exception());
   }
+
+  _impl->cachePopartTypes();
 }
 
 std::unique_ptr<char[]> Compiler::getExecutionInfo() const {
@@ -803,25 +812,7 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
 }
 
 poptorch::PopartType Compiler::getPopartType(poptorch::TensorId id) const {
-  if (isHostSideConstant(id)) {
-    return _impl->getHostSideConstant(id).popartType();
-  }
-
-  if (!_impl->session->hasInfo(_impl->ids[id])) {
-    return PopartType::UNDEFINED;
-  }
-
-  popart::TensorInfo info = _impl->session->getInfo(_impl->ids[id]);
-
-#define DEFINE_CASE(value)                                                     \
-  case popart::DataType::value: {                                              \
-    return PopartType::value;                                                  \
-  }
-
-  switch (info.dataType()) { FOR_ALL_POPART_TYPES(DEFINE_CASE) }
-#undef DEFINE_CASE
-
-  ERROR("Unsupported popart type in return: " << info.data_type());
+  return _impl->getPopartType(id);
 }
 
 const char *Compiler::tensorName(poptorch::TensorId id) const {
@@ -1087,16 +1078,17 @@ poptorch::TensorId Compiler::addUntypedInputTensor() {
 
 void Compiler::assertTensorIs(PopartType dataType,
                               poptorch::TensorId id) const {
-  PopartType actual_type;
-  actual_type = getPopartType(id);
+  PopartType actual_type = _impl->ids_types.at(id);
 
-  if (actual_type == PopartType::UNDEFINED) {
+  if (__builtin_expect(actual_type == PopartType::UNDEFINED, 0)) {
     // Rare case of input tensor never used, so not in IR
     return;
   }
 
   ERROR_ON_MSG(actual_type != dataType,
-               "Incorrect type for tensor, " << id << " used in setUpInputOp");
+               "One or more input data types have changed since the first model"
+               " run. You will need to call \"destroy\" on the model before "
+               "running with different input data types.");
 }
 
 void Compiler::addMultiConvPart(const std::vector<poptorch::TensorId> &inputs,

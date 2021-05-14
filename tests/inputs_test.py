@@ -31,6 +31,34 @@ def test_simple_tuple(use_half):
     assert inference_model((t1, t2)).float() == 3.0
 
 
+def test_type_change():
+    class SimpleAdder(nn.Module):
+        def forward(self, t):
+            assert isinstance(t, tuple)
+            (x, y) = t
+            assert isinstance(x, torch.Tensor)
+            assert isinstance(y, torch.Tensor)
+            return x + y
+
+    model = SimpleAdder()
+    inference_model = poptorch.inferenceModel(model)
+
+    t1 = torch.tensor([1.])
+    t2 = torch.tensor([2.])
+    assert inference_model((t1, t2)).float() == 3.0
+
+    t1 = torch.tensor([1])
+    t2 = torch.tensor([2])
+    error_msg = ("One or more input data types have changed since the first " +
+                 "model run. You will need to call \"destroy\" on the model " +
+                 "before running with different input data types.")
+    with pytest.raises(RuntimeError, match=error_msg):
+        assert inference_model((t1, t2)).float() == 3
+
+    inference_model.destroy()
+    assert inference_model((t1, t2)).float() == 3
+
+
 @pytest.mark.parametrize("use_half", [True, False])
 def test_nested_tuples(use_half):
     class SimpleAdder(nn.Module):

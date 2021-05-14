@@ -781,5 +781,34 @@ std::string CompilerImpl::getPopartIR() const {
   }
   return session->serializeIr(popart::IrSerializationFormat::JSON);
 }
+
+PopartType CompilerImpl::getPopartType(poptorch::TensorId id) const {
+  if (isHostSideConstant(id)) {
+    return getHostSideConstant(id).popartType();
+  }
+
+  ERROR_ON(!session);
+  if (!session->hasInfo(ids[id])) {
+    return PopartType::UNDEFINED;
+  }
+
+  popart::TensorInfo info = session->getInfo(ids[id]);
+
+#define DEFINE_CASE(value)                                                     \
+  case popart::DataType::value: {                                              \
+    return PopartType::value;                                                  \
+  }
+
+  switch (info.dataType()) { FOR_ALL_POPART_TYPES(DEFINE_CASE) }
+#undef DEFINE_CASE
+
+  ERROR("Unsupported popart type in return: " << info.data_type());
+}
+
+void CompilerImpl::cachePopartTypes() {
+  for (size_t idx = 1; idx < ids.size(); idx++) {
+    ids_types.push_back(getPopartType(idx));
+  }
+}
 } // namespace detail
 } // namespace poptorch
