@@ -273,11 +273,10 @@ torch::jit::Node *bceWithLogitsHandler(torch::jit::Graph *graph,
 
   // -x
   torch::jit::Node *loss = createNeg(graph, {x});
-  // 0
-  torch::jit::Node *zeros = createConstantFloatLike(graph, x, {0}, {});
 
-  // m = min(-x, 0)
-  torch::jit::Node *m = createMin(graph, {loss->output(), zeros->output()});
+  // m = clip(-x, min=0)
+  torch::jit::Node *m =
+      createClip(graph, {loss->output()}, std::numeric_limits<float>::max(), 0);
 
   // -x - m
   loss = createSub(graph, {loss->output(), m->output()});
