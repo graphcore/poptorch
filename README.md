@@ -1,15 +1,16 @@
 # PopTorch. PyTorch integration for the GraphCore IPU
 
 PopTorch is a set of extensions for PyTorch enabling models
-to be trained, evaluated and used on the GraphCore IPU.
+to be trained, evaluated and used on the Graphcore IPU.
 
-More information can be found in the [PopTorch User Guide](https://docs.graphcore.ai/projects/poptorch-user-guide/en/latest/)
+More information can be found in the [PopTorch User Guide](https://docs.graphcore.ai/projects/poptorch-user-guide/).
 
 ## Prerequisites
 
 These instructions assume you are building PopTorch on Ubuntu 18.04.
 
 To install and run PopTorch you will need:
+
 - python3
 - pip3 >= 18.1
 - The Poplar SDK
@@ -19,6 +20,7 @@ sudo apt install -y python3 python3-pip
 ```
 
 To build PopTorch from sources you will need all of the above and:
+
 - git
 - curl
 - g++
@@ -32,6 +34,7 @@ To build the documentation you will also need LaTeX:
 ```sh
 sudo apt install -y texlive-full
 ```
+
 ## Install the Poplar SDK
 
 The Poplar SDK can be downloaded from: https://downloads.graphcore.ai/.
@@ -47,11 +50,13 @@ PopTorch must be built against a compatible version of the SDK. For example, the
 ## Installation
 
 Make sure `pip3` is up to date (You need `pip3 >= 18.1`):
+
 ```sh
 pip3 install -U pip --user
 ```
 
 Install the wheel (Torch will automatically be installed in the process):
+
 ```sh
 pip3 install ${SDK_PATH}/poptorch-*.whl
 ```
@@ -59,7 +64,7 @@ pip3 install ${SDK_PATH}/poptorch-*.whl
 ## Usage
 
 The PopTorch wheel doesn't include the PopART and Poplar binaries, so you need to make sure they are in your path before loading PopTorch.
-This is done by calling their respective `enable.sh` scripts:
+This is done by sourcing their respective `enable.sh` scripts:
 
 ```sh
 . ${SDK_PATH}/poplar-ubuntu_18_04*/enable.sh
@@ -67,11 +72,12 @@ This is done by calling their respective `enable.sh` scripts:
 ```
 
 You can check everything is in order by running:
+
 ```sh
 python3 -c "import poptorch;print(poptorch.__version__)"
 ```
 
-More information can be found in the [PopTorch User Guide](https://docs.graphcore.ai/projects/poptorch-user-guide/en/latest/)
+More information can be found in the [PopTorch User Guide](https://docs.graphcore.ai/projects/poptorch-user-guide/)
 
 ## Build instructions
 
@@ -108,7 +114,7 @@ cd build
 cmake ../poptorch -DSDK_DIR=${SDK_PATH} -GNinja
 ```
 
-By default PopTorch will be built in release mode, to build in debug mode add `-DCMAKE_BUILD_TYPE=Debug`.
+By default, PopTorch will be built in release mode. To build in debug mode add `-DCMAKE_BUILD_TYPE=Debug`.
 
 To build the documentation, add `-DBUILD_DOCS=ON`. The HTML and PDF documentation will be generated in `docs/`.
 
@@ -119,7 +125,7 @@ ninja install
 ```
 
 If you're only going to use PopTorch for development purposes then you can stop here.
-Enable the PopTorch build folder and you can start using PopTorch:
+Source the enable script in the PopTorch build folder and you can start using PopTorch:
 
 ```sh
 . enable.sh
@@ -136,12 +142,12 @@ The wheel will be created in `install/dist`.
 
 ### Run the tests
 
-To run the tests call `./test.sh`:
+To run the tests:
 
 ```sh
 # Run all the tests, print the output only on failure, run 80 tests in parallel
 ./test.sh -j80
-# Poptorch has 3 tests labels: examples, short, long. To run all the tests except the long ones:
+# PopTorch has 3 test labels: examples, short, long. To run all the tests except the long ones:
 ./test.sh -j80 -LE long
 # To run only the short tests
 ./test.sh -j80 -L short
@@ -151,7 +157,7 @@ To run the tests call `./test.sh`:
 ./test.sh --help
 ```
 
-Note: If you run the tests in parallel make sure to tell PopTorch to wait for an IPU to become available when they are all already in use:
+Note: If you run the tests in parallel, make sure to tell PopTorch to wait for an IPU to become available if they are all in use:
 
 ```sh
 export POPTORCH_WAIT_FOR_IPU=1
