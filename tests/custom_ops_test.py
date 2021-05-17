@@ -86,6 +86,53 @@ def test_training():
     assert torch.argmax(out[0]) == 42
 
 
+# Check that the custom op not only trains but also propagates the gradient backwards.
+def test_training_both_sides():
+    class TrainingNetwork(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.ln1 = torch.nn.Linear(100, 100)
+            self.ln2 = torch.nn.Linear(100, 100)
+            self.softmax = nn.Softmax(1)
+
+        def forward(self, t):
+            x = self.ln1(t[0])
+            bias = t[1]
+            x, y = poptorch.custom_op([x, bias],
+                                      "Cube",
+                                      "com.acme",
+                                      1,
+                                      example_outputs=[x, x])
+            x = self.ln2(x)
+            return self.softmax(x), y
+
+    model = TrainingNetwork()
+
+    x = torch.rand((1, 100))
+    bias = torch.full((1, 100), 2.0)
+
+    y = torch.full([1], 42, dtype=torch.long)
+
+    def custom_loss(model_out, labels):
+        l1 = torch.nn.functional.nll_loss(model_out[0], labels)
+        # Popart errors if this is unused.
+        l2 = torch.sum(model_out[1]) * 0.0001
+
+        return l1 + l2
+
+    weights_before = model.ln1.weight.clone()
+
+    training = helpers.trainingModelWithLoss(model, custom_loss)
+
+    for _ in range(0, 100):
+        x = torch.rand((1, 100))
+        out, _ = training((x, bias), y)
+
+    assert not torch.allclose(weights_before, model.ln1.weight)
+
+    assert torch.argmax(out[0]) == 42
+
+
 def test_inference_with_an_attribute():
     #inference_with_attribute_start
     class Model(torch.nn.Module):

@@ -97,7 +97,8 @@ def for_loop(count, body, inputs):
     # Break the alias of the outputs.
     example_outputs = []
     for output in outputs:
-        example_outputs.append(torch.zeros(output.size()))
+        grad = output.requires_grad
+        example_outputs.append(torch.zeros_like(output, requires_grad=grad))
 
     if not isinstance(outputs, list) and not isinstance(outputs, tuple):
         outputs = [outputs]
@@ -455,7 +456,9 @@ def custom_op(inputs,
         # Dead code which will get eliminated but will safely allow the same
         # input to be provided to example_output (since it is only supposed
         # to be a template). Otherwise the compiler may recognise the alias.
-        transformed_outputs.append(torch.zeros_like(output))
+        grad = output.requires_grad
+        transformed_outputs.append(torch.zeros_like(output,
+                                                    requires_grad=grad))
 
     if attributes is not None:
         # Handle attributes list
