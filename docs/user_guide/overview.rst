@@ -10,7 +10,7 @@ Options
 
 You can change how PopTorch compiles and executes models using :class:`poptorch.Options`.
 You can find a full list of options in :numref:`options`.
-Broadly speaking, the options fall into the following catagories:
+Broadly speaking, the options fall into the following categories:
 
 #. General options (See :class:`poptorch.Options`)
 #. Options related to half precision (see :class:`opts.Precision.* <poptorch.options._PrecisionOptions>`)
@@ -38,18 +38,18 @@ config text file using :func:`poptorch.Options.loadFromFile`.
 
 Each line in the file must contain a single command corresponding to setting an option
 in :class:`poptorch.Options`. To set an option within the file, write the command as you
-would within a Python script but omit the ``options.`` prefix.
+would within a Python script but omit the ``options.`` prefix. For example:
 
 .. literalinclude:: poptorch.conf
     :language: python
-    :caption: Example contents of a config file used to set :class:`poptorch.Options`.
+    :caption: Example contents of a config file used to set :class:`poptorch.Options`
     :linenos:
 
-Then, instantiate :class:`poptorch.Options` and call :func:`poptorch.Options.loadFromFile`.
+Then, instantiate :class:`poptorch.Options` and call :func:`poptorch.Options.loadFromFile`:
 
 .. literalinclude:: api.py
     :language: python
-    :caption: Setting :class:`poptorch.Options` using a config file named `"poptorch.conf"`.
+    :caption: Setting :class:`poptorch.Options` using a config file named `"poptorch.conf"`
     :linenos:
     :start-after: conf_load_start
     :end-before: conf_load_end
@@ -59,7 +59,7 @@ Model wrapping functions
 ========================
 
 
-The basis of PopTorch integration comes from these two model wrapping functions.
+The basis of PopTorch integration comes from the following two model wrapping functions.
 
 poptorch.trainingModel
 ----------------------
@@ -108,7 +108,7 @@ functionality.
 
 .. literalinclude:: trainingModel.py
     :language: python
-    :caption: Example contents of when explicit copies are needed.
+    :caption: Example contents of when explicit copies are needed
     :linenos:
     :start-after: explicit_copy_start
     :end-before: explicit_copy_end
@@ -195,7 +195,7 @@ put on IPU 0 and all layers from ``model.bert.encoder.layer[0]`` onwards
     :start-after: annotations_start
     :end-before: annotations_end
     :emphasize-lines: 37-38, 41-42, 45-46
-    :caption: Annotating existing layers.
+    :caption: Annotating existing layers
 
 :py:class:`poptorch.BeginBlock` is an annotation defined outside the
 model, and applied to current and onward layers. Both forms can be used
@@ -207,7 +207,7 @@ interchangeably.
     :start-after: annotations_inline_start
     :end-before: annotations_inline_end
     :emphasize-lines: 16, 19, 22, 26
-    :caption: Annotating a model directly.
+    :caption: Annotating a model directly
 
 In addition, :py:func:`poptorch.BlockFunction` is a decorator which can
 decorate an existing function.
@@ -218,7 +218,7 @@ decorate an existing function.
     :start-after: annotations_decorator_start
     :end-before: annotations_decorator_end
     :emphasize-lines: 19, 25
-    :caption: Annotating functions.
+    :caption: Annotating functions
 
 Either annotation is enough to enable parallel execution in the simple cases.
 By default, the layers before the first :py:class:`poptorch.BeginBlock` will be
@@ -315,7 +315,7 @@ It is not used in
 
 .. literalinclude:: phased_execution.py
     :language: python
-    :caption: Example of Stage declaration.
+    :caption: Example of Stage declaration
     :linenos:
     :start-after: stage_start
     :end-before: stage_end
@@ -606,10 +606,10 @@ There is no method to override this behaviour which is why we recommend you alwa
 
 .. note:: There is an exception: ``lr`` is always marked as variable.
 
-Custom ops
-==========
+PopTorch ops
+============
 
-These are helper operations to be used within a model.
+This section describes some "helper" operations you can use within a model.
 
 poptorch.ipu_print_tensor
 -------------------------
@@ -618,7 +618,7 @@ Adds an op to print the content of a given IPU tensor.
 
 .. warning::
    To prevent the print operation being optimised out by the graph
-   optimiser, you must use the output of the print.
+   optimiser, you must use the return value of ``ipu_print_tensor()``.
 
 .. literalinclude:: api.py
     :language: python
@@ -659,119 +659,10 @@ Please refer to the `PopLibs documentation for multi-convolutions <https://docs.
 
 For more information see: :py:class:`poptorch.MultiConv` :py:class:`poptorch.MultiConvPlanType`.
 
-poptorch.custom_op
-------------------
-
-This is for the users who are familiar with PopART.
-If you need some special features that are not
-supported in PopART, you may write a PopART custom op.
-For more information about
-how to create Popart custom ops see
-`Creating custom operations
-<https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`_
-and
-`Building custom operators using PopART
-<https://github.com/graphcore/examples/tree/master/code_examples/popart/custom_operators>`_.
-You can call such a PopART custom op using
-:py:class:`poptorch.custom_op`
-in PopTorch.
-
-It takes three steps to enable a PopART custom op in PopTorch.
-
-First, set Poplar and PopART environment varibles as shown in
-:numref:`setting_env` and compile the PopART custom op.
-You can compile your custom op C++ code and link with Poplar and PopART to
-generate a dynamic library.
-Please refer to the custom op code custom_cube_op.cpp
-and its CMakeLists.txt under
-poptorch/tests/custom_ops$.
-
-Second, load the dynamic library.
-
-.. literalinclude:: ../../tests/custom_ops_test.py
-    :language: python
-    :caption: Loading the library for the PopART custom op
-    :linenos:
-    :start-after: loading_library_start
-    :end-before: loading_library_end
-
-Finally, use :py:class:`poptorch.custom_op` to finish the call.
-Its wrapper class is specified below.
-
-For more information see: :py:class:`poptorch.custom_op`.
-
-In the PopART custom op, both forward op and backward op are implemented.
-In the PopTorch inference model, only the forward op will be called.
-
-.. literalinclude:: ../../tests/custom_ops_test.py
-    :language: python
-    :caption: Calling a PopART custom op in a PopTorch inference model
-    :linenos:
-    :emphasize-lines: 4-8
-    :start-after: inference_start
-    :end-before: inference_end
-
-In the code example above, ``example_outputs`` is assigned as
-[``x``, ``x``], where ``x`` is one of the input tensors and used as
-a template to provide the right number of output tensors.
-The real outputs will be allocated memory, calculated and
-returned by the custom op.
-You can also call this custom op inside a training model
-using exactly the same interface of :py:class:`poptorch.custom_op`,
-and the backward op will be called automatically.
-
-You can pass attributes to custom ops using a Python dictionary, as shown by the
-following code example:
-
-.. literalinclude:: ../../tests/custom_ops_test.py
-    :language: python
-    :caption: Passing an attribute to a PopART custom op from PopTorch
-    :linenos:
-    :emphasize-lines: 8
-    :start-after: inference_with_attribute_start
-    :end-before: inference_with_attribute_end
-
-You can then obtain attributes from within the C++ code. The above code
-passes a ``Float`` attribute with the name ``alpha`` to the LeakyRELU implementation in the `Custom operations chapter of the PopART user guide
-<https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`_.
-PopTorch supports all possible attributes supported in PopArt except for
-``Graph``.
-
-Please refer to the following table and code examples for information on how to
-pass other attribute types to a PopArt custom op implementation:
-
-.. list-table:: Python types to use to pass attributes to PopART
-   :widths: 35 65
-   :header-rows: 1
-
-   * - PopART attribute type
-     - Python equivalent
-   * - ``Float``
-     - Python float (converted to 32-bit)
-   * - ``Floats``
-     - list/tuple of Python floats
-   * - ``Int``
-     - Python int (converted to 64-bit signed int)
-   * - ``Ints``
-     - list/tuple of Python ints
-   * - ``String``
-     - Python str (converted to ASCII)
-   * - ``Strings``
-     - List/tuple of Python strs
-   * - ``Graph``
-     - Not supported
-
-.. literalinclude:: ../../tests/custom_ops_attributes_test.py
-    :language: python
-    :caption: Passing different attribute types from PopTorch
-    :linenos:
-    :start-after: many_attribtes_examples_start
-    :end-before: many_attribtes_examples_end
-
 poptorch.nop
 ------------
 
-Poptorch includes a "no-op" function for debugging purposes.
+PopTorch includes a "no-op" function for debugging purposes.
 
 For more information see: :py:func:`poptorch.nop`.
 
@@ -795,7 +686,7 @@ For more information see: :py:func:`poptorch.set_available_memory`.
 Miscellaneous functions
 =======================
 
-These PopTorch functions, not related to model creation, are available:
+The following PopTorch functions, not related to model creation, are available:
 
 - :py:func:`poptorch.ipuHardwareIsAvailable`
 - :py:func:`poptorch.ipuHardwareVersion`
@@ -877,7 +768,7 @@ has the opposite effect. A typical use-case is applying it to the ``forward`` fu
     :end-before: decorator_autocast_end
     :emphasize-lines: 2
 
-In addition, ``poptorch.autocast(enabled=True)`` can be applied to a code-block, with simmilar effect.
+In addition, ``poptorch.autocast(enabled=True)`` can be applied to a code-block, with similar effect.
 
 .. literalinclude:: autocast.py
     :language: python
@@ -917,6 +808,135 @@ promoted to 32-bits when operands have mixed precision.
     :start-after: policy_autocast_start
     :end-before: policy_autocast_end
     :emphasize-lines: 5, 8
+
+.. _creating_custom_ops:
+
+Creating custom ops
+===================
+
+If you need to implement functionality that is not directly
+supported in in PopTorch, you can create a custom op.
+
+There are two steps to creating a custom op in PopTorch:
+
+#. Implement the op in C++ using the PopART API
+#. Make the op available in PopTorch so you can use it in your PyTorch model
+
+
+Implementing the custom op
+--------------------------
+
+You will need to implement the new op as C++ code by creating subclasses of, at
+least, the Op and Opx base classes provided by the PopART API.
+
+If you are going to use the custom op for training, then you will also need to
+define the classes that implement the gradient operation. For details of how to
+do this, see the `Custom operators
+<https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`__
+chapter of the PopART User Guide.
+
+You can find some examples of PopART custom ops in the `Graphcore GitHub repository
+<https://github.com/graphcore/examples/tree/master/code_examples/popart/custom_operators/>`__.
+
+You will need to compile the PopART custom op to produce a dynamic library file which you
+can load in your PopTorch program.
+
+Make the op available to PyTorch
+--------------------------------
+
+After you have compiled the C++ implementation of the custom op, you need to load
+the library file. You can then call the op from your PyTorch program, using the
+:py:class:`poptorch.custom_op` class.
+
+First, load the dynamic library as shown in :numref:`loading_library_code`.
+
+.. literalinclude:: ../../tests/custom_ops_test.py
+    :language: python
+    :caption: Loading the library for the custom op
+    :linenos:
+    :start-after: loading_library_start
+    :end-before: loading_library_end
+    :name: loading_library_code
+
+You can now call your custom op using the PopTorch class
+:py:class:`~poptorch.custom_op`.
+
+Both the forward op and backward op are implemented in the PopART code.
+However, in this inference model example, only the forward op is called:
+
+.. literalinclude:: ../../tests/custom_ops_test.py
+    :language: python
+    :caption: Calling a custom op in a PopTorch inference model
+    :linenos:
+    :emphasize-lines: 4-8
+    :start-after: inference_start
+    :end-before: inference_end
+
+In this example ``[x, x]`` is assigned to ``example_outputs``, where ``x``
+is one of the input tensors which is used as a template for the output tensors.
+The real output tensors will be created and returned by the custom op.
+
+You can also call this custom op inside a training model using
+:py:class:`~poptorch.custom_op` and the backward op will be called automatically.
+
+
+Passing attributes to the custom op
+-----------------------------------
+
+You can pass attributes to the custom op using a Python dictionary, as shown in
+:numref:`inference_with_attribute_code`.
+
+.. literalinclude:: ../../tests/custom_ops_test.py
+    :language: python
+    :caption: Passing an attribute to a custom op from PopTorch
+    :linenos:
+    :emphasize-lines: 8
+    :start-after: inference_with_attribute_start
+    :end-before: inference_with_attribute_end
+    :name: inference_with_attribute_code
+
+You can then access these attributes within the C++ custom op code. The above
+example passes a ``Float`` attribute with the name ``alpha`` to the LeakyRELU
+implementation. See the `Custom operators
+<https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`__
+chapter of the PopART User Guide for more information.
+
+Table :numref:`popart-attribute-types` and the code example in
+:numref:`many_attribtes_examples_code` show how to pass other attribute types
+to a custom op. PopTorch supports all attributes supported in PopART except for
+``Graph``.
+
+.. list-table:: Python types to use to pass attributes to PopART
+   :widths: 35 65
+   :header-rows: 1
+   :align: center
+   :name: popart-attribute-types
+
+   * - PopART attribute type
+     - Python equivalent
+   * - ``Float``
+     - Python float (converted to 32-bit)
+   * - ``Floats``
+     - List or tuple of Python float
+   * - ``Int``
+     - Python int (converted to 64-bit signed int)
+   * - ``Ints``
+     - List or tuple of Python int
+   * - ``String``
+     - Python str (converted to ASCII)
+   * - ``Strings``
+     - List or tuple of Python str
+   * - ``Graph``
+     - Not supported
+
+.. literalinclude:: ../../tests/custom_ops_attributes_test.py
+    :language: python
+    :caption: Passing different attribute types from PopTorch
+    :linenos:
+    :start-after: many_attribtes_examples_start
+    :end-before: many_attribtes_examples_end
+    :name: many_attribtes_examples_code
+
 
 Profiling
 =========
@@ -994,7 +1014,7 @@ executable and not the python wrapper or torch model (For example if your model 
 
 .. literalinclude:: precompilation.py
     :language: python
-    :caption: How to export only the exectuable.
+    :caption: How to export only the executable
     :linenos:
     :start-after: precomp_no_python_start
     :end-before: precomp_no_python_end
@@ -1003,7 +1023,7 @@ It means you will need to re-create and wrap the model yourself before loading t
 
 .. literalinclude:: precompilation.py
     :language: python
-    :caption: How to load a precompiled executable.
+    :caption: How to load a precompiled executable
     :linenos:
     :start-after: load_exe_start
     :end-before: load_exe_end
@@ -1019,7 +1039,7 @@ For example:
 
 .. literalinclude:: precompilation.py
     :language: python
-    :caption: PopTorch implicit copies.
+    :caption: PopTorch implicit copies
     :linenos:
     :start-after: implicit_cp_start
     :end-before: implicit_cp_end
@@ -1029,7 +1049,7 @@ If you were to export these models:
 
 .. literalinclude:: precompilation.py
     :language: python
-    :caption: Precompilation of both a training and validation models.
+    :caption: Precompilation of both a training and validation models
     :linenos:
     :start-after: precomp_train_val_start
     :end-before: precomp_train_val_end
@@ -1041,7 +1061,7 @@ You would then either need to insert explicit copy operations:
 
 .. literalinclude:: precompilation.py
     :language: python
-    :caption: Precompilation of both a training and validation models.
+    :caption: Precompilation of both a training and validation models
     :linenos:
     :start-after: load_train_val_start
     :end-before: load_train_val_end
@@ -1052,7 +1072,7 @@ and then loading the executable:
 
 .. literalinclude:: precompilation.py
     :language: python
-    :caption: Precompilation of both a training and validation models.
+    :caption: Precompilation of both a training and validation models
     :linenos:
     :start-after: load_train_val_connected_start
     :end-before: load_train_val_connected_end

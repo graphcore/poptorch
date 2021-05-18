@@ -21,7 +21,7 @@ def ipu_print_tensor(tensor, title=""):
     will print the gradient of the tensor.
 
     The operation is an identity operation and will return the exact same
-    tensor. The returned tensor should be used in place of the original tensor
+    tensor. The returned tensor must be used in place of the original tensor
     in the rest of the program, to make sure that the print operation isn't
     optimised away.
 
@@ -438,14 +438,14 @@ def custom_op(inputs,
     """Applies a custom operation, implemented within PopART, to the inputs.
 
     :param tuple inputs: A tuple of input tensors, for example, (x, y).
-    :param str name: unique name of the PopART custom
-    :param str domain: domain for the op
-    :param int domain_version: version of the domain to use
-    :param iterable example_outputs: a tuple of tensors with the same type
-        and shape of the outputs; the value does not matter as all values will
+    :param str name: Unique name of the PopART custom op.
+    :param str domain: Domain for the op.
+    :param int domain_version: Version of the domain to use.
+    :param iterable example_outputs: A tuple of tensors with the same type
+        and shape as the outputs. The value does not matter as all values will
         be set to zero for tracing purposes.
-    :param dict attributes: a dictionary of attributes for the custom op. All
-        attributes keys must be strings. All attribute values must be floats,
+    :param dict attributes: A dictionary of attributes for the custom op. All
+        attribute keys must be strings. All attribute values must be floats,
         ints, strings, or a list/tuple containing only floats, only ints or only
         strings (not a mix of types within the list).
 
