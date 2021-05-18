@@ -15,7 +15,8 @@ namespace poptorch {
 
 // The training optimizer algorithm used.
 enum class OptimizerType : std::uint8_t {
-  SGD = 0,
+  SGD1 = 0,
+  SGD2,
   ADAM,
   ADAMW,
   ADAMW_NO_BIAS,

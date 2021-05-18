@@ -357,10 +357,16 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
 
     // Indicate whether the optimizer should use float16 types
     getOptimizerValue(accum_type, opt, "accumType");
-    getOptimizerValue(first_order_momentum_accum_type, opt,
-                      "firstOrderMomentumAccumType");
-    getOptimizerValue(second_order_momentum_accum_type, opt,
-                      "secondOrderMomentumAccumType");
+
+    if (type == OptimizerType::SGD1 || type == OptimizerType::SGD2) {
+      getOptimizerValue(first_order_momentum_accum_type, opt,
+                        "velocityAccumType");
+    } else {
+      getOptimizerValue(first_order_momentum_accum_type, opt,
+                        "firstOrderMomentumAccumType");
+      getOptimizerValue(second_order_momentum_accum_type, opt,
+                        "secondOrderMomentumAccumType");
+    }
     // Create one Optimizer per parameter group + 1 for defaults
     for (std::uint64_t i = 0; i <= num_groups; ++i) {
       optimizers.emplace_back(type, accum_type, first_order_momentum_accum_type,
@@ -381,7 +387,6 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
     copyParametersDict(&optimizers[group], group_attr.cast<py::dict>());
     ++group;
   }
-
   return optimizers;
 }
 

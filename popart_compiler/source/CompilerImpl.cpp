@@ -1,5 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <chrono>
+#include <memory>
 
 #include <popart/adam.hpp>
 #include <popart/adaptive.hpp>
@@ -11,6 +12,7 @@
 #include <popart/op/identity.hpp>
 #include <popart/op/matmul.hpp>
 #include <popart/op/nll.hpp>
+#include <popart/optimizer.hpp>
 #include <popart/popx/devicex.hpp>
 #include <popart/popx/devicexmanager.hpp>
 #include <popart/session.hpp>
@@ -38,8 +40,10 @@ std::string toString(const std::vector<std::string> &vec) {
 
 std::string toString(OptimizerType type) {
   switch (type) {
-  case OptimizerType::SGD:
-    return "SGD";
+  case OptimizerType::SGD1:
+    return "SGD1";
+  case OptimizerType::SGD2:
+    return "SGD2";
   case OptimizerType::LAMB:
   case OptimizerType::LAMB_NO_BIAS:
     return "LAMB";
@@ -67,7 +71,8 @@ std::string toString(OptimizerType type) {
 std::vector<std::string> getAttributeNames(OptimizerType type,
                                            bool is_default) {
   switch (type) {
-  case OptimizerType::SGD: {
+  case OptimizerType::SGD1:
+  case OptimizerType::SGD2: {
     if (is_default) {
       return {"defaultLearningRate",    "defaultWeightDecay",
               "defaultMomentum",        "defaultDampening",
@@ -662,9 +667,20 @@ void CompilerImpl::updateGroups(OptimizerType *optimizer,
 }
 
 std::unique_ptr<popart::Optimizer>
-CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
+CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
   if (optimizers.empty()) {
     return nullptr;
+  }
+
+  // If using the separate tensor variant, glue velocity scaling to loss
+  // scaling. When T39344 is completed, there will be no benefit to setting
+  // velocity scaling different to loss scaling for the separate tensor case.
+
+  // The first optimizer contains the default values.
+  auto &default_value_optimizer(optimizers[0]);
+
+  if (default_value_optimizer.type == OptimizerType::SGD2) {
+    default_value_optimizer.copyParam("lossScaling", "velocityScaling");
   }
 
   // The first optimizer contains the default values.
@@ -674,9 +690,27 @@ CompilerImpl::getOptimizer(const std::vector<Optimizer> &optimizers) {
   logging::debug("Updating graph optimizer with {}", opt.debug());
 
   switch (opt.type) {
-  case OptimizerType::SGD: {
-    ERROR_ON(opt.accum_types_provided);
-    auto optimizer = std::make_unique<popart::SGD>(opt.params);
+  case OptimizerType::SGD1: {
+    ERROR_ON(!opt.accum_types_provided);
+
+    auto optimizer = std::unique_ptr<popart::SGD>(new popart::SGD(
+        opt.params, {}, popart::SGDAccumulatorAndMomentum::Combined,
+        popart::DataType::UNDEFINED, popart::DataType::UNDEFINED));
+    updateGroups(optimizer.get(), optimizers);
+    return optimizer;
+  }
+  case OptimizerType::SGD2: {
+    ERROR_ON(!opt.accum_types_provided);
+
+    // Copy loss scaling to velocity scaling for all groups
+    for (std::size_t idx = 1; idx < optimizers.size(); ++idx) {
+      optimizers[idx].copyParam(default_value_optimizer, "lossScaling",
+                                "velocityScaling");
+    }
+
+    auto optimizer = std::unique_ptr<popart::SGD>(new popart::SGD(
+        opt.params, {}, popart::SGDAccumulatorAndMomentum::Separate,
+        opt.accum_type, opt.first_order_momentum_accum_type));
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
   }

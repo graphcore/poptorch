@@ -74,6 +74,14 @@ struct Optimizer {
         first_order_momentum_accum_type_is_half(firstOrderType),
         second_order_momentum_accum_type_is_half(secondOrderType) {}
 
+  // Copies the value and constness of one parameter to another
+  void copyParam(const Optimizer &source_optim, const char *source,
+                 const char *dest);
+
+  void copyParam(const char *source, const char *dest) {
+    copyParam(*this, source, dest);
+  }
+
   OptimizerType type;
   // True if the main, first and second order accum types have been set.
   bool accum_types_provided;

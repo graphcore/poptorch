@@ -304,7 +304,7 @@ public:
   }
 
   std::unique_ptr<popart::Optimizer>
-  getOptimizer(const std::vector<Optimizer> &optimizers);
+  getPopartOptimizer(std::vector<Optimizer> optimizers);
 
   void updateUseModelConfig();
   std::string checkSystemConfig() const;

@@ -60,19 +60,88 @@ def _parseArgs(all_args, child_attrs=None):
 
 
 class SGD(torch.optim.SGD):
+    # pylint: disable=line-too-long
     """ Stochastic gradient descent with optional momentum.
 
-    The optimizer matches PyTorch's implementation
+    The optimizer is based on PyTorch's implementation
     (`torch.optim.SGD <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.SGD>`_)
     with optional loss and velocity scaling.
 
     Nesterov momentum is not currently supported.
+
+    PopTorch provides two possible variants. Both variants are mathematically
+    identical to PyTorch but differ in their stability and efficiency.
+
+    .. note:: If you set momentum to zero and do not use gradient accumulation,
+      PopTorch will use a simple SGD variant and ignore the values of
+      ``use_combined_accum``, ``accum_type`` and ``velocity_accum_type``.
+
+    **Separate tensor variant (default)**
+
+    If you set ``use_combined_accum`` to ``False`` (default), you will use a
+    more stable but more memory intensive variant. In this case, PopTorch keeps
+    two state tensors for each weight: one for gradient accumulation and one for
+    velocity. It operates as follows when training:
+
+    #. PopTorch runs one or more forward/backwards steps, equal the number of
+       gradient accumulations (see
+       :py:func:`~poptorch.options._TrainingOptions.gradientAccumulation`).
+       Each time PopTorch sums the gradients, storing them in accumulators.
+    #. Once all the forward and backwards have completed, PopTorch uses the
+       summed gradients to update the velocities. At this stage, PopTorch will
+       correct the scale based on the setting of
+       :py:func:`~poptorch.options._TrainingOptions.accumulationAndReplicationReductionType`.
+       PopTorch stores the velocities as optimiser states.
+    #. Finally, PopTorch uses the velocities to update the parameters, taking
+       into account the loss scaling and learning rate.
+
+    With ``use_combined_accum`` set to False, you can independently change the
+    data type used for storing the accumulated gradients and the velocity
+    values using ``accum_type`` and ``velocity_accum_type``, respectively.
+
+    Velocity scaling is ignored for this variant.
+
+    .. note:: If the number of gradient accumulations is high, you can use off
+        chip memory for the velocity tensors with a minimal performance hit.
+        >>> opts.TensorLocations.setOptimizerLocation(
+        ...     poptorch.TensorLocationSettings().useOnChipStorage(False))
+
+    **Combined tensor variant**
+
+    If you set `use_combined_accum`` to ``True``, you will use a less stable but
+    more memory efficient variant. In this case PopTorch uses a single tensor
+    (the combined tensor) for gradient accumulation and velocity.
+    It operates as follows when training:
+
+    #. PopTorch runs one or more forward/backwards steps equal the number of
+       gradient accumulations (see
+       :py:func:`~poptorch.options._TrainingOptions.gradientAccumulation`).
+       For each step, PopTorch immediately calculates an increment or decrement
+       for the combined tensors for each parameter. The amount of increment or
+       decrement takes into account the setting of
+       :py:func:`~poptorch.options._TrainingOptions.accumulationAndReplicationReductionType`.
+       as well as removing loss scaling and introducing any velocity scaling.
+    #. After running all the steps, the combined tensor will be be equal to the
+       new velocities. PopTorch uses these to update the parameters taking
+       into account the velocity scaling and learning rate.
+
+    PopTorch ignores the `accum_type`` and ``velocity_accum_type`` values when
+    using a combined tensor. In addition, there are no optimizer state tensors
+    and so ``opts.TensorLocations.setOptimizerLocation`` has no effect.
+
+    .. warning:: For both variants, reducing the velocity scaling during
+        training will result in temporary over-estimation of the velocity and
+        could cause model instability. Increasing the scaling may temporarily
+        slow model convergence but not lead to instability.
     """
     # Variables which don't exist in the parent optimizer class and are
     # global (Cannot be set per group).
     _child_vars = ["loss_scaling"]
     # All the attributes and variables which don't exist in the parent optimizer class.
-    _child_only = _child_vars + ["velocity_scaling"]
+    _child_only = _child_vars + [
+        "velocity_scaling", "use_combined_accum", "accum_type",
+        "velocity_accum_type"
+    ]
     # Attributes (from the parent or child class) which can be set per group.
     _group_vars = [
         "lr", "momentum", "dampening", "weight_decay", "nesterov",
@@ -87,7 +156,10 @@ class SGD(torch.optim.SGD):
                  weight_decay=None,
                  nesterov=None,
                  loss_scaling=None,
-                 velocity_scaling=None):
+                 velocity_scaling=None,
+                 use_combined_accum=None,
+                 accum_type=None,
+                 velocity_accum_type=None):
         """
         :param iterable params: parameters to optimize.
         :param float lr: learning rate.
@@ -103,8 +175,16 @@ class SGD(torch.optim.SGD):
             gradients to assist numerical stability when using float16.
         :type loss_scaling: float, optional
         :param velocity_scaling: Factor by which to scale the velocity values
-            to assist numerical stability when using float16.
+            to assist numerical stability when using float16. (This applies to
+            the combined variant only.)
         :type velocity_scaling: float, optional
+        :param use_combined_accum: Whether to use a combined accumulator.
+        :type accum_type: bool
+        :param accum_type: data type used for gradients.
+        :type accum_type: torch.dtype, optional
+        :param velocity_accum_type: data type used to store
+            the velocity values for each parameter.
+        :type velocity_accum_type: torch.dtype, optional
         """
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), SGD._child_only)
@@ -113,15 +193,42 @@ class SGD(torch.optim.SGD):
         # Loss scaling is a global setting: store it as an attribute
         if loss_scaling is None:
             loss_scaling = 1.0
+
+        if use_combined_accum is None:
+            use_combined_accum = False
+        self.use_combined_accum = use_combined_accum
+
+        if accum_type is None:
+            accum_type = torch.float32
+        if velocity_accum_type is None:
+            velocity_accum_type = torch.float32
+
         self.loss_scaling = loss_scaling
 
         # Velocity scaling can be set per group: register it in defaults
         # and update the existing groups.
         if velocity_scaling is None:
             velocity_scaling = 1.0
-        self.defaults["velocity_scaling"] = velocity_scaling
-        for group in self.param_groups:
-            group.setdefault("velocity_scaling", velocity_scaling)
+            # NB this will be overridden to loss_scaling in the case of the
+            # separate tensor variant.
+        else:
+            if not use_combined_accum:
+                raise RuntimeError("Velocity scaling should not be set for" +
+                                   " the separate tensor variant of SGD.")
+
+        if use_combined_accum:
+            self.defaults["velocity_scaling"] = velocity_scaling
+            for group in self.param_groups:
+                group.setdefault("velocity_scaling", velocity_scaling)
+
+        supportedTypes = [torch.float16, torch.float32]
+        errString = ("Accumulation types must be either torch.float32"
+                     " or torch.float16")
+        assert accum_type in supportedTypes, errString
+        self.accum_type = accum_type
+
+        assert velocity_accum_type in supportedTypes, errString
+        self.velocity_accum_type = velocity_accum_type
 
         self.variable_attrs = VariableAttributes(
             variables,
@@ -133,6 +240,9 @@ class SGD(torch.optim.SGD):
         # (groups / defaults are saved by the parent)
         state["variable_attrs"] = self.variable_attrs
         state["loss_scaling"] = self.loss_scaling
+        state["use_combined_accum"] = self.use_combined_accum
+        state["accum_type"] = self.accum_type
+        state["velocity_accum_type"] = self.velocity_accum_type
         return state
 
 

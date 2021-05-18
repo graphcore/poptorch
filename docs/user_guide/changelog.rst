@@ -37,6 +37,7 @@ New features
   to a block.
 - Add mechanism for inspecting arbitrary tensors
 - Add custom operator for CTC beam search decoding: ``poptorch.ctc_beam_search_decoder``
+- Add a separate tensor variant (now default) to the SGD optimiser.
 
 API changes
 -----------
@@ -46,6 +47,9 @@ API changes
 - Deprecated ``poptorch.Options.Training.accumulationReductionType`` in favour of ``poptorch.Options.Training.accumulationAndReplicationReductionType``
 - Deprecated ``runningVarianceAlwaysFloat`` in favour of ``runningStatisticsAlwaysFloat`` in ``poptorch.Options.Precision``,
   as this new option computes both the running mean and variance in FP32 when this option is set to `True`.
+- Use of SGD via PyTorch's or PopTorch's API now results in use of the new
+  separate tensor variant by default. To revert to the previous default variant,
+  use ``poptorch.optim.SGD`` with ``use_combined_accum=True``.
 
 v2.0 (Poplar SDK 2.0)
 =====================

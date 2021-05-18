@@ -97,13 +97,16 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
         "nesterov": assertNesterovDisabled,
         "amsgrad": assertAmsgradDisabled,
         "bias_correction": ignore,
-        "centered": ignore
+        "centered": ignore,
+        "use_combined_accum": ignore
     }
     # Optimizer attributes: global, cannot change over time.
     #     source: opt.name
     #     format: {name: value}
     _AttrReader(attr_readers, "accum_type", _OptimizerGetter(torch.float32),
                 isFloat16)
+    _AttrReader(attr_readers, "velocity_accum_type",
+                _OptimizerGetter(torch.float32), isFloat16)
     _AttrReader(attr_readers, "first_order_momentum_accum_type",
                 _OptimizerGetter(torch.float32), isFloat16)
     _AttrReader(attr_readers, "second_order_momentum_accum_type",
@@ -230,14 +233,15 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
 
 
 class _OptimizerType(enum.IntEnum):
-    SGD = 0
-    ADAM = 1
-    ADAMW = 2
-    ADAMW_NO_BIAS = 3
-    RMSPROP = 4
-    RMSPROP_CENTERED = 5
-    LAMB = 6
-    LAMB_NO_BIAS = 7
+    SGD1 = 0
+    SGD2 = 1
+    ADAM = 2
+    ADAMW = 3
+    ADAMW_NO_BIAS = 4
+    RMSPROP = 5
+    RMSPROP_CENTERED = 6
+    LAMB = 7
+    LAMB_NO_BIAS = 8
 
 
 def _toPoptorchClass(optimizer_type):
@@ -250,7 +254,7 @@ def _toPoptorchClass(optimizer_type):
         return optim.RMSprop
     if optimizer_type in [_OptimizerType.LAMB, _OptimizerType.LAMB_NO_BIAS]:
         return optim.LAMB
-    if optimizer_type == _OptimizerType.SGD:
+    if optimizer_type in [_OptimizerType.SGD1, _OptimizerType.SGD2]:
         return optim.SGD
     assert optimizer_type == _OptimizerType.ADAM, (
         "Unknown optimizer_type %s" % optimizer_type)
@@ -260,7 +264,10 @@ def _toPoptorchClass(optimizer_type):
 # pylint: disable=too-many-return-statements
 def _toPoptorchOptimizer(optimizer):
     if isinstance(optimizer, torch.optim.SGD):
-        return _OptimizerType.SGD
+        use_combined_accum = getattr(optimizer, "use_combined_accum", False)
+        if use_combined_accum:
+            return _OptimizerType.SGD1
+        return _OptimizerType.SGD2
 
     if isinstance(optimizer, torch.optim.Adam):
         return _OptimizerType.ADAM
