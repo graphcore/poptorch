@@ -237,7 +237,7 @@ class Block(torch.nn.Module):
     ...     self.layer = MyLayer(x)
 
     All layers called inside this scope will run on the specified IPU, if
-    one is specfied. In addition, you can combine multiple blocks into
+    one is specified. In addition, you can combine multiple blocks into
     a stage.
 
     .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
@@ -333,7 +333,7 @@ def BeginBlock(layer_to_call: torch.nn.Module,
     """
     Define a block by modifying an existing PyTorch module.
 
-    You can use this with an existing Pytorch module instance, as follows:
+    You can use this with an existing PyTorch module instance, as follows:
 
     >>> poptorch.BeginBlock(myModel.a_layer)
     >>> poptorch.BeginBlock(MyNewLayer())

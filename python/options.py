@@ -1411,12 +1411,12 @@ class Options(_options_impl.OptionsDict):
                      anchor_return_period: Optional[int] = 1):
         """Anchor a tensor such that it may be retrieved after a model run.
 
-        :param str short_name: user defined name to be used for retrieval
-        :param str long_name: the PopArt name of the tensor to be anchored
-        :param poptorch.AnchorMode anchor_mode: specifie when data should
+        :param str short_name: User defined name to be used for retrieval
+        :param str long_name: The PopART name of the tensor to be anchored
+        :param poptorch.AnchorMode anchor_mode: Specifies when data should
           be returned. Default to None, in which case the tensor will use
           the same anchor mode used for model outputs.
-        :param int anchor_return_period: return period if anchor type is
+        :param int anchor_return_period: Return period if anchor type is
           ``EveryN``. Defaults to 1.
         """
 
