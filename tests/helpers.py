@@ -111,6 +111,30 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
         poptorch_version=poptorch.__version__)
 
 
+# Wrapper model with weights to test that gradients are generated
+# and updated in a graph with a given op - Linear layer added to
+# ensure some weights exist
+class ModelWithWeights(torch.nn.Module):
+    def __init__(self, op, input_shape):
+        super().__init__()
+        self.op = op
+        self.input_shape = input_shape
+        self.lin = torch.nn.Linear(input_shape.numel(), input_shape.numel())
+        # Copy original weights for training test
+        self._weights_before = self.lin.weight.detach().clone()
+
+    def forward(self, x):
+        x = torch.flatten(x)
+        x = self.lin(x)
+        x = x.reshape(self.input_shape)
+        x = self.op(x)
+        return x, poptorch.identity_loss(x**2, reduction='sum')
+
+    def assert_weights_changed(self):
+        weights_after = self.lin.weight.detach().clone()
+        assert not torch.allclose(self._weights_before, weights_after)
+
+
 class PrintCapfdOnExit:
     """Helper that prints the content of capfd on exit
 
