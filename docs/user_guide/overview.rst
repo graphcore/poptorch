@@ -546,7 +546,7 @@ In addition, PopTorch has features to support float16 models, such as loss scali
     :linenos:
     :start-after: optim_start
     :end-before: optim_end
-    :emphasize-lines: 8-12
+    :emphasize-lines: 5-9
 
 .. important:: You must call :py:func:`~poptorch.PoplarExecutor.setOptimizer` to apply the new optimizer values to the model.
 
@@ -567,12 +567,16 @@ You can either set the ``loss_scaling`` factors manually, or you can set :py:fun
 which will automatically set a global loss scaling factor. If you both set ``loss_scaling`` manually and enable automatic loss scaling, the manually
 set factor(s) will be used initially and updated automatically during training.
 
-Velocity scaling (SGD only)
----------------------------
+Velocity scaling (SGD combined variant only)
+--------------------------------------------
 
-The SGD optimizer, when used with momentum, updates weights based on the velocity values.
-At each update step, the new velocity is a combination of the gradients derived from the loss function and the previous velocity value.
-Similar to loss scaling, the ``velocity_scaling`` parameter allows you to scale the velocity values to improve numerical precision when using half/float16 values.
+The SGD optimizer, when used with momentum, updates weights based
+on the velocity values.
+The combined variant uses one tensor per parameter to store the
+velocity and the changes to the velocity from accumulated gradients.
+Unlike the separate variant, therefore, each gradient accumulation step involves
+adding or subtracting values of a different magnitude to the gradients (for
+which loss scaling is used). You can therefore use the ``velocity_scaling`` parameter to scale the combined velocity tensor to improve numerical precision when using half/float16 values.
 (Note that the gradients are, in effect, scaled by ``velocity_scaling/loss_scaling`` so the ``loss_scaling`` has no impact on the effective scaling of velocity parameters.)
 
 As with loss scaling, higher values can minimise underflow of the velocity values but may result in overflow.

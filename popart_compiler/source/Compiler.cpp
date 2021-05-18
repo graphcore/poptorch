@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <atomic>
 #include <chrono>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <stack>
@@ -98,6 +99,41 @@ bool IsLoss(const std::string &operation) {
 }
 
 } // namespace
+
+void Optimizer::copyParam(const Optimizer &source_optim, const char *source,
+                          const char *dest) {
+  const float *source_float = nullptr;
+  const bool *source_is_const = nullptr;
+  float *dest_float = nullptr;
+  bool *dest_is_const = nullptr;
+
+  for (auto &param : source_optim.parameters) {
+    const char *param_name = static_cast<const char *>(param.name);
+    if (strcmp(param_name, source) == 0) {
+      source_float = &param.value;
+      source_is_const = &param.is_const;
+    }
+  }
+
+  for (auto &param : parameters) {
+    const char *param_name = static_cast<const char *>(param.name);
+    if (strcmp(param_name, dest) == 0) {
+      dest_float = &param.value;
+      dest_is_const = &param.is_const;
+    }
+  }
+
+  if (source_float && dest_float) {
+    ERROR_ON(!source_is_const);
+    ERROR_ON(!dest_is_const);
+
+    logging::debug("Set {} ({}) to {} ({})", dest, *dest_float, source,
+                   *source_float);
+
+    (*dest_float) = (*source_float);
+    (*dest_is_const) = (*source_is_const);
+  }
+}
 
 PopartAttribute::PopartAttribute(const char *name, const int64_t &value)
     : _name(stringToUniquePtr(name)), _any(new popart::any(value)) {}
@@ -539,7 +575,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   } else {
     // Create the optimizer from user provided parameters.
     std::unique_ptr<popart::Optimizer> optimizer =
-        _impl->getOptimizer(optimizers);
+        _impl->getPopartOptimizer(optimizers);
 
     // Create the training session.
     logging::LogContext ctx{
@@ -785,7 +821,7 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
 
   if (!optimizers.empty() && _impl->is_training) {
     std::unique_ptr<popart::Optimizer> optimizer =
-        _impl->getOptimizer(optimizers);
+        _impl->getPopartOptimizer(optimizers);
 
     // Update the popart graph/poplar executable with t::attache new optimizer.
     popart::TrainingSession &session =

@@ -132,8 +132,8 @@ def test_sgd_IR(opt):
 @pytest.mark.parametrize("accum_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("first_order_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("second_order_type", (torch.float16, torch.float))
-def test_accum_type(capfd, opt, accum_type, first_order_type,
-                    second_order_type):
+def test_adam_accum_type(capfd, opt, accum_type, first_order_type,
+                         second_order_type):
     def torchTypeToStr(dt):
         t = str(dt)
         assert t in ["torch.float32", "torch.float16"]
@@ -157,16 +157,45 @@ def test_accum_type(capfd, opt, accum_type, first_order_type,
         "secondOrderMomentumAccumType=" + torchTypeToStr(second_order_type))
 
 
-def test_velocity_scaling_copy():
+@helpers.printCapfdOnExit
+@pytest.mark.parametrize("accum_type", (torch.float16, torch.float))
+@pytest.mark.parametrize("velocity_accum_type", (torch.float16, torch.float))
+def test_sgd_accum_type(capfd, accum_type, velocity_accum_type):
+    def torchTypeToStr(dt):
+        t = str(dt)
+        assert t in ["torch.float32", "torch.float16"]
+        return t.split(".")[1]
+
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
+    torch.manual_seed(42)
+    model = OptimizerTestModel()
+
+    # "Train" with learning rate of zero and check the loss remains the same.
+    optimizer = poptorch.optim.SGD(model.parameters(),
+                                   lr=0.01,
+                                   use_combined_accum=False,
+                                   accum_type=accum_type,
+                                   velocity_accum_type=velocity_accum_type)
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_matches(
+        "graph optimizer", "accumType=" + torchTypeToStr(accum_type),
+        "firstOrderMomentumAccumType=" + torchTypeToStr(velocity_accum_type))
+
+
+@pytest.mark.parametrize("use_combined_accum", (True, False))
+def test_velocity_scaling_copy(use_combined_accum):
     torch.manual_seed(42)
 
     model = OptimizerTestModel()
 
     # "Train" with learning rate of zero and check the loss remains the same.
-    optimizer = poptorch.optim.SGD(model.parameters(),
-                                   lr=0.05,
-                                   loss_scaling=0.05,
-                                   velocity_scaling=128.1)
+    optimizer = poptorch.optim.SGD(
+        model.parameters(),
+        lr=0.05,
+        loss_scaling=0.05,
+        velocity_scaling=128.1 if use_combined_accum else None,
+        use_combined_accum=use_combined_accum)
 
     model.run(optimizer)
 
@@ -302,6 +331,20 @@ def test_optimizer_groups_none_args():
     helpers.assert_allequal(expected=bias2, actual=bias2_post)
 
 
+@helpers.printCapfdOnExit
+def test_optimizer_SGD_separate_velocity_scale_matched(capfd):
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
+    model = OptimizerTestModel()
+
+    optimizer = poptorch.optim.SGD(model.parameters(),
+                                   loss_scaling=2.0,
+                                   lr=1.0)
+
+    model.run(optimizer)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_contains("lossScaling=2", "defaultVelocityScaling=2")
+
+
 def test_optimizer_SGD_nesterov():
     torch.manual_seed(42)
     model = OptimizerTestModel()
@@ -396,7 +439,8 @@ def test_lamb_max_weight_norm(opt):
 
 
 @helpers.printCapfdOnExit
-def test_variable_groups(capfd):
+@pytest.mark.parametrize("use_combined_accum", (True, False))
+def test_variable_groups(capfd, use_combined_accum):
     poptorch.setLogLevel("DEBUG")  # Force debug logging
     model = OptimizerTestModel(num_groups=2)
 
@@ -406,15 +450,18 @@ def test_variable_groups(capfd):
     }, {
         "params": model.model[1].parameters()
     }]
-    o = poptorch.optim.SGD(params,
-                           lr=0.01,
-                           loss_scaling=2.0,
-                           velocity_scaling=2.0)
+    o = poptorch.optim.SGD(
+        params,
+        lr=0.01,
+        loss_scaling=2.0,
+        velocity_scaling=2.0 if use_combined_accum else None,
+        use_combined_accum=use_combined_accum)
     model.run(o)
     testlog = helpers.LogChecker(capfd)
     testlog.assert_contains("graph optimizer with SGD",
                             "defaultLearningRate=0.01,",
                             "defaultVelocityScaling=2,", "lossScaling=2")
+
     testlog.assert_contains("group 0 optimizer with SGD", "learningRate=0.01,",
                             "velocityScaling=2,")
     testlog.assert_contains("group 1 optimizer with SGD", "learningRate=0.01,",
@@ -422,18 +469,25 @@ def test_variable_groups(capfd):
 
     # Make sure the loss_scaling can be changed, and individual velocityScaling can be set.
     o.loss_scaling = 4.0
-    o.param_groups[1]["velocity_scaling"] = 4.0
+    o.param_groups[1]["velocity_scaling"] = 4.0  # onl for combined variant
     o.param_groups[0][
         "loss_scaling"] = 4.0  # doesn't exist: loss scaling is not a group attribute
     model.run(o)
     testlog = helpers.LogChecker(capfd)
     testlog.assert_contains("Ignoring unexpected group 0 attribute",
                             "'loss_scaling'")
-    testlog.assert_contains("graph optimizer with SGD",
-                            "defaultLearningRate=0.01,",
-                            "defaultVelocityScaling=2,", "lossScaling=4")
-    testlog.assert_contains("group 0 optimizer with SGD", "learningRate=0.01,",
-                            "velocityScaling=2,")
+    if use_combined_accum:
+        testlog.assert_contains("graph optimizer with SGD",
+                                "defaultLearningRate=0.01,",
+                                "defaultVelocityScaling=2,", "lossScaling=4")
+        testlog.assert_contains("group 0 optimizer with SGD",
+                                "learningRate=0.01,", "velocityScaling=2,")
+    else:
+        testlog.assert_contains("Ignoring unexpected group 1 attribute",
+                                "'velocity_scaling'")
+        testlog.assert_contains("group 0 optimizer with SGD",
+                                "learningRate=0.01,", "velocityScaling=4,")
+
     testlog.assert_contains("group 1 optimizer with SGD", "learningRate=0.01,",
                             "velocityScaling=4,")
 
@@ -443,10 +497,12 @@ def test_variable_groups(capfd):
     }, {
         "params": model.model[1].parameters()
     }]
-    o = poptorch.optim.SGD(params,
-                           lr=0.01,
-                           loss_scaling=1.0,
-                           velocity_scaling=3.0)
+    o = poptorch.optim.SGD(
+        params,
+        lr=0.01,
+        loss_scaling=1.0,
+        velocity_scaling=3.0 if use_combined_accum else None,
+        use_combined_accum=use_combined_accum)
     o.lr = 0.5  # doesn't exit
     o.defaults["lr"] = 0.7
     o.param_groups[0]["lr"] = 0.0
@@ -454,13 +510,23 @@ def test_variable_groups(capfd):
     model.run(o)
     testlog = helpers.LogChecker(capfd)
     testlog.assert_contains("Ignoring unexpected optimizer attribute", "'lr'")
-    testlog.assert_contains("graph optimizer with SGD",
-                            "defaultLearningRate=0.7,",
-                            "defaultVelocityScaling=3,", "lossScaling=1")
-    testlog.assert_contains("group 0 optimizer with SGD", "learningRate=0,",
-                            "velocityScaling=3,")
-    testlog.assert_contains("group 1 optimizer with SGD", "learningRate=1,",
-                            "velocityScaling=3,")
+
+    if use_combined_accum:
+        testlog.assert_contains("graph optimizer with SGD",
+                                "defaultLearningRate=0.7,",
+                                "defaultVelocityScaling=3,", "lossScaling=1")
+        testlog.assert_contains("group 0 optimizer with SGD",
+                                "learningRate=0,", "velocityScaling=3,")
+        testlog.assert_contains("group 1 optimizer with SGD",
+                                "learningRate=1,", "velocityScaling=3,")
+    else:
+        testlog.assert_contains("graph optimizer with SGD",
+                                "defaultLearningRate=0.7,",
+                                "defaultVelocityScaling=1,", "lossScaling=1")
+        testlog.assert_contains("group 0 optimizer with SGD",
+                                "learningRate=0,", "velocityScaling=1,")
+        testlog.assert_contains("group 1 optimizer with SGD",
+                                "learningRate=1,", "velocityScaling=1,")
 
 
 @helpers.printCapfdOnExit
@@ -688,7 +754,8 @@ def test_gradient_accum_new_api(reduction):
 
 
 @helpers.printCapfdOnExit
-def test_extra_attributes(capfd):
+@pytest.mark.parametrize("use_combined_accum", (True, False))
+def test_extra_attributes(capfd, use_combined_accum):
     poptorch.setLogLevel("WARN")  # Make sure we only get warnings
     model = OptimizerTestModel(num_groups=2)
 
@@ -698,10 +765,12 @@ def test_extra_attributes(capfd):
     }, {
         "params": model.model[1].parameters()
     }]
-    o = poptorch.optim.SGD(params,
-                           lr=0.01,
-                           loss_scaling=2.0,
-                           velocity_scaling=2.0)
+    o = poptorch.optim.SGD(
+        params,
+        lr=0.01,
+        loss_scaling=2.0,
+        velocity_scaling=2.0 if use_combined_accum else None,
+        use_combined_accum=use_combined_accum)
     model.run(o)
     o.step = 0
     o.param_groups[0]["initial_lr"] = 0.1
@@ -720,7 +789,9 @@ def test_extra_attributes(capfd):
 
 
 @helpers.printCapfdOnExit
-def test_extra_attributes2(capfd):
+@pytest.mark.parametrize("use_combined_accum", (True, False))
+def test_extra_attributes2(capfd, use_combined_accum):
+
     poptorch.setLogLevel("WARN")  # Make sure we only get warnings
 
     opts = poptorch.Options()
@@ -732,10 +803,12 @@ def test_extra_attributes2(capfd):
     }, {
         "params": model.model[1].parameters()
     }]
-    o = poptorch.optim.SGD(params,
-                           lr=0.01,
-                           loss_scaling=2.0,
-                           velocity_scaling=2.0)
+    o = poptorch.optim.SGD(
+        params,
+        lr=0.01,
+        loss_scaling=2.0,
+        velocity_scaling=2.0 if use_combined_accum else None,
+        use_combined_accum=use_combined_accum)
     model.run(o)
     o.step = 0
     o.param_groups[0]["initial_lr"] = 0.1
@@ -747,7 +820,8 @@ def test_extra_attributes2(capfd):
 
 
 @helpers.printCapfdOnExit
-def test_extra_attributes3(capfd):
+@pytest.mark.parametrize("use_combined_accum", (True, False))
+def test_extra_attributes3(capfd, use_combined_accum):
     poptorch.setLogLevel("WARN")  # Make sure we only get warnings
     model = OptimizerTestModel(num_groups=2)
     # Make sure all groups have the default values, and the values are not (const)
@@ -756,10 +830,12 @@ def test_extra_attributes3(capfd):
     }, {
         "params": model.model[1].parameters()
     }]
-    o = poptorch.optim.SGD(params,
-                           lr=0.01,
-                           loss_scaling=2.0,
-                           velocity_scaling=2.0)
+    o = poptorch.optim.SGD(
+        params,
+        lr=0.01,
+        loss_scaling=2.0,
+        velocity_scaling=2.0 if use_combined_accum else None,
+        use_combined_accum=use_combined_accum)
     o.step = 0
     o.param_groups[0]["initial_lr"] = 0.1
     o.param_groups[1]["initial_lr"] = 0.1
