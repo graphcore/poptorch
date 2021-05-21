@@ -566,10 +566,6 @@ You can either set the ``loss_scaling`` factors manually, or you can set :py:fun
 which will automatically set a global loss scaling factor. If you both set ``loss_scaling`` manually and enable automatic loss scaling, the manually
 set factor(s) will be used initially and updated automatically during training.
 
-.. TODO(T38044): Remove the warning below once the behaviour is fixed in PopART
-
-.. warning:: Currently, the automatically updated loss-scaling factor will be reset every time a value in the optimiser is changed. This behaviour will be fixed in a future release.
-
 Velocity scaling (SGD only)
 ---------------------------
 
