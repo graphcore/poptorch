@@ -115,20 +115,26 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
 # and updated in a graph with a given op - Linear layer added to
 # ensure some weights exist
 class ModelWithWeights(torch.nn.Module):
-    def __init__(self, op, input_shape):
+    def __init__(self, op, input_shape, out_fn=None):
         super().__init__()
         self.op = op
         self.input_shape = input_shape
         self.lin = torch.nn.Linear(input_shape.numel(), input_shape.numel())
         # Copy original weights for training test
         self._weights_before = self.lin.weight.detach().clone()
+        # A function of the output that returns what the backwards pass should
+        # propagate through. For example, torch.median returns values and indices
+        # but the loss should only be calculated using the values. If unspecified,
+        # defaults to an identity function
+        self.out_fn = out_fn
 
     def forward(self, x):
         x = torch.flatten(x)
         x = self.lin(x)
         x = x.reshape(self.input_shape)
         x = self.op(x)
-        return x, poptorch.identity_loss(x**2, reduction='sum')
+        loss_in = x if self.out_fn is None else self.out_fn(x)
+        return x, poptorch.identity_loss(loss_in**2, reduction='sum')
 
     def assert_weights_changed(self):
         weights_after = self.lin.weight.detach().clone()
