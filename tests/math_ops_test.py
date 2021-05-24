@@ -504,11 +504,14 @@ def test_reduction_ops_float_api2(op, dim, keepdim):
         else:
             helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
+    # This check must be repeated here because we need to check the op before we
+    # wrap the function otherwise it won't match in the test harness
+    test_training = not op in non_differentiable_ops
     out_fn = (lambda x: x.values) if op is torch.median else None
     unary_op_harness(operation,
                      input,
                      assert_,
-                     test_training=True,
+                     test_training=test_training,
                      out_fn=out_fn)
 
 
