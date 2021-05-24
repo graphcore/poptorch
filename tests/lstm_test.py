@@ -20,9 +20,7 @@ def test_lstm():
         out, newHidden = lstm(i.view(1, 1, -1), hidden)
         ipuOut, ipuHidden = ipuLstm(i.view(1, 1, -1), hidden)
         helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
-        helpers.assert_allclose(expected=newHidden[1],
-                                actual=ipuHidden[1].reshape(
-                                    newHidden[1].shape))
+        helpers.assert_allclose(expected=newHidden[1], actual=ipuHidden[1])
         helpers.assert_allclose(expected=out, actual=ipuOut)
         hidden = newHidden
 
@@ -40,8 +38,7 @@ def test_lstm2():
     out, newHidden = lstm(inputs, hidden)
     ipuOut, ipuHidden = ipuLstm(inputs, hidden)
     helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
-    helpers.assert_allclose(expected=newHidden[1],
-                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=newHidden[1], actual=ipuHidden[1])
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
@@ -58,15 +55,13 @@ def test_lstm_twice():
     out, newHidden = lstm(inputs, hidden)
     ipuOut, ipuHidden = ipuLstm(inputs, hidden)
     helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
-    helpers.assert_allclose(expected=newHidden[1],
-                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=newHidden[1], actual=ipuHidden[1])
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
     out, newHidden = lstm(inputs, hidden)
     ipuOut2, ipuHidden2 = ipuLstm(inputs, hidden)
     helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden2[0])
-    helpers.assert_allclose(expected=newHidden[1],
-                            actual=ipuHidden2[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=newHidden[1], actual=ipuHidden2[1])
     helpers.assert_allclose(expected=out, actual=ipuOut2)
     helpers.assert_allclose(expected=ipuOut, actual=ipuOut2)
 
@@ -84,8 +79,7 @@ def test_lstm_batch_first():
     out, newHidden = lstm(inputs, hidden)
     ipuOut, ipuHidden = ipuLstm(inputs, hidden)
     helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
-    helpers.assert_allclose(expected=newHidden[1],
-                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=newHidden[1], actual=ipuHidden[1])
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
@@ -105,8 +99,7 @@ def test_lstm_batched():
     out, newHidden = lstm(inputs, hidden)
     ipuOut, ipuHidden = ipuLstm(inputs, hidden)
     helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
-    helpers.assert_allclose(expected=newHidden[1],
-                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=newHidden[1], actual=ipuHidden[1])
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
@@ -125,8 +118,7 @@ def test_lstm_batched_batch_first():
     out, newHidden = lstm(inputs, hidden)
     ipuOut, ipuHidden = ipuLstm(inputs, hidden)
     helpers.assert_allclose(expected=newHidden[0], actual=ipuHidden[0])
-    helpers.assert_allclose(expected=newHidden[1],
-                            actual=ipuHidden[1].reshape(newHidden[1].shape))
+    helpers.assert_allclose(expected=newHidden[1], actual=ipuHidden[1])
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 

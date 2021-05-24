@@ -222,11 +222,18 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
     output = transpose->output();
   }
 
+  // The shape of y_c returned by PopART has shape (batch_size, hidden_size).
+  // Torch's c_n output has shape
+  // (num_directions * num_layers, batch_size, hidden_size), but since we don't
+  // support bidirectional or > 1 layers, this dimension is always 1 so we just
+  // need to prepend a single dim
+  auto y_c = createUnsqueeze(graph, {lstm->output(1)}, {0});
+
   ERROR_ON(node->outputs().size() != 3);
   if (node->hasUses()) {
     replaceOutputUse(node->output(0), output);
     replaceOutputUse(node->output(1), y_h->output());
-    replaceOutputUse(node->output(2), lstm->output(1));
+    replaceOutputUse(node->output(2), y_c->output());
   }
 
   markNodeForDeletion(node);
