@@ -2,6 +2,7 @@
 import copy
 import functools
 import re
+from abc import ABC
 import torch
 import poptorch
 import poptorch.poptorch_core as poptorch_core  # type: ignore
@@ -114,12 +115,16 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
 # Wrapper model with weights to test that gradients are generated
 # and updated in a graph with a given op - Linear layer added to
 # ensure some weights exist
-class ModelWithWeights(torch.nn.Module):
-    def __init__(self, op, input_shape, out_fn=None):
+#
+# This is an abstract class and the forward function must be implemented
+# in a subclass
+class AbstractModelWithWeights(torch.nn.Module, ABC):
+    def __init__(self, op, input_shapes, out_fn=None):
         super().__init__()
         self.op = op
-        self.input_shape = input_shape
-        self.lin = torch.nn.Linear(input_shape.numel(), input_shape.numel())
+        self.input_shapes = input_shapes
+        numel = sum([shape.numel() for shape in input_shapes])
+        self.lin = torch.nn.Linear(numel, numel)
         # Copy original weights for training test
         self._weights_before = self.lin.weight.detach().clone()
         # A function of the output that returns what the backwards pass should
@@ -128,17 +133,47 @@ class ModelWithWeights(torch.nn.Module):
         # defaults to an identity function
         self.out_fn = out_fn
 
-    def forward(self, x):
-        x = torch.flatten(x)
-        x = self.lin(x)
-        x = x.reshape(self.input_shape)
-        x = self.op(x)
+    def handle_output(self, x):
         loss_in = x if self.out_fn is None else self.out_fn(x)
         return x, poptorch.identity_loss(loss_in**2, reduction='sum')
 
     def assert_weights_changed(self):
         weights_after = self.lin.weight.detach().clone()
         assert not torch.allclose(self._weights_before, weights_after)
+
+
+class UnaryModelWithWeights(AbstractModelWithWeights):
+    def __init__(self, op, input_shape, out_fn=None):
+        super().__init__(op, [input_shape], out_fn)
+
+    # Flatten input, pass through linear layer of same size
+    # and pass output to the op
+    def forward(self, x):
+        x = torch.flatten(x)
+        x = self.lin(x)
+        x = x.reshape(self.input_shapes[0])
+        x = self.op(x)
+        return self.handle_output(x)
+
+
+class BinaryModelWithWeights(AbstractModelWithWeights):
+    def __init__(self, op, input_shape1, input_shape2, out_fn=None):
+        super().__init__(op, [input_shape1, input_shape2], out_fn)
+
+    # Flatten both inputs, concatenate into a a single 1-dim tensor
+    # and pass through linear layer of same size, then split and assign
+    # the output according to the sizes of the inputs and pass to the op
+    def forward(self, x1, x2):
+        x1_flat = torch.flatten(x1)
+        x2_flat = torch.flatten(x2)
+        x = torch.cat((x1_flat, x2_flat))
+        x = self.lin(x)
+        x1_out = x[:self.input_shapes[0].numel()]
+        x2_out = x[self.input_shapes[0].numel():]
+        x1_out = x1_out.reshape(self.input_shapes[0])
+        x2_out = x2_out.reshape(self.input_shapes[1])
+        x = self.op(x1_out, x2_out)
+        return self.handle_output(x)
 
 
 class PrintCapfdOnExit:

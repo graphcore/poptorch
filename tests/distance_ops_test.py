@@ -11,16 +11,23 @@ import helpers
 def test_pairwise_distance(norm):
     torch.manual_seed(42)
 
-    input1 = torch.randn(10, 5)
-    input2 = torch.randn(10, 5)
+    size = [10, 5]
+    input1 = torch.randn(size)
+    input2 = torch.randn(size)
+    shape = input1.shape
 
-    model = torch.nn.PairwiseDistance(norm)
-    poptorch_model = poptorch.inferenceModel(model)
+    model = helpers.BinaryModelWithWeights(torch.nn.PairwiseDistance(norm),
+                                           shape, shape)
+    poptorch_model = poptorch.trainingModel(model)
 
     # Run on CPU
-    native_out = model(input1, input2)
+    native_out, _ = model(input1, input2)
 
     # Run on IPU
-    poptorch_out = poptorch_model(input1, input2)
+    poptorch_out, _ = poptorch_model(input1, input2)
 
+    # Inference test - check outputs
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()

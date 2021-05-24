@@ -8,16 +8,24 @@ import helpers
 
 non_differentiable_ops = [
     torch.ceil, torch.floor, torch.round, torch.sign, torch.trunc,
-    torch.argmax, torch.argmin
+    torch.argmax, torch.argmin, torch.remainder
 ]
 
 
-def unary_op_harness(op, input, assert_func, test_training=False, out_fn=None):
+def op_harness(op, inputs, assert_func, test_training=False, out_fn=None):
+    is_unary = len(inputs) == 1
+    if not is_unary:
+        assert len(inputs) == 2
+
     if test_training and not op in non_differentiable_ops:
-        model = helpers.ModelWithWeights(op, input.shape, out_fn)
+        if is_unary:
+            model = helpers.UnaryModelWithWeights(op, inputs[0].shape, out_fn)
+        else:
+            model = helpers.BinaryModelWithWeights(op, inputs[0].shape,
+                                                   inputs[1].shape, out_fn)
 
         # Run on CPU.
-        native_out, _ = model(input)
+        native_out, _ = model(*inputs)
 
         # The LR should be large enough that a single training step will
         # definitely cause weights to change
@@ -25,7 +33,7 @@ def unary_op_harness(op, input, assert_func, test_training=False, out_fn=None):
 
         # Run on IPU.
         poptorch_model = poptorch.trainingModel(model, optimizer=optim)
-        poptorch_out, _ = poptorch_model(input)
+        poptorch_out, _ = poptorch_model(*inputs)
 
         # Training test - check weights have changed
         poptorch_model.assert_weights_changed()
@@ -36,38 +44,19 @@ def unary_op_harness(op, input, assert_func, test_training=False, out_fn=None):
                 super().__init__()
                 self.op = op
 
-            def forward(self, x):
-                return self.op(x)
+        if is_unary:
+            Model.forward = lambda self, x: self.op(x)
+        else:
+            Model.forward = lambda self, x, y: self.op(x, y)
 
         model = Model(op)
 
         # Run on CPU.
-        native_out = model(input)
+        native_out = model(*inputs)
 
         # Run on IPU.
         poptorch_model = poptorch.inferenceModel(model)
-        poptorch_out = poptorch_model(input)
-
-    assert_func(native_out, poptorch_out)
-
-
-def binary_op_harness(op, input1, input2, assert_func):
-    class Model(torch.nn.Module):
-        def __init__(self, op):
-            super(Model, self).__init__()
-            self.op = op
-
-        def forward(self, x, y):
-            return self.op(x, y)
-
-    model = Model(op)
-
-    # Run on CPU.
-    native_out = model(input1, input2)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(input1, input2)
+        poptorch_out = poptorch_model(*inputs)
 
     assert_func(native_out, poptorch_out)
 
@@ -128,14 +117,14 @@ def test_unary_ops_float(op):
                                 rtol=1e-04,
                                 equal_nan=True)
 
-    unary_op_harness(op, input, assert_, test_training=True)
+    op_harness(op, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("exponent", [4.0, 3, 2.5])
 def test_binary_pow(inplace, exponent):
     torch.manual_seed(42)
-    input1 = torch.randn([1, 2, 10, 200])
+    input = torch.randn([1, 2, 10, 200])
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
@@ -148,7 +137,7 @@ def test_binary_pow(inplace, exponent):
             return x.pow_(exponent)
         return torch.pow(x, exponent)
 
-    unary_op_harness(op, input1, assert_)
+    op_harness(op, [input], assert_)
 
 
 unary_ops_int = [
@@ -165,7 +154,7 @@ def test_unary_ops_int(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(op, input, assert_)
+    op_harness(op, [input], assert_)
 
 
 unary_ops_bool = [
@@ -182,7 +171,7 @@ def test_unary_ops_bool(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(op, input, assert_)
+    op_harness(op, [input], assert_)
 
 
 # Parameterize torch.clamp unittests for different supported overloads
@@ -201,7 +190,7 @@ def test_clamp(args):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(op_clamp, input, assert_, test_training=True)
+    op_harness(op_clamp, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("args", clamp_inputs)
@@ -216,7 +205,7 @@ def test_clamp_(args):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(op_clamp_, input, assert_, test_training=True)
+    op_harness(op_clamp_, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize(
@@ -233,7 +222,7 @@ def test_clamp_min(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(op_clamp, input, assert_, test_training=True)
+    op_harness(op_clamp, [input], assert_, test_training=True)
 
 
 binary_ops_float = [
@@ -256,15 +245,7 @@ def test_binary_ops_float(op):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    class Model(torch.nn.Module):
-        def __init__(self, op):
-            super(Model, self).__init__()
-            self.op = op
-
-        def forward(self, x, y):
-            return self.op(x, y)
-
-    binary_op_harness(Model(op), input1, input2, assert_)
+    op_harness(op, [input1, input2], assert_, test_training=True)
 
 
 binary_ops_basic_element_wise_float = [
@@ -278,7 +259,7 @@ binary_ops_basic_element_wise_float = [
 @pytest.mark.parametrize("op", binary_ops_basic_element_wise_float)
 def test_binary_ops_elementwise_edgecases(op):
     torch.manual_seed(42)
-    input1 = torch.randn([1, 2, 10, 200])
+    input1 = torch.randn([1, 2, 10, 10])
     input2 = torch.randn([1])
 
     def assert_(native_out, poptorch_out):
@@ -288,49 +269,26 @@ def test_binary_ops_elementwise_edgecases(op):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    # Constant on LHS
-    class ConstOnLHS(torch.nn.Module):
+    class Model(torch.nn.Module):
         def __init__(self, op):
-            super(ConstOnLHS, self).__init__()
+            super().__init__()
             self.op = op
 
-        def forward(self, x, _y):
-            return self.op(x, 4.0)
-
-    binary_op_harness(ConstOnLHS(op), input1, input2, assert_)
+    # Constant on LHS
+    Model.forward = lambda self, x, _y: self.op(x, 4.0)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
     # Constant on RHS
-    class ConstOnRHS(torch.nn.Module):
-        def __init__(self, op):
-            super(ConstOnRHS, self).__init__()
-            self.op = op
-
-        def forward(self, x, _y):
-            return self.op(2.5, x)
-
-    binary_op_harness(ConstOnRHS(op), input1, input2, assert_)
+    Model.forward = lambda self, x, _y: self.op(2.5, x)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
     # Constant on LHS wrong type.
-    class ConstOnLHSInt(torch.nn.Module):
-        def __init__(self, op):
-            super(ConstOnLHSInt, self).__init__()
-            self.op = op
-
-        def forward(self, x, _y):
-            return self.op(x, 4)
-
-    binary_op_harness(ConstOnLHSInt(op), input1, input2, assert_)
+    Model.forward = lambda self, x, _y: self.op(x, 4)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
     # Constant on RHS wrong type
-    class ConstOnRHSInt(torch.nn.Module):
-        def __init__(self, op):
-            super(ConstOnRHSInt, self).__init__()
-            self.op = op
-
-        def forward(self, x, _y):
-            return self.op(134, x)
-
-    binary_op_harness(ConstOnRHSInt(op), input1, input2, assert_)
+    Model.forward = lambda self, x, _y: self.op(134, x)
+    op_harness(Model(op), [input1, input2], assert_, test_training=True)
 
 
 binary_ops_basic_element_wise_bool = [
@@ -347,59 +305,30 @@ def test_binary_ops_elementwise_bools(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    class BothBools(torch.nn.Module):
+    class Model(torch.nn.Module):
         def __init__(self, op):
             super().__init__()
             self.op = op
 
-        def forward(self, x, y):
-            return self.op(x, y)
+    # Both bools
+    Model.forward = lambda self, x, y: self.op(x, y)
+    op_harness(Model(op), [input1, input2], assert_)
 
-    binary_op_harness(BothBools(op), input1, input2, assert_)
+    # Float on LHS
+    Model.forward = lambda self, x, y: self.op(x.to(torch.float) + 1.0, y)
+    op_harness(Model(op), [input1, input2], assert_)
 
-    class FloatOnLHS(torch.nn.Module):
-        def __init__(self, op):
-            super().__init__()
-            self.op = op
+    # Float on RHS
+    Model.forward = lambda self, x, y: self.op(x, y.to(torch.float) + 1.0)
+    op_harness(Model(op), [input1, input2], assert_)
 
-        def forward(self, x, y):
-            x = x.to(torch.float) + 1.0
-            return self.op(x, y)
+    # Int on LHS
+    Model.forward = lambda self, x, y: self.op(x.to(torch.int) + 1, y)
+    op_harness(Model(op), [input1, input2], assert_)
 
-    binary_op_harness(FloatOnLHS(op), input1, input2, assert_)
-
-    class FloatOnRHS(torch.nn.Module):
-        def __init__(self, op):
-            super().__init__()
-            self.op = op
-
-        def forward(self, x, y):
-            y = y.to(torch.float) + 1.0
-            return self.op(x, y)
-
-    binary_op_harness(FloatOnRHS(op), input1, input2, assert_)
-
-    class IntOnLHS(torch.nn.Module):
-        def __init__(self, op):
-            super().__init__()
-            self.op = op
-
-        def forward(self, x, y):
-            x = x.to(torch.int) + 1
-            return self.op(x, y)
-
-    binary_op_harness(IntOnLHS(op), input1, input2, assert_)
-
-    class IntOnRHS(torch.nn.Module):
-        def __init__(self, op):
-            super().__init__()
-            self.op = op
-
-        def forward(self, x, y):
-            y = y.to(torch.int) + 1
-            return self.op(x, y)
-
-    binary_op_harness(IntOnRHS(op), input1, input2, assert_)
+    # Int on RHS
+    Model.forward = lambda self, x, y: self.op(x, y.to(torch.int) + 1)
+    op_harness(Model(op), [input1, input2], assert_)
 
 
 @pytest.mark.parametrize("op", [torch.fmod, torch.remainder])
@@ -414,7 +343,7 @@ def test_modulo_mixed_sign(op):
                                 rtol=1e-05,
                                 equal_nan=True)
 
-    binary_op_harness(op, input1, input2, assert_)
+    op_harness(op, [input1, input2], assert_)
 
 
 binary_op_int = [
@@ -474,7 +403,7 @@ def test_reduction_ops_float(op):
         else:
             helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(op, input, assert_, test_training=True)
+    op_harness(op, [input], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("op", reduction_ops_api2)
@@ -508,11 +437,10 @@ def test_reduction_ops_float_api2(op, dim, keepdim):
     # wrap the function otherwise it won't match in the test harness
     test_training = not op in non_differentiable_ops
     out_fn = (lambda x: x.values) if op is torch.median else None
-    unary_op_harness(operation,
-                     input,
-                     assert_,
-                     test_training=test_training,
-                     out_fn=out_fn)
+    op_harness(operation, [input],
+               assert_,
+               test_training=test_training,
+               out_fn=out_fn)
 
 
 @pytest.mark.parametrize("op", [torch.min, torch.max])
@@ -534,11 +462,7 @@ def test_minmax_tuple_out(op, dim, keepdim):
             helpers.assert_allclose(actual=poptorch_out[i], expected=native)
 
     out_fn = lambda x: x.values
-    unary_op_harness(operation,
-                     input,
-                     assert_,
-                     test_training=True,
-                     out_fn=out_fn)
+    op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
 
 
 # Interesting p-values for testing torch.norm(X, p=<>)
@@ -556,7 +480,7 @@ def test_norm_p_values(p):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(operation, input, assert_, test_training=True)
+    op_harness(operation, [input], assert_, test_training=True)
 
 
 comparison_ops = [
@@ -592,14 +516,11 @@ def test_compare_operations(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    binary_op_harness(op, lhs, rhs, assert_)
+    op_harness(op, [lhs, rhs], assert_)
 
     if op not in (torch.min, torch.max):
-
-        def constant_rhs(x):
-            return op(x, 0.34)
-
-        unary_op_harness(constant_rhs, lhs, assert_)
+        constant_rhs = lambda x: op(x, 0.34)
+        op_harness(constant_rhs, [lhs], assert_)
 
 
 comparison_unity_nan_inf_ops = [
@@ -623,7 +544,7 @@ def test_compare_unity_nan_inf_ops(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(op, input, assert_)
+    op_harness(op, [input], assert_)
 
 
 comparison_unity = [torch.max, torch.min]
@@ -640,7 +561,7 @@ def test_compare_unity_operations(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(operation, input, assert_, test_training=True)
+    op_harness(operation, [input], assert_, test_training=True)
 
 
 # Support other arguments. TODO(T23319)
@@ -659,11 +580,7 @@ def test_topk():
                                 expected=native_out.indices)
 
     out_fn = lambda x: x.values
-    unary_op_harness(operation,
-                     input,
-                     assert_,
-                     test_training=True,
-                     out_fn=out_fn)
+    op_harness(operation, [input], assert_, test_training=True, out_fn=out_fn)
 
 
 types = [torch.float32, torch.int32]
@@ -683,7 +600,7 @@ def test_constant_arrays(ty):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(operation, input, assert_)
+    op_harness(operation, [input], assert_)
 
 
 @pytest.mark.parametrize("ty", types)
@@ -721,7 +638,7 @@ def test_big_constant_arrays_sliced(ty):
     def assert_(native_out, poptorch_out):
         helpers.assert_allequal(actual=poptorch_out, expected=native_out)
 
-    unary_op_harness(operation, input, assert_)
+    op_harness(operation, [input], assert_)
 
 
 # Parametrize input tensor shapes for addcdiv to make sure broadcasting works.
@@ -766,24 +683,21 @@ cross_shapes = [(3, 4, 5, 6), (4, 3, 5, 6), (4, 5, 3, 6), (4, 5, 6, 3),
 
 @pytest.mark.parametrize("shape", cross_shapes)
 def test_cross_shape(shape):
-    class Model(torch.nn.Module):
-        def forward(self, x, y):
-            return torch.cross(x, y)
-
-    model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
-
     torch.manual_seed(42)
+
     x = torch.randn(shape)
     y = torch.randn(shape)
 
-    native_out = model(x, y)
-    poptorch_out = poptorch_model(x, y)
-    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    op_harness(torch.cross, [x, y], assert_, test_training=True)
 
 
 @pytest.mark.parametrize("axis", range(0, 4))
 def test_cross_axis(axis):
+    torch.manual_seed(42)
+
     class Model(torch.nn.Module):
         def __init__(self, axis):
             super().__init__()
@@ -792,13 +706,10 @@ def test_cross_axis(axis):
         def forward(self, x, y):
             return torch.cross(x, y, self.axis)
 
-    model = Model(axis)
-    poptorch_model = poptorch.inferenceModel(model)
-
-    torch.manual_seed(42)
     x = torch.randn(3, 3, 3, 3)
     y = torch.randn(3, 3, 3, 3)
 
-    native_out = model(x, y)
-    poptorch_out = poptorch_model(x, y)
-    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    op_harness(Model(axis), [x, y], assert_, test_training=True)
