@@ -1033,10 +1033,6 @@ Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
   std::vector<popart::TensorId> output =
       ai_onnx.loop(transformed_ins, num_outputs, *body);
 
-  for (const popart::TensorId &id : output) {
-    logging::warn("Output {}", id);
-  }
-
   return HandleOutput<std::vector<popart::TensorId>>{}(output, false,
                                                        _impl.get());
 }
