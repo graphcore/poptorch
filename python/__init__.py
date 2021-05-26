@@ -19,12 +19,14 @@ assert torch.__version__.startswith("@TORCH_VERSION@"), (
 
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
-from . import _impl
+from . import _dataloader
+from . import _poptorch_data
 from .autocasting import autocast
 from .enums import *
 from .ops import *
 from .options import *
-from ._impl import PoplarExecutor, isRunningOnIpu
+from ._impl import isRunningOnIpu
+from ._poplar_executor import PoplarExecutor
 from . import optim
 from . import profiling
 
@@ -46,7 +48,7 @@ def load(filename: str,
     >>> model = poptorch.load("my_model.poptorch")
     >>> model(my_input)
     """
-    data, _ = _impl.parsePoptorchData(filename, __version__)
+    data, _ = _poptorch_data.parse(filename, __version__)
     assert data.model and data.options, (
         f"{filename} is a valid PopTorch file but was created"
         " with 'export_model=False' which means you need to re-create"
@@ -448,7 +450,7 @@ class AsynchronousDataAccessor:
         # To avoid hangs when the application exits: implicitly call terminate().
         atexit.register(self.terminate)
         self.rebatched_size = rebatched_size
-        self._worker = _impl.AsynchronousWorker(
+        self._worker = _dataloader.AsynchronousWorker(
             buffer_size, miss_sleep_time_in_ms, dataset, load_indefinitely,
             early_preload, sharing_strategy, rebatched_size)
 

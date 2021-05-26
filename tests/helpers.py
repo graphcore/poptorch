@@ -103,13 +103,13 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
     maybe_wrapped_model = copy.copy(model)
 
     # Store the real __call__ method before PoplarExecutor wraps it
-    return poptorch._impl.PoplarExecutor(  # pylint: disable=protected-access
-        model=TrainingModelWithLoss(maybe_wrapped_model, loss),
-        options=options,
-        training=True,
-        optimizer=optimizer,
-        user_model=model,
-        poptorch_version=poptorch.__version__)
+    training_model = TrainingModelWithLoss(maybe_wrapped_model, loss)
+    return poptorch.PoplarExecutor(model=training_model,
+                                   options=options,
+                                   training=True,
+                                   optimizer=optimizer,
+                                   user_model=model,
+                                   poptorch_version=poptorch.__version__)
 
 
 # Wrapper model with weights to test that gradients are generated

@@ -88,6 +88,11 @@ target_include_directories(poptorch_core PRIVATE
 install(TARGETS poptorch_core
   DESTINATION ${INSTALL_PYDIR})
 
+file(GLOB python_files "${CMAKE_CURRENT_SOURCE_DIR}/*.py")
+
+# __init__.py needs to be edited by set_version.py so don't copy it over.
+list(REMOVE_ITEM python_files "${CMAKE_CURRENT_SOURCE_DIR}/__init__.py")
+
 run_poptorch_install_command("python3 ${PROJECT_SOURCE_DIR}/scripts/set_version.py --torch-version ${TORCH_VERSION} ${CMAKE_CURRENT_BINARY_DIR}/__init__.py" "${PROJECT_SOURCE_DIR}" "Generate __init__.py")
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.py DESTINATION "${INSTALL_PYDIR}")
-install(FILES _impl.py _options_config.py _options_impl.py _logging.py _utils.py autocasting.py enums.py optim.py ops.py options.py profiling.py py.typed testing.py DESTINATION "${INSTALL_PYDIR}")
+install(FILES ${python_files}  py.typed DESTINATION "${INSTALL_PYDIR}")

@@ -40,7 +40,6 @@ short_tests = [
     "custom_loss_test.py",
     "custom_ops_attributes_test.py",
     "custom_ops_test.py",
-    "index_ops_test.py",
     "inputs_test.py",
     "loop_test.py",
     "lstm_test.py",
