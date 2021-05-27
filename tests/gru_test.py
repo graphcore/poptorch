@@ -9,7 +9,7 @@ import helpers
 
 @pytest.mark.parametrize("bias", [True, False])
 @pytest.mark.parametrize("batch_first", [True, False])
-def test_gru_inference(bias, batch_first):
+def test_gru(bias, batch_first):
     length = 1
     batches = 3
     input_size = 5
@@ -25,15 +25,22 @@ def test_gru_inference(bias, batch_first):
         inp = torch.randn(length, batches, input_size)
     h0 = torch.randn(layers * directions, batches, hidden_size)
 
-    model = torch.nn.GRU(input_size,
-                         hidden_size,
-                         bias=bias,
-                         batch_first=batch_first)
+    op = torch.nn.GRU(input_size,
+                      hidden_size,
+                      bias=bias,
+                      batch_first=batch_first)
 
-    poptorch_model = poptorch.inferenceModel(model)
+    out_fn = lambda x: x[0]
+    model = helpers.BinaryModelWithWeights(op, inp.shape, h0.shape, out_fn)
 
-    (native_out, native_hn) = model(inp, h0)
-    (poptorch_out, poptorch_hn) = poptorch_model(inp, h0)
+    poptorch_model = poptorch.trainingModel(model)
 
+    (native_out, native_hn), _ = model(inp, h0)
+    (poptorch_out, poptorch_hn), _ = poptorch_model(inp, h0)
+
+    # Inference test - check outputs
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
     helpers.assert_allclose(actual=poptorch_hn, expected=native_hn)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
