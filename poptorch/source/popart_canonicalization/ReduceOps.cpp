@@ -24,14 +24,25 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   torch::jit::Symbol kind = node->kind();
   torch::jit::Value *input = node->input(0);
 
+  // sum and prod works even for bool types in PyTorch
+  auto tensor_type = input->type()->expect<c10::TensorType>();
+  if (tensor_type->scalarType() == at::ScalarType::Bool) {
+    auto cast_node = createCast(graph, input, c10::ScalarType::Int);
+    input = cast_node->output();
+  }
+
   std::vector<std::int64_t> axes{};
   std::int64_t keepdim = 0;
 
   // Case 2.
   if (node->inputs().size() == 2) {
-    torch::jit::Node *flatten = createFlatten(graph, {node->input(0)}, 0);
-    input = flatten->output();
-    axes = {1};
+    // Need to use reshape as "Flatten" is for 2D output
+    auto numels_optional = tensor_type->numel();
+    ERROR_ON(!numels_optional);
+    input =
+        createReshape(graph, input, {static_cast<int64_t>(*numels_optional)})
+            ->output();
+    axes = {0};
   } else {
     // Case 1.
     // Sometimes the dimensions are just one int.
