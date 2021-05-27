@@ -211,3 +211,37 @@ through the whole system, as highlighted.
    :width: 400
 
    Pipeline execution with gradient accumulation
+
+.. _anchorReturnType:
+
+poptorch.Options.Training.anchorReturnType
+==========================================
+
+When you use a :py:func:`~poptorch.inferenceModel`, you will usually want to
+receive all the output tensors. For this reason, PopTorch will return them
+all to you by default. However, you can change this behaviour using
+:py:func:`poptorch.Options.anchorMode`.
+
+When you use a :py:func:`~poptorch.trainingModel`, you will often not need to
+receive all or any of the output tensors and it is more efficient not to
+receive them. For this reason, PopTorch only returns the last batch of tensors
+by default. As in the the case of ``inferenceModel``, you can change this
+behaviour using :py:func:`poptorch.Options.anchorMode`.
+
+If you want to monitor training using a metric such as loss or accuracy, you
+may wish to take into account all tensors. To do this with minimal or no
+overhead, you can use ``poptorch.AnchorMode.Sum``. For example:
+
+ .. literalinclude:: sumAnchorReturnType.py
+  :caption: A model which returns training accuracy as a tensor
+  :language: python
+  :linenos:
+  :start-after: model_returning_accuracy_start
+  :end-before: model_returning_accuracy_end
+
+ .. literalinclude:: sumAnchorReturnType.py
+  :caption: Efficient calculation of training accuracy across all batches
+  :language: python
+  :linenos:
+  :start-after: sum_accuracy_start
+  :end-before: sum_accuracy_end
