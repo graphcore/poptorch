@@ -1,4 +1,4 @@
-========
+GBy========
 Features
 ========
 
@@ -76,6 +76,11 @@ more information.
     :emphasize-lines: 22
     :start-after: training_model_start
     :end-before: training_model_end
+
+.. note:: By default, PopTorch will only return the final batch of outputs.
+   Please see :numref:`anchorReturnType` for details on what PopTorch returns
+   when using :py:func:`~poptorch.trainingModel` and how you can calculate
+   statistics such as training accuracy over all batches.
 
 poptorch.inferenceModel
 -----------------------
