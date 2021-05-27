@@ -10,6 +10,34 @@ from . import poptorch_core
 _end_ipu_block = torch.ops.poptorch.end_ipu_block
 
 
+def ctc_beam_search_decoder(probs,
+                            lengths,
+                            blank=0,
+                            beam_width=100,
+                            top_paths=1):
+    """Add a connectionist temporal classification (CTC) beam search decoder
+       to the model.
+
+    Calculates the most likely top paths and their probabilities given the
+    input logarithmic probabilities and the data lengths.
+
+    :param torch.Tensor probs: Logarithmic probabilities' tensor in the shape
+                               of [input_length, batch_size, num_classes].
+    :param torch.Tensor lenghts: Tensor representing lengths of the inputs
+                                 of shape [batch_size].
+    :param int blank: Integer identifier of the blank class (default: 0).
+    :param int beam_width: Number of beams used during decoding (default: 100).
+    :param int top_paths: Number of most likely paths to return (default: 1).
+    :returns: Three tensors representing paths' probabilities - of shape
+              [batch_size, top_paths], paths' lengths - of shape
+              [batch_size, top_paths] and the decoded paths - of shape
+              [batch_size, top_paths, input_length].
+    :rtype: [torch.Tensor, torch.Tensor, torch.Tensor]
+    """
+    return torch.ops.poptorch.ctc_beam_search_decoder(probs, lengths, blank,
+                                                      beam_width, top_paths)
+
+
 def ipu_print_tensor(tensor, title=""):
     """
     Adds an op to print the content of a given IPU tensor.

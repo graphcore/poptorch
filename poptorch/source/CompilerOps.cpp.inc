@@ -119,6 +119,13 @@ new_node->i_(c10::Symbol::fromQualString("attr::blank"),blank);
 new_node->s_(c10::Symbol::fromQualString("attr::outDataType"),outDataType);
 return new_node;
 }
+torch::jit::Node* createCtcbeamsearchdecoder(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int blank,unsigned int beamWidth,unsigned int topPaths) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::ctcbeamsearchdecoder, args, ImplicitCast::None, OutputType::Unknown);
+new_node->i_(c10::Symbol::fromQualString("attr::blank"),blank);
+new_node->i_(c10::Symbol::fromQualString("attr::beamWidth"),beamWidth);
+new_node->i_(c10::Symbol::fromQualString("attr::topPaths"),topPaths);
+return new_node;
+}
 torch::jit::Node* createShapeddropout(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & shape,float ratio) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::shapeddropout, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::shape"),shape);

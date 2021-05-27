@@ -554,6 +554,37 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
                         reduction, blank, "UNDEFINED");
 }
 
+torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
+                                              torch::jit::Node *node) {
+  auto log_probs = node->input(0);
+  auto lengths = node->input(1);
+  auto blank = constantToInt(node->input(2)->node());
+  auto width = constantToInt(node->input(3)->node());
+  auto top_paths = constantToInt(node->input(4)->node());
+
+  auto uses = node->output()->uses();
+  ERROR_ON_MSG(uses.size() != 1,
+               "[Internal Compiler Error] Malformed ctc beam search operator");
+
+  auto unpack = uses[0].user;
+  ERROR_ON_MSG(unpack->kind() != c10::prim::ListUnpack,
+               "[Internal Compiler Error] Malformed ctc beam search operator");
+
+  lengths = createCast(graph, {lengths}, "UINT32")->output();
+  auto decoder = createCtcbeamsearchdecoder(graph, {log_probs, lengths}, blank,
+                                            width, top_paths);
+  decoder->addOutput();
+  decoder->addOutput();
+
+  unpack->output(0)->replaceAllUsesWith(decoder->output(0));
+  unpack->output(1)->replaceAllUsesWith(decoder->output(1));
+  unpack->output(2)->replaceAllUsesWith(decoder->output(2));
+
+  markNodeForDeletion(node);
+  markNodeForDeletion(unpack);
+  return nullptr;
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -568,6 +599,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::cosine_embedding_loss, cosineEmbeddingLossHandler);
   registerHandler(c10::aten::triplet_margin_loss, tripletMarginLossHandler);
   registerHandler(c10::aten::ctc_loss, ctcLossHandler);
+  registerHandler(symbols::poptorch::ctc_beam_search_decoder,
+                  ctcbeamsearchdecoderHandler);
 }
 
 } // namespace poptorch

@@ -621,6 +621,21 @@ PopTorch ops
 
 This section describes some "helper" operations you can use within a model.
 
+poptorch.ctc_beam_search_decoder
+--------------------------------
+
+This function adds a Connectionist Temporal Classification (CTC) beam search
+decoder operator to the model.
+
+.. literalinclude:: api.py
+    :language: python
+    :linenos:
+    :start-after: ctc_beam_search_start
+    :end-before: ctc_beam_search_end
+    :emphasize-lines: 3
+
+For more information see: :py:func:`~poptorch.ctc_beam_search_decoder`.
+
 poptorch.ipu_print_tensor
 -------------------------
 

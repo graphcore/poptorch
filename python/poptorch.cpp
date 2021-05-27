@@ -112,6 +112,26 @@ customOperation(c10::List<at::Tensor> inputs,          // NOLINT
   return example_outputs;
 }
 
+c10::List<at::Tensor> ctcBeamSearchDecoder(const at::Tensor &log_probs,
+                                           const at::Tensor &lengths,
+                                           int64_t blank, int64_t width,
+                                           int64_t top_paths) {
+  UNUSED(lengths);
+  UNUSED(blank);
+  UNUSED(width);
+
+  ERROR_ON_MSG(log_probs.sizes().size() != 3,
+               "Incorrect shape for first input to CTC beam search decoder.");
+  unsigned input_len = log_probs.sizes()[0];
+  unsigned batch_size = log_probs.sizes()[1];
+
+  at::Tensor path_probs = at::zeros({batch_size, top_paths});
+  at::Tensor path_lens = at::zeros({batch_size, top_paths});
+  at::Tensor decoded_paths = at::zeros({batch_size, top_paths, input_len});
+
+  return c10::List<at::Tensor>({path_probs, path_lens, decoded_paths});
+}
+
 void callCpuOp(const c10::List<at::Tensor> &inputs, const std::string &name) {
   UNUSED(inputs);
   UNUSED(name);
@@ -189,6 +209,7 @@ static auto registry =
         .op("poptorch::internal_cast", &castOp)
         .op("popart::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
+        .op("poptorch::ctc_beam_search_decoder", &ctcBeamSearchDecoder)
         .op("poptorch::identity_loss", &identityLoss)
         .op("poptorch::while_loop_begin", &whileLoopBegin)
         .op("poptorch::end_loop_begin", &whileLoopEnd)

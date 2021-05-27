@@ -87,7 +87,7 @@ extern c10::Symbol add_untyped_input_tensor;
 extern c10::Symbol call_cpu_op;
 extern c10::Symbol end_cpu_op;
 extern c10::Symbol canonicalised_cpu_call;
-
+extern c10::Symbol ctc_beam_search_decoder;
 } // namespace symbols::poptorch
 
 } // namespace poptorch

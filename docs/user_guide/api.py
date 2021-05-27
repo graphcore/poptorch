@@ -4,6 +4,15 @@ import torch
 import poptorch
 
 
+# ctc_beam_search_start
+class Model(torch.nn.Module):
+    def forward(self, log_probs, lengths):
+        return poptorch.ctc_beam_search_decoder(log_probs, lengths)
+
+
+# ctc_beam_search_end
+
+
 # print_tensor_start
 class ExampleModel(torch.nn.Module):
     def __init__(self):

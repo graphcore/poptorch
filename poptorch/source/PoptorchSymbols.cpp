@@ -137,6 +137,7 @@ c10::Symbol call_cpu_op;
 c10::Symbol end_cpu_op;
 
 c10::Symbol canonicalised_cpu_call;
+c10::Symbol ctc_beam_search_decoder;
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -171,6 +172,7 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, end_cpu_op);
 
   SYMBOL_INIT(poptorch, canonicalised_cpu_call)
+  SYMBOL_INIT(poptorch, ctc_beam_search_decoder)
 }
 
 } // namespace poptorch::symbols::poptorch

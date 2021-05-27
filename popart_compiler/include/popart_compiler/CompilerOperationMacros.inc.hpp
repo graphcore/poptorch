@@ -25,6 +25,7 @@ OP_DECL(popart, l1loss, l1loss, AiGraphcoreOpset1.l1loss, ARG(FLOAT,lambda) ARG(
 OP_DECL(popart, nllloss, nllloss, AiGraphcoreOpset1.nllloss, ARG(INT,reduction) ARG(INT,ignoreIndex) ARG(INT,inputIsLogProbability) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(ignoreIndex) BODY_ARG(inputIsLogProbability) )
 OP_DECL(popart, identityloss, identityloss, AiGraphcoreOpset1.identityloss, ARG(INT,reduction) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) )
 OP_DECL(popart, _ctcloss, _ctcloss, AiGraphcoreOpset1._ctcloss, ARG(INT,reduction) ARG(INT,blank) ARG(STRING,outDataType) , BODY_ARG(static_cast<popart::ReductionType>(reduction)) BODY_ARG(blank) BODY_ARG(outDataType) )
+OP_DECL(popart, ctcbeamsearchdecoder, ctcbeamsearchdecoder, AiGraphcoreOpset1.ctcbeamsearchdecoder, ARG(INT,blank) ARG(INT,beamWidth) ARG(INT,topPaths) , BODY_ARG(blank) BODY_ARG(beamWidth) BODY_ARG(topPaths) )
 OP_DECL(popart, shapeddropout, shapeddropout, AiGraphcoreOpset1.shapeddropout, ARG(INT_VEC,shape) ARG(FLOAT,ratio) , BODY_ARG(shape) BODY_ARG(ratio) )
 OP_DECL(popart, atan2, atan2, AiGraphcoreOpset1.atan2, NONE, NONE)
 OP_DECL(popart, expm1, expm1, AiGraphcoreOpset1.expm1, NONE, NONE)

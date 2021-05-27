@@ -45,6 +45,8 @@ Helpers
 PopTorch Ops
 ============
 
+.. autofunction:: poptorch.ctc_beam_search_decoder
+
 .. autofunction:: poptorch.ipu_print_tensor
 
 .. autofunction:: poptorch.identity_loss

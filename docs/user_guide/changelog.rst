@@ -27,6 +27,7 @@ New features
 - Add ``poptorch.BlockFunction`` decorating for assigning an existing function
   to a block.
 - Add mechanism for inspecting arbitrary tensors
+- Add custom operator for CTC beam search decoding: ``poptorch.ctc_beam_search_decoder``
 
 API changes
 -----------
