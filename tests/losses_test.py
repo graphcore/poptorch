@@ -5,118 +5,105 @@ import os  # pylint: disable=unused-import
 import unittest.mock
 import torch
 import torch.optim as optim
+import torch.nn.functional as F
 import pytest
 import poptorch
 import helpers
 
 
-# Test L1 loss by directly running it against the pytorch native L1 in inference.
-def test_L1Loss_direct():
-    reductions = ["mean", "sum"]
+def loss_harness(loss, inputs, target, reduction, op=None, **kwargs):
+
+    if len(inputs) == 1:
+        loss_fn = lambda x: loss(x, target, reduction=reduction, **kwargs)
+
+        if op is None:
+            op = lambda x: x
+
+        model = helpers.UnaryModelWithWeights(op,
+                                              inputs[0].shape,
+                                              loss_fn=loss_fn)
+    else:
+        assert len(inputs) == 2
+        loss_fn = lambda x, y: loss(
+            x, y, target, reduction=reduction, **kwargs)
+
+        if op is None:
+            op = lambda x, y: (x, y)
+
+        model = helpers.BinaryModelWithWeights(op,
+                                               inputs[0].shape,
+                                               inputs[1].shape,
+                                               loss_fn=loss_fn)
+
+    poptorch_model = poptorch.trainingModel(model)
+
+    native_out, _ = model(*inputs)
+    poptorch_out, poptorch_loss = poptorch_model(*inputs)
+
+    # Inference test - check outputs
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    # Training test - check weights have changed
+    poptorch_model.assert_weights_changed()
+
+    # Return the poptorch model and original outputs for any further
+    # testing
+    return poptorch_model, poptorch_out, poptorch_loss
+
+
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_L1Loss(reduction):
     torch.manual_seed(42)
-
-    for reduction in reductions:
-        model = torch.nn.L1Loss(reduction=reduction)
-
-        poptorch_model = poptorch.inferenceModel(model)
-
-        for _ in range(0, 10):
-            target = torch.randn(10)
-            input = torch.randn(10)
-
-            groundTruth = model(target, input)
-            poptorch_out = poptorch_model(target, input)
-
-            helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
-
-
-# Test L1 loss by using it to match a target label
-def test_L1Loss_training():
-    torch.manual_seed(42)
-
-    reductions = ["mean", "sum"]
-
-    for reduction in reductions:
-        torch.manual_seed(42)
-
-        model = torch.nn.Linear(10, 10)
-
-        poptorch_model = helpers.trainingModelWithLoss(
-            model,
-            loss=torch.nn.L1Loss(reduction=reduction),
-            optimizer=optim.SGD(model.parameters(), lr=0.01))
-
-        target = torch.randn(10)
-        input = torch.randn(10)
-
-        # Make sure the first run doesn't already pass the test.
-        original, original_loss = poptorch_model(input, target)
-        assert original_loss > 0.1
-        assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
-
-        for i in range(0, 2000):
-            out, loss = poptorch_model(input, target)
-
-            # Model needs to adjust the LR in the middle to converge
-            if i == 1000:
-                poptorch_model.setOptimizer(
-                    optim.SGD(model.parameters(), lr=0.001))
-
-        # Check we have trained the "model"
-        assert loss < original_loss
-
-        # "sum" L1 losses tend to be very large compared to "mean"
-        if reduction == "sum":
-            assert loss < 0.1
-        else:
-            assert loss < 0.001
-
-        helpers.assert_allclose(actual=out,
-                                expected=target,
-                                rtol=1e-02,
-                                atol=1e-02)
-
-
-# Test MSE loss by directly running it against the pytorch native MSE in inference.
-def test_MSELoss_direct():
-
-    reductions = ["mean", "sum"]
-    torch.manual_seed(42)
-
-    for reduction in reductions:
-        model = torch.nn.MSELoss(reduction=reduction)
-
-        poptorch_model = poptorch.inferenceModel(model)
-
-        for _ in range(0, 10):
-            target = torch.randn(10)
-            input = torch.randn(10)
-
-            groundTruth = model(target, input)
-            poptorch_out = poptorch_model(target, input)
-
-            helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
-
-
-# Test MSE loss by using it to match a target label
-def test_MSELoss_training():
-    torch.manual_seed(42)
-
-    model = torch.nn.Linear(10, 10)
-
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss())
 
     target = torch.randn(10)
     input = torch.randn(10)
 
-    # Make sure the first run doesn't already pass the test.s
-    original, original_loss = poptorch_model(input, target)
+    poptorch_model, original, original_loss = loss_harness(
+        F.l1_loss, [input], target, reduction)
+
+    # Make sure the first run doesn't already pass the test.
     assert original_loss > 0.1
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
-    for _ in range(0, 2500):
-        out, loss = poptorch_model(input, target)
+    for i in range(0, 1000):
+        out, loss = poptorch_model(input)
+
+        # Model needs to adjust the LR in the middle to converge
+        if i == 500:
+            poptorch_model.setOptimizer(
+                optim.SGD(poptorch_model.model.parameters(), lr=0.001))
+
+    # Check we have trained the "model"
+    assert loss < original_loss
+
+    # "sum" L1 losses tend to be very large compared to "mean"
+    if reduction == "sum":
+        assert loss < 0.1
+    else:
+        assert loss < 0.001
+
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
+
+
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_MSELoss(reduction):
+    torch.manual_seed(42)
+
+    target = torch.randn(10)
+    input = torch.randn(10)
+
+    poptorch_model, original, original_loss = loss_harness(
+        F.mse_loss, [input], target, reduction)
+
+    # Make sure the first run doesn't already pass the test
+    assert original_loss > 0.1
+    assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
+
+    for _ in range(0, 1000):
+        out, loss = poptorch_model(input)
 
     # Check we have trained the "model"
     assert loss < 0.001
@@ -126,72 +113,32 @@ def test_MSELoss_training():
                             atol=1e-02)
 
 
-# This also servees as the NLL loss test as it uses NLL under the hood.
-def test_CrossEntropy_direct():
-    reductions = ["mean", "sum"]
+@pytest.mark.parametrize("reduction", ["mean", "sum"])
+def test_CrossEntropy(reduction):
     torch.manual_seed(42)
 
-    for reduction in reductions:
-        model = torch.nn.CrossEntropyLoss(reduction=reduction)
+    label = torch.randint(0, 10, [1])
+    input = torch.randn(1, 10)
 
-        poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model, _, original_loss = loss_harness(F.cross_entropy, [input],
+                                                    label, reduction)
 
-        for _ in range(0, 10):
-            label = torch.randint(0, 10, [1])
-            input = torch.randn(1, 10)
+    for _ in range(0, 100):
+        out, loss = poptorch_model(input)
 
-            groundTruth = model(input, label)
-            poptorch_out = poptorch_model(input, label)
-            helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
-
-
-# Since we swap out the log to conform to popart we are going to need to check that the LogSoftmax still actually works in normal contexts AND can be fed into a loss at the same time.
-def test_LogSoftmax():
-    torch.manual_seed(42)
-
-    class Net(torch.nn.Module):
-        def __init__(self):
-            super(Net, self).__init__()
-            self.linear = torch.nn.Linear(10, 10)
-            self.softmax = torch.nn.LogSoftmax(dim=1)
-
-        def forward(self, x):
-            x = self.linear(x)
-            return self.softmax(x)
-
-    model = Net()
-
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, loss=torch.nn.NLLLoss(reduction="mean"))
-
-    for _ in range(0, 10):
-        label = torch.randint(0, 10, [1])
-        input = torch.randn(1, 10)
-
-        # Run on host.
-        groundTruth = model(input)
-        poptorch_out, _ = poptorch_model(input, label)
-
-        helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
+    # Check we have trained the "model"
+    assert loss < original_loss
+    assert torch.argmax(out, dim=1) == label
 
 
 # Test softmax and logsoftmax for dimensions more than 2
 def op_withdim(op, input):
-    class Model(torch.nn.Module):
-        def __init__(self, op):
-            super(Model, self).__init__()
-            self.op = op
-
-        def forward(self, x):
-            return self.op(x)
-
-    model = Model(op)
 
     # Run on CPU.
-    native_out = model(input)
+    native_out = op(input)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model = poptorch.inferenceModel(op)
     poptorch_out = poptorch_model(input)
 
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
@@ -227,142 +174,74 @@ def test_op_withdim_2d(op, dim):
 
 # Test NLL loss by using it to match a target label.
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_NLLLoss_training(reduction):
-
+def test_NLLLoss(reduction):
     torch.manual_seed(42)
 
-    class Net(torch.nn.Module):
-        def __init__(self):
-            super(Net, self).__init__()
-            self.linear = torch.nn.Linear(10, 10)
-            self.softmax = torch.nn.LogSoftmax(dim=1)
+    op = lambda x: F.log_softmax(x, dim=1)
 
-        def forward(self, x):
-            x = self.linear(x)
-            return self.softmax(x)
-
-    model = Net()
-
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, loss=torch.nn.NLLLoss(reduction=reduction))
-    input = torch.randn(1, 10)
     label = torch.randint(0, 10, [1])
+    input = torch.randn(1, 10)
 
-    # Make sure the first run doesn't already pass the test.
-    _, original_loss = poptorch_model(input, label)
+    poptorch_model, _, original_loss = loss_harness(F.nll_loss, [input], label,
+                                                    reduction, op)
 
-    for _ in range(0, 1000):
-        out, loss = poptorch_model(input, label)
+    for _ in range(0, 100):
+        out, loss = poptorch_model(input)
 
-    # # Check we have trained the "model"
+    # Check we have trained the "model"
     assert loss < original_loss
     assert torch.argmax(out, dim=1) == label
 
 
 # Test NLL loss 2d by using it to match a target label.
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_NLLLoss2d_training(reduction):
+def test_NLLLoss2d(reduction):
 
     torch.manual_seed(42)
     N, C, M = 3, 2, 5
 
-    class Net(torch.nn.Module):
-        def __init__(self):
-            super(Net, self).__init__()
-            self.linear = torch.nn.Linear(M * M, M * M * C)
-            self.softmax = torch.nn.LogSoftmax(dim=1)
+    op = lambda x: F.log_softmax(x, dim=1)
 
-        def forward(self, x):
-            x = x.reshape(N, M * M)
-            x = self.linear(x).reshape(N, C, M, M)
-            return self.softmax(x)
-
-    model = Net()
-
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, loss=torch.nn.NLLLoss(reduction=reduction))
-    x = torch.randn(N, M, M)
     y = torch.empty(N, M, M, dtype=torch.long).random_(0, C)
+    x = torch.randn(N, C, M, M)
 
-    _, original_loss = poptorch_model(x, y)
+    poptorch_model, _, original_loss = loss_harness(F.nll_loss, [x], y,
+                                                    reduction, op)
 
-    for _ in range(0, 1000):
-        out, loss = poptorch_model(x, y)
+    for _ in range(0, 100):
+        out, loss = poptorch_model(x)
 
-    # # Check we have trained the "model"
+    # Check we have trained the "model"
     assert loss < original_loss
     helpers.assert_allclose(actual=torch.argmax(out, dim=1), expected=y)
 
 
-# Tell loss 2d in an inference model, comparing against pytorch
-@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
-def test_NLLLoss2d_inference(reduction):
-    N, C, M = 11, 7, 13
-    torch.manual_seed(42)
-
-    class Net(torch.nn.Module):
-        def __init__(self, reduction):
-            super(Net, self).__init__()
-            self.softmax = torch.nn.LogSoftmax(dim=1)
-            self.loss = torch.nn.NLLLoss(reduction=reduction)
-
-        def forward(self, x, y):
-            x = self.softmax(x)
-            return self.loss(x, y)
-
-    model = Net(reduction)
-    poptorch_model = poptorch.inferenceModel(model)
-
-    x = torch.randn(N, C, M, M)
-    y = torch.empty(N, M, M, dtype=torch.long).random_(0, C)
-
-    native_out = model(x, y)
-    poptorch_out = poptorch_model(x, y)
-
-    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
-
-
-# Test CrossEntropyLoss loss by using it to match a target label.
+# This also servees as the NLL loss test as it uses NLL under the hood.
 @pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_CrossEntropyLoss_training(reduction):
+def test_BCE(reduction):
     torch.manual_seed(42)
 
-    torch.manual_seed(42)
+    target = torch.empty(10).uniform_()
+    input = torch.randn(10)
 
-    model = torch.nn.Linear(10, 10)
-
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, loss=torch.nn.CrossEntropyLoss(reduction=reduction))
-    input = torch.randn(1, 10)
-    label = torch.randint(0, 10, [1])
+    poptorch_model, _, original_loss = loss_harness(F.binary_cross_entropy,
+                                                    [input],
+                                                    target,
+                                                    reduction,
+                                                    op=torch.sigmoid)
 
     # Make sure the first run doesn't already pass the test.
-    _, original_loss = poptorch_model(input, label)
+    _, original_loss = poptorch_model(input)
 
-    for _ in range(0, 1000):
-        out, loss = poptorch_model(input, label)
+    for _ in range(0, 2500):
+        out, loss = poptorch_model(input)
 
     # # Check we have trained the "model"
     assert loss < original_loss
-    assert torch.argmax(out, dim=1) == label
-
-
-# This also servees as the NLL loss test as it uses NLL under the hood.
-@pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_BCE_direct(reduction):
-    torch.manual_seed(42)
-
-    model = torch.nn.BCELoss(reduction=reduction)
-
-    poptorch_model = poptorch.inferenceModel(model)
-
-    for _ in range(0, 10):
-        target = torch.empty(10).random_(2)
-        input = torch.empty(10).uniform_()
-
-        groundTruth = model(input, target)
-        poptorch_out = poptorch_model(input, target)
-        helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
+    helpers.assert_allclose(actual=out,
+                            expected=target,
+                            rtol=1e-02,
+                            atol=1e-02)
 
 
 # TODO(T22975)
@@ -388,195 +267,125 @@ def test_BCE_direct(reduction):
 #             helpers.assert_allclose(expected=groundTruth, actual=poptorch_out)
 
 
-@pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_BCE_training(reduction):
-    torch.manual_seed(1)
-
-    model = torch.nn.Sequential(torch.nn.Linear(10, 10), torch.nn.Sigmoid())
-
-    poptorch_model = helpers.trainingModelWithLoss(
-        model,
-        loss=torch.nn.BCELoss(reduction=reduction),
-        optimizer=optim.SGD(model.parameters(), lr=0.1))
-
-    target = torch.empty(10).uniform_()
-    input = torch.randn(10)
-
-    # Make sure the first run doesn't already pass the test.
-    _, original_loss = poptorch_model(input, target)
-
-    for _ in range(0, 1500):
-        out, loss = poptorch_model(input, target)
-
-    print(out)
-    print(target)
-    print(loss)
-    print("\n")
-
-    # # Check we have trained the "model"
-    assert loss < original_loss
-    helpers.assert_allclose(actual=out,
-                            expected=target,
-                            rtol=1e-03,
-                            atol=1e-03)
-
-
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum", "batchmean"})
+@pytest.mark.parametrize("reduction", {"mean", "sum", "batchmean"})
 @pytest.mark.parametrize("log_target", {True, False})
-def test_KLDiv_direct(reduction, log_target):
+def test_KLDiv(reduction, log_target):
     torch.manual_seed(42)
-
-    model = torch.nn.KLDivLoss(reduction=reduction, log_target=log_target)
-    poptorch_model = poptorch.inferenceModel(model)
 
     # 2D Tensors to test batchmean
     target = torch.empty(3, 10).uniform_()
     input = torch.randn(3, 10)
 
-    native_out = model(input, target)
-    poptorch_out = poptorch_model(input, target)
-
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    loss_harness(F.kl_div, [input], target, reduction, log_target=log_target)
 
 
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("log_input", {True, False})
 @pytest.mark.parametrize("full", {True, False})
-def test_PoissonNLLLoss_direct(reduction, log_input, full):
+def test_PoissonNLLLoss(reduction, log_input, full):
     torch.manual_seed(42)
-
-    model = torch.nn.PoissonNLLLoss(log_input, full, reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
 
     target = torch.poisson(torch.rand(10) * 5)
     input = torch.empty(10).uniform_()
 
-    native_out = model(input, target)
-    poptorch_out = poptorch_model(input, target)
+    loss_harness(F.poisson_nll_loss, [input],
+                 target,
+                 reduction,
+                 full=full,
+                 log_input=log_input)
 
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
-
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
-def test_HingeEmbeddingLoss_direct(reduction):
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
+def test_HingeEmbeddingLoss(reduction):
     torch.manual_seed(42)
 
     delta = torch.rand(1) + 0.5
-    model = torch.nn.HingeEmbeddingLoss(delta.item(), reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
 
     # Generate random set of 1s and -1s for labels
     target = torch.randint(2, [10]) * 2 - 1
-
     input = torch.empty(10).uniform_()
 
-    native_out = model(input, target)
-    poptorch_out = poptorch_model(input, target)
-
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    loss_harness(F.hinge_embedding_loss, [input],
+                 target,
+                 reduction,
+                 margin=delta.item())
 
 
 torch.manual_seed(42)
 params_bcewithlogits = [
-    (
-        torch.rand(10, 3),  # Inputs
-        torch.empty(10, 3).uniform_(),  # Targets
-        torch.rand(10, 3),  # Weights
-        torch.rand(3)  # Pos Weights
-    ),
+    {
+        "input": torch.rand(10, 3),  # Inputs
+        "target": torch.empty(10, 3).uniform_(),  # Targets
+        "weight": torch.rand(10, 3),  # Weights
+        "pos_weight": torch.rand(3)  # Pos Weights
+    },
     # Numerical stability test
-    (torch.tensor([88.0]), torch.tensor([0.5]), None, None)
+    {
+        "input": torch.tensor([88.0]),
+        "target": torch.tensor([0.5]),
+        "weight": None,
+        "pos_weight": None
+    }
 ]
 
 
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("params", params_bcewithlogits)
-def test_BCEWithLogitsLoss_direct(reduction, params):
+def test_BCEWithLogitsLoss(reduction, params):
 
-    weight = params[2]
-    pos_weight = params[3]
-
-    model = torch.nn.BCEWithLogitsLoss(weight=weight,
-                                       reduction=reduction,
-                                       pos_weight=pos_weight)
-    poptorch_model = poptorch.inferenceModel(model)
-
-    target = params[1]
-    input = params[0]
-
-    native_out = model(input, target)
-    poptorch_out = poptorch_model(input, target)
-
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    loss_harness(F.binary_cross_entropy_with_logits, [params["input"]],
+                 params["target"],
+                 reduction,
+                 weight=params["weight"],
+                 pos_weight=params["pos_weight"])
 
 
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
-def test_SmoothL1Loss_direct(reduction):
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
+def test_SmoothL1Loss(reduction):
     torch.manual_seed(42)
-
-    model = torch.nn.SmoothL1Loss(reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
 
     input = torch.randn(10)
     target = torch.empty(10).uniform_()
 
-    native_out = model(input, target)
-    poptorch_out = poptorch_model(input, target)
-
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    loss_harness(F.smooth_l1_loss, [input], target, reduction)
 
 
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
-def test_SoftMarginLoss_direct(reduction):
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
+def test_SoftMarginLoss(reduction):
     torch.manual_seed(42)
 
-    model = torch.nn.SoftMarginLoss(reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
-
     input = torch.empty(10).uniform_()
-
     # Generate random set of 1s and -1s for labels
     target = torch.randint(2, [10]) * 2 - 1
 
-    native_out = model(input, target)
-    poptorch_out = poptorch_model(input, target)
-
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    loss_harness(F.soft_margin_loss, [input], target, reduction)
 
 
 # TODO(T30688): Support MultiLabelSoftMarginLoss
 @pytest.mark.skip()
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("specify_weight", {True, False})
-def test_MultiLabelSoftMarginLoss_direct(reduction, specify_weight):
+def test_MultiLabelSoftMarginLoss(reduction, specify_weight):
     torch.manual_seed(42)
 
     weight = torch.randn(3, 10) if specify_weight else None
 
-    model = torch.nn.MultiLabelSoftMarginLoss(weight, reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
-
     input = torch.empty(3, 10).uniform_()
-
     # Generate random set of 0s and 1s for labels
     target = torch.randint(2, [3, 10])
 
-    native_out = model(input, target)
-    poptorch_out = poptorch_model(input, target)
+    loss_harness(F.multilabel_soft_margin_loss, [input],
+                 target,
+                 reduction,
+                 weight=weight)
 
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
-
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
-def test_CosineEmbeddingLoss_direct(reduction):
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
+def test_CosineEmbeddingLoss(reduction):
     torch.manual_seed(42)
 
     # Margin should be between -1 and 1
     margin = torch.rand(1) * 2 - 1
-
-    model = torch.nn.CosineEmbeddingLoss(margin.item(), reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
 
     # As per the current PyTorch implementation, the first two dims must be equal
     input1 = torch.empty(10, 10, 3).uniform_()
@@ -585,21 +394,18 @@ def test_CosineEmbeddingLoss_direct(reduction):
     # Generate random set of 1s and -1s for labels
     target = torch.randint(2, [10, 10, 3]) * 2 - 1
 
-    native_out = model(input1, input2, target)
-    poptorch_out = poptorch_model(input1, input2, target)
+    loss_harness(F.cosine_embedding_loss, [input1, input2],
+                 target,
+                 reduction,
+                 margin=margin.item())
 
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
-
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
 def test_MarginRankingLoss_direct(reduction):
     torch.manual_seed(42)
 
     # Margin should be between -1 and 1
     margin = torch.rand(1) * 2 - 1
-
-    model = torch.nn.MarginRankingLoss(margin.item(), reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
 
     # As per the current PyTorch implementation, both dims must be equal
     input1 = torch.empty(10, 10).uniform_()
@@ -608,10 +414,10 @@ def test_MarginRankingLoss_direct(reduction):
     # Generate random set of 1s and -1s for labels
     target = torch.randint(2, [10]) * 2 - 1
 
-    native_out = model(input1, input2, target)
-    poptorch_out = poptorch_model(input1, input2, target)
-
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    loss_harness(F.margin_ranking_loss, [input1, input2],
+                 target,
+                 reduction,
+                 margin=margin.item())
 
 
 @pytest.mark.parametrize("p", {2., 3.})

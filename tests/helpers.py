@@ -119,7 +119,7 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
 # This is an abstract class and the forward function must be implemented
 # in a subclass
 class AbstractModelWithWeights(torch.nn.Module, ABC):
-    def __init__(self, op, input_shapes, out_fn=None):
+    def __init__(self, op, input_shapes, out_fn=None, loss_fn=None):
         super().__init__()
         self.op = op
         self.input_shapes = input_shapes
@@ -132,10 +132,19 @@ class AbstractModelWithWeights(torch.nn.Module, ABC):
         # but the loss should only be calculated using the values. If unspecified,
         # defaults to an identity function
         self.out_fn = out_fn
+        # If the loss fn takes a target param, this value must be included in a
+        # wrapper function that only takes a single input before passing to this
+        # constructor
+        self.loss_fn = loss_fn if not loss_fn is None \
+            else lambda x: poptorch.identity_loss(x**2, reduction='sum')
 
     def handle_output(self, x):
         loss_in = x if self.out_fn is None else self.out_fn(x)
-        return x, poptorch.identity_loss(loss_in**2, reduction='sum')
+        if isinstance(loss_in, tuple):
+            l = self.loss_fn(*loss_in)
+        else:
+            l = self.loss_fn(loss_in)
+        return x, l
 
     def assert_weights_changed(self):
         weights_after = self.lin.weight.detach().clone()
@@ -143,8 +152,8 @@ class AbstractModelWithWeights(torch.nn.Module, ABC):
 
 
 class UnaryModelWithWeights(AbstractModelWithWeights):
-    def __init__(self, op, input_shape, out_fn=None):
-        super().__init__(op, [input_shape], out_fn)
+    def __init__(self, op, input_shape, out_fn=None, loss_fn=None):
+        super().__init__(op, [input_shape], out_fn, loss_fn)
 
     # Flatten input, pass through linear layer of same size
     # and pass output to the op
@@ -157,8 +166,13 @@ class UnaryModelWithWeights(AbstractModelWithWeights):
 
 
 class BinaryModelWithWeights(AbstractModelWithWeights):
-    def __init__(self, op, input_shape1, input_shape2, out_fn=None):
-        super().__init__(op, [input_shape1, input_shape2], out_fn)
+    def __init__(self,
+                 op,
+                 input_shape1,
+                 input_shape2,
+                 out_fn=None,
+                 loss_fn=None):
+        super().__init__(op, [input_shape1, input_shape2], out_fn, loss_fn)
 
     # Flatten both inputs, concatenate into a a single 1-dim tensor
     # and pass through linear layer of same size, then split and assign
