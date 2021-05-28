@@ -29,22 +29,41 @@ adaptive_avg_pool = [
 # torch.nn.AdaptiveMaxPool2d] # Adaptive max pooling isn't supported due to returning 2 outputs, easy fix.
 # TODO (T22978)
 
+# TODO(T6631): PopART does not support PadGradOp when mode is not "constant".
+# Ops without grad implementations in PopART
+ops_grad_unsupported = (
+    torch.nn.ReflectionPad1d,
+    torch.nn.ReflectionPad2d,
+    torch.nn.ReplicationPad1d,
+    torch.nn.ReplicationPad2d,
+    torch.nn.ReplicationPad3d,
+)
 
-def execute_and_check_wrapper(model, input, check_shape_only=False):
+
+def execute_and_check_wrapper(op, input, check_shape_only=False):
+
+    model = helpers.UnaryModelWithWeights(op, input.shape)
     # Run on CPU.
-    native_out = model(input)
+    native_out, _ = model(input)
+
+    test_training = not isinstance(op, ops_grad_unsupported)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(input)
+    poptorch_model = poptorch.trainingModel(
+        model) if test_training else poptorch.inferenceModel(model)
 
-    print(native_out.size())
+    poptorch_out, _ = poptorch_model(input)
 
     if not check_shape_only:
+        # Inference test - check outputs
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
     else:
         # This is due to adaptive pooling's process essentially being an implementation detail.
         assert poptorch_out.size() == native_out.size()
+
+    if test_training:
+        # Training test - check weights have changed
+        poptorch_model.assert_weights_changed()
 
 
 @pytest.mark.parametrize("op", pool_2D)
@@ -52,7 +71,7 @@ def test_pool2D(op):
 
     torch.manual_seed(42)
 
-    input = torch.randn(20, 16, 50, 10)
+    input = torch.randn(1, 2, 10, 10)
 
     # pool of square window of size=3, stride=2
     model = op(3, stride=2)
@@ -79,16 +98,16 @@ def test_pool2D(op):
 @pytest.mark.parametrize("params", adaptive_avg_pool)
 def test_adaptive_avg_pool(params):
     torch.manual_seed(42)
-    # AdaptiveAvgPool1d: [10, 8, 4]       -> [10, 8, 2]
-    # AdaptiveAvgPool2d: [10, 8, 4, 6]    -> [10, 8, 2, 3]
-    # AdaptiveAvgPool3d: [10, 8, 4, 6, 8] -> [10, 8, 2, 3, 4]
+    # AdaptiveAvgPool1d: [1, 2, 4]       -> [1, 2, 2]
+    # AdaptiveAvgPool2d: [1, 2, 4, 6]    -> [1, 2, 2, 3]
+    # AdaptiveAvgPool3d: [1, 2, 4, 6, 8] -> [1, 2, 2, 3, 4]
     # TODO(T31335): Match PyTorch's implementation so that we can test cases where
     #               input dims are not divisible by corresponding output dims
 
     op = params[0]
     n_output_dims = params[1]
 
-    shape = [10, 8]
+    shape = [1, 2]
     shape.extend([2 * i + 4 for i in range(n_output_dims)])
 
     input = torch.randn(shape)
