@@ -215,6 +215,10 @@ void assertSingleInstanceMaxNumIPUs(std::size_t num_ipus) {
 
 namespace detail {
 
+const std::vector<popart::TensorId> &WeightsIO::parameterIds() const {
+  return _weights_order;
+}
+
 bool WeightsIO::contains(popart::TensorId id) const {
   return _weights.find(id) != _weights.end();
 }

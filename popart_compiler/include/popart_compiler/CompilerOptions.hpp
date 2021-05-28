@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 
 #include <popart/popx/devicexmanager.hpp>
@@ -23,6 +24,10 @@ enum class Liveness {
 };
 
 struct CompilerOptions {
+  // Make PopART save the initializers in a separate file.
+  // (Needed to keep the ONNX protobuf below the 2GB limit when compiling
+  // large models)
+  std::string external_initializers_file;
   // Number of times the graph will be executed for each execution.
   std::uint64_t steps;
   // Strategy to adopt for returning the graph's output tensors.

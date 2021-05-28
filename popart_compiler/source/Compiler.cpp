@@ -515,6 +515,17 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   // Create the anchors, these are used to copy to the host.
   auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
 
+  // Save the initializers to an external file if requested.
+  if (!_impl->options.external_initializers_file.empty()) {
+    logging::LogContext ctx{
+        "Compiler::initSession popart::Builder::saveInitializersExternally"};
+    logging::trace("Saving initializers to external file {}",
+                   _impl->options.external_initializers_file);
+    _impl->active_builder->saveInitializersExternally(
+        _impl->weights.parameterIds(),
+        _impl->options.external_initializers_file);
+  }
+
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.

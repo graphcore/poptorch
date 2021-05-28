@@ -69,6 +69,7 @@ public:
   void registerParameter(const popart::TensorId &id,
                          const popart::TensorInfo &info);
   void updateData(const std::vector<void *> &host_buffers);
+  const std::vector<popart::TensorId> &parameterIds() const;
 
 private:
   std::map<popart::TensorId, popart::MutableVoidData> _weights;

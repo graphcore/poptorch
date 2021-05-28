@@ -189,6 +189,11 @@ SessionOptionsImpl::SessionOptionsImpl() {
     popart_options.logDir = value;
   });
 
+  registerSetter(string_options, "saveInitializersToFile",
+                 [&](const std::string &value) {
+                   poptorch_options.external_initializers_file = value;
+                 });
+
   string_options["logDir"] = [&](const std::string &log_dir) {
     UNUSED(log_dir);
     logging::warn(
