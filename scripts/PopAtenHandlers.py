@@ -65,7 +65,6 @@ convert("gt", 2, "greater")
 convert("lt", 2, "less")
 
 expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
-expand("dropout", lambda x, y: op.dropout(x, cint(1), cfloat(y)))
 expand("elu", lambda x, y: op.elu(x, cfloat(y)))
 expand("full_like", lambda x, y: op.expand(y, as_ir(tensor_shape(x))))
 expand("ge", lambda x, y: x >= y)
@@ -98,7 +97,6 @@ def softshrink_handler(x, l):
     return op.where(x < -l, x + l, r)
 
 
-forward("dropout_", "dropout")
 forward("elu_", "elu")
 forward("leaky_relu_", "leaky_relu")
 forward("prelu_", "prelu")

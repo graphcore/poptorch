@@ -32,6 +32,7 @@ extern c10::Symbol pow_;                        // NOLINT
 extern c10::Symbol sigmoid_;                    // NOLINT
 extern c10::Symbol tanh_;                       // NOLINT
 extern c10::Symbol scatter_add_;                // NOLINT
+extern c10::Symbol feature_dropout_;            // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {

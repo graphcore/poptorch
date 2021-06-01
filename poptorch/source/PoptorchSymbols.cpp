@@ -34,6 +34,7 @@ c10::Symbol pow_;                        // NOLINT
 c10::Symbol sigmoid_;                    // NOLINT
 c10::Symbol tanh_;                       // NOLINT
 c10::Symbol scatter_add_;                // NOLINT
+c10::Symbol feature_dropout_;            // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -66,6 +67,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, sigmoid_)
   SYMBOL_INIT(aten, tanh_)
   SYMBOL_INIT(aten, scatter_add_)
+  SYMBOL_INIT(aten, feature_dropout_)
 }
 
 } // namespace c10::aten

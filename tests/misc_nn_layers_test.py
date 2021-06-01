@@ -146,11 +146,7 @@ def test_dropout_inference(dropout_op):
     poptorch_out = poptorch_model(x)
 
     msg = f"{dropout_op.__name__} in inference session should equal identity."
-    helpers.assert_allclose(expected=native_out,
-                            actual=poptorch_out,
-                            rtol=0,
-                            atol=0,
-                            msg=msg)
+    helpers.assert_allequal(expected=native_out, actual=poptorch_out, msg=msg)
 
 
 def dropout_training_harness(dropout_op, input, check_func):
@@ -171,6 +167,21 @@ def dropout_training_harness(dropout_op, input, check_func):
     poptorch_out, _ = poptorch_model(input, dummy_label)
     assert native_out.size() == poptorch_out.size()
     check_func(poptorch_out)
+
+
+@pytest.mark.parametrize("dropout_op", dropout_ops)
+def test_dropout_eval_during_training(dropout_op):
+    model = dropout_op()
+    model.eval()
+
+    torch.manual_seed(0)
+    x = torch.randn(128, 20)
+
+    def check_func(ipu_out):
+        msg = f"{dropout_op.__name__} should equal identity."
+        helpers.assert_allequal(expected=x, actual=ipu_out, msg=msg)
+
+    dropout_training_harness(model, x, check_func)
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),

@@ -1,5 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "../PoptorchStaticInit.hpp"
+#include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
@@ -7,6 +8,19 @@
 
 namespace poptorch {
 namespace {
+
+torch::jit::Node *dropoutHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto p = constantToFloat(node->input(1)->node());
+  auto train = constantToBool(node->input(2)->node());
+
+  if (!train) {
+    return createIdentity(graph, {x});
+  }
+
+  return createDropout(graph, {x}, 1, p);
+}
 
 torch::jit::Node *featureDropoutHandler(torch::jit::Graph *graph,
                                         torch::jit::Node *node) {
@@ -35,6 +49,9 @@ torch::jit::Node *featureDropoutHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::feature_dropout, featureDropoutHandler);
+  registerHandler(c10::aten::feature_dropout_, featureDropoutHandler);
+  registerHandler(c10::aten::dropout, dropoutHandler);
+  registerHandler(c10::aten::dropout_, dropoutHandler);
 }
 
 } // namespace poptorch

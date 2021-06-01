@@ -151,15 +151,6 @@ torch::jit::Node *divHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createDiv(graph, {i0, i1});
 }
 
-torch::jit::Node *dropoutHandler(torch::jit::Graph *graph,
-                                 torch::jit::Node *node) {
-  auto x = node->input(0);
-  auto y = node->input(1);
-  auto t0 = constantToFloat(y->node());
-  // dropout(x, 1, cfloat(y))
-  return createDropout(graph, {x}, 1, t0);
-}
-
 torch::jit::Node *eluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -826,8 +817,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::cosh, coshHandler);
   registerHandler(c10::aten::detach, detachHandler);
   registerHandler(c10::aten::div, divHandler);
-  registerHandler(c10::aten::dropout, dropoutHandler);
-  registerHandler(c10::aten::dropout_, dropoutHandler);
   registerHandler(c10::aten::elu, eluHandler);
   registerHandler(c10::aten::elu_, eluHandler);
   registerHandler(c10::aten::eq, eqHandler);
