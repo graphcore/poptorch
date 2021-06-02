@@ -152,6 +152,11 @@ passing in the updated optimizer.
 |   :emphasize-lines: 8-9                         |
 +-------------------------------------------------+
 
+.. note:: PopTorch also provides its own set of optimizers that can be accessed via ``poptorch.optim``.
+   These are wrapper classes which have several advantages over the native PyTorch optimizers. They embed constant attributes
+   for performance/memory savings and allow you to specify additional parameters such as loss scaling and velocity scaling.
+   See :numref:`optimizers` for more information.
+
 Going further
 =============
 

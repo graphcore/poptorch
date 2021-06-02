@@ -523,6 +523,7 @@ The default :py:class:`~poptorch.Liveness` is ``AlwaysLive``.
 ``OffChipAfterEachPhase`` may be helpful if you run a large model
 with a tight memory budget.
 
+.. _optimizers:
 
 Optimizers
 ==========
