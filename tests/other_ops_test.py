@@ -9,45 +9,40 @@ import helpers
 
 torch.manual_seed(42)
 params_einsum = [
-    ('i->', [torch.randn(5)]),
-    ('ij->i', [torch.randn(5, 4)]),
-    ('i,j->j', [torch.randn(5), torch.randn(4)]),
-    ('i,j->ji', [torch.randn(5), torch.randn(4)]),
-    ('bij,bjk->bik', [torch.randn(3, 2, 5),
-                      torch.randn(3, 5, 4)]),
-    ('bn,anm,bm->ba',
-     [torch.randn(2, 5),
-      torch.randn(3, 5, 4),
-      torch.randn(2, 4)]),
-    ('bfnd,ndh->bfh', [torch.randn(2, 3, 4, 5),
-                       torch.randn(4, 5, 6)]),
-    ('nmku,buvm->bnkv', [torch.randn(2, 3, 4, 5),
-                         torch.randn(6, 5, 7, 3)]),
+    ('i->', (torch.randn(5), )),
+    ('ij->i', (torch.randn(5, 4), )),
+    ('i,j->j', (torch.randn(5), torch.randn(4))),
+    ('i,j->ji', (torch.randn(5), torch.randn(4))),
+    ('bij,bjk->bik', (torch.randn(3, 2, 5), torch.randn(3, 5, 4))),
+    ('bn,anm,bm->ba', (torch.randn(2, 5), torch.randn(3, 5,
+                                                      4), torch.randn(2, 4))),
+    ('bfnd,ndh->bfh', (torch.randn(2, 3, 4, 5), torch.randn(4, 5, 6))),
+    ('nmku,buvm->bnkv', (torch.randn(2, 3, 4, 5), torch.randn(6, 5, 7, 3))),
 ]
 
 
 @pytest.mark.parametrize("params", params_einsum)
 @pytest.mark.parametrize("implicit_rhs", {True, False})
 def test_einsum(params, implicit_rhs):
-    class Model(torch.nn.Module):
-        def forward(self, xs):
-            eq = params[0].split('->')[0] if implicit_rhs else params[0]
-            return torch.einsum(eq, xs)
 
-    model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    eq = params[0].split('->')[0] if implicit_rhs else params[0]
 
-    # TODO(T26908): Passing in list causes compiler assert
-    xs = tuple(params[1])
+    op = lambda *xs: torch.einsum(eq, *xs)
+    xs = params[1]
+    model = helpers.ModelWithWeights(op, xs[0].shape)
+    poptorch_model = poptorch.trainingModel(model)
 
     # Run on CPU
-    native_out = model(xs)
+    native_out, _ = model(xs)
 
     # Run on IPU
-    poptorch_out = poptorch_model(xs)
+    poptorch_out, _ = poptorch_model(xs)
 
-    assert native_out.size() == poptorch_out.size()
+    # Inference test - check outputs
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
 
 
 def test_einsum_chained():
@@ -68,7 +63,6 @@ def test_einsum_chained():
     native_out = model(x, y, z)
     poptorch_out = poptorch_model(x, y, z)
 
-    assert native_out.size() == poptorch_out.size()
     helpers.assert_allclose(expected=native_out,
                             actual=poptorch_out,
                             rtol=1e-3,
@@ -80,25 +74,25 @@ def test_einsum_chained():
 def test_meshgrid(arr_lengths):
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
-        def forward(self, xs):
-            return torch.meshgrid(xs)
-
-    model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
-
-    # TODO(T26908): Passing in list causes compiler assert
     xs = tuple([torch.randn(arr_length) for arr_length in arr_lengths])
 
+    model = helpers.ModelWithWeights(torch.meshgrid,
+                                     xs[0].shape,
+                                     out_fn=lambda x: x[0])
+    poptorch_model = poptorch.trainingModel(model)
+
     # Run on CPU
-    native_out = model(xs)
+    native_out, _ = model(xs)
 
     # Run on IPU
-    poptorch_out = poptorch_model(xs)
+    poptorch_out, _ = poptorch_model(xs)
 
+    # Inference test - check outputs
     for native, pop in zip(native_out, poptorch_out):
-        assert native.size() == pop.size()
         helpers.assert_allclose(expected=native, actual=pop)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
 
 
 @pytest.mark.parametrize("arr_lengths",
@@ -106,25 +100,22 @@ def test_meshgrid(arr_lengths):
 def test_cartesian_prod(arr_lengths):
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
-        def forward(self, xs):
-            # Add one to force compute the first test case
-            return torch.cartesian_prod(*xs) + 1
-
-    model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
-
-    # TODO(T26908): Passing in list causes compiler assert
     xs = tuple([torch.randn(arr_length) for arr_length in arr_lengths])
 
+    model = helpers.ModelWithWeights(torch.cartesian_prod, xs[0].shape)
+    poptorch_model = poptorch.trainingModel(model)
+
     # Run on CPU
-    native_out = model(xs)
+    native_out, _ = model(xs)
 
     # Run on IPU
-    poptorch_out = poptorch_model(xs)
+    poptorch_out, _ = poptorch_model(xs)
 
-    assert native_out.size() == poptorch_out.size()
+    # Inference test - check outputs
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
 
 
 @pytest.mark.parametrize("dims",
@@ -132,23 +123,25 @@ def test_cartesian_prod(arr_lengths):
 def test_tensordot(dims):
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
-        def forward(self, x, y):
-            return torch.tensordot(x, y, dims)
-
-    model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    op = lambda a, b: torch.tensordot(a, b, dims)
 
     x = torch.randn(2, 3, 5, 4)
     y = torch.randn(5, 4, 1)
 
+    model = helpers.ModelWithWeights(op, x.shape)
+    poptorch_model = poptorch.trainingModel(model)
+
     # Run on CPU
-    native_out = model(x, y)
+    native_out, _ = model((x, y))
 
     # Run on IPU
-    poptorch_out = poptorch_model(x, y)
+    poptorch_out, _ = poptorch_model((x, y))
 
+    # Inference test - check outputs
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
 
 
 @pytest.mark.parametrize("inplace", [True, False])
@@ -171,13 +164,18 @@ def test_scatter_add(inplace, dim):
 
             return out.scatter_add(self.dim, index, src)
 
-    torch.manual_seed(0)
-    x = torch.randn(4, 16, 32)
+    torch.manual_seed(42)
+    x = torch.randn(4, 8, 16)
     dim_size = x.shape[dim] // 2
     index = torch.randint_like(x, high=dim_size).long()
-    model = Model(dim, dim_size)
+    model = helpers.ModelWithWeights(Model(dim, dim_size), x.shape)
 
-    cpu_out = model(x, index)
-    pop_model = poptorch.inferenceModel(model)
-    ipu_out = pop_model(x, index)
+    cpu_out, _ = model((x, index))
+    pop_model = poptorch.trainingModel(model)
+    ipu_out, _ = pop_model((x, index))
+
+    # Inference test - check outputs
     helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
+
+    # Training test - check weights changed
+    pop_model.assert_weights_changed()
