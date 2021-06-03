@@ -19,85 +19,41 @@ batch_norms = [nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]
 
 @pytest.mark.parametrize("running_stats", {True, False})
 @pytest.mark.parametrize("training", {True, False})
-def test_batchNorm1D(running_stats, training):
-    torch.manual_seed(42)
-
-    input = torch.randn([2, 10, 1000])
-    norm = nn.BatchNorm1d(10, track_running_stats=running_stats)
-
-    # pylint: disable=W0212
-    norm._buffers["running_mean"] = torch.randn([10])
-    norm._buffers["running_var"] = torch.clamp(torch.randn([10]) + 1.0,
-                                               min=0.1)
-    norm.train(training)
-
-    # Run pytorch native on CPU.
-    native_output = norm(input)
-
-    # Run on IPU.
-    ipuModel = poptorch.inferenceModel(norm)
-    poptorch_out = ipuModel(input)
-
-    helpers.assert_allclose(actual=poptorch_out,
-                            expected=native_output,
-                            atol=1e-1,
-                            rtol=0.1)
-
-
-@pytest.mark.parametrize("running_stats", {True, False})
-@pytest.mark.parametrize("training", {True, False})
+@pytest.mark.parametrize("batch_norm", batch_norms)
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-def test_batchNorm2D(running_stats, training):
+def test_batchNorm(batch_norm, running_stats, training):
     torch.manual_seed(42)
+    C = 4
+    input_shape = [3, C, 5]
+    if batch_norm in (nn.BatchNorm2d, nn.BatchNorm3d):
+        input_shape.append(6)
+    if batch_norm is nn.BatchNorm3d:
+        input_shape.append(7)
+    input = torch.randn(input_shape)
 
-    input = torch.randn([20, 10, 35, 45])
-    norm = nn.BatchNorm2d(10, track_running_stats=running_stats)
+    norm = batch_norm(C, track_running_stats=running_stats)
 
     # pylint: disable=W0212
-    norm._buffers["running_mean"] = torch.randn([10])
-    norm._buffers["running_var"] = torch.clamp(torch.randn([10]) + 1.0,
-                                               min=0.1)
+    norm._buffers["running_mean"] = torch.randn([C])
+    norm._buffers["running_var"] = torch.clamp(torch.randn([C]) + 1.0, min=0.1)
     norm.train(training)
 
-    # Run pytorch native on CPU.
-    native_output = norm(input)
-
-    # Run on IPU.
-    ipuModel = poptorch.inferenceModel(norm)
-    poptorch_out = ipuModel(input)
-
-    helpers.assert_allclose(actual=poptorch_out,
-                            expected=native_output,
-                            atol=1e-1,
-                            rtol=0.1)
-
-
-@pytest.mark.parametrize("running_stats", {True, False})
-@pytest.mark.parametrize("training", {True, False})
-@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-def test_batchNorm3D(running_stats, training):
-    torch.manual_seed(42)
-
-    input = torch.randn([20, 10, 35, 45, 10])
-    norm = nn.BatchNorm3d(10, track_running_stats=running_stats)
-
-    # pylint: disable=W0212
-    norm._buffers["running_mean"] = torch.randn([10])
-    norm._buffers["running_var"] = torch.clamp(torch.randn([10]) + 1.0,
-                                               min=0.1)
-    norm.train(training)
+    model = helpers.ModelWithWeights(norm, input.shape)
 
     # Run pytorch native on CPU.
-    native_output = norm(input)
+    native_out, _ = model((input, ))
 
+    poptorch_model = poptorch.trainingModel(
+        model) if training else poptorch.inferenceModel(model)
     # Run on IPU.
-    ipuModel = poptorch.inferenceModel(norm)
-    poptorch_out = ipuModel(input)
+    poptorch_out, _ = poptorch_model((input, ))
 
-    helpers.assert_allclose(actual=poptorch_out,
-                            expected=native_output,
-                            atol=1e-1,
-                            rtol=0.1)
+    # Inference test - check outputs
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    # Training test - check weights changed
+    if training:
+        poptorch_model.assert_weights_changed()
 
 
 def test_batchNorm_eval_during_training():
@@ -145,32 +101,27 @@ def test_layerNorm():
 
     for i in range(1, 4):
         input = torch.randn([3, 2, 5, 2])
-        layerNorm = nn.LayerNorm(input.size()[i:])
+        layerNorm = nn.LayerNorm(input.shape[i:])
+
+        model = helpers.ModelWithWeights(layerNorm, input.shape)
 
         # Run pytorch native on CPU.
-        native_output = layerNorm(input)
+        native_out, _ = model((input, ))
 
+        # TODO(T39897): Change to training model when issue is fixed
+        poptorch_model = poptorch.inferenceModel(model)
         # Run on IPU.
-        ipuModel = poptorch.inferenceModel(layerNorm)
-        poptorch_out = ipuModel(input)
+        poptorch_out, _ = poptorch_model((input, ))
 
-        helpers.assert_allclose(actual=poptorch_out, expected=native_output)
+        # Inference test - check outputs
+        helpers.assert_allclose(actual=poptorch_out,
+                                expected=native_out,
+                                atol=1e-4,
+                                rtol=1e-4)
 
-
-def test_layerNormScalar():
-    torch.manual_seed(42)
-
-    input = torch.randn([3, 2, 5, 2])
-    layerNorm = nn.LayerNorm(2)
-
-    # Run pytorch native on CPU.
-    native_output = layerNorm(input)
-
-    # Run on IPU.
-    ipuModel = poptorch.inferenceModel(layerNorm)
-    poptorch_out = ipuModel(input)
-
-    helpers.assert_allclose(actual=poptorch_out, expected=native_output)
+        # Training test - check weights changed
+        # TODO(T39897): Enable training test when issue is fixed
+        # poptorch_model.assert_weights_changed()
 
 
 def test_layerNormPretrainedWeights():
@@ -240,22 +191,20 @@ def test_groupNorm(dims):
 
     input = torch.randn(shape)
     groupNorm = nn.GroupNorm(5, 10)
+    model = helpers.ModelWithWeights(groupNorm, input.shape)
 
     # Run pytorch native on CPU.
-    native_output = groupNorm(input)
+    native_out, _ = model((input, ))
 
     # Run on IPU.
-    ipuModel = poptorch.inferenceModel(groupNorm)
-    poptorch_out = ipuModel(input)
+    poptorch_model = poptorch.trainingModel(model)
+    poptorch_out, _ = poptorch_model((input, ))
 
-    # Group norm is pending correctness changes in popart/poplar so we will just test the shape/type for now.
-    assert poptorch_out.size() == native_output.size()
-    assert poptorch_out.type() == native_output.type()
+    # Inference test - check outputs
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    helpers.assert_allclose(actual=poptorch_out,
-                            expected=native_output,
-                            atol=1e-1,
-                            rtol=0.1)
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
 
 
 def test_groupNorm_exfail():
