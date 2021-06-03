@@ -18,14 +18,10 @@ def op_harness(op, inputs, assert_func, test_training=False, out_fn=None):
         assert len(inputs) == 2
 
     if test_training and not op in non_differentiable_ops:
-        if is_unary:
-            model = helpers.UnaryModelWithWeights(op, inputs[0].shape, out_fn)
-        else:
-            model = helpers.BinaryModelWithWeights(op, inputs[0].shape,
-                                                   inputs[1].shape, out_fn)
+        model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn)
 
         # Run on CPU.
-        native_out, _ = model(*inputs)
+        native_out, _ = model(tuple(inputs))
 
         # The LR should be large enough that a single training step will
         # definitely cause weights to change
@@ -33,7 +29,7 @@ def op_harness(op, inputs, assert_func, test_training=False, out_fn=None):
 
         # Run on IPU.
         poptorch_model = poptorch.trainingModel(model, optimizer=optim)
-        poptorch_out, _ = poptorch_model(*inputs)
+        poptorch_out, _ = poptorch_model(tuple(inputs))
 
         # Training test - check weights have changed
         poptorch_model.assert_weights_changed()
@@ -265,8 +261,8 @@ def test_binary_ops_elementwise_edgecases(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out,
                                 expected=native_out,
-                                atol=1e-05,
-                                rtol=1e-05,
+                                atol=1e-04,
+                                rtol=1e-04,
                                 equal_nan=True)
 
     class Model(torch.nn.Module):

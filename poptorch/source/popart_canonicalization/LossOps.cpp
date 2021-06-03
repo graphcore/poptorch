@@ -549,9 +549,11 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
   target_lengths = createCast(graph, {target_lengths}, "UINT32")->output();
 
   reduction = convertReduceToPopart(reduction);
-  return create_ctcloss(graph,
-                        {log_probs, targets, input_lengths, target_lengths},
-                        reduction, blank, "UNDEFINED");
+  auto loss =
+      create_ctcloss(graph, {log_probs, targets, input_lengths, target_lengths},
+                     reduction, blank, "UNDEFINED");
+
+  return createIdentityloss(graph, {loss->output()}, reduction);
 }
 
 torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,

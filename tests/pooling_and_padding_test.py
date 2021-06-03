@@ -42,9 +42,9 @@ ops_grad_unsupported = (
 
 def execute_and_check_wrapper(op, input, check_shape_only=False):
 
-    model = helpers.UnaryModelWithWeights(op, input.shape)
+    model = helpers.ModelWithWeights(op, input.shape)
     # Run on CPU.
-    native_out, _ = model(input)
+    native_out, _ = model((input, ))
 
     test_training = not isinstance(op, ops_grad_unsupported)
 
@@ -52,7 +52,7 @@ def execute_and_check_wrapper(op, input, check_shape_only=False):
     poptorch_model = poptorch.trainingModel(
         model) if test_training else poptorch.inferenceModel(model)
 
-    poptorch_out, _ = poptorch_model(input)
+    poptorch_out, _ = poptorch_model((input, ))
 
     if not check_shape_only:
         # Inference test - check outputs

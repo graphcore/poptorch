@@ -11,40 +11,49 @@ import poptorch
 import helpers
 
 
-def loss_harness(loss, inputs, target, reduction, op=None, **kwargs):
+def loss_harness(loss,
+                 inputs,
+                 target,
+                 reduction,
+                 op=None,
+                 training=True,
+                 **kwargs):
 
     if len(inputs) == 1:
         loss_fn = lambda x: loss(x, target, reduction=reduction, **kwargs)
 
         if op is None:
             op = lambda x: x
-
-        model = helpers.UnaryModelWithWeights(op,
-                                              inputs[0].shape,
-                                              loss_fn=loss_fn)
-    else:
-        assert len(inputs) == 2
+    elif len(inputs) == 2:
         loss_fn = lambda x, y: loss(
             x, y, target, reduction=reduction, **kwargs)
 
         if op is None:
             op = lambda x, y: (x, y)
 
-        model = helpers.BinaryModelWithWeights(op,
-                                               inputs[0].shape,
-                                               inputs[1].shape,
-                                               loss_fn=loss_fn)
+    else:
+        assert len(inputs) == 3
+        # The only supported loss fn with 3 inputs is TripletMarginLoss
+        # which has no "target" per se
+        loss_fn = lambda x, y, z: loss(x, y, z, reduction=reduction, **kwargs)
 
-    poptorch_model = poptorch.trainingModel(model)
+        if op is None:
+            op = lambda x, y, z: (x, y, z)
 
-    native_out, _ = model(*inputs)
-    poptorch_out, poptorch_loss = poptorch_model(*inputs)
+    model = helpers.ModelWithWeights(op, inputs[0].shape, loss_fn=loss_fn)
+
+    poptorch_model = poptorch.trainingModel(
+        model) if training else poptorch.inferenceModel(model)
+
+    native_out, _ = model(tuple(inputs))
+    poptorch_out, poptorch_loss = poptorch_model(tuple(inputs))
 
     # Inference test - check outputs
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    # Training test - check weights have changed
-    poptorch_model.assert_weights_changed()
+    if training:
+        # Training test - check weights have changed
+        poptorch_model.assert_weights_changed()
 
     # Return the poptorch model and original outputs for any further
     # testing
@@ -401,7 +410,7 @@ def test_CosineEmbeddingLoss(reduction):
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-def test_MarginRankingLoss_direct(reduction):
+def test_MarginRankingLoss(reduction):
     torch.manual_seed(42)
 
     # Margin should be between -1 and 1
@@ -422,48 +431,36 @@ def test_MarginRankingLoss_direct(reduction):
 
 @pytest.mark.parametrize("p", {2., 3.})
 @pytest.mark.parametrize("swap", {True, False})
-@pytest.mark.parametrize("reduction", {"none", "mean", "sum"})
-def test_TripletMarginLoss_direct(p, swap, reduction):
+@pytest.mark.parametrize("reduction", {"mean", "sum"})
+def test_TripletMarginLoss(p, swap, reduction):
     torch.manual_seed(42)
 
     # Between 0 and 2
     margin = torch.rand(1) * 2
 
-    model = torch.nn.TripletMarginLoss(margin.item(),
-                                       p,
-                                       swap=swap,
-                                       reduction=reduction)
-    poptorch_model = poptorch.inferenceModel(model)
-
     anchor = torch.randn(10, 5)
     positive = torch.randn(10, 5)
     negative = torch.randn(10, 5)
 
-    native_out = model(anchor, positive, negative)
-    poptorch_out = poptorch_model(anchor, positive, negative)
+    # TODO(T39941): Re-enable training by setting training=True once fixed
+    loss_harness(F.triplet_margin_loss, [anchor, positive, negative],
+                 None,
+                 reduction,
+                 training=False,
+                 margin=margin.item(),
+                 p=p,
+                 swap=swap)
 
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
-
-@pytest.mark.parametrize("blank", {0, 11})
+@pytest.mark.parametrize("blank", {0, 3})
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 def test_CTCLoss(blank, reduction):
-    class Model(torch.nn.Module):
-        def __init__(self, blank, reduction):
-            super().__init__()
-            self.linear = torch.nn.Linear(C, N)
-            self.loss = torch.nn.CTCLoss(blank=blank, reduction=reduction)
 
-        def forward(self, input, target, input_lengths, target_lengths):
-            input = self.linear(input)
-            loss = self.loss(input, target, input_lengths, target_lengths)
-            return poptorch.identity_loss(loss, reduction="none")
-
-    T = 500  # Input sequence length
-    N = 16  # Batch size
-    C = 20  # Number of classes
-    S = 30  # Target sequence length
-    S_min = 10  # Minimum target length
+    T = 10  # Input sequence length
+    N = 4  # Batch size
+    C = 5  # Number of classes
+    S = 6  # Target sequence length
+    S_min = 3  # Minimum target length
 
     torch.manual_seed(42)
 
@@ -480,13 +477,9 @@ def test_CTCLoss(blank, reduction):
     target = torch.randint(low=0, high=C - 1, size=(N, S), dtype=torch.long)
     target[target > blank] += 1
 
-    model = Model(blank=blank, reduction=reduction)
-    poptorch_model = poptorch.trainingModel(model)
-
-    native_out = model(input, target, input_lengths, target_lengths)
-    poptorch_out = poptorch_model(input, target, input_lengths, target_lengths)
-
-    helpers.assert_allclose(expected=native_out,
-                            actual=poptorch_out,
-                            rtol=1e-3,
-                            atol=1e-3)
+    loss_harness(F.ctc_loss, [input],
+                 target,
+                 reduction,
+                 input_lengths=input_lengths,
+                 target_lengths=target_lengths,
+                 blank=blank)

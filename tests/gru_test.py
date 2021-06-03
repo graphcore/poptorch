@@ -31,12 +31,12 @@ def test_gru(bias, batch_first):
                       batch_first=batch_first)
 
     out_fn = lambda x: x[0]
-    model = helpers.BinaryModelWithWeights(op, inp.shape, h0.shape, out_fn)
+    model = helpers.ModelWithWeights(op, inp.shape, out_fn)
 
     poptorch_model = poptorch.trainingModel(model)
 
-    (native_out, native_hn), _ = model(inp, h0)
-    (poptorch_out, poptorch_hn), _ = poptorch_model(inp, h0)
+    (native_out, native_hn), _ = model((inp, h0))
+    (poptorch_out, poptorch_hn), _ = poptorch_model((inp, h0))
 
     # Inference test - check outputs
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)

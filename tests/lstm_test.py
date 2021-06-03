@@ -132,12 +132,12 @@ def test_lstm_fc():
 
     input = torch.randn(1, batch_size, input_size)
     out_fn = lambda x: x[0]
-    model = helpers.UnaryModelWithWeights(op, input.shape, out_fn)
+    model = helpers.ModelWithWeights(op, input.shape, out_fn)
 
     poptorch_model = poptorch.trainingModel(model)
 
-    (native_out, (native_hn, native_cn)), _ = model(input)
-    (poptorch_out, (poptorch_hn, poptorch_cn)), _ = poptorch_model(input)
+    (native_out, (native_hn, native_cn)), _ = model((input, ))
+    (poptorch_out, (poptorch_hn, poptorch_cn)), _ = poptorch_model((input, ))
 
     # Inference test - check outputs
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)

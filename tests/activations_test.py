@@ -31,15 +31,15 @@ def test_activations(op):
 
     fn = op(dim=1) if op in (nn.Softmax, nn.LogSoftmax) else op()
 
-    model = helpers.UnaryModelWithWeights(fn, input.shape)
+    model = helpers.ModelWithWeights(fn, input.shape)
     model.train()
 
     # Run on CPU.
-    native_out, _ = model(input)
+    native_out, _ = model((input, ))
 
     # Run on IPU.
     poptorch_model = poptorch.trainingModel(model)
-    poptorch_out, _ = poptorch_model(input)
+    poptorch_out, _ = poptorch_model((input, ))
 
     tol = [0.01, 1e-3] if op is nn.GELU else [1e-4, 1e-7]
 
@@ -62,14 +62,14 @@ def test_glu(dim):
     N, C, M, K, L = 2, 4, 6, 8, 10
 
     input = torch.randn(N, C, M, K, L)
-    model = helpers.UnaryModelWithWeights(nn.GLU(dim=dim), input.shape)
+    model = helpers.ModelWithWeights(nn.GLU(dim=dim), input.shape)
 
     # Run on CPU.
-    native_out, _ = model(input)
+    native_out, _ = model((input, ))
 
     # Run on IPU.
     poptorch_model = poptorch.trainingModel(model)
-    poptorch_out, _ = poptorch_model(input)
+    poptorch_out, _ = poptorch_model((input, ))
 
     # Inference test - check outputs
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
@@ -98,13 +98,13 @@ def test_rrelu_training():
     opts = poptorch.Options().randomSeed(0)
     input = torch.randn([3000])
 
-    model = helpers.UnaryModelWithWeights(nn.RReLU(), input.shape)
+    model = helpers.ModelWithWeights(nn.RReLU(), input.shape)
 
     # in training negative inputs are multiplied by a random parameter
     # we'll check positive outputs and distribution of negative outputs
-    native_out, _ = model(input)
+    native_out, _ = model((input, ))
     poptorch_model = poptorch.trainingModel(model, options=opts)
-    poptorch_out, _ = poptorch_model(input)
+    poptorch_out, _ = poptorch_model((input, ))
 
     ref = native_out[native_out >= 0]
     out = poptorch_out[poptorch_out >= 0]

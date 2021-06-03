@@ -2,7 +2,6 @@
 import copy
 import functools
 import re
-from abc import ABC
 import torch
 import poptorch
 import poptorch.poptorch_core as poptorch_core  # type: ignore
@@ -115,15 +114,12 @@ def trainingModelWithLoss(model, loss, options=None, optimizer=None):
 # Wrapper model with weights to test that gradients are generated
 # and updated in a graph with a given op - Linear layer added to
 # ensure some weights exist
-#
-# This is an abstract class and the forward function must be implemented
-# in a subclass
-class AbstractModelWithWeights(torch.nn.Module, ABC):
-    def __init__(self, op, input_shapes, out_fn=None, loss_fn=None):
+class ModelWithWeights(torch.nn.Module):
+    def __init__(self, op, first_input_shape, out_fn=None, loss_fn=None):
         super().__init__()
         self.op = op
-        self.input_shapes = input_shapes
-        numel = sum([shape.numel() for shape in input_shapes])
+        numel = first_input_shape.numel()
+        self.first_input_shape = first_input_shape
         self.lin = torch.nn.Linear(numel, numel)
         # Copy original weights for training test
         self._weights_before = self.lin.weight.detach().clone()
@@ -132,13 +128,18 @@ class AbstractModelWithWeights(torch.nn.Module, ABC):
         # but the loss should only be calculated using the values. If unspecified,
         # defaults to an identity function
         self.out_fn = out_fn
-        # If the loss fn takes a target param, this value must be included in a
-        # wrapper function that only takes a single input before passing to this
-        # constructor
+        # If the loss fn takes more than 1 param (e.g. a target), these extra params
+        # must be wrapped in a function that only takes a single input
         self.loss_fn = loss_fn if not loss_fn is None \
             else lambda x: poptorch.identity_loss(x**2, reduction='sum')
 
-    def handle_output(self, x):
+    # Flatten first input, pass through linear layer of same size
+    # and pass reassembled inputs to op
+    def forward(self, xs):
+        x1 = torch.flatten(xs[0])
+        x1 = self.lin(x1)
+        x1 = x1.reshape(self.first_input_shape)
+        x = self.op(x1, *xs[1:])
         loss_in = x if self.out_fn is None else self.out_fn(x)
         if isinstance(loss_in, tuple):
             l = self.loss_fn(*loss_in)
@@ -149,45 +150,6 @@ class AbstractModelWithWeights(torch.nn.Module, ABC):
     def assert_weights_changed(self):
         weights_after = self.lin.weight.detach().clone()
         assert not torch.allclose(self._weights_before, weights_after)
-
-
-class UnaryModelWithWeights(AbstractModelWithWeights):
-    def __init__(self, op, input_shape, out_fn=None, loss_fn=None):
-        super().__init__(op, [input_shape], out_fn, loss_fn)
-
-    # Flatten input, pass through linear layer of same size
-    # and pass output to the op
-    def forward(self, x):
-        x = torch.flatten(x)
-        x = self.lin(x)
-        x = x.reshape(self.input_shapes[0])
-        x = self.op(x)
-        return self.handle_output(x)
-
-
-class BinaryModelWithWeights(AbstractModelWithWeights):
-    def __init__(self,
-                 op,
-                 input_shape1,
-                 input_shape2,
-                 out_fn=None,
-                 loss_fn=None):
-        super().__init__(op, [input_shape1, input_shape2], out_fn, loss_fn)
-
-    # Flatten both inputs, concatenate into a a single 1-dim tensor
-    # and pass through linear layer of same size, then split and assign
-    # the output according to the sizes of the inputs and pass to the op
-    def forward(self, x1, x2):
-        x1_flat = torch.flatten(x1)
-        x2_flat = torch.flatten(x2)
-        x = torch.cat((x1_flat, x2_flat))
-        x = self.lin(x)
-        x1_out = x[:self.input_shapes[0].numel()]
-        x2_out = x[self.input_shapes[0].numel():]
-        x1_out = x1_out.reshape(self.input_shapes[0])
-        x2_out = x2_out.reshape(self.input_shapes[1])
-        x = self.op(x1_out, x2_out)
-        return self.handle_output(x)
 
 
 class PrintCapfdOnExit:
