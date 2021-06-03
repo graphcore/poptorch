@@ -92,8 +92,8 @@ serial_tests = [
 
 
 def add_test(output, test, folder, test_id, test_properties):
-    output.write(f"add_test({test} \"python3\" \"-m\" \"pytest\" \"-s\" "
-                 f"\"{folder}/{test}\" "
+    output.write(f"add_test({test} \"{folder}/timeout_handler.py\" \"python3\""
+                 f" \"-m\" \"pytest\" \"-s\" \"{folder}/{test}\" "
                  f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
 
     props_string = " ".join(f"{k} {v}" for k, v in test_properties.items())
@@ -119,6 +119,9 @@ with open(args.output_file, "w") as output:
         m = re.match("^(.*)::(.*)", test)
         if m:
             test_properties = {"WORKING_DIRECTORY": work_dir}
+            # Mark tests as timed out 1 second after TEST_TIMEOUT appears in
+            # their output (see tests/timeout_handler.py)
+            test_properties["TIMEOUT_AFTER_MATCH"] = "\"1;TEST_TIMEOUT\""
             # Use os.path.basename() to ensure we only have
             # the filename
             test_file = os.path.basename(m.group(1))
