@@ -136,6 +136,7 @@ class ModelWithWeights(torch.nn.Module):
     # Flatten first input, pass through linear layer of same size
     # and pass reassembled inputs to op
     def forward(self, xs):
+        assert isinstance(xs, tuple)
         x1 = torch.flatten(xs[0])
         x1 = self.lin(x1)
         x1 = x1.reshape(self.first_input_shape)
