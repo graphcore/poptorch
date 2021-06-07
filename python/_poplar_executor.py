@@ -628,6 +628,89 @@ class PoplarExecutor:
             return output
         return output[0]
 
+    def getPerfCounters(self):
+        """Return performance counters for the last execution of the model.
+
+        Return the values (in fractional seconds) of the performance counters
+        corresponding to the latest run of the model. The reference point of
+        the returned value is undefined, however the difference between values
+        is valid.
+
+        The returned object is a dictionary where they keys correspond to each
+        of the following events:
+        * 'input': the IPU requesting an input tensor
+        * 'input_complete': an input tensor having been transferred
+        * 'output': the IPU requesting to transmit an output tensor
+        * 'output_complete': an output tensor having been transferred
+
+        The values of the dictionary are nested lists. The first level of
+        nesting corresponds to an input or output index. The second level list
+        contains the actual values as fractional seconds.
+
+        Examples:
+        * dict['input'][1][3]: performance counter for the second input
+        tensor being requested on the third iteration of the model
+        * dict['output_complete'][0][0]: performance counter the first
+        output tensor having been transferred on the first iteration of
+        the model
+        """
+        if not self._executable:
+            return {
+                'input': [[]],
+                'input_complete': [[]],
+                'output': [[]],
+                'output_complete': [[]]
+            }
+
+        values = poptorch_core.getTimestamps(self._executable)
+        return {
+            'input': values[0],
+            'input_complete': values[1],
+            'output': values[2],
+            'output_complete': values[3]
+        }
+
+    def getLatency(self):
+        """Return latency information for the last execution of the model.
+
+        Latency is the interval of time (in fractional seconds) between the
+        first input tensor being requested and the last output tensor being
+        written back to the host.
+
+        The result is a tuple containg the minimum, maximum and average
+        latency for the iterations corresponding to the latest invocation of
+        the model.
+        """
+        perf_counters = self.getPerfCounters()
+        start_times = []
+        end_times = []
+        durations = []
+
+        num_inputs = len(perf_counters['input'])
+        for step in range(0, len(perf_counters['input'][0])):
+            start_times.append(
+                min([
+                    perf_counters['input'][i][step]
+                    for i in range(0, num_inputs)
+                ]))
+
+        num_outputs = len(perf_counters['output_complete'])
+        for step in range(0, len(perf_counters['output_complete'][0])):
+            end_times.append(
+                max([
+                    perf_counters['output_complete'][i][step]
+                    for i in range(0, num_outputs)
+                ]))
+
+        durations = list(
+            map(lambda v: v[1] - v[0], zip(start_times, end_times)))
+
+        if len(durations) == 0:
+            return (0., 0., 0.)
+
+        avg = sum(durations) / len(durations)
+        return (min(durations), max(durations), avg)
+
     def destroy(self) -> None:
         """Destroy the model: release the IPUs and the executable.
         """

@@ -58,6 +58,8 @@ public:
   void attachToDevice();
   bool isAttachedToDevice() const;
 
+  const Compiler &getCompiler() const { return _compiler; }
+
 private:
   poptorch::Compiler _compiler;
 

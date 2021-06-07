@@ -161,7 +161,9 @@ Compiler::addInputTensor(const char *type,
                          const std::vector<std::int64_t> &dims) {
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{type, dims};
-  _impl->ids.push_back(_impl->active_builder->addInputTensor(info));
+  auto popart_id = _impl->active_builder->addInputTensor(info);
+  _impl->inputs.push_back(popart_id);
+  _impl->ids.push_back(popart_id);
   return _impl->ids.size() - 1;
 }
 
@@ -795,8 +797,8 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
     attachToDevice();
   }
   // Execute the model on IPU.
-  popart::StepIO stepio(_impl->popart_incoming, _impl->popart_outgoing);
-  _impl->session->run(stepio);
+  _impl->stepio.populate(_impl->popart_incoming, _impl->popart_outgoing);
+  _impl->session->run(_impl->stepio);
 
   // In case several outputs point at the same tensor: duplicate the data
   for (const auto &out : _impl->outgoing_duplicates) {
@@ -1237,5 +1239,31 @@ void Compiler::attachToDevice() { _impl->attachToDevice(); }
 bool Compiler::isAttachedToDevice() const {
   return _impl->isAttachedToDevice();
 }
+
+const std::vector<double> &Compiler::getInputTimestamps(size_t index) const {
+  auto id = _impl->inputs[index];
+  return _impl->stepio.getInputTimestamps(id);
+}
+
+const std::vector<double> &
+Compiler::getInputCompleteTimestamps(size_t index) const {
+  auto id = _impl->inputs[index];
+  return _impl->stepio.getInputCompleteTimestamps(id);
+}
+
+const std::vector<double> &Compiler::getOutputTimestamps(size_t index) const {
+  auto id = _impl->outputs[index];
+  return _impl->stepio.getOutputTimestamps(id);
+}
+
+const std::vector<double> &
+Compiler::getOutputCompleteTimestamps(size_t index) const {
+  auto id = _impl->outputs[index];
+  return _impl->stepio.getOutputCompleteTimestamps(id);
+}
+
+size_t Compiler::getNumInputs() const { return _impl->inputs.size(); }
+
+size_t Compiler::getNumOutputs() const { return _impl->outputs.size(); }
 
 } // namespace poptorch

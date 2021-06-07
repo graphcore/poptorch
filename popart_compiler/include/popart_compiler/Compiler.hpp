@@ -420,6 +420,14 @@ public:
   void attachToDevice();
   bool isAttachedToDevice() const;
 
+  const std::vector<double> &getInputTimestamps(size_t index) const;
+  const std::vector<double> &getInputCompleteTimestamps(size_t index) const;
+  const std::vector<double> &getOutputTimestamps(size_t index) const;
+  const std::vector<double> &getOutputCompleteTimestamps(size_t index) const;
+
+  size_t getNumInputs() const;
+  size_t getNumOutputs() const;
+
 private:
   void assertTensorIs(PopartType dataType, poptorch::TensorId id) const;
   std::unique_ptr<detail::CompilerImpl> _impl;

@@ -1,4 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <chrono>
+
 #include <popart/adam.hpp>
 #include <popart/adaptive.hpp>
 #include <popart/builder.hpp>
@@ -215,6 +217,98 @@ void assertSingleInstanceMaxNumIPUs(std::size_t num_ipus) {
 
 namespace detail {
 
+popart::ConstVoidData StepIO::in(popart::TensorId id, int64_t num_elems,
+                                 bool prefetch) {
+  (void)prefetch;
+  timestamp(&in_times, id);
+  return get<popart::ConstVoidData>(id, &inputs_info, num_elems);
+}
+
+void StepIO::inComplete(popart::TensorId id, int64_t num_elems) {
+  (void)num_elems;
+  timestamp(&in_complete_times, id);
+}
+
+popart::MutableVoidData StepIO::out(popart::TensorId id, int64_t num_elems) {
+  timestamp(&out_times, id);
+  return get<popart::MutableVoidData>(id, &outputs_info, num_elems);
+}
+
+void StepIO::outComplete(popart::TensorId id) {
+  timestamp(&out_complete_times, id);
+}
+
+void StepIO::computeStepDataInfo(const popart::TensorId &id,
+                                 popart::IArray *array) {
+  if (step_data_info.find(id) != step_data_info.end()) {
+    return;
+  }
+
+  auto dtype = AccessorType::getArrayDataType(*array);
+  auto rank = AccessorType::getArrayRank(*array);
+  std::vector<int64_t> shape;
+
+  for (size_t i = 0; i < rank; ++i) {
+    shape.push_back(AccessorType::getArrayDim(*array, i));
+  }
+
+  step_data_info.insert({id, popart::TensorInfo(dtype, shape)});
+}
+
+void StepIO::populate(const TensorArrayMap &inputs,
+                      const TensorArrayMap &outputs) {
+  inputs_info.clear();
+  for (const auto &input : inputs) {
+    inputs_info.insert({input.first, {input.second, 0}});
+    in_times[input.first].clear();
+    in_complete_times[input.first].clear();
+    computeStepDataInfo(input.first, &input.second);
+  }
+
+  outputs_info.clear();
+  for (const auto &output : outputs) {
+    outputs_info.insert({output.first, {output.second, 0}});
+    out_times[output.first].clear();
+    out_complete_times[output.first].clear();
+    computeStepDataInfo(output.first, &output.second);
+  }
+}
+
+template <typename T>
+T StepIO::get(const popart::TensorId &id, TensorArrayInfo *map,
+              int64_t num_elems) {
+  auto it = map->find(id);
+  ERROR_ON_MSG(it == map->end(), "Internal Compiler Error in StepIO");
+  auto &array_info = it->second;
+
+  auto it2 = step_data_info.find(id);
+  ERROR_ON_MSG(it2 == step_data_info.end(),
+               "Internal Compiler Error in StepIO");
+
+  T step_data;
+  step_data.info = it2->second;
+
+  step_data.data = static_cast<uint8_t *>(AccessorType::getDataPointer(
+                       array_info.array)) + // NOLINT
+                   array_info.offset;
+
+  int64_t num_bytes =
+      static_cast<int64_t>(step_data.info.getDataTypeInfo()->nbytes()) *
+      num_elems;
+
+  array_info.offset = (array_info.offset + num_bytes) % step_data.info.nbytes();
+  return step_data;
+}
+
+void StepIO::timestamp(TensorTimestamps *time, const popart::TensorId &id) {
+  auto now = std::chrono::system_clock::now().time_since_epoch();
+  auto stamp =
+      static_cast<double>(
+          std::chrono::duration_cast<std::chrono::milliseconds>(now).count()) /
+      1000;
+  time->at(id).push_back(stamp);
+}
+
 const std::vector<popart::TensorId> &WeightsIO::parameterIds() const {
   return _weights_order;
 }
@@ -321,24 +415,24 @@ void CompilerImpl::addMemoryToOutput(poptorch::TensorId id, void *ptr,
 }
 
 void CompilerImpl::addOutputTensor(
-    const std::vector<popart::TensorId> &inputs) {
-  active_builder->addOutputTensor(inputs.at(0));
+    const std::vector<popart::TensorId> &tensors) {
+  active_builder->addOutputTensor(tensors.at(0));
 }
 
 void CompilerImpl::addInputTensorFromParentGraph(
-    const std::vector<popart::TensorId> &inputs) {
-  active_builder->addInputTensorFromParentGraph(inputs.at(0));
+    const std::vector<popart::TensorId> &tensors) {
+  active_builder->addInputTensorFromParentGraph(tensors.at(0));
 }
 
 popart::TensorId
-CompilerImpl::reshape(const std::vector<popart::TensorId> &inputs,
+CompilerImpl::reshape(const std::vector<popart::TensorId> &tensors,
                       const std::vector<int64_t> &shape) {
   auto ai_onnx = active_builder->aiOnnxOpset10();
 
   popart::Shape s = {static_cast<int64_t>(shape.size())};
   popart::TensorInfo tensor_info("INT64", s);
   auto new_shape = ai_onnx.constant({shape.data(), tensor_info});
-  return ai_onnx.reshape({inputs.at(0), new_shape});
+  return ai_onnx.reshape({tensors.at(0), new_shape});
 }
 
 std::vector<popart::TensorId> CompilerImpl::customOperation(
@@ -377,25 +471,25 @@ std::vector<popart::TensorId> CompilerImpl::customOperation(
 }
 
 popart::TensorId CompilerImpl::recomputationCheckpoint(
-    const std::vector<popart::TensorId> &inputs) {
+    const std::vector<popart::TensorId> &tensors) {
   // Popart is simply a for loop over vector inputs and it is better for the
   // PyTorch Graph to avoid Tuple/List packs and unpacks
-  ERROR_ON(inputs.size() != 1);
-  return active_builder->checkpointOutput(inputs)[0];
+  ERROR_ON(tensors.size() != 1);
+  return active_builder->checkpointOutput(tensors)[0];
 }
 
 popart::TensorId
-CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &inputs,
+CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
                              const PopartConstant &constant) {
-  UNUSED(inputs);
+  UNUSED(tensors);
   auto ai_onnx = active_builder->aiOnnxOpset10();
 
   return ai_onnx.constant(*constant.getPopartData());
 }
 
 poptorch::TensorId CompilerImpl::hostSideTensorConstant(
-    const std::vector<popart::TensorId> &inputs, HostSideConstant constant) {
-  UNUSED(inputs);
+    const std::vector<popart::TensorId> &tensors, HostSideConstant constant) {
+  UNUSED(tensors);
   _host_side_constants.emplace(std::make_pair(ids.size(), std::move(constant)));
 
   // Add a dummy into ids
@@ -641,10 +735,10 @@ CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
 }
 
 popart::TensorId
-CompilerImpl::randomNormal(const std::vector<popart::TensorId> &inputs,
+CompilerImpl::randomNormal(const std::vector<popart::TensorId> &tensors,
                            const std::vector<int64_t> &shape, float mean,
                            float scale, const std::string &dtype) {
-  UNUSED(inputs);
+  UNUSED(tensors);
   auto ai_onnx = active_builder->aiOnnxOpset10();
   auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomnormal(shape, popart::getONNXDataTypeAsInt(pdt), mean,
@@ -652,31 +746,32 @@ CompilerImpl::randomNormal(const std::vector<popart::TensorId> &inputs,
 }
 
 popart::TensorId
-CompilerImpl::randomUniform(const std::vector<popart::TensorId> &inputs,
+CompilerImpl::randomUniform(const std::vector<popart::TensorId> &tensors,
                             const std::vector<int64_t> &shape, float high,
                             float low, const std::string &dtype) {
-  UNUSED(inputs);
+  UNUSED(tensors);
   auto ai_onnx = active_builder->aiOnnxOpset10();
   auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomuniform(shape, popart::getONNXDataTypeAsInt(pdt), high,
                                low);
 }
 
-popart::TensorId CompilerImpl::ones(const std::vector<popart::TensorId> &inputs,
-                                    const std::vector<int64_t> &shape,
-                                    const std::string &dtype) {
-  return zerosOrOnes(inputs, shape, dtype, false);
+popart::TensorId
+CompilerImpl::ones(const std::vector<popart::TensorId> &tensors,
+                   const std::vector<int64_t> &shape,
+                   const std::string &dtype) {
+  return zerosOrOnes(tensors, shape, dtype, false);
 }
 
 popart::TensorId
-CompilerImpl::zeros(const std::vector<popart::TensorId> &inputs,
+CompilerImpl::zeros(const std::vector<popart::TensorId> &tensors,
                     const std::vector<int64_t> &shape,
                     const std::string &dtype) {
-  return zerosOrOnes(inputs, shape, dtype, true);
+  return zerosOrOnes(tensors, shape, dtype, true);
 }
 
 popart::TensorId
-CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &inputs,
+CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &tensors,
                           const std::vector<int64_t> &shape,
                           const std::string &dtype, bool zeros) {
   auto total_size = static_cast<size_t>(std::accumulate(
@@ -689,7 +784,7 @@ CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &inputs,
       const_buff.emplace_back(zeros ? 0 : 1);
     }
     PopartConstant popart_const(PopartType::INT32, &const_buff[0], shape);
-    return tensorConstant(inputs, popart_const);
+    return tensorConstant(tensors, popart_const);
   }
   if (dtype == "FLOAT") {
     std::vector<float> const_buff;
@@ -699,7 +794,7 @@ CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &inputs,
     }
 
     PopartConstant popart_const(PopartType::FLOAT, &const_buff[0], shape);
-    return tensorConstant(inputs, popart_const);
+    return tensorConstant(tensors, popart_const);
   }
   if (dtype == "FLOAT16") {
     std::vector<uint16_t> const_buff;
@@ -709,7 +804,7 @@ CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &inputs,
     }
 
     PopartConstant popart_const(PopartType::FLOAT16, &const_buff[0], shape);
-    return tensorConstant(inputs, popart_const);
+    return tensorConstant(tensors, popart_const);
   }
   ERROR("Unsupported type " << dtype);
 }
@@ -723,16 +818,16 @@ bool CompilerImpl::isHostSideConstant(poptorch::TensorId id) const {
   return _host_side_constants.count(id);
 }
 
-void CompilerImpl::addMultiConvPart(const std::vector<popart::TensorId> &inputs,
-                                    const std::vector<int64_t> &dilations,
-                                    const std::vector<int64_t> &kernel_shape,
-                                    const std::vector<int64_t> &pads,
-                                    const std::vector<int64_t> &strides) {
+void CompilerImpl::addMultiConvPart(
+    const std::vector<popart::TensorId> &tensors,
+    const std::vector<int64_t> &dilations,
+    const std::vector<int64_t> &kernel_shape, const std::vector<int64_t> &pads,
+    const std::vector<int64_t> &strides) {
   if (multi_conv_builder == nullptr) {
     multi_conv_builder = std::make_unique<MultiConvBuilder>();
   }
 
-  multi_conv_builder->addConv(inputs, dilations, kernel_shape, pads, strides);
+  multi_conv_builder->addConv(tensors, dilations, kernel_shape, pads, strides);
 }
 
 std::vector<popart::TensorId> CompilerImpl::endMultiConv() {

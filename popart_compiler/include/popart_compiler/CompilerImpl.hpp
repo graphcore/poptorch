@@ -61,6 +61,70 @@ struct CallbackInternalMetadata {
   std::atomic<std::uint32_t> number_of_input_streams_inited;
 };
 
+class StepIO : public popart::IStepIO {
+public:
+  struct ArrayInfo {
+    popart::IArray &array;
+    int64_t offset;
+  };
+
+  using ArrayType = popart::IArray;
+  using AccessorType = popart::StepIONS::IArrayAccessor;
+  using TensorArrayMap = std::map<popart::TensorId, ArrayType &>;
+  using TensorTimestamps = std::map<popart::TensorId, std::vector<double>>;
+  using TensorArrayInfo = std::map<popart::TensorId, ArrayInfo>;
+  using TensorStepDataInfo = std::map<popart::TensorId, popart::TensorInfo>;
+
+  StepIO() = default;
+
+  popart::ConstVoidData in(popart::TensorId id, int64_t num_elems, // NOLINT
+                           bool prefetch)override;
+  void inComplete(popart::TensorId id, int64_t num_elems) override; // NOLINT
+  popart::MutableVoidData out(popart::TensorId id,
+                              int64_t num_elems) override; // NOLINT
+  void outComplete(popart::TensorId id) override;          // NOLINT
+
+  void computeStepDataInfo(const popart::TensorId &id, popart::IArray *array);
+  void populate(const TensorArrayMap &inputs, const TensorArrayMap &outputs);
+
+  template <typename T>
+  T get(const popart::TensorId &id, TensorArrayInfo *map, int64_t num_elems);
+  static void timestamp(TensorTimestamps *time, const popart::TensorId &id);
+
+  void assertNumElements(
+      const popart::popx::Executablex & /*unused*/) const override {}
+
+  const std::vector<double> &
+  getInputTimestamps(const popart::TensorId &id) const {
+    return in_times.at(id);
+  }
+
+  const std::vector<double> &
+  getInputCompleteTimestamps(const popart::TensorId &id) const {
+    return in_complete_times.at(id);
+  }
+
+  const std::vector<double> &
+  getOutputTimestamps(const popart::TensorId &id) const {
+    return out_times.at(id);
+  }
+
+  const std::vector<double> &
+  getOutputCompleteTimestamps(const popart::TensorId &id) const {
+    return out_complete_times.at(id);
+  }
+
+protected:
+  TensorArrayInfo inputs_info;
+  TensorArrayInfo outputs_info;
+  TensorStepDataInfo step_data_info;
+
+  TensorTimestamps in_times;
+  TensorTimestamps in_complete_times;
+  TensorTimestamps out_times;
+  TensorTimestamps out_complete_times;
+};
+
 class WeightsIO : public popart::IWeightsIO {
 public:
   ~WeightsIO() override = default;
@@ -109,7 +173,8 @@ public:
   std::map<popart::TensorId, popart::IArray &> popart_outgoing;
   std::map<popart::TensorId, std::vector<void *>> outgoing_duplicates;
 
-  std::list<popart::TensorId> outputs;
+  std::vector<popart::TensorId> inputs;
+  std::vector<popart::TensorId> outputs;
   // Flat representation of the output shapes
   std::vector<OutputType> output_types;
 
@@ -118,6 +183,7 @@ public:
 
   std::unique_ptr<popart::Session> session;
 
+  StepIO stepio;
   WeightsIO weights;
 
   bool is_training;
@@ -162,16 +228,16 @@ public:
                          std::unique_ptr<popart::IArray> &&memory);
 
   // Domain helpers
-  popart::TensorId reshape(const std::vector<popart::TensorId> &inputs,
+  popart::TensorId reshape(const std::vector<popart::TensorId> &tensors,
                            const std::vector<int64_t> &shape);
 
-  void addOutputTensor(const std::vector<popart::TensorId> &inputs);
+  void addOutputTensor(const std::vector<popart::TensorId> &tensors);
 
   void
-  addInputTensorFromParentGraph(const std::vector<popart::TensorId> &inputs);
+  addInputTensorFromParentGraph(const std::vector<popart::TensorId> &tensors);
 
   popart::TensorId
-  addUntypedInputTensor(const std::vector<popart::TensorId> &inputs);
+  addUntypedInputTensor(const std::vector<popart::TensorId> &tensors);
 
   std::vector<popart::TensorId> customOperation(
       const std::vector<popart::TensorId> &args, const std::string &op,
@@ -179,48 +245,48 @@ public:
       const std::shared_ptr<std::vector<PopartAttribute>> &attributes);
 
   popart::TensorId
-  recomputationCheckpoint(const std::vector<popart::TensorId> &input);
+  recomputationCheckpoint(const std::vector<popart::TensorId> &tensors);
 
-  popart::TensorId tensorConstant(const std::vector<popart::TensorId> &inputs,
+  popart::TensorId tensorConstant(const std::vector<popart::TensorId> &tensors,
                                   const PopartConstant &constant);
 
   poptorch::TensorId
-  hostSideTensorConstant(const std::vector<popart::TensorId> &inputs,
+  hostSideTensorConstant(const std::vector<popart::TensorId> &tensors,
                          HostSideConstant constant);
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
 
   // Convert a poptorch tensor id to a popart tensor.
   inline popart::TensorId
-  convertPoptorchToPopartTensor(poptorch::TensorId inputs) {
-    return ids.at(inputs);
+  convertPoptorchToPopartTensor(poptorch::TensorId tensors) {
+    return ids.at(tensors);
   }
 
   // Convert a list of poptorch tensors to a list of popart tensors.
-  std::vector<popart::TensorId>
-  convertPoptorchToPopartTensors(const std::vector<poptorch::TensorId> &inputs);
+  std::vector<popart::TensorId> convertPoptorchToPopartTensors(
+      const std::vector<poptorch::TensorId> &tensors);
 
-  popart::TensorId randomNormal(const std::vector<popart::TensorId> &inputs,
+  popart::TensorId randomNormal(const std::vector<popart::TensorId> &tensors,
                                 const std::vector<int64_t> &shape, float mean,
                                 float scale, const std::string &dtype);
 
-  popart::TensorId randomUniform(const std::vector<popart::TensorId> &inputs,
+  popart::TensorId randomUniform(const std::vector<popart::TensorId> &tensors,
                                  const std::vector<int64_t> &shape, float high,
                                  float low, const std::string &dtype);
 
-  popart::TensorId ones(const std::vector<popart::TensorId> &inputs,
+  popart::TensorId ones(const std::vector<popart::TensorId> &tensors,
                         const std::vector<int64_t> &shape,
                         const std::string &dtype);
 
-  popart::TensorId zeros(const std::vector<popart::TensorId> &inputs,
+  popart::TensorId zeros(const std::vector<popart::TensorId> &tensors,
                          const std::vector<int64_t> &shape,
                          const std::string &dtype);
 
-  popart::TensorId zerosOrOnes(const std::vector<popart::TensorId> &inputs,
+  popart::TensorId zerosOrOnes(const std::vector<popart::TensorId> &tensors,
                                const std::vector<int64_t> &shape,
                                const std::string &dtype, bool zeros);
 
-  void addMultiConvPart(const std::vector<popart::TensorId> &inputs,
+  void addMultiConvPart(const std::vector<popart::TensorId> &tensors,
                         const std::vector<int64_t> &dilations,
                         const std::vector<int64_t> &kernel_shape,
                         const std::vector<int64_t> &pads,
@@ -228,10 +294,10 @@ public:
 
   std::vector<popart::TensorId> endMultiConv();
 
-  void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
+  void optimizerGroup(const std::vector<poptorch::TensorId> &tensors,
                       int64_t group) {
     std::vector<popart::TensorId> ins;
-    std::transform(inputs.begin(), inputs.end(), std::back_inserter(ins),
+    std::transform(tensors.begin(), tensors.end(), std::back_inserter(ins),
                    [&](poptorch::TensorId index) { return ids[index]; });
 
     grad_update_groups.insert({group, ins});

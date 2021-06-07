@@ -986,6 +986,34 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+std::vector<pybind11::object>
+getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  std::vector<pybind11::object> returnee;
+  auto &compiler = executable->getCompiler();
+  auto num_inputs = compiler.getNumInputs();
+  auto num_outputs = compiler.getNumOutputs();
+
+  py::list input;
+  py::list input_complete;
+  py::list output;
+  py::list output_complete;
+
+  try {
+    for (size_t i = 0; i < num_inputs; ++i) {
+      input.append(py::cast(compiler.getInputTimestamps(i)));
+      input_complete.append(py::cast(compiler.getInputCompleteTimestamps(i)));
+    }
+
+    for (size_t i = 0; i < num_outputs; ++i) {
+      output.append(py::cast(compiler.getOutputTimestamps(i)));
+      output_complete.append(py::cast(compiler.getOutputCompleteTimestamps(i)));
+    }
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+
+  return {input, input_complete, output, output_complete};
+}
+
 void processPrecisionOptions(py::handle h) {
   auto values_dict = h.attr("_values").cast<py::dict>();
 
@@ -1206,6 +1234,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         poptorch::processTraceAndImportExecutable);
   m.def("compileWithScript", poptorch::compileWithScript);
   m.def("execute", poptorch::execute);
+  m.def("getTimestamps", poptorch::getTimestamps);
   m.def("loadEngineAndConnectStreams", poptorch::loadEngineAndConnectStreams);
   m.def("propagateInputShapes", poptorch::pyPropagateInputShapes);
   m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
