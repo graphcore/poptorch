@@ -137,9 +137,9 @@ def for_loop(count, body, inputs):
 
 
 def nop(tensor):
-    """ A no-operation: it is functionally the same as an identity but is never
-        eliminated by PopART patterns or inlining, so it is useful for
-        debugging.
+    """A no-operation: it is functionally the same as an identity but is never
+    eliminated by PopART patterns or inlining, so it is useful for
+    debugging.
 
     :param torch.Tensor tensor: the tensor to simply return by the no-op.
     :returns: The same tensor which was input.
@@ -210,18 +210,30 @@ def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
 
 
 def set_available_memory(tensor, available_memory_proportion):
-    """ Sets the available memory for a convolution or matrix multiplication.
+    """Sets the amount of temporary memory made available to a convolution or
+    a matrix multiplication.
 
-    When called on the on the output of a convolution or a matrix
-    multiplication, it sets the proportion of tile memory (between 0 and 1) to
-    be made available as temporary memory for the convolution/matrix
-    multiplication. Less temporary memory will reduce the time performance but
-    may use less memory overall. Lower memory proportions result in the use of
-    more live (not temporary) memory, and so the overall memory may increase
-    for too low values, possibly resulting in out of memory errors.
+    When called on the output of a convolution or matrix multiplication, it
+    controls the trade-off between execution cycles and the temporary memory
+    used during the execution of the operation.
 
-    In the event that the value is too low, the planner will replan for the
-    smaller memory usage possible.
+    The value should be between 0 and 1 (inclusive) and represents a proportion
+    of available memory on the IPU. The default value is 0.6 (therefore, by
+    default, PopTorch will not use more than 60% of IPU memory for temporary
+    data).
+
+    PopTorch passes this setting to the PopLibs convolution planner, which will
+    try to constrain the use of temporary memory to below this value. Generally,
+    an operation that has more temporary memory available will run in fewer
+    cycles.
+
+    For a specific operation, the necessary amount of temporary memory may be
+    more than amount specified by this option. In this case, a warning message
+    will be generated.
+
+    For more information, please refer to the `technical note
+    <https://docs.graphcore.ai/projects/available-memory/en/latest/>`_ on
+    optimising temporary memory usage.
 
     >>> class BasicNetwork(nn.Module):
     ...     def __init__(self):
