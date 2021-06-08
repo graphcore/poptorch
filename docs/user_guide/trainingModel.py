@@ -26,6 +26,7 @@ poptorch_model = poptorch.trainingModel(model)
 # Some dummy inputs.
 input = torch.randn(10)
 target = torch.randn(10)
+ones = torch.ones(10)
 
 # Train on IPU.
 for i in range(0, 800):
@@ -49,25 +50,49 @@ torch.testing.assert_allclose(native_out, poptorch_out, rtol=1e-04, atol=1e-04)
 Model = ExampleModelWithLoss
 
 
-def train(_):
-    pass
+def train(model):
+    # Dummy single training step on IPU
+    model(input, target)
 
 
-def validate(_):
-    pass
+def train_on_cpu(model):
+    # Dummy single training step on CPU
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    _, loss = model(input, target)
+    loss.backward()
+    optimizer.step()
+
+
+def validate(model):
+    # Dummy validate step
+    print(model(ones))
 
 
 # explicit_copy_start
 model = Model()
-poptorch_train = poptorch.trainingModel(model)
+
+model.eval()
 poptorch_inf = poptorch.inferenceModel(model)
 
+# Switch for "poptorch.trainingModel": poptorch_inf will remain in "eval" mode
+model.train()
+poptorch_train = poptorch.trainingModel(model)
+
+# train on IPU
 train(poptorch_train)
 torch.save(model.state_dict(), "model.save")  # OK
+
+# Aready in "eval" mode
 validate(poptorch_inf)  # OK
+
+# switch to "eval" mode for CPU
+model.eval()
 validate(model)  # OK
 
-train(model)
+# train on CPU
+model.train()
+train_on_cpu(model)
+
 # Explicit copy needed
 poptorch_inf.copyWeightsToDevice()
 validate(poptorch_inf)

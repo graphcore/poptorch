@@ -43,6 +43,9 @@ def accessAttributes(attribute_id_str):
     return attributes
 
 
+NO_EXECUTABLE_ERR = "Model has not been compiled or has been destroyed."
+
+
 class PoplarExecutor:
     """ This class should not be created directly but is a wrapper around
     the model that was passed into `inferenceModel` or `trainingModel`.
@@ -262,6 +265,10 @@ class PoplarExecutor:
         """ Updates the parameters used in `model` with the weights stored on device.
         (The weights in ``model.parameters()``)
         """
+
+        if not self.isCompiled():
+            raise RuntimeError(NO_EXECUTABLE_ERR)
+
         weights = {
             **dict(self._model.named_parameters()),
             **dict(self._model.named_buffers())
@@ -277,6 +284,9 @@ class PoplarExecutor:
         """Copies the weights from ``model.parameters()`` to the IPU device.
         Implicitly called on first call.
         """
+        if not self.isCompiled():
+            raise RuntimeError(NO_EXECUTABLE_ERR)
+
         # Don't trigger a copyToHost by accessing `named_parameters`
         saved_dirty_flag = self._dirty_host_weights
         self._dirty_host_weights = False
@@ -327,7 +337,7 @@ class PoplarExecutor:
         # In distributed execution mode:
         # At that point only the first process will have a compiled executable:
         # trigger the compilation process in all the other processes.
-        if self._executable is None:
+        if not self.isCompiled():
             self._executable = poptorch_core.compileWithTrace(*trace_args)
 
         # Load the engine and connect the streams in all the processes.
@@ -567,7 +577,7 @@ class PoplarExecutor:
             " model(inputs)")
         in_tensors = self._args_parser(args, kwargs)
 
-        if self._executable is None:
+        if not self.isCompiled():
             self._compile(in_tensors)
 
         if not self._is_attached:
@@ -654,7 +664,7 @@ class PoplarExecutor:
         output tensor having been transferred on the first iteration of
         the model
         """
-        if not self._executable:
+        if not self.isCompiled():
             return {
                 'input': [[]],
                 'input_complete': [[]],
@@ -714,7 +724,7 @@ class PoplarExecutor:
     def destroy(self) -> None:
         """Destroy the model: release the IPUs and the executable.
         """
-        if not self._executable:
+        if not self.isCompiled():
             return
         if self._training:
             self.copyWeightsToHostIfNeeded()
@@ -858,34 +868,43 @@ class PoplarExecutor:
         """Returns true, if the target device has been attached. False,
         otherwise.
         """
-        if not self._executable:
-            raise RuntimeError("Executable isn't compiled yet")
+        if not self.isCompiled():
+            return False
 
         return poptorch_core.isAttachedToDevice(self._executable)
 
+    def isCompiled(self) -> bool:
+        """Returns true if the model has been compiled (and not destroyed).
+        False, otherwise."""
+        return bool(self._executable)
+
     def detachFromDevice(self) -> None:
         """Detach from target device. Before calling this function, the device
-        must be attached."""
-        if not self._executable:
-            raise RuntimeError("Executable isn't compiled yet")
+        must be attached (and the model compiled)."""
+        if not self.isCompiled():
+            raise RuntimeError(NO_EXECUTABLE_ERR)
 
         if self._training:
             self.copyWeightsToHostIfNeeded()
 
-        assert self._is_attached
+        if not self._is_attached:
+            raise RuntimeError("Device is not attached")
+
         poptorch_core.detachFromDevice(self._executable)
         self._is_attached = False
 
     def attachToDevice(self) -> None:
         """Attach to target device. Before calling this function, the device
-        must be detached."""
-        if not self._executable:
-            raise RuntimeError("Executable isn't compiled yet")
+        must be detached and thne model compiled."""
+        if not self.isCompiled():
+            raise RuntimeError(NO_EXECUTABLE_ERR)
         assert self._options.connection_type != enums.ConnectionType.Never, (
             "Trying to attach to an offline device"
             " (ConnectionType.Never)")
 
-        assert not self._is_attached
+        if self._is_attached:
+            raise RuntimeError("Device is already attached")
+
         poptorch_core.attachToDevice(self._executable)
         poptorch_core.loadEngineAndConnectStreams(self._executable)
         self._is_attached = True
