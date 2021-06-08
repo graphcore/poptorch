@@ -1128,7 +1128,7 @@ class Options(_options_impl.OptionsDict):
 
     def showCompilationProgressBar(self,
                                    show: bool = True) -> "poptorch.Options":
-        """"Show / hide a progress bar while the model is being compiled.
+        """Show / hide a progress bar while the model is being compiled.
         (The progress bar is shown by default)
         """
         self._show_compilation_progress_bar = show
@@ -1258,10 +1258,14 @@ class Options(_options_impl.OptionsDict):
 
     def setAvailableMemoryProportion(
             self, available_memory_proportion: Dict[str, float]):
-        """Memory is set on a per IPU basis, this should be a dictionary
-        of IPU ids and float values between 0 and 1.
+        """Sets the amount of temporary memory made available for convolutions
+        and matrix multiplications on a per-IPU basis.
 
-        For example: ``{"IPU0": 0.5}``
+        Parameter should be a dictionary of IPU ids and float values between 0
+        and 1. (for example, ``{"IPU0": 0.5}``)
+
+        The floating point value has the same meaning and effect as documented
+        in :py:func:`~poptorch.set_available_memory`.
         """
         actual_memory = {}
 
