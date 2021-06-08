@@ -43,7 +43,9 @@ def test_attach_detach():
 
     training.detachFromDevice()
     # Ensure that this breaks
-    with pytest.raises(AssertionError):
+
+    error_msg = r"Device is not attached"
+    with pytest.raises(RuntimeError, match=error_msg):
         training.detachFromDevice()
 
     inference.compile(torch.randn(10))
