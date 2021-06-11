@@ -142,6 +142,7 @@ public:
   popart::DataType accum_type;
   popart::DataType first_order_momentum_accum_type;
   popart::DataType second_order_momentum_accum_type;
+  bool use_tf_variant;
   std::map<std::string, std::pair<float, bool>> params;
 };
 
@@ -159,6 +160,7 @@ std::string OptimizerParameters::debug() const {
     ss << ", firstOrderMomentumAccumType=" << first_order_momentum_accum_type;
     ss << ", secondOrderMomentumAccumType=" << second_order_momentum_accum_type;
   }
+  ss << ", useTfVariant=" << use_tf_variant;
   return ss.str();
 }
 
@@ -173,7 +175,8 @@ OptimizerParameters::OptimizerParameters(const Optimizer &opt, bool is_default)
       second_order_momentum_accum_type(
           opt.second_order_momentum_accum_type_is_half
               ? popart::DataType::FLOAT16
-              : popart::DataType::FLOAT) {
+              : popart::DataType::FLOAT),
+      use_tf_variant(opt.use_tf_variant) {
   // In Popart the attributes which can be specified per group are prefixed with
   // "default" For example learningRate -> defaultLearningRate In order to keep
   // it simple the PopTorch frontend will always use the group name, therefore
@@ -750,7 +753,8 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
     auto optimizer = std::make_unique<popart::Adaptive>(
         opt.params, mode, popart::WeightDecayMode::L2Regularization,
         opt.accum_type, opt.first_order_momentum_accum_type,
-        opt.second_order_momentum_accum_type, popart::DataType::FLOAT);
+        opt.second_order_momentum_accum_type, popart::DataType::FLOAT,
+        opt.use_tf_variant);
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
   }

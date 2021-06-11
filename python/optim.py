@@ -476,7 +476,14 @@ class RMSprop(torch.optim.RMSprop):
 
     This optimizer matches PyTorch's implementation (
     `torch.optim.RMSprop <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.RMSprop>`_)
-    with optional loss scaling."""
+    with optional loss scaling.
+
+    However, if the use_tf_variant flag is set to True, it will instead match
+    the TensorFlow implementation which differs from PyTorch's implementation
+    in three ways:
+    1) The average squared gradients buffer is initialized to ones.
+    2) The small epsilon constant is applied inside the square root.
+    3) Learning rate is accumulated in the momentum buffer if momentum is used."""
 
     # Variables which don't exist in the parent optimizer class and are
     # global (Cannot be set per group).
@@ -484,7 +491,7 @@ class RMSprop(torch.optim.RMSprop):
     # All the attributes and variables which don't exist in the parent optimizer class.
     _child_only = _child_vars + [
         "accum_type", "first_order_momentum_accum_type",
-        "second_order_momentum_accum_type"
+        "second_order_momentum_accum_type", "use_tf_variant"
     ]
     # Attributes (from the parent or child class) which can be set per group.
     _group_vars = [
@@ -502,7 +509,8 @@ class RMSprop(torch.optim.RMSprop):
                  loss_scaling=None,
                  accum_type=None,
                  first_order_momentum_accum_type=None,
-                 second_order_momentum_accum_type=None):
+                 second_order_momentum_accum_type=None,
+                 use_tf_variant=None):
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate.
@@ -530,6 +538,9 @@ class RMSprop(torch.optim.RMSprop):
         :param second_order_momentum_accum_type: data type used to store
             the second order momentum values for each parameter.
         :type second_order_momentum_accum_type: torch.dtype, optional
+        :param use_tf_variant: False: If True, use the TensorFlow variant
+            of RMSProp.
+        :type centered: bool, optional
         """
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), RMSprop._child_only)
@@ -543,6 +554,9 @@ class RMSprop(torch.optim.RMSprop):
             first_order_momentum_accum_type = torch.float32
         if second_order_momentum_accum_type is None:
             second_order_momentum_accum_type = torch.float32
+        if use_tf_variant is None:
+            use_tf_variant = False
+
         self.loss_scaling = loss_scaling
 
         supportedTypes = [torch.float16, torch.float32]
@@ -558,6 +572,7 @@ class RMSprop(torch.optim.RMSprop):
         assert second_order_momentum_accum_type in supportedTypes, errString
         self.second_order_momentum_accum_type = \
              second_order_momentum_accum_type
+        self.use_tf_variant = use_tf_variant
         self.variable_attrs = VariableAttributes(
             variables,
             list(self.defaults) + RMSprop._child_vars)
@@ -573,6 +588,7 @@ class RMSprop(torch.optim.RMSprop):
                 self.first_order_momentum_accum_type
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
+        state["use_tf_variant"] = self.use_tf_variant
         return state
 
 

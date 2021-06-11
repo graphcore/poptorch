@@ -73,11 +73,17 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
         return {}
 
     def isFloat16(type, name):
-        assert type in [
-            torch.float16, torch.float32
-        ], (f"{name} must be set "
-            "to either torch.float16 or torch.float32 not {type}")
+        if type not in [torch.float16, torch.float32]:
+            raise ValueError(f"{name} must be set to either torch.float16"
+                             " or torch.float32 not {type}")
         return type == torch.float16
+
+    def assertRMSProp(value, name):
+        if optimizer_type not in (_OptimizerType.RMSPROP,
+                                  _OptimizerType.RMSPROP_CENTERED):
+            raise ValueError(
+                f"{name} is only available with RMSProp optimizers.")
+        return value
 
     def ignore(_params):
         return {}
@@ -111,6 +117,8 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
                 _OptimizerGetter(torch.float32), isFloat16)
     _AttrReader(attr_readers, "second_order_momentum_accum_type",
                 _OptimizerGetter(torch.float32), isFloat16)
+    _AttrReader(attr_readers, "use_tf_variant", _OptimizerGetter(False),
+                assertRMSProp)
     # Optimizer variables: global, can change over time.
     #     source: opt.name
     #     format: {name: (value, is_const)}
@@ -384,7 +392,7 @@ class _AttrReader:
         if new_name is None:
             new_name = _toCamelCase(name)
         if formatter is None:
-            formatter = lambda x: x
+            formatter = lambda x, _: x
 
         self.name = name
         self.getter = getter

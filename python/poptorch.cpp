@@ -351,6 +351,12 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
   // Note: all the group variables and optimizer variables are
   // automatically forwarded to the Compiler backend however
   // the optimizer attributes are extracted here.
+  bool use_tf_variant = false;
+  if (type == OptimizerType::RMSPROP ||
+      type == OptimizerType::RMSPROP_CENTERED) {
+    getOptimizerValue(use_tf_variant, opt, "useTfVariant");
+  }
+
   if (opt.contains("accumType")) {
     bool accum_type = false;
     bool first_order_momentum_accum_type = false;
@@ -371,12 +377,12 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
     // Create one Optimizer per parameter group + 1 for defaults
     for (std::uint64_t i = 0; i <= num_groups; ++i) {
       optimizers.emplace_back(type, accum_type, first_order_momentum_accum_type,
-                              second_order_momentum_accum_type);
+                              second_order_momentum_accum_type, use_tf_variant);
     }
   } else {
     // Create one Optimizer per parameter group + 1 for defaults
     for (std::uint64_t i = 0; i <= num_groups; ++i) {
-      optimizers.emplace_back(type);
+      optimizers.emplace_back(type, use_tf_variant);
     }
   }
 
