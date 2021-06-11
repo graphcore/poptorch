@@ -29,6 +29,7 @@ New features
 - Add mechanism for inspecting arbitrary tensors
 - Add custom operator for CTC beam search decoding: ``poptorch.ctc_beam_search_decoder``
 - Add a separate tensor variant (now default) to the SGD optimiser.
+- Add a TensorFlow variant to the RMSProp optimiser.
 
 API changes
 -----------

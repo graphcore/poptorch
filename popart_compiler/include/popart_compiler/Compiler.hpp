@@ -67,12 +67,14 @@ struct Optimizer {
   };
   using ParamType = std::pair<float, bool>;
 
-  explicit Optimizer(OptimizerType t) : type(t), accum_types_provided(false) {}
+  explicit Optimizer(OptimizerType t, bool useTfVariant)
+      : type(t), accum_types_provided(false), use_tf_variant(useTfVariant) {}
   Optimizer(OptimizerType t, bool accumType, bool firstOrderType,
-            bool secondOrderType)
+            bool secondOrderType, bool useTfVariant)
       : type(t), accum_types_provided(true), accum_type_is_half(accumType),
         first_order_momentum_accum_type_is_half(firstOrderType),
-        second_order_momentum_accum_type_is_half(secondOrderType) {}
+        second_order_momentum_accum_type_is_half(secondOrderType),
+        use_tf_variant(useTfVariant) {}
 
   // Copies the value and constness of one parameter to another
   void copyParam(const Optimizer &source_optim, const char *source,
@@ -90,6 +92,7 @@ struct Optimizer {
   bool accum_type_is_half;
   bool first_order_momentum_accum_type_is_half;
   bool second_order_momentum_accum_type_is_half;
+  bool use_tf_variant;
 
   std::vector<Parameter> parameters;
 };

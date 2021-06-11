@@ -910,3 +910,49 @@ def test_extra_attributes3(capfd, use_combined_accum):
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches("unexpected optimizer attribute")
     testlog.assert_no_matches(r"unexpected group \d attribute")
+
+
+@pytest.mark.parametrize("use_tf_variant", [True, False])
+def test_rmsprop_tf_variant(use_tf_variant):
+    torch.manual_seed(0)
+    # Make sure the TF flag is propagated correctly by comparing the
+    # results of TF and non-TF versions.
+    weight = torch.randn(10, 10)
+    bias = torch.randn(10)
+    input = torch.randn(1, 10)
+    label = torch.randint(0, 10, [1])
+
+    model_pt = OptimizerTestModel()
+    model_pt.model.weight = torch.nn.Parameter(weight.detach().clone())
+    model_pt.model.bias = torch.nn.Parameter(bias.detach().clone())
+    model_pt.input = input.detach().clone()
+    model_pt.label = label.detach().clone()
+    optimizer_pt = poptorch.optim.RMSprop(model_pt.parameters(), lr=0.02)
+
+    model_tf = OptimizerTestModel()
+    model_tf.model.weight = torch.nn.Parameter(weight.detach().clone())
+    model_tf.model.bias = torch.nn.Parameter(bias.detach().clone())
+    model_tf.input = input.detach().clone()
+    model_tf.label = label.detach().clone()
+    optimizer_tf = poptorch.optim.RMSprop(model_tf.parameters(),
+                                          lr=0.02,
+                                          use_tf_variant=use_tf_variant)
+
+    helpers.assert_allequal(actual=model_pt.model.weight,
+                            expected=model_tf.model.weight)
+    helpers.assert_allequal(actual=model_pt.model.bias,
+                            expected=model_tf.model.bias)
+
+    for _ in range(5):
+        out_pt, loss_pt = model_pt.run(optimizer_pt)
+        out_tf, loss_tf = model_tf.run(optimizer_tf)
+
+    if use_tf_variant:
+        assert not torch.allclose(model_pt.model.weight, model_tf.model.weight)
+        assert not torch.allclose(out_pt, out_tf)
+        assert not torch.allclose(loss_pt, loss_tf)
+    else:
+        helpers.assert_allequal(actual=model_pt.model.weight,
+                                expected=model_tf.model.weight)
+        helpers.assert_allequal(actual=out_pt, expected=out_tf)
+        helpers.assert_allequal(actual=loss_pt, expected=loss_tf)
