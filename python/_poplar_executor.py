@@ -687,7 +687,7 @@ class PoplarExecutor:
         first input tensor being requested and the last output tensor being
         written back to the host.
 
-        The result is a tuple containg the minimum, maximum and average
+        The result is a tuple containing the minimum, maximum and average
         latency for the iterations corresponding to the latest invocation of
         the model.
         """
@@ -911,7 +911,7 @@ class PoplarExecutor:
 
     def attachToDevice(self) -> None:
         """Attach to target device. Before calling this function, the device
-        must be detached and thne model compiled."""
+        must be detached and the model compiled."""
         if not self.isCompiled():
             raise RuntimeError(NO_EXECUTABLE_ERR)
         assert self._options.connection_type != enums.ConnectionType.Never, (
