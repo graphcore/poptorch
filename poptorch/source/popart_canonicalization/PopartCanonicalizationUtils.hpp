@@ -38,7 +38,7 @@ bool allInputsBool(torch::jit::Node *node, int ignore_input = -1);
 // Returns true if all inputs are Bools
 bool allInputsInteger(torch::jit::Node *node, int ignore_input = -1);
 
-// Get the tensor shape and add it to the IR as a constant primative.
+// Get the tensor shape and add it to the IR as a constant primitive.
 torch::jit::Value *shapeFromTensorAsIR(torch::jit::Graph *graph,
                                        torch::jit::Value *value);
 
