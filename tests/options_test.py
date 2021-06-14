@@ -244,7 +244,10 @@ def test_automatic_loss_scaling(capfd, optim):
     opts.Training.setAutomaticLossScaling(True)
 
     # The lr value doesn't matter here, we just want to ensure the option is set
-    optimizer = optim(model.parameters(), lr=0.0)
+    if optim == poptorch.optim.SGD:
+        optimizer = optim(model.parameters(), lr=0.0, use_combined_accum=False)
+    else:
+        optimizer = optim(model.parameters(), lr=0.0)
     training_model = poptorch.trainingModel(model, opts, optimizer)
 
     training_model(torch.ones(5))

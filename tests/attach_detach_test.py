@@ -94,7 +94,9 @@ def test_attach_detach_accuracy():
     input_data = torch.Tensor([[1.], [-1.]])
     labels_data = torch.Tensor([0, 1]).long()
     model_with_loss = TrainingModelWithLoss()
-    optimizer = poptorch.optim.SGD(model_with_loss.parameters(), lr=0.1)
+    optimizer = poptorch.optim.SGD(model_with_loss.parameters(),
+                                   lr=0.1,
+                                   use_combined_accum=False)
     training_model = poptorch.trainingModel(model_with_loss,
                                             model_opts,
                                             optimizer=optimizer)
