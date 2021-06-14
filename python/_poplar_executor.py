@@ -712,8 +712,24 @@ class PoplarExecutor:
                     for i in range(0, num_outputs)
                 ]))
 
+        # It is possible to have more input timestamps than output timestamps
+        # due to other options such as gradient accumulation and anchor modes.
+        # Whatever the case, the number of input ticks will always be divisible
+        # by the number of output ticks.
+        assert len(start_times) % len(end_times) == 0, \
+            "Internal PopTorch error: mismatching number of start timestamps" \
+            " and ending timestamps when calculating latency"
+
+        # Find the group of input ticks corresponding to each output tick and
+        # replace the whole set by its minimum
+        factor = len(start_times) // len(end_times)
+        start_groups = [
+            min(start_times[i:i + factor])
+            for i in range(0, len(start_times), factor)
+        ]
+
         durations = list(
-            map(lambda v: v[1] - v[0], zip(start_times, end_times)))
+            map(lambda v: v[1] - v[0], zip(start_groups, end_times)))
 
         if len(durations) == 0:
             return (0., 0., 0.)

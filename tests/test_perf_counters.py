@@ -2,6 +2,7 @@
 import torch
 import pytest
 import poptorch
+import helpers
 
 
 class Model(torch.nn.Module):
@@ -9,16 +10,18 @@ class Model(torch.nn.Module):
         return torch.matmul(x, y)
 
 
-def assert_perf_counter_size(perf, inputs, outputs, steps):
+def assert_perf_counter_size(perf, inputs, outputs, steps, outsteps=None):
     def assert_size(perf, elems, steps):
         assert len(perf) == elems
         for elem in perf:
             assert len(elem) == steps
 
+    outsteps = outsteps or steps
+
     assert_size(perf['input'], inputs, steps)
     assert_size(perf['input_complete'], inputs, steps)
-    assert_size(perf['output'], outputs, steps)
-    assert_size(perf['output_complete'], outputs, steps)
+    assert_size(perf['output'], outputs, outsteps)
+    assert_size(perf['output_complete'], outputs, outsteps)
 
 
 def assert_latency_values(latency):
@@ -71,4 +74,77 @@ def test_replicas():
 
     latency = poptorch_model.getLatency()
 
+    assert_latency_values(latency)
+
+
+@pytest.mark.parametrize("mode_tuple", [(poptorch.AnchorMode.Final, 1),
+                                        (poptorch.AnchorMode.All, 1),
+                                        (poptorch.AnchorMode.Sum, 1),
+                                        (poptorch.AnchorMode.EveryN, 2)])
+@pytest.mark.parametrize("steps", [2, 4])
+@pytest.mark.parametrize("replicas", [1, 2])
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_inference(mode_tuple, steps, replicas):
+    model = Model()
+    opts = poptorch.Options()
+    opts.anchorMode(mode_tuple[0], mode_tuple[1])
+    opts.deviceIterations(steps)
+    opts.replicationFactor(replicas)
+    poptorch_model = poptorch.inferenceModel(model, opts)
+
+    torch.manual_seed(42)
+    x = torch.randn(16, 100, 100)
+    y = torch.randn(16, 100, 100)
+    poptorch_model(x, y)
+    perf = poptorch_model.getPerfCounters()
+
+    outsteps = steps * replicas
+    if mode_tuple[0] in [poptorch.AnchorMode.Final, poptorch.AnchorMode.Sum]:
+        outsteps = replicas
+    elif mode_tuple[0] is poptorch.AnchorMode.EveryN:
+        outsteps = steps // mode_tuple[1] * replicas
+    assert_perf_counter_size(perf, 2, 1, steps * replicas, outsteps)
+
+    latency = poptorch_model.getLatency()
+    assert_latency_values(latency)
+
+
+@pytest.mark.parametrize("mode_tuple", [(poptorch.AnchorMode.Final, 1),
+                                        (poptorch.AnchorMode.All, 1),
+                                        (poptorch.AnchorMode.Sum, 1),
+                                        (poptorch.AnchorMode.EveryN, 2)])
+@pytest.mark.parametrize("steps", [2, 4])
+@pytest.mark.parametrize("accums", [1, 2])
+@pytest.mark.parametrize("replicas", [1, 2])
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_training(mode_tuple, steps, accums, replicas):
+    torch.manual_seed(42)
+    inputs = torch.randn(16, 100)
+    targets = torch.randn(16, 100)
+
+    opts = poptorch.Options()
+    opts.anchorMode(mode_tuple[0], mode_tuple[1])
+    opts.deviceIterations(steps)
+    opts.Training.gradientAccumulation(accums)
+    opts.replicationFactor(replicas)
+
+    model = torch.nn.Linear(100, 100)
+    poptorch_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.L1Loss(),
+                                                   options=opts)
+
+    poptorch_model(inputs, targets)
+    perf = poptorch_model.getPerfCounters()
+
+    outsteps = steps * accums * replicas
+    if mode_tuple[0] in [poptorch.AnchorMode.Final, poptorch.AnchorMode.Sum]:
+        outsteps = replicas
+    elif mode_tuple[0] is poptorch.AnchorMode.EveryN:
+        outsteps = steps // mode_tuple[1] * accums * replicas
+
+    assert_perf_counter_size(perf, 2, 2, steps * accums * replicas, outsteps)
+
+    latency = poptorch_model.getLatency()
     assert_latency_values(latency)
