@@ -289,7 +289,6 @@ class PoplarExecutor:
             raise RuntimeError(NO_EXECUTABLE_ERR)
 
         # Don't trigger a copyToHost by accessing `named_parameters`
-        saved_dirty_flag = self._dirty_host_weights
         self._dirty_host_weights = False
 
         weights = {
@@ -299,9 +298,6 @@ class PoplarExecutor:
         poptorch_core.copyWeightsToDevice_impl(self._executable,
                                                tuple(weights.keys()),
                                                tuple(weights.values()))
-
-        # Restore dirtiness flag
-        self._dirty_host_weights = saved_dirty_flag
 
     def setOptimizer(self, optimizer: 'torch.optim.Optimizer'):
         """Sets the optimiser for a training model. Will overwrite the
