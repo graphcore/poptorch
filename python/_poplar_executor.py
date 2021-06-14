@@ -7,6 +7,7 @@ import os
 import pickle
 from typing import Dict, List, Optional
 import weakref
+import warnings
 import torch
 
 # Do not import any poptorch.* here: it will break the poptorch module
@@ -747,6 +748,34 @@ class PoplarExecutor:
         del self._executable
         self._executable = None
 
+    def _trace_with_warning_filter(self, in_tensors_trace_view_tuple):
+        # Conditionally suppress the following jit warnings when the model
+        # contains any non-deterministic nodes (e.g. dropout)
+        rng_warnings = [
+            "Trace had nondeterministic nodes",
+            "the traced function does not match the corresponding output"
+        ]
+
+        def filterWarnings(warning):
+            return not any([m in str(warning.message) for m in rng_warnings])
+
+        warns = []
+        with warnings.catch_warnings(record=True) as caught:
+            traced = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
+
+            # pylint: disable=protected-access
+            if poptorch_core.isGraphNondeterministic(traced._c):
+                warns = list(filter(filterWarnings, caught))
+
+        # Reissue remaining warnings
+        for w in warns:
+            warnings.warn_explicit(message=w.message,
+                                   category=w.category,
+                                   filename=w.filename,
+                                   lineno=w.lineno)
+
+        return traced
+
     def _getTraceNoOutput(self, in_tensors_trace_view_tuple):
         if not isinstance(self._model, torch.nn.Module):
             raise RuntimeError(
@@ -762,7 +791,7 @@ class PoplarExecutor:
 
         old_class = self._model.__class__
         self._model.__class__ = AddFakeOutput
-        traced = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
+        traced = self._trace_with_warning_filter(in_tensors_trace_view_tuple)
         self._model.__class__ = old_class
 
         return traced
@@ -826,8 +855,8 @@ class PoplarExecutor:
         added_dummy_output = False
 
         try:
-            self._trace = torch.jit.trace(self._model,
-                                          in_tensors_trace_view_tuple)
+            self._trace = self._trace_with_warning_filter(
+                in_tensors_trace_view_tuple)
         except RuntimeError as e:
             if "didn't return any values" in str(e):
                 self._trace = self._getTraceNoOutput(

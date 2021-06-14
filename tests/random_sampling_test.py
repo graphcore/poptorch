@@ -49,29 +49,9 @@ def rng_harness(rng_op, input, stat_funs, expected_dtype=torch.float):
                                 rtol=0.1)
 
 
-def rng_requirements(func):
-    # Filter the following expected warnings for RNG tests
-    warnings = [
-        "ignore:Trace had nondeterministic nodes",
-        "ignore:Output nr 1. of the traced function does not match",
-        "ignore:torch.tensor results are registered as constants in the trace"
-    ]
-
-    markers = [pytest.mark.filterwarnings(w) for w in warnings]
-
-    # PRNG requires IPU hardware so skip if not available
-    skip = pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                              reason="Hardware IPU needed")
-    markers.append(skip)
-
-    for m in markers:
-        func = m(func)
-
-    return func
-
-
 # torch.rand
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_rand():
     def rng_op(x):
         return torch.rand(x.size())
@@ -82,7 +62,8 @@ def test_rand():
 
 
 # torch.distributions.Uniform
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_distributions_uniform():
     def rng_op(x):
         ud = torch.distributions.Uniform(0.0, 10.0)
@@ -94,7 +75,8 @@ def test_distributions_uniform():
 
 
 # torch.uniform_
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 @pytest.mark.parametrize("dt", [torch.float, torch.half])
 def test_uniform_(dt):
     def rng_op(x):
@@ -106,7 +88,8 @@ def test_uniform_(dt):
 
 
 # torch.normal
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal():
     def rng_op(x):
         return torch.normal(mean=0.0, std=1.0, size=x.size())
@@ -117,7 +100,8 @@ def test_normal():
 
 
 # torch.normal_
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 @pytest.mark.parametrize("dt", [torch.float, torch.half])
 def test_normal_(dt):
     def rng_op(x):
@@ -130,7 +114,8 @@ def test_normal_(dt):
 
 # torch.distributions.Normal
 # The sample method uses torch.normal(Tensor mean, Tensor std)
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_distributions_normal():
     def rng_op(x):
         h = torch.tensor([234.0, 100.0])
@@ -149,7 +134,8 @@ def test_distributions_normal():
 
 
 # torch.randn
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_randn():
     def rng_op(x):
         return torch.randn(x.size())
@@ -160,7 +146,8 @@ def test_randn():
 
 
 # torch.normal(Tensor mean, float std)
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal_tensor_mean():
     def rng_op(x):
         return torch.normal(mean=x, std=3.0)
@@ -171,7 +158,8 @@ def test_normal_tensor_mean():
 
 
 # torch.normal(float mean, Tensor std)
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_normal_tensor_std():
     def rng_op(x):
         return torch.normal(mean=3.0, std=x)
@@ -182,7 +170,8 @@ def test_normal_tensor_std():
 
 
 # torch.bernoulli - test with both float and half types
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 @pytest.mark.parametrize("t", [torch.float, torch.half])
 def test_bernoulli(t):
     prob = torch.full(size=(3, 5, 100), dtype=t, fill_value=0.5)
@@ -191,7 +180,8 @@ def test_bernoulli(t):
 
 
 # torch.bernoulli - check expected output for probability limits.
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 @pytest.mark.parametrize("p", [0.0, 1.0])
 def test_bernoulli_limits(p):
     prob = torch.full(size=(3, 5, 1000), fill_value=p)
@@ -201,7 +191,8 @@ def test_bernoulli_limits(p):
 
 
 # torch.bernoulli_
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_bernoulli_():
     def rng_op(x):
         return x.bernoulli_(p=0.5)
@@ -212,7 +203,8 @@ def test_bernoulli_():
 
 
 # torch.distributions.Bernoulli
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_distributions_bernoulli():
     def rng_op(x):
         bd = torch.distributions.Bernoulli(0.5)
@@ -223,7 +215,8 @@ def test_distributions_bernoulli():
     rng_harness(rng_op, input, stat_funs)
 
 
-@rng_requirements
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
 def test_random_seed_repeatability():
     class Model(torch.nn.Module):
         def forward(self, x):
