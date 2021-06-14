@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import copy
 import pytest
 import torch
 import helpers
@@ -20,27 +21,52 @@ import poptorch
 
 
 def zeros_and_ones_harness(model, dtype, is_like):
-    z = torch.tensor([1.0], dtype=dtype)
-    poptorch_model = poptorch.inferenceModel(model)
+    assert dtype in [torch.float16, torch.float32, torch.int32]
+    torch.manual_seed(42)
 
+    # Calculating with integers does not produce meaningful gradients (almost always zero)
+    test_training = not dtype is torch.int32
+
+    inputs = [torch.tensor([1], dtype=dtype)]
     if is_like:
-        t = torch.empty(3, 5, 1)
-        # Run on CPU.
-        native_out = model(t, z)
+        inputs.append(torch.empty(3, 5, 1))
+    inputs = tuple(inputs)
+
+    if test_training:
+        out_fn = lambda out: out[0]
+        model = helpers.ModelWithWeights(model, inputs[0].shape, out_fn=out_fn)
+        # We need to copy the model to use the original weights for native comparison
+        model_copy = copy.deepcopy(model)
         # Run on IPU.
-        poptorch_out = poptorch_model(t, z)
+        poptorch_model = poptorch.trainingModel(model)
+        poptorch_out, _ = poptorch_model(inputs)
+        if dtype is torch.float16:
+            # Promote CPU model and input
+            model_copy = model_copy.float()
+            inputs = tuple([input.float() for input in inputs])
+            # promote IPU result to allow comparison
+            poptorch_out = [pop.float() for pop in poptorch_out]
+        native_out, _ = model_copy(inputs)
     else:
-        # Run on CPU.
-        native_out = model(z)
-        # Run on IPU.
-        poptorch_out = poptorch_model(z)
+        native_out = model(*inputs)
+        poptorch_model = poptorch.inferenceModel(model)
+        poptorch_out = poptorch_model(*inputs)
 
+    # Inference test - check outputs
     for native, pop in zip(native_out, poptorch_out):
-        assert native.size() == pop.size()
-        helpers.assert_allclose(expected=native, actual=pop)
+        rtol = 0.001 if dtype is torch.float16 else 0.0001
+        atol = 1e-4 if dtype is torch.float16 else 1e-5
+        helpers.assert_allclose(expected=native,
+                                actual=pop,
+                                rtol=rtol,
+                                atol=atol)
+
+    if test_training:
+        # Training test - check weights changed
+        poptorch_model.assert_weights_changed()
 
 
-zeros_and_ones_dtypes = (torch.float16, torch.float32, torch.int32)
+zeros_and_ones_dtypes = [torch.float16, torch.float32, torch.int32]
 
 
 @pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
@@ -58,7 +84,7 @@ def test_zeros_and_ones(dtype):
 @pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
 def test_zeros_like_and_ones_like(dtype):
     class Model(torch.nn.Module):
-        def forward(self, t, z):
+        def forward(self, z, t):
             x = torch.zeros_like(t, dtype=dtype)
             y = torch.ones_like(t, dtype=dtype)
 
@@ -67,299 +93,161 @@ def test_zeros_like_and_ones_like(dtype):
     zeros_and_ones_harness(Model(), dtype, True)
 
 
-def test_cat():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.cat((x, x, x), 0)
+def op_harness(op,
+               *inputs,
+               test_training=True,
+               assert_fn=None,
+               out_fn=None,
+               native_out=None):
 
-    model = Model()
+    if assert_fn is None:
+
+        def assert_fn(native_out, poptorch_out):
+            if isinstance(native_out, tuple):
+                for native, pop in zip(native_out, poptorch_out):
+                    helpers.assert_allclose(expected=native, actual=pop)
+            else:
+                helpers.assert_allclose(expected=native_out,
+                                        actual=poptorch_out)
+
+    if test_training:
+        model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn=out_fn)
+
+        # Run on CPU.
+        if native_out is None:
+            native_out, _ = model(inputs)
+
+        # Run on IPU.
+        poptorch_model = poptorch.trainingModel(model)
+        poptorch_out, _ = poptorch_model(inputs)
+
+        # Training test - check weights changed
+        poptorch_model.assert_weights_changed()
+    else:
+        model = torch.nn.Module()
+        model.forward = op
+
+        # Run on CPU.
+        if native_out is None:
+            native_out = model(*inputs)
+
+        poptorch_model = poptorch.inferenceModel(model)
+        # Run on IPU.
+        poptorch_out = poptorch_model(*inputs)
+
+    # Inference test - check outputs
+    assert_fn(native_out, poptorch_out)
+
+
+@pytest.mark.parametrize("dim", [0, 1])
+def test_cat(dim):
     x = torch.randn(2, 3)
 
-    # Run on CPU.
-    native_out = model(x)
+    op = lambda *xs: torch.cat(xs, dim=dim)
 
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x, x, x)
 
 
 def test_chunk():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.chunk(x, 5)
-
-    model = Model()
     x = torch.randn(20, 10)
 
-    # Run on CPU.
-    native_out = model(x)
+    op = lambda x: torch.chunk(x, 5)
 
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    for native, pop in zip(native_out, poptorch_out):
-        helpers.assert_allequal(expected=native, actual=pop)
+    op_harness(op, x, out_fn=lambda x: x[0])
 
 
 def test_reshape():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.reshape(x, (1, 1, 2, 2))
+    op = lambda x: torch.reshape(x, (1, 1, 2, 2))
 
-    model = Model()
     x = torch.arange(4.)
 
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x)
 
 
 @pytest.mark.parametrize("split_size_or_sections",
                          (1, 5, 6, 20, [10, 10], [19, 1]))
 def test_split(split_size_or_sections):
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.split(x, split_size_or_sections)
-
-    model = Model()
     x = torch.randn(20, 10)
+    op = lambda x: torch.split(x, split_size_or_sections)
 
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    for native, pop in zip(native_out, poptorch_out):
-        assert native.size() == pop.size()
-        helpers.assert_allequal(expected=native, actual=pop)
+    op_harness(op, x, out_fn=lambda x: x[0])
 
 
 def test_split_singleton():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.split(x, 1, 1)[0]
-
-    model = Model()
     x = torch.randn(1, 4, 3, 1)
+    op = lambda x: torch.split(x, 1, 1)[0]
 
-    # Run on CPU.
-    native_out = model(x)
-    print(native_out.shape)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-    print(poptorch_out.shape)
-
-    for native, pop in zip(native_out, poptorch_out):
-        assert native.size() == pop.size()
-        helpers.assert_allequal(expected=native, actual=pop)
+    op_harness(op, x)
 
 
 def test_squeeze():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.squeeze(x)
+    x = torch.randn(1, 1, 5, 1, 10, 1)
 
-    model = Model()
-    x = torch.randn(1, 1, 20, 1, 10, 1)
-
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(torch.squeeze, x)
 
 
 def test_t():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.t(x)
-
-    model = Model()
     x = torch.randn(20, 10)
 
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(torch.t, x)
 
 
 def test_transpose():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.transpose(x, 3, 0)
+    x = torch.randn(3, 2, 5, 2)
+    op = lambda x: torch.transpose(x, 3, 0)
 
-    model = Model()
-    x = torch.randn(3, 2, 5, 10)
-
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x)
 
 
 def test_unsqueeze():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.unsqueeze(x, 1)
+    x = torch.randn(3, 2, 5, 2)
+    op = lambda x: torch.unsqueeze(x, 1)
 
-    model = Model()
-    x = torch.randn(3, 2, 5, 10)
-
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x)
 
 
 def test_expand():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return x.expand(3, 4)
-
-    model = Model()
     x = torch.randn(3, 1)
+    op = lambda x: x.expand(3, 4)
 
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x)
 
 
 def test_expand_preserve_dim():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return x.expand(2, -1, -1)
-
-    model = Model()
     x = torch.randn(1, 1, 100)
+    op = lambda x: x.expand(2, -1, -1)
 
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x)
 
 
 def test_expand_as():
-    class Model(torch.nn.Module):
-        def forward(self, x, y):
-            return x.expand_as(y)
-
-    model = Model()
     x = torch.randn(3, 1)
     y = torch.randn(3, 4)
+    op = lambda x, y: x.expand_as(y)
 
-    # Run on CPU.
-    native_out = model(x, y)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x, y)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x, y)
 
 
 def test_flatten():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.flatten(x)
-
-    model = Model()
     x = torch.randn(3, 1)
 
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(torch.flatten, x)
 
 
 def test_view():
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return x.view((15, 2, 5))
-
-    model = Model()
     x = torch.randn(30, 5)
+    op = lambda x: x.view((15, 2, 5))
 
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 2), (2, 3, 4)])
 def test_size(input_shapes):
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            # Use size as input to another operation to workaround pruning error
-            return x.view(x.size())
-
-    model = Model()
     x = torch.ones(*input_shapes)
+    # Use size as input to another operation to workaround pruning error
+    op = lambda x: x.view(x.size())
 
-    # Run on CPU.
-    native_out = model(x)
-    helpers.assert_allequal(actual=native_out, expected=x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    assert native_out.size() == poptorch_out.size()
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    op_harness(op, x)
 
 
 input_shapes = [(1, 4, 5), (2, ), (2, 2), (2, 3, 4, 1, 3, 4)]
@@ -371,35 +259,32 @@ dtypes = [torch.float, torch.float16, torch.int32]
 def test_fill(input_shapes, t):
     float_test_num = 1.9375
 
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            value = 42 if x.dtype == torch.int32 else float_test_num
-            x = x + 0  # Ensure x is not modified in place
-            return x.fill_(value), torch.full_like(x, value), torch.full(
-                input_shapes, value, dtype=x.dtype)
+    def op(x):
+        value = 42 if x.dtype == torch.int32 else float_test_num
+        x = x + 0  # Ensure x is not modified in place
+        return x.fill_(value), torch.full_like(x, value), torch.full(
+            input_shapes, value, dtype=x.dtype)
 
-    model = Model()
     x = torch.ones(*input_shapes, dtype=t)
 
-    # Run on CPU.
-    if t != torch.float16:
-        native_out = model(x)
-    else:
-        native_out = (torch.full(input_shapes, float_test_num),
-                      torch.full(input_shapes, float_test_num),
-                      torch.full(input_shapes, float_test_num))
+    native_out = tuple(
+        [torch.full(input_shapes, float_test_num)
+         for _ in range(3)]) if t == torch.float16 else None
 
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
+    def assert_fn(native_out, poptorch_out):
+        for native, pop in zip(native_out, poptorch_out):
+            if t == torch.float16:
+                pop = pop.float()
 
-    for native, pop in zip(native_out, poptorch_out):
-        if t == torch.float16:
-            pop = pop.float()
+            assert native.dtype == pop.dtype
+            helpers.assert_allequal(expected=native, actual=pop)
 
-        assert native.size() == pop.size()
-        helpers.assert_allequal(expected=native, actual=pop)
-        assert native.dtype == pop.dtype
+    # Fill is non-differentiable so set test_training=False
+    op_harness(op,
+               x,
+               test_training=False,
+               assert_fn=assert_fn,
+               native_out=native_out)
 
 
 @pytest.mark.parametrize("input_shapes", input_shapes)
@@ -413,19 +298,8 @@ def test_masked_fill(input_shapes, value):
             where_result = torch.where(x > 0.5, x, torch.tensor(value))
             return fill_result, where_result
 
-    model = Model()
     x = torch.randn(*input_shapes)
-
-    # Run on CPU.
-    native_out = model(x)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x)
-
-    for pop, native in zip(poptorch_out, native_out):
-        assert native.size() == pop.size()
-        helpers.assert_allequal(expected=native, actual=pop)
+    op_harness(Model(), x, out_fn=lambda x: x[0])
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (3, 4), (1, 3, 4)])
@@ -435,27 +309,10 @@ def test_stack(input_shapes, dim):
     if dim > len(input_shapes):
         pytest.skip()
 
-    torch.manual_seed(42)
+    op = lambda *xs: torch.stack(xs, dim=dim)
+    inputs = [torch.randn(*input_shapes) for _ in range(3)]
 
-    class Model(torch.nn.Module):
-        def forward(self, x, y, z):
-            return torch.stack([x, y, z], dim=dim)
-
-    model = Model()
-    a = torch.randn(*input_shapes)
-    b = torch.randn(*input_shapes)
-    c = torch.randn(*input_shapes)
-
-    # Run on CPU.
-    native_out = model(a, b, c)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(a, b, c)
-
-    for pop, native in zip(poptorch_out, native_out):
-        assert native.size() == pop.size()
-        helpers.assert_allequal(expected=native, actual=pop)
+    op_harness(op, *inputs)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
@@ -470,23 +327,10 @@ def test_repeat(input_shapes, dims):
 
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return x.repeat(dims)
-
-    model = Model()
+    op = lambda x: x.repeat(dims)
     a = torch.randn(*input_shapes)
 
-    # Run on CPU.
-    native_out = model(a)
-
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(a)
-
-    for pop, native in zip(poptorch_out, native_out):
-        assert native.size() == pop.size()
-        helpers.assert_allequal(expected=native, actual=pop)
+    op_harness(op, a)
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
@@ -494,25 +338,19 @@ def test_repeat(input_shapes, dims):
 def test_copy_(input_shapes, dtype):
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
-        def forward(self, x, y):
-            return y.copy_(x)
+    op = lambda x, y: y.copy_(x)
 
-    model = Model()
     x = torch.randn(*input_shapes)
     y = torch.empty_like(x, dtype=dtype)
 
-    # Run on CPU.
-    native_out = model(x, y)
+    def assert_fn(native_out, poptorch_out):
+        for pop, native in zip(poptorch_out, native_out):
+            assert native.dtype == pop.dtype
+            helpers.assert_allclose(expected=native, actual=pop)
 
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(x, y)
-
-    for pop, native in zip(poptorch_out, native_out):
-        assert native.size() == pop.size()
-        assert native.dtype == pop.dtype
-        helpers.assert_allequal(expected=native, actual=pop)
+    # Calculating with integers does not produce meaningful gradients
+    test_training = dtype is torch.float
+    op_harness(op, x, y, test_training=test_training, assert_fn=assert_fn)
 
 
 @pytest.mark.parametrize("with_detach", [True, False])
