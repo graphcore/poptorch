@@ -35,6 +35,7 @@
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/ShapeInference.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
+#include "poptorch/Utils.hpp"
 
 void beginIpuBlock(int64_t stage_id, int64_t phase_id, int64_t ipu_id) {
   UNUSED(stage_id);
@@ -1193,6 +1194,22 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+bool pyIsGraphNondeterministic(py::handle h) {
+  try {
+    auto module = asModule(h);
+    auto forward = module->get_method("forward");
+    auto graph_and_tensors =
+        torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
+    auto graph = graph_and_tensors.first;
+    const auto &nodes = graph->nodes();
+    return std::any_of(nodes.begin(), nodes.end(),
+                       [](const torch::jit::Node *n) {
+                         return poptorch::isNondeterministic(*n);
+                       });
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
 void pyPropagateInputShapes(py::handle h) {
   try {
     auto graph = asGraph(h);
@@ -1233,6 +1250,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
       give_me_a_name(m, "InternalPoplarExecutable");
 
   m.def("processPrecisionOptions", poptorch::processPrecisionOptions);
+  m.def("isGraphNondeterministic", poptorch::pyIsGraphNondeterministic);
   m.def("compileWithTrace", poptorch::compileWithTrace);
   m.def("compileWithTraceAndExport", poptorch::compileWithTraceAndExport);
   m.def("processTraceAndImportExecutable",
