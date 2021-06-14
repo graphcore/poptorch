@@ -501,6 +501,14 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     """ Create a PopTorch training model, from a PyTorch model, to run on IPU
     hardware in training mode.
 
+    .. note:: PopTorch makes a shallow copy of the model. Changes to the
+        parameters in the returned training model affect the original model
+        and vice versa. However, primitive variable types are not synced: for
+        example calling ``model.train()`` on the original model, which
+        changes the ``training`` bool of the model instance, will not alter the
+        model returned by this function. You may need to call ``model.train()``
+        on your model before you call this function for correct behaviour.
+
     :param model: The PyTorch model to wrap.
     :param options: The IPU specific options
     :param optimizer: The optimizers to apply during \
@@ -537,6 +545,14 @@ def inferenceModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
                    ) -> 'poptorch.PoplarExecutor':
     """Create a PopTorch inference model, from a PyTorch model, to run on IPU
     hardware in inference mode.
+
+    .. note:: PopTorch makes a shallow copy of the model. Changes to the
+        parameters in the returned inference model affect the original model
+        and vice versa. However, primitive variable types are not synced: for
+        example calling ``model.eval()`` on the original model will not alter
+        the model returned by this function. You may need to call
+        ``model.eval()`` on your model before you call this function for correct
+        behaviour.
 
     :param model: The PyTorch model to wrap.
     :param options: The IPU specific options

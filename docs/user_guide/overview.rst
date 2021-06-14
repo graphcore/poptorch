@@ -60,7 +60,16 @@ Model wrapping functions
 ========================
 
 
-The basis of PopTorch integration comes from the two model wrapping functions described in the following sections.
+The basis of PopTorch integration comes from the two model wrapping functions
+described in the following sections.
+
+.. note:: PopTorch makes a shallow copy of the model. Changes to the parameters
+    in the models returned by these two model wrapping functions affect the
+    original model and vice versa. However, primitive variable types will not be
+    kept in sync. This includes the ``training`` bool of ``pytorch.nn.Module``.
+    If your PyTorch model is named ``model``, call ``model.eval()`` or
+    ``model.train()``, if required, before calling these wrapping functions.
+
 
 poptorch.trainingModel
 ----------------------
