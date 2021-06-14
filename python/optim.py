@@ -3,6 +3,8 @@ import math
 import inspect
 import torch
 
+from ._logging import logger
+
 
 class VariableAttributes:
     """Track which attributes are variable or constant.
@@ -195,6 +197,12 @@ class SGD(torch.optim.SGD):
             loss_scaling = 1.0
 
         if use_combined_accum is None:
+            logger.warning(
+                "Default SGD implementation has changed to the "
+                "more stable but more memory intensive separate "
+                "variant. To suppress set use_combined_accum=False "
+                "with poptorch.optim.SGD; to restore old behaviour, "
+                "set use_combined_accum=True")
             use_combined_accum = False
         self.use_combined_accum = use_combined_accum
 
@@ -213,8 +221,11 @@ class SGD(torch.optim.SGD):
             # separate tensor variant.
         else:
             if not use_combined_accum:
-                raise RuntimeError("Velocity scaling should not be set for" +
-                                   " the separate tensor variant of SGD.")
+                logger.warning("velocity_scaling value ignored when "
+                               "using the separate variant "
+                               "(use_combined_accum=False). In future, this "
+                               "will lead to an error. Please update your "
+                               "code.")
 
         if use_combined_accum:
             self.defaults["velocity_scaling"] = velocity_scaling

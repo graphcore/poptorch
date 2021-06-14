@@ -74,7 +74,10 @@ input = torch.tensor([1.0, 2.0, 3.0])
 target = torch.tensor([3.0, 4.0, 5.0])
 options = poptorch.Options()
 # optim_start
-opt = poptorch.optim.SGD(model.parameters(), lr=0.01, loss_scaling=2.0)
+opt = poptorch.optim.SGD(model.parameters(),
+                         lr=0.01,
+                         loss_scaling=2.0,
+                         use_combined_accum=False)
 poptorch_model = poptorch.trainingModel(model, options, opt)
 poptorch_model(input, target)
 # Update optimizer attribute
@@ -89,18 +92,25 @@ poptorch_model.destroy()
 
 # optim_const_start
 # lr, momentum and loss_scaling will be marked as variable.
-opt = poptorch.optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
+opt = poptorch.optim.SGD(model.parameters(),
+                         lr=0.01,
+                         momentum=0.0,
+                         use_combined_accum=False)
 # momentum and loss_scaling  will be marked as constant.
-opt = poptorch.optim.SGD(model.parameters(), lr=0.01)
+opt = poptorch.optim.SGD(model.parameters(), lr=0.01, use_combined_accum=False)
 # lr and momentum will be marked as variable.
 # loss_scaling will be marked as constant.
 opt = poptorch.optim.SGD(model.parameters(),
                          lr=0.01,
                          momentum=0.0,
-                         loss_scaling=2.0)
+                         loss_scaling=2.0,
+                         use_combined_accum=False)
 opt.variable_attrs.markAsConstant("loss_scaling")
 # lr, momentum and loss_scaling will be marked as variable.
-opt = poptorch.optim.SGD(model.parameters(), lr=0.01, loss_scaling=2.0)
+opt = poptorch.optim.SGD(model.parameters(),
+                         lr=0.01,
+                         loss_scaling=2.0,
+                         use_combined_accum=False)
 opt.variable_attrs.markAsVariable("momentum")
 # optim_const_end
 
