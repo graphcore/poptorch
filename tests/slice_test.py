@@ -9,20 +9,22 @@ import helpers
 
 
 def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn, step):
-    class SliceModel(torch.nn.Module):
-        def forward(self, x, y):
-            return x[start_fn(x):end_fn(x):step] + y
+    op = lambda x, y: x[start_fn(x):end_fn(x):step] + y
 
-    model = SliceModel()
+    model = helpers.ModelWithWeights(op, tensor_x.shape)
 
     # Run on CPU.
-    native_out = model(tensor_x, tensor_y)
+    native_out, _ = model((tensor_x, tensor_y))
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(tensor_x, tensor_y)
+    poptorch_model = poptorch.trainingModel(model)
+    poptorch_out, _ = poptorch_model((tensor_x, tensor_y))
 
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    # Inference test - check outputs
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
@@ -69,21 +71,38 @@ def test_slice_with_branch(step):
                        torch.tensor([-3.0]), start_fn, end_fn, step)
 
 
-def dynamic_slice_harness(tensor_in, extra_in, start_fn, end_fn, step):
-    class DynamicSliceModel(torch.nn.Module):
-        def forward(self, tensor_in, extra_in):
-            return tensor_in[start_fn(extra_in):end_fn(extra_in):step]
+def dynamic_slice_harness(tensor_in,
+                          extra_in,
+                          start_fn,
+                          end_fn,
+                          step,
+                          test_training=True):
 
-    model = DynamicSliceModel()
+    if test_training:
+        op = lambda t: t[start_fn(extra_in):end_fn(extra_in):step]
+        model = helpers.ModelWithWeights(op, tensor_in.shape)
 
-    # Run on CPU.
-    native_out = model(tensor_in, extra_in)
+        # Run on CPU.
+        native_out, _ = model((tensor_in, ))
 
-    # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(tensor_in, extra_in)
+        # Run on IPU.
+        poptorch_model = poptorch.trainingModel(model)
+        poptorch_out, _ = poptorch_model((tensor_in, ))
 
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+        # Training test - check weights changed
+        poptorch_model.assert_weights_changed()
+    else:
+        model = torch.nn.Module()
+        model.forward = lambda t, e: t[start_fn(e):end_fn(e):step]
+
+        # Run on CPU.
+        native_out = model(tensor_in, extra_in)
+
+        # Run on IPU.
+        poptorch_model = poptorch.inferenceModel(model)
+        poptorch_out = poptorch_model(tensor_in, extra_in)
+
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
@@ -147,27 +166,31 @@ def test_dynamic_slice_two_dims(step):
 
 @pytest.mark.parametrize("step", [1, 2, 3])
 def test_dynamic_slice_two_dims_twice_sliced(step):
-    class Model(torch.nn.Module):
-        def forward(self, tensor_in, start_dim_one, start_dim_two):
-            return tensor_in[start_dim_one:start_dim_one +
-                             2:step, start_dim_two:start_dim_two + 4:step]
+    start_dim_one = torch.tensor([1])
+    start_dim_two = torch.tensor([0])
+
+    op = lambda t: t[start_dim_one:start_dim_one + 2:step, start_dim_two:
+                     start_dim_two + 4:step]
 
     tensor_in = torch.tensor([[2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
                               [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
                               [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
                               [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]])
-    start_dim_one = torch.tensor([1])
-    start_dim_two = torch.tensor([0])
 
-    model = Model()
+    model = helpers.ModelWithWeights(op, tensor_in.shape)
 
     # Run on CPU.
-    native_out = model(tensor_in, start_dim_one, start_dim_two)
+    native_out, _ = model((tensor_in, ))
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
-    poptorch_out = poptorch_model(tensor_in, start_dim_one, start_dim_two)
-    helpers.assert_allequal(expected=native_out, actual=poptorch_out)
+    poptorch_model = poptorch.trainingModel(model)
+    poptorch_out, _ = poptorch_model((tensor_in, ))
+
+    # Inference test - check outputs
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
 
 
 def test_dynamic_slice_one_dim_equal():
@@ -180,9 +203,14 @@ def test_dynamic_slice_one_dim_equal():
     error_msg = r"The start and end of a slice must be different."
 
     with pytest.raises(RuntimeError, match=error_msg):
-        dynamic_slice_harness(
-            torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn, 1)
+        # Set test_training=False because we expect inference to fail
+        dynamic_slice_harness(torch.tensor(
+            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+                              torch.tensor([5]),
+                              start_fn,
+                              end_fn,
+                              1,
+                              test_training=False)
 
 
 def test_dynamic_slice_one_dim_less_than():
@@ -196,9 +224,14 @@ def test_dynamic_slice_one_dim_less_than():
                  r"start is not supported.")
 
     with pytest.raises(RuntimeError, match=error_msg):
-        dynamic_slice_harness(
-            torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn, 2)
+        # Set test_training=False because we expect inference to fail
+        dynamic_slice_harness(torch.tensor(
+            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+                              torch.tensor([5]),
+                              start_fn,
+                              end_fn,
+                              2,
+                              test_training=False)
 
 
 def test_dynamic_slice_one_dim_multiply():
@@ -213,9 +246,14 @@ def test_dynamic_slice_one_dim_multiply():
         r"execution of the model when running on the IPU\.")
 
     with pytest.raises(RuntimeError, match=error_msg):
-        dynamic_slice_harness(
-            torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn, 3)
+        # Set test_training=False because we expect inference to fail
+        dynamic_slice_harness(torch.tensor(
+            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+                              torch.tensor([5]),
+                              start_fn,
+                              end_fn,
+                              3,
+                              test_training=False)
 
 
 def test_dynamic_slice_one_dim_add_non_factor():
@@ -229,9 +267,14 @@ def test_dynamic_slice_one_dim_add_non_factor():
                  r"slicing dimension \(8\)\.")
 
     with pytest.raises(RuntimeError, match=error_msg):
-        dynamic_slice_harness(
-            torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([1]), start_fn, end_fn, 1)
+        # Set test_training=False because we expect inference to fail
+        dynamic_slice_harness(torch.tensor(
+            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+                              torch.tensor([1]),
+                              start_fn,
+                              end_fn,
+                              1,
+                              test_training=False)
 
 
 def test_dynamic_slice_one_dim_mix_up_float():
@@ -254,30 +297,32 @@ def test_dynamic_slice_one_dim_mix_up_float():
         r"between runs\.")
 
     with pytest.raises(RuntimeError, match=error_msg):
-        dynamic_slice_harness(
-            torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
-            torch.tensor([5]), start_fn, end_fn, 2)
+        # Set test_training=False because we expect inference to fail
+        dynamic_slice_harness(torch.tensor(
+            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+                              torch.tensor([5]),
+                              start_fn,
+                              end_fn,
+                              2,
+                              test_training=False)
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2])
 def test_unbind(dim):
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            return torch.unbind(x, dim)
-
-    model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
-
+    op = lambda x: torch.unbind(x, dim)
     x = torch.randn(2, 3, 4)
+    model = helpers.ModelWithWeights(op, x.shape, out_fn=lambda x: x[0])
+    poptorch_model = poptorch.trainingModel(model)
 
-    native_out = model(x)
-    poptorch_out = poptorch_model(x)
+    native_out, _ = model((x, ))
+    poptorch_out, _ = poptorch_model((x, ))
 
     # Check the unbound dim length is the same
     assert len(native_out) == len(poptorch_out)
 
+    # Inference test - check outputs
     for tensor_native, tensor_pop in zip(native_out, poptorch_out):
-        # Check each corresponding tensor has the same shape
-        assert tensor_native.size() == tensor_pop.size()
-        # Check each corresponding tensor is equal
-        helpers.assert_allequal(expected=tensor_native, actual=tensor_pop)
+        helpers.assert_allclose(expected=tensor_native, actual=tensor_pop)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
