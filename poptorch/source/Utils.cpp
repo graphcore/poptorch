@@ -203,7 +203,8 @@ size_t numTensorsForType(const c10::TypePtr &type) {
   case c10::TypeKind::TensorType:
     return 1;
   case c10::TypeKind::ListType:
-    ERROR("Returning a list or tuples of lists is not supported.");
+    ERROR("Returning a list or tuples of lists is not supported. Try to "
+          "convert your list into a tuple: return tuple(my_list)");
   case c10::TypeKind::TupleType: {
     size_t num_tensors = 0;
     auto tuple = type->expect<c10::TupleType>();
