@@ -52,6 +52,13 @@ API changes
   separate tensor variant by default. To revert to the previous default variant,
   use ``poptorch.optim.SGD`` with ``use_combined_accum=True``.
 
+Known issues
+------------
+
+- Using a convolution layer op with the value of ``padding`` greater than or
+  equal to `kernel_size`` results in an error when training. Use a constant pad
+  layer instead of the excess padding prior to the convolution.
+
 v2.0 (Poplar SDK 2.0)
 =====================
 
