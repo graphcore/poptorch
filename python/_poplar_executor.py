@@ -380,8 +380,7 @@ class PoplarExecutor:
 
                 # pylint: disable=protected-access
                 self._executable = poptorch_core.compileWithScript(
-                    self._trace._c, self._trace.graph,
-                    tuple(parameters.keys()), tuple(parameters.values()),
+                    self._trace._c, self._trace.graph, parameters,
                     in_tensors_trace_view.asTuple(), self._options.toDict(),
                     self._training, accessAttributes,
                     list(self._options.anchored_tensors.values()))
@@ -797,7 +796,6 @@ class PoplarExecutor:
                                           has_converted_any_half,
                                           narrow_tensor_fn):
         logger.info('Compiling the model using tracing')
-
         # CPU tracing doens't work for half types. We need to convert all half
         # layers to float, run tracing and revert the types to their original.
         half_layers = set()
@@ -881,9 +879,21 @@ class PoplarExecutor:
             if name in half_layers:
                 layer.half()
 
+        # Convert back the original model as well.
+        for name, layer in self._model.named_modules():
+            if name in half_layers:
+                layer.half()
+
+        # We need to track the parameters from the traced model as this is what the C++ graph sees.
         parameters = {
             **dict(self._trace.named_parameters()),
             **dict(self._trace.named_buffers())
+        }
+
+        # Track the original model parameters as well.
+        model_parameters = {
+            **dict(self._model.named_parameters()),
+            **dict(self._model.named_buffers())
         }
 
         if has_converted_any_half[0]:
@@ -892,18 +902,18 @@ class PoplarExecutor:
             in_tensors_as_half.forEach(narrow_tensor_fn)
 
             # Compile using the actual halves.
-            return (self._trace._c, tuple(parameters.keys()),
-                    tuple(parameters.values()),
+            return (self._trace._c, parameters,
                     in_tensors_as_half.asTuple(), has_converted_any_half[0],
                     self._options.toDict(), self._training,
                     self._dict_optimizer, accessAttributes, added_dummy_output,
-                    list(self._options.anchored_tensors.values()))
-        return (self._trace._c, tuple(parameters.keys()),
-                tuple(parameters.values()),
+                    list(self._options.anchored_tensors.values()),
+                    model_parameters)
+        return (self._trace._c, parameters,
                 in_tensors_trace_view.asTuple(), has_converted_any_half[0],
                 self._options.toDict(), self._training, self._dict_optimizer,
                 accessAttributes, added_dummy_output,
-                list(self._options.anchored_tensors.values()))
+                list(self._options.anchored_tensors.values()),
+                model_parameters)
 
     def isAttachedToDevice(self) -> bool:
         """Returns true, if the target device has been attached. False,

@@ -410,36 +410,76 @@ getParameterBuffers(const pybind11::tuple &names,
   return parameters;
 }
 
+// We have three sets of tensors.
+// 1. Tensors in the graph from jit::trace.
+// 2. Tensors in the original user model.
+// 3. Tensors in the graph from jit::trace which lowerGraph has removed unused
+// tensors from. We remap them by mapping the indices of 1. to the tensors of 3.
+// and then creating a new vector using 3 with that map as a guide to tell us
+// which tensors have been culled.
+std::vector<at::Tensor>
+remapTensors(const pybind11::dict &python_tensors,
+             const pybind11::dict &model_parameters,
+             const std::vector<at::Tensor> &traced_tensors) {
+  // Create a set of the pointers actually in use.
+  std::unordered_map<void *, std::size_t> tensor_pointers;
+
+  for (std::size_t i = 0; i < traced_tensors.size(); ++i) {
+    tensor_pointers.insert({traced_tensors[i].data_ptr(), i});
+  }
+
+  std::vector<at::Tensor> returnee;
+  returnee.resize(traced_tensors.size());
+
+  for (auto element : model_parameters) {
+    auto option_name = element.first.cast<std::string>();
+
+    // Get the original tensor which the.
+    auto dict_itr = python_tensors[element.first];
+    at::Tensor traced_tensor = dict_itr.cast<at::Tensor>();
+
+    auto itr = tensor_pointers.find(traced_tensor.data_ptr());
+    if (itr != tensor_pointers.end()) {
+      at::Tensor tensor = element.second.cast<at::Tensor>();
+      returnee[itr->second] = tensor;
+    }
+  }
+
+  return returnee;
+}
+
 // python_names and python_tensors are the parameters from the python trace.
 // And trace_tensors is a subset of python_tensors (The unused parameters have
 // been removed). So we build a map[tensor] = name based on the python trace
 // which we then use to build the list of the names of the parameters in
 // traced_tensors.
 std::vector<std::string>
-getParameterNames(const pybind11::tuple &python_names,
-                  const pybind11::tuple &python_tensors,
+getParameterNames(const pybind11::dict &python_tensors,
                   const std::vector<at::Tensor> &traced_tensors) {
+  // Create a set of the pointers actually in use.
+  std::unordered_map<void *, std::size_t> tensor_pointers;
+
+  for (std::size_t i = 0; i < traced_tensors.size(); ++i) {
+    tensor_pointers.insert({traced_tensors[i].data_ptr(), i});
+  }
+
+  // Get the names of each tensor which hasn't been removed as unused.
   std::vector<std::string> names;
-  for (auto name : python_names) {
-    ERROR_ON(!py::isinstance<py::str>(name));
-    names.push_back(name.cast<std::string>());
+  names.resize(tensor_pointers.size());
+
+  // Extract the python strings into an actual language.
+  for (auto element : python_tensors) {
+    at::Tensor tensor = element.second.cast<at::Tensor>();
+
+    auto itr = tensor_pointers.find(tensor.data_ptr());
+
+    if (itr != tensor_pointers.end()) {
+      std::string option_name = element.first.cast<std::string>();
+      names[itr->second] = option_name;
+    }
   }
 
-  torch::jit::Stack parameter_stack =
-      torch::jit::toTraceableStack(python_tensors);
-  std::map<void *, std::string> parameters_map;
-  int name_idx = 0;
-  for (const torch::jit::IValue &value : parameter_stack) {
-    parameters_map.insert({value.toTensor().data_ptr(), names.at(name_idx)});
-    name_idx++;
-  }
-
-  std::vector<std::string> parameters;
-  parameters.reserve(traced_tensors.size());
-  for (auto &param : traced_tensors) {
-    parameters.push_back(parameters_map.at(param.data_ptr()));
-  }
-  return parameters;
+  return names;
 }
 
 std::string castToString(py::handle obj) {
@@ -703,11 +743,12 @@ void identifyZeroSizedTensors(const std::vector<at::Tensor> &tensors) {
 }
 
 poptorch::LowerToPopart lowerToPopartFromTrace(
-    py::handle h, const pybind11::tuple &parameter_names,
-    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
-    bool has_converted_any_half, const pybind11::dict &options, bool training,
+    py::handle h, const pybind11::dict &python_traced_params,
+    const pybind11::tuple &inputs, bool has_converted_any_half,
+    const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output, const py::list &anchors) {
+    const bool added_dummy_output, const py::list &anchors,
+    const py::dict &model_parameters) {
   auto module = asModule(h);
 
   auto forward = module->get_method("forward");
@@ -744,8 +785,11 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   identifyZeroSizedTensors(input_tensors);
   identifyZeroSizedTensors(traced_parameter_tensors);
 
-  std::vector<std::string> parameters = getParameterNames(
-      parameter_names, parameter_tensors, traced_parameter_tensors);
+  std::vector<std::string> parameters =
+      getParameterNames(python_traced_params, traced_parameter_tensors);
+
+  traced_parameter_tensors = remapTensors(
+      python_traced_params, model_parameters, traced_parameter_tensors);
 
   std::vector<Optimizer> optimizers = parseOptimizer(optimizer_dict);
 
@@ -1045,60 +1089,61 @@ void processPrecisionOptions(py::handle h) {
 }
 
 void compileWithTraceAndExport(
-    py::handle h, const pybind11::tuple &parameter_names,
-    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
-
-    bool has_converted_any_half, const pybind11::dict &options, bool training,
+    py::handle h, const pybind11::dict &python_traced_params,
+    const pybind11::tuple &inputs, bool has_converted_any_half,
+    const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
     const bool added_dummy_output, const py::list &anchors,
-    const std::string &export_filename) {
+    const py::dict &model_parameters, const std::string &export_filename) {
   try {
     auto lower = lowerToPopartFromTrace(
-        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
-        options, training, optimizer_dict, attribute_accessor,
-        added_dummy_output, anchors);
+        h, python_traced_params, inputs, has_converted_any_half, options,
+        training, optimizer_dict, attribute_accessor, added_dummy_output,
+        anchors, model_parameters);
     return lower.compileAndExport(export_filename);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
-    py::handle h, const pybind11::tuple &parameter_names,
-    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
-    bool has_converted_any_half, const pybind11::dict &options, bool training,
+    py::handle h, const pybind11::dict &python_traced_params,
+    const pybind11::tuple &inputs, bool has_converted_any_half,
+    const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
     const bool added_dummy_output, const py::list &anchors,
-    const std::string &import_filename, std::int64_t offset) {
+    const py::dict &model_parameters, const std::string &import_filename,
+    std::int64_t offset) {
   try {
     auto lower = lowerToPopartFromTrace(
-        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
-        options, training, optimizer_dict, attribute_accessor,
-        added_dummy_output, anchors);
+        h, python_traced_params, inputs, has_converted_any_half, options,
+        training, optimizer_dict, attribute_accessor, added_dummy_output,
+        anchors, model_parameters);
     return lower.loadExecutableFromFile(import_filename, offset);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-std::shared_ptr<poptorch::PoplarExecutable> compileWithTrace(
-    py::handle h, const pybind11::tuple &parameter_names,
-    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
-    bool has_converted_any_half, const pybind11::dict &options, bool training,
-    const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output, const py::list &anchors) {
+std::shared_ptr<poptorch::PoplarExecutable>
+compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
+                 const pybind11::tuple &inputs, bool has_converted_any_half,
+                 const pybind11::dict &options, bool training,
+                 const py::dict &optimizer_dict,
+                 const py::function &attribute_accessor,
+                 const bool added_dummy_output, const py::list &anchors,
+                 const py::dict &model_parameters) {
   try {
     auto lower = lowerToPopartFromTrace(
-        h, parameter_names, parameter_tensors, inputs, has_converted_any_half,
-        options, training, optimizer_dict, attribute_accessor,
-        added_dummy_output, anchors);
+        h, python_traced_params, inputs, has_converted_any_half, options,
+        training, optimizer_dict, attribute_accessor, added_dummy_output,
+        anchors, model_parameters);
     return lower.compile();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
-    py::handle h, py::handle g, const pybind11::tuple &parameter_names,
-    const pybind11::tuple &parameter_tensors, const pybind11::tuple &inputs,
-    const pybind11::dict &options, bool training,
+    py::handle h, py::handle g, const pybind11::dict &python_traced_params,
+    const pybind11::tuple &inputs, const pybind11::dict &options, bool training,
     const py::function &attribute_accessor, const pybind11::list &anchors) {
   try {
     auto module = asModule(h);
@@ -1117,7 +1162,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
     }
     graph->dump();
     std::vector<std::string> parameters =
-        getParameterNames(parameter_names, parameter_tensors, parameter_data);
+        getParameterNames(python_traced_params, parameter_data);
 
     int loop_count = 0;
     std::string graph_string;

@@ -214,3 +214,41 @@ def test_half_tracing():
     model.linear2.float()
     check_param_types(popmodel._trace.linear1, torch.half)
     check_param_types(popmodel._trace.linear2, torch.float)
+
+
+def test_buffers():
+    torch.manual_seed(42)
+    fake_data = torch.ones(1, 64, 10, 10).half()
+
+    class M(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.bn = torch.nn.BatchNorm2d(64)
+
+            self.bn.running_mean += torch.randn(64)
+            self.bn.running_var += torch.randn(64)
+
+        def forward(self, i):
+            out = self.bn(i)
+            return out, self.bn.running_var, self.bn.running_mean
+
+    model = M()
+
+    cpu_mean = model.bn.running_mean
+    cpu_var = model.bn.running_var
+
+    model.bn.half()
+
+    poptorch_model = poptorch.inferenceModel(model)
+    _, ipu_var, ipu_mean = poptorch_model(fake_data)
+
+    # We lose some precision in the half conversion.
+    helpers.assert_allclose(actual=ipu_mean,
+                            expected=cpu_mean.half(),
+                            rtol=1e-02,
+                            atol=1e-02)
+
+    helpers.assert_allclose(actual=ipu_var,
+                            expected=cpu_var.half(),
+                            rtol=1e-02,
+                            atol=1e-02)
