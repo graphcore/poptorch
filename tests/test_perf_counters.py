@@ -24,10 +24,21 @@ def assert_perf_counter_size(perf, inputs, outputs, steps, outsteps=None):
     assert_size(perf['output_complete'], outputs, outsteps)
 
 
-def assert_latency_values(latency):
-    (minimum, maximum, average) = latency
-    assert minimum <= average
-    assert average <= maximum
+def assert_latency_values(model):
+    def check(latency):
+        (minimum, maximum, average) = latency
+        assert minimum <= average
+        assert average <= maximum
+
+    host2ipu = model.getHostIpuLatency()
+    compute = model.getComputeLatency()
+    ipu2host = model.getIpuHostLatency()
+    round_trip = model.getLatency()
+
+    check(host2ipu)
+    check(compute)
+    check(ipu2host)
+    check(round_trip)
 
 
 def test_simple():
@@ -39,9 +50,7 @@ def test_simple():
 
     perf = poptorch_model.getPerfCounters()
     assert_perf_counter_size(perf, 2, 1, 1)
-
-    latency = poptorch_model.getLatency()
-    assert_latency_values(latency)
+    assert_latency_values(poptorch_model)
 
 
 def test_steps():
@@ -54,9 +63,7 @@ def test_steps():
 
     perf = poptorch_model.getPerfCounters()
     assert_perf_counter_size(perf, 2, 1, 10)
-
-    latency = poptorch_model.getLatency()
-    assert_latency_values(latency)
+    assert_latency_values(poptorch_model)
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
@@ -71,10 +78,7 @@ def test_replicas():
 
     perf = poptorch_model.getPerfCounters()
     assert_perf_counter_size(perf, 2, 1, 4)
-
-    latency = poptorch_model.getLatency()
-
-    assert_latency_values(latency)
+    assert_latency_values(poptorch_model)
 
 
 @pytest.mark.parametrize("mode_tuple", [(poptorch.AnchorMode.Final, 1),
@@ -105,9 +109,7 @@ def test_inference(mode_tuple, steps, replicas):
     elif mode_tuple[0] is poptorch.AnchorMode.EveryN:
         outsteps = steps // mode_tuple[1] * replicas
     assert_perf_counter_size(perf, 2, 1, steps * replicas, outsteps)
-
-    latency = poptorch_model.getLatency()
-    assert_latency_values(latency)
+    assert_latency_values(poptorch_model)
 
 
 @pytest.mark.parametrize("mode_tuple", [(poptorch.AnchorMode.Final, 1),
@@ -145,6 +147,23 @@ def test_training(mode_tuple, steps, accums, replicas):
         outsteps = steps // mode_tuple[1] * accums * replicas
 
     assert_perf_counter_size(perf, 2, 2, steps * accums * replicas, outsteps)
+    assert_latency_values(poptorch_model)
+
+
+def test_synthetic_data():
+    model = Model()
+    opts = poptorch.Options()
+    opts.deviceIterations(16)
+    opts.enableSyntheticData(True)
+    poptorch_model = poptorch.inferenceModel(model, opts)
+
+    torch.manual_seed(42)
+    x = torch.randn(16, 100, 100)
+    y = torch.randn(16, 100, 100)
+    poptorch_model(x, y)
+    perf = poptorch_model.getPerfCounters()
+
+    assert_perf_counter_size(perf, 2, 1, 0, 0)
 
     latency = poptorch_model.getLatency()
-    assert_latency_values(latency)
+    assert latency == (0., 0., 0.)
