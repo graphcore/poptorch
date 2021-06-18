@@ -879,8 +879,8 @@ do this, see the `Custom operators
 <https://docs.graphcore.ai/projects/popart-user-guide/en/latest/custom_ops.html>`__
 chapter of the PopART User Guide.
 
-You can find some examples of PopART custom ops in the `Graphcore GitHub repository
-<https://github.com/graphcore/examples/tree/master/code_examples/popart/custom_operators/>`__.
+You can find some examples of PopART custom ops in the `Graphcore GitHub tutorials repository
+<https://github.com/graphcore/tutorials/tree/sdk-release-2.1/feature_examples/popart/custom_operators>`__.
 
 Compiling the PopART custom op will create a dynamic library file, which you can
 use with your PyTorch code.
