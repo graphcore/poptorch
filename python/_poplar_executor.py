@@ -5,7 +5,7 @@ import ctypes
 import json
 import os
 import pickle
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 import weakref
 import warnings
 import torch
@@ -668,45 +668,53 @@ class PoplarExecutor:
                 'output_complete': [[]]
             }
 
+        def normalize(timestamps):
+            if len(timestamps) == 0:
+                return [[]]
+            return timestamps
+
         values = poptorch_core.getTimestamps(self._executable)
         return {
-            'input': values[0],
-            'input_complete': values[1],
-            'output': values[2],
-            'output_complete': values[3]
+            'input': normalize(values[0]),
+            'input_complete': normalize(values[1]),
+            'output': normalize(values[2]),
+            'output_complete': normalize(values[3])
         }
 
-    def getLatency(self):
-        """Return latency information for the last execution of the model.
+    def _computeLatency(self, from_event: str,
+                        from_reduce: Callable[[List[float]], float],
+                        to_event: str,
+                        to_reduce: Callable[[List[float]], float]):
+        """Computes latency figures between two performance counters.
 
-        Latency is the interval of time (in fractional seconds) between the
-        first input tensor being requested and the last output tensor being
-        written back to the host.
-
-        The result is a tuple containing the minimum, maximum and average
-        latency for the iterations corresponding to the latest invocation of
-        the model.
+        :param str from_event: key of starting performance counter
+        :param from_reduce: reduction function for starting counters
+        :param str to_event: key of ending performance counter
+        :param to_reduce: redunction function for ending counters
         """
         perf_counters = self.getPerfCounters()
         start_times = []
         end_times = []
         durations = []
 
-        num_inputs = len(perf_counters['input'])
-        for step in range(0, len(perf_counters['input'][0])):
+        num_inputs = len(perf_counters[from_event])
+        for step in range(0, len(perf_counters[from_event][0])):
             start_times.append(
-                min([
-                    perf_counters['input'][i][step]
+                from_reduce([
+                    perf_counters[from_event][i][step]
                     for i in range(0, num_inputs)
                 ]))
 
-        num_outputs = len(perf_counters['output_complete'])
-        for step in range(0, len(perf_counters['output_complete'][0])):
+        num_outputs = len(perf_counters[to_event])
+        for step in range(0, len(perf_counters[to_event][0])):
             end_times.append(
-                max([
-                    perf_counters['output_complete'][i][step]
+                to_reduce([
+                    perf_counters[to_event][i][step]
                     for i in range(0, num_outputs)
                 ]))
+
+        if len(end_times) == 0:
+            return (0., 0., 0.)
 
         # It is possible to have more input timestamps than output timestamps
         # due to other options such as gradient accumulation and anchor modes.
@@ -727,11 +735,60 @@ class PoplarExecutor:
         durations = list(
             map(lambda v: v[1] - v[0], zip(start_groups, end_times)))
 
-        if len(durations) == 0:
-            return (0., 0., 0.)
-
         avg = sum(durations) / len(durations)
         return (min(durations), max(durations), avg)
+
+    def getHostIpuLatency(self):
+        """Return Host-IPU latency for the last execution of the model.
+
+        The Host-IPU latency is the interval of time (in fractional seconds)
+        between the first input tensor being requested and the last input
+        tensor being transferred to the IPU.
+
+        The result is a tuple containing the minimum, maximum and average
+        latency for the iterations corresponding to the latest invocation of
+        the model.
+        """
+        return self._computeLatency('input', min, 'input_complete', max)
+
+    def getComputeLatency(self):
+        """Return compute latency for the last execution of the model.
+
+        The compute latency is the interval of time (in fractional seconds)
+        between the last input tensor being transferred to the IPU and the
+        last output tensor becoming available.
+
+        The result is a tuple containing the minimum, maximum and average
+        latency for the iterations corresponding to the latest invocation of
+        the model.
+        """
+        return self._computeLatency('input_complete', max, 'output', max)
+
+    def getIpuHostLatency(self):
+        """Return IPU-Host latency for the last execution of the model.
+
+        The IPU-Host latency is the interval of time (in fractional seconds)
+        between the first output tensor becoming available and the last output
+        tensor being written back to the host.
+
+        The result is a tuple containing the minimum, maximum and average
+        latency for the iterations corresponding to the latest invocation of
+        the model.
+        """
+        return self._computeLatency('output', min, 'output_complete', max)
+
+    def getLatency(self):
+        """Return round-trip latency for the last execution of the model.
+
+        The round-trip latency is the interval of time (in fractional seconds)
+        between the first input tensor being requested and the last output
+        tensor being written back to the host.
+
+        The result is a tuple containing the minimum, maximum and average
+        latency for the iterations corresponding to the latest invocation of
+        the model.
+        """
+        return self._computeLatency('input', min, 'output_complete', max)
 
     def destroy(self) -> None:
         """Destroy the model: release the IPUs and the executable.
