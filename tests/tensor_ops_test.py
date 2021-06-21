@@ -111,6 +111,8 @@ def op_harness(op,
                                         actual=poptorch_out)
 
     if test_training:
+        # Set a fixed seed for the weights of the model
+        torch.manual_seed(42)
         model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn=out_fn)
 
         # Run on CPU.
@@ -139,8 +141,14 @@ def op_harness(op,
     assert_fn(native_out, poptorch_out)
 
 
+# Note: Many of the following operations don't depend on the values of the tensors
+# but we still need to fix the random seed for any op with randomly generated values
+# so that it's guaranteed that weights change after one training step
+
+
 @pytest.mark.parametrize("dim", [0, 1])
 def test_cat(dim):
+    torch.manual_seed(42)
     x = torch.randn(2, 3)
 
     op = lambda *xs: torch.cat(xs, dim=dim)
@@ -149,6 +157,7 @@ def test_cat(dim):
 
 
 def test_chunk():
+    torch.manual_seed(42)
     x = torch.randn(20, 10)
 
     op = lambda x: torch.chunk(x, 5)
@@ -167,6 +176,7 @@ def test_reshape():
 @pytest.mark.parametrize("split_size_or_sections",
                          (1, 5, 6, 20, [10, 10], [19, 1]))
 def test_split(split_size_or_sections):
+    torch.manual_seed(42)
     x = torch.randn(20, 10)
     op = lambda x: torch.split(x, split_size_or_sections)
 
@@ -174,6 +184,7 @@ def test_split(split_size_or_sections):
 
 
 def test_split_singleton():
+    torch.manual_seed(42)
     x = torch.randn(1, 4, 3, 1)
     op = lambda x: torch.split(x, 1, 1)[0]
 
@@ -181,18 +192,21 @@ def test_split_singleton():
 
 
 def test_squeeze():
+    torch.manual_seed(42)
     x = torch.randn(1, 1, 5, 1, 10, 1)
 
     op_harness(torch.squeeze, x)
 
 
 def test_t():
+    torch.manual_seed(42)
     x = torch.randn(20, 10)
 
     op_harness(torch.t, x)
 
 
 def test_transpose():
+    torch.manual_seed(42)
     x = torch.randn(3, 2, 5, 2)
     op = lambda x: torch.transpose(x, 3, 0)
 
@@ -200,6 +214,7 @@ def test_transpose():
 
 
 def test_unsqueeze():
+    torch.manual_seed(42)
     x = torch.randn(3, 2, 5, 2)
     op = lambda x: torch.unsqueeze(x, 1)
 
@@ -207,6 +222,7 @@ def test_unsqueeze():
 
 
 def test_expand():
+    torch.manual_seed(42)
     x = torch.randn(3, 1)
     op = lambda x: x.expand(3, 4)
 
@@ -214,6 +230,7 @@ def test_expand():
 
 
 def test_expand_preserve_dim():
+    torch.manual_seed(42)
     x = torch.randn(1, 1, 100)
     op = lambda x: x.expand(2, -1, -1)
 
@@ -221,6 +238,7 @@ def test_expand_preserve_dim():
 
 
 def test_expand_as():
+    torch.manual_seed(42)
     x = torch.randn(3, 1)
     y = torch.randn(3, 4)
     op = lambda x, y: x.expand_as(y)
@@ -229,12 +247,14 @@ def test_expand_as():
 
 
 def test_flatten():
+    torch.manual_seed(42)
     x = torch.randn(3, 1)
 
     op_harness(torch.flatten, x)
 
 
 def test_view():
+    torch.manual_seed(42)
     x = torch.randn(30, 5)
     op = lambda x: x.view((15, 2, 5))
 
@@ -305,6 +325,7 @@ def test_masked_fill(input_shapes, value):
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (3, 4), (1, 3, 4)])
 @pytest.mark.parametrize("dim", [0, 1, 2])
 def test_stack(input_shapes, dim):
+    torch.manual_seed(42)
 
     if dim > len(input_shapes):
         pytest.skip()
