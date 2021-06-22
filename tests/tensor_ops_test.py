@@ -374,6 +374,19 @@ def test_copy_(input_shapes, dtype):
     op_harness(op, x, y, test_training=test_training, assert_fn=assert_fn)
 
 
+@pytest.mark.parametrize("shifts,dims", [(1, 0), (-1, 0), (10, 1), (-10, 1),
+                                         (0, 2), ((1, 1), (0, 1)),
+                                         ((1, -1), (1, 2)), ((-3, -4), (0, 2)),
+                                         ((1, 2, 3), (0, 1, 2)),
+                                         ((-1, -2, -3), (0, 1, 2)), (5, None),
+                                         (-3, None)])
+def test_roll(shifts, dims):
+    torch.manual_seed(0)
+    op = lambda x: x.roll(shifts, dims)
+    x = torch.randn((2, 3, 4))
+    op_harness(op, x)
+
+
 @pytest.mark.parametrize("with_detach", [True, False])
 def test_detach(with_detach):
     torch.manual_seed(42)

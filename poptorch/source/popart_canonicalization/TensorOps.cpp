@@ -71,6 +71,64 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
   return createReshape(graph, new_node->output(), new_shape);
 }
 
+torch::jit::Node *rollHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
+  auto input = node->input(0);
+  auto input_shape = shapeFromTensor(input);
+  auto shifts = constantToLongVec(node->input(1)->node());
+  auto dims = constantToLongVec(node->input(2)->node());
+
+  bool reshape_output = false;
+  if (dims.empty()) {
+    // If dims not provided, a flattened version of the tensor is rolled and
+    // then reshaped back.
+    ERROR_ON_MSG(shifts.size() != 1,
+                 "The 'shifts' argument of the roll op must be a scalar when "
+                 "'dims' is not specified.");
+    input = createFlatten(graph, {input}, 0)->output();
+    int64_t flattened_size = std::accumulate(
+        input_shape.begin(), input_shape.end(), 1, std::multiplies<int64_t>());
+    input_shape.clear();
+    input_shape.push_back(1);
+    input_shape.push_back(flattened_size);
+    dims.push_back(1);
+    reshape_output = true;
+  } else {
+    ERROR_ON_MSG(shifts.size() != dims.size(),
+                 "The 'shifts' and 'dims' arguments of the roll op must be the "
+                 "same size.");
+  }
+
+  torch::jit::Node *output = input->node();
+  for (size_t i = 0; i < dims.size(); ++i) {
+    auto current_dim = dims.at(i);
+    ERROR_ON_MSG(static_cast<size_t>(current_dim) >= input_shape.size() ||
+                     current_dim < 0,
+                 "Dimension out of range in the roll op.");
+
+    auto current_dim_size = input_shape.at(current_dim);
+    // Handle overreaching and negative shifts.
+    auto current_shift =
+        ((shifts.at(i) % current_dim_size) + current_dim_size) %
+        current_dim_size;
+
+    // Duplicate the rolling dimension and then slice based on the shift.
+    auto duplicated =
+        createConcat(graph, {output->output(), output->output()}, current_dim);
+    auto start = wrapInConstant1D(graph, current_dim_size - current_shift);
+    auto end = wrapInConstant1D(graph, 2 * current_dim_size - current_shift);
+    auto axis = wrapInConstant1D(graph, current_dim);
+    output = createSlice(graph, {duplicated->output(), start, end, axis});
+  }
+
+  if (reshape_output) {
+    return createReshape(graph, output->output(),
+                         shapeFromTensor(node->input(0)));
+  }
+  return output;
+}
+
 // NOLINTNEXTLINE
 torch::jit::Node *copy_Handler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
@@ -85,6 +143,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::size, sizeHandler);
   registerHandler(c10::prim::NumToTensor, numToTensorHandler);
   registerHandler(c10::aten::repeat, repeatHandler);
+  registerHandler(c10::aten::roll, rollHandler);
   registerHandler(c10::aten::copy_, copy_Handler);
 }
 

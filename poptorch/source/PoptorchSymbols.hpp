@@ -4,7 +4,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 // Create all the C10 symbols.
-// For some reason aten::relu_ is missing from the c10 namespace
+// For some reason the below symbols are missing from the c10 namespace.
 namespace c10::aten {
 extern c10::Symbol relu_;                       // NOLINT
 extern c10::Symbol dropout_;                    // NOLINT
@@ -33,6 +33,7 @@ extern c10::Symbol sigmoid_;                    // NOLINT
 extern c10::Symbol tanh_;                       // NOLINT
 extern c10::Symbol scatter_add_;                // NOLINT
 extern c10::Symbol feature_dropout_;            // NOLINT
+extern c10::Symbol roll;                        // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {

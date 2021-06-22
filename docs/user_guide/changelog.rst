@@ -8,6 +8,8 @@ v2.2 (Poplar SDK 2.2)
 New features
 ------------
 
+- Support for ``torch.roll``
+
 API changes
 -----------
 
