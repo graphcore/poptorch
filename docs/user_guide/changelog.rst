@@ -11,6 +11,11 @@ New features
 API changes
 -----------
 
+- Removed ``accumulationReductionType`` which was deprecated in 2.1 in favour of
+  ``accumulationAndReplicationReductionType`` in ``poptorch.Options.Training``
+- Removed ``runningVarianceAlwaysFloat`` which was deprecated in 2.1 and replaced by
+  ``runningStatisticsAlwaysFloat`` in ``poptorch.Options.Precision``,
+
 v2.1 (Poplar SDK 2.1)
 =====================
 

@@ -8,7 +8,6 @@ from ._logging import logger
 from . import _options_config
 from . import _options_impl
 from . import ops
-from ._utils import deprecated
 
 
 # Used by _options_config, defined here so that it is reported
@@ -127,33 +126,6 @@ class _PrecisionOptions(_options_impl.OptionsDict):
                 "poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat")
 
         self.set(half_float_casting=half_float_casting)
-        return self
-
-    # TODO(T36755): Remove this entrypoint
-    @deprecated(
-        "poptorch.Options.Precision", "2.1",
-        "Use poptorch.Options.Precision.runningStatisticsAlwaysFloat instead, "
-        "which also calculates the running mean in float32 regardless of input "
-        "type")
-    def runningVarianceAlwaysFloat(self, value: bool
-                                   ) -> "poptorch.options._PrecisionOptions":
-        """Controls whether the running variance tensor of batch normalisation
-        layers should be a float32 regardless of input type.
-
-        A batch normalisation layer stores a running estimate of the variances
-        of each channel during training, for use at inference in lieu of batch
-        statistics. Storing the value as a half (float16) can result in poor
-        performance due to the low precision. Enabling this option yields more
-        reliable estimates by forcing all running estimates of variances to be
-        stored as float32, at the cost of extra memory use.
-
-        :param value:
-            * True: Always store running estimates of variance as float32.
-            * False: Store running estimates of variance as the same type as the
-              layer input.
-        """
-
-        self.runningStatisticsAlwaysFloat(value)
         return self
 
     def runningStatisticsAlwaysFloat(self, value: bool
@@ -366,32 +338,6 @@ class _TrainingOptions(_options_impl.OptionsDict):
         self.set(accumulation_and_replication_reduction_type=reduction_type)
         self._warnings_disabled.add(
             "accumulation_and_replication_reduction_type")
-        return self
-
-    @deprecated(
-        'poptorch.Options.Training', '2.1',
-        'Use poptorch.Options.Training.accumulationAndReplicationReductionType'
-        ' instead')
-    def accumulationReductionType(self,
-                                  reduction_type: "poptorch.ReductionType"
-                                  ) -> "poptorch.options._TrainingOptions":
-        """The type of reduction (sum or mean) applied to accumulated gradients.
-
-            When using a non-unity value for
-            :py:func:`~poptorch.options._TrainingOptions.gradientAccumulation`,
-            you can specify whether to reduce the gradients by sum or mean
-            (default). When using mean reduction, scaling the
-            :py:func:`~poptorch.options._TrainingOptions.gradientAccumulation`,
-            will not change the training curve of the model compared to an
-            identical scaling of the compute batch size (barring numerical
-            error) except for ops which depend on the compute batch size such as
-            batch normalisation.
-
-            :param accumulation_reduction_type:
-                * Mean: Reduce gradients by calculating the mean of them.
-                * Sum: Reduce gradients by calculating the sum of them.
-            """
-        self.accumulationAndReplicationReductionType(reduction_type)
         return self
 
     def setAutomaticLossScaling(self, enabled: bool
