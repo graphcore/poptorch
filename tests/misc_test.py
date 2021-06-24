@@ -106,3 +106,20 @@ def test_print_orig_input_trace_tensors(capfd):
         "%z : Int(1:1, requires_grad=0, device=cpu)",
         orig_input_trace_tensors[0], orig_input_trace_tensors[1],
         orig_input_trace_tensors[2])
+
+
+def test_untracable_type_error():
+    class Model(torch.nn.Module):
+        def forward(self, t, f):
+            return t + torch.tensor([f])
+
+    x = torch.tensor([3.4])
+    poptorch_model = poptorch.inferenceModel(Model())
+
+    with pytest.raises(
+            TypeError,
+            match=
+            r"All forward function arguments used to compile and run the model "
+            r"must be Tensors or \(possibly nested\) Lists and Tuples of "
+            r"Tensors \(Got types: \[Tensor, float\]\)."):
+        poptorch_model(x, 5.6)

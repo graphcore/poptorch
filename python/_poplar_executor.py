@@ -5,6 +5,7 @@ import ctypes
 import json
 import os
 import pickle
+import re
 from typing import Callable, Dict, List, Optional
 import weakref
 import warnings
@@ -813,7 +814,20 @@ class PoplarExecutor:
 
         warns = []
         with warnings.catch_warnings(record=True) as caught:
-            traced = torch.jit.trace(self._model, in_tensors_trace_view_tuple)
+            try:
+                traced = torch.jit.trace(self._model,
+                                         in_tensors_trace_view_tuple)
+            except RuntimeError as e:
+                pattern = r'Type \'Tuple(\[.*\])\' cannot be traced'
+                match = re.match(pattern, str(e))
+                if match:
+                    types = match.group(1)
+                    raise TypeError(
+                        "All forward function arguments used to compile and "
+                        "run the model must be Tensors or (possibly nested) "
+                        f"Lists and Tuples of Tensors (Got types: {types})."
+                    ).with_traceback(e.__traceback__)
+                raise e
 
             # pylint: disable=protected-access
             if poptorch_core.isGraphNondeterministic(traced._c):
