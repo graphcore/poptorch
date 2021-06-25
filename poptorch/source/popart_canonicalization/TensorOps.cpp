@@ -100,7 +100,7 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
                  "same size.");
   }
 
-  torch::jit::Node *output = input->node();
+  torch::jit::Value *output = input;
   for (size_t i = 0; i < dims.size(); ++i) {
     auto current_dim = dims.at(i);
     ERROR_ON_MSG(static_cast<size_t>(current_dim) >= input_shape.size() ||
@@ -114,19 +114,18 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
         current_dim_size;
 
     // Duplicate the rolling dimension and then slice based on the shift.
-    auto duplicated =
-        createConcat(graph, {output->output(), output->output()}, current_dim);
+    auto duplicated = createConcat(graph, {output, output}, current_dim);
     auto start = wrapInConstant1D(graph, current_dim_size - current_shift);
     auto end = wrapInConstant1D(graph, 2 * current_dim_size - current_shift);
     auto axis = wrapInConstant1D(graph, current_dim);
-    output = createSlice(graph, {duplicated->output(), start, end, axis});
+    output =
+        createSlice(graph, {duplicated->output(), start, end, axis})->output();
   }
 
   if (reshape_output) {
-    return createReshape(graph, output->output(),
-                         shapeFromTensor(node->input(0)));
+    return createReshape(graph, output, shapeFromTensor(node->input(0)));
   }
-  return output;
+  return output->node();
 }
 
 // NOLINTNEXTLINE
