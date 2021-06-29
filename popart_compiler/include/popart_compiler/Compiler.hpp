@@ -45,9 +45,10 @@ struct CompilerImpl;
 struct SessionOptionsImpl;
 } // namespace detail
 
+enum class OutputElemType { Tensor, Tuple, List };
+
 struct OutputType {
-  enum class Type { Tensor, Tuple, List };
-  Type type;
+  OutputElemType type;
   int64_t num_elements{0};
 };
 

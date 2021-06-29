@@ -204,9 +204,12 @@ size_t numTensorsForType(const c10::TypePtr &type) {
   switch (type->kind()) {
   case c10::TypeKind::TensorType:
     return 1;
-  case c10::TypeKind::ListType:
-    ERROR("Returning a list or tuples of lists is not supported. Try to "
-          "convert your list into a tuple: return tuple(my_list)");
+
+  case c10::TypeKind::ListType: {
+    auto list_type = std::dynamic_pointer_cast<ListTypeWithNumElements>(type);
+    ERROR_ON(!list_type);
+    return list_type->numElements();
+  }
   case c10::TypeKind::TupleType: {
     size_t num_tensors = 0;
     auto tuple = type->expect<c10::TupleType>();

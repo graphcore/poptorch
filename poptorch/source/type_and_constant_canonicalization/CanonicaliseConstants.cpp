@@ -4,8 +4,11 @@
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 
 #include <any>
+#include <functional>
 #include <iterator>
 #include <limits>
+#include <stack>
+#include <utility>
 
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -204,56 +207,191 @@ void handleStringConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
   replaceWithConstantTensor(graph, n, t);
 }
 
-void handleList(torch::jit::Graph *graph, torch::jit::Node *n,
-                std::unordered_set<torch::jit::Node *> *to_delete) {
-  torch::jit::WithInsertPoint insert_point(n);
+// Visit an ivalue which is a tuple or list constant and single type constant
+// nodes and list/tuple constructs to replace it
+class ListTupleVisitor {
+  enum class State { IN_TUPLE, IN_LIST };
 
-  // Turn each element into a prim constant
-  auto value_vec = n->ival(c10::attr::value).toListRef();
-  std::vector<torch::jit::Node *> prim_consts;
-  for (auto &val : value_vec) {
-    prim_consts.emplace_back(graph->create(c10::prim::Constant));
+  // Maintain the information about the list or tuple at each level
+  struct ListOrTupleInfo {
+    ListOrTupleInfo(State state_, size_t elements_left_,
+                    c10::TypePtr container_type_)
+        : state(state_), elements_left(elements_left_),
+          container_type(std::move(container_type_)) {}
 
-    if (n->output()->type()->isSubtypeOf(c10::ListType::ofBools())) {
-      prim_consts.back()->i_(c10::attr::value, val.toBool());
-      prim_consts.back()->output()->setType(c10::BoolType::get());
-    } else if (n->output()->type()->isSubtypeOf(c10::ListType::ofFloats())) {
-      prim_consts.back()->f_(c10::attr::value, val.toDouble());
-      prim_consts.back()->output()->setType(c10::FloatType::get());
-    } else if (n->output()->type()->isSubtypeOf(c10::ListType::ofInts())) {
-      prim_consts.back()->i_(c10::attr::value, val.toInt());
-      prim_consts.back()->output()->setType(c10::IntType::get());
-    } else if (n->output()->type()->isSubtypeOf(c10::ListType::ofTensors()) ||
-               n->output()->type()->isSubtypeOf(c10::ListType::create(
-                   c10::OptionalType::create(c10::TensorType::get())))) {
-      if (!val.isNone()) {
-        // Treat node as a regular tensor
-        auto tensor = val.toTensor();
-        prim_consts.back()->t_(c10::attr::value, tensor);
-        prim_consts.back()->output()->inferTypeFrom(tensor);
-      } else {
-        // Assign NoneType so that the node can be skipped over
-        // during constant canonicalization
-        prim_consts.back()->output()->setType(c10::NoneType::get());
-      }
-    } else {
-      ERROR("Unexpected type");
+    // Whether or not the visitor is currently in a list or a tuple
+    State state;
+
+    // The number of elenents left to be visited (before a List/TupleConstruct)
+    size_t elements_left;
+
+    // The type of the list/tuple, preserved from first visit ahead of
+    // constructing the list or tuple
+    c10::TypePtr container_type;
+
+    // All the nodes to be input to the List/TupleConstruct
+    std::vector<torch::jit::Node *> container_nodes;
+  };
+
+public:
+  explicit ListTupleVisitor(torch::jit::Graph *graph)
+      : _graph(graph), _last_node(nullptr) {}
+
+  // We never return true as we visit every element
+  bool operator()(const c10::IValue &i_value) {
+    if (i_value.isGenericDict()) {
+      ERROR("Dicts are not supported in constant canonicalisation.");
     }
 
-    graph->insertNode(prim_consts.back());
+    // Handle the visting of a list or tuple: actual creation will happen
+    // once all its elements have been visited
+    if (i_value.isTuple() || i_value.isList()) {
+      handleListOrTuple(i_value);
+      return false;
+    }
+
+    // Handle an element which is not a tuple or list
+    handleConstant(i_value);
+
+    // There will not be a further visit marking the completition of a tuple
+    // or list, so this must be handled after the final constant.
+    // In addition, in a nested scenario, this might trigger for then once
+    // e.g. (1, (2, (3, 4))) will lead this block running three times.
+
+    while (_info_stack.top().elements_left == 0) {
+      handleTupleOrListConstruction();
+
+      if (_info_stack.empty()) {
+        // All tuples and lists have been constructed
+        break;
+      }
+    }
+
+    return false;
   }
 
-  // Add a list construct
-  auto list_construct = graph->create(c10::prim::ListConstruct);
-  for (auto prim_const : prim_consts) {
-    list_construct->addInput(prim_const->output());
+  const std::vector<torch::jit::Node *> &getAllConstNodes() {
+    return _all_const_nodes;
   }
 
-  graph->insertNode(list_construct);
-  n->output()->replaceAllUsesWith(list_construct->output());
+  torch::jit::Node *getLastNode() const {
+    ERROR_ON(_last_node == nullptr);
+    return _last_node;
+  }
 
-  // Canonicalize each constant individually and ensure deletion
-  for (auto prim_const : prim_consts) {
+private:
+  // Handle a list of the tuple: this involves merely recording the state, type
+  // and number of elements as the inputs to a List/TupleConstruct will not have
+  // been constructed at this point.
+  void handleListOrTuple(const c10::IValue &i_value) {
+    if (i_value.isTuple()) {
+      _info_stack.emplace(State::IN_TUPLE, i_value.toTuple()->elements().size(),
+                          i_value.type());
+    } else {
+      _info_stack.emplace(State::IN_LIST, i_value.toListRef().size(),
+                          i_value.type());
+    }
+  }
+
+  // Handle a tensor or numeric constant. This adds a constant of the same type
+  // to the graph, which will later be canonicalised to a tensor constant.
+  // Though this means that there will be an extra canonicalisation step, it
+  // minimises code duplication. All constants are added to "_all_const_nodes"
+  // for the later canonicalisation.
+  void handleConstant(const c10::IValue &i_value) {
+    ERROR_ON(_info_stack.empty());
+
+    auto new_const = _graph->create(c10::prim::Constant);
+
+    if (i_value.isTensor()) {
+      new_const->output()->inferTypeFrom(i_value.toTensor());
+      new_const->t_(c10::attr::value, i_value.toTensor());
+    } else if (i_value.isInt()) {
+      new_const->output()->setType(c10::IntType::get());
+      new_const->i_(c10::attr::value, i_value.toInt());
+    } else if (i_value.isDouble()) {
+      new_const->output()->setType(c10::FloatType::get());
+      new_const->f_(c10::attr::value, i_value.toDouble());
+    } else if (i_value.isBool()) {
+      new_const->output()->setType(c10::BoolType::get());
+      new_const->i_(c10::attr::value, i_value.toBool());
+    } else if (i_value.isNone()) {
+      // Assign NoneType so that the node can be skipped over
+      // during constant canonicalization
+      new_const->output()->setType(c10::NoneType::get());
+    } else {
+      ERROR("Unsupported type for constant: " << i_value);
+    }
+
+    _graph->insertNode(new_const);
+    _info_stack.top().container_nodes.push_back(new_const);
+    _all_const_nodes.push_back(new_const);
+    _info_stack.top().elements_left--;
+  }
+
+  // Handle the actual constructions of a list or tuple once the last element
+  // has been visited.
+  void handleTupleOrListConstruction() {
+    torch::jit::Node *construct_node;
+
+    switch (_info_stack.top().state) {
+    case State::IN_TUPLE:
+      construct_node = _graph->create(c10::prim::TupleConstruct);
+      break;
+    case State::IN_LIST:
+      construct_node = _graph->create(c10::prim::ListConstruct);
+      break;
+    }
+
+    for (auto element : _info_stack.top().container_nodes) {
+      construct_node->addInput(element->output());
+    }
+    construct_node->output()->setType(_info_stack.top().container_type);
+    _graph->insertNode(construct_node);
+
+    _info_stack.pop();
+
+    if (!_info_stack.empty()) {
+      ERROR_ON(_info_stack.top().elements_left < 1);
+      _info_stack.top().elements_left--;
+
+      // The container is itself an element of the previous container
+      _info_stack.top().container_nodes.push_back(construct_node);
+    } else {
+      // Store the final node for access outside the visit
+      _last_node = construct_node;
+    }
+  }
+
+  torch::jit::Graph *_graph;
+  std::stack<ListOrTupleInfo> _info_stack;
+  std::vector<torch::jit::Node *> _all_const_nodes;
+  torch::jit::Node *_last_node;
+};
+
+void handleListOrTuple(torch::jit::Graph *graph, torch::jit::Node *n,
+                       std::unordered_set<torch::jit::Node *> *to_delete) {
+  torch::jit::WithInsertPoint insert_point(n);
+
+  // Use the visitor to turn the single list/tuple constant into many
+  // constants and List/TupleConstructs.
+  ListTupleVisitor visitor(graph);
+  auto &tuple_ivalue = n->ival(c10::attr::value);
+  tuple_ivalue.visit(std::function<bool(const c10::IValue &)>(
+      std::reference_wrapper(visitor)));
+
+  // Find the very last node added and use it to replace the original node
+  auto replacement_node = visitor.getLastNode();
+  auto replacement_node_out = replacement_node->output();
+  replacement_node_out->setType(n->output()->type());
+  n->output()->replaceAllUsesWith(replacement_node_out);
+
+  // The nodes added in the visitor match those of constants not in lists/tuples
+  // *before* canonicalisation (to permit code reuse). Hence, we canonicalise
+  // in the same way.
+  for (auto prim_const : visitor.getAllConstNodes()) {
+    torch::jit::WithInsertPoint insert_point_prim_const(prim_const);
+
     // If there are NoneTypes we can skip those
     if (prim_const->output()->type() != c10::NoneType::get()) {
       if (prim_const->output()->type()->isSubtypeOf(c10::TensorType::get())) {
@@ -428,24 +566,26 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
     } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofBools())) {
       // Only known case is the result of an evaluated constexpr
       logging::LogContext ctx2("handling as bool list constant");
-      handleList(graph, node, &to_delete);
+      handleListOrTuple(graph, node, &to_delete);
     } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofFloats())) {
       // Only known case is the result of an evaluated constexpr
       logging::LogContext ctx2("handling as float list constant");
-      handleList(graph, node, &to_delete);
+      handleListOrTuple(graph, node, &to_delete);
     } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofInts())) {
       // Only known case is the result of an evaluated constexpr
       logging::LogContext ctx2("handling as int list constant");
-      handleList(graph, node, &to_delete);
+      handleListOrTuple(graph, node, &to_delete);
     } else if (node->output()->type()->isSubtypeOf(
                    c10::ListType::ofTensors())) {
       // Only known case is the result of an evaluated constexpr
       logging::LogContext ctx2("handling a tensor list constant");
-      handleList(graph, node, &to_delete);
+      handleListOrTuple(graph, node, &to_delete);
     } else if (node->output()->type()->isSubtypeOf(c10::ListType::create(
                    c10::OptionalType::create(c10::TensorType::get())))) {
       logging::LogContext ctx2("handling an optional tensor list constant");
-      handleList(graph, node, &to_delete);
+      handleListOrTuple(graph, node, &to_delete);
+    } else if (node->output()->type()->cast<c10::TupleType>()) {
+      handleListOrTuple(graph, node, &to_delete);
     } else {
       ERROR("Unsupported type " << node->output()->type()->str());
     }

@@ -24,16 +24,17 @@ namespace poptorch {
 namespace {
 
 // Mapping between the SSA values of torch jit with the ssa values of popart.
-// Each Value is either a single tensor or a tuple (Note: nested tuples are
+// Each Value is either a single tensor, tuple or list (Note: nested tuples are
 // stored flattened).
 class ValueMap {
 public:
   using TensorList = std::vector<poptorch::TensorId>;
 
   poptorch::TensorId tensor(torch::jit::Value *value) const;
-  const TensorList &tuple(torch::jit::Value *value) const;
-  // Return the list of tensors without checking if it's a tuple or a single
-  // tensor.
+  const TensorList &listTuple(torch::jit::Value *value) const;
+
+  // Return the list of tensors without checking if it's a tuple, list or a
+  // single tensor.
   const TensorList &tensors(torch::jit::Value *value) const;
 
   bool hasTensor(torch::jit::Value *value) const {
@@ -41,16 +42,18 @@ public:
   }
 
   void setTensor(torch::jit::Value *value, poptorch::TensorId id);
+  void setList(torch::jit::Value *value, const TensorList &tensors);
   void setTuple(torch::jit::Value *value, const TensorList &tensors);
 
 private:
   struct Data {
-    explicit Data(poptorch::TensorId id) : is_tuple(false) {
+    explicit Data(poptorch::TensorId id) : type(OutputElemType::Tensor) {
       tensors.push_back(id);
     }
-    explicit Data(TensorList tuple)
-        : is_tuple(true), tensors(std::move(std::move(tuple))) {}
-    bool is_tuple;
+
+    Data(TensorList tuple, OutputElemType type_)
+        : type(type_), tensors(std::move(tuple)) {}
+    OutputElemType type;
     TensorList tensors;
   };
   std::unordered_map<torch::jit::Value *, Data> _map;
@@ -60,16 +63,20 @@ poptorch::TensorId ValueMap::tensor(torch::jit::Value *value) const {
   auto it = _map.find(value);
   ERROR_ON_MSG(it == _map.end(), value->debugName()
                                      << " not found in ValueMap");
-  ERROR_ON_MSG(it->second.is_tuple, value->debugName() << " is not a tensor");
+  ERROR_ON_MSG(it->second.type != OutputElemType::Tensor,
+               value->debugName() << " is not a tensor");
   ERROR_ON(it->second.tensors.size() != 1);
   return it->second.tensors.front();
 }
 
-const ValueMap::TensorList &ValueMap::tuple(torch::jit::Value *value) const {
+const ValueMap::TensorList &
+ValueMap::listTuple(torch::jit::Value *value) const {
   auto it = _map.find(value);
   ERROR_ON_MSG(it == _map.end(), value->debugName()
                                      << " not found in ValueMap");
-  ERROR_ON_MSG(!it->second.is_tuple, value->debugName() << " is not a tuple");
+  ERROR_ON_MSG((it->second.type != OutputElemType::Tuple &&
+                it->second.type != OutputElemType::List),
+               value->debugName() << " is not a tuple or list");
   return it->second.tensors;
 }
 
@@ -85,10 +92,17 @@ void ValueMap::setTensor(torch::jit::Value *value, poptorch::TensorId id) {
                "Value " << value->debugName() << " already present in the map");
 }
 
+void ValueMap::setList(torch::jit::Value *value,
+                       const ValueMap::TensorList &tensors) {
+  ERROR_ON_MSG(!_map.emplace(value, Data(tensors, OutputElemType::List)).second,
+               "Value " << value->debugName() << " already present in the map");
+}
+
 void ValueMap::setTuple(torch::jit::Value *value,
                         const ValueMap::TensorList &tensors) {
-  ERROR_ON_MSG(!_map.emplace(value, Data(tensors)).second,
-               "Value " << value->debugName() << " already present in the map");
+  ERROR_ON_MSG(
+      !_map.emplace(value, Data(tensors, OutputElemType::Tuple)).second,
+      "Value " << value->debugName() << " already present in the map");
 }
 
 /*
@@ -383,16 +397,13 @@ void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
 void LowerToPopartImpl::lowerReturn() {
   // Used to encode the number of (actual) outputs
   _compiler.addOutputType(
-      {OutputType::Type::Tuple,
+      {OutputElemType::Tuple,
        static_cast<std::int64_t>(_inplace_op_handler->getNumNormalOutputs())});
 
-  // Recursively go through the output's type to
-  // flatten its structure.
-  // In the flat representation each 0 represent a
-  // tensor, and each non zero value represent a
-  // tuple of that size.
-  // e.g: (T0, T1, (T2, T3), T4)
-  // [ 4, 0, 0, 2, 0, 0, 0 ]
+  // Recursively go through the output's type to flatten its structure and
+  // add it to the compiler.
+  // In this representation, (T0, T1, (T2, T3), T4) would be
+  // [ Tuple3, Tensor, Tensor, Tuple2, Tensor, Tensor, Tensor]
 
   // Only lower the outputs not used for tensors modified inplace.
   size_t num_added = 0;
@@ -401,16 +412,33 @@ void LowerToPopartImpl::lowerReturn() {
   process_type = [this, &process_type, &num_added](const c10::TypePtr &type) {
     switch (type->kind()) {
     case c10::TypeKind::TensorType: {
-      _compiler.addOutputType({OutputType::Type::Tensor});
+      _compiler.addOutputType({OutputElemType::Tensor});
       break;
     }
     case c10::TypeKind::TupleType: {
-      auto tuple = type->expect<c10::TupleType>();
+      auto tuple_type = type->expect<c10::TupleType>();
       _compiler.addOutputType(
-          {OutputType::Type::Tuple,
-           static_cast<std::int64_t>(tuple->elements().size())});
-      for (const auto &elt_type : tuple->elements()) {
+          {OutputElemType::Tuple,
+           static_cast<std::int64_t>(tuple_type->elements().size())});
+      for (const auto &elt_type : tuple_type->elements()) {
         process_type(elt_type);
+      }
+      break;
+    }
+    case c10::TypeKind::ListType: {
+      // Use our custom type to find the number of tensors (lists can only be
+      // tensors as enforced by torch JIT)
+
+      // type->expect is static and always succeeds
+      auto list_type = std::dynamic_pointer_cast<ListTypeWithNumElements>(type);
+      ERROR_ON(!list_type);
+
+      _compiler.addOutputType(
+          {OutputElemType::List,
+           static_cast<std::int64_t>(list_type->numElements())});
+
+      for (size_t i = 0; i < list_type->numElements(); i++) {
+        _compiler.addOutputType({OutputElemType::Tensor});
       }
       break;
     }
@@ -432,9 +460,10 @@ void LowerToPopartImpl::lowerReturn() {
       ERROR_ON_MSG(elt_kind != c10::TypeKind::TensorType,
                    "Unsupported list type " << c10::typeKindToString(elt_kind));
       std::int64_t num_tensors = static_cast<std::int64_t>(tensors.size());
-      _compiler.addOutputType({OutputType::Type::List, num_tensors});
+      _compiler.addOutputType({OutputElemType::List, num_tensors});
+      logging::trace("List with num tensors: {}", num_tensors);
       for (std::int64_t i = 0; i < num_tensors; ++i) {
-        _compiler.addOutputType({OutputType::Type::Tensor});
+        _compiler.addOutputType({OutputElemType::Tensor});
       }
     } else {
       process_type(value->type());
@@ -455,7 +484,7 @@ void LowerToPopartImpl::lowerReturn() {
                    anchorTypeToString(anchor_mode), return_period);
 
     auto id = _compiler.createTensorId(name);
-    _compiler.addOutputType({OutputType::Type::Tensor});
+    _compiler.addOutputType({OutputElemType::Tensor});
     _compiler.addOutputTensor(id);
     _output_tensor_hooks.push_back(id);
   }
@@ -532,7 +561,7 @@ LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
 // Lower the main body of the _graph.
 void LowerToPopartImpl::lowerBody() {
   for (torch::jit::Node *node : _graph.nodes()) {
-    logging::LogContext ctx("LowerToPopartImpl::lowerBody Processing " +
+    logging::LogContext ctx("LowerToPopartImpl::lowerBody processing " +
                             nodeToString(node));
     // Switch/lookup based on the actual int value.
     const c10::Symbol kind = node->kind();
@@ -693,24 +722,26 @@ void LowerToPopartImpl::lowerBody() {
       torch::jit::Value *output = node->output();
 
       // Add the values to the value map.
-      ValueMap::TensorList tuple;
+      ValueMap::TensorList input_tensors;
       for (torch::jit::Value *ids : node->inputs()) {
         for (auto tensor : _value_map.tensors(ids)) {
-          tuple.push_back(tensor);
+          input_tensors.push_back(tensor);
         }
       }
-      _value_map.setTuple(output, tuple);
+      if (kind == c10::prim::TupleConstruct) {
+        _value_map.setTuple(output, input_tensors);
+      } else {
+        _value_map.setList(output, input_tensors);
+      }
     } else if (kind == c10::prim::TupleUnpack ||
                kind == c10::prim::ListUnpack) {
       // Get the torch jit SSA for the input/output values.
-      auto tensors = _value_map.tuple(node->input());
+      auto &tensors(_value_map.listTuple(node->input()));
       auto tensor_it = tensors.begin();
-      std::function<void(c10::TypePtr, ValueMap::TensorList &)> process_output;
-
-      // Find out how many tensors a given output consumes by walking
-      // recursively through its type.
-      process_output = [&](const c10::TypePtr &type,
-                           ValueMap::TensorList &tensorList) {
+      // As tuples may be nested, walk recursively to flatten all tensors
+      std::function<void(c10::TypePtr, ValueMap::TensorList &)> flattened_tuple;
+      flattened_tuple = [&](const c10::TypePtr &type,
+                            ValueMap::TensorList &tensorList) {
         switch (type->kind()) {
         case c10::TypeKind::TensorType: {
           ERROR_ON_MSG(tensor_it == tensors.end(),
@@ -722,7 +753,7 @@ void LowerToPopartImpl::lowerBody() {
         case c10::TypeKind::TupleType: {
           auto tuple = type->expect<c10::TupleType>();
           for (const auto &elt_type : tuple->elements()) {
-            process_output(elt_type, tensorList);
+            flattened_tuple(elt_type, tensorList);
           }
           break;
         }
@@ -730,16 +761,19 @@ void LowerToPopartImpl::lowerBody() {
           ERROR("Unsupported type '" << c10::typeKindToString(type->kind()));
         }
       };
+
       for (auto output : node->outputs()) {
-        ValueMap::TensorList tensor_list;
-        process_output(output->type(), tensor_list);
         switch (output->type()->kind()) {
         case c10::TypeKind::TensorType: {
-          ERROR_ON(tensor_list.size() != 1);
-          _value_map.setTensor(output, tensor_list.front());
+          ERROR_ON(tensor_it == tensors.end());
+          _value_map.setTensor(output, *tensor_it);
+          tensor_it++;
           break;
         }
+        case c10::TypeKind::ListType: // (should only have TensorType)
         case c10::TypeKind::TupleType: {
+          ValueMap::TensorList tensor_list;
+          flattened_tuple(output->type(), tensor_list);
           _value_map.setTuple(output, tensor_list);
           break;
         }

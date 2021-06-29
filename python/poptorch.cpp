@@ -808,11 +808,22 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   logGraph("Graph before handling inplace ops:", *graph, has_converted_any_half,
            input_tensors);
+
+  // Ensure that list elements have the ListTypeWithNumElements type which
+  // contains the number of elements in a list
+  poptorch::type_and_constant_canonicalization::addListNumElements(graph.get());
+
   auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
       graph, traced_parameter_tensors.size(), anchors.size());
 
+  // Any types with ListTypeWithNumElements must be revereted (revert = true)
+  // to allow constant evaluation to proceed
+  poptorch::type_and_constant_canonicalization::addListNumElements(graph.get(),
+                                                                   true);
+
   logGraph("Graph right before evaluating constant expressions:", *graph,
            has_converted_any_half, input_tensors);
+
   poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
 
   logGraph("Graph right before casting making integer params as constant "
@@ -836,6 +847,11 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
            has_converted_any_half, input_tensors);
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
       graph.get());
+
+  // After constant canonicalisation, it is safe to ensure that list have
+  // ListTypeWithNumElements once again, plus the last step will have added
+  // new list constructs.
+  poptorch::type_and_constant_canonicalization::addListNumElements(graph.get());
 
   // Convert the IR to half to match the inputs/actual usage.
   logGraph("Graph before canonicalising half:", *graph, has_converted_any_half,
@@ -1001,14 +1017,14 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     process_output = [&]() -> pybind11::object { // NOLINT
       ERROR_ON_MSG(type_it == output_types.end(), "Invalid OutputTypes object");
       switch (type_it->type) {
-      case OutputType::Type::Tensor: {
+      case OutputElemType::Tensor: {
         ERROR_ON_MSG(tensor_it == output_tensors.end(),
                      "Not enough tensors to unpack");
         auto object = torch::jit::toPyObject(*tensor_it);
         tensor_it++;
         return object;
       }
-      case OutputType::Type::Tuple: {
+      case OutputElemType::Tuple: {
         std::int64_t num_elements = type_it->num_elements;
         pybind11::tuple pytuple(num_elements);
         for (std::int64_t i = 0; i < num_elements; ++i) {
@@ -1017,7 +1033,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
         }
         return std::move(pytuple);
       }
-      case OutputType::Type::List: {
+      case OutputElemType::List: {
         std::int64_t num_elements = type_it->num_elements;
         pybind11::list pylist(num_elements);
         for (std::int64_t i = 0; i < num_elements; ++i) {

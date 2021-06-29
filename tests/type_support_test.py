@@ -245,3 +245,36 @@ def test_int8_return(input_type):
 
     assert output.dtype == input_type
     helpers.assert_allequal(actual=output, expected=input)
+
+
+def test_tuple_and_list_constant():
+    const1 = torch.tensor([1., 2.])
+    const2 = torch.tensor([3., 4.])
+
+    class Model(torch.nn.Module):
+        def forward(self):
+            return torch.tensor(1), const1 + const2, [const1, const2]
+
+    model = Model()
+    inference_model = poptorch.inferenceModel(model)
+
+    poptorch_out = inference_model()
+    native = model()
+    helpers.assert_allclose(actual=poptorch_out, expected=native)
+
+
+def test_tuple_and_list_constant_double_nested():
+    const1 = torch.tensor([1., 2.])
+    const2 = torch.tensor([3., 4.])
+
+    class Model(torch.nn.Module):
+        def forward(self):
+            return ([torch.tensor(1)], const1 + const2,
+                    ([const1, const2], [const1, const2]), const2)
+
+    model = Model()
+    inference_model = poptorch.inferenceModel(model)
+
+    poptorch_out = inference_model()
+    native = model()
+    helpers.assert_allclose(actual=poptorch_out, expected=native)

@@ -24,6 +24,12 @@ struct Node;
 namespace poptorch {
 namespace type_and_constant_canonicalization {
 
+// Add the number of elements of the list to the type by replacing it with
+// ListTypeWithNumElements instances. The PyTorch ListType does not contain
+// the number of elements. If revert is "true", reverts all such types to the
+// original ListType.
+void addListNumElements(torch::jit::Graph *graph, bool revert = false);
+
 void evaluateConstexprs(torch::jit::Graph *graph);
 
 void makeConstantIntParams(
