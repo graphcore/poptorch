@@ -872,6 +872,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   if (training) {
     poptorch::removeSurplusIdentityLosses(graph.get());
     poptorch::addDetachOperations(graph.get());
+    logging::trace("Graph right after add detach operations:\n{}", *graph);
   }
 
   // Warn the user if any operations couldn't be canonicalised.

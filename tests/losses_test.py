@@ -446,7 +446,6 @@ def test_TripletMarginLoss(p, swap, reduction):
     loss_harness(F.triplet_margin_loss, [anchor, positive, negative],
                  None,
                  reduction,
-                 training=False,
                  margin=margin.item(),
                  p=p,
                  swap=swap)
