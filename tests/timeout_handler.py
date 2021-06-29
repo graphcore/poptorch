@@ -30,15 +30,19 @@ timeout = int(os.environ.get("POPTORCH_TEST_TIMEOUT", "1000")) - 60
 # Run the command passed
 with subprocess.Popen(sys.argv[1:]) as p:
     try:
+        print("Setting timeout to %d seconds" % timeout, flush=True)
         p.wait(timeout=timeout)
     except subprocess.TimeoutExpired as e:
+        print("Timeout after %d seconds" % timeout, flush=True)
         # Timeout: send an abort signal to generate a core dump
         p.send_signal(signal.SIGABRT)
+        print("Waiting for aborted process...")
         # Wait for the process to exit cleanly
         p.wait()
         # Signal to ctest it was a timeout
         print("TEST_TIMEOUT", flush=True)
         # give ctest some time to process the timeout
-        time.sleep(10)
+        time.sleep(60)
+        print("ERROR: Shouldn't have reached this point", flush=True)
         # Note: in theory ctest should kill this process 1 second after TEST_TIMEOUT was printed.
     sys.exit(p.returncode)
