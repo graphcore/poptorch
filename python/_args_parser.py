@@ -82,10 +82,10 @@ class ArgsParser:
         self._defaults = [p.default for p in sig.parameters.values()]
         self._warned_not_contiguous_input = False
 
-    def __call__(self, args, kwargs):
-        """Calls the wrapped model with the given tensors. Inputs must be
-        tensors or tuples/lists of tensors.
-        Will compile for IPU on the first invocation.
+    def __call__(self, args, kwargs, fast_path=False):
+        """Checks the inputs are of a supported type. Inputs must be
+           tensors or tuples/lists of tensors. Will convert list to tuples
+           as we can't natively support lists in the JIT.
         """
         in_tensors = ArgsParser.Args()
         assert self._has_variadic_arguments or len(args) + len(kwargs) <= len(
@@ -104,8 +104,21 @@ class ArgsParser:
 
         for i, name in enumerate(self._varnames):
             if i < len(args):
-                self._errorOnListOrDict(args[i], name, [])
-                in_tensors._args.append(args[i])
+                has_list = self._errorOnDictReturnTrueIfList(args[i], name, [])
+
+                # Non fast path for compilation, fast path for executing.
+                if not fast_path:
+                    if has_list:
+                        logger.warning(
+                            """Lists as inputs only have partial support, they
+                            can be accessed but full Python functionality is
+                            not enabled. Consider changing input to tuple.""")
+
+                    data = self._convertLists(args[i])
+                    in_tensors._args.append(data)
+                else:
+                    in_tensors._args.append(args[i])
+
                 assert name not in kwargs, ("Parameter %s was passed more "
                                             "than once") % name
             elif name in kwargs:
@@ -113,7 +126,18 @@ class ArgsParser:
                     "Torch doesn't support passing tensors (%s)"
                     " after the following parameters have defaulted to None."
                     " %s") % (name, ", ".join(none_passed))
-                self._errorOnListOrDict(kwargs[name], name, [])
+                has_list = self._errorOnDictReturnTrueIfList(
+                    kwargs[name], name, [])
+
+                # Non fast path for compilation, fast path for executing.
+                if not fast_path:
+                    if has_list:
+                        logger.warning(
+                            """Lists as inputs only have partial support, they
+                            can be accessed but full Python functionality is
+                            not enabled. Consider changing input to tuple.""")
+                    kwargs[name] = self._convertLists(kwargs[name])
+
                 in_tensors._args.append(kwargs[name])
             else:
                 assert i >= first_optional, ("Mandatory parameter %s "
@@ -157,14 +181,29 @@ class ArgsParser:
 
         return in_tensors
 
-    def _errorOnListOrDict(self, data, arg_name, stack_list):
-        if isinstance(data, (tuple)):
+    def _convertLists(self, input):
+        if isinstance(input, (tuple, list)):
+            new_tuple = []
+            for _, data in enumerate(input):
+                new_tuple.append(self._convertLists(data))
+
+            return tuple(new_tuple)
+
+        return input
+
+    def _errorOnDictReturnTrueIfList(self, data, arg_name, stack_list):
+        has_list = False
+        if isinstance(data, (tuple, list)):
             for idx, d in enumerate(data):
                 stack_list.append(idx)
-                self._errorOnListOrDict(d, arg_name, stack_list)
+                has_list &= self._errorOnDictReturnTrueIfList(
+                    d, arg_name, stack_list)
                 stack_list.pop()
 
-        if isinstance(data, (dict, list)):
+            if isinstance(data, list):
+                has_list = True
+
+        if isinstance(data, (dict)):
             stack_list = [str(s) for s in stack_list]
             end_msg = arg_name
             if stack_list:
@@ -175,8 +214,4 @@ class ArgsParser:
             raise TypeError(
                 "Dictionaries are not supported as input arguments,"
                 " including when nested in tuples.\nReceived dict " + end_msg)
-
-        if isinstance(data, list):
-            raise TypeError(
-                "Lists are not supported as input arguments,"
-                " including when nested in tuples.\nReceived list " + end_msg)
+        return has_list

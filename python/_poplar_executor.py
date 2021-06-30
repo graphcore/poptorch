@@ -470,7 +470,7 @@ class PoplarExecutor:
         To precompile and save to file use
         :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
         """
-        in_tensors = self._args_parser(args, kwargs)
+        in_tensors = self._args_parser(args, kwargs, False)
         if self._executable is not None:
             logger.warning(
                 "Call to compile() ignored: the executable is already compiled"
@@ -521,7 +521,7 @@ class PoplarExecutor:
             before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
             to restore the executable.
         """
-        in_tensors = self._args_parser(args, kwargs)
+        in_tensors = self._args_parser(args, kwargs, False)
         dst_dir = os.path.dirname(filename)
         if dst_dir:
             if os.path.exists(dst_dir):
@@ -572,7 +572,9 @@ class PoplarExecutor:
             "Trying to run a model on an offline device "
             "(ConnectionType.Never): use model.compile(inputs) instead of"
             " model(inputs)")
-        in_tensors = self._args_parser(args, kwargs)
+
+        # If it is compiled we take the fast path, if not we convert lists to tuples.
+        in_tensors = self._args_parser(args, kwargs, self.isCompiled())
 
         if not self.isCompiled():
             self._compile(in_tensors)

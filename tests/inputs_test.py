@@ -60,7 +60,8 @@ def test_type_change():
 
 
 @pytest.mark.parametrize("use_half", [True, False])
-def test_nested_tuples(use_half):
+@pytest.mark.parametrize("thing_to_test", ['List', 'Tuple', 'Mixed'])
+def test_nested_tuples_and_lists(use_half, thing_to_test):
     class SimpleAdder(nn.Module):
         def forward(self, tpl1, t2, tpl34567):
             (t1, ) = tpl1
@@ -98,8 +99,18 @@ def test_nested_tuples(use_half):
         t5 = t5.half()
         t6 = t6.half()
         t7 = t7.half()
-    assert inference_model((t1, ), t2,
-                           (t3, (t4, t5), (t6, t7))).float() == 28.0
+
+    if thing_to_test == "List":
+        assert inference_model([
+            t1,
+        ], t2, [t3, [t4, t5], [t6, t7]]).float() == 28.0
+    elif thing_to_test == "Tuple":
+        assert inference_model((t1, ), t2,
+                               (t3, (t4, t5), (t6, t7))).float() == 28.0
+    else:
+        assert inference_model([
+            t1,
+        ], t2, [t3, (t4, t5), [t6, t7]]).float() == 28.0
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -158,6 +169,11 @@ def test_list_inputs(use_half):
 
     assert [t.float() for t in inference_model(t1, t2, t3)] == expected
 
+    # Call multiple times to check the fast path works
+    assert [t.float() for t in inference_model(t1, t2, t3)] == expected
+    assert [t.float() for t in inference_model(t1, t2, t3)] == expected
+    assert [t.float() for t in inference_model(t1, t2, t3)] == expected
+
 
 def test_unused_tuple():
     class SimpleAdder(nn.Module):
@@ -170,55 +186,6 @@ def test_unused_tuple():
     t2 = torch.tensor([2.])
     z = (torch.tensor([1.]), torch.tensor([1.]))
     inference_model(t1, t2, z)
-
-
-def test_input_plain_list():
-    model = torch.nn.ReLU()
-    inference_model = poptorch.inferenceModel(model)
-
-    with pytest.raises(TypeError) as excinfo:
-        inference_model([torch.tensor([1])])
-
-    assert (str(
-        excinfo.value) == "Lists are not supported as input arguments, "
-            "including when nested in tuples.\n"
-            "Received list input = [tensor([1])]")
-
-
-def test_input_nested_list():
-    model = torch.nn.ReLU()
-    inference_model = poptorch.inferenceModel(model)
-
-    with pytest.raises(TypeError) as excinfo:
-        inference_model((torch.tensor([1]), torch.tensor([2]),
-                         (torch.tensor([3]), [torch.tensor([4])],
-                          torch.tensor([5])), torch.tensor([6])))
-
-    assert (str(
-        excinfo.value) == "Lists are not supported as input arguments, "
-            "including when nested in tuples.\n"
-            "Received list input[2][1] = [tensor([4])]")
-
-
-def test_input_three_agg_nested_list():
-    class ThreeIdentity(nn.Module):
-        def forward(self, x, y, z):
-            return x, y, z
-
-    model = ThreeIdentity()
-    inference_model = poptorch.inferenceModel(model)
-
-    with pytest.raises(TypeError) as excinfo:
-        inference_model(torch.tensor([0]),
-                        (torch.tensor([1]), torch.tensor([2]),
-                         (torch.tensor([3]), [torch.tensor(
-                             [4])], torch.tensor([5])), torch.tensor([6])),
-                        torch.tensor([7]))
-
-    assert (str(
-        excinfo.value) == "Lists are not supported as input arguments, "
-            "including when nested in tuples.\n"
-            "Received list y[2][1] = [tensor([4])]")
 
 
 def test_input_plain_dict():

@@ -162,6 +162,8 @@ void processInput(torch::jit::Graph *graph, torch::jit::Value *input,
              input->node()->kind() != c10::prim::TupleUnpack);
     tensors->push_back(input);
     break;
+
+  case c10::TypeKind::ListType: // Fallthrough.
   case c10::TypeKind::TupleType: {
     // Find the TupleUnpack node
     if (input->hasUses()) {
