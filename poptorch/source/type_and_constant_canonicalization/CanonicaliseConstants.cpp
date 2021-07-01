@@ -20,7 +20,34 @@ namespace poptorch {
 namespace type_and_constant_canonicalization {
 namespace {
 
-bool isHostSideNode(torch::jit::Node *n) {
+// Returns true for node kinds which change compiler state. These need to be
+// removed for any host side tensors but otherwise does not make connected
+// node a PopART only node.
+bool compilerStateChangingKind(const torch::jit::NodeKind &kind) {
+  return (kind == symbols::poptorch::begin_ipu_block ||
+          kind == symbols::poptorch::end_ipu_block ||
+          kind == symbols::poptorch::set_available_memory ||
+          kind == symbols::poptorch::set_matmul_serialization);
+}
+
+bool popartOnlyNode(const torch::jit::NodeKind &kind) {
+  return (!compilerStateChangingKind(kind) && kind != c10::prim::Constant &&
+          kind != c10::prim::TupleConstruct &&
+          kind != c10::prim::ListConstruct && kind != c10::prim::TupleUnpack &&
+          kind != c10::prim::ListUnpack);
+}
+
+// Check whether the node is (eventually) used host side, IPU or both
+UseOfNode getUseOfNode(torch::jit::Node *n) {
+  // Check the kind of the node itself (for when not called on a constant)
+  if (popartOnlyNode(n->kind())) {
+    return UseOfNode::PopARTOnly;
+  }
+
+  bool popart_use = false;
+  bool host_use = false;
+
+  // Check all outputs
   std::vector<torch::jit::Node *> to_check;
   to_check.push_back(n);
   while (!to_check.empty()) {
@@ -29,26 +56,42 @@ bool isHostSideNode(torch::jit::Node *n) {
     for (auto output : cur_node->outputs()) {
       for (auto use : output->uses()) {
         auto use_kind = use.user->kind();
-        if (use_kind != c10::prim::Return &&
-            use_kind != symbols::poptorch::set_available_memory &&
-            use_kind != symbols::poptorch::set_matmul_serialization &&
-            use_kind != c10::prim::TupleConstruct &&
-            use_kind != c10::prim::ListConstruct &&
-            use_kind != c10::prim::TupleUnpack &&
-            use_kind != c10::prim::ListUnpack) {
-          return false;
+        if (use_kind == c10::prim::Return) {
+          // This must be host use as we have not reached an op which would be
+          // run on popart yet.
+          host_use = true;
+        } else if (popartOnlyNode(use_kind)) {
+          popart_use = true;
+        } else {
+          // We only need to check the node further if it is neither returned
+          // nor used by a Popart op
+          to_check.push_back(use.user);
         }
-        to_check.push_back(use.user);
       }
     }
   }
-  return true;
+
+  if (!host_use && !popart_use) {
+    // Some nodes such as begin_ipu_block will simply remove the tensor so make
+    // it a default tensor_constant for simplicity.
+    return UseOfNode::PopARTOnly;
+  }
+
+  if (host_use && popart_use) {
+    return UseOfNode::HostSideAndPopART;
+  }
+  if (host_use) {
+    return UseOfNode::HostSideOnly;
+  }
+  return UseOfNode::PopARTOnly;
 }
 
 void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
                                const at::Tensor &t) {
+  ERROR_ON(n->kind() != c10::prim::Constant);
+
   torch::jit::WithInsertPoint insert_point(n);
-  auto new_node = tensorToConstant(graph, t, isHostSideNode(n));
+  auto new_node = tensorToConstant(graph, t, getUseOfNode(n));
 
   // Due to tracing ambiguity, a float tensor here could be either float or half
   auto new_type = new_node->output()->type()->expect<c10::TensorType>();
@@ -223,6 +266,130 @@ void handleList(torch::jit::Graph *graph, torch::jit::Node *n,
   }
 }
 
+void recursivelySelectHostAndIPUSideConstants(
+    torch::jit::Node *node_to_process, torch::jit::Node *host_side_replacement,
+    torch::jit::Node *ipu_side_replacement,
+    std::unordered_set<torch::jit::Node *> *to_delete) {
+  for (size_t output_idx = 0; output_idx < node_to_process->outputs().size();
+       output_idx++) {
+    auto output = node_to_process->output(output_idx);
+
+    while (!output->uses().empty()) {
+      auto use = output->uses()[0];
+      switch (getUseOfNode(use.user)) {
+      case UseOfNode::HostSideOnly:
+        use.user->replaceInput(use.offset,
+                               host_side_replacement->output(output_idx));
+        break;
+      case UseOfNode::PopARTOnly:
+        use.user->replaceInput(use.offset,
+                               ipu_side_replacement->output(output_idx));
+        break;
+      case UseOfNode::HostSideAndPopART:
+        auto graph = use.user->owningGraph();
+        torch::jit::WithInsertPoint insert_point(use.user);
+
+        auto same_value = [](torch::jit::Value *value) { return value; };
+
+        auto host_side_node = graph->createClone(use.user, same_value);
+        host_side_node->replaceInput(use.offset,
+                                     host_side_replacement->output(output_idx));
+        graph->insertNode(host_side_node);
+
+        auto ipu_side_node = graph->createClone(use.user, same_value);
+        ipu_side_node->replaceInput(use.offset,
+                                    ipu_side_replacement->output(output_idx));
+        graph->insertNode(ipu_side_node);
+
+        recursivelySelectHostAndIPUSideConstants(use.user, host_side_node,
+                                                 ipu_side_node, to_delete);
+
+        to_delete->insert(use.user);
+
+        // Prevent further cloning
+        while (!use.user->inputs().empty()) {
+          use.user->removeInput(0);
+        }
+        break;
+      }
+    }
+  }
+}
+
+// Find any host_and_ipu_side_tensor_constant constants and perform the
+// neccessary splitting
+void rectifyHostAndIPUSideConstants(
+    torch::jit::Graph *graph,
+    std::unordered_set<torch::jit::Node *> *to_delete) {
+  for (auto node : graph->nodes()) {
+    logging::LogContext ctx("rectifyHostAndIPUSideConstants processing " +
+                            nodeToString(node));
+
+    if (node->kind() != symbols::poptorch::host_and_ipu_side_tensor_constant) {
+      continue;
+    }
+
+    // Create two new nodes
+    auto t = node->t(c10::attr::value);
+    torch::jit::WithInsertPoint insert_point(node);
+
+    torch::jit::Node *host_side_node = createAndInsertNode(
+        graph, symbols::poptorch::host_side_tensor_constant);
+    host_side_node->output()->inferTypeFrom(t);
+    host_side_node->t_(c10::attr::value, t);
+
+    torch::jit::Node *ipu_node =
+        createAndInsertNode(graph, symbols::poptorch::tensor_constant);
+    ipu_node->output()->inferTypeFrom(t);
+    ipu_node->t_(c10::attr::value, t);
+
+    recursivelySelectHostAndIPUSideConstants(node, host_side_node, ipu_node,
+                                             to_delete);
+
+    to_delete->insert(node);
+  }
+}
+
+void removeStateChangingNodesFromHostSideBranch(
+    torch::jit::Graph *graph,
+    std::unordered_set<torch::jit::Node *> *to_delete) {
+  for (auto node : graph->nodes()) {
+    logging::LogContext ctx("removeStateChangingNodesFromHostSideBranch"
+                            "processsing " +
+                            nodeToString(node));
+    if (node->kind() != symbols::poptorch::host_side_tensor_constant) {
+      continue;
+    }
+
+    std::vector<torch::jit::Node *> to_process;
+    to_process.push_back(node);
+    while (!to_process.empty()) {
+      auto cur_node = to_process.back();
+      to_process.pop_back();
+
+      auto outputs = cur_node->outputs();
+      for (auto output : outputs) {
+        for (auto use : output->uses()) {
+          to_process.push_back(use.user);
+        }
+      }
+
+      if (!compilerStateChangingKind(cur_node->kind())) {
+        continue;
+      }
+
+      // The number of outputs may be less e.g. begin_ipu_block, but otherwise
+      // any output to be replaced must match the input for this to work.
+      for (size_t output_idx = 0; output_idx < cur_node->outputs().size();
+           output_idx++) {
+        cur_node->output(output_idx)
+            ->replaceAllUsesWith(cur_node->input(output_idx));
+      }
+
+      to_delete->insert(cur_node);
+    }
+  }
+}
 } // namespace
 
 void canonicaliseConstants(torch::jit::Graph *graph) {
@@ -285,6 +452,14 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
 
     to_delete.insert(*it);
   }
+  searchAndPossiblyDestroy(to_delete);
+  to_delete.clear();
+
+  rectifyHostAndIPUSideConstants(graph, &to_delete);
+  searchAndPossiblyDestroy(to_delete);
+
+  to_delete.clear();
+  removeStateChangingNodesFromHostSideBranch(graph, &to_delete);
   searchAndPossiblyDestroy(to_delete);
 }
 

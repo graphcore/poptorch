@@ -395,3 +395,37 @@ def test_no_but_one_buffer():
 
     assert poptorch_model() == 2.
     assert poptorch_model() == 2.
+
+
+def test_return_and_use_input():
+    class Model(torch.nn.Module):
+        def forward(self, input):
+            c = torch.tensor([1.])
+            return c, input + c
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+    assert poptorch_model(torch.tensor([0.])) == (torch.tensor([1.]),
+                                                  torch.tensor([1.]))
+    assert poptorch_model(torch.tensor([1.])) == (torch.tensor([1.]),
+                                                  torch.tensor([2.]))
+
+
+def test_return_and_use_nested_input():
+    class Model(torch.nn.Module):
+        def forward(self, input):
+            c = torch.tensor([1.])
+
+            c = poptorch.set_available_memory(c, 0.1)
+            c = poptorch.set_available_memory(c, 0.2)
+
+            return c, (c, input + c)
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+    assert poptorch_model(torch.tensor([0.])) == (torch.tensor([1.]),
+                                                  (torch.tensor([1.]),
+                                                   torch.tensor([1.])))
+    assert poptorch_model(torch.tensor([1.])) == (torch.tensor([1.]),
+                                                  (torch.tensor([1.]),
+                                                   torch.tensor([2.])))

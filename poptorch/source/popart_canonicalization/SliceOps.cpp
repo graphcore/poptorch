@@ -134,7 +134,7 @@ void resolveCastConstants(torch::jit::Graph *graph, torch::jit::Node *node) {
 
     // Replace node to avoid a cast
     torch::jit::WithInsertPoint insert_point(node);
-    auto replacement_node = tensorToConstant(graph, tensor, false);
+    auto replacement_node = tensorToConstant(graph, tensor);
     cast_node->output()->replaceAllUsesWith(replacement_node->output());
 
     markNodeForDeletion(cast_node);
