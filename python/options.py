@@ -385,6 +385,11 @@ class _PopartOptions:
         self.options[key] = value
         return self
 
+    def setEngineOptions(self, engine_options: Dict[str, str]
+                         ) -> "poptorch.options._PopartOptions":
+        self.set('engineOptions', engine_options)
+        return self
+
     def setPatterns(self, patterns: Dict[str, bool],
                     level: int = 2) -> "poptorch.options._PopartOptions":
         """Override the default patterns of PopART's compiler.
@@ -1478,6 +1483,30 @@ class Options(_options_impl.OptionsDict):
             * False: Do not enable IPU cycle count logging.
         """
         self._Popart.set("instrumentWithHardwareCycleCounter", log_cycle_count)
+        return self
+
+    def enableProfiling(self, profile_dir: Optional[str] = None
+                        ) -> "poptorch.Options":
+        """Enable profiling report generation.
+
+        :param str profile_dir: path to directory where report will be created.
+            Defaults to current directory.
+        """
+        env_engine_opts = os.getenv('POPLAR_ENGINE_OPTIONS', default='')
+        env_override = ('debug.allowOutOfMemory' in env_engine_opts) or \
+                       ('autoReport.directory' in env_engine_opts) or \
+                       ('autoReport.all' in env_engine_opts)
+
+        if env_override:
+            logger.warning(
+                'Profiling setting overriden by environment variable. '
+                'Check content of POPLAR_ENGINE_OPTIONS.')
+
+        opts = self._popart.options.get('engineOptions', {})
+        opts['debug.allowOutOfMemory'] = 'true'
+        opts['autoReport.directory'] = profile_dir or '.'
+        opts['autoReport.all'] = 'true'
+        self._popart.setEngineOptions(opts)
         return self
 
     def toDict(self) -> Dict[str, Any]:

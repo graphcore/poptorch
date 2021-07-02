@@ -4,6 +4,7 @@ import unittest.mock
 
 import tempfile
 import os
+import threading
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -418,3 +419,21 @@ def test_log_cycle_count(capfd):
 
     log = LogChecker(capfd)
     log.validate()
+
+
+def test_profile_report():
+    def test(dirname):
+        model = torch.nn.Linear(100, 100)
+        opts = poptorch.Options()
+        opts.enableProfiling(dirname)
+
+        poptorch_model = poptorch.inferenceModel(model, opts)
+        x = torch.randn(100, 100)
+        poptorch_model(x)
+
+    dirname = tempfile.mkdtemp()
+    x = threading.Thread(target=test, args=(dirname, ))
+    x.start()
+    x.join()
+
+    assert os.path.exists(dirname + '/profile.pop')
