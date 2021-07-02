@@ -7,7 +7,14 @@ import re
 import requests
 
 DOC_FOLDER = "../docs/user_guide"
-URL_PATTERN = re.compile(r"`[^<]+\<http[^>]+\>`_")
+URL_PATTERN = re.compile(r"\bhttps?:[^\s>]+")
+
+# URLs which don't exist yet (e.g documentation for a future release) can be
+# added to the list of exceptions below.
+#
+# Make sure to add a TODO(TXXXX) comment to remove the exception once the link
+# is fixed.
+EXCEPTIONS = []
 
 
 def get_all_links_from_file(rst_file_name):
@@ -21,8 +28,7 @@ def get_all_links_from_file(rst_file_name):
         for line in rst_file:
             matches = URL_PATTERN.findall(line)
             for match in matches:
-                url = match.split("<")[1].split(">")[0]
-                all_links.append(url)
+                all_links.append(match)
 
     return all_links
 
@@ -47,7 +53,8 @@ def assert_url_works(url):
     else:
         # Allow any non 4xx status code, as other failures could be temporary
         # and break the CI tests.
-        assert r.status_code < 400 or r.status_code >= 500
+        assert r.status_code < 400 or r.status_code >= 500, (
+            f"{url}: {message} ({code})")
         print()
 
 
@@ -59,6 +66,9 @@ def test_all_links():
         for url in get_all_links_from_file(rst_file):
             try:
                 assert_url_works(url)
-            except AssertionError:  # FIXME: Silently ignore missing links for now.
-                pass
+            except AssertionError as e:
+                if url in EXCEPTIONS:
+                    print(f"{url} found in exceptions: ignoring {e}")
+                else:
+                    raise
         print()
