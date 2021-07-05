@@ -8,7 +8,7 @@ import helpers
 
 non_differentiable_ops = [
     torch.ceil, torch.floor, torch.round, torch.sign, torch.trunc,
-    torch.argmax, torch.argmin, torch.remainder
+    torch.argmax, torch.argmin, torch.remainder, torch.floor_divide
 ]
 
 
