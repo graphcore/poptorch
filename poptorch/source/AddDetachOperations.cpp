@@ -15,8 +15,8 @@ namespace {
 std::map<torch::jit::Value *, torch::jit::Value *> detached_values;
 std::set<torch::jit::Node *> visited_nodes;
 
-torch::jit::Value *detachedValue(torch::jit::Graph *graph,
-                                 torch::jit::Value *value) {
+torch::jit::Value *possiblyDetachedValue(torch::jit::Graph *graph,
+                                         torch::jit::Value *value) {
   auto producer = value->node();
   auto producer_kind = producer->kind();
 
@@ -50,11 +50,24 @@ void maybeInsertDetachOp(torch::jit::Graph *graph, torch::jit::Node *node) {
   visited_nodes.insert(node);
 
   for (torch::jit::Value *input : node->inputs()) {
-    auto detach = detachedValue(graph, input);
-    if (input != detach) {
-      node->replaceInputWith(input, detach);
+    auto detach = possiblyDetachedValue(graph, input);
+    if (input == detach) {
+      maybeInsertDetachOp(graph, input->node());
     }
-    maybeInsertDetachOp(graph, input->node());
+  }
+}
+
+void replaceDetachedValues(torch::jit::Node *node) {
+  for (torch::jit::Value *input : node->inputs()) {
+    if (node->kind() != symbols::popart::detach) {
+      // Don't replace detach node inputs as that results in an invalid graph,
+      // i.e. %1 = detach(%1).
+      auto it = detached_values.find(input);
+      if (it != detached_values.end()) {
+        node->replaceInputWith(input, it->second);
+      }
+    }
+    replaceDetachedValues(input->node());
   }
 }
 
@@ -71,8 +84,9 @@ void addDetachOperations(torch::jit::Graph *graph) {
     detached_values.insert({input, input});
   }
 
-  // Process the graph recursively and replace the uses at the end.
+  // Process the graph recursively and replace the values at the end.
   maybeInsertDetachOp(graph, graph->return_node());
+  replaceDetachedValues(graph->return_node());
 }
 
 } // namespace poptorch

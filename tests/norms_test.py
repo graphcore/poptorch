@@ -85,9 +85,6 @@ def test_batchNorm_eval_during_training():
     # Run on IPU.
     ipu_model = poptorch.trainingModel(model)
     poptorch_out, _ = ipu_model(input, target)
-    # TODO: T38684
-    # Implicit copy only happens when we touch the params so copy explicitly.
-    ipu_model.copyWeightsToHost()
 
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
     helpers.assert_allequal(actual=model.bn.running_mean,
