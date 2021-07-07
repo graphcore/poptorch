@@ -59,13 +59,14 @@ void maybeInsertDetachOp(torch::jit::Graph *graph, torch::jit::Node *node) {
 
 void replaceDetachedValues(torch::jit::Node *node) {
   for (torch::jit::Value *input : node->inputs()) {
-    if (node->kind() != symbols::popart::detach) {
-      // Don't replace detach node inputs as that results in an invalid graph,
-      // i.e. %1 = detach(%1).
-      auto it = detached_values.find(input);
-      if (it != detached_values.end()) {
-        node->replaceInputWith(input, it->second);
+    auto it = detached_values.find(input);
+    if (it != detached_values.end()) {
+      if (node->kind() == symbols::popart::detach) {
+        // Only replace values (with their detached counterparts) that exist
+        // after the detach node that generated the detached value.
+        return;
       }
+      node->replaceInputWith(input, it->second);
     }
     replaceDetachedValues(input->node());
   }
