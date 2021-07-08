@@ -9,9 +9,10 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
-#include "poptorch/TypeAndConstantCanonicalization.hpp"
+#include "../PoptorchSymbols.hpp"
 
 namespace poptorch {
 namespace type_and_constant_canonicalization {
@@ -35,9 +36,10 @@ void warnNonNativeSupport(torch::jit::Node *node,
       node->kind() == c10::aten::expand_as ||
       node->kind() == c10::aten::flatten || node->kind() == c10::aten::ones ||
       node->kind() == c10::aten::ones || node->kind() == c10::aten::permute ||
-      node->kind() == c10::aten::reshape || node->kind() == c10::aten::select ||
-      node->kind() == c10::aten::slice || node->kind() == c10::aten::split ||
-      node->kind() == c10::aten::stack || node->kind() == c10::aten::squeeze ||
+      node->kind() == c10::aten::reshape || node->kind() == c10::aten::roll ||
+      node->kind() == c10::aten::select || node->kind() == c10::aten::slice ||
+      node->kind() == c10::aten::split || node->kind() == c10::aten::stack ||
+      node->kind() == c10::aten::squeeze ||
       node->kind() == c10::aten::transpose ||
       node->kind() == c10::aten::unsqueeze ||
       node->kind() == c10::aten::upsample_nearest1d ||
