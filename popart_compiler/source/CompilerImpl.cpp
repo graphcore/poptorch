@@ -16,6 +16,7 @@
 #include <popart/popx/devicex.hpp>
 #include <popart/popx/devicexmanager.hpp>
 #include <popart/session.hpp>
+#include <popart/sgd.hpp>
 #include <popart/tensorinfo.hpp>
 #include <popart/tensors.hpp>
 
