@@ -96,9 +96,25 @@ void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
 
     auto replacement = static_cast<int>(replacement_dtype);
     auto input = node->input(dtype_index)->node();
-    logging::warn("Replacing {} with {} for {}", input->i(c10::attr::value),
-                  replacement, nodeToString(input));
-    input->i_(c10::attr::value, replacement);
+
+    if (node->input(dtype_index)->uses().size() == 1) {
+      // Type constant is only used once, change its value
+      input->i_(c10::attr::value, replacement);
+    } else {
+      // Create a new constant as the constant is used elsewhere
+      auto no_inputs = [](torch::jit::Value *value) {
+        ERROR("A constant should have no inputs");
+        return value; // ensures correct output type
+      };
+      auto new_type_const = node->owningGraph()->createClone(input, no_inputs);
+      new_type_const->i_(c10::attr::value, replacement);
+      node->replaceInput(dtype_index, new_type_const->output());
+      new_type_const->insertBefore(node);
+    }
+
+    logging::info("Replacing cast to {} with cast to {} for {}",
+                  c10::toString(unsupported_dtype),
+                  c10::toString(replacement_dtype), nodeToString(node));
   }
 }
 
