@@ -49,9 +49,7 @@ torch::jit::Node *featureDropoutHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::feature_dropout, featureDropoutHandler);
-  registerHandler(c10::aten::feature_dropout_, featureDropoutHandler);
   registerHandler(c10::aten::dropout, dropoutHandler);
-  registerHandler(c10::aten::dropout_, dropoutHandler);
 }
 
 } // namespace poptorch

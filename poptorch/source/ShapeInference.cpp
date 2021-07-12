@@ -486,8 +486,8 @@ namespace {
 __attribute__((constructor(SHAPE_INFERENCE_INIT_PRIORITY))) void
 registerShapeInference() {
   RegisterInferenceFunction output_matches_input(
-      {c10::aten::batch_norm, c10::aten::relu, c10::aten::relu_,
-       c10::aten::softmax, c10::prim::unchecked_cast},
+      {c10::aten::batch_norm, c10::aten::relu, c10::aten::softmax,
+       c10::prim::unchecked_cast},
       outputTypeMatchesInputType);
   RegisterInferenceFunction conv2d(c10::aten::conv2d, inferShapeConv2d);
   RegisterInferenceFunction maxpool2d(c10::aten::max_pool2d,
@@ -495,10 +495,8 @@ registerShapeInference() {
   RegisterInferenceFunction view(c10::aten::view, inferShapeView);
   RegisterInferenceFunction addmm(c10::aten::addmm, inferShapeAddmm);
   RegisterInferenceFunction transpose(c10::aten::t, inferShapeTranspose);
-  RegisterInferenceFunction broadcast({c10::aten::add, c10::aten::add_,
-                                       c10::aten::sub, c10::aten::sub_,
-                                       c10::aten::mul, c10::aten::mul_},
-                                      inferShapeBroadcast);
+  RegisterInferenceFunction broadcast(
+      {c10::aten::add, c10::aten::sub, c10::aten::mul}, inferShapeBroadcast);
   RegisterInferenceFunction avgpool2d(c10::aten::adaptive_avg_pool2d,
                                       inferShapeAdaptiveAvgPool2d);
   RegisterInferenceFunction flatten(c10::aten::flatten, inferShapeFlatten);

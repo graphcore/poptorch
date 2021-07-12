@@ -94,6 +94,7 @@ def generate(script, namespace, filename, global_symbols):
     f.write('#include "../PoptorchSymbols.hpp"\n')
     f.write('#include "PopartCanonicalizationUtils.hpp"\n')
     f.write('#include "poptorch/OpBuilder.hpp"\n')
+    f.write('#include "poptorch/Utils.hpp"\n')
     f.write('#include "poptorch_logging/Error.hpp"\n')
     f.write('#include "poptorch_logging/Logging.hpp"\n')
 
@@ -132,8 +133,5 @@ def generate(script, namespace, filename, global_symbols):
 # Parameters:
 #   aten - the name of the operator
 def get_op_name(aten):
-    in_place = aten[-1] == '_'
     opname = aten.split(':')[-1].replace('_', '')
-    if in_place:
-        opname = opname + "InPlace"
     return opname

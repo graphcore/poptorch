@@ -14,7 +14,19 @@
 
 #include "poptorch/Utils.hpp"
 
+#include "PoptorchSymbols.hpp"
+
 namespace poptorch {
+
+namespace {
+// Ops which only have an in-place version
+const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
+  // static to make sure values are initialised
+  static std::unordered_set<torch::jit::NodeKind> only_implace = {
+      c10::aten::copy_, c10::aten::normal_, c10::aten::uniform_};
+  return only_implace;
+}
+} // namespace
 
 InplaceOpHandler::InplaceOpHandler(
     const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters,
@@ -37,7 +49,7 @@ InplaceOpHandler::InplaceOpHandler(
 
   // There may still be inplace ops (which do not affect an input).
   // The original algorithm can safely handle these
-  torch::jit::RemoveInplaceOps(graph);
+  removeRemainingInplaceOps();
 }
 
 void InplaceOpHandler::storeNumTensorOutputs() {
@@ -71,25 +83,15 @@ void InplaceOpHandler::processInput(size_t input_num) {
       continue;
     }
 
-    auto new_kind = torch::jit::inPlaceToOutOfPlace.at(node->kind());
-
-    torch::jit::WithInsertPoint insert_point(node);
-    auto new_node = _graph->create(new_kind);
-    _graph->insertNode(new_node);
-
-    for (auto input : inputs) {
-      new_node->addInput(input);
+    // Keep it in place if there is only an inplace version
+    if (onlyInplaceOps().count(node->kind()) != 0) {
+      current_alias = node->output();
+      continue;
     }
 
-    torch::jit::addAdditionalInputsIfRequired(_graph, node, new_node);
-
-    current_alias = new_node->output();
-    current_alias->setType(node->output()->type());
-
-    node->output()->replaceAllUsesWith(current_alias);
-    node->input(0)->replaceAllUsesAfterNodeWith(node, current_alias);
-
+    auto new_node = outplaceOp(node);
     to_delete.push_back(node);
+    current_alias = new_node->output();
   }
 
   for (auto node : to_delete) {
@@ -112,6 +114,56 @@ void InplaceOpHandler::processInput(size_t input_num) {
     }
   }
   _input_output_mapping.push_back(output_mapping);
+}
+
+void InplaceOpHandler::removeRemainingInplaceOps() {
+  std::vector<torch::jit::Node *> to_delete;
+  for (auto node : _graph->nodes()) {
+    // Skip if not in-place
+    if (!torch::jit::isInplaceOp(node)) {
+      continue;
+    }
+
+    // Keep it in place if there is only an inplace version
+    if (onlyInplaceOps().count(node->kind()) != 0) {
+      continue;
+    }
+
+    outplaceOp(node);
+    to_delete.push_back(node);
+  }
+
+  for (auto node : to_delete) {
+    node->destroy();
+  }
+}
+
+torch::jit::Node *InplaceOpHandler::outplaceOp(torch::jit::Node *node) {
+  torch::jit::NodeKind new_kind;
+  if (torch::jit::inPlaceToOutOfPlace.count(node->kind()) != 0) {
+    new_kind = torch::jit::inPlaceToOutOfPlace.at(node->kind());
+  } else {
+    // Remove trailing '_' from the kind string
+    std::string kind_str(node->kind().toQualString());
+    std::string modified_kind_str = kind_str.substr(0, kind_str.length() - 1);
+    new_kind = c10::Symbol::fromQualString(modified_kind_str);
+  }
+
+  torch::jit::WithInsertPoint insert_point(node);
+  auto new_node = _graph->create(new_kind);
+  _graph->insertNode(new_node);
+
+  for (auto input : node->inputs()) {
+    new_node->addInput(input);
+  }
+
+  torch::jit::addAdditionalInputsIfRequired(_graph, node, new_node);
+
+  new_node->output()->setType(node->output()->type());
+  node->output()->replaceAllUsesWith(new_node->output());
+  node->input(0)->replaceAllUsesAfterNodeWith(node, node->output());
+
+  return new_node;
 }
 
 } // namespace poptorch

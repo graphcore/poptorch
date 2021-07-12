@@ -134,7 +134,7 @@ torch::jit::Node *indexHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
-  // aten::index_put_(Tensor self, Tensor?[] indices, Tensor value, bool
+  // aten::index_put(Tensor self, Tensor?[] indices, Tensor value, bool
   //                  accumulate)
   torch::jit::Value *x = node->input(0);
   std::vector<torch::jit::Value *> indices =
@@ -187,7 +187,7 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::index, indexHandler);
-  registerHandler(c10::aten::index_put_, indexPutHandler);
+  registerHandler(c10::aten::index_put, indexPutHandler);
 }
 
 } // namespace poptorch

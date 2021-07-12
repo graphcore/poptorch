@@ -190,13 +190,9 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::mul, mulHandler);
   registerHandler(c10::aten::true_divide, trueDivideHandler);
   registerHandler(c10::aten::clamp, clampHandler);
-  registerHandler(c10::aten::clamp_, clampHandler);
   registerHandler(c10::aten::clamp_min, clampMinHandler);
-  registerHandler(c10::aten::clamp_min_, clampMinHandler);
   registerHandler(c10::aten::clamp_max, clampMaxHandler);
-  registerHandler(c10::aten::clamp_max_, clampMaxHandler);
   registerHandler(c10::aten::addcdiv, addCDivHandler);
-  registerHandler(c10::aten::addcdiv_, addCDivHandler);
   registerHandler(c10::aten::cross, crossHandler);
 }
 

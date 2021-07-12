@@ -129,8 +129,8 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
 }
 
 // NOLINTNEXTLINE
-torch::jit::Node *copy_Handler(torch::jit::Graph *graph,
-                               torch::jit::Node *node) {
+torch::jit::Node *copyHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
   // aten::copy_(Tensor self, Tensor src, bool non_blocking) -> Tensor
   at::ScalarType dest_type = getNodeScalarType(node->input(0));
 
@@ -143,7 +143,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::prim::NumToTensor, numToTensorHandler);
   registerHandler(c10::aten::repeat, repeatHandler);
   registerHandler(c10::aten::roll, rollHandler);
-  registerHandler(c10::aten::copy_, copy_Handler);
+  registerHandler(c10::aten::copy_, copyHandler);
 }
 
 } // namespace poptorch

@@ -10,6 +10,7 @@
 namespace torch {
 namespace jit {
 struct Graph;
+struct Node;
 struct Value;
 } // namespace jit
 } // namespace torch
@@ -57,6 +58,14 @@ private:
   // Process the input by changing any nodes to inplace varients and adding an
   // addition output if required.
   void processInput(size_t input);
+
+  // Remove any inplace ops that are not connected with an input or an alias
+  // so can simply be replace with an outplace equivalents
+  void removeRemainingInplaceOps();
+
+  // Outplace op by swapping it with the correct variant (usually but not always
+  // removing the trialing '_') and making any other changes
+  torch::jit::Node *outplaceOp(torch::jit::Node *node);
 
   torch::jit::Graph *_graph;
   std::vector<torch::jit::Value *> _collapsed_inputs;

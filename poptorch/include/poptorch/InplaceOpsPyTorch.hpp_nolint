@@ -81,21 +81,19 @@
 
 namespace torch {
 namespace jit {
+// Modify from source to handle only those which cannot be formed by removing
+// trailing _
 static const std::unordered_map<NodeKind, NodeKind> inPlaceToOutOfPlace = {
-    {aten::add_, aten::add},
-    {aten::sub_, aten::sub},
-    {aten::div_, aten::div},
-    {aten::mul_, aten::mul},
-    {aten::masked_fill_, aten::masked_fill},
     {aten::zero_, aten::zeros_like},
     {aten::fill_, aten::full_like}};
 
 static const std::unordered_map<NodeKind, int> expectedInputCount = {
     {aten::zero_, 6}, {aten::fill_, 7}};
 
-
+// Modify from source to handle other in place ops not in the list
 bool isInplaceOp(const Node* node) {
-  return inPlaceToOutOfPlace.count(node->kind()) != 0;
+  const char *kind_str = node->kind().toQualString();
+  return kind_str[strlen(kind_str)-1] == '_';
 }
 
 // Code within function is copied but wrapped in a new function

@@ -49,11 +49,6 @@ expand("selu", lambda x: op.selu(x, cfloat(selu_alpha), cfloat(selu_lambda)))
 expand("silu", lambda x: x * op.sigmoid(x))
 expand("square", lambda x: x * x)
 
-forward("relu_", "relu")
-forward("selu_", "selu")
-forward("sigmoid_", "sigmoid")
-forward("tanh_", "tanh")
-
 # binary operators
 opers = ["atan2", "div", "fmod", "pow", "prelu", "remainder"]
 
@@ -75,7 +70,6 @@ expand("pixel_shuffle", lambda x, y: op.depthtospace(x, clong(y), cstr("CRD")))
 expand("reflection_pad1d", lambda x, y: op.reflectionPad(x, clong_list(y)))
 expand("replication_pad1d", lambda x, y: op.edgePad(x, clong_list(y)))
 expand("rsub", lambda x, y: y - x)
-forward("pow_", "pow")
 
 
 def celu_handler(x, a):
@@ -97,9 +91,6 @@ def softshrink_handler(x, l):
     return op.where(x < -l, x + l, r)
 
 
-forward("elu_", "elu")
-forward("leaky_relu_", "leaky_relu")
-forward("prelu_", "prelu")
 forward("reflection_pad2d", "reflection_pad1d")
 forward("replication_pad2d", "replication_pad1d")
 forward("replication_pad3d", "replication_pad1d")
@@ -131,11 +122,6 @@ def softplus_handler(x, b, threshold):
     condition = x * b > threshold
     softplus = 1. / b * op.log(1. + op.exp(b * x))
     return op.where(condition, x, softplus)
-
-
-forward("hardtanh_", "hardtanh")
-forward("masked_fill_", "masked_fill")
-forward("where_", "where")
 
 
 # loss handlers

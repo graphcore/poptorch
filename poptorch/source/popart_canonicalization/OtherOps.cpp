@@ -203,7 +203,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::cartesian_prod, cartesianProdHandler);
   registerHandler(c10::aten::tensordot, tensordotHandler);
   registerHandler(c10::aten::scatter_add, scatterAddHandler);
-  registerHandler(c10::aten::scatter_add_, scatterAddHandler);
 }
 
 } // namespace poptorch

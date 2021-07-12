@@ -475,8 +475,8 @@ torch::jit::Node *nlllossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {t3}, 2);
 }
 
-torch::jit::Node *normalInPlaceHandler(torch::jit::Graph *graph,
-                                       torch::jit::Node *node) {
+torch::jit::Node *normalHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
   auto x = node->input(0);
   auto t0 = shapeFromTensor(x);
   auto c1 = node->input(1);
@@ -776,8 +776,8 @@ torch::jit::Node *topkHandler(torch::jit::Graph *graph,
   return createTopk(graph, {x, t1}, t3);
 }
 
-torch::jit::Node *uniformInPlaceHandler(torch::jit::Graph *graph,
-                                        torch::jit::Node *node) {
+torch::jit::Node *uniformHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
   auto x = node->input(0);
   auto t0 = shapeFromTensor(x);
   auto b = node->input(2);
@@ -818,7 +818,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::detach, detachHandler);
   registerHandler(c10::aten::div, divHandler);
   registerHandler(c10::aten::elu, eluHandler);
-  registerHandler(c10::aten::elu_, eluHandler);
   registerHandler(c10::aten::eq, eqHandler);
   registerHandler(c10::aten::erf, erfHandler);
   registerHandler(c10::aten::erfc, erfcHandler);
@@ -833,14 +832,12 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::gt, gtHandler);
   registerHandler(c10::aten::hardshrink, hardshrinkHandler);
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
-  registerHandler(c10::aten::hardtanh_, hardtanhHandler);
   registerHandler(c10::aten::hinge_embedding_loss, hingeembeddinglossHandler);
   registerHandler(c10::aten::index_select, indexselectHandler);
   registerHandler(c10::aten::isnan, isnanHandler);
   registerHandler(c10::aten::l1_loss, l1lossHandler);
   registerHandler(c10::aten::le, leHandler);
   registerHandler(c10::aten::leaky_relu, leakyreluHandler);
-  registerHandler(c10::aten::leaky_relu_, leakyreluHandler);
   registerHandler(c10::aten::log, logHandler);
   registerHandler(c10::aten::log10, log10Handler);
   registerHandler(c10::aten::log1p, log1pHandler);
@@ -850,24 +847,20 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::lt, ltHandler);
   registerHandler(c10::aten::margin_ranking_loss, marginrankinglossHandler);
   registerHandler(c10::aten::masked_fill, maskedfillHandler);
-  registerHandler(c10::aten::masked_fill_, maskedfillHandler);
   registerHandler(c10::aten::mse_loss, mselossHandler);
   registerHandler(c10::aten::ne, neHandler);
   registerHandler(c10::aten::neg, negHandler);
   registerHandler(c10::aten::nll_loss, nlllossHandler);
-  registerHandler(c10::aten::normal_, normalInPlaceHandler);
+  registerHandler(c10::aten::normal_, normalHandler);
   registerHandler(c10::aten::pixel_shuffle, pixelshuffleHandler);
   registerHandler(c10::aten::pow, powHandler);
-  registerHandler(c10::aten::pow_, powHandler);
   registerHandler(c10::aten::prelu, preluHandler);
-  registerHandler(c10::aten::prelu_, preluHandler);
   registerHandler(c10::aten::rand, randHandler);
   registerHandler(c10::aten::randn, randnHandler);
   registerHandler(c10::aten::reciprocal, reciprocalHandler);
   registerHandler(c10::aten::reflection_pad1d, reflectionpad1dHandler);
   registerHandler(c10::aten::reflection_pad2d, reflectionpad1dHandler);
   registerHandler(c10::aten::relu, reluHandler);
-  registerHandler(c10::aten::relu_, reluHandler);
   registerHandler(c10::aten::remainder, remainderHandler);
   registerHandler(c10::aten::replication_pad1d, replicationpad1dHandler);
   registerHandler(c10::aten::replication_pad2d, replicationpad1dHandler);
@@ -876,9 +869,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::rsqrt, rsqrtHandler);
   registerHandler(c10::aten::rsub, rsubHandler);
   registerHandler(c10::aten::selu, seluHandler);
-  registerHandler(c10::aten::selu_, seluHandler);
   registerHandler(c10::aten::sigmoid, sigmoidHandler);
-  registerHandler(c10::aten::sigmoid_, sigmoidHandler);
   registerHandler(c10::aten::sign, signHandler);
   registerHandler(c10::aten::silu, siluHandler);
   registerHandler(c10::aten::sin, sinHandler);
@@ -893,12 +884,10 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::t, tHandler);
   registerHandler(c10::aten::tan, tanHandler);
   registerHandler(c10::aten::tanh, tanhHandler);
-  registerHandler(c10::aten::tanh_, tanhHandler);
   registerHandler(c10::aten::threshold, thresholdHandler);
   registerHandler(c10::aten::topk, topkHandler);
-  registerHandler(c10::aten::uniform_, uniformInPlaceHandler);
+  registerHandler(c10::aten::uniform_, uniformHandler);
   registerHandler(c10::aten::where, whereHandler);
-  registerHandler(c10::aten::where_, whereHandler);
 }
 
 } // namespace poptorch

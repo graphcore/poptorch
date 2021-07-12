@@ -119,6 +119,13 @@ def op_harness(op,
         if native_out is None:
             native_out, _ = model(inputs)
 
+            # native_out could be an alias of the input and so modified by
+            # the poptorch_model
+            if isinstance(native_out, tuple):
+                native_out = tuple([n.clone().detach() for n in native_out])
+            else:
+                native_out = native_out.clone().detach()
+
         # Run on IPU.
         poptorch_model = poptorch.trainingModel(model)
         poptorch_out, _ = poptorch_model(inputs)

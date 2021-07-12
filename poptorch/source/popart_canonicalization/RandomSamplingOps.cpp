@@ -90,7 +90,6 @@ torch::jit::Node *bernoulliHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::normal, normalHandler);
   registerHandler(c10::aten::bernoulli, bernoulliHandler);
-  registerHandler(c10::aten::bernoulli_, bernoulliHandler);
 }
 
 } // namespace poptorch
