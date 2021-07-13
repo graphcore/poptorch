@@ -128,6 +128,15 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
   return output->node();
 }
 
+torch::jit::Node *cloneHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  // aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
+
+  // Use cast to same type for cloning
+  at::ScalarType dest_type = getNodeScalarType(node->input(0));
+  return createCast(graph, node->input(0), dest_type);
+}
+
 // NOLINTNEXTLINE
 torch::jit::Node *copyHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
@@ -143,6 +152,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::prim::NumToTensor, numToTensorHandler);
   registerHandler(c10::aten::repeat, repeatHandler);
   registerHandler(c10::aten::roll, rollHandler);
+  registerHandler(c10::aten::clone, cloneHandler);
   registerHandler(c10::aten::copy_, copyHandler);
 }
 

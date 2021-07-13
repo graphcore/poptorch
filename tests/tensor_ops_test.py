@@ -363,6 +363,52 @@ def test_repeat(input_shapes, dims):
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
 @pytest.mark.parametrize("dtype", [torch.float, torch.int])
+def test_clone_one(input_shapes, dtype):
+    torch.manual_seed(42)
+
+    op = lambda x: x.clone()
+
+    x = torch.randn(*input_shapes)
+
+    def assert_fn(native_out, poptorch_out):
+        for pop, native in zip(poptorch_out, native_out):
+            assert native.dtype == pop.dtype
+            helpers.assert_allclose(expected=native, actual=pop)
+
+    # Calculating with integers does not produce meaningful gradients
+    test_training = dtype is torch.float
+    op_harness(op, x, test_training=test_training, assert_fn=assert_fn)
+
+
+def test_clone_two():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def forward(self, x, y, z):
+            x += y
+            x_clone = x.clone()
+            x += y
+            x_clone += z
+
+            return x, x_clone
+
+    dummy_x = torch.randn([2, 3])
+    dummy_y = torch.randn([2, 3])
+    dummy_z = torch.randn([2, 3])
+
+    model = Model()
+
+    native_out = model(dummy_x.clone(), dummy_y.clone(), dummy_z.clone())
+
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_out = poptorch_model(dummy_x.clone(), dummy_y.clone(),
+                                  dummy_z.clone())
+
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+@pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
+@pytest.mark.parametrize("dtype", [torch.float, torch.int])
 def test_copy_(input_shapes, dtype):
     torch.manual_seed(42)
 
@@ -394,8 +440,9 @@ def test_roll(shifts, dims):
     op_harness(op, x)
 
 
+@pytest.mark.parametrize("with_clone", [True, False])
 @pytest.mark.parametrize("with_detach", [True, False])
-def test_detach(with_detach):
+def test_detach_and_clone(with_clone, with_detach):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -406,6 +453,8 @@ def test_detach(with_detach):
 
         def forward(self, x):
             out = self.first_layer(x)
+            if with_clone:
+                out = out.clone()
             if with_detach:
                 out = out.detach()
 
