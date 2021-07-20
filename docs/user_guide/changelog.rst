@@ -21,6 +21,8 @@ New features
 - Support for ``torch.gather``. Please note: this operator is known to cause
   long compilation times. Consider using a onehot-based solution instead or
   `torch.index_select` if appropriate.
+- Using a convolution layer op with the value of ``padding`` greater than or
+  equal to `kernel_size`` is now supported.
 
 API changes
 -----------
