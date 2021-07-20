@@ -436,4 +436,4 @@ def test_profile_report():
     x.start()
     x.join()
 
-    assert os.path.exists(dirname + '/profile.pop')
+    assert os.path.exists(os.path.join(dirname, "inference", "profile.pop"))
