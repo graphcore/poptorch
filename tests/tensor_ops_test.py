@@ -361,6 +361,30 @@ def test_repeat(input_shapes, dims):
     op_harness(op, a)
 
 
+def test_repeat_training_input():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            # Dummy weights for training
+            self.lin = torch.nn.Linear(2, 1)
+
+        def forward(self, x):
+            x = x.repeat(5, 2, 2)
+            return x, poptorch.identity_loss(x**2, reduction="sum")
+
+    torch.manual_seed(42)
+
+    input = torch.randn((10, 1, 1))
+
+    model = Model()
+    poptorch_model = poptorch.trainingModel(model)
+
+    native_out, _ = model(input)
+    poptorch_out, _ = poptorch_model(input)
+
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
 @pytest.mark.parametrize("dtype", [torch.float, torch.int])
 def test_clone_one(input_shapes, dtype):

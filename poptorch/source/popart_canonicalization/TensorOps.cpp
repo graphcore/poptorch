@@ -37,21 +37,22 @@ torch::jit::Node *numToTensorHandler(torch::jit::Graph *graph,
 //   3) reshaping to [R1*M, R2*N, ...]
 torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
-  std::vector<std::int64_t> old_shape = shapeFromTensor(node->input(0));
-  std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
+  torch::jit::Value *input = node->input(0);
   std::vector<std::int64_t> dim_repeats =
       constantToLongVec(node->input(1)->node());
-  std::vector<std::int64_t> dim_expands;
-  std::vector<std::int64_t> transform_shape;
+  std::vector<std::int64_t> old_shape = shapeFromTensor(input);
+  std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
 
   // If repeat dimensions exceed shape dimensions, pad the front of the
   // original shape with singleton dimensions so that it can
   // be expanded
-  size_t padding = dim_repeats.size() > old_shape.size()
-                       ? dim_repeats.size() - old_shape.size()
-                       : 0;
 
-  torch::jit::Node *new_node = node->input(0)->node();
+  std::size_t padding = dim_repeats.size() > old_shape.size()
+                            ? dim_repeats.size() - old_shape.size()
+                            : 0;
+
+  std::vector<std::int64_t> dim_expands;
+  std::vector<std::int64_t> transform_shape;
 
   for (std::size_t i = 0; i < dim_repeats.size(); i++) {
     dim_expands.push_back(dim_repeats[i]);
@@ -64,11 +65,11 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
     transform_shape.push_back(padded_dim);
   }
 
-  new_node = createReshape(graph, new_node->output(), transform_shape);
-  new_node = createExpand(
-      graph, {new_node->output(), intVectorToIrConstant(graph, dim_expands)});
+  auto reshape = createReshape(graph, input, transform_shape);
+  auto expand = createExpand(
+      graph, {reshape->output(), intVectorToIrConstant(graph, dim_expands)});
 
-  return createReshape(graph, new_node->output(), new_shape);
+  return createReshape(graph, expand->output(), new_shape);
 }
 
 torch::jit::Node *rollHandler(torch::jit::Graph *graph,
