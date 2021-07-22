@@ -64,7 +64,7 @@ class OptionType(enum.IntEnum):
 
 # check container_options
 def parse_session_options(root_node):  # pylint: disable=too-many-statements
-    # Build the list of options handled by Poptorch:
+    # Build the list of options handled by PopTorch:
     handled = {}
     checks = {
         r".*container_options, \"(.*)\",.*": OptionType.Container,

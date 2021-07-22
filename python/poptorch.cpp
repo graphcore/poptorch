@@ -926,7 +926,7 @@ void copyWeightsToHostImpl(
   if (!executable) {
     logging::warn(
         "Call to copyWeightsToHost ignored as model has not been compiled "
-        "(Poptorch will compile models on first invocation).");
+        "(PopTorch will compile models on first invocation).");
   } else {
     executable->copyWeightsToHost(
         getParameterBuffers(parameter_names, parameter_tensors));
@@ -941,7 +941,7 @@ void copyWeightsToDeviceImpl(
   if (!executable) {
     logging::warn(
         "Call to copyWeightsToDevice ignored as model has not been compiled "
-        "(Poptorch will compile models on first invocation).");
+        "(PopTorch will compile models on first invocation).");
   } else {
     executable->copyWeightsToDevice(
         getParameterBuffers(parameter_names, parameter_tensors));

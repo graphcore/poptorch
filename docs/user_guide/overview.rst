@@ -542,7 +542,7 @@ with a tight memory budget.
 Optimizers
 ==========
 
-Poptorch supports the following optimizers:
+PopTorch supports the following optimizers:
 
 #. :py:class:`~poptorch.optim.SGD`
 #. :py:class:`~poptorch.optim.Adam`
@@ -622,7 +622,7 @@ You can override this behaviour using :py:func:`~poptorch.optim.VariableAttribut
     :start-after: optim_const_start
     :end-before: optim_const_end
 
-For native optimizers (those from the `torch.optim <https://pytorch.org/docs/1.7.1/optim.html>`__ namespace) the attributes which are left to their default value in the constructor will be considered to be constant.
+For native optimizers (those from the `torch.optim <https://pytorch.org/docs/1.9.0/optim.html>`__ namespace) the attributes which are left to their default value in the constructor will be considered to be constant.
 
 There is no method to override this behaviour which is why we recommend you always use the ``poptorch.optim`` optimizers instead.
 
@@ -762,7 +762,7 @@ You can use your models in one of the following ways:
     :end-before: inference_half_end
     :emphasize-lines: 1, 2
 
-Because PopTorch relies on the `torch.jit.trace() <https://pytorch.org/docs/1.7.1/generated/torch.jit.trace.html#torch.jit.trace>`__ function, it is limited to tracing operations which run on the CPU.
+Because PopTorch relies on the `torch.jit.trace() <https://pytorch.org/docs/1.9.0/generated/torch.jit.trace.html#torch.jit.trace>`__ function, it is limited to tracing operations which run on the CPU.
 Many of these operations do not support float16 inputs.
 To allow the full range of operations, PopTorch converts all float16 inputs to float32 before tracing and then restores the inputs to float16 as part of the canonicalization process.
 Some operations may result in the model running in float32 where float16 would

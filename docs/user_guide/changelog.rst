@@ -9,6 +9,7 @@ New features
 ------------
 
 - Support for ``torch.roll``
+- Migrated to PyTorch version 1.9.0
 
 API changes
 -----------

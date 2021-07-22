@@ -37,8 +37,8 @@ class _JitOptions(_options_impl.OptionsDict):
         ``torch.jit.script`` for details about PyTorch's JIT implementations.
 
         :param bool trace_model:
-            * True: use `torch.jit.trace <https://pytorch.org/docs/1.7.1/generated/torch.jit.trace.html#torch.jit.trace>`_
-            * False: use `torch.jit.script <https://pytorch.org/docs/1.7.1/generated/torch.jit.script.html#torch.jit.script>`_ (experimental)
+            * True: use `torch.jit.trace <https://pytorch.org/docs/1.9.0/generated/torch.jit.trace.html#torch.jit.trace>`_
+            * False: use `torch.jit.script <https://pytorch.org/docs/1.9.0/generated/torch.jit.script.html#torch.jit.script>`_ (experimental)
        """
         self.set(trace_model=trace_model)
         return self

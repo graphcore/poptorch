@@ -396,12 +396,11 @@ def test_CosineEmbeddingLoss(reduction):
     # Margin should be between -1 and 1
     margin = torch.rand(1) * 2 - 1
 
-    # As per the current PyTorch implementation, the first two dims must be equal
-    input1 = torch.empty(10, 10, 3).uniform_()
-    input2 = torch.empty(10, 10, 3).uniform_()
+    input1 = torch.empty(10, 3).uniform_()
+    input2 = torch.empty(10, 3).uniform_()
 
     # Generate random set of 1s and -1s for labels
-    target = torch.randint(2, [10, 10, 3]) * 2 - 1
+    target = torch.randint(2, [10]) * 2 - 1
 
     loss_harness(F.cosine_embedding_loss, [input1, input2],
                  target,

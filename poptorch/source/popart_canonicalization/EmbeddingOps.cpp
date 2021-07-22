@@ -28,13 +28,18 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   // aten::embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool
   // scale_grad_by_freq, int mode, bool sparse, Tensor per_sample_weights, bool
-  // include_last_offset) -> Tensor
+  // include_last_offset, int? padding_idx) -> Tensor
 
   bool scale_grad_by_freq = constantToBool(node->input(3)->node());
   bool sparse = constantToBool(node->input(5)->node());
+  auto padding_idx = node->input(8);
 
   ERROR_ON_MSG(scale_grad_by_freq || sparse,
                "Unsupported aten::embedding_bag operation");
+
+  ERROR_ON_MSG(!isNone(padding_idx),
+               "Unsupported aten::embedding_bag operation: padding_idx "
+               "parameter is unsupported.");
 
   // aten::embedding_bag has 4 outputs but only the first one is used so we
   // delete them here to match our output

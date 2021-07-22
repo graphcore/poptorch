@@ -67,22 +67,8 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {final_node->output()}, reduction);
 }
 
-torch::jit::Node *nllLoss2dHandler(torch::jit::Graph *graph,
+torch::jit::Node *nllLossNdHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
-  // "aten::nll_loss2d(Tensor input, Tensor target, Tensor height, Tensor
-  // weight, int reduction, int ignore_index) -> Tensor"
-
-  // aten::nll_loss2d() is implemented based on popart:nllloss().
-  // Suppose the input[0] has the shape of (N, C, M, K)
-  // input[0] will be transposed with perm [0, 2, 3, 1],
-  //   and reshaped with (N * M * K, C), pushing C to the last dimension.
-  // input[1] will be reshaped to (N * M * K), before calling nllloss.
-  // The generated IRs are as follows:
-  // %37 : Tensor = popart::transpose[perm=[0, 2, 3, 1]](%35)
-  // %38 : Tensor(500:4, 4:1) = popart::reshape_static_shape[shape=[500,4]](%37)
-  // %39 : Int(500:1) = popart::reshape_static_shape[shape=[500]](%25)
-  // %40 : Float() = popart::nllloss[reduction=1, ignoreIndex=-100](%38, %39)
-
   std::int64_t reduction = constantToLong(node->input(3)->node());
   std::int64_t ignore_index = constantToLong(node->input(4)->node());
 
@@ -90,53 +76,100 @@ torch::jit::Node *nllLoss2dHandler(torch::jit::Graph *graph,
 
   torch::jit::Value *in = node->input(0); // in for input
   torch::jit::Value *target = node->input(1);
+  torch::jit::Value *weight = node->input(2);
+  // TODO(T42695): Support optional weight parameter
+  ERROR_ON_MSG(!isNone(weight),
+               "Parameter \"weight\" is unsupported for aten::nll_loss_nd");
   std::vector<std::int64_t> shape_input = shapeFromTensor(in);
   std::vector<std::int64_t> shape_target = shapeFromTensor(target);
-  ERROR_ON_MSG(shape_input.size() != 4,
-               "Dimension size for input[0] of aten::nll_loss2d() is: "
-                   << shape_input.size() << ", and expected 4");
-  ERROR_ON_MSG(shape_target.size() != 3,
-               "Dimension size for input[1] of aten::nll_loss2d() is: "
-                   << shape_target.size() << ", and expected 3");
 
-  std::int64_t n = shape_input[0];
-  std::int64_t c = shape_input[1];
-  std::int64_t height = shape_input[2];
-  std::int64_t width = shape_input[3];
-  std::int64_t n_1 = shape_target[0];
-  std::int64_t height_1 = shape_target[1];
-  std::int64_t width_1 = shape_target[2];
-  std::int64_t flat = n * height * width;
-  ERROR_ON_MSG(n != n_1,
-               "Dimension size mismatch: the parameter N from input[0] "
-                   << n << ", and target[0] " << n_1);
-  ERROR_ON_MSG(height != height_1,
-               "Dimension size mismatch: the input height and target height: "
-                   << height << " and " << height_1);
-  ERROR_ON_MSG(width != width_1,
-               "Dimension size mismatch: the input width and target width: "
-                   << width << ", and " << width_1);
+  // Depending on the dimensionality of the input, aten::nll_loss_nd redirects
+  // to aten::nll_loss2d or aten::nll_loss in PyTorch
+  if (shape_input.size() == 4) {
+    // aten::nll_loss2d(Tensor input, Tensor target, Tensor? weight,
+    // int reduction, int ignore_index) -> Tensor
 
-  std::vector<std::int64_t> input_new_shape({flat, c});
-  std::vector<std::int64_t> target_new_shape({flat});
+    // aten::nll_loss2d() is implemented based on popart:nllloss().
+    // Suppose the input[0] has the shape of (N, C, M, K)
+    // input[0] will be transposed with perm [0, 2, 3, 1],
+    //   and reshaped with (N * M * K, C), pushing C to the last dimension.
+    // input[1] will be reshaped to (N * M * K), before calling nllloss.
+    // The generated IRs are as follows:
+    // %37 : Tensor = popart::transpose[perm=[0, 2, 3, 1]](%35)
+    // %38 : Tensor(500:4, 4:1) =
+    // popart::reshape_static_shape[shape=[500,4]](%37) %39 : Int(500:1) =
+    // popart::reshape_static_shape[shape=[500]](%25) %40 : Float() =
+    // popart::nllloss[reduction=1, ignoreIndex=-100](%38, %39)
+    ERROR_ON_MSG(shape_target.size() != 3,
+                 "Dimension size for input[1] of aten::nll_loss2d() is: "
+                     << shape_target.size() << ", and expected 3");
 
-  torch::jit::Node *perm = createTranspose(graph, {in}, {0, 2, 3, 1});
-  torch::jit::Node *reshape_input =
-      createReshape(graph, perm->output(), input_new_shape);
+    std::int64_t n = shape_input[0];
+    std::int64_t c = shape_input[1];
+    std::int64_t height = shape_input[2];
+    std::int64_t width = shape_input[3];
+    std::int64_t n_1 = shape_target[0];
+    std::int64_t height_1 = shape_target[1];
+    std::int64_t width_1 = shape_target[2];
+    std::int64_t flat = n * height * width;
+    ERROR_ON_MSG(n != n_1,
+                 "Dimension size mismatch: the parameter N from input[0] "
+                     << n << ", and target[0] " << n_1);
+    ERROR_ON_MSG(height != height_1,
+                 "Dimension size mismatch: the input height and target height: "
+                     << height << " and " << height_1);
+    ERROR_ON_MSG(width != width_1,
+                 "Dimension size mismatch: the input width and target width: "
+                     << width << ", and " << width_1);
 
-  torch::jit::Node *reshape_target =
-      createReshape(graph, target, target_new_shape);
+    std::vector<std::int64_t> input_new_shape({flat, c});
+    std::vector<std::int64_t> target_new_shape({flat});
 
-  torch::jit::Node *final_node =
-      createNllloss(graph, {reshape_input->output(), reshape_target->output()},
-                    reduction, ignore_index, /*inputIsLogProbability=*/true);
+    torch::jit::Node *perm = createTranspose(graph, {in}, {0, 2, 3, 1});
+    torch::jit::Node *reshape_input =
+        createReshape(graph, perm->output(), input_new_shape);
 
-  if (reduction == 2) {
-    // If "none" reduction, return the results with input's original shape
-    final_node = createReshape(graph, final_node->output(), shape_target);
+    torch::jit::Node *reshape_target =
+        createReshape(graph, target, target_new_shape);
+
+    torch::jit::Node *final_node = createNllloss(
+        graph, {reshape_input->output(), reshape_target->output()}, reduction,
+        ignore_index, /*inputIsLogProbability=*/true);
+
+    if (reduction == 2) {
+      // If "none" reduction, return the results with input's original shape
+      final_node = createReshape(graph, final_node->output(), shape_target);
+    }
+
+    return createIdentityloss(graph, {final_node->output()}, reduction);
   }
+  // aten::nll_loss(Tensor self, Tensor target, Tensor? weight, int reduction,
+  // int ignore_index) -> Tensor
+  auto loss = createNllloss(graph, {in, target}, reduction, ignore_index, true);
+  return createIdentityloss(graph, {loss->output()}, 2);
+}
 
-  return createIdentityloss(graph, {final_node->output()}, reduction);
+torch::jit::Node *crossEntropyLossHandler(torch::jit::Graph *graph,
+                                          torch::jit::Node *node) {
+  // aten::cross_entropy_loss(Tensor self, Tensor target, Tensor? weight, int
+  // reduction, int ignore_index)
+  auto input = node->input(0);
+  auto target = node->input(1);
+  auto weight = node->input(2);
+  // TODO(T42695): Support optional weight parameter
+  ERROR_ON_MSG(
+      !isNone(weight),
+      "Parameter \"weight\" is unsupported for aten::cross_entropy_loss");
+  auto reduction = node->input(3);
+  auto ignore_index = node->input(4);
+
+  auto log_softmax_handler = getHandler(c10::aten::log_softmax);
+  auto log_softmax = createHandlerOperation(
+      graph, log_softmax_handler, {input, wrapInConstant1D(graph, 1)});
+
+  return createHandlerOperation(
+      graph, nllLossNdHandler,
+      {log_softmax->output(), target, weight, reduction, ignore_index});
 }
 
 torch::jit::Node *klDivHandler(torch::jit::Graph *graph,
@@ -590,7 +623,7 @@ torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
-  registerHandler(c10::aten::nll_loss2d, nllLoss2dHandler);
+  registerHandler(c10::aten::nll_loss_nd, nllLossNdHandler);
   registerHandler(c10::aten::binary_cross_entropy, binaryCrossEntropyHandler);
   registerHandler(c10::aten::kl_div, klDivHandler);
   registerHandler(c10::aten::poisson_nll_loss, poissonNllLossHandler);
@@ -603,6 +636,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::ctc_loss, ctcLossHandler);
   registerHandler(symbols::poptorch::ctc_beam_search_decoder,
                   ctcbeamsearchdecoderHandler);
+  registerHandler(c10::aten::cross_entropy_loss, crossEntropyLossHandler);
 }
 
 } // namespace poptorch

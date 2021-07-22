@@ -70,7 +70,7 @@ class ILinterFamily:
             all_valid = all(
                 [linter.check_version() for linter in self._linters])
             if not all_valid:
-                print("\nERROR: You need a valid Poptorch buildenv to run "
+                print("\nERROR: You need a valid PopTorch buildenv to run "
                       "the linters:")
                 print("- create a buildenv using scripts/create_buildenv.py")
                 print(

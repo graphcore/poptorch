@@ -15,7 +15,7 @@ set(COPY_TESTS OFF CACHE BOOL "Copy tests files to the build folder (instead of 
 set(ENABLE_WERROR ON CACHE BOOL "Treat C++ warnings as errors")
 
 # Note: The next line is also parsed by scripts/utils/_utils.py
-set(TORCH_VERSION 1.7.1)
+set(TORCH_VERSION 1.9.0)
 
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})

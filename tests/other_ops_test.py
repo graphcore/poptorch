@@ -96,8 +96,7 @@ def test_cartesian_prod(arr_lengths):
     op_harness(torch.cartesian_prod, *inputs)
 
 
-@pytest.mark.parametrize("dims",
-                         (0, 2, ([], []), ([2], [0]), ([2, 3], [0, 1])))
+@pytest.mark.parametrize("dims", (2, ([2], [0]), ([2, 3], [0, 1])))
 def test_tensordot(dims):
     torch.manual_seed(42)
 

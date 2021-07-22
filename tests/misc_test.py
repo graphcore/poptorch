@@ -74,9 +74,10 @@ def test_print_orig_input_trace_nested_tuple_tensors(capfd):
             return xss[0][0] + xss[0][1] + xss[1][0]
 
     print_orig_input_trace_harness(
-        capfd, Model(), "%1 : ((Half(1:1, requires_grad=0, device=cpu), " +
-        "Float(1:1, requires_grad=0, device=cpu)), " +
-        "(Int(1:1, requires_grad=0, device=cpu)))",
+        capfd, Model(),
+        "%xss : ((Half(1, strides=[1], requires_grad=0, device=cpu), " +
+        "Float(1, strides=[1], requires_grad=0, device=cpu)), " +
+        "(Int(1, strides=[1], requires_grad=0, device=cpu)))",
         ((orig_input_trace_tensors[0], orig_input_trace_tensors[1]),
          (orig_input_trace_tensors[2], )))
 
@@ -87,9 +88,10 @@ def test_print_orig_input_trace_tuple_tensors(capfd):
             return xs[0] + xs[1] + xs[2]
 
     print_orig_input_trace_harness(
-        capfd, Model(), "%1 : (Half(1:1, requires_grad=0, device=cpu), " +
-        "Float(1:1, requires_grad=0, device=cpu), " +
-        "Int(1:1, requires_grad=0, device=cpu))",
+        capfd, Model(),
+        "%xs : (Half(1, strides=[1], requires_grad=0, device=cpu), " +
+        "Float(1, strides=[1], requires_grad=0, device=cpu), " +
+        "Int(1, strides=[1], requires_grad=0, device=cpu))",
         (orig_input_trace_tensors[0], orig_input_trace_tensors[1],
          orig_input_trace_tensors[2]))
 
@@ -101,9 +103,9 @@ def test_print_orig_input_trace_tensors(capfd):
 
     print_orig_input_trace_harness(
         capfd, Model(),
-        "%x : Half(1:1, requires_grad=0, device=cpu),\n      " +
-        "%y : Float(1:1, requires_grad=0, device=cpu),\n      " +
-        "%z : Int(1:1, requires_grad=0, device=cpu)",
+        "%x : Half(1, strides=[1], requires_grad=0, device=cpu),\n      " +
+        "%y : Float(1, strides=[1], requires_grad=0, device=cpu),\n      " +
+        "%z : Int(1, strides=[1], requires_grad=0, device=cpu)",
         orig_input_trace_tensors[0], orig_input_trace_tensors[1],
         orig_input_trace_tensors[2])
 

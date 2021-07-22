@@ -132,7 +132,7 @@ void handleNumberConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
     replaceWithConstantTensor(
         graph, n,
         at::native::scalar_tensor(*torch::jit::constant_as<bool>(n->output()),
-                                  at::device(at::kCPU).dtype(at::kInt)));
+                                  at::kInt, c10::nullopt, at::kCPU));
   } else {
     auto s = *torch::jit::constant_as<at::Scalar>(n->output());
 
@@ -157,7 +157,7 @@ void handleNumberConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
     }
 
     auto wrapped_number =
-        at::native::scalar_tensor(s, at::device(at::kCPU).dtype(dtype));
+        at::native::scalar_tensor(s, dtype, c10::nullopt, at::kCPU);
     wrapped_number.unsafeGetTensorImpl()->set_wrapped_number(true);
     replaceWithConstantTensor(graph, n, wrapped_number);
   }

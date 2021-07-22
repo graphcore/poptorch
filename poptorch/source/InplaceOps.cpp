@@ -1,7 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 #include <torch/csrc/jit/ir/ir.h>
-#include <torch/csrc/jit/passes/remove_inplace_ops.h>
 
 #include <algorithm>
 #include <utility>
@@ -48,7 +47,7 @@ InplaceOpHandler::InplaceOpHandler(
   }
 
   // There may still be inplace ops (which do not affect an input).
-  // The original algorithm can safely handle these
+  // These must also be removed.
   removeRemainingInplaceOps();
 }
 

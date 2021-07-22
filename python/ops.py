@@ -174,7 +174,7 @@ def recomputationCheckpoint(*tensors):
     if len(out) == 1:
         return out[0]
 
-    # Return a tuple by default since Poptorch does not support list inputs
+    # Return a tuple by default since PopTorch does not support list inputs
     return tuple(out)
 
 

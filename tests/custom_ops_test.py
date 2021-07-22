@@ -40,9 +40,9 @@ def test_inference():
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x, bias)
 
-    print(out)
-    helpers.assert_allclose(actual=out[0], expected=12.0)
-    helpers.assert_allclose(actual=out[1], expected=8.0)
+    expected = (torch.full((1, 8), 12.0), torch.full((1, 8), 8.0))
+    helpers.assert_allclose(actual=out[0], expected=expected[0])
+    helpers.assert_allclose(actual=out[1], expected=expected[1])
 
 
 def test_training():

@@ -127,7 +127,7 @@ class PoplarExecutor:
                                    "copyWeightsToDevice", "setOptimizer",
                                    "compile", "destroy")
         if self._training:
-            # We don't want the pytorch model to keep the Poptorch one
+            # We don't want the pytorch model to keep the PopTorch one
             # alive so only keep a weak reference.
             parent = weakref.ref(self)
 

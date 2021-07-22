@@ -138,13 +138,28 @@ torch::jit::Node *cloneHandler(torch::jit::Graph *graph,
   return createCast(graph, node->input(0), dest_type);
 }
 
-// NOLINTNEXTLINE
 torch::jit::Node *copyHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   // aten::copy_(Tensor self, Tensor src, bool non_blocking) -> Tensor
   at::ScalarType dest_type = getNodeScalarType(node->input(0));
 
   return createCast(graph, node->input(1), dest_type);
+}
+
+torch::jit::Node *linearHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  // aten::linear(Tensor input, Tensor weight, Tensor? bias) -> Tensor
+  auto x = node->input(0);
+  auto w = node->input(1);
+  auto b = node->input(2);
+
+  auto w_t = createTranspose(graph, {w}, {1, 0});
+  auto output = createMatmul(graph, {x, w_t->output()});
+
+  if (!isNone(b)) {
+    output = createAdd(graph, {output->output(), b});
+  }
+  return output;
 }
 } // namespace
 
@@ -155,6 +170,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::roll, rollHandler);
   registerHandler(c10::aten::clone, cloneHandler);
   registerHandler(c10::aten::copy_, copyHandler);
+  registerHandler(c10::aten::linear, linearHandler);
 }
 
 } // namespace poptorch

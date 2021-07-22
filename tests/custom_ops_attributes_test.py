@@ -35,8 +35,9 @@ def test_float_attribute():
 
     inference_model = poptorch.inferenceModel(model)
     out = inference_model(x)
+    expected = torch.tensor([8.5])
 
-    helpers.assert_allclose(actual=out[0], expected=8.5)
+    helpers.assert_allclose(actual=out[0], expected=expected)
 
 
 def test_float_attribute_too_low():

@@ -150,13 +150,6 @@ def mse_loss_handler(x, y, red):
     return op.identityloss(loss, red)
 
 
-def nll_loss_handler(x, y, _weight, red, ignore_index):
-    red = reduction(clong(red))
-    input_islog = cint(1)
-    loss = op.nllloss(x, y, red, cint(ignore_index), input_islog)
-    return op.identityloss(loss, cint(2))
-
-
 def smooth_l1_loss_handler(x, y, red, beta):
     red = reduction(clong(red))
     delta = op.abs(x - y)

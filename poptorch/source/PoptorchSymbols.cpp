@@ -8,16 +8,12 @@
 
 namespace c10::aten {
 
-c10::Symbol relu_;                       // NOLINT
-c10::Symbol dropout_;                    // NOLINT
-c10::Symbol hardtanh_;                   // NOLINT
 c10::Symbol logical_not;                 // NOLINT
 c10::Symbol floor_divide;                // NOLINT
 c10::Symbol prelu_;                      // NOLINT
 c10::Symbol leaky_relu_;                 // NOLINT
 c10::Symbol elu_;                        // NOLINT
 c10::Symbol selu_;                       // NOLINT
-c10::Symbol isnan;                       // NOLINT
 c10::Symbol isinf;                       // NOLINT
 c10::Symbol uniform_;                    // NOLINT
 c10::Symbol normal_;                     // NOLINT
@@ -31,27 +27,23 @@ c10::Symbol one_hot;                     // NOLINT
 c10::Symbol amax;                        // NOLINT
 c10::Symbol amin;                        // NOLINT
 c10::Symbol pow_;                        // NOLINT
-c10::Symbol sigmoid_;                    // NOLINT
-c10::Symbol tanh_;                       // NOLINT
 c10::Symbol scatter_add_;                // NOLINT
 c10::Symbol feature_dropout_;            // NOLINT
 c10::Symbol roll;                        // NOLINT
+c10::Symbol nll_loss_nd;                 // NOLINT
+c10::Symbol cross_entropy_loss;          // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializeAtenSymbols() {
   // clang-format on
   logging::trace("Initializing aten symbols");
-  SYMBOL_INIT(aten, relu_)
-  SYMBOL_INIT(aten, dropout_)
-  SYMBOL_INIT(aten, hardtanh_)
   SYMBOL_INIT(aten, logical_not)
   SYMBOL_INIT(aten, floor_divide)
   SYMBOL_INIT(aten, prelu_)
   SYMBOL_INIT(aten, leaky_relu_)
   SYMBOL_INIT(aten, elu_)
   SYMBOL_INIT(aten, selu_)
-  SYMBOL_INIT(aten, isnan)
   SYMBOL_INIT(aten, isinf)
   SYMBOL_INIT(aten, uniform_)
   SYMBOL_INIT(aten, normal_)
@@ -65,11 +57,11 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, amax)
   SYMBOL_INIT(aten, amin)
   SYMBOL_INIT(aten, pow_)
-  SYMBOL_INIT(aten, sigmoid_)
-  SYMBOL_INIT(aten, tanh_)
   SYMBOL_INIT(aten, scatter_add_)
   SYMBOL_INIT(aten, feature_dropout_)
   SYMBOL_INIT(aten, roll)
+  SYMBOL_INIT(aten, nll_loss_nd)
+  SYMBOL_INIT(aten, cross_entropy_loss)
 }
 
 } // namespace c10::aten

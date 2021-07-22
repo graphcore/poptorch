@@ -6,16 +6,12 @@
 // Create all the C10 symbols.
 // For some reason the below symbols are missing from the c10 namespace.
 namespace c10::aten {
-extern c10::Symbol relu_;                       // NOLINT
-extern c10::Symbol dropout_;                    // NOLINT
-extern c10::Symbol hardtanh_;                   // NOLINT
 extern c10::Symbol logical_not;                 // NOLINT
 extern c10::Symbol floor_divide;                // NOLINT
 extern c10::Symbol prelu_;                      // NOLINT
 extern c10::Symbol leaky_relu_;                 // NOLINT
 extern c10::Symbol elu_;                        // NOLINT
 extern c10::Symbol selu_;                       // NOLINT
-extern c10::Symbol isnan;                       // NOLINT
 extern c10::Symbol isinf;                       // NOLINT
 extern c10::Symbol uniform_;                    // NOLINT
 extern c10::Symbol normal_;                     // NOLINT
@@ -29,11 +25,11 @@ extern c10::Symbol one_hot;                     // NOLINT
 extern c10::Symbol amax;                        // NOLINT
 extern c10::Symbol amin;                        // NOLINT
 extern c10::Symbol pow_;                        // NOLINT
-extern c10::Symbol sigmoid_;                    // NOLINT
-extern c10::Symbol tanh_;                       // NOLINT
 extern c10::Symbol scatter_add_;                // NOLINT
 extern c10::Symbol feature_dropout_;            // NOLINT
 extern c10::Symbol roll;                        // NOLINT
+extern c10::Symbol nll_loss_nd;                 // NOLINT
+extern c10::Symbol cross_entropy_loss;          // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {

@@ -367,12 +367,11 @@ def test_running_statistics(capfd, dtype, setting):
         log.assert_contains(
             "poptorch.Options set runningStatisticsAlwaysFloat to false")
 
-    if dtype == torch.float:
-        log.assert_contains("%24 : Float(16:1, requires_grad=0, device=cpu)):")
-    elif setting is None or setting:
-        log.assert_contains("%24 : Float(16:1, requires_grad=0, device=cpu)):")
-    else:
-        log.assert_contains("%24 : Half(16:1, requires_grad=0, device=cpu)):")
+    dtype_str = "Float" if dtype == torch.float or \
+        setting is None or setting else "Half"
+
+    log.assert_contains(
+        f"%22 : {dtype_str}(16, strides=[1], requires_grad=0, device=cpu)):")
 
 
 def test_ipu_context_flag():

@@ -25,7 +25,7 @@ class WrappedModel(torch.nn.Module):
     def __getattr__(self, attr):
         try:
             return torch.nn.Module.__getattr__(self, attr)
-        except torch.nn.modules.module.ModuleAttributeError:
+        except AttributeError:
             return getattr(self.wrapped, attr)
 
 

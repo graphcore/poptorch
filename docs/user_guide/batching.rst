@@ -21,7 +21,7 @@ actually sent for a single step.
 poptorch.DataLoader
 ===================
 
-Poptorch provides a thin wrapper around the traditional `torch.utils.data.DataLoader <https://pytorch.org/docs/1.7.1/data.html#torch.utils.data.DataLoader>`_
+PopTorch provides a thin wrapper around the traditional `torch.utils.data.DataLoader <https://pytorch.org/docs/1.9.0/data.html#torch.utils.data.DataLoader>`_
 to abstract away some of the batch sizes calculations. If :py:class:`poptorch.DataLoader`
 is used in a distributed execution environment, it will ensure that each process uses
 a different subset of the dataset.
@@ -82,10 +82,10 @@ executing and returns to host the data will be ready for the IPU to pull in agai
 Rebatching iterable datasets
 ----------------------------
 
-There are `two types of datasets in PyTorch <https://pytorch.org/docs/1.7.1/data.html#dataset-types>`_ : map-style datasets and iterable datasets.
+There are `two types of datasets in PyTorch <https://pytorch.org/docs/1.9.0/data.html#dataset-types>`_ : map-style datasets and iterable datasets.
 
-As explained in the notes of PyTorch's `Data Loading Order and Sampler <https://pytorch.org/docs/1.7.1/data.html#data-loading-order-and-sampler>`_ : for
-`IterableDataset <https://pytorch.org/docs/1.7.1/data.html#torch.utils.data.IterableDataset>`_ :
+As explained in the notes of PyTorch's `Data Loading Order and Sampler <https://pytorch.org/docs/1.9.0/data.html#data-loading-order-and-sampler>`_ : for
+`IterableDataset <https://pytorch.org/docs/1.9.0/data.html#torch.utils.data.IterableDataset>`_ :
 "When fetching from iterable-style datasets with multi-processing, the drop_last argument drops the
 last non-full batch of each worker’s dataset replica."
 

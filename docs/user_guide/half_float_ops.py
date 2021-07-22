@@ -74,8 +74,8 @@ class Model(torch.nn.Module):
     def forward(self, x):
         # dtype is ignored, however the type is resolved to be the type of x
         ud = torch.distributions.uniform.Uniform(
-            torch.tensor([10.0], dtype=torch.float16),
-            torch.tensor([10.0], dtype=torch.float32))
+            torch.tensor([0.0], dtype=torch.float16),
+            torch.tensor([1.0], dtype=torch.float32))
         return ud.sample((10, 10, 1000)) + x
 
 

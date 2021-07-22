@@ -70,7 +70,7 @@ class SGD(torch.optim.SGD):
     """ Stochastic gradient descent with optional momentum.
 
     The optimizer is based on PyTorch's implementation
-    (`torch.optim.SGD <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.SGD>`_)
+    (`torch.optim.SGD <https://pytorch.org/docs/1.9.0/optim.html#torch.optim.SGD>`_)
     with optional loss and velocity scaling.
 
     Nesterov momentum is not currently supported.
@@ -256,7 +256,7 @@ class Adam(torch.optim.Adam):
     """ Adam optimizer.
 
     This optimizer matches PyTorch's implementation
-    (`torch.optim.Adam <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.Adam>`_) with
+    (`torch.optim.Adam <https://pytorch.org/docs/1.9.0/optim.html#torch.optim.Adam>`_) with
     optional loss scaling.
 
     AMSGrad is currently not supported."""
@@ -352,7 +352,7 @@ class AdamW(torch.optim.AdamW):
     """ Adam optimizer with true weight decay.
 
     This optimizer matches PyTorch's implementation
-    (`torch.optim.AdamW <https://pytorch.org/docs/1.7.1/optim.htmltorch.optim.AdamW>`_)
+    (`torch.optim.AdamW <https://pytorch.org/docs/1.9.0/optim.htmltorch.optim.AdamW>`_)
     with optional loss scaling.
 
     AMSGrad is currently not supported."""
@@ -453,7 +453,7 @@ class RMSprop(torch.optim.RMSprop):
     """ RMSprop optimizer with optional L2 penalty.
 
     This optimizer matches PyTorch's implementation (
-    `torch.optim.RMSprop <https://pytorch.org/docs/1.7.1/optim.html#torch.optim.RMSprop>`_)
+    `torch.optim.RMSprop <https://pytorch.org/docs/1.9.0/optim.html#torch.optim.RMSprop>`_)
     with optional loss scaling.
 
     However, if the use_tf_variant flag is set to True, it will instead match

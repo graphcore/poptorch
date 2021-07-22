@@ -305,7 +305,8 @@ Dropout
 Sparse layers
 -------------
 
-Embedding is supported with the exception of ``padding_idx`` being ignored.
+Embedding and EmbeddingBag are supported with the exception of the ``padding_idx`` parameter
+being unsupported.
 
 * ``torch.nn.Embedding``
 * ``torch.nn.EmbeddingBag``

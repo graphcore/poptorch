@@ -40,14 +40,10 @@ def test_autocast_decorator(capfd, setting):
     poptorch_model(x, y)
 
     testlog = helpers.LogChecker(capfd)
-    if setting == "false":
-        testlog.assert_contains(
-            "Float(1:400, 20:20, 20:1, requires_grad=0, device=cpu)" +
-            " = popart::matmul")
-    else:
-        testlog.assert_contains(
-            "Half(1:400, 20:20, 20:1, requires_grad=0, device=cpu)" +
-            " = popart::matmul")
+    test_type = "Float" if setting == "false" else "Half"
+    testlog.assert_contains(
+        f"{test_type}(1, 20, 20, strides=[400, 20, 1], requires_grad=0,"
+        " device=cpu) = popart::matmul")
 
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
@@ -83,14 +79,10 @@ def test_autocast_block(capfd, setting):
     poptorch_model(x, y)
 
     testlog = helpers.LogChecker(capfd)
-    if setting == "false":
-        testlog.assert_contains(
-            "Float(1:400, 20:20, 20:1, requires_grad=0, device=cpu)" +
-            " = popart::matmul")
-    else:
-        testlog.assert_contains(
-            "Half(1:400, 20:20, 20:1, requires_grad=0, device=cpu)" +
-            " = popart::matmul")
+    test_type = "Float" if setting == "false" else "Half"
+    testlog.assert_contains(
+        f"{test_type}(1, 20, 20, strides=[400, 20, 1], requires_grad=0,"
+        " device=cpu) = popart::matmul")
 
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
@@ -112,14 +104,10 @@ def test_enable_autocast(capfd, setting):
     poptorch_model(x)
 
     testlog = helpers.LogChecker(capfd)
-    if setting == "false":
-        testlog.assert_contains(
-            "Float(1:5120, 20:256, 16:16, 16:1, requires_grad=1, device=cpu)" +
-            " = popart::conv")
-    else:
-        testlog.assert_contains(
-            "Half(1:5120, 20:256, 16:16, 16:1, requires_grad=1, device=cpu)" +
-            " = popart::conv")
+    test_type = "Float" if setting == "false" else "Half"
+    testlog.assert_contains(
+        f"{test_type}(1, 20, 16, 16, strides=[5120, 256, 16, 1],"
+        " requires_grad=1, device=cpu) = popart::conv")
 
 
 @pytest.mark.parametrize("setting", {"hff", "hfh", "hhf", "default"})
@@ -157,43 +145,18 @@ def test_autocast_policy(capfd, setting):
     poptorch_model(x)
 
     testlog = helpers.LogChecker(capfd)
-    if setting == "hff":
-        testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::conv")
-        testlog.assert_contains(
-            "Float(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::mul")
-        testlog.assert_contains(
-            "Float(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::relu")
-    elif setting == "hfh":
-        testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::conv")
-        testlog.assert_contains(
-            "Float(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::mul")
-        testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::relu")
-    elif setting == "hhf":
-        testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::conv")
-        testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::mul")
-        testlog.assert_contains(
-            "Float(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::relu")
+    test_ops = ["conv", "mul", "relu"]
+    test_types = []
+    if setting == "default":
+        test_types = ["Half", "Half", "Half"]
     else:
+        for c in setting:
+            if c == "f":
+                test_types.append("Float")
+            elif c == "h":
+                test_types.append("Half")
+
+    for i, op in enumerate(test_ops):
         testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::conv")
-        testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::mul")
-        testlog.assert_contains(
-            "Half(1:1, 1:1, 1:1, 1:1, requires_grad=1, device=cpu)" +
-            " = popart::relu")
+            f"{test_types[i]}(1, 1, 1, 1, strides=[1, 1, 1, 1],"
+            f" requires_grad=1, device=cpu) = popart::{op}")

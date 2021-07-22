@@ -220,7 +220,41 @@ EXPECTED_FAILURES = {
     "test_nn_AdaptiveMaxPool3d_single": "T30564",
     "test_nn_Unfold": "T30606",
 
-    # unsupported upsamplig modes downstream
+    # torch.complex128 not supported
+    "test_nn_L1Loss_no_reduce_complex": "torch.complex128 not supported",
+    "test_nn_ReflectionPad1d_complex": "torch.complex128 not supported",
+    "test_nn_ReflectionPad2d_complex": "torch.complex128 not supported",
+    "test_nn_ReplicationPad1d_complex": "torch.complex128 not supported",
+    "test_nn_ReplicationPad2d_complex": "torch.complex128 not supported",
+    "test_nn_ConstantPad1d_complex": "torch.complex128 not supported",
+    "test_nn_ConstantPad2d_complex": "torch.complex128 not supported",
+    "test_nn_ConstantPad3d_complex": "torch.complex128 not supported",
+    "test_nn_ReplicationPad3d_complex": "torch.complex128 not supported",
+    "test_nn_ZeroPad2d_complex": "torch.complex128 not supported",
+
+    # TODO(T42768): Support aten::_convolution_mode
+    "test_nn_Conv1d_pad_valid": "T42768",
+    "test_nn_Conv1d_pad_same": "T42768",
+    "test_nn_Conv1d_pad_same2": "T42768",
+    "test_nn_Conv1d_pad_same_dilated": "T42768",
+    "test_nn_Conv2d_pad_valid": "T42768",
+    "test_nn_Conv2d_pad_same": "T42768",
+    "test_nn_Conv2d_pad_same_dilated": "T42768",
+    "test_nn_Conv3d_pad_valid": "T42768",
+    "test_nn_Conv3d_pad_same": "T42768",
+    "test_nn_Conv3d_pad_same_dilated": "T42768",
+
+    # TODO(T42770): Support torch.nn.HuberLoss
+    "test_nn_HuberLoss_delta": "T42770",
+
+    # TODO(T42771): Support torch.nn.PixelUnshuffle
+    "test_nn_PixelUnshuffle": "T42771",
+
+    # TODO(T42772): Support torch.nn.Mish
+    "test_nn_Mish": "T42772",
+    "test_nn_Mish_scalar": "T42772",
+
+    # unsupported upsampling modes downstream
     "test_nn_interpolate_linear_1d": "Upsample mode not supported",
     "test_nn_interpolate_linear_tuple_1d": "Upsample mode not supported",
     "test_nn_interpolate_linear_scale_1d": "Upsample mode not supported",
@@ -258,6 +292,10 @@ EXPECTED_FAILURES = {
     "test_nn_Embedding_sparse": "T27057: sparse gradient support",
 
     "test_nn_MultiheadAttention": "ai.onnx.Dropout:10 ratio value 0 is not valid",
+
+    "test_nn_EmbeddingBag_sum_padding_idx": "padding_idx not supported",
+    "test_nn_EmbeddingBag_mean_padding_idx": "padding_idx not supported",
+    "test_nn_EmbeddingBag_max_padding_idx": "padding_idx not supported",
 }
 
 HALF_EXPECTED_FAILURES = {
@@ -278,14 +316,18 @@ HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
     "test_nn_Conv2d_depthwise_padded": (0.05, 1e-3), # TODO(T31811)?
     "test_nn_Conv3d_dilated": (0.05, 1e-3),
+    "test_nn_Conv2d_groups": (0.05, 1e-3),
     "test_nn_Conv3d_groups": (0.05, 1e-3),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),
     "test_nn_BatchNorm2d_not_tracking_stats": (0.05, 1e-3),
-    "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-3),
-    "test_nn_TransformerDecoderLayer_relu_activation": (0.05, 1e-3),
+    "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-2),
+    "test_nn_TransformerDecoderLayer_relu_activation": (0.05, 1e-2),
     "test_nn_Linear_no_bias": (0.05, 1e-3),
     "test_nn_Conv2d_replicate_stride2_pad2": (0.05, 1e-3),
+    "test_nn_Transformer_multilayer_coder": (0.05, 1e-2),
+    "test_nn_GroupNorm_1d_affine_large_batch": (0.05, 1e-3),
+    "test_nn_GroupNorm_2d_affine_large_feature": (0.05, 1e-2),
 }
 
 # pylint: enable=line-too-long

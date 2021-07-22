@@ -205,7 +205,7 @@ def test_velocity_scaling_copy(use_combined_accum):
 
     model.run(optimizer)
 
-    # Check copy.copy preserves optimizer Poptorch attributes
+    # Check copy.copy preserves optimizer PopTorch attributes
     o = copy.copy(optimizer)
     model.setOptimizer(o)
     model.run()

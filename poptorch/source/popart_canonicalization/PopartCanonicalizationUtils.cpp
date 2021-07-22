@@ -385,6 +385,10 @@ bool attributeEqual(torch::jit::Node *a, torch::jit::Node *b,
     return a->g(attr) == b->g(attr);
   case torch::jit::AttributeKind::gs:
     return a->gs(attr) == b->gs(attr);
+  case torch::jit::AttributeKind::c:
+    return a->c(attr) == b->c(attr);
+  case torch::jit::AttributeKind::cs:
+    return a->cs(attr) == b->cs(attr);
   case torch::jit::AttributeKind::ty:
     return a->ty(attr) == b->ty(attr);
   case torch::jit::AttributeKind::tys:

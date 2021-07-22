@@ -460,21 +460,6 @@ torch::jit::Node *negHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createNeg(graph, {i0});
 }
 
-torch::jit::Node *nlllossHandler(torch::jit::Graph *graph,
-                                 torch::jit::Node *node) {
-  auto x = node->input(0);
-  auto y = node->input(1);
-  auto red = node->input(3);
-  auto t0 = constantToLong(red->node());
-  auto t1 = convertReduceToPopart(t0);
-  auto ignore_index = node->input(4);
-  auto t2 = constantToInt(ignore_index->node());
-  auto t3 = createNllloss(graph, {x, y}, t1, t2, true)->output();
-  // identityloss(nllloss(x, y, reduction(clong(red)), cint(ignore_index), 1),
-  // 2)
-  return createIdentityloss(graph, {t3}, 2);
-}
-
 torch::jit::Node *normalHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   auto x = node->input(0);
@@ -850,7 +835,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::mse_loss, mselossHandler);
   registerHandler(c10::aten::ne, neHandler);
   registerHandler(c10::aten::neg, negHandler);
-  registerHandler(c10::aten::nll_loss, nlllossHandler);
   registerHandler(c10::aten::normal_, normalHandler);
   registerHandler(c10::aten::pixel_shuffle, pixelshuffleHandler);
   registerHandler(c10::aten::pow, powHandler);
