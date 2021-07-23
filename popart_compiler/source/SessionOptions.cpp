@@ -343,6 +343,8 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableFloatingPointChecks);
   ADD_POPART_BOOL_OPTION(enableStochasticRounding);
   ADD_POPART_BOOL_OPTION(explicitRecomputation);
+  ADD_POPART_BOOL_OPTION(enableExplicitMainLoops);
+  ADD_POPART_BOOL_OPTION(useHostCopyOps);
   ADD_POPART_BOOL_OPTION(aliasZeroCopy);
   ADD_POPART_BOOL_OPTION(delayVarUpdates);
   ADD_POPART_BOOL_OPTION(enableFullyConnectedPass);
