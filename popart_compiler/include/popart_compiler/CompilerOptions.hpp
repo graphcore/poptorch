@@ -135,6 +135,9 @@ struct CompilerOptions {
   bool serial_phases_execution;
   bool separate_backward_phase;
   Liveness tensors_liveness;
+
+  // Debug name for the model
+  std::string model_name;
 };
 
 } // namespace detail

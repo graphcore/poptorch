@@ -109,7 +109,6 @@ public:
   SessionOptions &operator=(const SessionOptions &) = delete;
 
   void setMemoryProportion(std::uint32_t ipu, float memory);
-
   void setPatternsLevel(std::uint64_t level);
   void addPattern(const char *pattern, bool enabled);
   void setTensorLocation(const char *tensor, const char *option,

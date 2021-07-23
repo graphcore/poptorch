@@ -564,6 +564,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         _impl->options.external_initializers_file);
   }
 
+  auto model_name_set = _impl->options_set.count("model_name") > 0;
+
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.
@@ -571,7 +573,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         "Compiler::initSession popart::InferenceSession::createFromOnnxModel"};
     _impl->session = popart::InferenceSession::createFromOnnxModel(
         _impl->active_builder->getModelProto(), data_flow, device, {}, options,
-        popart::PatternsLevel::Default);
+        popart::PatternsLevel::Default,
+        model_name_set ? _impl->options.model_name : "inference");
   } else {
     // Create the optimizer from user provided parameters.
     std::unique_ptr<popart::Optimizer> optimizer =
@@ -582,7 +585,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         "Compiler::initSession popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
         _impl->active_builder->getModelProto(), data_flow, _impl->loss,
-        *optimizer, device, {}, options, _impl->options.patterns);
+        *optimizer, device, {}, options, _impl->options.patterns,
+        model_name_set ? _impl->options.model_name : "training");
   }
 }
 

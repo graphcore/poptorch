@@ -1258,6 +1258,17 @@ class Options(_options_impl.OptionsDict):
         self.set(log_dir=log_dir)
         return self
 
+    def modelName(self, name: str) -> "poptorch.Options":
+        """Set the model name
+
+        :param name:
+            Name of the model defaults to "inference" or "training" depending
+            on the type of model created. Used when profiling to set the
+            subdirectory of the report directory to output the profiling too.
+        """
+        self.createOrSet(model_name=name)
+        return self
+
     def enableExecutableCaching(self, path: str) -> "poptorch.Options":
         """Load/save Poplar executables to the specified ``path``, using it as
         a cache,  to avoid recompiling identical graphs.

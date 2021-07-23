@@ -201,6 +201,10 @@ SessionOptionsImpl::SessionOptionsImpl() {
         "poptorch.Options.logDir() instead");
   };
 
+  registerSetter(string_options, "model_name", [&](const std::string &value) {
+    poptorch_options.model_name = value;
+  });
+
   registerSetter(
       container_options, "dotChecks",
       [&](const std::pair<std::string, std::string> &p) {

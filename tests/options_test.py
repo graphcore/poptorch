@@ -421,6 +421,25 @@ def test_log_cycle_count(capfd):
     log.validate()
 
 
+def test_profile_report_with_model_name():
+    def test(dirname):
+        model = torch.nn.Linear(100, 100)
+        opts = poptorch.Options()
+        opts.modelName("tommyflowers")
+        opts.enableProfiling(dirname)
+
+        poptorch_model = poptorch.inferenceModel(model, opts)
+        x = torch.randn(100, 100)
+        poptorch_model(x)
+
+    dirname = tempfile.mkdtemp()
+    x = threading.Thread(target=test, args=(dirname, ))
+    x.start()
+    x.join()
+
+    assert os.path.exists(os.path.join(dirname, "tommyflowers", "profile.pop"))
+
+
 def test_profile_report():
     def test(dirname):
         model = torch.nn.Linear(100, 100)
