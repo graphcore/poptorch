@@ -679,11 +679,6 @@ poptorch.identity_loss
 You can use this function to implement custom losses. It takes a single PyTorch tensor
 and will backpropagate a gradient of ones through it.
 
-.. note::
-   Passing a PyTorch loss function or another ``identity_loss`` to this function is not
-   supported. You must implement multiple losses as composite PyTorch ops.
-
-
 .. literalinclude:: api.py
   :language: python
   :linenos:
