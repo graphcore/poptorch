@@ -350,7 +350,8 @@ class PoplarExecutor:
         # Note: if multiple processes run on the same host, it's recommended
         # to enable executable caching to avoid out of memory issues due
         # to concurrent compilation processes.
-        poptorch_core.loadEngineAndConnectStreams(self._executable)
+        if self._options.connection_type != enums.ConnectionType.Never:
+            poptorch_core.loadEngineAndConnectStreams(self._executable)
 
     def _compile(self, in_tensors):
         with self._profiling.tracepoint("modelCompilation"):
