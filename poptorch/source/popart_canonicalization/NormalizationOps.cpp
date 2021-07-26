@@ -170,6 +170,16 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   // Bias to add.
   torch::jit::Value *beta = node->input(3);
 
+  // GroupNorm takes per-channel affine parameters whereas LayerNorm takes
+  // elementwise affine parameters. Therefore we first need to reshape such that
+  // the affine parameters are "per-channel" which in the case of LayerNorm is
+  // equivalent to flattening them
+  auto numel_affine = gamma->type()->expect<c10::TensorType>()->numel().value();
+  gamma = createReshape(graph, gamma, {static_cast<std::int64_t>(numel_affine)})
+              ->output();
+  beta = createReshape(graph, beta, {static_cast<std::int64_t>(numel_affine)})
+             ->output();
+
   const float epsilon = constantToFloat(node->input(4)->node());
 
   // Pytorch normalizes across arbitrary number of dimensions from the end.

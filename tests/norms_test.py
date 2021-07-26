@@ -108,8 +108,7 @@ def test_layerNorm():
         # Run pytorch native on CPU.
         native_out, _ = model((input, ))
 
-        # TODO(T39897): Change to training model when issue is fixed
-        poptorch_model = poptorch.inferenceModel(model)
+        poptorch_model = poptorch.trainingModel(model)
         # Run on IPU.
         poptorch_out, _ = poptorch_model((input, ))
 
@@ -120,8 +119,7 @@ def test_layerNorm():
                                 rtol=1e-4)
 
         # Training test - check weights changed
-        # TODO(T39897): Enable training test when issue is fixed
-        # poptorch_model.assert_weights_changed()
+        poptorch_model.assert_weights_changed()
 
 
 def test_layerNormPretrainedWeights():
