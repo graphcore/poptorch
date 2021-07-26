@@ -48,7 +48,12 @@ _conda_poptorch_packages = [
     "wheel==0.34.2",
 ]
 
-_conda_popart_packages = ["boost=1.70.0", "capnproto=0.6.1", "pycapnp=0.6.4"]
+_conda_popart_packages = [
+    "boost=1.70.0",
+    "capnproto=0.6.1",
+    "pycapnp=0.6.4",
+    "mypy=0.812",
+]
 
 _conda_protobuf_packages = ["libprotobuf-static=3.14.0", "protobuf=3.14.0"]
 _conda_toolchains_packages = ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
