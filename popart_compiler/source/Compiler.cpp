@@ -423,6 +423,8 @@ void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
 }
 
 void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
+  logging::LogContext ctx_init_session{"Compiler::initSession"};
+
   logging::trace("Initializing session");
 
   // Some simple PyTorch models will not need an IPU at all. However, we do not
@@ -555,8 +557,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
 
   // Save the initializers to an external file if requested.
   if (!_impl->options.external_initializers_file.empty()) {
-    logging::LogContext ctx{
-        "Compiler::initSession popart::Builder::saveInitializersExternally"};
+    logging::LogContext ctx{"popart::Builder::saveInitializersExternally"};
     logging::trace("Saving initializers to external file {}",
                    _impl->options.external_initializers_file);
     _impl->active_builder->saveInitializersExternally(
@@ -569,8 +570,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.
-    logging::LogContext ctx{
-        "Compiler::initSession popart::InferenceSession::createFromOnnxModel"};
+    logging::LogContext ctx{"popart::InferenceSession::createFromOnnxModel"};
     _impl->session = popart::InferenceSession::createFromOnnxModel(
         _impl->active_builder->getModelProto(), data_flow, device, {}, options,
         popart::PatternsLevel::Default,
@@ -581,8 +581,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
         _impl->getPopartOptimizer(optimizers);
 
     // Create the training session.
-    logging::LogContext ctx{
-        "Compiler::initSession popart::TrainingSession::createFromOnnxModel"};
+    logging::LogContext ctx{"popart::TrainingSession::createFromOnnxModel"};
     _impl->session = popart::TrainingSession::createFromOnnxModel(
         _impl->active_builder->getModelProto(), data_flow, _impl->loss,
         *optimizer, device, {}, options, _impl->options.patterns,
@@ -595,9 +594,7 @@ void Compiler::compileAndExport(const char *filename) {
                "Nothing to export. This may be because the model does not run "
                "any op on the IPU.");
 
-  logging::LogContext ctx{
-      "Compiler::compileAndExport popart::Session::compileAndExport: Poplar "
-      "compilation"};
+  logging::LogContext ctx_function{"Compiler::compileAndExport"};
   // We use std::ios_base::ate to append to the file: the Python frontend
   // will have already created the folder and written the Poptorch python
   // data in the file.
@@ -609,6 +606,8 @@ void Compiler::compileAndExport(const char *filename) {
   ERROR_ON_MSG(!stream.is_open(),
                "Failed to open " + std::string(filename) + " for writing");
   stream.seekp(0, std::ios::end);
+  logging::LogContext ctx{
+      "popart::Session::compileAndExport: Poplar compilation"};
   _impl->session->compileAndExport(stream);
   stream.flush();
   stream.close();
@@ -619,7 +618,7 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
   ERROR_ON_MSG(!_impl->session, "Nothing to import. This may be because the "
                                 "model does not run any op on an IPU.");
 
-  logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice "};
+  logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice"};
   std::ifstream stream(import_filename, std::ifstream::binary);
   ERROR_ON_MSG(!stream.is_open(), "Failed to open " +
                                       std::string(import_filename) +
@@ -727,11 +726,11 @@ void Compiler::compileAndPrepareDevice() {
 
     return;
   }
+  logging::LogContext ctx_func{"Compiler::compileAndPrepareDevice"};
 
   // Poplar compilation.
   try {
-    logging::LogContext ctx{"Compiler::compileAndPrepareDevice "
-                            "popart::Session::prepareDevice: Poplar "
+    logging::LogContext ctx{"popart::Session::prepareDevice: Poplar "
                             "compilation"};
     logging::trace("Begining Poplar compilation.");
     constexpr bool load_engine = false;
@@ -1306,4 +1305,73 @@ size_t Compiler::getNumInputs() const { return _impl->inputs.size(); }
 
 size_t Compiler::getNumOutputs() const { return _impl->outputs.size(); }
 
+namespace detail {
+struct ExceptionInfoImpl {
+  std::string type;
+  std::vector<std::string> stack;
+
+  void extractStack(const popart::error *e);
+};
+
+void ExceptionInfoImpl::extractStack(const popart::error *e) {
+  std::istringstream iss(e->stackreport());
+  std::string line;
+  // PopART adds a numbered prefix to each stack line: remove it:
+  // [0] top_level_fn()
+  // [1] main()
+  //
+  // Becomes:
+  //
+  // top_level_fn()
+  // main()
+  while (std::getline(iss, line)) {
+    size_t first_space = line.find_first_of(' ');
+    if (first_space == std::string::npos) {
+      first_space = 0;
+    } else {
+      // Start at the first character after the space
+      ++first_space;
+    }
+    stack.push_back(line.substr(first_space));
+  }
+}
+} // namespace detail
+
+ExceptionInfo::ExceptionInfo(const std::exception &e)
+    : _impl(std::make_unique<detail::ExceptionInfoImpl>()) {
+  switch (popart::getErrorSource(e)) {
+  case popart::ErrorSource::popart_internal: {
+    _impl->type = "popart_internal_exception";
+    _impl->extractStack(dynamic_cast<const popart::error *>(&e));
+    break;
+  }
+  case popart::ErrorSource::popart: {
+    _impl->type = "popart_exception";
+    _impl->extractStack(dynamic_cast<const popart::error *>(&e));
+    break;
+  }
+  case popart::ErrorSource::poplar: {
+    _impl->type = "poplar_exception";
+    break;
+  }
+  case popart::ErrorSource::poplibs: {
+    _impl->type = "poplibs_exception";
+    break;
+  }
+  default: {
+    _impl->type = "std::exception";
+    break;
+  }
+  }
+}
+
+const char *ExceptionInfo::type() const { return _impl->type.c_str(); }
+
+int64_t ExceptionInfo::stackDepth() const { return _impl->stack.size(); }
+
+const char *ExceptionInfo::stack(int64_t level) const {
+  return _impl->stack.at(level).c_str();
+}
+
+ExceptionInfo::~ExceptionInfo() = default;
 } // namespace poptorch

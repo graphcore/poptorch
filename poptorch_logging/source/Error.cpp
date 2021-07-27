@@ -1,8 +1,31 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "poptorch_logging/Error.hpp"
+
+#include <vector>
+
 #include "poptorch_logging/Logging.hpp"
 
 namespace logging {
+
+namespace {
+using Context = std::vector<std::string>;
+
+Context &getContext() {
+  static Context log_context{};
+  return log_context;
+}
+
+std::string singleLineContext() {
+  std::stringstream ss;
+  std::string sep{};
+  for (const auto &lvl : getContext()) {
+    ss << sep << lvl;
+    sep = " -> ";
+  }
+  return ss.str();
+}
+
+} // namespace
 
 const char *shortPoptorchFilename(const char *filename) {
   auto pos = std::string(filename).rfind("/poptorch/");
@@ -12,15 +35,9 @@ const char *shortPoptorchFilename(const char *filename) {
   return filename + pos + 1; // NOLINT
 }
 
-std::string &getContext() {
-  static std::string log_context;
-  return log_context;
-}
-
 namespace detail {
 struct LogContextImpl {
-  LogContextImpl() : saved_context(getContext()), cleared(true) {}
-  std::string saved_context;
+  LogContextImpl() : cleared(true) {}
   bool cleared;
   static bool trace_enabled;
 };
@@ -44,10 +61,10 @@ LogContext::LogContext(const char *context) : LogContext() {
 
 void LogContext::updateContext(const std::string &new_context) {
   clear();
-  getContext() = _impl->saved_context + " " + new_context;
+  getContext().push_back(new_context);
   _impl->cleared = false;
   if (detail::LogContextImpl::trace_enabled) {
-    logging::trace("[{}] Start", getContext());
+    logging::trace("[{}] Start", singleLineContext());
   }
 }
 
@@ -57,11 +74,11 @@ void LogContext::clear() {
     // we might want to recover the context later.
     if (!std::uncaught_exceptions()) {
       if (detail::LogContextImpl::trace_enabled && !getContext().empty()) {
-        logging::trace("[{}] End", getContext());
+        logging::trace("[{}] End", singleLineContext());
       }
       // Don't restore the saved context if the context has been cleared.
       if (!getContext().empty()) {
-        getContext() = _impl->saved_context;
+        getContext().pop_back();
       }
     }
     _impl->cleared = true;
@@ -70,8 +87,28 @@ void LogContext::clear() {
 
 LogContext::~LogContext() { clear(); }
 
-/* static */ const char *LogContext::context() { return getContext().c_str(); }
+/* static */ std::unique_ptr<char[]> LogContext::context() {
+  std::stringstream ss;
+  auto &ctx = getContext();
+  for (int64_t idx = ctx.size() - 1; idx >= 0; --idx) {
+    ss << "  [" << ctx.size() - idx - 1 << "] " << ctx.at(idx) << std::endl;
+  }
+
+  std::string str = ss.str();
+  if (str.empty()) {
+    return nullptr;
+  }
+
+  auto ptr = std::unique_ptr<char[]>(new char[str.size() + 1]);
+  str.copy(ptr.get(), std::string::npos);
+  ptr.get()[str.size()] = '\0';
+  return ptr;
+}
+
 /* static */ void LogContext::resetContext() { return getContext().clear(); }
 /* static */ bool LogContext::isEmpty() { return getContext().empty(); }
+/* static */ void LogContext::push(const char *new_context) {
+  getContext().push_back(new_context);
+}
 
 } // namespace logging

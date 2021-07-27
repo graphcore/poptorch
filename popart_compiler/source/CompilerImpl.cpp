@@ -30,7 +30,7 @@ namespace {
 std::string toString(const std::vector<std::string> &vec) {
   std::stringstream ss;
   ss << "[";
-  std::string sep;
+  std::string sep{};
   for (const auto &s : vec) {
     ss << sep << s;
     sep = ", ";

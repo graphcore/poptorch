@@ -62,9 +62,9 @@ private:
   }
 
   void run(torch::jit::Block *block) {
+    logging::LogContext ctx_func("PeepholeOptimizer");
     for (auto node : block->nodes()) {
-      logging::LogContext ctx("PeepholeOptimizer Processing " +
-                              nodeToString(node));
+      logging::LogContext ctx("Processing " + nodeToString(node));
       for (auto b : node->blocks()) {
         run(b);
       }

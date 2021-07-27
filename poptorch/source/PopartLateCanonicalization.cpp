@@ -169,6 +169,7 @@ private:
 };
 
 void canonicalizeLate(torch::jit::Graph *graph) {
+  logging::LogContext ctx_func("canonicalizeLate");
   /*
    * Perform the operation by looking for nodes we know need to be patched and
    * add the patching code to the callback which then all get called at once.
@@ -179,8 +180,7 @@ void canonicalizeLate(torch::jit::Graph *graph) {
 
   // Look for the nodes.
   for (torch::jit::Node *node : graph->nodes()) {
-    logging::LogContext ctx("canonicalizeLate Processing " +
-                            nodeToString(node));
+    logging::LogContext ctx("Processing " + nodeToString(node));
     const torch::jit::Symbol kind = node->kind();
 
     if (kind == symbols::poptorch::begin_multi_conv) {

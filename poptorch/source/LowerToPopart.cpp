@@ -336,7 +336,7 @@ void maskVector(std::vector<T> *vec, const std::vector<bool> &mask,
 std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
   ERROR_ON_MSG(!_lowered, "You need to lower() the graph first");
 
-  logging::LogContext ctx("LowerToPopart::compile ");
+  logging::LogContext ctx("LowerToPopart::compile");
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizers);
 
@@ -356,7 +356,7 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
 std::shared_ptr<poptorch::PoplarExecutable>
 LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
                                           std::int64_t offset) {
-  logging::LogContext ctx("LowerToPopart::loadExecutableFromFile ");
+  logging::LogContext ctx("LowerToPopart::loadExecutableFromFile");
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizers);
   _compiler.loadExecutableAndPrepareDevice(input_filename.c_str(), offset);
@@ -375,7 +375,7 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
 void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
   ERROR_ON_MSG(!_lowered, "You need to lower() the graph first");
 
-  logging::LogContext ctx("LowerToPopart::compileAndExport ");
+  logging::LogContext ctx("LowerToPopart::compileAndExport");
   _compiler.initSession(_optimizers);
   _compiler.compileAndExport(export_filename.c_str());
 }
@@ -560,9 +560,9 @@ LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
 
 // Lower the main body of the _graph.
 void LowerToPopartImpl::lowerBody() {
+  logging::LogContext ctx_func("LowerToPopartImpl::lowerBody");
   for (torch::jit::Node *node : _graph.nodes()) {
-    logging::LogContext ctx("LowerToPopartImpl::lowerBody processing " +
-                            nodeToString(node));
+    logging::LogContext ctx("processing " + nodeToString(node));
     // Switch/lookup based on the actual int value.
     const c10::Symbol kind = node->kind();
 
@@ -1051,7 +1051,7 @@ std::vector<float> convertType(const std::vector<double> &v) {
 }
 
 PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
-  logging::LogContext ctx("convertTensorConstantNode processing " +
+  logging::LogContext ctx("convertTensorConstantNode: processing " +
                           nodeToString(node));
 
   ERROR_ON_MSG(
@@ -1076,7 +1076,7 @@ PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
 
 HostSideConstant
 convertHostSideTensorConstantNode(const torch::jit::Node *node) {
-  logging::LogContext ctx("convertHostSideTensorConstantNode processing " +
+  logging::LogContext ctx("convertHostSideTensorConstantNode: processing " +
                           nodeToString(node));
   ERROR_ON_MSG(node->kind() != symbols::poptorch::host_side_tensor_constant,
                "Only a poptorch::host_side_tensor_constant can be converted "
@@ -1142,7 +1142,7 @@ void processListAttribute(
 std::shared_ptr<std::vector<PopartAttribute>>
 convertCustomOpAttributes(const torch::jit::Node *node,
                           const py::function &attribute_accessor) {
-  logging::LogContext ctx("convertCustomOpAttributes processing " +
+  logging::LogContext ctx("convertCustomOpAttributes: processing " +
                           nodeToString(node));
   std::string attributes_id_str(
       node->s(c10::Symbol::fromQualString("attr::attributes_id")));

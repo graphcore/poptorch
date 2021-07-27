@@ -37,6 +37,43 @@
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
+namespace {
+std::string formatException(const std::exception &e) {
+  std::string type = "std::exception";
+  poptorch::ExceptionInfo info(e);
+  std::stringstream msg;
+  msg << "'" << info.type() << "': ";
+  const std::string &what = e.what();
+  if (std::count(what.begin(), what.end(), '\n') > 80) {
+    std::ofstream log;
+    log.open(ERROR_LOG);
+    log << e.what();
+    log.close();
+    msg << "See " ERROR_LOG " for details";
+  } else {
+    msg << e.what();
+  }
+  // Add the exception's stack trace to the PopTorch one
+  for (int64_t i = info.stackDepth() - 1; i >= 0; --i) {
+    logging::LogContext::push(info.stack(i));
+  }
+
+  return msg.str();
+}
+} // namespace
+
+// This is needed to catch STL exceptions and attach some context to them.
+#define CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION                                \
+  catch (const logging::Error &e) {                                            \
+    throw e;                                                                   \
+  }                                                                            \
+  catch (const std::out_of_range &e) {                                         \
+    ERROR("'std::out_of_range' exception: " << e.what());                      \
+  }                                                                            \
+  catch (const std::exception &e) {                                            \
+    ERROR(formatException(e));                                                 \
+  }
+
 void beginIpuBlock(int64_t stage_id, int64_t phase_id, int64_t ipu_id) {
   UNUSED(stage_id);
   UNUSED(phase_id);
@@ -248,23 +285,26 @@ void registerBuffersWithCallback(
     std::vector<at::Tensor> &input_tensors, // NOLINT
     std::vector<at::Tensor> &output_tensors // NOLINT
 ) {
-  auto itr = callbacks.find(ID);
+  try {
+    auto itr = callbacks.find(ID);
 
-  ERROR_ON_MSG(itr == callbacks.end(), "Callback has not been registered.");
+    ERROR_ON_MSG(itr == callbacks.end(), "Callback has not been registered.");
 
-  CallbackMetadata &metadata = itr->second;
+    CallbackMetadata &metadata = itr->second;
 
-  // Track the input tensors. Our python creates a persistent storage location
-  // for the inputs and outputs.
-  for (at::Tensor &tensor : input_tensors) {
-    metadata.input_pointers.push_back(tensor.data_ptr());
+    // Track the input tensors. Our python creates a persistent storage location
+    // for the inputs and outputs.
+    for (at::Tensor &tensor : input_tensors) {
+      metadata.input_pointers.push_back(tensor.data_ptr());
+    }
+
+    // Same for output.
+    for (at::Tensor &tensor : output_tensors) {
+      tensor = tensor.contiguous();
+      metadata.output_pointers.push_back(tensor.data_ptr());
+    }
   }
-
-  // Same for output.
-  for (at::Tensor &tensor : output_tensors) {
-    tensor = tensor.contiguous();
-    metadata.output_pointers.push_back(tensor.data_ptr());
-  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 // Python interface to map a given CPU op with the IR calls.
@@ -313,6 +353,7 @@ void getOptimizerValue(T &value, const py::dict &d, const std::string &key) {
 }
 
 void copyParametersDict(Optimizer *out, const py::dict &in) {
+  logging::LogContext ctx_func("copyParametersDict");
   out->parameters.resize(in.size());
   std::uint64_t param_idx = 0;
   for (auto optimizer_field : in) {
@@ -320,7 +361,7 @@ void copyParametersDict(Optimizer *out, const py::dict &in) {
     param_idx++;
 
     const std::string name = optimizer_field.first.cast<std::string>();
-    logging::LogContext ctx("copyParametersDict attr: " + name);
+    logging::LogContext ctx("attr: " + name);
     std::pair<float, bool> p =
         optimizer_field.second.cast<std::pair<float, bool>>();
 
@@ -504,12 +545,13 @@ void parseAnchors(AnchorList *map, const py::list &list) {
 }
 
 SessionOptions parseSessionOptions(const py::dict &opt) {
+  logging::LogContext ctx_func("parseSessionOptions");
   // steps, replicationFactor, profile
   SessionOptions options;
 
   for (auto element : opt) {
     auto option_name = element.first.cast<std::string>();
-    logging::LogContext ctx("parseSessionOptions option: " + option_name);
+    logging::LogContext ctx("option: " + option_name);
     // Exception patterns_level is handled at the same time as "patterns"
     if (option_name == "patterns_level" || option_name == "anchored_tensors") {
       continue;
@@ -922,50 +964,68 @@ void copyWeightsToHostImpl(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors) {
-  // Copy the weights or warn if this is before first time compilation.
-  if (!executable) {
-    logging::warn(
-        "Call to copyWeightsToHost ignored as model has not been compiled "
-        "(PopTorch will compile models on first invocation).");
-  } else {
-    executable->copyWeightsToHost(
-        getParameterBuffers(parameter_names, parameter_tensors));
+  try {
+    // Copy the weights or warn if this is before first time compilation.
+    if (!executable) {
+      logging::warn(
+          "Call to copyWeightsToHost ignored as model has not been compiled "
+          "(PopTorch will compile models on first invocation).");
+    } else {
+      executable->copyWeightsToHost(
+          getParameterBuffers(parameter_names, parameter_tensors));
+    }
   }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void copyWeightsToDeviceImpl(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors) {
-  // Copy the weights or warn if this is before first time compilation.
-  if (!executable) {
-    logging::warn(
-        "Call to copyWeightsToDevice ignored as model has not been compiled "
-        "(PopTorch will compile models on first invocation).");
-  } else {
-    executable->copyWeightsToDevice(
-        getParameterBuffers(parameter_names, parameter_tensors));
+  try {
+    // Copy the weights or warn if this is before first time compilation.
+    if (!executable) {
+      logging::warn(
+          "Call to copyWeightsToDevice ignored as model has not been compiled "
+          "(PopTorch will compile models on first invocation).");
+    } else {
+      executable->copyWeightsToDevice(
+          getParameterBuffers(parameter_names, parameter_tensors));
+    }
   }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 std::string
 getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
-  return executable->getPopartIR();
+  try {
+    return executable->getPopartIR();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void detachFromDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
-  executable->detachFromDevice();
+  try {
+    executable->detachFromDevice();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void attachToDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
-  executable->attachToDevice();
+  try {
+    executable->attachToDevice();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 bool isAttachedToDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
-  return executable->isAttachedToDevice();
+  try {
+    return executable->isAttachedToDevice();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void setLogLevel(std::uint64_t level) {
@@ -976,7 +1036,10 @@ void setLogLevel(std::uint64_t level) {
 
 void loadEngineAndConnectStreams(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
-  executable->loadEngineAndConnectStreams();
+  try {
+    executable->loadEngineAndConnectStreams();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 std::vector<pybind11::object>
@@ -1088,21 +1151,24 @@ getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
 }
 
 void processPrecisionOptions(py::handle h) {
-  auto values_dict = h.attr("_values").cast<py::dict>();
+  try {
+    auto values_dict = h.attr("_values").cast<py::dict>();
 
-  poptorch::setAutocastEnabled(values_dict["autocast_enabled"].cast<bool>());
+    poptorch::setAutocastEnabled(values_dict["autocast_enabled"].cast<bool>());
 
-  auto policy = values_dict["autocast_policy_dict"].cast<py::dict>();
-  setAutocastHalf(policy["fp16"].cast<std::vector<std::string>>());
-  setAutocastFloat(policy["fp32"].cast<std::vector<std::string>>());
-  setAutocastPromote(policy["promote"].cast<std::vector<std::string>>());
-  setAutocastDemote(policy["demote"].cast<std::vector<std::string>>());
+    auto policy = values_dict["autocast_policy_dict"].cast<py::dict>();
+    setAutocastHalf(policy["fp16"].cast<std::vector<std::string>>());
+    setAutocastFloat(policy["fp32"].cast<std::vector<std::string>>());
+    setAutocastPromote(policy["promote"].cast<std::vector<std::string>>());
+    setAutocastDemote(policy["demote"].cast<std::vector<std::string>>());
 
-  poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
-      values_dict["half_float_casting"].cast<uint64_t>()));
+    poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
+        values_dict["half_float_casting"].cast<uint64_t>()));
 
-  poptorch::setRunningStatisticsAlwaysFloat(
-      values_dict["running_statistics_always_float"].cast<bool>());
+    poptorch::setRunningStatisticsAlwaysFloat(
+        values_dict["running_statistics_always_float"].cast<bool>());
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 void compileWithTraceAndExport(

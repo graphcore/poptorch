@@ -147,6 +147,7 @@ void checkAndChangeOutputTypesForOutput(torch::jit::Node *node,
 } // namespace
 
 void checkAndChangeOutputTypes(torch::jit::Graph *graph) {
+  logging::LogContext ctx_func("CheckAndChangeOutputTypes");
   for (auto n : graph->nodes()) {
     // Unpacks will happen before a host side cast, so ignore here
     if (n->kind() == c10::prim::TupleUnpack ||
@@ -154,8 +155,7 @@ void checkAndChangeOutputTypes(torch::jit::Graph *graph) {
       continue;
     }
 
-    logging::LogContext ctx("CheckAndChangeOutputTypes processing " +
-                            nodeToString(n));
+    logging::LogContext ctx("processing " + nodeToString(n));
 
     for (auto output : n->outputs()) {
       logging::LogContext ctx_2(output->debugName());
