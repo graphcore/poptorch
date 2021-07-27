@@ -16,7 +16,7 @@ void canonicalizeLists(torch::jit::Graph *graph) {
 
   // 1st pass. Looking for broadcasts.
   for (torch::jit::Node *node : graph->nodes()) {
-    logging::LogContext ctx("canonicalizeLists1 Processing " +
+    logging::LogContext ctx("canonicalizeLists1: Processing " +
                             nodeToString(node));
     const torch::jit::Symbol kind = node->kind();
     const std::string kind_as_str = kind.toDisplayString();
@@ -35,7 +35,7 @@ void canonicalizeLists(torch::jit::Graph *graph) {
 
   // 2nd pass. Hitting the actual loops.
   for (torch::jit::Node *list : graph->nodes()) {
-    logging::LogContext ctx("canonicalizeLists2 Processing " +
+    logging::LogContext ctx("canonicalizeLists2: Processing " +
                             nodeToString(list));
     const torch::jit::Symbol kind = list->kind();
     const std::string kind_as_str = kind.toDisplayString();

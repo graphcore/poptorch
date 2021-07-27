@@ -44,9 +44,9 @@ void recursivelySwitchType(torch::jit::Node *node,
 } // namespace
 
 void addListNumElements(torch::jit::Graph *graph, bool revert) {
+  logging::LogContext ctx_func("addListNumElements");
   for (torch::jit::Node *node : graph->nodes()) {
-    logging::LogContext ctx("addListNumElements processing " +
-                            nodeToString(node));
+    logging::LogContext ctx("processing " + nodeToString(node));
 
     if (node->kind() == c10::prim::ListConstruct) {
       auto list_inputs = node->inputs();
