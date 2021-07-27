@@ -8,8 +8,16 @@ v2.2 (Poplar SDK 2.2)
 New features
 ------------
 
-- Support for ``torch.roll``
 - Migrated to PyTorch version 1.9.0
+- Support for ``torch.roll``
+- Support for ``torch.clone``
+- Add modelName session option that can be passed to PopART
+- Support List inputs to a model
+- Tuples/Lists of constants can now be returned by a model
+- Add ``enableProfiling`` convenience method in ``poptorch.Options`` to enable profile report generation
+- Fix bug with ``torch.Tensor.repeat`` when applied to an input during training
+- Fix bug with ``aten::to`` when applied to a constant used as an input to another node
+- Improved error message when encountering untraceable types during compilation
 
 API changes
 -----------
