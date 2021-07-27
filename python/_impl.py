@@ -143,31 +143,31 @@ def distributedCacheLock(model, opts):
 # in the copy case _pickleRestoreWrapperIfPossible() is called immediately after
 # to create the new object.
 #
-# The _wrapper_registry keeps track of the mapping between user model types
-# and their corresponding wrapper.
+# The _wrapper_registry keeps track of the mapping between user model, parameter,
+# buffer types and their corresponding wrapper.
 
 # When an object is copied we want to preserve the Wrapper type: the PopTorch
 # wrapper doesn't contain any attribute so it's just a question of updating
 # the __class__attribute.
 #
 # When an object is loaded from file: the wrapper type doesn't exist anymore
-# therefore we keep the model unwrapped. (It will be wrapped again when passed
+# therefore we keep the object unwrapped. (It will be wrapped again when passed
 # to poptorch.trainingModel anyway)
 _wrapper_registry: Dict[int, Any] = {}
 
 
-def _pickleRestoreWrapperIfPossible(model):
-    wrapperType = _wrapper_registry.get(id(model))
+def _pickleRestoreWrapperIfPossible(obj):
+    wrapperType = _wrapper_registry.get(id(obj))
     if wrapperType:
-        model.__class__ = wrapperType
-    return model
+        obj.__class__ = wrapperType
+    return obj
 
 
-def pickleUnwrapModel(model):
+def pickleUnwrapObject(obj):
     global _wrapper_registry
-    wrapperType = model.__class__
-    model.__class__ = model.__class__.__bases__[0]
-    other = copy.copy(model)
+    wrapperType = obj.__class__
+    obj.__class__ = obj.__class__.__bases__[0]
+    other = copy.copy(obj)
     _wrapper_registry[id(other)] = wrapperType
-    model.__class__ = wrapperType
+    obj.__class__ = wrapperType
     return _pickleRestoreWrapperIfPossible, (other, )

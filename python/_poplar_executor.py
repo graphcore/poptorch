@@ -210,7 +210,9 @@ class PoplarExecutor:
                 self._user_model).__name__
             self._user_model.__class__ = PoptorchModel
             # Register custom function to copy / serialize wrappers
-            copyreg.pickle(PoptorchModel, _impl.pickleUnwrapModel)
+            copyreg.pickle(PoptorchModel, _impl.pickleUnwrapObject)
+            copyreg.pickle(PoptorchParameter, _impl.pickleUnwrapObject)
+            copyreg.pickle(PoptorchBuffer, _impl.pickleUnwrapObject)
 
     def load_state_dict(self,
                         state_dict: Dict[str, 'torch.Tensor'],

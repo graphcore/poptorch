@@ -167,10 +167,12 @@ class DummyTrainingModel(torch.nn.Module):
         super().__init__()
         self.conv = torch.nn.Conv2d(16, 4, (3, 3))
         self.loss = torch.nn.NLLLoss()
+        self.batch_norm = torch.nn.BatchNorm2d(4)
         self.softmax = torch.nn.LogSoftmax(dim=1)
 
     def forward(self, x, target):
         x = self.conv(x)
+        x = self.batch_norm(x)
         x = self.softmax(x)
         return self.loss(x, target)
 
