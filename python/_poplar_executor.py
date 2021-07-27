@@ -634,11 +634,30 @@ class PoplarExecutor:
         if self._training:
             self._dirty_host_weights = True
 
+        # Provide a useful error message if the user attempts to call
+        # backward() on an output tensor
+        self._assign_backward_error(output)
+
         if len(output) == 0:
             return None
         if len(output) > 1:
             return output
         return output[0]
+
+    def _assign_backward_error(self, input):
+        def error_on_backward():
+            raise RuntimeError(
+                "backward() cannot be called explicitly on "
+                "outputs of a PopTorch model. If you're using a trainingModel, "
+                "the backwards pass is performed automatically when invoking "
+                "the model. If you're using an inferenceModel, you should use "
+                "a trainingModel instead.")
+
+        if isinstance(input, (list, tuple)):
+            for element in input:
+                self._assign_backward_error(element)
+        elif isinstance(input, torch.Tensor):
+            input.backward = error_on_backward
 
     def getPerfCounters(self):
         """Return performance counters for the last execution of the model.

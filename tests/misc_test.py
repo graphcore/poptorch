@@ -125,3 +125,22 @@ def test_untracable_type_error():
             r"must be Tensors or \(possibly nested\) Lists and Tuples of "
             r"Tensors \(Got types: \[Tensor, float\]\)."):
         poptorch_model(x, 5.6)
+
+
+def test_torch_backward_error():
+    x = torch.Tensor([5.0])
+    model = helpers.ModelWithWeights(lambda x: x, x.shape)
+    poptorch_model = poptorch.trainingModel(model)
+    poptorch_out, poptorch_loss = poptorch_model((x, ))
+
+    error_message = (
+        r"backward\(\) cannot be called explicitly on "
+        r"outputs of a PopTorch model. If you're using a trainingModel, "
+        r"the backwards pass is performed automatically when invoking the "
+        r"model. If you're using an inferenceModel, you should use a "
+        r"trainingModel instead.")
+
+    with pytest.raises(RuntimeError, match=error_message):
+        poptorch_out.backward()
+    with pytest.raises(RuntimeError, match=error_message):
+        poptorch_loss.backward()
