@@ -344,6 +344,54 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
     markNodeForDeletion(node);
     return nullptr;
   }
+
+  // Check for unsupported cast.
+  // The following table shows which conversions are not supported by PopLibs:
+  // 1: supported; 0: unsupported
+  // |        | Bool | Byte | Char | Int |
+  // | Bool   |   1  |   0  |   0  |  1  |
+  // | Byte   |   0  |   1  |   0  |  0  |
+  // | Char   |   0  |   0  |   1  |  0  |
+  // | Int    |   1  |   0  |   0  |  1  |
+  bool unsupported_cast = false;
+  switch (*tensor_type->scalarType()) {
+  case at::ScalarType::Bool: {
+    if ((*cast_to == at::ScalarType::Byte) ||
+        (*cast_to == at::ScalarType::Char)) {
+      unsupported_cast = true;
+    }
+    break;
+  }
+  case at::ScalarType::Byte: {
+    if ((*cast_to == at::ScalarType::Bool) ||
+        (*cast_to == at::ScalarType::Char) ||
+        (*cast_to == at::ScalarType::Int)) {
+      unsupported_cast = true;
+    }
+    break;
+  }
+  case at::ScalarType::Char: {
+    if ((*cast_to == at::ScalarType::Bool) ||
+        (*cast_to == at::ScalarType::Byte) ||
+        (*cast_to == at::ScalarType::Int)) {
+      unsupported_cast = true;
+    }
+    break;
+  }
+  case at::ScalarType::Int: {
+    if ((*cast_to == at::ScalarType::Byte) ||
+        (*cast_to == at::ScalarType::Char)) {
+      unsupported_cast = true;
+    }
+    break;
+  }
+  default:
+    // Other types are ok
+    break;
+  }
+  ERROR_ON_MSG(unsupported_cast, "Found unsupported cast in the graph: "
+                                     << *tensor_type->scalarType() << " to "
+                                     << *cast_to);
   return createCast(graph, node->input(0), *cast_to);
 }
 
