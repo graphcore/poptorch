@@ -172,6 +172,54 @@ def test_chunk():
     op_harness(op, x, out_fn=lambda x: x[0])
 
 
+@pytest.mark.parametrize("dim", [0, 1, 2])
+def test_gather_3dim(dim):
+    torch.manual_seed(42)
+    shape = (9, 11, 6)
+    input = torch.randn(shape)
+
+    indices = torch.randint(0, 6, shape)
+    op = lambda x, y: torch.gather(x, dim, y)
+    op_harness(op, input, indices)
+
+    small_shape = (7, 9, 5)
+    indices = torch.randint(0, 6, small_shape)
+    op = lambda x, y: torch.gather(x, dim, y)
+    op_harness(op, input, indices)
+
+
+@pytest.mark.parametrize("dim", [0, 1, 2, 3])
+def test_gather_4dim(dim):
+    torch.manual_seed(42)
+    shape = (5, 8, 6, 7)
+    input = torch.randn(shape)
+
+    indices = torch.randint(0, 5, shape)
+    op = lambda x, y: torch.gather(x, dim, y)
+    op_harness(op, input, indices)
+
+    small_shape = (4, 5, 2, 6)
+    indices = torch.randint(0, 5, small_shape)
+    op = lambda x, y: torch.gather(x, dim, y)
+    op_harness(op, input, indices)
+
+
+@pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
+def test_gather_5dim(dim):
+    torch.manual_seed(42)
+    shape = (3, 3, 3, 3, 3)
+    input = torch.randn(shape)
+
+    indices = torch.randint(0, 3, shape)
+    op = lambda x, y: torch.gather(x, dim, y)
+    op_harness(op, input, indices)
+
+    small_shape = (2, 2, 2, 2, 2)
+    indices = torch.randint(0, 3, small_shape)
+    op = lambda x, y: torch.gather(x, dim, y)
+    op_harness(op, input, indices)
+
+
 def test_reshape():
     op = lambda x: torch.reshape(x, (1, 1, 2, 2))
 

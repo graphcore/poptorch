@@ -161,6 +161,116 @@ torch::jit::Node *linearHandler(torch::jit::Graph *graph,
   }
   return output;
 }
+
+torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  auto input = node->input(0);
+  auto axis = constantToLong(node->input(1)->node());
+  auto indices = node->input(2);
+  auto scalar_type = getNodeScalarType(input);
+  auto input_shape = shapeFromTensor(input);
+  auto index_shape = shapeFromTensor(indices);
+  ERROR_ON_MSG(input_shape.size() != index_shape.size(),
+               "Index and input of mismatching rank!");
+
+  std::vector<int64_t> permutation;
+  permutation.resize(input_shape.size());
+
+  std::iota(permutation.begin(), permutation.end(), 0);
+  std::swap(permutation[0], permutation[axis]);
+
+  // transpose the input so that we gather elements along axis 0
+  if (axis != 0) {
+    input = createTranspose(graph, {input}, permutation)->output();
+    indices = createTranspose(graph, {indices}, permutation)->output();
+    std::swap(input_shape[0], input_shape[axis]);
+    std::swap(index_shape[0], index_shape[axis]);
+  }
+
+  auto input_dims = input_shape[0];
+  auto index_dims = index_shape[0];
+
+  // after perfoming the transposiztion we know that we are gathering along
+  // axis 0. We'll perform gather for each slice along axis 0 - call this slice
+  // a plane. The shape of the plane is the shape of the index tensor, less
+  // the axis 0 dimension.
+  std::vector<std::int64_t> plane_shape(++index_shape.begin(),
+                                        index_shape.end());
+
+  bool slice_needed = false;
+  for (unsigned i = 1; i < index_shape.size(); ++i) {
+    if (index_shape[i] < input_shape[i]) {
+      slice_needed = true;
+    }
+  }
+
+  // slice input planes to plane_shape
+  if (slice_needed) {
+    std::vector<std::int64_t> start(plane_shape.size(), 0);
+    std::vector<std::int64_t> axes;
+
+    axes.resize(input_shape.size() - 1);
+    std::iota(axes.begin(), axes.end(), 1);
+
+    auto start_vals =
+        createConstantInt(graph, start,
+                          {static_cast<std::int64_t>(start.size())})
+            ->output();
+    auto end_vals =
+        createConstantInt(graph, plane_shape,
+                          {static_cast<std::int64_t>(plane_shape.size())})
+            ->output();
+    auto axes_vals =
+        createConstantInt(graph, axes, {static_cast<std::int64_t>(axes.size())})
+            ->output();
+    input =
+        createSlice(graph, {input, start_vals, end_vals, axes_vals})->output();
+  }
+
+  std::vector<std::int64_t> dims_vector;
+  dims_vector.resize(input_dims);
+  std::iota(dims_vector.begin(), dims_vector.end(), 0);
+
+  std::vector<torch::jit::Value *> plane_mask;
+  std::transform(dims_vector.begin(), dims_vector.end(),
+                 std::back_inserter(plane_mask),
+                 [&](std::int64_t i) -> torch::jit::Value * {
+                   return createConstantInt(graph, {i}, plane_shape)->output();
+                 });
+
+  std::vector<std::int64_t> input_slice_size(input_dims, 1);
+  std::vector<std::int64_t> index_slice_size(index_dims, 1);
+  auto input_split =
+      createSplit(graph, {input}, input_dims, 0, input_slice_size);
+  auto index_split =
+      createSplit(graph, {indices}, index_dims, 0, index_slice_size);
+
+  std::vector<torch::jit::Value *> planes;
+  for (int i = 0; i < index_dims; ++i) {
+    auto plane =
+        createConstantFloatLike(graph, input, {0.0}, plane_shape)->output();
+
+    for (int j = 0; j < input_dims; ++j) {
+      auto eq =
+          createEqual(graph, {index_split->output(i), plane_mask[j]})->output();
+      auto mask = createCast(graph, eq, scalar_type)->output();
+      auto mul = createMul(graph, {input_split->output(j), mask})->output();
+      plane = createAdd(graph, {plane, mul})->output();
+    }
+
+    planes.push_back(plane);
+  }
+
+  auto result = createConcat(graph, planes, 0)->output();
+
+  // transpose the result
+  if (axis != 0) {
+    result = createTranspose(graph, {result}, permutation)->output();
+  }
+
+  return result->node();
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -171,6 +281,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::clone, cloneHandler);
   registerHandler(c10::aten::copy_, copyHandler);
   registerHandler(c10::aten::linear, linearHandler);
+  registerHandler(c10::aten::gather, gatherHandler);
 }
 
 } // namespace poptorch

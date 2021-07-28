@@ -54,6 +54,7 @@ PyTorch functions
 
 * ``torch.cat``
 * ``torch.chunk``
+* ``torch.gather``
 * ``torch.index_select``
 * ``torch.reshape``
 * ``torch.roll``

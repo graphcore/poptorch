@@ -18,6 +18,9 @@ New features
 - Fix bug with ``torch.Tensor.repeat`` when applied to an input during training
 - Fix bug with ``aten::to`` when applied to a constant used as an input to another node
 - Improved error message when encountering untraceable types during compilation
+- Support for ``torch.gather``. Please note: this operator is known to cause
+  long compilation times. Consider using a onehot-based solution instead or
+  `torch.index_select` if appropriate.
 
 API changes
 -----------
