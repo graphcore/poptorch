@@ -172,7 +172,7 @@ def test_chunk():
     op_harness(op, x, out_fn=lambda x: x[0])
 
 
-@pytest.mark.parametrize("dim", [0, 1, 2])
+@pytest.mark.parametrize("dim", [0, 1, 2, -1, -2])
 def test_gather_3dim(dim):
     torch.manual_seed(42)
     shape = (9, 11, 6)

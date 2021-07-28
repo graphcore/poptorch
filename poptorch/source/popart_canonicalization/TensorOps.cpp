@@ -165,7 +165,8 @@ torch::jit::Node *linearHandler(torch::jit::Graph *graph,
 torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   auto input = node->input(0);
-  auto axis = constantToLong(node->input(1)->node());
+  auto tensor_type = input->type()->expect<c10::TensorType>();
+  auto axis = handleDimensionParam(node->input(1), tensor_type);
   auto indices = node->input(2);
   auto scalar_type = getNodeScalarType(input);
   auto input_shape = shapeFromTensor(input);
