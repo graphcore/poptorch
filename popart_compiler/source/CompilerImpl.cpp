@@ -85,11 +85,12 @@ std::vector<std::string> getAttributeNames(OptimizerType type,
   case OptimizerType::LAMB:
   case OptimizerType::LAMB_NO_BIAS: {
     if (is_default) {
-      return {"defaultLearningRate", "defaultWeightDecay", "defaultBeta1",
-              "defaultBeta2",        "defaultEps",         "lossScaling",
-              "maxWeightNorm"};
+      return {"defaultLearningRate", "defaultWeightDecay",
+              "defaultBeta1",        "defaultBeta2",
+              "defaultEps",          "defaultMaxWeightNorm",
+              "lossScaling"};
     }
-    return {"learningRate", "weightDecay", "beta1", "beta2", "eps"};
+    return {"learningRate", "weightDecay", "beta1", "beta2", "eps", "maxWeightNorm"};
   }
   case OptimizerType::ADAM:
   case OptimizerType::ADAMW:

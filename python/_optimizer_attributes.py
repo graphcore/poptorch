@@ -133,8 +133,6 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
         attr_readers, "loss_scaling", _OptimizerGetter(1.0),
         _ValueConstPairFormatter(
             variable_attrs, lambda v: v == 1.0 and not auto_loss_scaling))
-    _AttrReader(attr_readers, "max_weight_norm", _OptimizerGetter(),
-                _ValueConstPairFormatter(variable_attrs, isAlwaysConst))
     # Group variables: per group, can change over time.
     #     source: opt.param_groups[i][name] / opt.defaults[name]
     #     format: {name: (value, is_const)}
@@ -160,6 +158,8 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
                 _ValueConstPairFormatter(variable_attrs, _IsEqualTo(0.0)))
     _AttrReader(attr_readers, "eps", _GroupGetter(),
                 _ValueConstPairFormatter(variable_attrs, _IsEqualTo(1e-08)))
+    _AttrReader(attr_readers, "max_weight_norm", _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, _IsEqualTo(65500.0)))
     _AttrReader(attr_readers, "alpha", _GroupGetter(),
                 _ValueConstPairFormatter(variable_attrs, isAlwaysConst))
     _BetaReader(attr_readers, variable_attrs)

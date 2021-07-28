@@ -419,19 +419,8 @@ def test_lamb_max_weight_norm(opt):
     torch.manual_seed(42)
     model = OptimizerTestModel()
 
-    # With max_weight_norm=0.0, lr is multiplied by 0.0. The model shouldn't train.
-    optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=0.0)
-
-    # Make sure the first run doesn't already pass the test.
+    optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=100.0)
     _, original_loss = model.run(optimizer)
-
-    # Loss shouldn't change.
-    for _ in range(0, 50):
-        out, loss = model.run()
-        assert loss == original_loss
-
-    # Update the optimizer with a non-zero max_weight_norm. It should now train.
-    optimizer.max_weight_norm = 100.0
     model.run(optimizer)
 
     for _ in range(0, 1000):
