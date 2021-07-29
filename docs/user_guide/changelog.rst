@@ -2,6 +2,15 @@
 Changelog
 =========
 
+v2.3 (Poplar SDK 2.3)
+=====================
+
+New features
+------------
+
+API changes
+-----------
+
 v2.2 (Poplar SDK 2.2)
 =====================
 
