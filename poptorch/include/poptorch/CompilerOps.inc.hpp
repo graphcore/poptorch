@@ -1,8 +1,9 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
 // Run `python3 PopParse.py to regenerate
 // clang-format off
 
+torch::jit::Node* createCopyvarupdate(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createGroupnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t num_groups,float epsilon);
 torch::jit::Node* createSubsample(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & strides);
 torch::jit::Node* createPrinttensor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t print_gradient,const std::string & title);

@@ -1,8 +1,12 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
 // Run `python3 PopParse.py to regenerate
 // clang-format off
 
+torch::jit::Node* createCopyvarupdate(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::copyvarupdate, args, ImplicitCast::None, OutputType::Unknown);
+return new_node;
+}
 torch::jit::Node* createGroupnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t num_groups,float epsilon) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::groupnormalization, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
 new_node->i_(c10::Symbol::fromQualString("attr::num_groups"),num_groups);
@@ -162,19 +166,19 @@ torch::jit::Node* createBitwisenot(torch::jit::Graph *graph,  const std::vector<
 return new_node;
 }
 torch::jit::Node* createBitwiseand(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwiseand, args, ImplicitCast::None, OutputType::Unknown);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwiseand, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
 torch::jit::Node* createBitwiseor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwiseor, args, ImplicitCast::None, OutputType::Unknown);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwiseor, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
 torch::jit::Node* createBitwisexor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwisexor, args, ImplicitCast::None, OutputType::Unknown);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwisexor, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
 torch::jit::Node* createBitwisexnor(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwisexnor, args, ImplicitCast::None, OutputType::Unknown);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::bitwisexnor, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
 torch::jit::Node* createReducemedian(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> axes,int64_t keepdims) {

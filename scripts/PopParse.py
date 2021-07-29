@@ -38,9 +38,10 @@ logging.basicConfig(level=logging_level)
 options_not_handled = [
     "enableLoadAndOffloadRNGState",
     "prefetchBufferingDepthMap",
-    "accumulateOuterFragmentSettings",
+    "matmulOptions",
     "tensorLocationSettingsOverride",
     "autodiffSettings",
+    "scheduleNonWeightUpdateGradientConsumersEarly",
     "matmulOptions",
     # Handled by PopTorch but not detected by this parser:
     "activationTensorLocationSettings",
@@ -51,7 +52,10 @@ options_not_handled = [
     "replicatedGraphCount",
     "accumulationReductionType",
     "executionPhaseSettings",
+    "accumulateOuterFragmentSettings",
     "batchSerializationSettings",
+    "automaticLossScalingSettings",
+    "autodiffSettings",
 ]
 
 
@@ -161,18 +165,21 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
                 else:
                     assert False, f"Type not supported {opt_type.spelling}"
 
-    missing = []
+    missing_mismatched = []
     for opt, type in expected.items():
         if opt in options_not_handled:
             continue
         if opt not in handled:
-            missing.append(
-                f"Option {opt} not handled by PopTorch Type: {str(type)}")
+            missing_mismatched.append(
+                f"Option {opt} not handled by PopTorch Type: {str(type)}. You"
+                +
+                " need to add the relevant macro in SessionOptions.cpp or to" +
+                " options_not_handled in this script.")
         elif handled[opt] != type:
-            missing.append(
+            missing_mismatched.append(
                 (f"Type mismatch for option {opt}: Popart type {str(type)} "
                  f"PopTorch: {str(handled[opt])}"))
-    assert not missing, "\n".join(missing)
+    assert not missing_mismatched, "\n".join(missing_mismatched)
 
 
 index = clang.cindex.Index.create()
@@ -274,6 +281,10 @@ OutputTypeSameAsFirstInput = [
     "atanh",
     "averagepool",
     "batchnormalization",
+    "bitwiseand",
+    "bitwiseor",
+    "bitwisexor",
+    "bitwisexnor",
     "bitwisenot",
     "ceil",
     "celu",
@@ -692,7 +703,7 @@ for opset in classes:
 
         cxxFile += cppFile + "\n"
 
-autoComment = """// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+autoComment = """// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
 // Run `python3 PopParse.py to regenerate
 // clang-format off

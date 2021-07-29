@@ -280,6 +280,9 @@ SessionOptionsImpl::SessionOptionsImpl() {
     popart_options.name = value;                                               \
   })
 
+  ADD_POPART_ENUM_OPTION(autodiffSettings.stitchStrategy,
+                         AutodiffStitchStrategy);
+
   ADD_POPART_ENUM_OPTION(batchSerializationSettings.transformContext,
                          BatchSerializationTransformContext);
   ADD_POPART_ENUM_OPTION(batchSerializationSettings.method,

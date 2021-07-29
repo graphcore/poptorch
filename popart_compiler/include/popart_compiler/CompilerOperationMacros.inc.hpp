@@ -1,9 +1,10 @@
-// Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
 // Run `python3 PopParse.py to regenerate
 // clang-format off
 
 // Ops from AiGraphcoreOpset1
+OP_DECL(popart, copyvarupdate, copyvarupdate, AiGraphcoreOpset1.copyvarupdate, NONE, NONE)
 OP_DECL(popart, groupnormalization, groupnormalization, AiGraphcoreOpset1.groupnormalization, ARG(INT,num_groups) ARG(FLOAT,epsilon) , BODY_ARG(num_groups) BODY_ARG(epsilon) )
 OP_DECL(popart, subsample, subsample, AiGraphcoreOpset1.subsample, ARG(INT_VEC,strides) , BODY_ARG(strides) )
 OP_DECL(popart, printtensor, printtensor, AiGraphcoreOpset1.printtensor, ARG(INT,print_gradient) ARG(STRING,title) , BODY_ARG(print_gradient) BODY_ARG(title) )

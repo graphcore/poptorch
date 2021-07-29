@@ -11,7 +11,10 @@ logger = logging.getLogger('OnnxParser')
 popart_include_dir = None
 popart_files = ["builder.hpp", "builder.h.gen"]
 
-nodeBlacklist = {"DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11"}
+nodeBlacklist = {
+    "DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11",
+    "AiOnnxOpset12"
+}
 
 
 # find_popart_includes(path=None)
