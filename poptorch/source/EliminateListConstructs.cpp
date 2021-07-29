@@ -180,11 +180,11 @@ void tryDeleteListConstructNode(torch::jit::Node *listConstruct) {
 }
 
 void eliminateListConstructs(torch::jit::Block *block) {
-  logging::LogContext ctx_func("eliminateListConstructs");
   std::vector<torch::jit::Node *> to_delete;
 
   for (auto node : block->nodes()) {
-    logging::LogContext ctx("Processing " + nodeToString(node));
+    logging::LogContext ctx("eliminateListConstructs Processing " +
+                            nodeToString(node));
     if (node->kind() == c10::prim::ListConstruct) {
       if (tryCreateConstantNode(node)) {
         to_delete.push_back(node);

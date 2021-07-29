@@ -26,8 +26,7 @@ const char *shortPoptorchFilename(const char *filename);
     __error_msg << "ERROR in " << logging::shortPoptorchFilename(__FILE__)     \
                 << ":" << __LINE__ << ": " << msg; /* NOLINT */                \
     if (!logging::LogContext::isEmpty()) {                                     \
-      __error_msg << "\nError raised in:\n"                                    \
-                  << logging::LogContext::context().get();                     \
+      __error_msg << " Context:" << logging::LogContext::context();            \
       logging::LogContext::resetContext();                                     \
     }                                                                          \
     throw logging::InternalError(__error_msg.str().c_str());                   \
@@ -41,6 +40,30 @@ const char *shortPoptorchFilename(const char *filename);
   } while (0)
 
 #define ERROR_ON(condition) ERROR_ON_MSG(condition, #condition)
+
+// This is needed to catch STL exceptions and attach some context to them.
+#define CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION                                \
+  catch (const logging::Error &e) {                                            \
+    throw e;                                                                   \
+  }                                                                            \
+  catch (const std::out_of_range &e) {                                         \
+    ERROR("'std::out_of_range' exception: " << e.what());                      \
+  }                                                                            \
+  catch (const std::runtime_error &e) {                                        \
+    const std::string &what = e.what();                                        \
+    if (std::count(what.begin(), what.end(), '\n') > 80) {                     \
+      std::ofstream log;                                                       \
+      log.open(ERROR_LOG);                                                     \
+      log << e.what();                                                         \
+      log.close();                                                             \
+      ERROR("'std::runtime_error' exception: See " ERROR_LOG " for "           \
+            "details");                                                        \
+    }                                                                          \
+    ERROR("'std::runtime_error' exception: " << e.what());                     \
+  }                                                                            \
+  catch (const std::exception &e) {                                            \
+    ERROR("'std::exception' exception: " << e.what());                         \
+  }
 
 /**
  * Exception class for poptorch
@@ -69,10 +92,9 @@ struct LogContextImpl;
 class LogContext {
 public:
   // Current context stack as a string
-  static std::unique_ptr<char[]> context();
+  static const char *context();
   static void resetContext();
   static bool isEmpty();
-  static void push(const char *);
 
   LogContext();
   // Push the context at the top of the context stack.

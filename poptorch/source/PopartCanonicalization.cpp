@@ -27,9 +27,9 @@ public:
  */
 
 void CanonicalizeImpl::run(torch::jit::Graph *graph) {
-  logging::LogContext ctx_func("PopartCanonicalization");
   for (torch::jit::Node *node : graph->nodes()) {
-    logging::LogContext ctx("processing " + nodeToString(node));
+    logging::LogContext ctx("PopartCanonicalization processing " +
+                            nodeToString(node));
     torch::jit::WithInsertPoint insert_point(node);
     torch::jit::Node *new_node = nullptr;
     torch::jit::Symbol kind = node->kind();

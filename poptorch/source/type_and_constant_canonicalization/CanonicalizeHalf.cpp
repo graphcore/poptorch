@@ -56,7 +56,6 @@ void ConvertHalfImpl::convertTensorIfNeeded(const at::Tensor &tensor,
 void ConvertHalfImpl::convertGraphInputs(
     const std::vector<at::Tensor> &in_tensors,
     const std::vector<at::Tensor> &parameters) {
-  logging::LogContext ctx_func("convertGraphInputs");
   auto collapsed_inputs = collapsedGraphInputHierachy(_graph);
 
   std::size_t num_inputs = collapsed_inputs.size() - parameters.size();
@@ -70,7 +69,8 @@ void ConvertHalfImpl::convertGraphInputs(
     }
 
     if (idx < num_inputs) {
-      logging::LogContext ctx("processing " + nodeToString(value->node()));
+      logging::LogContext ctx("convertGraphInputs processing " +
+                              nodeToString(value->node()));
       convertTensorIfNeeded(in_tensors[idx], value);
     } else {
       // Can't have tuples for parameters:

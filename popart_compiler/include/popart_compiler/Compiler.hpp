@@ -43,22 +43,9 @@ static constexpr TensorId NoneTensor = 0; // NOLINT
 namespace detail {
 struct CompilerImpl;
 struct SessionOptionsImpl;
-struct ExceptionInfoImpl;
 } // namespace detail
 
 enum class OutputElemType { Tensor, Tuple, List };
-
-class ExceptionInfo {
-public:
-  explicit ExceptionInfo(const std::exception &e);
-  ~ExceptionInfo();
-  const char *type() const;
-  int64_t stackDepth() const;
-  const char *stack(int64_t level) const;
-
-private:
-  std::unique_ptr<detail::ExceptionInfoImpl> _impl;
-};
 
 struct OutputType {
   OutputElemType type;

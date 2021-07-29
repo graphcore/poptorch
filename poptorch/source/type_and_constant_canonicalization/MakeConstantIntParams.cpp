@@ -15,7 +15,6 @@ namespace type_and_constant_canonicalization {
 void makeConstantIntParams(
     torch::jit::Graph *graph, const std::vector<std::string> &parameter_names,
     const std::vector<at::Tensor> &traced_parameter_tensors) {
-  logging::LogContext ctx_func("makeConstantIntParams");
   //_parameters in Lower to popart is traced_parameter_tensors here
   std::size_t num_inputs =
       graph->inputs().size() - traced_parameter_tensors.size();
@@ -27,7 +26,7 @@ void makeConstantIntParams(
       continue;
     }
 
-    logging::LogContext ctx("processing " +
+    logging::LogContext ctx("makeConstantIntParams processing " +
                             parameter_names[index - num_inputs]);
 
     //_parameters in Lower to popart is traced_paramater_tensors here

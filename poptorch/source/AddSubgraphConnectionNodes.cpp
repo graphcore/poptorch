@@ -123,7 +123,6 @@ void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
  * above we must add a specific input entry op to the graph for that op.
  */
 void annotateSubgraphs(torch::jit::Graph *graph) {
-  logging::LogContext ctx_func("annotateSubgraphs Processing");
   // Subgraph start to all nodes contained directly within that subgraph.
   std::stack<Subgraph> subgraph_nodes;
 
@@ -133,7 +132,8 @@ void annotateSubgraphs(torch::jit::Graph *graph) {
   // Look for any subgraphs. Subgraphs are currently:
   // * If/Else bodies.
   for (torch::jit::Node *node : graph->nodes()) {
-    logging::LogContext ctx("Processing " + nodeToString(node));
+    logging::LogContext ctx("annotateSubgraphs Processing " +
+                            nodeToString(node));
     const torch::jit::Symbol kind = node->kind();
 
     // Both if and else will create a new subgraph.

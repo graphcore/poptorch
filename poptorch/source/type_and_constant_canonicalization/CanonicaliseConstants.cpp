@@ -459,9 +459,9 @@ void recursivelySelectHostAndIPUSideConstants(
 void rectifyHostAndIPUSideConstants(
     torch::jit::Graph *graph,
     std::unordered_set<torch::jit::Node *> *to_delete) {
-  logging::LogContext ctx_func("rectifyHostAndIPUSideConstants");
   for (auto node : graph->nodes()) {
-    logging::LogContext ctx("processing " + nodeToString(node));
+    logging::LogContext ctx("rectifyHostAndIPUSideConstants processing " +
+                            nodeToString(node));
 
     if (node->kind() != symbols::poptorch::host_and_ipu_side_tensor_constant) {
       continue;
@@ -491,9 +491,10 @@ void rectifyHostAndIPUSideConstants(
 void removeStateChangingNodesFromHostSideBranch(
     torch::jit::Graph *graph,
     std::unordered_set<torch::jit::Node *> *to_delete) {
-  logging::LogContext ctx_func("removeStateChangingNodesFromHostSideBranch");
   for (auto node : graph->nodes()) {
-    logging::LogContext ctx("processsing " + nodeToString(node));
+    logging::LogContext ctx("removeStateChangingNodesFromHostSideBranch"
+                            "processsing " +
+                            nodeToString(node));
     if (node->kind() != symbols::poptorch::host_side_tensor_constant) {
       continue;
     }
@@ -530,13 +531,13 @@ void removeStateChangingNodesFromHostSideBranch(
 } // namespace
 
 void canonicaliseConstants(torch::jit::Graph *graph) {
-  logging::LogContext ctx_func("CanonicaliseConstants");
   auto nodes = graph->nodes();
   std::unordered_set<torch::jit::Node *> to_delete;
   for (auto it = nodes.begin(); it != nodes.end(); it++) {
     auto node = *it;
 
-    logging::LogContext ctx("processing " + nodeToString(node));
+    logging::LogContext ctx("CanonicaliseConstants processing " +
+                            nodeToString(node));
 
     if (node->kind() == c10::aten::size) {
       // This will be made a constant in the size handler
