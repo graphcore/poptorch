@@ -293,8 +293,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_ENUM_OPTION(subgraphCopyingStrategy, SubgraphCopyingStrategy);
   ADD_POPART_ENUM_OPTION(accumulationAndReplicationReductionType,
                          ReductionType);
-  ADD_POPART_ENUM_OPTION(meanAccumulationAndReplicationReductionStrategy,
-                         MeanReductionStrategy);
 
   ADD_POPART_STRING_OPTION(logDir);
   ADD_POPART_STRING_OPTION(cachePath);
