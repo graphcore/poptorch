@@ -392,7 +392,7 @@ std::string CompilerImpl::checkSystemConfig() const {
 void CompilerImpl::updateUseModelConfig() {
   // The configuration set by the application takes precedence over everything
   // else.
-  if (options_set.count("ipu_model")) {
+  if (options_set.count("use_model")) {
     logging::info("From the user configuration: Ipu model: {}",
                   options.ipu_model ? "Enabled" : "Disabled");
   } else if (ipuModelEnvironmentVariableIsEnabled() ||

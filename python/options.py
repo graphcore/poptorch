@@ -1064,7 +1064,6 @@ class Options(_options_impl.OptionsDict):
                          anchored_tensors={},
                          anchor_mode=enums.AnchorMode.Default.value,
                          anchor_return_period=1,
-                         use_model=False,
                          connection_type=enums.ConnectionType.Always.value,
                          sync_pattern=enums.SyncPattern.Full.value,
                          available_memory_proportion={})
@@ -1298,7 +1297,7 @@ class Options(_options_impl.OptionsDict):
             * True: Use the IPU Model.
             * False: Use IPU hardware.
         """
-        self.set(use_model=use_model)
+        self.createOrSet(use_model=use_model)
         return self
 
     def connectionType(self, connection_type: "poptorch.ConnectionType"
