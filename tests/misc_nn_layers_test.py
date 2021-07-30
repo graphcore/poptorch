@@ -193,10 +193,10 @@ def test_dropout2d_training():
     dropout_op = torch.nn.Dropout2d(drop_ratio)
 
     # Input size needs to be large enough for convergence to expected dropout ratio
-    N = 15
-    C = 10
+    N = 30
+    C = 30
     num_channels = torch.as_tensor(N * C, dtype=torch.float)
-    sz = [N, C, 3, 4]
+    sz = [N, C, 2, 2]
     x = torch.ones(sz, dtype=torch.float)
 
     def check_ratio(_, poptorch_out):
@@ -217,10 +217,10 @@ def test_dropout3d_training():
     dropout_op = torch.nn.Dropout3d(drop_ratio)
 
     # Input size needs to be large enough for convergence to expected dropout ratio
-    N = 10
-    C = 10
+    N = 30
+    C = 30
     num_channels = torch.as_tensor(N * C, dtype=torch.float)
-    sz = [N, C, 3, 3, 3]
+    sz = [N, C, 2, 2, 1]
     x = torch.ones(sz, dtype=torch.float)
 
     def check_ratio(_, poptorch_out):
