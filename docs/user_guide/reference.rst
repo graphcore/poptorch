@@ -1,8 +1,8 @@
 .. _reference:
 
-=========
-Reference
-=========
+=============
+API reference
+=============
 
 .. _options:
 
