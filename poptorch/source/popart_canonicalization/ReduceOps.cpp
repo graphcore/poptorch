@@ -168,6 +168,9 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
   auto result = createTopk(graph, {x, one}, dim);
   auto values = result->output(0);
   auto indices = result->output(1);
+  // TopK returns UINT32 indices, but torch doesn't have unsigned
+  // 32 bit integer tensor types so we need to cast back to INT32
+  indices = createCast(graph, indices, c10::ScalarType::Int)->output();
 
   if (negate) {
     values = createNeg(graph, {values})->output();

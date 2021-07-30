@@ -125,6 +125,28 @@ def test_index(op, idxs):
     index_harness(op, idxs, False)
 
 
+def test_index_on_max_indices():
+    def op(x):
+        _, argmax_tensor = torch.max(x, dim=1)
+        b = x[:, argmax_tensor]
+        return b, argmax_tensor
+
+    inp_tensor = torch.rand(1, 10, 2)
+
+    model = helpers.ModelWithWeights(op, inp_tensor.shape, lambda x: x[0])
+    poptorch_model = poptorch.trainingModel(model)
+
+    native_out, _ = model((inp_tensor, ))
+    poptorch_out, _ = poptorch_model((inp_tensor, ))
+
+    # Inference test - check outputs
+    for native, pop in zip(native_out, poptorch_out):
+        helpers.assert_allclose(actual=pop, expected=native)
+
+    # Training test - check weights changed
+    poptorch_model.assert_weights_changed()
+
+
 @pytest.mark.parametrize("idxs", index_indices)
 @pytest.mark.parametrize("op", index_put_ops)
 def test_index_put(op, idxs):
