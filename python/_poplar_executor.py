@@ -958,7 +958,7 @@ class PoplarExecutor:
         torch.Tensor.half = old_half
 
         # Revert the traced copy to the inital weights.
-        self._trace.load_state_dict(temp_model)
+        self._trace.load_state_dict(temp_model, strict=False)
         self._model.load_state_dict(temp_model)
 
         # Restore to non-IPU codepath.
