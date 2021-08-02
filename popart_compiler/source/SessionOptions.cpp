@@ -316,6 +316,8 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_UINT64_OPTION(globalReplicationFactor);
   ADD_POPART_UINT64_OPTION(globalReplicaOffset);
   ADD_POPART_UINT64_OPTION(defaultPrefetchBufferingDepth);
+  ADD_POPART_UINT64_OPTION(compilationProgressTotal);
+  ADD_POPART_UINT64_OPTION(transitiveClosureOptimizationThreshold);
 
   ADD_POPART_BOOL_OPTION(batchSerializationSettings.concatOnVirtualGraphChange);
   ADD_POPART_BOOL_OPTION(
@@ -338,10 +340,12 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableGradientAccumulation);
   ADD_POPART_BOOL_OPTION(instrumentWithHardwareCycleCounter);
   ADD_POPART_BOOL_OPTION(enablePipelining);
+  ADD_POPART_BOOL_OPTION(explicitPipelining);
   ADD_POPART_BOOL_OPTION(disableGradAccumulationTensorStreams);
   ADD_POPART_BOOL_OPTION(compileEngine);
   ADD_POPART_BOOL_OPTION(constantWeights);
   ADD_POPART_BOOL_OPTION(enableEngineCaching);
+  ADD_POPART_BOOL_OPTION(enableMergeExchange);
   ADD_POPART_BOOL_OPTION(enableFloatingPointChecks);
   ADD_POPART_BOOL_OPTION(enableStochasticRounding);
   ADD_POPART_BOOL_OPTION(explicitRecomputation);

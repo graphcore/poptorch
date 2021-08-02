@@ -152,7 +152,8 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
                     expected[c.spelling] = OptionType.Object
                 elif opt_type.spelling.startswith("class "):
                     expected[c.spelling] = OptionType.Object
-                elif opt_type.spelling == "int64_t":
+                elif opt_type.spelling == "int64_t" or \
+                     opt_type.spelling == "size_t":
                     expected[c.spelling] = OptionType.Int
                 else:
                     assert False, f"Type not supported {opt_type.spelling}"
