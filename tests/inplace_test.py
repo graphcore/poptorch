@@ -2,6 +2,8 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import torch
+import pytest
+
 import poptorch
 
 
@@ -194,3 +196,22 @@ def test_inplace_non_input():
     assert y[0][1] == 2.5
     assert y[1][0] == 2.25
     assert y[1][1] == 4.0
+
+
+def test_double_underscore():
+    # This tests aten::__and__ is not treated as inplace
+
+    class Model(torch.nn.Module):
+        def forward(self, x, l):
+            return x[x[0][0].int() & l.item()]
+
+    poptorch_model = poptorch.inferenceModel(Model(),
+                                             options=poptorch.Options())
+    inp, l = torch.rand(10, 10), torch.LongTensor([2])
+
+    # So far this passed the inplace test without an assert, but fails on
+    # aten::select
+
+    error_msg = ("Cannot force a non-constant")
+    with pytest.raises(RuntimeError, match=error_msg):
+        poptorch_model(inp, l)
