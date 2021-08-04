@@ -354,7 +354,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(aliasZeroCopy);
   ADD_POPART_BOOL_OPTION(delayVarUpdates);
   ADD_POPART_BOOL_OPTION(enableFullyConnectedPass);
-  ADD_POPART_BOOL_OPTION(enableGroupedMatmuls);
   ADD_POPART_BOOL_OPTION(enableSerializedMatmuls);
   ADD_POPART_BOOL_OPTION(enableStableNorm);
   ADD_POPART_BOOL_OPTION(hostAllReduce);
