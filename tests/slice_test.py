@@ -326,3 +326,21 @@ def test_unbind(dim):
 
     # Training test - check weights changed
     poptorch_model.assert_weights_changed()
+
+
+def test_dynamic_length_slice():
+    class Model(torch.nn.Module):
+        def forward(self, x, l):
+            return x[l:]
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+    inp, l = torch.rand(10, 10), torch.LongTensor([2])
+
+    error_msg = (
+        r"The size of the sliced tensor must be a constant for each " +
+        r"execution of the model when running on the IPU\.")
+
+    with pytest.raises(RuntimeError, match=error_msg):
+        # Set test_training=False because we expect inference to fail
+        poptorch_model(inp, l)
