@@ -173,7 +173,7 @@ void populateAncestory(torch::jit::Graph *graph,
     // chain of non-constant inputs
     *later_node = getOnlyNonConstantInput(*later_node);
 
-    if (later_node == nullptr) {
+    if (*later_node == nullptr) {
       logging::trace("dynamicSliceHandler failed due to lack of a shared "
                      "ancestor.");
       ERROR(fail_msg);
