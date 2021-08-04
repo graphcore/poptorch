@@ -212,6 +212,6 @@ def test_double_underscore():
     # So far this passed the inplace test without an assert, but fails on
     # aten::select
 
-    error_msg = ("Cannot force a non-constant")
+    error_msg = ("Unsupported ops found in compiled model")
     with pytest.raises(poptorch.Error, match=error_msg):
         poptorch_model(inp, l)

@@ -123,22 +123,32 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
   // aten::select(Tensor[] list, int idx) -> Tensor
   std::int64_t dim = constantToLong(node->input(1)->node());
 
-  std::int64_t index = constantToLong(node->input(2)->node());
-  if (index < 0) {
-    c10::TensorTypePtr as_tensor =
-        node->input(0)->type()->cast<c10::TensorType>();
-    c10::VaryingShape dims = as_tensor->sizes();
-    index += *dims[dim];
-  }
+  auto index_node = node->input(2)->node();
 
-  auto slice_node =
-      createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
-                          wrapInConstant1D(graph, index + 1),
-                          wrapInConstant1D(graph, dim)});
+  torch::jit::Node *slice_node;
+  if (!isTensorConstant(index_node)) {
+    // Handle dynamic index
+    slice_node = createDynamicslice(
+        graph, {node->input(0), index_node->output()}, {dim}, {1}, 1);
+  } else {
+    // Handle static index
+    std::int64_t index = constantToLong(index_node);
+
+    if (index < 0) {
+      c10::TensorTypePtr as_tensor =
+          node->input(0)->type()->cast<c10::TensorType>();
+      c10::VaryingShape dims = as_tensor->sizes();
+      index += *dims[dim];
+    }
+
+    slice_node =
+        createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
+                            wrapInConstant1D(graph, index + 1),
+                            wrapInConstant1D(graph, dim)});
+  }
 
   // Reshape to remove the singleton dimenson left in by slice
   auto original_shape = shapeFromTensor(node->output());
-
   return createReshape(graph, slice_node->output(), original_shape);
 }
 
@@ -454,6 +464,10 @@ torch::jit::Node *stackHandler(torch::jit::Graph *graph,
   return createConcat(graph, transformed_tensors, dim);
 }
 
+torch::jit::Node *intHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  return createCast(graph, node->input(0), at::ScalarType::Int);
+}
+
 torch::jit::Node *autocastHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   auto from_type = getNodeScalarType(node->input(0));
@@ -497,6 +511,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::squeeze, reshapeHandler);
   registerHandler(c10::aten::stack, stackHandler);
+  registerHandler(c10::aten::Int, intHandler);
   registerHandler(symbols::poptorch::autocast, autocastHandler);
 }
 
