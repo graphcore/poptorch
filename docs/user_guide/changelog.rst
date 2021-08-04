@@ -23,6 +23,7 @@ New features
   `torch.index_select` if appropriate.
 - Using a convolution layer op with the value of ``padding`` greater than or
   equal to `kernel_size`` is now supported.
+- Support for ``torch.Tensor.new_ones`` and ``torch.Tensor.new_zeros``
 
 API changes
 -----------
