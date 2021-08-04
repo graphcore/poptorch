@@ -87,8 +87,6 @@ extern c10::Symbol call_cpu_op;
 extern c10::Symbol end_cpu_op;
 extern c10::Symbol canonicalised_cpu_call;
 extern c10::Symbol ctc_beam_search_decoder;
-extern c10::Symbol set_attribute;
-extern c10::Symbol clear_attribute;
 } // namespace symbols::poptorch
 
 } // namespace poptorch

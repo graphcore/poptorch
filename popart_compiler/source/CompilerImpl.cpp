@@ -89,8 +89,7 @@ std::vector<std::string> getAttributeNames(OptimizerType type,
               "defaultBeta2",        "defaultEps",         "lossScaling",
               "maxWeightNorm"};
     }
-    return {"learningRate", "weightDecay", "beta1",
-            "beta2",        "eps",         "maxWeightNorm"};
+    return {"learningRate", "weightDecay", "beta1", "beta2", "eps"};
   }
   case OptimizerType::ADAM:
   case OptimizerType::ADAMW:
@@ -868,39 +867,6 @@ void CompilerImpl::addMultiConvPart(
   }
 
   multi_conv_builder->addConv(tensors, dilations, kernel_shape, pads, strides);
-}
-
-void CompilerImpl::setAttribute(const std::string &attribute,
-                                const std::string &key,
-                                const std::string &value) {
-  auto &attrs = _attribute_key_value_map[attribute];
-  attrs[key] = value;
-  std::vector<std::string> attrs_vec;
-  for (auto &attr : attrs) {
-    attrs_vec.push_back(attr.first);
-    attrs_vec.push_back(attr.second);
-  }
-  active_builder->setAttribute(attribute, attrs_vec);
-}
-
-void CompilerImpl::clearAttribute(const std::string &attribute,
-                                  const std::string &key) {
-  auto &attrs = _attribute_key_value_map[attribute];
-  ERROR_ON_MSG(attrs.erase(key) == 0, "Unknown key '" << key
-                                                      << "' for attribute '"
-                                                      << attribute << "'.");
-  active_builder->clearAttribute(attribute);
-  if (attrs.empty()) {
-    ERROR_ON_MSG(_attribute_key_value_map.erase(attribute) == 0,
-                 "Unknown attribute '" << attribute << "'.");
-  } else {
-    std::vector<std::string> attrs_vec;
-    for (auto &attr : attrs) {
-      attrs_vec.push_back(attr.first);
-      attrs_vec.push_back(attr.second);
-    }
-    active_builder->setAttribute(attribute, attrs_vec);
-  }
 }
 
 std::vector<popart::TensorId> CompilerImpl::endMultiConv() {

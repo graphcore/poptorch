@@ -1,9 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #pragma once
 
-#include <map>
 #include <memory>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -441,9 +439,6 @@ public:
   void setMultiConvCycleBackOff(double c);
 
   std::vector<poptorch::TensorId> endMultiConv();
-
-  void setAttribute(const char *attribute, const char *key, const char *value);
-  void clearAttribute(const char *attribute, const char *key);
 
   void detachFromDevice();
   void attachToDevice();

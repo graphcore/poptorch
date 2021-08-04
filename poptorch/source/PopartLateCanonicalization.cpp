@@ -193,18 +193,6 @@ void canonicalizeLate(torch::jit::Graph *graph) {
     } else if (kind == symbols::poptorch::push_name_scope) {
       std::string name = constantToString(node->input(0)->node());
       node->s_(c10::Symbol::attr("name"), name);
-    } else if (kind == symbols::poptorch::set_attribute) {
-      std::string attribute = constantToString(node->input(0)->node());
-      std::string key = constantToString(node->input(1)->node());
-      std::string value = constantToString(node->input(2)->node());
-      node->s_(c10::Symbol::attr("attribute"), attribute);
-      node->s_(c10::Symbol::attr("key"), key);
-      node->s_(c10::Symbol::attr("value"), value);
-    } else if (kind == symbols::poptorch::clear_attribute) {
-      std::string attribute = constantToString(node->input(0)->node());
-      std::string key = constantToString(node->input(1)->node());
-      node->s_(c10::Symbol::attr("attribute"), attribute);
-      node->s_(c10::Symbol::attr("key"), key);
     }
   }
 

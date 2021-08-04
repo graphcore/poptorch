@@ -1,6 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import os
-import copy
 from typing import Optional, Union, Dict, Any, List, Set
 import torch
 from . import autocasting
@@ -9,34 +8,6 @@ from ._logging import logger
 from . import _options_config
 from . import _options_impl
 from . import ops
-
-
-class Attribute():
-    _current_attrs = {}
-
-    def __init__(self, **kwargs):
-        self._kwargs = kwargs
-        self._saved = {}
-
-    def __enter__(self):
-        self._saved = copy.deepcopy(Attribute._current_attrs)
-        for attr, dictionary in self._kwargs.items():
-            for k, v in dictionary.items():
-                torch.ops.poptorch.set_attribute(attr, k, v)
-            if attr in Attribute._current_attrs:
-                Attribute._current_attrs[attr].update(dictionary)
-            else:
-                Attribute._current_attrs[attr] = dictionary
-
-    def __exit__(self, type, value, traceback):
-        for attr, dictionary in self._kwargs.items():
-            saved_dict = self._saved.get(attr, {})
-            for k in dictionary.keys():
-                if k not in saved_dict:
-                    torch.ops.poptorch.clear_attribute(attr, k)
-                else:
-                    torch.ops.poptorch.set_attribute(attr, k, saved_dict[k])
-        Attribute._current_attrs = self._saved
 
 
 # Used by _options_config, defined here so that it is reported

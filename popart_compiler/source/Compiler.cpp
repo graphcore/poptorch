@@ -1054,16 +1054,6 @@ void Compiler::startElseBlock() {
   _impl->if_false_stack.push(_impl->active_builder);
 }
 
-void Compiler::setAttribute(const char *attribute, const char *key,
-                            const char *value) {
-  _impl->setAttribute(std::string(attribute), std::string(key),
-                      std::string(value));
-}
-
-void Compiler::clearAttribute(const char *attribute, const char *key) {
-  _impl->clearAttribute(std::string(attribute), std::string(key));
-}
-
 poptorch::TensorId
 Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
                      const std::vector<poptorch::TensorId> &inputs) {

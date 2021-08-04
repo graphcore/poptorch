@@ -892,20 +892,6 @@ void LowerToPopartImpl::lowerBody() {
                      "Output " << i << " doesn't exist of Node " << *node);
         _value_map.setTensor(output, output_tensor);
       }
-    } else if (kind == symbols::poptorch::set_attribute) {
-      const std::string &attribute =
-          node->s(c10::Symbol::fromQualString("attr::attribute"));
-      const std::string &key =
-          node->s(c10::Symbol::fromQualString("attr::key"));
-      const std::string &value =
-          node->s(c10::Symbol::fromQualString("attr::value"));
-      _compiler.setAttribute(attribute.c_str(), key.c_str(), value.c_str());
-    } else if (kind == symbols::poptorch::clear_attribute) {
-      const std::string &attribute =
-          node->s(c10::Symbol::fromQualString("attr::attribute"));
-      const std::string &key =
-          node->s(c10::Symbol::fromQualString("attr::key"));
-      _compiler.clearAttribute(attribute.c_str(), key.c_str());
     } else {
       ERROR("Couldn't find a registered operation for node");
     }
