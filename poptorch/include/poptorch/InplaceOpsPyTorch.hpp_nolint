@@ -93,7 +93,14 @@ static const std::unordered_map<NodeKind, int> expectedInputCount = {
 // Modify from source to handle other in place ops not in the list
 bool isInplaceOp(const Node* node) {
   const char *kind_str = node->kind().toQualString();
-  return kind_str[strlen(kind_str)-1] == '_';
+  size_t str_length = strlen(kind_str);
+
+  if (str_length < 2) { return false; }
+
+  // Handle ops like aten::__and__
+  if (kind_str[str_length-2] == '_') { return false; }
+
+  return kind_str[str_length-1] == '_';
 }
 
 // Code within function is copied but wrapped in a new function
