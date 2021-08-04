@@ -36,6 +36,8 @@ Creation ops
 * ``tensor.fill``
 * ``torch.full``
 * ``torch.full_like``
+* ``torch.Tensor.new_ones``
+* ``torch.Tensor.new_zeros``
 * ``torch.ones``
 * ``torch.ones_like``
 * ``torch.zeros``

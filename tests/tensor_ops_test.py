@@ -82,6 +82,18 @@ def test_zeros_and_ones(dtype):
 
 
 @pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
+def test_new_zeros_and_new_ones(dtype):
+    class Model(torch.nn.Module):
+        def forward(self, z):
+            x = z.new_zeros(3, 5, 1)
+            y = z.new_ones(3, 5, 1)
+
+            return (x * y) + z, (y + x) + z
+
+    zeros_and_ones_harness(Model(), dtype, False)
+
+
+@pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)
 def test_zeros_like_and_ones_like(dtype):
     class Model(torch.nn.Module):
         def forward(self, z, t):

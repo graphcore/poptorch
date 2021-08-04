@@ -30,6 +30,8 @@ extern c10::Symbol feature_dropout_;            // NOLINT
 extern c10::Symbol roll;                        // NOLINT
 extern c10::Symbol nll_loss_nd;                 // NOLINT
 extern c10::Symbol cross_entropy_loss;          // NOLINT
+extern c10::Symbol new_ones;                    // NOLINT
+extern c10::Symbol new_zeros;                   // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {

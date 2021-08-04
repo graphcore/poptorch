@@ -32,6 +32,8 @@ c10::Symbol feature_dropout_;            // NOLINT
 c10::Symbol roll;                        // NOLINT
 c10::Symbol nll_loss_nd;                 // NOLINT
 c10::Symbol cross_entropy_loss;          // NOLINT
+c10::Symbol new_ones;                    // NOLINT
+c10::Symbol new_zeros;                   // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -62,6 +64,8 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, roll);
   SYMBOL_INIT(aten, nll_loss_nd);
   SYMBOL_INIT(aten, cross_entropy_loss);
+  SYMBOL_INIT(aten, new_ones);
+  SYMBOL_INIT(aten, new_zeros);
 }
 
 } // namespace c10::aten
