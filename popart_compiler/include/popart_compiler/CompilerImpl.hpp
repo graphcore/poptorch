@@ -11,6 +11,8 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
+
 #include <vector>
 
 #include <popart/builder.hpp>
@@ -356,11 +358,18 @@ public:
     return ids_types[id];
   }
 
+  void setAttribute(const std::string &attribute, const std::string &key,
+                    const std::string &value);
+  void clearAttribute(const std::string &attribute, const std::string &key);
+
 private:
   // Constants which are simply returned (possibly as part of a tuple/list) and
   // do not need to be input into Popart
   std::unordered_map<poptorch::TensorId, HostSideConstant> _host_side_constants;
   std::shared_ptr<popart::DeviceInfo> _device;
+
+  std::unordered_map<std::string, std::map<std::string, std::string>>
+      _attribute_key_value_map;
 };
 
 } // namespace detail

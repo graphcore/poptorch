@@ -4,7 +4,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 #define SYMBOL_INIT(Namespace, Name)                                           \
-  Name = c10::Symbol::fromQualString(#Namespace "::" #Name);
+  Name = c10::Symbol::fromQualString(#Namespace "::" #Name)
 
 namespace c10::aten {
 
@@ -38,30 +38,30 @@ __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializeAtenSymbols() {
   // clang-format on
   logging::trace("Initializing aten symbols");
-  SYMBOL_INIT(aten, logical_not)
-  SYMBOL_INIT(aten, floor_divide)
-  SYMBOL_INIT(aten, prelu_)
-  SYMBOL_INIT(aten, leaky_relu_)
-  SYMBOL_INIT(aten, elu_)
-  SYMBOL_INIT(aten, selu_)
-  SYMBOL_INIT(aten, isinf)
-  SYMBOL_INIT(aten, uniform_)
-  SYMBOL_INIT(aten, normal_)
-  SYMBOL_INIT(aten, where_)
-  SYMBOL_INIT(aten, poisson_nll_loss)
-  SYMBOL_INIT(aten, multilabel_soft_margin_loss)
-  SYMBOL_INIT(aten, bernoulli_)
-  SYMBOL_INIT(aten, clamp_min_)
-  SYMBOL_INIT(aten, clamp_max_)
-  SYMBOL_INIT(aten, one_hot)
-  SYMBOL_INIT(aten, amax)
-  SYMBOL_INIT(aten, amin)
-  SYMBOL_INIT(aten, pow_)
-  SYMBOL_INIT(aten, scatter_add_)
-  SYMBOL_INIT(aten, feature_dropout_)
-  SYMBOL_INIT(aten, roll)
-  SYMBOL_INIT(aten, nll_loss_nd)
-  SYMBOL_INIT(aten, cross_entropy_loss)
+  SYMBOL_INIT(aten, logical_not);
+  SYMBOL_INIT(aten, floor_divide);
+  SYMBOL_INIT(aten, prelu_);
+  SYMBOL_INIT(aten, leaky_relu_);
+  SYMBOL_INIT(aten, elu_);
+  SYMBOL_INIT(aten, selu_);
+  SYMBOL_INIT(aten, isinf);
+  SYMBOL_INIT(aten, uniform_);
+  SYMBOL_INIT(aten, normal_);
+  SYMBOL_INIT(aten, where_);
+  SYMBOL_INIT(aten, poisson_nll_loss);
+  SYMBOL_INIT(aten, multilabel_soft_margin_loss);
+  SYMBOL_INIT(aten, bernoulli_);
+  SYMBOL_INIT(aten, clamp_min_);
+  SYMBOL_INIT(aten, clamp_max_);
+  SYMBOL_INIT(aten, one_hot);
+  SYMBOL_INIT(aten, amax);
+  SYMBOL_INIT(aten, amin);
+  SYMBOL_INIT(aten, pow_);
+  SYMBOL_INIT(aten, scatter_add_);
+  SYMBOL_INIT(aten, feature_dropout_);
+  SYMBOL_INIT(aten, roll);
+  SYMBOL_INIT(aten, nll_loss_nd);
+  SYMBOL_INIT(aten, cross_entropy_loss);
 }
 
 } // namespace c10::aten
@@ -137,32 +137,35 @@ c10::Symbol end_cpu_op;
 c10::Symbol canonicalised_cpu_call;
 c10::Symbol ctc_beam_search_decoder;
 
+c10::Symbol set_attribute;
+c10::Symbol clear_attribute;
+
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializePoptorchSymbols() {
   // clang-format on
   logging::trace("Initializing poptorch symbols");
-  SYMBOL_INIT(poptorch, begin_ipu_block)
-  SYMBOL_INIT(poptorch, internal_cast)
-  SYMBOL_INIT(poptorch, end_ipu_block)
-  SYMBOL_INIT(poptorch, identity_loss)
-  SYMBOL_INIT(poptorch, set_available_memory)
-  SYMBOL_INIT(poptorch, set_matmul_serialization)
-  SYMBOL_INIT(poptorch, optimizer_group)
-  SYMBOL_INIT(poptorch, begin_multi_conv)
-  SYMBOL_INIT(poptorch, multi_conv_part)
-  SYMBOL_INIT(poptorch, end_multi_conv)
-  SYMBOL_INIT(poptorch, begin_autocast)
-  SYMBOL_INIT(poptorch, suppress_autocast)
-  SYMBOL_INIT(poptorch, restore_autocast)
-  SYMBOL_INIT(poptorch, host_side_cast)
-  SYMBOL_INIT(poptorch, autocast)
+  SYMBOL_INIT(poptorch, begin_ipu_block);
+  SYMBOL_INIT(poptorch, internal_cast);
+  SYMBOL_INIT(poptorch, end_ipu_block);
+  SYMBOL_INIT(poptorch, identity_loss);
+  SYMBOL_INIT(poptorch, set_available_memory);
+  SYMBOL_INIT(poptorch, set_matmul_serialization);
+  SYMBOL_INIT(poptorch, optimizer_group);
+  SYMBOL_INIT(poptorch, begin_multi_conv);
+  SYMBOL_INIT(poptorch, multi_conv_part);
+  SYMBOL_INIT(poptorch, end_multi_conv);
+  SYMBOL_INIT(poptorch, begin_autocast);
+  SYMBOL_INIT(poptorch, suppress_autocast);
+  SYMBOL_INIT(poptorch, restore_autocast);
+  SYMBOL_INIT(poptorch, host_side_cast);
+  SYMBOL_INIT(poptorch, autocast);
 
   SYMBOL_INIT(poptorch, end_if);
   SYMBOL_INIT(poptorch, start_if_true);
   SYMBOL_INIT(poptorch, start_if_false);
   SYMBOL_INIT(poptorch, start_for_loop);
-  SYMBOL_INIT(poptorch, end_for_loop)
+  SYMBOL_INIT(poptorch, end_for_loop);
   SYMBOL_INIT(poptorch, push_name_scope);
   SYMBOL_INIT(poptorch, pop_name_scope);
   SYMBOL_INIT(poptorch, add_untyped_input_tensor);
@@ -172,8 +175,11 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, call_cpu_op);
   SYMBOL_INIT(poptorch, end_cpu_op);
 
-  SYMBOL_INIT(poptorch, canonicalised_cpu_call)
-  SYMBOL_INIT(poptorch, ctc_beam_search_decoder)
+  SYMBOL_INIT(poptorch, canonicalised_cpu_call);
+  SYMBOL_INIT(poptorch, ctc_beam_search_decoder);
+
+  SYMBOL_INIT(poptorch, set_attribute);
+  SYMBOL_INIT(poptorch, clear_attribute);
 }
 
 } // namespace poptorch::symbols::poptorch

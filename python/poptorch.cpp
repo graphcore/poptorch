@@ -180,6 +180,18 @@ c10::List<at::Tensor> endCPUOp(c10::List<at::Tensor> output) {
   return output;
 }
 
+void setAttribute(const std::string &attribute, const std::string &key,
+                  const std::string &value) {
+  UNUSED(attribute);
+  UNUSED(key);
+  UNUSED(value);
+}
+
+void clearAttribute(const std::string &attribute, const std::string &key) {
+  UNUSED(attribute);
+  UNUSED(key);
+}
+
 void ifElse() {}
 
 // We track the outputs of the if in this brach as it is easier to add them
@@ -268,7 +280,9 @@ static auto registry =
         .op("poptorch::suppress_autocast", &suppressAutocast)
         .op("poptorch::restore_autocast", &restoreAutocast)
         .op("poptorch::end_cpu_op", &endCPUOp)
-        .op("poptorch::call_cpu_op", &callCpuOp);
+        .op("poptorch::call_cpu_op", &callCpuOp)
+        .op("poptorch::set_attribute", setAttribute)
+        .op("poptorch::clear_attribute", &clearAttribute);
 
 namespace poptorch {
 namespace {
