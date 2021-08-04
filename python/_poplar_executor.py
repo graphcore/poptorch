@@ -31,6 +31,10 @@ def accessAttributes(attribute_id_str):
     if not isinstance(attribute_id_str, (str)):
         raise ValueError("Wrong type for attribute_id_str")
 
+    # this is to allow creating of attributes from poptorch cpp
+    if attribute_id_str.startswith('{'):
+        return json.loads(attribute_id_str)
+
     if not attribute_id_str.startswith(ATTR_PREFIX):
         raise ValueError("Invalid attribute_id_str")
 

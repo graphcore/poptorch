@@ -24,5 +24,10 @@ const popart::OperatorIdentifier host_op = {"poptorch.custom_ops",
                                             "HostOp",
                                             domain,
                                             {min_inputs, max_inputs}}; // NOLINT
+const popart::OperatorIdentifier upsample_bilinear2d = {
+    "poptorch.custom_ops", "UpsampleBilinear2d", 1};
+const popart::OperatorIdentifier upsample_bilinear2d_grad = {
+    "poptorch.custom_ops", "UpsampleBilinear2dGrad", 1};
+
 } // namespace poptorch_custom_ops
 }

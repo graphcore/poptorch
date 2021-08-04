@@ -9,7 +9,8 @@ add_library(popart_compiler SHARED
   "source/Utils.cpp"
   "source/SessionOptions.cpp"
   "source/custom_operations/HostOp.cpp"
-  )
+  "source/custom_operations/UpsampleBilinear2d.cpp"
+)
 
 set_property(TARGET popart_compiler PROPERTY CXX_STANDARD 14)
 

@@ -57,16 +57,24 @@ def op_harness(op, inputs, inference_test_fn=None):
 @pytest.mark.parametrize("scale_factor", [2, 3.5])
 @pytest.mark.parametrize("input_shape", [(1, 2, 8), (2, 2, 2, 8),
                                          (2, 3, 4, 2, 8)])
-def test_upsample(scale_factor, input_shape):
+def test_upsample_nearest(scale_factor, input_shape):
     torch.manual_seed(42)
-    mode = "nearest"  # Other modes not supported by Popart
-    op = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)
+    op = torch.nn.Upsample(scale_factor=scale_factor, mode="nearest")
+    x = torch.randn(*input_shape)
+    op_harness(op, [x])
+
+
+# TODO(T43375): replace scale factor 5 with 3.5
+@pytest.mark.parametrize("scale_factor", [2, 5])
+@pytest.mark.parametrize("input_shape", [(1, 2, 3, 4), (2, 2, 2, 8)])
+def test_upsample_bilinear(scale_factor, input_shape):
+    torch.manual_seed(42)
+    op = torch.nn.Upsample(scale_factor=scale_factor, mode="bilinear")
     x = torch.randn(*input_shape)
     op_harness(op, [x])
 
 
 @pytest.mark.parametrize("mode, input_shape", [("linear", (1, 2, 3)),
-                                               ("bilinear", (1, 2, 3, 4)),
                                                ("bicubic", (1, 2, 3, 4)),
                                                ("trilinear", (1, 2, 3, 4, 5))])
 def test_unsupported_upsample(mode, input_shape):

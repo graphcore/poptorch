@@ -363,9 +363,6 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   // aten::upsample_linear1d(Tensor self, int[] output_size, bool align_corners,
   // float? scales) -> Tensor
   //
-  // aten::upsample_bilinear2d(Tensor self, int[] output_size, bool
-  // align_corners, float? scales_h, float? scales_w) -> Tensor
-  //
   // aten::upsample_trilinear3d(Tensor self, int[] output_size, bool
   // align_corners, float? scales_d, float? scales_h, float? scales_w) -> Tensor
 
@@ -387,6 +384,31 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   torch::jit::Node *scales_node = createConstantFloatLike(
       graph, x, scales, {static_cast<std::int64_t>(scales.size())});
   return createResize(graph, {x, scales_node->output()}, "nearest");
+}
+
+torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
+                                            torch::jit::Node *node) {
+  auto input = node->input(0);
+  auto scalar_type = getNodeScalarType(input);
+  auto scales = handleTensorList(node->input(3)->node());
+  auto scalex = constantToFloat(scales[0]->node());
+  auto scaley = constantToFloat(scales[1]->node());
+
+  ERROR_ON_MSG(scalex != scaley,
+               "Non-uniform bilinear upsampling not supported");
+  ERROR_ON_MSG(scalex != floor(scalex),
+               "Bilinear upsampling with non-integer factor not supported");
+
+  std::vector<torch::jit::Value *> inputs = {input};
+  std::string name = "UpsampleBilinear2d";
+  std::string domain = "poptorch.custom_ops";
+  std::string attributes("{\"scaling_factor\":" + std::to_string(scalex) + "}");
+
+  auto new_node =
+      createCustomOperation(graph, inputs, name, domain, 1, 1, attributes);
+  new_node->output(0)->setType(c10::TensorType::create(
+      scalar_type, c10::nullopt, c10::nullopt, c10::nullopt));
+  return new_node;
 }
 
 torch::jit::Node *unsupportedUpsampleHandler(torch::jit::Graph *graph,
@@ -453,7 +475,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::upsample_nearest2d, upsampleHandler);
   registerHandler(c10::aten::upsample_nearest3d, upsampleHandler);
   registerHandler(c10::aten::upsample_linear1d, unsupportedUpsampleHandler);
-  registerHandler(c10::aten::upsample_bilinear2d, unsupportedUpsampleHandler);
+  registerHandler(c10::aten::upsample_bilinear2d, upsampleBilinear2dHandler);
   registerHandler(c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::squeeze, reshapeHandler);
