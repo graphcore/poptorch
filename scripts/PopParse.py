@@ -40,8 +40,11 @@ options_not_handled = [
     "prefetchBufferingDepthMap",
     "accumulateOuterFragmentSettings",
     "tensorLocationSettingsOverride",
+    "autodiffSettings",
+    "matmulOptions",
     # Handled by PopTorch but not detected by this parser:
     "activationTensorLocationSettings",
+    "automaticLossScalingSettings",
     "weightTensorLocationSettings",
     "optimizerStateTensorLocationSettings",
     "accumulatorTensorLocationSettings",
