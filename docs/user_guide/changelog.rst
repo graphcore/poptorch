@@ -10,6 +10,9 @@ New features
 - Support for deepcopy functionality in ``poptorch.Options`` class
 - Support reading internal optimiser state via ``optimizer.state_dict()``
 - Added functionality to add a name scope for each operator present in the module. This function is enabled by default. It can be disabled using ``poptorch.Options.disableModuleNamescope``.
+- Support for a greater number of convolution and transpose convolution
+  parameters including those which result in input/kernel/output truncation,
+  either for inference (transpose) or gradient calculation.
 
 - Migrated to PyTorch version 1.10.0
 

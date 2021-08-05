@@ -15,7 +15,7 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
   // aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[]
   //                    stride, int[] padding, int[] dilation, bool transposed,
   //                    int[] output_padding, int groups) -> Tensor
-  std::optional<bool> transposed = constantToBool(node->input(6)->node());
+  bool transposed = constantToBool(node->input(6)->node());
 
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *kernel = node->input(1);
@@ -42,17 +42,25 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
 
   std::vector<std::int64_t> dilation =
       constantToLongVec(node->input(5)->node());
-  // torch::jit::Value* output_padding = node->input(8);
+
+  std::vector<std::int64_t> output_padding =
+      constantToLongVec(node->input(7)->node());
+
   std::int64_t groups = constantToLong(node->input(8)->node());
 
-  if (transposed.has_value() && !(*transposed)) {
+  if (!transposed) {
     // Create a "normal" convolution.
-    return poptorch::createConv(graph, inputs, dilation, groups, {}, padding,
-                                stride);
+
+    // output_padding should be zero except for conv transpose
+    for (auto out_pad : output_padding) {
+      ERROR_ON(out_pad > 0);
+    }
+
+    return createConv(graph, inputs, dilation, groups, {}, padding, stride);
   }
 
-  return poptorch::createConvtranspose(graph, inputs, dilation, groups, {}, {},
-                                       {}, padding, stride);
+  return createConvtranspose(graph, inputs, dilation, groups, {},
+                             output_padding, {}, padding, stride);
 }
 
 torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,

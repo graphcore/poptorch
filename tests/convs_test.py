@@ -31,48 +31,79 @@ conv_2D = [torch.nn.Conv2d, torch.nn.ConvTranspose2d]
 conv_3D = [torch.nn.Conv3d, torch.nn.ConvTranspose3d]
 
 
-def execute_and_check_wrapper(op, input, training=True):
-
+def execute_and_check_wrapper(op, input, training=True, rtol=0.01, atol=0.01):
     # TODO(T6631): PopART does not support PadGradOp when mode is not "constant"
     if hasattr(op, 'padding_mode') and op.padding_mode != 'zeros':
-        training = False
+        return
 
-    model = helpers.ModelWithWeights(op, input.shape)
-
-    # Run on CPU.
-    native_out, _ = model((input, ))
-
-    # Run on IPU.
-    poptorch_model = poptorch.trainingModel(
-        model) if training else poptorch.inferenceModel(model)
-    poptorch_out, _ = poptorch_model((input, ))
-
-    # Inference test - check outputs
-    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+    model = helpers.ModelWithWeights(op,
+                                     input.shape,
+                                     loss_fn=torch.nn.L1Loss(reduction='mean'),
+                                     out_fn=lambda x: (x, torch.zeros_like(x)))
 
     if training:
-        # Training test - check weights changed
-        poptorch_model.assert_weights_changed()
+        optimizer = poptorch.optim.SGD(model.parameters(), lr=0.01)
+        poptorch_model = poptorch.trainingModel(model, optimizer=optimizer)
+
+        try:
+            has_own_weight = any([
+                n == 'weight'
+                for (n, p) in poptorch_model.op.named_parameters()
+            ])
+        except AttributeError:
+            has_own_weight = False
+
+        if has_own_weight:
+            weights_before = poptorch_model.op.weight.detach().clone()
+
+        input = torch.ones_like(input)
+        for _ in range(5):
+            poptorch_out, loss = poptorch_model((input, ))
+
+        if has_own_weight:
+            model.op.weight.data = weights_before
+
+        # pylint: disable=protected-access
+        model.lin.weight.data = model._weights_before
+        for _ in range(5):
+            optimizer.zero_grad()
+            native_out, loss = model((input, ))
+            loss.backward()
+            optimizer.step()
+
+        # Inference test - check outputs
+        helpers.assert_allclose(actual=poptorch_out,
+                                expected=native_out,
+                                rtol=rtol,
+                                atol=atol)
+    else:
+        poptorch_model = poptorch.inferenceModel(model)
+        # Run on CPU.
+        native_out, _ = model((input, ))
+
+        # Run on IPU.
+        poptorch_out, _ = poptorch_model((input, ))
+        helpers.assert_allclose(actual=poptorch_out,
+                                expected=native_out,
+                                rtol=rtol,
+                                atol=atol)
 
 
 @pytest.mark.parametrize("op", conv_1D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
-def test_conv1D(op, padding_mode):
+@pytest.mark.parametrize("training", [True, False])
+def test_conv1D(op, padding_mode, training):
     if (op is torch.nn.ConvTranspose1d and padding_mode != 'zeros') or \
        padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
     torch.manual_seed(42)
     C_IN = 4
     C_OUT = 8
-    input = torch.randn(1, C_IN, 10)
 
+    input = torch.randn(1, C_IN, 10)
     # With square kernels and equal stride
     model = op(C_IN, C_OUT, 3, stride=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(model, input)
-
-    # Grouped convolutions.
-    model = op(C_IN, C_OUT, 3, stride=2, groups=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(model, input)
+    execute_and_check_wrapper(model, input, training)
 
     if op is not torch.nn.ConvTranspose1d:
         # non-square kernels and unequal stride and with padding and dilation
@@ -82,12 +113,13 @@ def test_conv1D(op, padding_mode):
                    padding=(4),
                    dilation=(3),
                    padding_mode=padding_mode)
-        execute_and_check_wrapper(model, input)
+        execute_and_check_wrapper(model, input, training)
 
 
 @pytest.mark.parametrize("op", conv_2D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
-def test_conv2D(op, padding_mode):
+@pytest.mark.parametrize("training", [True, False])
+def test_conv2D(op, padding_mode, training):
     if (op is torch.nn.ConvTranspose2d and padding_mode != 'zeros') or \
        padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
@@ -98,21 +130,21 @@ def test_conv2D(op, padding_mode):
 
     # With square kernels and equal stride
     model = op(C_IN, C_OUT, 3, stride=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(model, input)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
     # Grouped convolutions.
+
     model = op(C_IN,
                C_OUT, (3, 5),
                stride=2,
                groups=2,
                padding_mode=padding_mode)
-    execute_and_check_wrapper(model, input)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
     # Rectangular padding/stride
     if op is not torch.nn.ConvTranspose2d:
         # non-square kernels and unequal stride and with padding
         model = op(C_IN, C_OUT, (3, 5), stride=(2, 1), padding=(4, 2))
-        # TODO(T40086): Compile failure in training when padding >= kernel_size
         execute_and_check_wrapper(model, input, training=False)
 
         # non-square kernels and unequal stride and with padding and dilation
@@ -123,16 +155,18 @@ def test_conv2D(op, padding_mode):
                    dilation=(3),
                    padding_mode=padding_mode)
         # TODO(T40086): Compile failure in training when padding >= kernel_size
-        execute_and_check_wrapper(model, input, training=False)
+        execute_and_check_wrapper(model, input, training, rtol=0.01, atol=0.05)
 
 
 @pytest.mark.parametrize("op", conv_3D)
 @pytest.mark.parametrize("padding_mode", padding_modes)
-def test_conv3D(op, padding_mode):
+@pytest.mark.parametrize("training", [True, False])
+def test_conv3D(op, padding_mode, training):
     if (op is torch.nn.ConvTranspose3d and padding_mode != 'zeros') or \
        (op is torch.nn.Conv3d and padding_mode == 'reflect') or \
        padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
+
     torch.manual_seed(42)
     C_IN = 4
     C_OUT = 2
@@ -140,21 +174,30 @@ def test_conv3D(op, padding_mode):
 
     # With square kernels and equal stride
     model = op(C_IN, C_OUT, 3, stride=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(model, input)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
     # Grouped convolutions.
     model = op(C_IN, C_OUT, 3, stride=2, groups=2, padding_mode=padding_mode)
-    execute_and_check_wrapper(model, input)
+    execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
-    if op is not torch.nn.ConvTranspose3d:
+    if op is torch.nn.ConvTranspose3d:
+        #  test output padding
+        model = op(C_IN,
+                   C_OUT, (3, 2, 2),
+                   stride=(2, 1, 1),
+                   groups=2,
+                   output_padding=[1, 0, 0],
+                   padding_mode=padding_mode)
+        execute_and_check_wrapper(model, input, training, rtol=0.05, atol=0.05)
+    else:
         # non-square kernels and unequal stride and with padding
         model = op(C_IN,
                    C_OUT, (3, 2, 2),
                    stride=(2, 1, 1),
                    padding=(4, 2, 0),
                    padding_mode=padding_mode)
-        # TODO(T40086): Compile failure in training when padding >= kernel_size
-        execute_and_check_wrapper(model, input, training=False)
+
+        execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
         # non-square kernels and unequal stride and with padding and dilation
         model = op(C_IN,
@@ -162,8 +205,8 @@ def test_conv3D(op, padding_mode):
                    stride=(2, 1, 1),
                    padding=(4, 2, 0),
                    dilation=(3, 1, 1))
-        # TODO(T40086): Compile failure in training when padding >= kernel_size
-        execute_and_check_wrapper(model, input, training=False)
+
+        execute_and_check_wrapper(model, input, training, rtol=0.1, atol=0.1)
 
 
 # The test is reliant on an IPU model with limited memory, so force the small model
@@ -272,10 +315,11 @@ def test_available_memory_automatic():
 
 
 @pytest.mark.parametrize("dim", range(-3, 3))
-def test_cumsum(dim):
+@pytest.mark.parametrize("training", [True, False])
+def test_cumsum(dim, training):
     torch.manual_seed(42)
 
     op = lambda x: torch.cumsum(x, dim=dim)
     input = torch.randn(1, 5, 6, dtype=torch.float32)
 
-    execute_and_check_wrapper(op, input)
+    execute_and_check_wrapper(op, input, training, rtol=0.02, atol=0.02)
