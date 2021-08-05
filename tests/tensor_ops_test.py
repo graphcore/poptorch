@@ -524,6 +524,14 @@ def test_roll(shifts, dims):
     op_harness(op, x)
 
 
+@pytest.mark.parametrize("dims", [(0, 1)])
+def test_flip(dims):
+    torch.manual_seed(0)
+    op = lambda x: x.flip(dims)
+    x = torch.randn((2, 3))
+    op_harness(op, x)
+
+
 @pytest.mark.parametrize("with_clone", [True, False])
 @pytest.mark.parametrize("with_detach", [True, False])
 def test_detach_and_clone(with_clone, with_detach):

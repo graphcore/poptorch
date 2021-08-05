@@ -30,6 +30,15 @@ torch::jit::Node *numToTensorHandler(torch::jit::Graph *graph,
   return nullptr;
 }
 
+torch::jit::Node *flipHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  auto input = node->input(0);
+  auto dims = constantToLongVec(node->input(1)->node());
+  std::vector<torch::jit::Value *> args;
+  args.push_back(input);
+  return createReverse(graph, {input}, dims);
+}
+
 // Input tensor of shape [M, N, ...] is repeated in [R1, R2, ...]
 // dimensions by:
 //   1) transforming to [1, M, 1, N, ...]
@@ -277,6 +286,7 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::size, sizeHandler);
   registerHandler(c10::prim::NumToTensor, numToTensorHandler);
+  registerHandler(c10::aten::flip, flipHandler);
   registerHandler(c10::aten::repeat, repeatHandler);
   registerHandler(c10::aten::roll, rollHandler);
   registerHandler(c10::aten::clone, cloneHandler);

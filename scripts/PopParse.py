@@ -338,6 +338,7 @@ OutputTypeSameAsFirstInput = [
     "replicatedallreduce",
     "reshape",
     "resize",
+    "reverse",
     "reversesequence",
     "roialign",
     "round",
