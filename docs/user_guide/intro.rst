@@ -124,6 +124,6 @@ Other resources
 ===============
 
 Please see Graphcore's website for `How-to Videos <https://www.graphcore.ai/resources/how-to-videos>`_, `Graphcore's examples GitHub repository <https://github.com/graphcore/examples>`_ for PopTorch `applications <https://github.com/graphcore/examples/tree/master/applications/pytorch>`_,
-and `Graphcore's tutorials GitHub repository <https://github.com/graphcore/tutorials>`_ for `feature examples <https://github.com/graphcore/tutorials/tree/sdk-release-2.1/feature_examples/pytorch>`_,
-`tutorials <https://github.com/graphcore/tutorials/tree/sdk-release-2.1/tutorials/pytorch>`_ and `simple applications <https://github.com/graphcore/tutorials/tree/sdk-release-2.1/simple_applications/pytorch>`_.
+and `Graphcore's tutorials GitHub repository <https://github.com/graphcore/tutorials>`_ for `feature examples <https://github.com/graphcore/tutorials/tree/sdk-release-2.2/feature_examples/pytorch>`_,
+`tutorials <https://github.com/graphcore/tutorials/tree/sdk-release-2.2/tutorials/pytorch>`_ and `simple applications <https://github.com/graphcore/tutorials/tree/sdk-release-2.2/simple_applications/pytorch>`_.
 Further developer resources can be found on `Graphcore's developer portal <https://www.graphcore.ai/developer>`_.
