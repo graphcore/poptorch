@@ -153,7 +153,7 @@ torch::jit::Node* createRemainder(torch::jit::Graph *graph,  const std::vector<t
 return new_node;
 }
 torch::jit::Node* createReverse(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dimensions) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::reverse, args, ImplicitCast::None, OutputType::Unknown);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::reverse, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::dimensions"),dimensions);
 return new_node;
 }
