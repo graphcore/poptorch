@@ -63,7 +63,7 @@ class ConnectionType(enum.IntEnum):
 
 class HalfFloatCastingBehavior(enum.IntEnum):
     """
-    - ``FloatDowncastToHalf`` Any op with operands (inputs) which are a
+    - ``FloatDowncastToHalf``: Any op with operands (inputs) which are a
         mix of float32 and float16 (half) will cast all operands to half.
     - ``HalfUpcastToFloat``: Implicit casting will follow PyTorch's rules,
             promoting float16 (half) inputs to float32 if another input is
@@ -86,9 +86,14 @@ class ReductionType(enum.IntEnum):
 
 class SyncPattern(enum.IntEnum):
     """
-    - ``Full``
-    - ``SinglePipeline``
-    - ``ReplicaAndLadder``
+    - ``Full``: Require all IPUs to synchronise on every communication between
+      IPUs or between IPUs and host.
+    - ``SinglePipeline``: Allow IPUs to synchronise with the host independently,
+      without having to synchronise with each other. This permits any one IPU to
+      perform host IO while other IPUs are processing data.
+    - ``ReplicaAndLadder``: Allow an IPU group to communicate with the host
+      without requiring synchronisation between groups. This permits multiple
+      IPU groups to alternate between performing host IO and computation.
     """
     Full = 0
     SinglePipeline = 1

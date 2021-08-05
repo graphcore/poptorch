@@ -1352,12 +1352,27 @@ class Options(_options_impl.OptionsDict):
 
     def syncPattern(self, sync_pattern: "poptorch.SyncPattern"
                     ) -> "poptorch.Options":
-        """Set the IPU sync pattern.
+        """Controls synchronisation in multi-IPU systems.
+
+        This option can be used to allow subsets of IPUs to overlap their work.
+        For example, one set of IPUs could be communicating with the host
+        while other IPUs are processing data.
+
+        This option is typically used together with replicated execution, in
+        which case it takes effect on a per-replica basis. If replication is
+        not used, it will apply to all IPUs.
 
         :param sync_pattern:
-            * ``Full``
-            * ``SinglePipeline``
-            * ``ReplicaAndLadder``
+            * ``Full``: Require all IPUs to synchronise on every communication
+              between IPUs or between IPUs and host. This is the default.
+            * ``SinglePipeline``: Allow IPUs to synchronise with the host
+              independently, without having to synchronise with each other.
+              This permits any one IPU to perform host IO while other IPUs are
+              processing data.
+            * ``ReplicaAndLadder``: Allow an IPU group to communicate with the
+              host without requiring synchronisation between groups. This
+              permits multiple IPU groups to alternate between performing host
+              IO and computation.
         """
         assert isinstance(sync_pattern, enums.SyncPattern)
         self.set(sync_pattern=sync_pattern.value)
