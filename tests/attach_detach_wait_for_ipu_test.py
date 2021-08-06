@@ -37,8 +37,8 @@ def inference_process(event):
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "1"})
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test POPTORCH_WAIT_FOR_IPU")
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_attach_detach_wait_for_ipu(capfd):
-    poptorch.setLogLevel('TRACE')  # Force trace logging
 
     torch.manual_seed(42)
 

@@ -54,9 +54,8 @@ def test_set_options():
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_set_options_from_file(capfd):
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
-
     class LogChecker(helpers.LogChecker):
         def validate(self):
             # pylint: disable=line-too-long
@@ -182,6 +181,7 @@ def test_popart_patterns():
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("ptype", [torch.half, torch.float])
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_popart_partials(capfd, dtype, ptype):
     # pylint: disable=protected-access
     torch.manual_seed(42)
@@ -191,7 +191,6 @@ def test_popart_partials(capfd, dtype, ptype):
     model.add_module('lin', torch.nn.Linear(16, 16))
     model.add_module('conv', torch.nn.Conv1d(16, 16, 1))
 
-    poptorch.setLogLevel(0)
     opts = poptorch.Options()
     opts.Precision.setPartialsType(ptype)
     poptorch_model = poptorch.inferenceModel(model, opts)
@@ -226,8 +225,8 @@ def test_popart_partials(capfd, dtype, ptype):
     poptorch.optim.RMSprop,
     poptorch.optim.LAMB,
 ])
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_automatic_loss_scaling(capfd, optim):
-    poptorch.setLogLevel('DEBUG')
 
     # Just a simple model with weights and a loss function
     class Model(nn.Module):
@@ -342,6 +341,7 @@ def test_tensor_location():
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("setting", [True, False, None])
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_running_statistics(capfd, dtype, setting):
     x = torch.randn((16, 16), dtype=dtype)
 
@@ -352,7 +352,6 @@ def test_running_statistics(capfd, dtype, setting):
     if dtype == torch.half:
         model.half()
 
-    poptorch.setLogLevel(0)
     opts = poptorch.Options()
     if setting is not None:
         opts.Precision.runningStatisticsAlwaysFloat(setting)
@@ -397,9 +396,8 @@ def test_ipu_context_flag():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to count IPU cycles")
+@helpers.overridePoptorchLogLevel("INFO")
 def test_log_cycle_count(capfd):
-    poptorch.setLogLevel("INFO")
-
     class LogChecker(helpers.LogChecker):
         def validate(self):
             self.assert_contains("Total number of IPU cycles: ")

@@ -156,7 +156,7 @@ if __name__ == '__main__':
                         help="offload optimizer state")
     opts = parser.parse_args()
 
-    poptorch.setLogLevel(1)  # Force debug logging
+    poptorch.setLogLevel("DEBUG")  # Force debug logging
 
     #annotations_strategy_start
     training_data, test_data = get_mnist_data(opts)

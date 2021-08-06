@@ -5,6 +5,7 @@
 
 #include "poptorch_logging/Logging.hpp"
 
+namespace poptorch {
 namespace logging {
 
 namespace {
@@ -112,3 +113,4 @@ LogContext::~LogContext() { clear(); }
 }
 
 } // namespace logging
+} // namespace poptorch

@@ -55,7 +55,7 @@ std::string formatException(const std::exception &e) {
   }
   // Add the exception's stack trace to the PopTorch one
   for (int64_t i = info.stackDepth() - 1; i >= 0; --i) {
-    logging::LogContext::push(info.stack(i));
+    poptorch::logging::LogContext::push(info.stack(i));
   }
 
   return msg.str();
@@ -64,7 +64,7 @@ std::string formatException(const std::exception &e) {
 
 // This is needed to catch STL exceptions and attach some context to them.
 #define CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION                                \
-  catch (const logging::Error &e) {                                            \
+  catch (const poptorch::logging::Error &e) {                                  \
     throw e;                                                                   \
   }                                                                            \
   catch (const std::out_of_range &e) {                                         \
@@ -1048,6 +1048,12 @@ void setLogLevel(std::uint64_t level) {
   logging::setLogLevel(static_cast<logging::Level>(level));
 }
 
+void setPopartLogLevelUInt(std::uint64_t level) {
+  ERROR_ON(level > static_cast<std::uint64_t>(logging::Level::Off) ||
+           level == 5);
+  poptorch::setPopartLogLevel(static_cast<logging::Level>(level));
+}
+
 void loadEngineAndConnectStreams(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
@@ -1416,6 +1422,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("ipuHardwareVersion", poptorch::ipuHardwareVersion,
         py::arg("numIpus") = 1);
   m.def("setLogLevel", poptorch::setLogLevel, py::arg("level") = 2);
+  m.def("setPopartLogLevel", poptorch::setPopartLogLevelUInt);
   m.def("_getPopartIR", poptorch::getPopartIR);
   m.def("detachFromDevice", poptorch::detachFromDevice);
   m.def("attachToDevice", poptorch::attachToDevice);

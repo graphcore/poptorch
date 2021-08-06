@@ -75,6 +75,8 @@ struct OutputType {
  */
 std::int64_t ipuHardwareVersion(std::uint64_t num_ipus = 1);
 
+void setPopartLogLevel(logging::Level level);
+
 struct Optimizer {
   struct Parameter {
     char name[32];

@@ -11,9 +11,8 @@ import helpers
 import poptorch
 
 
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_missing_block():
-    poptorch.setLogLevel(1)  # Force debug logging
-
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -35,9 +34,8 @@ def test_missing_block():
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_api_inline(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
-
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -61,10 +59,9 @@ def test_api_inline(capfd):
     log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
 
 
+@helpers.overridePoptorchLogLevel("DEBUG")
 def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted):
     # pylint: disable=protected-access
-    poptorch.setLogLevel(1)  # Force debug logging
-
     dev_its = 6
 
     opts = poptorch.Options()
@@ -182,11 +179,11 @@ def test_recomputation_checkpoint_tensor_tuple_inputs():
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_api_wrap(capfd):
     """
     stage "0" ipu(0) stage(0) l0 l1 l2
     """
-    poptorch.setLogLevel(1)  # Force debug logging
 
     class Block(torch.nn.Module):
         def forward(self, x):
@@ -220,12 +217,12 @@ def test_api_wrap(capfd):
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_api_wrap_2stages(capfd):
     """
     stage "0" ipu(0) stage(0) l0
     stage "1" ipu(1) stage(1) l1 / l2
     """
-    poptorch.setLogLevel(1)  # Force debug logging
 
     class Block(torch.nn.Module):
         def forward(self, x):
@@ -262,9 +259,8 @@ def test_api_wrap_2stages(capfd):
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_inline_AutoIncrement(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
-
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -297,9 +293,8 @@ def test_inline_AutoIncrement(capfd):
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_api_AutoIncrement(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
-
     class Block(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -398,9 +393,8 @@ class BlockFnModel(torch.nn.Module):
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_block_function(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
-
     m = BlockFnModel()
 
     opts = poptorch.Options()

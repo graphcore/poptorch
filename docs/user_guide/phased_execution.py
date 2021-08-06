@@ -6,7 +6,7 @@ import poptorch
 
 # pylint: disable=function-redefined, too-many-function-args
 # annotations_start
-poptorch.setLogLevel(1)  # Force debug logging
+poptorch.setLogLevel("DEBUG")  # Force debug logging
 N = 3
 size = 10
 

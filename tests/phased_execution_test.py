@@ -294,8 +294,8 @@ class LogChecker(helpers.LogChecker):
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_2x2_parallel_phased_execution_inline(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
     N = 3
     size = 10
 
@@ -350,8 +350,8 @@ def test_2x2_parallel_phased_execution_inline(capfd):
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_2x2_parallel_phased_execution_opts(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
     N = 3
     size = 10
 
@@ -411,8 +411,8 @@ def test_2x2_parallel_phased_execution_opts(capfd):
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_2x2_parallel_phased_execution_small_opts(capfd):
-    poptorch.setLogLevel(1)  # Force debug logging
     size = 10
 
     class Model(torch.nn.Module):
@@ -490,9 +490,8 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
 
 @pytest.mark.parametrize("liveness", list(poptorch.Liveness))
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_serial_tensor_liveness(capfd, liveness):
-    poptorch.setLogLevel(1)  # Force debug logging
-
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()

@@ -67,8 +67,8 @@ def get_mean_cycle_count(io_dtype, capfd):
                           (torch.float32, torch.float16)])
 @helpers.printCapfdOnExit
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
+@helpers.overridePoptorchLogLevel("INFO")
 def test_compare_io_performance(capfd, io_dtype1, io_dtype2):
-    poptorch.setLogLevel('INFO')
     cycle_count_1 = get_mean_cycle_count(io_dtype1, capfd)
     cycle_count_2 = get_mean_cycle_count(io_dtype2, capfd)
     # We only log the resulting cycle counts and ratios due to high variance

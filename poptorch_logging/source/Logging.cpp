@@ -12,6 +12,7 @@
 #include <iostream>
 #include <string>
 
+namespace poptorch {
 namespace logging {
 
 namespace {
@@ -133,3 +134,4 @@ void setLogLevel(Level l) { context().logger->set_level(translate(l)); }
 void flush() { context().logger->flush(); }
 
 } // namespace logging
+} // namespace poptorch

@@ -6,6 +6,7 @@ import poptorch
 import helpers
 
 
+@helpers.overridePoptorchLogLevel()
 def test_set_log_level():
     for i in range(5):
         poptorch.setLogLevel(i)
@@ -25,6 +26,48 @@ def test_set_log_level():
 
     with pytest.raises(ValueError, match=err_str):
         poptorch.setLogLevel("wibble")
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePopartLogLevel()
+def test_set_popart_log_level(capfd):
+    # Only strings are allowed
+    with pytest.raises(ValueError, match="Level must be one of"):
+        poptorch._logging.setPopartLogLevel(0)  # pylint: disable=protected-access
+
+    # Only some strings are allowed
+    with pytest.raises(ValueError, match="Level must be one of"):
+        poptorch._logging.setPopartLogLevel("FOO")  # pylint: disable=protected-access
+
+    poptorch._logging.setPopartLogLevel("DEBUG")  # pylint: disable=protected-access
+    poptorch._logging.setPopartLogLevel("INFO")  # pylint: disable=protected-access
+    poptorch._logging.setPopartLogLevel("WARN")  # pylint: disable=protected-access
+
+    model = torch.nn.Linear(2, 2)
+
+    inference_model = poptorch.inferenceModel(model)
+    inference_model(torch.randn([2, 2]))
+
+    log = helpers.LogChecker(capfd)
+    log.assert_not_contains("[popart:devicex] [trace]")
+    log.assert_not_contains("[popart:ir] [debug]")
+    log.assert_not_contains("[popart:ir] [info]")
+    log.assert_not_contains("[popart:session] [trace]")
+    log.assert_not_contains("[popart:popart] [trace]")
+
+    poptorch._logging.setPopartLogLevel("ERR")  # pylint: disable=protected-access
+    poptorch._logging.setPopartLogLevel("OFF")  # pylint: disable=protected-access
+    poptorch._logging.setPopartLogLevel("TRACE")  # pylint: disable=protected-access
+
+    inference_model = poptorch.inferenceModel(model)
+    inference_model(torch.randn([2, 2]))
+
+    log = helpers.LogChecker(capfd)
+    log.assert_contains("[popart:devicex] [trace]")
+    log.assert_contains("[popart:ir] [debug]")
+    log.assert_contains("[popart:ir] [info]")
+    log.assert_contains("[popart:session] [trace]")
+    log.assert_contains("[popart:popart] [trace]")
 
 
 def test_zero_size_tensor_error():
@@ -54,9 +97,6 @@ orig_input_trace_tensors = [
 
 
 def print_orig_input_trace_harness(capfd, model, orig_types, *input_args):
-    # Only printed in log level TRACE
-    poptorch.setLogLevel("TRACE")
-
     inference_model = poptorch.inferenceModel(model)
     inference_model(*input_args)
 
@@ -68,6 +108,8 @@ def print_orig_input_trace_harness(capfd, model, orig_types, *input_args):
     testlog.assert_contains(trace_str + orig_str)
 
 
+@helpers.overridePoptorchLogLevel("TRACE")
+@helpers.printCapfdOnExit
 def test_print_orig_input_trace_nested_tuple_tensors(capfd):
     class Model(torch.nn.Module):
         def forward(self, xss):
@@ -82,6 +124,8 @@ def test_print_orig_input_trace_nested_tuple_tensors(capfd):
          (orig_input_trace_tensors[2], )))
 
 
+@helpers.overridePoptorchLogLevel("TRACE")
+@helpers.printCapfdOnExit
 def test_print_orig_input_trace_tuple_tensors(capfd):
     class Model(torch.nn.Module):
         def forward(self, xs):
@@ -96,6 +140,8 @@ def test_print_orig_input_trace_tuple_tensors(capfd):
          orig_input_trace_tensors[2]))
 
 
+@helpers.overridePoptorchLogLevel("TRACE")
+@helpers.printCapfdOnExit
 def test_print_orig_input_trace_tensors(capfd):
     class Model(torch.nn.Module):
         def forward(self, x, y, z):

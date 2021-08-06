@@ -1315,6 +1315,15 @@ size_t Compiler::getNumInputs() const { return _impl->inputs.size(); }
 
 size_t Compiler::getNumOutputs() const { return _impl->outputs.size(); }
 
+void setPopartLogLevel(logging::Level level) {
+  for (uint64_t module = 0;
+       module < static_cast<uint64_t>(popart::logging::Module::none);
+       module++) {
+    popart::logging::setLogLevel(static_cast<popart::logging::Module>(module),
+                                 static_cast<popart::logging::Level>(level));
+  }
+}
+
 namespace detail {
 struct ExceptionInfoImpl {
   std::string type;
