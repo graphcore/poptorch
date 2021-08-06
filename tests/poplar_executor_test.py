@@ -18,9 +18,8 @@ import poptorch
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_ExecutableCaching(capfd):
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
-
     class Model(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -44,9 +43,8 @@ def test_ExecutableCaching(capfd):
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_ExecutableCaching_env(capfd):
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
-
     class Model(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -253,7 +251,7 @@ def test_explicit_destroy(use_half):
 
 
 def _compile_model_offline(cache, pid, num_processes):
-    poptorch.setLogLevel(1)  # Force debug logging
+    poptorch.setLogLevel("DEBUG")  # Force debug logging in worker process
     opts = poptorch.Options().useOfflineIpuTarget()
     opts.enableExecutableCaching(cache)
     # Disable compilation bar to avoid issues with capfd

@@ -138,6 +138,7 @@ def test_sgd_IR(opt):
 @pytest.mark.parametrize("accum_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("first_order_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("second_order_type", (torch.float16, torch.float))
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_adam_accum_type(capfd, opt, accum_type, first_order_type,
                          second_order_type):
     def torchTypeToStr(dt):
@@ -145,7 +146,6 @@ def test_adam_accum_type(capfd, opt, accum_type, first_order_type,
         assert t in ["torch.float32", "torch.float16"]
         return t.split(".")[1]
 
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
     torch.manual_seed(42)
     model = OptimizerTestModel()
 
@@ -166,13 +166,13 @@ def test_adam_accum_type(capfd, opt, accum_type, first_order_type,
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("accum_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("velocity_accum_type", (torch.float16, torch.float))
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_sgd_accum_type(capfd, accum_type, velocity_accum_type):
     def torchTypeToStr(dt):
         t = str(dt)
         assert t in ["torch.float32", "torch.float16"]
         return t.split(".")[1]
 
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
     torch.manual_seed(42)
     model = OptimizerTestModel()
 
@@ -340,8 +340,8 @@ def test_optimizer_groups_none_args():
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_optimizer_SGD_separate_velocity_scale_matched(capfd):
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
     model = OptimizerTestModel()
 
     optimizer = poptorch.optim.SGD(model.parameters(),
@@ -459,8 +459,8 @@ def test_lamb_max_weight_norm(opt):
 
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("use_combined_accum", (True, False))
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_variable_groups(capfd, use_combined_accum):
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
     model = OptimizerTestModel(num_groups=2)
 
     # Make sure all groups have the default values, and the values are not (const)
@@ -559,6 +559,7 @@ def test_variable_groups(capfd, use_combined_accum):
     (poptorch.optim.RMSprop, (("momentum", 0.0), ("alpha", 0.99),
                               ("eps", 1e-08), ("weight_decay", 0.0))),
 ))
+@helpers.overridePoptorchLogLevel("DEBUG")
 # pylint: disable=too-many-statements
 def test_variable_default(opt, capfd):
     def toCamelCase(string):
@@ -602,7 +603,6 @@ def test_variable_default(opt, capfd):
     # as variable because they were explicitly passed to the constructor.
     poptorch_opt, opt_args_tuple = opt
     opt_args = dict(opt_args_tuple)
-    poptorch.setLogLevel("DEBUG")  # Force debug logging
     pytorch_opt = poptorch_opt.__bases__[0]  # Retrieve the upstream type
 
     # Learning rate is a special case: it's always variable so handle it separately.
@@ -810,8 +810,9 @@ def test_gradient_accum_new_api(reduction):
 
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("use_combined_accum", (True, False))
+@helpers.overridePoptorchLogLevel("WARN"
+                                  )  # We only want warnings for this test
 def test_extra_attributes(capfd, use_combined_accum):
-    poptorch.setLogLevel("WARN")  # Make sure we only get warnings
     model = OptimizerTestModel(num_groups=2)
 
     # Make sure all groups have the default values, and the values are not (const)
@@ -845,9 +846,9 @@ def test_extra_attributes(capfd, use_combined_accum):
 
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("use_combined_accum", (True, False))
+@helpers.overridePoptorchLogLevel("WARN"
+                                  )  # We only want warnings for this test
 def test_extra_attributes2(capfd, use_combined_accum):
-
-    poptorch.setLogLevel("WARN")  # Make sure we only get warnings
 
     opts = poptorch.Options()
     opts.relaxOptimizerAttributesChecks()
@@ -876,8 +877,9 @@ def test_extra_attributes2(capfd, use_combined_accum):
 
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("use_combined_accum", (True, False))
+@helpers.overridePoptorchLogLevel("WARN"
+                                  )  # We only want warnings for this test
 def test_extra_attributes3(capfd, use_combined_accum):
-    poptorch.setLogLevel("WARN")  # Make sure we only get warnings
     model = OptimizerTestModel(num_groups=2)
     # Make sure all groups have the default values, and the values are not (const)
     params = [{

@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import copy
 import functools
+import os
 import re
 import torch
 import poptorch
@@ -184,6 +185,39 @@ def printCapfdOnExit(func):
     return wrapper
 
 
+def overridePoptorchLogLevel(level=None):
+    """Decorator to override the PopTorch log level for the duration of the test"""
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if level is not None:
+                poptorch.setLogLevel(level)
+            func(*args, **kwargs)
+            poptorch.setLogLevel(os.environ.get("POPTORCH_LOG_LEVEL", "WARN"))
+
+        return wrapper
+
+    return decorator
+
+
+def overridePopartLogLevel(level=None):
+    """Decorator to override the Popart log level for the duration of the test"""
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if level is not None:
+                poptorch._logging.setPopartLogLevel(level)  # pylint: disable=protected-access
+            func(*args, **kwargs)
+            poptorch._logging.setPopartLogLevel(  # pylint: disable=protected-access
+                os.environ.get("POPART_LOG_LEVEL", "WARN"))
+
+        return wrapper
+
+    return decorator
+
+
 class LogIterator:
     def __init__(self, lines):
         self._lines = lines
@@ -237,6 +271,22 @@ class LogChecker:
             ]), (f"{self._log}"
                  "\n No line in the above log contains all of the strings "
                  f"{strings}")
+
+    def assert_not_contains(self, *strings):
+        """Assert there is no line in the log matching all the strings provided
+        """
+        if len(strings) == 1:
+            assert strings[0] not in self._log, (f"{self._log}"
+                                                 "\ncontains "
+                                                 f"'{strings[0]}'")
+        else:
+            for line in self._lines:
+                if all([s in line for s in strings]):
+                    # Found a line matching all the strings
+                    raise ValueError(
+                        f"{line}"
+                        "\n The line above matches all of the strings "
+                        f"{strings}")
 
     def assert_matches(self, *exprs):
         """Assert there is a line in the log matching all the regular expressions provided

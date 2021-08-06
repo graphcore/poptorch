@@ -9,6 +9,7 @@ import helpers
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_autocast_decorator(capfd, setting):
     class ModelDefault(torch.nn.Module):
         @poptorch.autocast()
@@ -35,7 +36,6 @@ def test_autocast_decorator(capfd, setting):
     torch.manual_seed(42)
     x = torch.randn(1, 20, 20)
     y = torch.randn(1, 20, 20)
-    poptorch.setLogLevel('TRACE')
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_model(x, y)
 
@@ -48,6 +48,7 @@ def test_autocast_decorator(capfd, setting):
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_autocast_block(capfd, setting):
     class ModelDefault(torch.nn.Module):
         def forward(self, x, y):
@@ -74,7 +75,6 @@ def test_autocast_block(capfd, setting):
     torch.manual_seed(42)
     x = torch.randn(1, 20, 20)
     y = torch.randn(1, 20, 20)
-    poptorch.setLogLevel('TRACE')
     poptorch_model = poptorch.inferenceModel(model)
     poptorch_model(x, y)
 
@@ -87,6 +87,7 @@ def test_autocast_block(capfd, setting):
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_enable_autocast(capfd, setting):
     torch.manual_seed(42)
     x = torch.randn(1, 1, 20, 20)
@@ -100,7 +101,6 @@ def test_enable_autocast(capfd, setting):
         opts.Precision.autocastEnabled(False)
 
     poptorch_model = poptorch.inferenceModel(model, opts)
-    poptorch.setLogLevel('TRACE')
     poptorch_model(x)
 
     testlog = helpers.LogChecker(capfd)
@@ -112,6 +112,7 @@ def test_enable_autocast(capfd, setting):
 
 @pytest.mark.parametrize("setting", {"hff", "hfh", "hhf", "default"})
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_autocast_policy(capfd, setting):
     class PolicyModel(torch.nn.Module):
         def __init__(self):
@@ -138,7 +139,6 @@ def test_autocast_policy(capfd, setting):
     else:
         policy = poptorch.autocasting.Policy()
 
-    poptorch.setLogLevel('TRACE')
     opts = poptorch.Options()
     opts.Precision.autocastPolicy(policy)
     poptorch_model = poptorch.inferenceModel(model, opts)

@@ -58,13 +58,13 @@ template <>
 void Setter<std::pair<std::string, std::string>>::operator()(
     std::pair<std::string, std::string> value) { // NOLINT
   _fn(value);
-  logging::debug("poptorch.Options set {}[{}] to {}", _name, value.first,
-                 value.second);
+  poptorch::logging::debug("poptorch.Options set {}[{}] to {}", _name,
+                           value.first, value.second);
 }
 
 template <typename Value> void Setter<Value>::operator()(Value value) {
   _fn(value);
-  logging::debug("poptorch.Options set {} to value {}", _name, value);
+  poptorch::logging::debug("poptorch.Options set {} to value {}", _name, value);
 }
 
 template <typename Value, typename Lambda>

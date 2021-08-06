@@ -39,7 +39,7 @@ c10::Symbol new_zeros;                   // NOLINT
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializeAtenSymbols() {
   // clang-format on
-  logging::trace("Initializing aten symbols");
+  poptorch::logging::trace("Initializing aten symbols");
   SYMBOL_INIT(aten, logical_not);
   SYMBOL_INIT(aten, floor_divide);
   SYMBOL_INIT(aten, prelu_);

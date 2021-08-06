@@ -25,6 +25,7 @@
 /// Formatting is done using the `fmt` library. It supports {}-style and %-style
 /// format specification strings. See https://github.com/fmtlib/fmt for details.
 
+namespace poptorch {
 namespace logging {
 
 enum class Level {
@@ -99,5 +100,6 @@ MAKE_LOG_TEMPLATE(err, Err)
 #undef FUNC_LOGGER
 
 } // namespace logging
+} // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_LOGGING_H

@@ -29,6 +29,15 @@ _LOG_LEVEL_MAPPING = {
 _INTERNAL_ONLY = ("TRACE_ALL", "DEBUG_IR")
 
 
+def setPopartLogLevel(level):
+    if not isinstance(level, str) or level not in _LOG_LEVEL_MAPPING:
+        raise ValueError("Level must be one of " +
+                         ", ".join(_LOG_LEVEL_MAPPING.keys()))
+    # Only import poptorch_core when it's needed
+    import poptorch.poptorch_core as poptorch_core  # type: ignore # pylint: disable=wrong-import-position, import-outside-toplevel
+    poptorch_core.setPopartLogLevel(_LOG_LEVEL_MAPPING[level][0])
+
+
 def setLogLevel(level, update_cpp=True):
     if isinstance(level, int):
         # Legacy usage

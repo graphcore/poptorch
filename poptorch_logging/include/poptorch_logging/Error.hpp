@@ -11,6 +11,7 @@
 
 #define ERROR_LOG "poptorch_error.log"
 
+namespace poptorch {
 namespace logging {
 
 // Remove everything before the last occurrence of "/poptorch/" in a string
@@ -23,14 +24,15 @@ const char *shortPoptorchFilename(const char *filename);
 #define ERROR(msg)                                                             \
   do {                                                                         \
     std::stringstream __error_msg;                                             \
-    __error_msg << "ERROR in " << logging::shortPoptorchFilename(__FILE__)     \
-                << ":" << __LINE__ << ": " << msg; /* NOLINT */                \
-    if (!logging::LogContext::isEmpty()) {                                     \
+    __error_msg << "ERROR in "                                                 \
+                << poptorch::logging::shortPoptorchFilename(__FILE__) << ":"   \
+                << __LINE__ << ": " << msg; /* NOLINT */                       \
+    if (!poptorch::logging::LogContext::isEmpty()) {                           \
       __error_msg << "\nError raised in:\n"                                    \
-                  << logging::LogContext::context().get();                     \
-      logging::LogContext::resetContext();                                     \
+                  << poptorch::logging::LogContext::context().get();           \
+      poptorch::logging::LogContext::resetContext();                           \
     }                                                                          \
-    throw logging::InternalError(__error_msg.str().c_str());                   \
+    throw poptorch::logging::InternalError(__error_msg.str().c_str());         \
   } while (0)
 
 #define ERROR_ON_MSG(condition, msg)                                           \
@@ -94,5 +96,6 @@ private:
 };
 
 } // namespace logging
+} // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_LOGGING_ERROR_HPP
