@@ -202,7 +202,7 @@ def test_dynamic_slice_one_dim_equal():
 
     error_msg = r"The start and end of a slice must be different."
 
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
         dynamic_slice_harness(torch.tensor(
             [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
@@ -223,7 +223,7 @@ def test_dynamic_slice_one_dim_less_than():
     error_msg = (r"Taking a slice of a tensor with the end less than the " +
                  r"start is not supported.")
 
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
         dynamic_slice_harness(torch.tensor(
             [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
@@ -245,7 +245,7 @@ def test_dynamic_slice_one_dim_multiply():
         r"The size of the sliced tensor must be a constant for each " +
         r"execution of the model when running on the IPU\.")
 
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
         dynamic_slice_harness(torch.tensor(
             [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
@@ -266,7 +266,7 @@ def test_dynamic_slice_one_dim_add_non_factor():
     error_msg = (r"The size of the slice \(7\) must be a factor of the " +
                  r"slicing dimension \(8\)\.")
 
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
         dynamic_slice_harness(torch.tensor(
             [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
@@ -296,7 +296,7 @@ def test_dynamic_slice_one_dim_mix_up_float():
         r"there is a float added to the slice indices meaning it may change " +
         r"between runs\.")
 
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
         dynamic_slice_harness(torch.tensor(
             [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
@@ -341,6 +341,6 @@ def test_dynamic_length_slice():
         r"The size of the sliced tensor must be a constant for each " +
         r"execution of the model when running on the IPU\.")
 
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
         poptorch_model(inp, l)

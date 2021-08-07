@@ -33,6 +33,8 @@ New features
 - Using a convolution layer op with the value of ``padding`` greater than or
   equal to `kernel_size`` is now supported.
 - Support for ``torch.Tensor.new_ones`` and ``torch.Tensor.new_zeros``
+- Support for Poplar recoverable and unrecoverable errors.
+- Support for ``torch.flip``.
 
 API changes
 -----------

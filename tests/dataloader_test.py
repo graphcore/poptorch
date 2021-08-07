@@ -584,7 +584,7 @@ def test_broken_dataset():
                                batch_size=1,
                                num_workers=32)
 
-    with pytest.raises(RuntimeError, match="worker thread failed to start"):
+    with pytest.raises(poptorch.Error, match="worker thread failed to start"):
         poptorch.AsynchronousDataAccessor(data)
 
 

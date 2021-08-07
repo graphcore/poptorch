@@ -14,6 +14,11 @@
 namespace poptorch {
 namespace logging {
 
+namespace detail {
+struct LogContextImpl;
+struct ErrorImpl;
+} // namespace detail
+
 // Remove everything before the last occurrence of "/poptorch/" in a string
 // For example given an absolute path like:
 // /a/b/c/poptorch/d/e/f.cpp -> poptorch/d/e/f.cpp
@@ -24,15 +29,9 @@ const char *shortPoptorchFilename(const char *filename);
 #define ERROR(msg)                                                             \
   do {                                                                         \
     std::stringstream __error_msg;                                             \
-    __error_msg << "ERROR in "                                                 \
-                << poptorch::logging::shortPoptorchFilename(__FILE__) << ":"   \
-                << __LINE__ << ": " << msg; /* NOLINT */                       \
-    if (!poptorch::logging::LogContext::isEmpty()) {                           \
-      __error_msg << "\nError raised in:\n"                                    \
-                  << poptorch::logging::LogContext::context().get();           \
-      poptorch::logging::LogContext::resetContext();                           \
-    }                                                                          \
-    throw poptorch::logging::InternalError(__error_msg.str().c_str());         \
+    __error_msg << msg; /* NOLINT */                                           \
+    throw poptorch::logging::InternalError(__error_msg.str().c_str(),          \
+                                           __FILE__, __LINE__);                \
   } while (0)
 
 #define ERROR_ON_MSG(condition, msg)                                           \
@@ -49,7 +48,15 @@ const char *shortPoptorchFilename(const char *filename);
  */
 class Error : public std::runtime_error {
 public:
-  explicit Error(const char *s);
+  explicit Error(const char *s, const char *file, uint64_t line);
+  Error(Error &&e);
+  const char *file() const;
+  uint64_t line() const;
+  const char *message() const;
+  ~Error() override;
+
+private:
+  std::unique_ptr<detail::ErrorImpl> _impl;
 };
 
 /**
@@ -62,9 +69,6 @@ public:
   using Error::Error;
 };
 
-namespace detail {
-struct LogContextImpl;
-} // namespace detail
 /* Context stack used to attach extra information to exceptions when they're
  * raised. All contexts changes can be printed by enabling the info mode.
  */
@@ -73,7 +77,6 @@ public:
   // Current context stack as a string
   static std::unique_ptr<char[]> context();
   static void resetContext();
-  static bool isEmpty();
   static void push(const char *);
 
   LogContext();

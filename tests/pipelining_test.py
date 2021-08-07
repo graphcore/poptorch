@@ -29,7 +29,7 @@ def test_missing_block():
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
 
     m = poptorch.inferenceModel(m, opts)
-    with pytest.raises(RuntimeError, match="No active Block"):
+    with pytest.raises(poptorch.Error, match="No active Block"):
         m.compile(torch.randn(2, 5))
 
 
@@ -372,7 +372,7 @@ def test_ipu_round_up_error():
         "because PopTorch must reserve a power of 2 or maximum of 64 IPUs per "
         r"process\. Please reconfigure your model to use a different number of "
         r"IPUs or set poptorch\.Options\(\)\.autoRoundNumIPUs\(True\)\.")
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         m(torch.randn(4, 5))
 
 

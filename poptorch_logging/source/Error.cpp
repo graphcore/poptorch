@@ -50,9 +50,29 @@ bool LogContextImpl::trace_enabled = []() {
   }
   return std::string(level) == "TRACE_ALL";
 }();
+
+struct ErrorImpl {
+  std::string file;
+  uint64_t line;
+};
+
 } // namespace detail
 
-Error::Error(const char *s) : std::runtime_error(s) { logging::err(what()); }
+Error::~Error() = default;
+
+Error::Error(Error &&e)
+    : std::runtime_error(e.what()), _impl(std::move(e._impl)) {}
+
+Error::Error(const char *s, const char *file, uint64_t line)
+    : std::runtime_error(std::string(s)),
+      _impl(std::make_unique<detail::ErrorImpl>()) {
+  _impl->file = logging::shortPoptorchFilename(file);
+  _impl->line = line;
+}
+
+const char *Error::file() const { return _impl->file.c_str(); }
+
+uint64_t Error::line() const { return _impl->line; }
 
 LogContext::LogContext() : _impl(std::make_unique<detail::LogContextImpl>()) {}
 
@@ -91,15 +111,14 @@ LogContext::~LogContext() { clear(); }
 /* static */ std::unique_ptr<char[]> LogContext::context() {
   std::stringstream ss;
   auto &ctx = getContext();
+  if (ctx.empty()) {
+    return nullptr;
+  }
   for (int64_t idx = ctx.size() - 1; idx >= 0; --idx) {
     ss << "  [" << ctx.size() - idx - 1 << "] " << ctx.at(idx) << std::endl;
   }
 
   std::string str = ss.str();
-  if (str.empty()) {
-    return nullptr;
-  }
-
   auto ptr = std::unique_ptr<char[]>(new char[str.size() + 1]);
   str.copy(ptr.get(), std::string::npos);
   ptr.get()[str.size()] = '\0';
@@ -107,7 +126,6 @@ LogContext::~LogContext() { clear(); }
 }
 
 /* static */ void LogContext::resetContext() { return getContext().clear(); }
-/* static */ bool LogContext::isEmpty() { return getContext().empty(); }
 /* static */ void LogContext::push(const char *new_context) {
   getContext().push_back(new_context);
 }

@@ -130,7 +130,7 @@ def test_too_many_ipus():
     labels = np.ones((128, 4)).astype(np.float32)
 
     with pytest.raises(
-            RuntimeError,
+            poptorch.Error,
             match=r"Too many IPUs requested \(128\)\. Experiments that need .*"
     ):
         poptorch_model(torch.tensor(input, requires_grad=True),

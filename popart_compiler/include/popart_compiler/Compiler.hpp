@@ -50,13 +50,21 @@ struct ExceptionInfoImpl;
 
 enum class OutputElemType { Tensor, Tuple, List };
 
-class ExceptionInfo {
+enum class ErrorCategory { RuntimeRecoverable, RuntimeUnrecoverable, Other };
+
+class ExceptionInfo : public std::exception {
 public:
-  explicit ExceptionInfo(const std::exception &e);
-  ~ExceptionInfo();
+  explicit ExceptionInfo(const std::exception &e, const char *type,
+                         const char *filename, uint64_t line);
+  ~ExceptionInfo() override;
+  const char *what() const noexcept override;
   const char *type() const;
   int64_t stackDepth() const;
   const char *stack(int64_t level) const;
+  const char *filename() const;
+  uint64_t line() const;
+  const char *recoveryAction() const;
+  ErrorCategory category() const;
 
 private:
   std::unique_ptr<detail::ExceptionInfoImpl> _impl;

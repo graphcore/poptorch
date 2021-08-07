@@ -110,9 +110,9 @@ class ArgsParser:
                 if not fast_path:
                     if has_list:
                         logger.warning(
-                            """Lists as inputs only have partial support, they
-                            can be accessed but full Python functionality is
-                            not enabled. Consider changing input to tuple.""")
+                            "Lists as inputs only have partial support, they "
+                            "can be accessed but full Python functionality is "
+                            "not enabled. Consider changing input to tuple.")
 
                     data = self._convertLists(args[i])
                     in_tensors._args.append(data)
@@ -133,9 +133,9 @@ class ArgsParser:
                 if not fast_path:
                     if has_list:
                         logger.warning(
-                            """Lists as inputs only have partial support, they
-                            can be accessed but full Python functionality is
-                            not enabled. Consider changing input to tuple.""")
+                            "Lists as inputs only have partial support, they "
+                            "can be accessed but full Python functionality is "
+                            "not enabled. Consider changing input to tuple.")
                     kwargs[name] = self._convertLists(kwargs[name])
 
                 in_tensors._args.append(kwargs[name])

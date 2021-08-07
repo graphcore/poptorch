@@ -164,7 +164,7 @@ def test_invalid_multiconv_nested():
     poptorch_model = poptorch.inferenceModel(m)
     msg = "Nested poptorch.MultiConv is not supported"
 
-    with pytest.raises(RuntimeError, match=msg):
+    with pytest.raises(poptorch.Error, match=msg):
         poptorch_model(torch.zeros(2, 1, 32, 32))
 
 
@@ -178,7 +178,7 @@ def test_invalid_multiconv_empty():
     poptorch_model = poptorch.inferenceModel(m)
     msg = "Unexpected end_multi_conv"
 
-    with pytest.raises(RuntimeError, match=msg):
+    with pytest.raises(poptorch.Error, match=msg):
         poptorch_model(torch.ones(2, 2))
 
 

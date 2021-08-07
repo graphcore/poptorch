@@ -82,7 +82,7 @@ def test_zero_size_tensor_error():
     poptorch_model = poptorch.inferenceModel(Model())
 
     with pytest.raises(
-            RuntimeError,
+            poptorch.Error,
             match=
             r"Zero-sized tensors are unsupported \(Got shape \[0, 2, 5, 5\]\)"
     ):
@@ -186,7 +186,7 @@ def test_torch_backward_error():
         r"model. If you're using an inferenceModel, you should use a "
         r"trainingModel instead.")
 
-    with pytest.raises(RuntimeError, match=error_message):
+    with pytest.raises(poptorch.Error, match=error_message):
         poptorch_out.backward()
-    with pytest.raises(RuntimeError, match=error_message):
+    with pytest.raises(poptorch.Error, match=error_message):
         poptorch_loss.backward()

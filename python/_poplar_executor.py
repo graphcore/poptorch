@@ -198,8 +198,8 @@ class PoplarExecutor:
 
             for b in self._user_model.buffers():
                 if b.__class__ != torch.Tensor:
-                    raise RuntimeError("All buffers must be an instance of " +
-                                       "torch.Tensor")
+                    raise _impl.createPoptorchError(
+                        "All buffers must be an instance of " + "torch.Tensor")
                 b.__class__ = PoptorchBuffer
 
             # __getattr__ and __getattribute__ are attributes, not methods,
@@ -271,7 +271,7 @@ class PoplarExecutor:
         """
 
         if not self.isCompiled():
-            raise RuntimeError(NO_EXECUTABLE_ERR)
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
 
         weights = {
             **dict(self._model.named_parameters()),
@@ -289,7 +289,7 @@ class PoplarExecutor:
         Implicitly called on first call.
         """
         if not self.isCompiled():
-            raise RuntimeError(NO_EXECUTABLE_ERR)
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
 
         # Don't trigger a copyToHost by accessing `named_parameters`
         self._dirty_host_weights = False
@@ -646,7 +646,7 @@ class PoplarExecutor:
 
     def _assign_backward_error(self, input):
         def error_on_backward():
-            raise RuntimeError(
+            raise _impl.createPoptorchError(
                 "backward() cannot be called explicitly on "
                 "outputs of a PopTorch model. If you're using a trainingModel, "
                 "the backwards pass is performed automatically when invoking "
@@ -868,7 +868,7 @@ class PoplarExecutor:
 
     def _getTraceNoOutput(self, in_tensors_trace_view_tuple):
         if not isinstance(self._model, torch.nn.Module):
-            raise RuntimeError(
+            raise _impl.createPoptorchError(
                 "Tracing a model returning no outputs is only " +
                 "supported if the model is an instance of " +
                 "torch.nn.Module or an instance of a subclass " +
@@ -1028,13 +1028,13 @@ class PoplarExecutor:
         """Detach from target device. Before calling this function, the device
         must be attached (and the model compiled)."""
         if not self.isCompiled():
-            raise RuntimeError(NO_EXECUTABLE_ERR)
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
 
         if self._training:
             self.copyWeightsToHostIfNeeded()
 
         if not self._is_attached:
-            raise RuntimeError("Device is not attached")
+            raise _impl.createPoptorchError("Device is not attached")
 
         poptorch_core.detachFromDevice(self._executable)
         self._is_attached = False
@@ -1043,13 +1043,13 @@ class PoplarExecutor:
         """Attach to target device. Before calling this function, the device
         must be detached and the model compiled."""
         if not self.isCompiled():
-            raise RuntimeError(NO_EXECUTABLE_ERR)
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
         assert self._options.connection_type != enums.ConnectionType.Never, (
             "Trying to attach to an offline device"
             " (ConnectionType.Never)")
 
         if self._is_attached:
-            raise RuntimeError("Device is already attached")
+            raise _impl.createPoptorchError("Device is already attached")
 
         poptorch_core.attachToDevice(self._executable)
         poptorch_core.loadEngineAndConnectStreams(self._executable)
@@ -1079,4 +1079,4 @@ class PoplarExecutor:
         # This implies that there is an input type or condition which does not
         # cause the tracer to fail, yet is none of the above types, or
         # alternatively, it is one of the above but the deepcopy failed.
-        raise RuntimeError("Unsupported input type or condition.")
+        raise _impl.createPoptorchError("Unsupported input type or condition.")

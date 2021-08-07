@@ -52,7 +52,7 @@ def test_type_change():
     error_msg = ("One or more input data types have changed since the first " +
                  "model run. You will need to call \"destroy\" on the model " +
                  "before running with different input data types.")
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         assert inference_model((t1, t2)).float() == 3
 
     inference_model.destroy()

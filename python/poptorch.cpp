@@ -37,41 +37,17 @@
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
-namespace {
-std::string formatException(const std::exception &e) {
-  std::string type = "std::exception";
-  poptorch::ExceptionInfo info(e);
-  std::stringstream msg;
-  msg << "'" << info.type() << "': ";
-  const std::string &what = e.what();
-  if (std::count(what.begin(), what.end(), '\n') > 80) {
-    std::ofstream log;
-    log.open(ERROR_LOG);
-    log << e.what();
-    log.close();
-    msg << "See " ERROR_LOG " for details";
-  } else {
-    msg << e.what();
-  }
-  // Add the exception's stack trace to the PopTorch one
-  for (int64_t i = info.stackDepth() - 1; i >= 0; --i) {
-    poptorch::logging::LogContext::push(info.stack(i));
-  }
-
-  return msg.str();
-}
-} // namespace
-
 // This is needed to catch STL exceptions and attach some context to them.
 #define CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION                                \
   catch (const poptorch::logging::Error &e) {                                  \
-    throw e;                                                                   \
+    throw poptorch::ExceptionInfo(e, "poptorch_cpp_error", e.file(),           \
+                                  e.line());                                   \
   }                                                                            \
   catch (const std::out_of_range &e) {                                         \
-    ERROR("'std::out_of_range' exception: " << e.what());                      \
+    throw poptorch::ExceptionInfo(e, "std::out_of_range", __FILE__, __LINE__); \
   }                                                                            \
   catch (const std::exception &e) {                                            \
-    ERROR(formatException(e));                                                 \
+    throw poptorch::ExceptionInfo(e, nullptr, __FILE__, __LINE__);             \
   }
 
 void beginIpuBlock(int64_t stage_id, int64_t phase_id, int64_t ipu_id) {
@@ -1398,6 +1374,53 @@ void pyCanonicalize(py::handle h) {
 
 } // namespace poptorch
 
+class Error : public py::object {
+public:
+  Error() = default;
+  Error(handle scope, const char *name, handle base = PyExc_Exception) {
+    std::string full_name =
+        scope.attr("__name__").cast<std::string>() + std::string(".") + name;
+    m_ptr = PyErr_NewException(full_name.c_str(), base.ptr(), nullptr);
+    if (hasattr(scope, "__dict__") && scope.attr("__dict__").contains(name)) {
+      pybind11::pybind11_fail(
+          "Error during initialization: multiple incompatible "
+          "definitions with name \"" +
+          std::string(name) + "\"");
+    }
+    scope.attr(name) = *this;
+  }
+
+  // Sets the current python myexception to this exception object with the given
+  // message
+  void setWhat(const std::string &message) {
+    PyErr_SetString(m_ptr, message.c_str());
+  }
+
+  void setMessage(const std::string &message) {
+    py::object x = py::cast(message);
+    PyObject_SetAttrString(m_ptr, "message", x.ptr());
+  }
+
+  void setType(const std::string &type) {
+    py::object x = py::cast(type);
+    PyObject_SetAttrString(m_ptr, "type", x.ptr());
+  }
+  void setLocation(const std::string &location) {
+    py::object x = py::cast(location);
+    PyObject_SetAttrString(m_ptr, "location", x.ptr());
+  }
+};
+
+class RecoverableError : public Error {
+public:
+  using Error::Error;
+
+  void setRecoveryAction(const std::string &recoveryAction) {
+    py::object x = py::cast(recoveryAction);
+    PyObject_SetAttrString(m_ptr, "recovery_action", x.ptr());
+  }
+};
+
 PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   py::class_<poptorch::PoplarExecutable,
              std::shared_ptr<poptorch::PoplarExecutable>>
@@ -1430,4 +1453,57 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("registerCPUCallBack", poptorch::registerCPUCallBack);
   m.def("isAlreadyRegistered", poptorch::alreadyRegistered);
   m.def("registerBuffersWithCallback", poptorch::registerBuffersWithCallback);
+
+  static Error error(m, "Error");
+  static RecoverableError recoverable_error(m, "RecoverableError", error);
+  static Error unrecoverable_error(m, "UnrecoverableError", error);
+
+  py::register_exception_translator(
+      [](std::exception_ptr p) { // NOLINT: Don't change 'p' to a const&
+        try {
+          if (p) {
+            std::rethrow_exception(p);
+          }
+        } catch (const poptorch::ExceptionInfo &e) {
+          for (int64_t i = e.stackDepth() - 1; i >= 0; --i) {
+            poptorch::logging::LogContext::push(e.stack(i));
+          }
+          std::string location{};
+          auto ctx = poptorch::logging::LogContext::context();
+          if (ctx) {
+            location = ctx.get();
+          }
+          std::stringstream what;
+          what << "In " << e.filename() << ":" << e.line() << ": '" << e.type()
+               << "': " << e.what();
+          Error *err = nullptr;
+          switch (e.category()) {
+          case poptorch::ErrorCategory::RuntimeRecoverable: {
+            what << "\nRecovery action required: " << e.recoveryAction();
+            recoverable_error.setRecoveryAction(e.recoveryAction());
+            err = &recoverable_error;
+            break;
+          }
+          case poptorch::ErrorCategory::RuntimeUnrecoverable: {
+            err = &unrecoverable_error;
+            break;
+          }
+          default: {
+            err = &error;
+            break;
+          }
+          }
+
+          if (!location.empty()) {
+            what << "\nError raised in:\n" << location;
+          }
+          poptorch::logging::LogContext::resetContext();
+          err->setType(e.type());
+          err->setMessage(e.what());
+          err->setLocation(location);
+          // Note: on Ubuntu 20.04 PyErr_SetString(), i.e setWhat(),
+          // needs to be the last call in register_exception_translator()
+          err->setWhat(what.str());
+        }
+      });
 }

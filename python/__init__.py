@@ -19,13 +19,14 @@ assert torch.__version__.startswith("@TORCH_VERSION@"), (
 
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
+from poptorch.poptorch_core import Error, RecoverableError
 from . import _dataloader
 from . import _poptorch_data
 from .autocasting import autocast
 from .enums import *
 from .ops import *
 from .options import *
-from ._impl import isRunningOnIpu
+from ._impl import isRunningOnIpu, createPoptorchError
 from ._poplar_executor import PoplarExecutor
 from . import optim
 from . import profiling
@@ -427,7 +428,7 @@ class AsynchronousDataAccessor:
 
         # Ensure the DataLoader doesn't already have an AsynchronousDataAccessor
         if isinstance(dataset, DataLoader) and dataset._accessor is not None:
-            raise RuntimeError(
+            raise createPoptorchError(
                 "The DataLoader already uses an "
                 "AsynchronousDataAccessor internally. Either use "
                 "the existing one or set mode='poptorch.DataLoaderMode.Sync'"

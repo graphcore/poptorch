@@ -54,8 +54,9 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
     optimizer_type = _toPoptorchOptimizer(optimizer)
     attr_tracker.setType(optimizer_type)
 
-    assert optimizer_type is not None, """Unsupported optimizer type.
-         Types supported %s""" % str(list(_OptimizerType))
+    assert optimizer_type is not None, ("Unsupported optimizer type. "
+                                        "Types supported %s") % str(
+                                            list(_OptimizerType))
     opt_class = _toPoptorchClass(optimizer_type)
 
     num_groups = len(optimizer.param_groups)
