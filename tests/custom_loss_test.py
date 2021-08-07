@@ -213,7 +213,7 @@ def test_two_custom_losses():
     error_msg = ("Multiple independent losses found in graph."
                  " Graph must have one final loss. "
                  "Wrap final graph loss in poptorch.identityLoss.")
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         _ = poptorch_model(input, label)
 
 
@@ -267,5 +267,5 @@ def test_no_loss():
     input = torch.randn(1, 10)
 
     error_msg = "Couldn't find a loss in graph"
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         _ = poptorch_model(input, label)

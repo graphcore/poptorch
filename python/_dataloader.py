@@ -14,6 +14,7 @@ import torch.multiprocessing as multiprocessing
 # Do not import any poptorch.* here: it will break the poptorch module
 from . import enums
 from ._logging import logger
+from . import _impl
 
 
 class AsynchronousWorker:
@@ -221,7 +222,7 @@ class _AsynchronousWorkerProcess:
         except EOFError:
             pass
         # Exit the except block before raising a cleaner exception otherwise the previous one will not be cleared.
-        raise RuntimeError(
+        raise _impl.createPoptorchError(
             "AsynchronousDataAccessor worker thread failed to start "
             "(Check above for details)")
 
@@ -251,7 +252,7 @@ class _AsynchronousWorkerProcess:
         except StopIteration:
             pass
         if data is None:
-            raise RuntimeError("The Dataset is empty")
+            raise _impl.createPoptorchError("The Dataset is empty")
 
         # We support either a single tensor or a flat 1D iterable of tensors.
         is_single_tensor = False
@@ -278,10 +279,10 @@ class _AsynchronousWorkerProcess:
         for index, tensor in enumerate(data):
             assert isinstance(
                 tensor,
-                torch.Tensor), """Tensor at index %d is not a torch tensor.
-                    AsynchronousDataAccessor expects data to
-                    be organised as a flat 1D container of
-                    tensors.""" % index
+                torch.Tensor), ("Tensor at index %d is not a torch tensor."
+                                " AsynchronousDataAccessor expects data to "
+                                "be organised as a flat 1D container of "
+                                "tensors.") % index
 
             # Shared with parent process.
             tensor_size = [*tensor.size()]
@@ -527,7 +528,8 @@ class _HostCommandHandler:
                 logger.debug("StartIterating command received")
                 self._start_iterating = True
             else:
-                raise RuntimeError(f"Unknown command received {cmd}")
+                raise _impl.createPoptorchError(
+                    f"Unknown command received {cmd}")
 
     def priorityCommandWaiting(self):
         return self.shutdown_now or self._reset_iterator

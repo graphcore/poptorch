@@ -441,7 +441,7 @@ if __name__ == "__main__":
     for testname in sys.argv[1:]:
         try:
             test_pytorch_nn(testname, os.environ.get("HALF", "0") == "1")
-        except (RuntimeError, AssertionError):
+        except (RuntimeError, AssertionError, poptorch.Error):
             fails.append(testname)
 
     if len(fails) > 0:

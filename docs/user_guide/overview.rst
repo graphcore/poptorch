@@ -151,6 +151,42 @@ when running on the CPU. For example:
               return my_torch_implementation(x,y)
 
 
+Error handling
+==============
+
+Recoverable runtime errors
+--------------------------
+
+This category of error is likely to be transient.
+
+Exception type raised by PopTorch: `poptorch.RecoverableError` (inherits from `poptorch.Error`)
+
+The exception contains the action required to recover from this error in its `recovery_action` string attribute.
+
+This attribute can contain:
+ - `IPU_RESET`: Reset the IPU and reload the IPU memory.
+ - `PARTITION_RESET`: Reset the IPU partition. This resets the IPU-links between IPUs.
+ - `FULL_RESET`: Power cycle the system.
+
+Unrecoverable runtime errors
+----------------------------
+
+These errors are likely to persist. You should take the system out of operation for analysis and repair.
+
+Exception type raised by PopTorch: `poptorch.UnrecoverableError` (inherits from `poptorch.Error`)
+
+Application and other errors
+----------------------------
+
+This kind of error is due to an error in the program or a misuse of an API.
+
+Exception type raised by PopTorch: `poptorch.Error` if the error was detected in the C++ backend, or some generic Python `Exception` if it happened in the python layer.
+
+`poptorch.Error` has the following string attributes:
+ - `message` The error message without any of the context.
+ - `type` The part of the software stack that raised the exception and the category of the error if available.
+ - `location` Where the exception was raised from.
+
 .. _parallel_execution:
 
 Execution strategies

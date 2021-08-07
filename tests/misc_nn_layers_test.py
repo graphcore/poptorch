@@ -77,7 +77,7 @@ def test_unsupported_upsample(mode, input_shape):
 
     # Run on IPU.
     poptorch_model = poptorch.inferenceModel(model)
-    with pytest.raises(RuntimeError, match="only 'nearest' is supported"):
+    with pytest.raises(poptorch.Error, match="only 'nearest' is supported"):
         poptorch_model(x)
 
 

@@ -16,7 +16,7 @@ def harness(setting, Model, args):
     poptorch_model = poptorch.inferenceModel(Model(), opts)
 
     if setting == "true":
-        with pytest.raises(RuntimeError):
+        with pytest.raises(poptorch.Error):
             poptorch_model(*args)
     else:
         poptorch_model(*args)

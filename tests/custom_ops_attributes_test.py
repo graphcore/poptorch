@@ -57,7 +57,7 @@ def test_float_attribute_too_low():
     inference_model = poptorch.inferenceModel(model)
 
     with pytest.raises(
-            RuntimeError,
+            poptorch.Error,
             match=r"-1\.79769e\+308 is too low for a Popart float " +
             r"attribute\."):
         inference_model(x)
@@ -80,7 +80,7 @@ def test_float_attribute_too_high():
     inference_model = poptorch.inferenceModel(model)
 
     with pytest.raises(
-            RuntimeError,
+            poptorch.Error,
             match=r"1\.79769e\+308 is too high for a Popart float " +
             r"attribute\."):
         inference_model(x)
@@ -148,7 +148,7 @@ def test_float_list_attribute_too_low():
 
     inference_model = poptorch.inferenceModel(model)
     with pytest.raises(
-            RuntimeError,
+            poptorch.Error,
             match=r"-1\.79769e\+308 is too low for a Popart float " +
             r"attribute\."):
         inference_model(x)
@@ -172,7 +172,7 @@ def test_float_list_attribute_too_high():
 
     inference_model = poptorch.inferenceModel(model)
     with pytest.raises(
-            RuntimeError,
+            poptorch.Error,
             match=r"1\.79769e\+308 is too high for a Popart float " +
             r"attribute\."):
         inference_model(x)

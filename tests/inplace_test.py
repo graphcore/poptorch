@@ -213,5 +213,5 @@ def test_double_underscore():
     # aten::select
 
     error_msg = ("Cannot force a non-constant")
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         poptorch_model(inp, l)

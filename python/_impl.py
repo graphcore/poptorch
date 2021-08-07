@@ -10,10 +10,20 @@ import torch
 
 # Do not import any poptorch.* here: it will break the poptorch module
 from ._logging import logger
+from . import poptorch_core
 
 # A flag to tell the user if the current target is IPU. This is to allow
 # divergent IPU/CPU codepaths within one model.
 _is_ipu_context = False
+
+
+def createPoptorchError(msg):
+    type = "poptorch_py_error"
+    error = poptorch_core.Error(f"'{type}': {msg}")
+    error.type = type
+    error.message = msg
+    error.location = ""
+    return error
 
 
 def isRunningOnIpu() -> bool:

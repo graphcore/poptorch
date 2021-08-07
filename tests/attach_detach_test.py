@@ -37,7 +37,7 @@ def test_attach_detach():
         raise ValueError("original_loss is NaN")
 
     if poptorch.ipuHardwareIsAvailable():
-        with pytest.raises(RuntimeError) as excinfo:
+        with pytest.raises(poptorch.Error) as excinfo:
             inference.compile(torch.randn(10))
             assert excinfo.match("Failed to acquire")
 
@@ -45,7 +45,7 @@ def test_attach_detach():
     # Ensure that this breaks
 
     error_msg = r"Device is not attached"
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         training.detachFromDevice()
 
     inference.compile(torch.randn(10))

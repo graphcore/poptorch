@@ -242,9 +242,9 @@ def test_explicit_destroy(use_half):
     training_model.destroy()
 
     error_msg = r"Model has not been compiled or has been destroyed."
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         training_model.copyWeightsToHost()
-    with pytest.raises(RuntimeError, match=error_msg):
+    with pytest.raises(poptorch.Error, match=error_msg):
         training_model.copyWeightsToDevice()
 
     inference_model(input)

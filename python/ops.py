@@ -6,6 +6,7 @@ import torch
 
 from . import enums
 from . import poptorch_core
+from . import _impl
 
 _end_ipu_block = torch.ops.poptorch.end_ipu_block
 
@@ -404,8 +405,8 @@ def BeginBlock(layer_to_call: torch.nn.Module,
         if callable(layer_to_call):
             return LegacyBeginBlockFn(layer_to_call, user_id, ipu_id)
 
-        raise RuntimeError("module is not an instance of torch.nn.Module or " +
-                           "function.")
+        raise _impl.createPoptorchError(
+            "module is not an instance of torch.nn.Module or " + "function.")
 
     class BlockModule(type(layer_to_call)):
         def __call__(self, *input, **kwargs):
@@ -418,7 +419,8 @@ def BeginBlock(layer_to_call: torch.nn.Module,
             return super().__call__(*input, **kwargs)
 
     if str(layer_to_call.__class__) == str(BlockModule):
-        raise RuntimeError("module has already been assigned to a block.")
+        raise _impl.createPoptorchError(
+            "module has already been assigned to a block.")
 
     BlockModule.__name__ = type(layer_to_call).__name__
     layer_to_call.__class__ = BlockModule

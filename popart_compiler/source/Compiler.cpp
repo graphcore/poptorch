@@ -11,6 +11,7 @@
 #include <popart/graphtransformer.hpp>
 #include <popart/ndarraywrapper.hpp>
 #include <popart/optimizer.hpp>
+#include <poplar/exceptions.hpp>
 
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
@@ -1326,15 +1327,21 @@ void setPopartLogLevel(logging::Level level) {
 
 namespace detail {
 struct ExceptionInfoImpl {
+  std::string what;
   std::string type;
   std::vector<std::string> stack;
+  std::string filename;
+  std::string message;
+  uint64_t line;
+  std::string recovery_action;
+  ErrorCategory category;
 
   void extractStack(const popart::error *e);
 };
 
 void ExceptionInfoImpl::extractStack(const popart::error *e) {
   std::istringstream iss(e->stackreport());
-  std::string line;
+  std::string l;
   // PopART adds a numbered prefix to each stack line: remove it:
   // [0] top_level_fn()
   // [1] main()
@@ -1343,21 +1350,27 @@ void ExceptionInfoImpl::extractStack(const popart::error *e) {
   //
   // top_level_fn()
   // main()
-  while (std::getline(iss, line)) {
-    size_t first_space = line.find_first_of(' ');
+  while (std::getline(iss, l)) {
+    size_t first_space = l.find_first_of(' ');
     if (first_space == std::string::npos) {
       first_space = 0;
     } else {
       // Start at the first character after the space
       ++first_space;
     }
-    stack.push_back(line.substr(first_space));
+    stack.push_back(l.substr(first_space));
   }
 }
 } // namespace detail
 
-ExceptionInfo::ExceptionInfo(const std::exception &e)
+ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
+                             const char *filename, uint64_t line)
     : _impl(std::make_unique<detail::ExceptionInfoImpl>()) {
+
+  _impl->filename = logging::shortPoptorchFilename(filename);
+  _impl->line = line;
+  _impl->category = ErrorCategory::Other;
+  std::string extra_info;
   switch (popart::getErrorSource(e)) {
   case popart::ErrorSource::popart_internal: {
     _impl->type = "popart_internal_exception";
@@ -1370,7 +1383,19 @@ ExceptionInfo::ExceptionInfo(const std::exception &e)
     break;
   }
   case popart::ErrorSource::poplar: {
-    _impl->type = "poplar_exception";
+    _impl->type = "poplar_";
+    _impl->type += dynamic_cast<const poplar::poplar_error *>(&e)->type;
+    if (dynamic_cast<const poplar::link_error *>(&e)) {
+      extra_info =
+          ". Output: " + dynamic_cast<const poplar::link_error *>(&e)->output;
+    } else if (dynamic_cast<const poplar::recoverable_runtime_error *>(&e)) {
+      _impl->category = ErrorCategory::RuntimeRecoverable;
+      _impl->recovery_action = poplar::toString(
+          dynamic_cast<const poplar::recoverable_runtime_error *>(&e)
+              ->getRecoveryAction());
+    } else if (dynamic_cast<const poplar::unrecoverable_runtime_error *>(&e)) {
+      _impl->category = ErrorCategory::RuntimeUnrecoverable;
+    }
     break;
   }
   case popart::ErrorSource::poplibs: {
@@ -1378,11 +1403,39 @@ ExceptionInfo::ExceptionInfo(const std::exception &e)
     break;
   }
   default: {
-    _impl->type = "std::exception";
+    if (type != nullptr) {
+      _impl->type = type;
+    } else {
+      _impl->type = "std::exception";
+    }
     break;
   }
   }
+  const std::string &what = e.what();
+  if (std::count(what.begin(), what.end(), '\n') > 80) {
+    std::ofstream log;
+    log.open(ERROR_LOG);
+    log << e.what();
+    log << extra_info;
+    log.close();
+    _impl->message = "See " ERROR_LOG " for details";
+  } else {
+    _impl->message = e.what() + extra_info;
+  }
+  _impl->what = _impl->message;
 }
+
+ErrorCategory ExceptionInfo::category() const { return _impl->category; }
+
+const char *ExceptionInfo::recoveryAction() const {
+  return _impl->recovery_action.c_str();
+}
+
+const char *ExceptionInfo::filename() const { return _impl->filename.c_str(); }
+
+uint64_t ExceptionInfo::line() const { return _impl->line; }
+
+const char *ExceptionInfo::what() const noexcept { return _impl->what.c_str(); }
 
 const char *ExceptionInfo::type() const { return _impl->type.c_str(); }
 
