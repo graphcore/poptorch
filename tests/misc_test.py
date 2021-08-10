@@ -190,3 +190,56 @@ def test_torch_backward_error():
         poptorch_out.backward()
     with pytest.raises(poptorch.Error, match=error_message):
         poptorch_loss.backward()
+
+
+@pytest.mark.parametrize(
+    "error_type", poptorch.poptorch_core.TestErrorType.__members__.values())
+def test_generic_error_handling(error_type):
+    with pytest.raises(poptorch.Error) as e:
+        poptorch.poptorch_core._throwTestError(error_type)  # pylint: disable=protected-access
+    assert "throwTestError::bottomLevel" in e.value.args[0]
+    assert "throwTestError::topLevel" in e.value.args[0]
+
+
+def test_specific_error_handling():
+    try:
+        poptorch.poptorch_core._throwTestError(  # pylint: disable=protected-access
+            poptorch.poptorch_core.TestErrorType.PoplarRecoverableFullReset)
+        assert False, "Expected an error to be thrown"
+    except poptorch.RecoverableError as e:
+        assert e.recovery_action == "FULL_RESET"
+        assert "throwTestError::bottomLevel" in e.location
+        assert "throwTestError::topLevel" in e.location
+        assert e.type == "poplar_recoverable_runtime_error"
+        # Message shouldn't contain any backtrace
+        assert "throwTestError::bottomLevel" not in e.message
+        assert "throwTestError::topLevel" not in e.message
+
+    try:
+        poptorch.poptorch_core._throwTestError(  # pylint: disable=protected-access
+            poptorch.poptorch_core.TestErrorType.PoplarLinkError)
+        assert False, "Expected an error to be thrown"
+    except poptorch.Error as e:
+        # Make sure the backtrace was reset between the two exceptions
+        assert e.location.count("throwTestError::bottomLevel") == 1
+        assert e.location.count("throwTestError::topLevel") == 1
+        assert e.type == "poplar_link_error"
+        # Message shouldn't contain any backtrace
+        assert "throwTestError::bottomLevel" not in e.message
+        assert "throwTestError::topLevel" not in e.message
+
+        # Make sure the link error is added at the end of the error message
+        assert "-lfoo not found" in e.message
+
+    try:
+        poptorch.poptorch_core._throwTestError(  # pylint: disable=protected-access
+            poptorch.poptorch_core.TestErrorType.PoplarUnrecoverable)
+        assert False, "Expected an error to be thrown"
+    except poptorch.UnrecoverableError as e:
+        # Make sure the backtrace was reset between the two exceptions
+        assert e.location.count("throwTestError::bottomLevel") == 1
+        assert e.location.count("throwTestError::topLevel") == 1
+        assert e.type == "poplar_unrecoverable_runtime_error"
+        # Message shouldn't contain any backtrace
+        assert "throwTestError::bottomLevel" not in e.message
+        assert "throwTestError::topLevel" not in e.message

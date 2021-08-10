@@ -180,12 +180,21 @@ Application and other errors
 
 This kind of error is due to an error in the program or a misuse of an API.
 
-Exception type raised by PopTorch: `poptorch.Error` if the error was detected in the C++ backend, or some generic Python `Exception` if it happened in the python layer.
+Exception type raised by PopTorch: `poptorch.Error` if the error was detected in the C++ backend, or some generic Python `Exception` if it happened in the Python layer.
 
 `poptorch.Error` has the following string attributes:
  - `message` The error message without any of the context.
  - `type` The part of the software stack that raised the exception and the category of the error if available.
- - `location` Where the exception was raised from.
+ - `location` Where the exception was raised.
+
+Example:
+
+.. literalinclude:: error_handling.py
+    :language: python
+    :linenos:
+    :start-after: error_handling_start
+    :end-before: error_handling_end
+    :caption: How to handle recoverable / unrecoverable errors
 
 .. _parallel_execution:
 

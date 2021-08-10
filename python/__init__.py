@@ -19,7 +19,7 @@ assert torch.__version__.startswith("@TORCH_VERSION@"), (
 
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
-from poptorch.poptorch_core import Error, RecoverableError
+from poptorch.poptorch_core import Error, RecoverableError, UnrecoverableError
 from . import _dataloader
 from . import _poptorch_data
 from .autocasting import autocast

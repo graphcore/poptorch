@@ -1220,6 +1220,12 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+void throwTestErrorSafe(TestErrorType type) {
+  try {
+    poptorch::throwTestError(type);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
 std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
     py::handle h, py::handle g, const pybind11::dict &python_traced_params,
     const pybind11::tuple &inputs, const pybind11::dict &options, bool training,
@@ -1453,10 +1459,23 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("registerCPUCallBack", poptorch::registerCPUCallBack);
   m.def("isAlreadyRegistered", poptorch::alreadyRegistered);
   m.def("registerBuffersWithCallback", poptorch::registerBuffersWithCallback);
+  m.def("_throwTestError", poptorch::throwTestErrorSafe);
 
   static Error error(m, "Error");
   static RecoverableError recoverable_error(m, "RecoverableError", error);
   static Error unrecoverable_error(m, "UnrecoverableError", error);
+
+  py::enum_<poptorch::TestErrorType>(m, "TestErrorType")
+      .value("Poptorch", poptorch::TestErrorType::Poptorch)
+      .value("Popart", poptorch::TestErrorType::Popart)
+      .value("PopartInternal", poptorch::TestErrorType::PopartInternal)
+      .value("Poplibs", poptorch::TestErrorType::Poplibs)
+      .value("PoplarUnrecoverable",
+             poptorch::TestErrorType::PoplarUnrecoverable)
+      .value("PoplarUnknown", poptorch::TestErrorType::PoplarUnknown)
+      .value("PoplarRecoverableFullReset",
+             poptorch::TestErrorType::PoplarRecoverableFullReset)
+      .value("PoplarLinkError", poptorch::TestErrorType::PoplarLinkError);
 
   py::register_exception_translator(
       [](std::exception_ptr p) { // NOLINT: Don't change 'p' to a const&
