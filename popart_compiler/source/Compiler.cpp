@@ -12,6 +12,7 @@
 #include <popart/ndarraywrapper.hpp>
 #include <popart/optimizer.hpp>
 #include <poplar/exceptions.hpp>
+#include <poputil/exceptions.hpp>
 
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
@@ -1363,6 +1364,45 @@ void ExceptionInfoImpl::extractStack(const popart::error *e) {
 }
 } // namespace detail
 
+void throwTestError(TestErrorType type) {
+  logging::LogContext ctx_top{"throwTestError::topLevel"};
+  {
+    logging::LogContext ctx{"throwTestError::bottomLevel"};
+    switch (type) {
+    case TestErrorType::Poptorch: {
+      ERROR("This is a PopTorch error");
+    }
+    case TestErrorType::Popart: {
+      throw popart::error("This is a Popart error");
+    }
+    case TestErrorType::PopartInternal: {
+      throw popart::internal_error("This is a Popart error");
+    }
+    case TestErrorType::Poplibs: {
+      throw poputil::poplibs_error("This is a Poplibs error");
+    }
+    case TestErrorType::PoplarUnrecoverable: {
+      throw poplar::unrecoverable_runtime_error("This is not recoverable");
+    }
+    case TestErrorType::PoplarUnknown: {
+      throw poplar::unknown_runtime_error("Don't know what happened");
+    }
+    case TestErrorType::PoplarRecoverableFullReset: {
+      throw poplar::recoverable_runtime_error(
+          poplar::RecoveryAction::FULL_RESET, "Reboot needed");
+    }
+    case TestErrorType::PoplarLinkError: {
+      throw poplar::link_error("Link error",
+                               "Library -lfoo not found\ncheck path");
+    }
+    default: {
+      break;
+    }
+    }
+  }
+  ERROR("Unknown TestErrorType");
+}
+
 ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
                              const char *filename, uint64_t line)
     : _impl(std::make_unique<detail::ExceptionInfoImpl>()) {
@@ -1386,6 +1426,8 @@ ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
     _impl->type = "poplar_";
     _impl->type += dynamic_cast<const poplar::poplar_error *>(&e)->type;
     if (dynamic_cast<const poplar::link_error *>(&e)) {
+      // Note: for some reason this error doesn't set its type in Poplar
+      _impl->type = "poplar_link_error";
       extra_info =
           ". Output: " + dynamic_cast<const poplar::link_error *>(&e)->output;
     } else if (dynamic_cast<const poplar::recoverable_runtime_error *>(&e)) {

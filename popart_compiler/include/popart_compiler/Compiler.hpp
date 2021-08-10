@@ -52,6 +52,19 @@ enum class OutputElemType { Tensor, Tuple, List };
 
 enum class ErrorCategory { RuntimeRecoverable, RuntimeUnrecoverable, Other };
 
+// For testing only: throw an exception of the selected type.
+enum class TestErrorType {
+  Poptorch,
+  Popart,
+  PopartInternal,
+  Poplibs,
+  PoplarUnrecoverable,
+  PoplarUnknown,
+  PoplarRecoverableFullReset,
+  PoplarLinkError
+};
+void throwTestError(TestErrorType type);
+
 class ExceptionInfo : public std::exception {
 public:
   explicit ExceptionInfo(const std::exception &e, const char *type,
