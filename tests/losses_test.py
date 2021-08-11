@@ -122,12 +122,25 @@ def test_MSELoss(reduction):
                             atol=1e-02)
 
 
-@pytest.mark.parametrize("reduction", ["mean", "sum"])
-def test_CrossEntropy(reduction):
+cross_entropy_params = [
+    # Input shape, reduction
+    ((1, 10), "mean"),
+    ((1, 10, 2), "sum"),
+    ((1, 10, 2, 3), "mean"),
+]
+
+
+@pytest.mark.parametrize("params", cross_entropy_params)
+def test_CrossEntropy(params):
     torch.manual_seed(42)
 
-    label = torch.randint(0, 10, [1])
-    input = torch.randn(1, 10)
+    input_shape, reduction = params
+
+    input = torch.randn(input_shape)
+    label_shape = [input_shape[0]]
+    if len(input_shape) > 2:
+        label_shape.extend(input_shape[2:])
+    label = torch.randint(0, 10, label_shape)
 
     poptorch_model, _, original_loss = loss_harness(F.cross_entropy, [input],
                                                     label, reduction)
@@ -137,7 +150,7 @@ def test_CrossEntropy(reduction):
 
     # Check we have trained the "model"
     assert loss < original_loss
-    assert torch.argmax(out, dim=1) == label
+    helpers.assert_allequal(actual=torch.argmax(out, dim=1), expected=label)
 
 
 # Test softmax and logsoftmax for dimensions more than 2
