@@ -226,6 +226,7 @@ def test_popart_partials(capfd, dtype, ptype):
     poptorch.optim.LAMB,
 ])
 @helpers.overridePoptorchLogLevel("DEBUG")
+@helpers.printCapfdOnExit
 def test_automatic_loss_scaling(capfd, optim):
 
     # Just a simple model with weights and a loss function
@@ -392,6 +393,35 @@ def test_ipu_context_flag():
 
     assert inference_model(x, y) == 52
     assert model(x, y) == 100
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+@pytest.mark.parametrize("enabled", [True, False, None])
+@helpers.overridePoptorchLogLevel("INFO")
+def test_ipu_model(enabled, capfd):
+    class Model(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = Model()
+    opts = poptorch.Options()
+    if enabled is not None:
+        opts.useIpuModel(enabled)
+
+    poptorch_model = poptorch.inferenceModel(model, opts)
+    x = torch.tensor([50])
+    y = torch.tensor([2])
+
+    poptorch_model(x, y)
+
+    log = helpers.LogChecker(capfd)
+    if enabled is None:
+        log.assert_not_contains("From the user configuration: Ipu model")
+    elif enabled:
+        log.assert_contains("From the user configuration: Ipu model: Enabled")
+    else:
+        log.assert_contains("From the user configuration: Ipu model: Disabled")
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
