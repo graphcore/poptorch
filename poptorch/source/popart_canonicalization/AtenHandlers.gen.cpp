@@ -390,11 +390,27 @@ torch::jit::Node *logsigmoidHandler(torch::jit::Graph *graph,
   return createLog(graph, {t0});
 }
 
+torch::jit::Node *logicalandHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  auto i1 = node->input(1);
+  // logical_and(i0, i1)
+  return createLogical_and(graph, {i0, i1});
+}
+
 torch::jit::Node *logicalnotHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto i0 = node->input(0);
   // logical_not(i0)
   return createLogical_not(graph, {i0});
+}
+
+torch::jit::Node *logicalorHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  auto i0 = node->input(0);
+  auto i1 = node->input(1);
+  // logical_or(i0, i1)
+  return createLogical_or(graph, {i0, i1});
 }
 
 torch::jit::Node *ltHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
@@ -828,7 +844,9 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::log1p, log1pHandler);
   registerHandler(c10::aten::log2, log2Handler);
   registerHandler(c10::aten::log_sigmoid, logsigmoidHandler);
+  registerHandler(c10::aten::logical_and, logicalandHandler);
   registerHandler(c10::aten::logical_not, logicalnotHandler);
+  registerHandler(c10::aten::logical_or, logicalorHandler);
   registerHandler(c10::aten::lt, ltHandler);
   registerHandler(c10::aten::margin_ranking_loss, marginrankinglossHandler);
   registerHandler(c10::aten::masked_fill, maskedfillHandler);

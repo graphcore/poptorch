@@ -106,7 +106,10 @@ Pointwise ops
 * ``torch.asinh``
 * ``torch.atan``
 * ``torch.atanh``
+* ``torch.bitwise_and``
 * ``torch.bitwise_not``
+* ``torch.bitwise_or``
+* ``torch.bitwise_xor``
 * ``torch.ceil``
 * ``torch.clamp``
 * ``torch.clamp_max``
@@ -124,6 +127,8 @@ Pointwise ops
 * ``torch.log10``
 * ``torch.log1p``
 * ``torch.log2``
+* ``torch.logical_and``
+* ``torch.logical_or``
 * ``torch.mul``
 * ``torch.norm``
 * ``torch.neg``

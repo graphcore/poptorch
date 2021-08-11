@@ -34,6 +34,9 @@ c10::Symbol nll_loss_nd;                 // NOLINT
 c10::Symbol cross_entropy_loss;          // NOLINT
 c10::Symbol new_ones;                    // NOLINT
 c10::Symbol new_zeros;                   // NOLINT
+c10::Symbol logical_and;                 // NOLINT
+c10::Symbol logical_or;                  // NOLINT
+c10::Symbol logical_xor;                 // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -66,6 +69,9 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, cross_entropy_loss);
   SYMBOL_INIT(aten, new_ones);
   SYMBOL_INIT(aten, new_zeros);
+  SYMBOL_INIT(aten, logical_and);
+  SYMBOL_INIT(aten, logical_or);
+  SYMBOL_INIT(aten, logical_xor);
 }
 
 } // namespace c10::aten

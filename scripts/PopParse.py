@@ -286,6 +286,7 @@ OutputTypeSameAsFirstInput = [
     "bitwisexor",
     "bitwisexnor",
     "bitwisenot",
+    "bitwisexor",
     "ceil",
     "celu",
     "compress",
@@ -394,7 +395,9 @@ FirstOutputTypeSameAsFirstInputButSecondAlwaysInt = ["topk", "reducemedian"]
 
 OutputTypeSameAsThirdInput = ["onehot"]
 
-OutputTypeAlwaysBool = ["isinf", "isnan"]
+OutputTypeAlwaysBool = [
+    "isinf", "isnan", "logical_and", "logical_not", "logical_or", "logical_xor"
+]
 
 OutputTypeAlwaysFloat = ["tfidfvectorizer"]
 

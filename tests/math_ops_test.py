@@ -343,8 +343,51 @@ def test_modulo_mixed_sign(op):
 
 
 binary_op_int = [
-    # torch.logical_or, torch.logical_xor, , torch.bitwise_and, torch.bitwise_or, torch.bitwise_xor, torch.logical_and,
+    torch.bitwise_and,
+    torch.bitwise_or,
+    torch.bitwise_xor,
 ]
+
+
+@pytest.mark.parametrize("op", binary_op_int)
+def test_binary_int_ops(op):
+    input1 = torch.tensor([-4, 7, 5, 4, -7, 8], dtype=torch.int)
+    input2 = torch.tensor([2, -3, 8, -2, 3, 5], dtype=torch.int)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out,
+                                expected=native_out,
+                                atol=1e-05,
+                                rtol=1e-05,
+                                equal_nan=True)
+
+    op_harness(op, [input1, input2], assert_)
+
+
+binary_op_bool = [
+    torch.bitwise_and,
+    torch.bitwise_or,
+    # torch.bitwise_xor, TODO(T43716)
+    torch.logical_and,
+    torch.logical_or,
+    #torch.logical_xor TODO(T43716)
+]
+
+
+@pytest.mark.parametrize("op", binary_op_bool)
+def test_binary_bool_ops(op):
+    input1 = torch.tensor([-4, 7, 5, 4, -7, 8]) > 0
+    input2 = torch.tensor([2, -3, 8, -2, 3, 5]) > 0
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out,
+                                expected=native_out,
+                                atol=1e-05,
+                                rtol=1e-05,
+                                equal_nan=True)
+
+    op_harness(op, [input1, input2], assert_)
+
 
 # These functions support API 1 - op(input)
 reduction_ops_api1 = [
