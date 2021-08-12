@@ -49,9 +49,19 @@ PopTorch Ops
 
 .. autofunction:: poptorch.ipu_print_tensor
 
+.. autofunction:: poptorch.for_loop
+
+.. autofunction:: poptorch.recomputationCheckpoint
+
 .. autofunction:: poptorch.identity_loss
 
 .. autoclass:: poptorch.MultiConv
+   :members:
+
+.. autoclass:: poptorch.CPU
+   :members:
+
+.. autoclass:: poptorch.NameScope
    :members:
 
 .. autoclass:: poptorch.MultiConvPlanType

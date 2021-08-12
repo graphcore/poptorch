@@ -1,5 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Union, Tuple, Optional
 import copy
 import copyreg
 import torch
@@ -11,35 +11,35 @@ from . import _impl
 _end_ipu_block = torch.ops.poptorch.end_ipu_block
 
 
-def ctc_beam_search_decoder(probs,
-                            lengths,
-                            blank=0,
-                            beam_width=100,
-                            top_paths=1):
+def ctc_beam_search_decoder(probs: "torch.Tensor",
+                            lengths: "torch.Tensor",
+                            blank: int = 0,
+                            beam_width: int = 100,
+                            top_paths: int = 1) -> List["torch.Tensor"]:
     """Add a connectionist temporal classification (CTC) beam search decoder
        to the model.
 
     Calculates the most likely top paths and their probabilities given the
     input logarithmic probabilities and the data lengths.
 
-    :param torch.Tensor probs: Logarithmic probabilities' tensor in the shape
+    :param probs: Logarithmic probabilities tensor with the shape
                                of [input_length, batch_size, num_classes].
-    :param torch.Tensor lenghts: Tensor representing lengths of the inputs
+    :param lengths: Tensor representing lengths of the inputs
                                  of shape [batch_size].
-    :param int blank: Integer identifier of the blank class (default: 0).
-    :param int beam_width: Number of beams used during decoding (default: 100).
-    :param int top_paths: Number of most likely paths to return (default: 1).
+    :param blank: Integer identifier of the blank class (default: 0).
+    :param beam_width: Number of beams used during decoding (default: 100).
+    :param top_paths: Number of most likely paths to return (default: 1).
     :returns: Three tensors representing paths' probabilities - of shape
               [batch_size, top_paths], paths' lengths - of shape
               [batch_size, top_paths] and the decoded paths - of shape
               [batch_size, top_paths, input_length].
-    :rtype: [torch.Tensor, torch.Tensor, torch.Tensor]
     """
     return torch.ops.poptorch.ctc_beam_search_decoder(probs, lengths, blank,
                                                       beam_width, top_paths)
 
 
-def ipu_print_tensor(tensor, title=""):
+def ipu_print_tensor(tensor: "torch.Tensor",
+                     title: str = "") -> "torch.Tensor":
     """
     Adds an op to print the content of a given IPU tensor.
 
@@ -94,8 +94,10 @@ def ipu_print_tensor(tensor, title=""):
     return torch.ops.poptorch.ipu_print_tensor(tensor, title)
 
 
-def for_loop(count, body, inputs):
-    """ An on device for loop. This loop will execute on device for |count|
+def for_loop(count: int,
+             body: Callable[[List['torch.Tensor']], List['torch.Tensor']],
+             inputs: List['torch.Tensor']) -> List['torch.Tensor']:
+    """ An on device for loop. This loop will execute on device for `count`
         number of iterations.
 
         The body should be a python function containing the PyTorch code you
@@ -137,27 +139,26 @@ def for_loop(count, body, inputs):
                                            example_outputs)
 
 
-def nop(tensor):
+def nop(tensor: "torch.Tensor") -> "torch.Tensor":
     """A no-operation: it is functionally the same as an identity but is never
     eliminated by PopART patterns or inlining, so it is useful for
     debugging.
 
-    :param torch.Tensor tensor: the tensor to simply return by the no-op.
+    :param tensor: the tensor to pass to the no-op.
     :returns: The same tensor which was input.
-    :rtype: torch.Tensor
     """
     return torch.ops.popart.nop(tensor)
 
 
-def recomputationCheckpoint(*tensors):
+def recomputationCheckpoint(*tensors: List["torch.Tensor"]
+                            ) -> List["torch.Tensor"]:
     """Operation for checkpointing values in a computational pipeline stage.
 
     When recomputation is enabled, these values will not be recomputed and they
     will be stored in memory between forward and backwards passes instead.
 
-    :param tensors: one or more tensors which should be checkpointed.
+    :param tensors: One or more tensors which should be checkpointed.
     :return: Tensors (same number and shape as the input tensors).
-    :rtype: tuple
     """
 
     # Allow passing a single list or tuple
@@ -179,24 +180,28 @@ def recomputationCheckpoint(*tensors):
     return tuple(out)
 
 
-def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
+def serializedMatMul(lhs: "torch.Tensor",
+                     rhs: "torch.Tensor",
+                     mode: "poptorch.MatMulSerializationMode",
+                     factor: int = 0,
+                     keep_precision: bool = False) -> "torch.Tensor":
     """ Calculates a matrix product using a serialized matrix multiplication.
 
     The matrix multiplication, ``lhs*rhs``, is split into separate smaller
     multiplications, calculated one after the other, to reduce the memory
     requirements of the multiplication and its gradient calculation.
 
-    :param torch.Tensor lhs: Left-hand size input matrix.
-    :param torch.Tensor rhs: Right-hand side input matrix.
-    :param poptorch.MatMulSerializationMode mode: Which dimension of the matmul
+    :param lhs: Left-hand size input matrix.
+    :param rhs: Right-hand side input matrix.
+    :param mode: Which dimension of the matmul
         to serialize on: for matrix A (m by n) multiplied by matrix B (n by p).
         * InputChannels: Split across the input channels (dimension m).
         * ReducingDim: Split across the reducing dimension (n).
         * OutputChannels: Split across the output channels (dimension p).
         * Disabled: Same as an ordinary matrix multiplication.
-    :param int factor: Number of serialized multiplications. Must be a factor of
+    :param factor: Number of serialized multiplications. Must be a factor of
         the dimension to serialize on.
-    :param bool keep_precision: (Half/float16 inputs only) The forward op when
+    :param keep_precision: (Half/float16 inputs only) The forward op when
         serializing over ReducingDim and the backwards ops when serializing over
         InputChannels involve an addition step. If ``keep_precision`` is True,
         these additions will occur using float32 rather than half precision
@@ -210,7 +215,8 @@ def serializedMatMul(lhs, rhs, mode, factor=0, keep_precision=False):
                                                        keep_precision)
 
 
-def set_available_memory(tensor, available_memory_proportion):
+def set_available_memory(tensor: "torch.Tensor",
+                         available_memory_proportion: float) -> "torch.Tensor":
     """Sets the amount of temporary memory made available to a convolution or
     a matrix multiplication.
 
@@ -246,12 +252,11 @@ def set_available_memory(tensor, available_memory_proportion):
     ...         out = poptorch.set_available_memory(out, 0.2)
     ...         return out
 
-    :param torch.Tensor tensor: output tensor of a convolution or matrix
+    :param tensor: Output tensor of a convolution or matrix
         multiplication (otherwise the statement will be an identity).
-    :param float available_memory_proportion: proportion between 0.0 and 1.0
+    :param available_memory_proportion: Proportion between 0.0 and 1.0
         of tile memory to be made available for temporary memory (default 0.6).
-    :returns: input tensor, as if calling an identity function.
-    :rtype: torch.Tensor
+    :returns: The input tensor, as if calling an identity function.
      """
     return torch.ops.poptorch.set_available_memory(
         tensor, available_memory_proportion)
@@ -308,15 +313,16 @@ class Block(torch.nn.Module):
         if Block._stages_manager is not None:
             Block._stages_manager.resetAutoId()
 
-    def __init__(self, user_id=None, ipu_id=None):
+    def __init__(self,
+                 user_id: Optional[str] = None,
+                 ipu_id: Optional[int] = None):
         """
 
         :param user_id: A user defined identifier for the block.
             Blocks with the same id are considered as being a single block.
             Block identifiers are also used to manually specify pipelines or
             phases.
-        :type user_id: str, optional
-        :param int, optional ipu_id: The id of the IPU to run on.
+        :param ipu_id: The id of the IPU to run on.
                        Note that the ``ipu_id`` is an index
                        in a multi-IPU device within PopTorch, and is
                        separate and distinct from the device ids used by
@@ -370,7 +376,7 @@ class LegacyBeginBlockFn(torch.nn.Module):
 
 def BeginBlock(layer_to_call: torch.nn.Module,
                user_id: str = None,
-               ipu_id: int = None):
+               ipu_id: int = None) -> torch.nn.Module:
     """
     Define a block by modifying an existing PyTorch module.
 
@@ -438,7 +444,7 @@ def BeginBlock(layer_to_call: torch.nn.Module,
 # pylint: enable=abstract-method
 
 
-def BlockFunction(user_id=None, ipu_id=None):
+def BlockFunction(user_id: Optional[str] = None, ipu_id: Optional[int] = None):
     """ A decorator to define blocks of the model.
 
     You can use ``BlockFunction`` as a decorator for an existing function, as
@@ -451,6 +457,16 @@ def BlockFunction(user_id=None, ipu_id=None):
     All layers inside the function and any functions called by the function will
     run on the specified IPU, if one is specified. In addition, you can combine
     multiple blocks into a stage.
+
+    :param user_id: A user defined identifier for the block.
+        Blocks with the same id are considered as being a single block.
+        Block identifiers are also used to manually specify pipelines or
+        phases.
+    :param ipu_id: The id of the IPU to run on.
+                   Note that the ``ipu_id`` is an index
+                   in a multi-IPU device within PopTorch, and is
+                   separate and distinct from the device ids used by
+                   ``gc-info``.
 
     .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
     """
@@ -471,12 +487,14 @@ attributes_lists: List[Dict[str, Union[float, int, str, list, tuple]]] = []
 ATTR_PREFIX = "attr:"
 
 
-def custom_op(inputs,
-              name,
-              domain,
-              domain_version,
-              example_outputs,
-              attributes=None):
+def custom_op(inputs: Tuple["torch.Tensor"],
+              name: str,
+              domain: str,
+              domain_version: int,
+              example_outputs: Tuple["torch.Tensor"],
+              attributes: Optional[
+                  Dict[str, Union[float, int, str, list, tuple]]] = None
+              ) -> List["torch.Tensor"]:
     """Applies a custom operation, implemented within PopART, to the inputs.
 
     :param tuple inputs: A tuple of input tensors, for example, (x, y).
@@ -634,13 +652,13 @@ class CPU:
         return outputs
 
 
-def identity_loss(x, reduction):
+def identity_loss(x: "torch.Tensor", reduction: "str") -> "torch.Tensor":
     """Marks this operation as being part of the loss calculation and, as such,
     will back-propagate through it in the PopTorch autograd. This enables
     multiple losses and custom losses.
 
-    :param torch.Tensor loss: The calculated loss.
-    :param str reduction: Reduce the loss output as per PyTorch loss
+    :param x: The calculated loss.
+    :param reduction: Reduce the loss output as per PyTorch loss
         semantics. Supported values are:
 
         * ``"sum"``: Sum the losses.
@@ -703,14 +721,14 @@ class MultiConv():
 
         raise AssertionError(f"Invalid {name}!")
 
-    def availableMemoryProportions(self, value):
+    def availableMemoryProportions(self, value: Union[float, List[float]]
+                                   ) -> "poptorch.MultiConv":
         """The available memory proportion per convolution, each [0, 1).
 
         :param value: Can be a ``float`` value in which case the same value is
             used for all of the convolutions. Otherwise, can be a ``tuple`` or
             ``list`` containing as many ``float`` values as the number of
             convolutions.
-        :type value: float, [float]
         :returns: self, to support method chaining
         """
         name = "available memory proportion"
@@ -718,15 +736,14 @@ class MultiConv():
         self._available_memory_proportions = value
         return self
 
-    def partialsTypes(self, value):
+    def partialsTypes(self, value: Union[torch.dtype, List[torch.dtype]]
+                      ) -> "poptorch.MultiConv":
         """The partials type used for each convolution.
 
         :param value: Can be a single instance of ``torch.dtype`` in which case
             the same value is used for all of the convolutions. Otherwise, can
             be a ``tuple`` or ``list`` containing as many ``torch.dtype``
             values as the number of convolutions.
-        :type value: :py:class:`torch.dtype`,
-            [:py:class:`torch.dtype`]
         :returns: self, to support method chaining
         """
 
@@ -746,7 +763,8 @@ class MultiConv():
         self._partials_types = value
         return self
 
-    def planType(self, value):
+    def planType(self,
+                 value: "poptorch.MultiConvPlanType") -> "poptorch.MultiConv":
         """Select the multi-convolution execution strategy.
 
         :param value: An instance of :py:class:`MultiConvPlanType`.
@@ -762,22 +780,20 @@ class MultiConv():
 
         return self
 
-    def perConvReservedTiles(self, value):
+    def perConvReservedTiles(self, value: int) -> "poptorch.MultiConv":
         """Tiles to reserve for each convolution.
 
         :param value: Number of tiles
-        :type value: int
         :returns: self, to support method chaining
         """
         assert isinstance(value, int)
         self._per_conv_reserved_tiles = value
         return self
 
-    def cycleBackOff(self, value):
+    def cycleBackOff(self, value: float) -> "poptorch.MultiConv":
         """Cycle back off proportion.
 
         :param value: Number between 0 and 1
-        :type value: float
         :returns: self, to support method chaining
         """
         assert isinstance(value, float)
@@ -808,7 +824,7 @@ class NameScope:
         ...     z = torch.relu(y)
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         assert isinstance(name, str), 'Parameter to NameScope must be a string'
         self.name = name
 

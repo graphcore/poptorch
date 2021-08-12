@@ -516,8 +516,8 @@ class PoplarExecutor:
         ``args`` and ``kwargs`` are the same arguments as the wrapped PyTorch
         ``model.__call__``
 
-        :param str filename: Where to save the compiled executable.
-        :param bool export_model: If `True` the Torch model will be saved in
+        :param filename: Where to save the compiled executable.
+        :param export_model: If `True` the Torch model will be saved in
             the file alongside the executable. :py:func:`poptorch.load` can
             be used to restore both the original Torch model, the PopTorch
             model and the executable.
@@ -716,10 +716,13 @@ class PoplarExecutor:
                         to_reduce: Callable[[List[float]], float]):
         """Computes latency figures between two performance counters.
 
-        :param str from_event: key of starting performance counter
-        :param from_reduce: reduction function for starting counters
-        :param str to_event: key of ending performance counter
-        :param to_reduce: redunction function for ending counters
+        :param from_event: Key for starting performance counter.
+        :param from_reduce: Reduction function for starting counters.
+        :param to_event: Key for ending performance counter.
+        :param to_reduce: Reduction function for ending counters.
+
+        .. seealso:: :py:meth:`~poptorch.PoplarExecutor.getPerfCounters` for
+            the list of keys allowed.
         """
         perf_counters = self.getPerfCounters()
         start_times = []
