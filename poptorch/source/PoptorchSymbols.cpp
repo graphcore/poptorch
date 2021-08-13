@@ -37,6 +37,7 @@ c10::Symbol new_zeros;                   // NOLINT
 c10::Symbol logical_and;                 // NOLINT
 c10::Symbol logical_or;                  // NOLINT
 c10::Symbol logical_xor;                 // NOLINT
+c10::Symbol numpy_T;                     // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -72,6 +73,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, logical_and);
   SYMBOL_INIT(aten, logical_or);
   SYMBOL_INIT(aten, logical_xor);
+  SYMBOL_INIT(aten, numpy_T);
 }
 
 } // namespace c10::aten

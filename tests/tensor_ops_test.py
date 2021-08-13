@@ -280,6 +280,17 @@ def test_transpose():
     op_harness(op, x)
 
 
+def test_numpy_T():
+    torch.manual_seed(42)
+    op = lambda x: x.T
+
+    x = torch.randn(3, 2, 5, 4)
+    op_harness(op, x)
+
+    x = torch.randn(5)
+    op_harness(op, x)
+
+
 def test_unsqueeze():
     torch.manual_seed(42)
     x = torch.randn(3, 2, 5, 2)

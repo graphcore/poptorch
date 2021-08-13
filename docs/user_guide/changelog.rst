@@ -11,7 +11,7 @@ New features
 - Support for ``torch.logical_and``, ``torch.logical_or``,
 - Support K-dimensional NLLLoss, K-dimensional CrossEntropyLoss
 - Support for non-default affine parameter flags in normalisation ops
-
+- Support for ``torch.Tensor.T``
 
 API changes
 -----------

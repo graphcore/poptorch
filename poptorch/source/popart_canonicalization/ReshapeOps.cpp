@@ -211,6 +211,22 @@ torch::jit::Node *transposeHandler(torch::jit::Graph *graph,
   return createTranspose(graph, {node->input(0)}, permutation);
 }
 
+torch::jit::Node *numpyTHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  auto shape = shapeFromTensor(node->input(0));
+
+  if (shape.size() < 2) {
+    return node->input(0)->node();
+  }
+
+  std::vector<std::int64_t> permutation;
+  for (std::int64_t i = shape.size() - 1; i >= 0; i--) {
+    permutation.push_back(i);
+  }
+
+  return createTranspose(graph, {node->input(0)}, permutation);
+}
+
 torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   // aten::split(Tensor self, int[] split_sizes, int dim=0) -> Tensor[]"
@@ -469,6 +485,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::contiguous, contiguousHandler);
   registerHandler(c10::aten::permute, permuteHandler);
   registerHandler(c10::aten::transpose, transposeHandler);
+  registerHandler(c10::aten::numpy_T, numpyTHandler);
   registerHandler(c10::aten::to, toHandler);
   registerHandler(c10::aten::type_as, toHandler);
   registerHandler(c10::aten::upsample_nearest1d, upsampleHandler);

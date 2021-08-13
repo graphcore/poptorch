@@ -35,6 +35,7 @@ extern c10::Symbol new_zeros;                   // NOLINT
 extern c10::Symbol logical_and;                 // NOLINT
 extern c10::Symbol logical_or;                  // NOLINT
 extern c10::Symbol logical_xor;                 // NOLINT
+extern c10::Symbol numpy_T;                     // NOLINT
 } // namespace c10::aten
 
 namespace poptorch {
