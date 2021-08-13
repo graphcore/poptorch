@@ -243,3 +243,40 @@ def test_specific_error_handling():
         # Message shouldn't contain any backtrace
         assert "throwTestError::bottomLevel" not in e.message
         assert "throwTestError::topLevel" not in e.message
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePopartLogLevel("DEBUG")
+def test_outline_attribute(capfd):
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.gn1 = torch.nn.GroupNorm(4, 8)
+            self.gn2 = torch.nn.GroupNorm(2, 8)
+
+        def forward(self, x):
+            with poptorch.Attribute(__outline={"layer": "embedding"}):
+                x = self.gn1(x)
+            return self.gn2(x)
+
+    input = torch.randn(3, 8)
+
+    poptorch_model = poptorch.inferenceModel(Model())
+
+    poptorch_model(input)
+
+    testlog = helpers.LogChecker(capfd)
+
+    get_regex = lambda op_name: (r"Op [0-9]+ of type ai\.graphcore\."
+                                 "GroupNormalization:1"
+                                 r"(?:\n.+)+"
+                                 f"{op_name}"
+                                 r".+(?:\n.+)+"
+                                 "layer: layer:embedding")
+
+    # Ensure the first group norm has the outline attribute
+    testlog.assert_matches(get_regex("gn1"), per_line=False)
+
+    # Ensure the second group norm doesn't have the attribute,
+    # as it is outside the attribute scope
+    testlog.assert_no_matches(get_regex("gn2"), per_line=False)

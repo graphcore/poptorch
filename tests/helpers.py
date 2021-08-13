@@ -288,24 +288,44 @@ class LogChecker:
                         "\n The line above matches all of the strings "
                         f"{strings}")
 
-    def assert_matches(self, *exprs):
-        """Assert there is a line in the log matching all the regular expressions provided
+    def _string_matches_exprs(self, s, exprs):
+        return all([re.search(e, s) for e in exprs])
+
+    def assert_matches(self, *exprs, per_line=True):
+        """Assert the log matches all the regular expressions provided
         """
-        for line in self._lines:
-            if all([re.search(e, line) for e in exprs]):
-                # Found a line matching all the exprs
+        if per_line:
+            # Found a line matching all the exprs
+            if any([
+                    self._string_matches_exprs(line, exprs)
+                    for line in self._lines
+            ]):
                 return
+        else:
+            # Search the entire log at once
+            if self._string_matches_exprs(self._log, exprs):
+                return
+
+        any_line_in = "any line in " if per_line else ""
         raise ValueError(
             f"{self._log}"
-            "\n No line in the above log matches all of the expressions "
-            f"{exprs}")
+            f"\n All of the expressions do not match {any_line_in}"
+            f"the log {exprs}")
 
-    def assert_no_matches(self, *exprs):
-        """Assert there is no line matching all the regular expressions provided"""
-        for line in self._lines:
-            if all([re.search(e, line) for e in exprs]):
-                # Found a line matching all the exprs
+    def assert_no_matches(self, *exprs, per_line=True):
+        """Assert the log does not match all the regular expressions provided"""
+        if per_line:
+            for line in self._lines:
+                if self._string_matches_exprs(line, exprs):
+                    # Found a line matching all the exprs
+                    raise ValueError(
+                        f"{line}"
+                        "\n The line above matches all of the expressions "
+                        f"{exprs}")
+        else:
+            if self._string_matches_exprs(self._log, exprs):
+                # The log matches all the exprs
                 raise ValueError(
-                    f"{line}"
-                    "\n The line above matches all of the expressions "
+                    f"{self._log}"
+                    "\n The log above matches all of the expressions "
                     f"{exprs}")
