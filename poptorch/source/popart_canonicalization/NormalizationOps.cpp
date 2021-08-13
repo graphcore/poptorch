@@ -10,6 +10,55 @@
 namespace poptorch {
 namespace {
 
+void initializeParamConstant(torch::jit::Graph *graph, torch::jit::Value *input,
+                             torch::jit::Value **param, float value,
+                             const std::vector<int64_t> &shape,
+                             const std::string &norm_name,
+                             const std::string &input_name,
+                             bool always_f32 = false) {
+  c10::ScalarType scalar_type =
+      *input->type()->expect<c10::TensorType>()->scalarType();
+  switch (scalar_type) {
+  case c10::ScalarType::Int: {
+    *param = createConstantInt(graph, {static_cast<int64_t>(value)}, shape)
+                 ->output();
+    break;
+  }
+  case c10::ScalarType::Half:
+  case c10::ScalarType::Float: {
+    if (always_f32) {
+      *param = createConstantFloat32(graph, {value}, shape)->output();
+    } else {
+      *param = createConstantFloatLike(graph, input, {value}, shape)->output();
+    }
+    break;
+  }
+  default:
+    ERROR(norm_name << " input \"" << input_name << "\""
+                    << " of type " << c10::toString(scalar_type)
+                    << " not supported");
+  }
+}
+
+// Return true if parameters are initialised by this function, otherwise return
+// false
+bool maybeInitializeAffineParamConstants(torch::jit::Graph *graph,
+                                         torch::jit::Value *input,
+                                         torch::jit::Value **weight,
+                                         torch::jit::Value **bias,
+                                         const std::vector<std::int64_t> &shape,
+                                         const std::string &norm_name) {
+  // Either both should be defined, or neither
+  ERROR_ON(isNone(*weight) != isNone(*bias));
+  if (!isNone(*weight)) {
+    return false;
+  }
+
+  initializeParamConstant(graph, input, weight, 1, shape, norm_name, "weight");
+  initializeParamConstant(graph, input, bias, 0, shape, norm_name, "bias");
+  return true;
+}
+
 // Ensures running_mean and running_var tensors by creating constants if they
 // are not set (None) The running_mean and running_var may be none e.g. if
 // track_running_stats is set to False for the relevant PyTorch BatchNorm layer.
@@ -18,89 +67,19 @@ namespace {
 void maybeInitializeRunningParamConstants(
     torch::jit::Graph *graph, torch::jit::Value *input,
     torch::jit::Value **running_mean, torch::jit::Value **running_var,
-    const std::vector<std::int64_t> &new_shape) {
-
-  std::vector<int64_t> running_shape{new_shape[1]};
-
+    const std::vector<std::int64_t> &shape) {
+  // Either both should be defined, or neither
+  ERROR_ON(isNone(*running_mean) != isNone(*running_var));
   if (!isNone(*running_mean)) {
-    ERROR_ON(isNone(*running_var));
     return;
   }
 
-  ERROR_ON(!isNone(*running_var));
-
-  c10::ScalarType scalar_type =
-      *input->type()->expect<c10::TensorType>()->scalarType();
-  switch (scalar_type) {
-  case c10::ScalarType::Int: {
-    *running_mean = createConstantInt(graph, {0}, running_shape)->output();
-    *running_var = createConstantInt(graph, {1}, running_shape)->output();
-    break;
-  }
-  case c10::ScalarType::Half:
-  case c10::ScalarType::Float: {
-    if (runningStatisticsAlwaysFloat()) {
-      *running_mean =
-          createConstantFloat32(graph, {0}, running_shape)->output();
-      *running_var = createConstantFloat32(graph, {1}, running_shape)->output();
-    } else {
-      *running_mean =
-          createConstantFloatLike(graph, input, {0}, running_shape)->output();
-      *running_var =
-          createConstantFloatLike(graph, input, {1}, running_shape)->output();
-    }
-    break;
-  }
-  default:
-    ERROR("Batch norm input"
-          << " of type " << c10::toString(scalar_type) << " not supported");
-  }
-}
-
-// Flattens or expands input tensor to 4D and returns new 4D tensor
-torch::jit::Value *get4dInput(torch::jit::Graph *graph,
-                              torch::jit::Value *input) {
-  std::vector<std::int64_t> shape = shapeFromTensor(input);
-  if (shape.size() == 4) {
-    ERROR("Input is already 4-dimensional");
-  }
-
-  // Turn the shape into a 4D tensor.
-  if (shape.size() < 4) {
-    // Pad to 4D with singletons.
-    std::size_t padding = 4 - shape.size();
-    std::generate_n(std::back_inserter(shape), padding, []() { return 1; });
-  } else if (shape.size() > 4) {
-    // Flatten excess dimensions to reduce to 4.
-    shape[3] = std::accumulate(shape.begin() + 4, shape.end(), shape[3],
-                               std::multiplies<std::int64_t>());
-    shape.resize(4);
-  }
-
-  return createReshape(graph, input, shape)->output();
-}
-
-// Helper function used for normalization functions where input tensors are
-// required to be 4D. Reshapes to 4D, performs the normalization function
-// passed to it, and then reshapes the output back to its original shape
-template <typename NormFunc>
-torch::jit::Node *normalizeReshapeIfNeeded(torch::jit::Graph *graph,
-                                           torch::jit::Value *input,
-                                           NormFunc &&normalize_fn) {
-  // Reshape to 4D if needed
-  std::vector<std::int64_t> original_shape = shapeFromTensor(input);
-  if (original_shape.size() != 4) {
-    input = get4dInput(graph, input);
-  }
-
-  torch::jit::Node *new_node = normalize_fn(input);
-
-  // If we reshaped, reshape back
-  if (original_shape.size() != 4) {
-    new_node = createReshape(graph, new_node->output(), original_shape);
-  }
-
-  return new_node;
+  std::string norm_name = "BatchNorm";
+  bool always_f32 = runningStatisticsAlwaysFloat();
+  initializeParamConstant(graph, input, running_mean, 0, shape, norm_name,
+                          "running_mean", always_f32);
+  initializeParamConstant(graph, input, running_var, 1, shape, norm_name,
+                          "running_var", always_f32);
 }
 
 torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
@@ -109,8 +88,9 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   // running_mean, Tensor? running_var, bool training, float momentum, float
   // eps, bool cudnn_enabled) -> Tensor
 
-  // Input is value at 0th position.
   torch::jit::Value *input = node->input(0);
+
+  auto input_shape = shapeFromTensor(input);
 
   torch::jit::Value *weight = node->input(1);
   torch::jit::Value *bias = node->input(2);
@@ -135,25 +115,35 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
 
   bool training = constantToBool(node->input(5)->node());
 
-  auto batch_norm_fn = [&](torch::jit::Value *input_4d) {
-    // Use initialised constants if running_mean and running_var are none
-    maybeInitializeRunningParamConstants(graph, input_4d, &running_mean,
-                                         &running_var,
-                                         shapeFromTensor(input_4d));
+  std::vector<int64_t> param_shape{input_shape[1]};
 
-    // To indicate training, for BatchNormalization-9, use num_outputs = 5
-    // From ONNX
-    // Output case #1: Y, mean, var, saved_mean, saved_var (training mode)
-    // Output case #2: Y (test mode)
-    // Popart supports this with "if (output->n() > 1)"
-    return createBatchnormalization(
-        graph, {input_4d, weight, bias, running_mean, running_var},
-        training ? 5 : 1, epsilon, 1.0f - momentum);
-  };
+  maybeInitializeAffineParamConstants(graph, input, &weight, &bias, param_shape,
+                                      "BatchNorm");
 
-  // Pytorch supports BatchNorm1D/2D/3D. PopART only supports 2D so we need
-  // to reshape input into a 4D tensor.
-  return normalizeReshapeIfNeeded(graph, input, batch_norm_fn);
+  // Use initialised constants if running_mean and running_var are none
+  maybeInitializeRunningParamConstants(graph, input, &running_mean,
+                                       &running_var, param_shape);
+
+  // PyTorch supports an input size of (N, C, *) but PopART requires the spatial
+  // dimension, so we must ensure an input size of (N, C, L, *)
+  if (input_shape.size() == 2) {
+    input = createUnsqueeze(graph, {input}, {2})->output();
+  }
+
+  // To indicate training, for BatchNormalization-9, use num_outputs = 5
+  // From ONNX
+  // Output case #1: Y, mean, var, saved_mean, saved_var (training mode)
+  // Output case #2: Y (test mode)
+  // Popart supports this with "if (output->n() > 1)"
+  auto batch_norm = createBatchnormalization(
+      graph, {input, weight, bias, running_mean, running_var}, training ? 5 : 1,
+      epsilon, 1.0f - momentum);
+
+  // If the input size was of rank 2, we need to squeeze out the added dim
+  if (input_shape.size() == 2) {
+    batch_norm = createSqueeze(graph, {batch_norm->output()}, {2});
+  }
+  return batch_norm;
 }
 
 torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
@@ -164,30 +154,36 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   // Tensor to normalise.
   torch::jit::Value *input = node->input(0);
 
+  std::vector<std::int64_t> normalized_shape =
+      constantToLongVec(node->input(1)->node());
+
   // Weight to multiply.
   torch::jit::Value *gamma = node->input(2);
-
   // Bias to add.
   torch::jit::Value *beta = node->input(3);
+  auto numel_affine =
+      std::accumulate(normalized_shape.begin(), normalized_shape.end(), 1,
+                      std::multiplies<int64_t>{});
+  bool initialized = maybeInitializeAffineParamConstants(
+      graph, input, &gamma, &beta, {numel_affine}, "LayerNorm");
 
-  // GroupNorm takes per-channel affine parameters whereas LayerNorm takes
-  // elementwise affine parameters. Therefore we first need to reshape such that
-  // the affine parameters are "per-channel" which in the case of LayerNorm is
-  // equivalent to flattening them
-  auto numel_affine = gamma->type()->expect<c10::TensorType>()->numel().value();
-  gamma = createReshape(graph, gamma, {static_cast<std::int64_t>(numel_affine)})
-              ->output();
-  beta = createReshape(graph, beta, {static_cast<std::int64_t>(numel_affine)})
-             ->output();
+  if (!initialized) {
+    // GroupNorm takes per-channel affine parameters whereas LayerNorm takes
+    // elementwise affine parameters. Therefore we first need to reshape such
+    // that the affine parameters are "per-channel" which in the case of
+    // LayerNorm is equivalent to flattening them
+    gamma =
+        createReshape(graph, gamma, {static_cast<std::int64_t>(numel_affine)})
+            ->output();
+    beta = createReshape(graph, beta, {static_cast<std::int64_t>(numel_affine)})
+               ->output();
+  }
 
   const float epsilon = constantToFloat(node->input(4)->node());
 
   // Pytorch normalizes across arbitrary number of dimensions from the end.
   // We flatten into a [M, N] array and normalize the N.
-
   std::vector<std::int64_t> output_shape = shapeFromTensor(node->output());
-  std::vector<std::int64_t> normalized_shape =
-      constantToLongVec(node->input(1)->node());
   std::vector<std::int64_t> input_shape = shapeFromTensor(input);
   const std::int64_t axis = input_shape.size() - normalized_shape.size();
 
@@ -215,14 +211,15 @@ torch::jit::Node *groupNormHandler(torch::jit::Graph *graph,
   torch::jit::Value *gamma = node->input(2);
   // Bias to add
   torch::jit::Value *beta = node->input(3);
+
+  auto num_channels = shapeFromTensor(input)[1];
+  maybeInitializeAffineParamConstants(graph, input, &gamma, &beta,
+                                      {num_channels}, "GroupNorm");
+
   float epsilon = constantToFloat(node->input(4)->node());
 
-  auto group_norm_fn = [&](torch::jit::Value *input_4d) {
-    return createGroupnormalization(graph, {input_4d, gamma, beta}, num_groups,
-                                    epsilon);
-  };
-
-  return normalizeReshapeIfNeeded(graph, input, group_norm_fn);
+  return createGroupnormalization(graph, {input, gamma, beta}, num_groups,
+                                  epsilon);
 }
 
 torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
@@ -240,23 +237,22 @@ torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
 
   // Weight to multiply
   torch::jit::Value *gamma = node->input(1);
-
   // Bias to add
   torch::jit::Value *beta = node->input(2);
+
+  std::int64_t num_channels = shapeFromTensor(input)[1];
+
+  maybeInitializeAffineParamConstants(graph, input, &gamma, &beta,
+                                      {num_channels}, "InstanceNorm");
 
   // Group normalization does not currently allow passing a momentum value,
   // nor the running mean or running variance
 
   float epsilon = constantToFloat(node->input(7)->node());
-  std::int64_t num_channels = shapeFromTensor(input)[1];
 
-  auto instance_norm_fn = [&](torch::jit::Value *input_4d) {
-    // Normalize per channel C, so use Group normalization with C groups
-    return createGroupnormalization(graph, {input_4d, gamma, beta},
-                                    num_channels, epsilon);
-  };
-
-  return normalizeReshapeIfNeeded(graph, input, instance_norm_fn);
+  // Normalize per channel C, so use Group normalization with C groups
+  return createGroupnormalization(graph, {input, gamma, beta}, num_channels,
+                                  epsilon);
 }
 } // namespace
 

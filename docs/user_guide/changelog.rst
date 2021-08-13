@@ -9,6 +9,8 @@ New features
 ------------
 - Support for ``torch.bitwise_and``, ``torch.bitwise_or``, ``torch.bitwise_xor``
 - Support for ``torch.logical_and``, ``torch.logical_or``,
+- Support K-dimensional NLLLoss, K-dimensional CrossEntropyLoss
+- Support for non-default affine parameter flags in normalisation ops
 
 
 API changes
