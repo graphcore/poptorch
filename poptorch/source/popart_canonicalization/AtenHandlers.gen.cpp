@@ -677,23 +677,6 @@ torch::jit::Node *softmarginlossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {t3}, t5);
 }
 
-torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
-                                  torch::jit::Node *node) {
-  auto threshold = node->input(2);
-  auto x = node->input(0);
-  auto b = node->input(1);
-  auto t0 = createMul(graph, {x, b})->output();
-  auto t1 = createLess(graph, {threshold, t0})->output();
-  auto t2 = createMul(graph, {b, x})->output();
-  auto t3 = createExp(graph, {t2})->output();
-  // matched log1p: log(add(1.0, x))
-  auto t4 = createLog1p(graph, {t3})->output();
-  // matched div: mul(div(1.0, y), x)
-  auto t5 = createDiv(graph, {t4, b})->output();
-  // where(less(threshold, mul(x, b)), x, div(log1p(exp(mul(b, x))), b))
-  return createWhere(graph, {t1, x, t5});
-}
-
 torch::jit::Node *softshrinkHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto x = node->input(0);
@@ -878,7 +861,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::sinh, sinhHandler);
   registerHandler(c10::aten::smooth_l1_loss, smoothl1lossHandler);
   registerHandler(c10::aten::soft_margin_loss, softmarginlossHandler);
-  registerHandler(c10::aten::softplus, softplusHandler);
   registerHandler(c10::aten::softshrink, softshrinkHandler);
   registerHandler(c10::aten::sqrt, sqrtHandler);
   registerHandler(c10::aten::square, squareHandler);

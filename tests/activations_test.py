@@ -78,12 +78,20 @@ def test_glu(dim):
     poptorch_model.assert_weights_changed()
 
 
-def test_logsoftmax_numerics():
-    model = nn.LogSoftmax(dim=1)
+@pytest.mark.parametrize("op", activation_functions)
+def test_activation_numerics(op):
+    enable_exceptions = True
+    if op in (nn.SELU, nn.ELU, nn.CELU):
+        # TODO(T44221): figure out why these activations are overflowing
+        enable_exceptions = False
+
+    model = op(dim=1) if op in (nn.Softmax, nn.LogSoftmax) else op()
     x = torch.FloatTensor([[10., 100., 1000.]])
     native_out = model(x)
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Precision.enableFloatingPointExceptions(enable_exceptions)
+    poptorch_model = poptorch.inferenceModel(model, options=options)
     poptorch_out = poptorch_model(x)
 
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)

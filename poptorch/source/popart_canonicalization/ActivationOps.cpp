@@ -78,11 +78,35 @@ torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
   return createWhere(graph, {xlt0, mul, x});
 }
 
+torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
+                                  torch::jit::Node *node) {
+  auto x = node->input(0);
+  auto beta = node->input(1);
+  auto threshold = node->input(2);
+
+  // beta defaults to 1
+  auto is_default = constantToFloat(beta->node()) == 1.0f;
+
+  if (!is_default) {
+    x = createMul(graph, {x, beta})->output();
+  }
+
+  auto y = createSoftplus(graph, {x})->output();
+
+  if (!is_default) {
+    y = createDiv(graph, {y, beta})->output();
+  }
+
+  auto below_threshold = createLess(graph, {x, threshold})->output();
+  return createWhere(graph, {below_threshold, y, node->input(0)});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::glu, gluHandler);
   registerHandler(c10::aten::rrelu, rreluHandler);
+  registerHandler(c10::aten::softplus, softplusHandler);
 }
 
 } // namespace poptorch

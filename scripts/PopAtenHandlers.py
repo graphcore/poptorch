@@ -121,12 +121,6 @@ expand("index_select", lambda x, d, i: op.gather(x, i,
                                                  dimension(d, tensor_type(x))))
 
 
-def softplus_handler(x, b, threshold):
-    condition = x * b > threshold
-    softplus = 1. / b * op.log(1. + op.exp(b * x))
-    return op.where(condition, x, softplus)
-
-
 # loss handlers
 def hinge_embedding_loss_handler(x, y, delta, red):
     red = reduction(clong(red))
