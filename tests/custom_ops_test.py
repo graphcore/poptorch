@@ -51,13 +51,20 @@ def test_inference(trace_model):
 
 
 def test_training():
+    def custom_loss(model_out, labels):
+        l1 = torch.nn.functional.nll_loss(model_out[0], labels)
+        # Popart errors if this is unused.
+        l2 = torch.sum(model_out[1]) * 0.0001
+
+        return l1 + l2
+
     class TrainingNetwork(nn.Module):
         def __init__(self):
             super().__init__()
             self.ln = torch.nn.Linear(100, 100)
             self.softmax = nn.Softmax(1)
 
-        def forward(self, t):
+        def forward(self, t, target):
             x = t[0]
             bias = t[1]
             x, y = poptorch.custom_op([x, bias],
@@ -66,7 +73,11 @@ def test_training():
                                       1,
                                       example_outputs=[x, x])
             x = self.ln(x)
-            return self.softmax(x), y
+            x = self.softmax(x)
+
+            out = (x, y)
+            loss = custom_loss(out, target)
+            return out, loss
 
     model = TrainingNetwork()
 
@@ -75,24 +86,23 @@ def test_training():
 
     y = torch.full([1], 42, dtype=torch.long)
 
-    def custom_loss(model_out, labels):
-        l1 = torch.nn.functional.nll_loss(model_out[0], labels)
-        # Popart errors if this is unused.
-        l2 = torch.sum(model_out[1]) * 0.0001
-
-        return l1 + l2
-
-    training = helpers.trainingModelWithLoss(model, custom_loss)
+    poptorch_model = poptorch.trainingModel(model)
 
     for _ in range(0, 100):
         x = torch.rand((1, 100))
-        out, _ = training((x, bias), y)
+        out, _ = poptorch_model((x, bias), y)
 
     assert torch.argmax(out[0]) == 42
 
 
 # Check that the custom op not only trains but also propagates the gradient backwards.
 def test_training_both_sides():
+    def custom_loss(model_out, labels):
+        l1 = torch.nn.functional.nll_loss(model_out[0], labels)
+        # Popart errors if this is unused.
+        l2 = torch.sum(model_out[1]) * 0.0001
+        return l1 + l2
+
     class TrainingNetwork(nn.Module):
         def __init__(self):
             super().__init__()
@@ -100,7 +110,7 @@ def test_training_both_sides():
             self.ln2 = torch.nn.Linear(100, 100)
             self.softmax = nn.Softmax(1)
 
-        def forward(self, t):
+        def forward(self, t, target):
             x = self.ln1(t[0])
             bias = t[1]
             x, y = poptorch.custom_op([x, bias],
@@ -109,7 +119,12 @@ def test_training_both_sides():
                                       1,
                                       example_outputs=[x, x])
             x = self.ln2(x)
-            return self.softmax(x), y
+            x = self.softmax(x)
+
+            out = (x, y)
+
+            loss = custom_loss(out, target)
+            return out, loss
 
     model = TrainingNetwork()
 
@@ -118,20 +133,13 @@ def test_training_both_sides():
 
     y = torch.full([1], 42, dtype=torch.long)
 
-    def custom_loss(model_out, labels):
-        l1 = torch.nn.functional.nll_loss(model_out[0], labels)
-        # Popart errors if this is unused.
-        l2 = torch.sum(model_out[1]) * 0.0001
-
-        return l1 + l2
-
     weights_before = model.ln1.weight.clone()
 
-    training = helpers.trainingModelWithLoss(model, custom_loss)
+    poptorch_model = poptorch.trainingModel(model)
 
     for _ in range(0, 100):
         x = torch.rand((1, 100))
-        out, _ = training((x, bias), y)
+        out, _ = poptorch_model((x, bias), y)
 
     assert not torch.allclose(weights_before, model.ln1.weight)
 

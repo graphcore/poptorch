@@ -15,6 +15,22 @@ import helpers
 import poptorch
 
 
+class ModelWithLoss(torch.nn.Module):
+    def __init__(self, loss):
+        super().__init__()
+        self.linear = torch.nn.Linear(10, 10)
+        self.loss = loss
+
+    def forward(self, data, target=None):
+        out = self.linear(data)
+
+        if target is None:
+            return out
+
+        loss = self.loss(out, target)
+        return out, loss
+
+
 @pytest.mark.parametrize("use_half", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_training_and_inference(use_half, trace_model):
@@ -26,7 +42,7 @@ def test_training_and_inference(use_half, trace_model):
     # 10 batches of 1
     label = torch.randint(0, 10, [1])
     label = label.expand([10])
-    model = torch.nn.Linear(10, 10)
+    model = ModelWithLoss(torch.nn.CrossEntropyLoss())
 
     if use_half:
         model.half()
@@ -34,11 +50,10 @@ def test_training_and_inference(use_half, trace_model):
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, options=opts, loss=torch.nn.CrossEntropyLoss())
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    inference = poptorch.inferenceModel(model, options)
+    opts.Jit.traceModel(trace_model)
+
+    training = poptorch.trainingModel(model, options=opts)
+    inference = poptorch.inferenceModel(model, options=opts)
 
     # Run all 10 batches as batchsize 10.
     out = inference(input)
@@ -47,9 +62,10 @@ def test_training_and_inference(use_half, trace_model):
     assert not torch.equal(torch.argmax(out.int(), dim=1), label)
 
     for _ in range(0, 1000):
-        _, loss = poptorch_model(input, label)
+        _, loss = training(input, label)
 
-        # Each batch should NOT report its own loss. As by default training model should have a "Final" output mode.
+        # Each batch should NOT report its own loss. As by default training
+        # model should have a "Final" output mode.
         assert len(loss.size()) == 0
 
     # Run with trained weights.
@@ -70,7 +86,8 @@ def test_training_inference_parameters(use_half):
     # 10 batches of 1
     label = torch.randint(0, 10, [1])
     label = label.expand([10])
-    model = torch.nn.Linear(10, 10)
+
+    model = ModelWithLoss(torch.nn.CrossEntropyLoss())
 
     if use_half:
         model.half()
@@ -78,11 +95,10 @@ def test_training_inference_parameters(use_half):
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, options=opts, loss=torch.nn.CrossEntropyLoss())
-    opts = opts.clone()
     opts.Jit.traceModel(False)
     inference = poptorch.inferenceModel(model, opts)
+    training = poptorch.trainingModel(model, options=opts)
+    inference = poptorch.inferenceModel(model)
 
     # Run all 10 batches as batchsize 10.
     out = inference(input)
@@ -91,7 +107,7 @@ def test_training_inference_parameters(use_half):
     assert not torch.equal(torch.argmax(out.int(), dim=1), label)
 
     for _ in range(0, 1000):
-        _, loss = poptorch_model(input, label)
+        _, loss = training(input, label)
 
         # Each batch should NOT report its own loss. As by default training model should have a "Final" output mode.
         assert len(loss.size()) == 0
@@ -120,15 +136,7 @@ def test_access_parameters(use_half, trace_model):
     label = torch.randint(0, 10, [1])
     label = label.expand([10])
 
-    class Model(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.linear = torch.nn.Linear(10, 10)
-
-        def forward(self, x):
-            return self.linear(x)
-
-    model = Model()
+    model = ModelWithLoss(torch.nn.CrossEntropyLoss())
 
     if use_half:
         model.half()
@@ -136,8 +144,7 @@ def test_access_parameters(use_half, trace_model):
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, options=opts, loss=torch.nn.CrossEntropyLoss())
+    poptorch_model = poptorch.trainingModel(model, options=opts)
 
     original_weights = str(model.linear.weight)
     options = poptorch.Options()
@@ -267,10 +274,11 @@ def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
 
 def test_weights_sharing_ipu_cpu():
     torch.manual_seed(42)
-    model = torch.nn.Linear(10, 10)
 
-    training_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss())
+    model = ModelWithLoss(torch.nn.MSELoss())
+
+    training_model = poptorch.trainingModel(model)
+
     training_model.deviceToHostCounter = 0
     realMethod = training_model.copyWeightsToHost
 
@@ -304,7 +312,7 @@ def test_weights_sharing_ipu_cpu():
         out, _ = training_model(input, target)
 
     # Access a parameter directly:
-    print(model.weight.data)
+    print(model.linear.weight.data)
 
     assert training_model.deviceToHostCounter == 1, \
             "1 implicit copy after having trained the model"
@@ -372,10 +380,11 @@ def train_N_times_and_check_copying(N, inference_model, training_model, input,
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_weights_sharing_ipus(trace_model):
     torch.manual_seed(42)
-    model = torch.nn.Linear(10, 10)
 
-    training_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss())
+    model = ModelWithLoss(torch.nn.MSELoss())
+
+    training_model = poptorch.trainingModel(model)
+
     training_model.deviceToHostCounter = 0
     realMethod = training_model.copyWeightsToHost
 
@@ -520,10 +529,11 @@ def test_implicit_first_time_copy_negative(trace_model):
 
 def test_weight_overwrite_trained_weight():
     torch.manual_seed(42)
-    model = torch.nn.Linear(10, 10)
 
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss())
+    model = ModelWithLoss(torch.nn.MSELoss())
+
+    poptorch_model = poptorch.trainingModel(model)
+
     target = torch.randn(10)
     input = torch.randn(10)
 
@@ -614,54 +624,34 @@ def test_access_scalar_parameter(use_half):
 def test_copy_on_torch_equal(reverse_equal_call):
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.layer = torch.nn.Linear(10, 10)
+    model = ModelWithLoss(torch.nn.MSELoss())
 
-        def forward(self, x):
-            out = self.layer(x)
-            return out
-
-    model = Model()
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss(),
-                                                   optimizer=torch.optim.SGD(
-                                                       model.parameters(),
-                                                       lr=0.01))
+    poptorch_model = poptorch.trainingModel(model,
+                                            optimizer=torch.optim.SGD(
+                                                model.parameters(), lr=0.01))
 
     target = torch.ones(10)
     input = torch.randn(10)
 
-    weight_at_start = model.layer.weight.clone().data
+    weight_at_start = model.linear.weight.clone().data
 
     for _ in range(100):
         poptorch_model(input, target)
 
     if reverse_equal_call:
-        assert not torch.equal(model.layer.weight, weight_at_start)
+        assert not torch.equal(model.linear.weight, weight_at_start)
     else:
-        assert not torch.equal(weight_at_start, model.layer.weight)
+        assert not torch.equal(weight_at_start, model.linear.weight)
 
 
 def test_copy_after_compile():
     torch.manual_seed(42)
 
-    class Model(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.layer = torch.nn.Linear(10, 10)
+    model = ModelWithLoss(torch.nn.MSELoss())
 
-        def forward(self, x):
-            out = self.layer(x)
-            return out
-
-    model = Model()
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss(),
-                                                   optimizer=torch.optim.SGD(
-                                                       model.parameters(),
-                                                       lr=0.01))
+    poptorch_model = poptorch.trainingModel(model,
+                                            optimizer=torch.optim.SGD(
+                                                model.parameters(), lr=0.01))
 
     target = torch.ones(10)
     input = torch.randn(10)
@@ -684,19 +674,21 @@ def test_torch_save_unwrapped():
                                  torch.zeros([2], dtype=torch.float32))
             self.register_parameter("test_param",
                                     torch.nn.Parameter(torch.empty(10)))
+            self.loss = torch.nn.L1Loss()
 
         def forward(self, inp):
-            return self.conv(inp)
+            out = self.conv(inp)
+            loss = self.loss(out)
+            return out, loss
 
     model = Model()
     # Only training models instrument the model so we can't use poptporch.inferenceModel
-    training_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.L1Loss())
+    poptorch.trainingModel(model)
 
     # An inference model sharing its user model with a training model will be instrumented though.
     options = poptorch.Options()
     options.Jit.traceModel(False)
-    poptorch.inferenceModel(training_model, options)
+    poptorch.inferenceModel(model, options)
 
     with tempfile.TemporaryDirectory() as tmp:
         torch_file = os.path.join(tmp, "torch_saved.pt")

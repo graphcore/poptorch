@@ -272,18 +272,20 @@ def test_instanceNorm(params):
             super(Model, self).__init__()
             self.norm = instance_norm(6, affine=affine)
             self.fc1 = nn.Linear(6 * 2**d, 10)
+            self.loss = nn.CrossEntropyLoss()
 
-        def forward(self, x):
-            x = self.norm(x)
-            x = x.flatten(1)
-            return self.fc1(x)
+        def forward(self, x, target):
+            out = self.norm(x)
+            out = out.flatten(1)
+            out = self.fc1(out)
+            loss = self.loss(out, target)
+
+            return out, loss
 
     for _ in range(3):
         model = Model()
         opt = optim.AdamW(model.parameters(), lr=0.01)
-
-        poptorch_model = helpers.trainingModelWithLoss(
-            model, loss=nn.CrossEntropyLoss(), optimizer=opt)
+        poptorch_model = poptorch.trainingModel(model, optimizer=opt)
 
         shape = [5, 6]
         shape.extend([2 for _ in range(d)])

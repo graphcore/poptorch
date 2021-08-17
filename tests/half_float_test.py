@@ -340,10 +340,19 @@ def test_float16_activations_float32_weights(trace_model):
 def test_master_weight_training():
     torch.manual_seed(42)
 
-    model = torch.nn.Linear(10, 10)
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.MSELoss()
 
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss())
+        def forward(self, data, target):
+            out = self.linear(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
+    poptorch_model = poptorch.trainingModel(model)
 
     target = torch.randn(10)
     input = torch.randn(10).half()
@@ -367,14 +376,23 @@ def test_master_weight_training():
 def test_bigger_model_training():
     torch.manual_seed(42)
 
-    model = torch.nn.Sequential(torch.nn.Linear(10,
-                                                10), torch.nn.Linear(10, 10),
-                                torch.nn.Linear(10,
-                                                10), torch.nn.Linear(10, 10),
-                                torch.nn.Linear(10, 10))
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear_chain = torch.nn.Sequential(torch.nn.Linear(10, 10),
+                                                    torch.nn.Linear(10, 10),
+                                                    torch.nn.Linear(10, 10),
+                                                    torch.nn.Linear(10, 10),
+                                                    torch.nn.Linear(10, 10))
+            self.loss = torch.nn.MSELoss()
 
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss())
+        def forward(self, data, target):
+            out = self.linear_chain(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
+    poptorch_model = poptorch.trainingModel(model)
 
     target = torch.randn(10)
     input = torch.randn(10).half()

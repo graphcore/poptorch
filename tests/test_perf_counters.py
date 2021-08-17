@@ -2,7 +2,6 @@
 import torch
 import pytest
 import poptorch
-import helpers
 
 
 class Model(torch.nn.Module):
@@ -141,10 +140,19 @@ def test_training(mode_tuple, steps, accums, replicas):
     opts.Training.gradientAccumulation(accums)
     opts.replicationFactor(replicas)
 
-    model = torch.nn.Linear(100, 100)
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.L1Loss(),
-                                                   options=opts)
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(100, 100)
+            self.loss = torch.nn.MSELoss()
+
+        def forward(self, data, target):
+            out = self.linear(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
+    poptorch_model = poptorch.trainingModel(model, options=opts)
 
     poptorch_model(inputs, targets)
     perf = poptorch_model.getPerfCounters()

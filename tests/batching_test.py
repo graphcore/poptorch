@@ -40,15 +40,26 @@ def test_trainingBatching():
     # 10 batches of 1
     label = torch.randint(0, 10, [1])
     label = label.expand([10])
-    model = torch.nn.Linear(10, 10)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, data, target):
+            out = self.linear(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, options=opts, loss=torch.nn.CrossEntropyLoss())
+    poptorch_model = poptorch.trainingModel(model, options=opts)
 
     # Run all 10 batches as batchsize 10.
-    out = model(input)
+    out, _ = model(input, label)
 
     # Sanity check we weren't already matching the label.
     assert not torch.equal(torch.argmax(out, dim=1), label)
@@ -60,7 +71,7 @@ def test_trainingBatching():
         assert len(loss.size()) == 0
 
     # Run with trained weights.
-    out = model(input)
+    out, _ = model(input, label)
 
     # Check we are now equal with labels.
     helpers.assert_allequal(actual=torch.argmax(out, dim=1), expected=label)
@@ -129,17 +140,27 @@ def test_trainingOutputModes(mode):
     label = torch.randint(0, 10, [1])
     label = label.expand([1000])
 
-    # The model
-    model = torch.nn.Linear(10, 10)
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, data, target):
+            out = self.linear(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
 
     # Run pytorch native on CPU batchsize 10.
-    model(input)
+    model(input, label)
 
     # Run on IPU batch size 1 * 1000 popart batches.
     opts = poptorch.Options().deviceIterations(1000)
     opts.outputMode(mode, output_return_period=20)
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, options=opts, loss=torch.nn.CrossEntropyLoss())
+
+    poptorch_model = poptorch.trainingModel(model, options=opts)
 
     poptorch_out, loss = poptorch_model(input, label)
 
@@ -193,7 +214,19 @@ def test_trainingOutputModes(mode):
 def run_gradient_accumulation_test(input, target, gradient_accumulations,
                                    accumulation_reduction_type, lr):
     torch.manual_seed(42)
-    model = torch.nn.Linear(10, 10)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.L1Loss(reduction="mean")
+
+        def forward(self, data, target):
+            out = self.linear(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
 
     opts = poptorch.Options()
     opts.outputMode(poptorch.OutputMode.All)
@@ -203,18 +236,17 @@ def run_gradient_accumulation_test(input, target, gradient_accumulations,
         opts.Training.accumulationAndReplicationReductionType(
             accumulation_reduction_type)
 
-    poptorch_model = helpers.trainingModelWithLoss(
-        model,
-        loss=torch.nn.L1Loss(reduction="mean"),
-        options=opts,
-        optimizer=torch.optim.SGD(model.parameters(), lr=lr))
+    poptorch_model = poptorch.trainingModel(model,
+                                            options=opts,
+                                            optimizer=torch.optim.SGD(
+                                                model.parameters(), lr=lr))
 
     # Run 10 training steps
     for _ in range(10):
         poptorch_model(input, target)
 
     # return trained weight matrix
-    return poptorch_model.weight.data
+    return poptorch_model.linear.weight.data
 
 
 def test_gradient_accumulation_training():

@@ -97,13 +97,25 @@ def test_resnet():
 
     image_input = torch.randn([1, 3, 224, 224]).half()
     t1 = torch.tensor([1.]).long()
-    # We are running on a dummy input so it doesn't matter if the weights are trained.
-    model = models.resnet18(pretrained=False)
+    loss_fn = torch.nn.NLLLoss()
+
+    class ModelWithLoss(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            # We are running on a dummy input so it doesn't matter whether the
+            # weights are trained.
+            self.base_model = models.resnet18(pretrained=False)
+
+        def forward(self, data, target):
+            out = self.base_model(data)
+            loss = loss_fn(out, target)
+            return out, loss
+
+    model = ModelWithLoss()
     model.train()
     model.half()
 
-    training_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.NLLLoss())
+    training_model = poptorch.trainingModel(model)
 
     # Run on IPU.
     poptorch_out, loss = training_model(image_input, t1)

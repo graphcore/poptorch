@@ -612,8 +612,9 @@ def test_detach_and_clone(with_clone, with_detach):
             super().__init__()
             self.first_layer = torch.nn.Linear(10, 10)
             self.second_layer = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.MSELoss()
 
-        def forward(self, x):
+        def forward(self, x, target):
             out = self.first_layer(x)
             if with_clone:
                 out = out.clone()
@@ -621,14 +622,13 @@ def test_detach_and_clone(with_clone, with_detach):
                 out = out.detach()
 
             out = self.second_layer(out)
-            return out
+            loss = self.loss(out, target)
+            return out, loss
 
     model = Model()
-    poptorch_model = helpers.trainingModelWithLoss(model,
-                                                   loss=torch.nn.MSELoss(),
-                                                   optimizer=torch.optim.SGD(
-                                                       model.parameters(),
-                                                       lr=0.01))
+    poptorch_model = poptorch.trainingModel(model,
+                                            optimizer=torch.optim.SGD(
+                                                model.parameters(), lr=0.01))
 
     target = torch.ones(10)
     input = torch.randn(10)

@@ -39,10 +39,13 @@ def test_weight_update_replicas(process_id=0, num_processes=1):
 
             self.matmul = torch.matmul
 
-        def forward(self, input):
+            self.loss = torch.nn.L1Loss(reduction="mean")
+
+        def forward(self, input, target):
             # Perform the GEMM operation
             x = alpha * self.matmul(input, self.B) + beta * self.C
-            return x
+            loss = self.loss(x, target)
+            return x, loss
 
     def reference():
         module = Model()
@@ -60,12 +63,10 @@ def test_weight_update_replicas(process_id=0, num_processes=1):
 
         # graph with gradient accumlation i.e. only update the weights after x passes
         for _ in range(replicationFactor):
-            o = module(a)
-            outputs = outputs + (o, )
-            loss = torch.nn.L1Loss(reduction="mean")
-            target = torch.zeros(o.size())
-            output = loss(o, target)
-            output.backward()
+            target = torch.zeros(C.shape)
+            out, loss = module(a, target)
+            outputs = outputs + (out, )
+            loss.backward()
 
         # Update the weights
         optimizer.step()
@@ -76,14 +77,13 @@ def test_weight_update_replicas(process_id=0, num_processes=1):
         return [torch.cat(outputs), module.B.data, module.C.data]
 
     model = Model()
-    poptorch_model = helpers.trainingModelWithLoss(
-        model,
-        options=opts,
-        loss=torch.nn.L1Loss(reduction="mean"),
-        optimizer=torch.optim.SGD(model.parameters(),
-                                  lr=0.01,
-                                  weight_decay=0.0,
-                                  momentum=0.0))
+    poptorch_model = poptorch.trainingModel(model,
+                                            options=opts,
+                                            optimizer=torch.optim.SGD(
+                                                model.parameters(),
+                                                lr=0.01,
+                                                weight_decay=0.0,
+                                                momentum=0.0))
 
     ref_out = reference()
     ipu_A = np.concatenate([A for _ in range(localReplicationFactor)])
@@ -111,19 +111,22 @@ def test_too_many_ipus():
         def __init__(self):
             super(Model, self).__init__()
             self.layer = torch.nn.Linear(128, 4)
+            self.loss = torch.nn.L1Loss(reduction="mean")
 
-        def forward(self, input):
-            return self.layer(input)
+        def forward(self, input, target):
+            out = self.layer(input)
+            loss = self.loss(out, target)
+            return out, loss
 
     model = Model()
-    poptorch_model = helpers.trainingModelWithLoss(
-        model,
-        options=opts,
-        loss=torch.nn.L1Loss(reduction="mean"),
-        optimizer=torch.optim.SGD(model.parameters(),
-                                  lr=0.01,
-                                  weight_decay=0.0,
-                                  momentum=0.0))
+
+    poptorch_model = poptorch.trainingModel(model,
+                                            options=opts,
+                                            optimizer=torch.optim.SGD(
+                                                model.parameters(),
+                                                lr=0.01,
+                                                weight_decay=0.0,
+                                                momentum=0.0))
 
     np.random.seed(42)
     input = np.random.rand(512, 128).astype(np.float32)

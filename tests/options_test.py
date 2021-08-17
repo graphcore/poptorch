@@ -754,10 +754,12 @@ def test_num_io_tiles():
 
 # pylint: disable=protected-access
 def test_options_change_after_use():
-    model = torch.nn.Linear(10, 10)
+    model = helpers.ModelWithWeights(torch.nn.Linear(10, 10),
+                                     torch.Size((5, 10)),
+                                     loss_fn=torch.nn.CrossEntropyLoss())
+
     opts = poptorch.Options()
-    poptorch_model = helpers.trainingModelWithLoss(
-        model, options=opts, loss=torch.nn.CrossEntropyLoss())
+    poptorch_model = poptorch.trainingModel(model, options=opts)
 
     with pytest.raises(Exception):
         opts.randomSeed(42)

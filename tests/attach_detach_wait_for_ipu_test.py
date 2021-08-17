@@ -48,15 +48,24 @@ def test_attach_detach_wait_for_ipu(capfd, trace_model):
     target = target.expand([10])
     input = torch.randn(10, 10)
 
-    model = torch.nn.Linear(10, 10)
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, data, target):
+            out = self.linear(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
 
     opts = poptorch.Options()
     # Ensure that both models use the same IPU
     opts.useIpuId(1)
 
-    training = helpers.trainingModelWithLoss(model,
-                                             options=opts,
-                                             loss=torch.nn.CrossEntropyLoss())
+    poptorch_model = poptorch.trainingModel(model, options=opts)
 
     ctx = mp.get_context('spawn')
     mgr = mp.Manager()
@@ -65,12 +74,12 @@ def test_attach_detach_wait_for_ipu(capfd, trace_model):
 
     process.start()
     event.wait()
-    _, initial_loss = training(input, target)
+    _, initial_loss = poptorch_model(input, target)
     process.join()
 
     if math.isnan(initial_loss):
         raise ValueError("original_loss is NaN")
 
-    training.detachFromDevice()
+    poptorch_model.detachFromDevice()
     log = helpers.LogChecker(capfd)
     log.assert_contains("No IPU available, sleeping")

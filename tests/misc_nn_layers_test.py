@@ -188,9 +188,20 @@ def test_dropout_eval_during_training(dropout_op):
     # Create a poptorch training model with a fixed random seed for deterministic runs
     # Note that the loss is irrelevant and ignored.
     opts = poptorch.Options().randomSeed(8)
-    poptorch_model = helpers.trainingModelWithLoss(dropout,
-                                                   loss=torch.nn.L1Loss(),
-                                                   options=opts)
+
+    class ModelWithLoss(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.dropout = dropout
+            self.loss = torch.nn.L1Loss()
+
+        def forward(self, data, target):
+            out = self.dropout(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = ModelWithLoss()
+    poptorch_model = poptorch.trainingModel(model, options=opts)
     dummy_label = torch.zeros_like(x)
     poptorch_out, _ = poptorch_model(x, dummy_label)
 
@@ -300,6 +311,7 @@ def test_embedding_padding_idx():
             return y, loss
 
     model = TestEmbedding()
+    # pylint:disable=unsubscriptable-object
     x = torch.arange(0, model.embedding.weight.shape[0])
     y, loss = model(x)
     loss.backward()

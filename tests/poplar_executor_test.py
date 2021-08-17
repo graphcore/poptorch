@@ -272,9 +272,19 @@ def _compile_model_offline(cache, pid, num_processes):
     opts.deviceIterations(10)
     opts.Distributed.configureProcessId(pid, num_processes)
 
-    model = helpers.trainingModelWithLoss(torch.nn.Linear(10, 10),
-                                          options=opts,
-                                          loss=torch.nn.CrossEntropyLoss())
+    class ModelWithLoss(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, data, target):
+            out = self.linear(data)
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = ModelWithLoss()
+    poptorch_model = poptorch.trainingModel(model, options=opts)
 
     # 10 Batches of 10.
     input = torch.randn(10, 10)
@@ -282,7 +292,7 @@ def _compile_model_offline(cache, pid, num_processes):
     label = torch.randint(0, 10, [1])
     label = label.expand([10])
 
-    model.compile(input, label)
+    poptorch_model.compile(input, label)
 
 
 # Force-disable the IPU model

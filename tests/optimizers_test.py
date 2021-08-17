@@ -41,32 +41,45 @@ class OptimizerTestModel:
     def __init__(self, num_groups=1, options=None):
         layers = [torch.nn.Linear(10, 10) for _ in range(num_groups)]
         if num_groups == 1:
-            self.model = layers[0]
+            base_model = layers[0]
         else:
-            self.model = torch.nn.Sequential(*layers)
+            base_model = torch.nn.Sequential(*layers)
         self.input = torch.randn(1, 10)
         self.label = torch.randint(0, 10, [1])
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.base_model = base_model
+                self.loss = torch.nn.CrossEntropyLoss()
+
+            def forward(self, data, target):
+                out = self.base_model(data)
+                loss = self.loss(out, target)
+                return out, loss
+
+        self.model = Model()
         self.poptorch_model = None
+
         self.options = options
 
     def parameters(self):
         return self.model.parameters()
 
     def setOptimizer(self, optimizer):
-        self.poptorch_model.setOptimizer(optimizer)
+        if self.poptorch_model is None:
+            self.poptorch_model = poptorch.trainingModel(self.model,
+                                                         optimizer=optimizer,
+                                                         options=self.options)
+        else:
+            self.poptorch_model.setOptimizer(optimizer)
 
-    def run(self, optimizer=None):
-        if not self.poptorch_model:
-            assert optimizer, ("An optimizer must be provided to compile "
-                               "the model")
-            self.poptorch_model = helpers.trainingModelWithLoss(
-                self.model,
-                loss=torch.nn.CrossEntropyLoss(),
-                optimizer=optimizer,
-                options=self.options)
-        elif optimizer:
-            self.setOptimizer(optimizer)
-        return self.poptorch_model(self.input, self.label)
+    def run(self):
+        if self.poptorch_model is None:
+            raise RuntimeError("Call setOptimizer first.")
+
+        out_loss = self.poptorch_model(self.input, self.label)
+        return out_loss
 
 
 @pytest.mark.parametrize("opt", all_optimizers)
@@ -82,7 +95,8 @@ def test_optimizer(opt):
         optimizer = opt(model.parameters(), lr=0.00)
 
     # Make sure the first run doesn't already pass the test.
-    _, original_loss = model.run(optimizer)
+    model.setOptimizer(optimizer)
+    _, original_loss = model.run()
 
     # Loss shouldn't change.
     for _ in range(0, 50):
@@ -95,7 +109,6 @@ def test_optimizer(opt):
     # Update the optimizer and check the loss now begins to decrease.
     optimizer.param_groups[0]['lr'] = 0.01
     model.setOptimizer(optimizer)
-
     for _ in range(0, 1000):
         out, loss = model.run()
 
@@ -117,7 +130,8 @@ def test_sgd_IR(opt):
     else:
         optimizer = opt(model.parameters(), lr=0.01)
 
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
 
     as_json = json.load(StringIO(model.poptorch_model._debugGetPopartIR()))  # pylint: disable=protected-access
 
@@ -165,7 +179,8 @@ def test_adam_accum_type(capfd, opt, accum_type, first_order_type,
                     accum_type=accum_type,
                     first_order_momentum_accum_type=first_order_type,
                     second_order_momentum_accum_type=second_order_type)
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches(
         "graph optimizer", "accumType=" + torchTypeToStr(accum_type),
@@ -192,7 +207,8 @@ def test_sgd_accum_type(capfd, accum_type, velocity_accum_type):
                                    use_combined_accum=False,
                                    accum_type=accum_type,
                                    velocity_accum_type=velocity_accum_type)
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches(
         "graph optimizer", "accumType=" + torchTypeToStr(accum_type),
@@ -213,7 +229,8 @@ def test_velocity_scaling_copy(use_combined_accum):
         velocity_scaling=128.1 if use_combined_accum else None,
         use_combined_accum=use_combined_accum)
 
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
 
     # Check copy.copy preserves optimizer PopTorch attributes
     o = copy.copy(optimizer)
@@ -235,10 +252,10 @@ def test_optimizer_groups(opt):
     model = OptimizerTestModel(num_groups=2)
 
     # Parameter is a soft copy by default oddly.
-    weight1 = model.model[0].weight.clone()
-    bias1 = model.model[0].bias.clone()
-    weight2 = model.model[1].weight.clone()
-    bias2 = model.model[1].bias.clone()
+    weight1 = model.model.base_model[0].weight.clone()
+    bias1 = model.model.base_model[0].bias.clone()
+    weight2 = model.model.base_model[1].weight.clone()
+    bias2 = model.model.base_model[1].bias.clone()
 
     def get_optims(run_time):
 
@@ -247,31 +264,31 @@ def test_optimizer_groups(opt):
 
         if opt == poptorch.optim.SGD:
             return opt([{
-                'params': model.model[0].parameters(),
+                'params': model.model.base_model[0].parameters(),
                 "lr": first_group_lr
             }, {
-                'params': model.model[1].parameters(),
+                'params': model.model.base_model[1].parameters(),
                 "lr": second_group_lr
             }],
                        lr=0.1,
                        use_combined_accum=False)
         return opt([{
-            'params': model.model[0].parameters(),
+            'params': model.model.base_model[0].parameters(),
             "lr": first_group_lr
         }, {
-            'params': model.model[1].parameters(),
+            'params': model.model.base_model[1].parameters(),
             "lr": second_group_lr
         }],
                    lr=0.1)
 
     # Start the optimizer as zero for both groups.
-    _, original_loss = model.run(get_optims(run_time=0))
-
+    model.setOptimizer(get_optims(run_time=0))
+    _, original_loss = model.run()
     for _ in range(0, 10):
         out, loss = model.run()
 
-    weight1_post, bias1_post = model.model[0].parameters()
-    weight2_post, bias2_post = model.model[1].parameters()
+    weight1_post, bias1_post = model.model.base_model[0].parameters()
+    weight2_post, bias2_post = model.model.base_model[1].parameters()
 
     # Nothing should have changed.
     helpers.assert_allequal(expected=weight1, actual=weight1_post)
@@ -283,13 +300,14 @@ def test_optimizer_groups(opt):
     assert loss == original_loss
 
     # Now update the optimizer to train just one weight
-    _, original_loss = model.run(get_optims(1))
+    model.setOptimizer(get_optims(run_time=1))
+    _, original_loss = model.run()
 
     for _ in range(0, 10):
         out, loss = model.run()
 
-    weight1_post, bias1_post = model.model[0].parameters()
-    weight2_post, bias2_post = model.model[1].parameters()
+    weight1_post, bias1_post = model.model.base_model[0].parameters()
+    weight2_post, bias2_post = model.model.base_model[1].parameters()
 
     assert loss != original_loss
 
@@ -299,13 +317,14 @@ def test_optimizer_groups(opt):
     helpers.assert_allequal(expected=bias2, actual=bias2_post)
 
     # Now update the optimizer to train just both weight
-    _, original_loss = model.run(get_optims(2))
+    model.setOptimizer(get_optims(run_time=2))
+    _, original_loss = model.run()
 
     # Actually try and train here.
     for _ in range(0, 2000):
         out, loss = model.run()
 
-    weight2_post, bias2_post = model.model[1].parameters()
+    weight2_post, bias2_post = model.model.base_model[1].parameters()
 
     assert not torch.equal(weight2, weight2_post)
     assert not torch.equal(bias2, bias2_post)
@@ -320,18 +339,18 @@ def test_optimizer_groups_none_args():
     model = OptimizerTestModel(num_groups=2)
 
     # Parameter is a soft copy by default oddly.
-    weight1 = model.model[0].weight.clone()
-    bias1 = model.model[0].bias.clone()
-    weight2 = model.model[1].weight.clone()
-    bias2 = model.model[1].bias.clone()
+    weight1 = model.model.base_model[0].weight.clone()
+    bias1 = model.model.base_model[0].bias.clone()
+    weight2 = model.model.base_model[1].weight.clone()
+    bias2 = model.model.base_model[1].bias.clone()
 
     # Start the optimizer as zero for both groups.
-    model.run(
+    model.setOptimizer(
         optim.AdamW([{
-            'params': model.model[0].parameters(),
+            'params': model.model.base_model[0].parameters(),
             "lr": 0.0
         }, {
-            'params': model.model[1].parameters(),
+            'params': model.model.base_model[1].parameters(),
             "lr": 0.0
         }],
                     lr=0.1))
@@ -339,8 +358,8 @@ def test_optimizer_groups_none_args():
     for _ in range(0, 10):
         model.run()
 
-    weight1_post, bias1_post = model.model[0].parameters()
-    weight2_post, bias2_post = model.model[1].parameters()
+    weight1_post, bias1_post = model.model.base_model[0].parameters()
+    weight2_post, bias2_post = model.model.base_model[1].parameters()
 
     # Nothing should have changed.
     helpers.assert_allequal(expected=weight1, actual=weight1_post)
@@ -358,8 +377,8 @@ def test_optimizer_SGD_separate_velocity_scale_matched(capfd):
                                    loss_scaling=2.0,
                                    lr=1.0,
                                    use_combined_accum=False)
-
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_contains("lossScaling=2", "defaultVelocityScaling=2")
 
@@ -370,11 +389,12 @@ def test_optimizer_SGD_nesterov():
 
     with pytest.raises(ValueError,
                        match="Nesterov momentum is currently not supported"):
-        model.run(
+        model.setOptimizer(
             optim.SGD(model.parameters(),
                       nesterov=True,
                       momentum=0.1,
                       lr=0.001))
+        model.run()
 
 
 @pytest.mark.parametrize("opt", poptorch_optimizers)
@@ -392,10 +412,12 @@ def test_optimizer_const(opt):
     else:
         optimizer = opt(model.parameters(), loss_scaling=1.0, lr=1.0)
 
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
 
     optimizer.loss_scaling = 2.0
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
 
 
 @pytest.mark.parametrize("opt", poptorch_optimizers)
@@ -410,10 +432,12 @@ def test_optimizer_mark_as_variable(opt):
         optimizer = opt(model.parameters(), lr=1.0)
 
     optimizer.variable_attrs.markAsVariable("loss_scaling")
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
 
     optimizer.loss_scaling = 2.0
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
 
 
 @pytest.mark.parametrize("opt", {poptorch.optim.LAMB, LAMBNoBias})
@@ -422,8 +446,8 @@ def test_lamb_max_weight_norm(opt):
     model = OptimizerTestModel()
 
     optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=100.0)
-    _, original_loss = model.run(optimizer)
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    _, original_loss = model.run()
 
     for _ in range(0, 1000):
         out, loss = model.run()
@@ -438,7 +462,7 @@ def test_lamb_max_weight_norm(opt):
     optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=None)
 
     # Train model again
-    _, original_loss = model.run(optimizer)
+    model.setOptimizer(optimizer)
     for _ in range(0, 1000):
         out, loss = model.run()
 
@@ -456,9 +480,9 @@ def test_variable_groups(capfd, use_combined_accum):
 
     # Make sure all groups have the default values, and the values are not (const)
     params = [{
-        "params": model.model[0].parameters()
+        "params": model.model.base_model[0].parameters()
     }, {
-        "params": model.model[1].parameters()
+        "params": model.model.base_model[1].parameters()
     }]
     o = poptorch.optim.SGD(
         params,
@@ -466,7 +490,8 @@ def test_variable_groups(capfd, use_combined_accum):
         loss_scaling=2.0,
         velocity_scaling=2.0 if use_combined_accum else None,
         use_combined_accum=use_combined_accum)
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_contains("graph optimizer with SGD",
                             "defaultLearningRate=0.01,",
@@ -482,7 +507,8 @@ def test_variable_groups(capfd, use_combined_accum):
     o.param_groups[1]["velocity_scaling"] = 4.0  # onl for combined variant
     o.param_groups[0][
         "loss_scaling"] = 4.0  # doesn't exist: loss scaling is not a group attribute
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_contains("Ignoring unexpected group 0 attribute",
                             "'loss_scaling'")
@@ -503,9 +529,9 @@ def test_variable_groups(capfd, use_combined_accum):
 
     # Make sure the the groups default to the new optimizer's default velocityScaling, manually set lr for both groups
     params = [{
-        "params": model.model[0].parameters()
+        "params": model.model.base_model[0].parameters()
     }, {
-        "params": model.model[1].parameters()
+        "params": model.model.base_model[1].parameters()
     }]
     o = poptorch.optim.SGD(
         params,
@@ -517,7 +543,8 @@ def test_variable_groups(capfd, use_combined_accum):
     o.defaults["lr"] = 0.7
     o.param_groups[0]["lr"] = 0.0
     o.param_groups[1]["lr"] = 1.0
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_contains("Ignoring unexpected optimizer attribute", "'lr'")
 
@@ -602,7 +629,8 @@ def test_variable_default(opt, capfd):
     # Test the torch Optimizer: check all the attributes are set to constant by default
     model = OptimizerTestModel()
     optimizer = pytorch_opt(model.parameters(), lr=1.0, **opt_args)
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches("graph optimizer",
                            *genRegexp(attrs, default=True, is_const=True),
@@ -613,7 +641,8 @@ def test_variable_default(opt, capfd):
 
     # Create a default pytorch optimizer (It should be identical to the previous one)
     optimizer = pytorch_opt(model.parameters(), lr=1.0)
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     # As the optimizer is identical it shouldn't trigger any update in the backend
     testlog.assert_no_matches("graph optimizer")
@@ -627,7 +656,9 @@ def test_variable_default(opt, capfd):
     else:
         optimizer = poptorch_opt(model.parameters(), lr=1.0)
 
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
+
     testlog = helpers.LogChecker(capfd)
     # As the optimizer is identical it shouldn't trigger any update in the backend
     testlog.assert_no_matches("graph optimizer")
@@ -647,7 +678,8 @@ def test_variable_default(opt, capfd):
         assert not optimizer.variable_attrs.isConstant(attr)
         optimizer.variable_attrs.markAsConstant(attr)
 
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     # As the optimizer is identical it shouldn't trigger any update in the backend
     testlog.assert_no_matches("graph optimizer")
     testlog.assert_no_matches("group 0 optimizer")
@@ -664,7 +696,8 @@ def test_variable_default(opt, capfd):
     else:
         optimizer = poptorch_opt(model.parameters(), lr=1.0, **opt_args)
 
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches("graph optimizer",
                            *genRegexp(attrs, default=True, is_const=False),
@@ -691,7 +724,8 @@ def test_variable_default(opt, capfd):
     else:
         optimizer = poptorch_opt(model.parameters(), lr=1.0, **new_opts)
 
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches("graph optimizer",
                            *genRegexp(attrs, default=True, is_const=False),
@@ -711,7 +745,8 @@ def test_variable_default(opt, capfd):
     for attr in opt_args.keys():
         assert optimizer.variable_attrs.isConstant(attr)
         optimizer.variable_attrs.markAsVariable(attr)
-    model.run(optimizer)
+    model.setOptimizer(optimizer)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches("graph optimizer",
                            *genRegexp(attrs, default=True, is_const=False),
@@ -808,9 +843,9 @@ def test_extra_attributes(capfd, use_combined_accum):
 
     # Make sure all groups have the default values, and the values are not (const)
     params = [{
-        "params": model.model[0].parameters()
+        "params": model.model.base_model[0].parameters()
     }, {
-        "params": model.model[1].parameters()
+        "params": model.model.base_model[1].parameters()
     }]
     o = poptorch.optim.SGD(
         params,
@@ -818,17 +853,20 @@ def test_extra_attributes(capfd, use_combined_accum):
         loss_scaling=2.0,
         velocity_scaling=2.0 if use_combined_accum else None,
         use_combined_accum=use_combined_accum)
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     o.step = 0
     o.param_groups[0]["initial_lr"] = 0.1
     o.param_groups[1]["initial_lr"] = 0.1
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches("unexpected optimizer attribute")
     testlog.assert_matches(r"unexpected group \d attribute")
     # loss_scaling = 3.0: Make sure optimizer is different to trigger update
     o.loss_scaling = 3.0
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     # Ensure warnings are printed only once
     testlog = helpers.LogChecker(capfd)
     testlog.assert_no_matches("unexpected optimizer attribute")
@@ -846,9 +884,9 @@ def test_extra_attributes2(capfd, use_combined_accum):
     model = OptimizerTestModel(num_groups=2, options=opts)
     # Make sure all groups have the default values, and the values are not (const)
     params = [{
-        "params": model.model[0].parameters()
+        "params": model.model.base_model[0].parameters()
     }, {
-        "params": model.model[1].parameters()
+        "params": model.model.base_model[1].parameters()
     }]
     o = poptorch.optim.SGD(
         params,
@@ -856,11 +894,13 @@ def test_extra_attributes2(capfd, use_combined_accum):
         loss_scaling=2.0,
         velocity_scaling=2.0 if use_combined_accum else None,
         use_combined_accum=use_combined_accum)
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     o.step = 0
     o.param_groups[0]["initial_lr"] = 0.1
     o.param_groups[1]["initial_lr"] = 0.1
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_no_matches("unexpected optimizer attribute")
     testlog.assert_no_matches(r"unexpected group \d attribute")
@@ -874,9 +914,9 @@ def test_extra_attributes3(capfd, use_combined_accum):
     model = OptimizerTestModel(num_groups=2)
     # Make sure all groups have the default values, and the values are not (const)
     params = [{
-        "params": model.model[0].parameters()
+        "params": model.model.base_model[0].parameters()
     }, {
-        "params": model.model[1].parameters()
+        "params": model.model.base_model[1].parameters()
     }]
     o = poptorch.optim.SGD(
         params,
@@ -887,7 +927,8 @@ def test_extra_attributes3(capfd, use_combined_accum):
     o.step = 0
     o.param_groups[0]["initial_lr"] = 0.1
     o.param_groups[1]["initial_lr"] = 0.1
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     # If extra attributes are added before the first run
     # they shouldn't trigger any warning
     testlog = helpers.LogChecker(capfd)
@@ -899,7 +940,8 @@ def test_extra_attributes3(capfd, use_combined_accum):
     # initial_lr is a group attribute: should trigger a warning.
     o.initial_lr = 0.2
     # If they're added later then they should print a warning
-    model.run(o)
+    model.setOptimizer(o)
+    model.run()
     testlog = helpers.LogChecker(capfd)
     testlog.assert_matches("unexpected optimizer attribute")
     testlog.assert_no_matches(r"unexpected group \d attribute")
@@ -916,38 +958,43 @@ def test_rmsprop_tf_variant(use_tf_variant):
     label = torch.randint(0, 10, [1])
 
     model_pt = OptimizerTestModel()
-    model_pt.model.weight = torch.nn.Parameter(weight.detach().clone())
-    model_pt.model.bias = torch.nn.Parameter(bias.detach().clone())
+    model_pt.model.base_model.weight = torch.nn.Parameter(
+        weight.detach().clone())
+    model_pt.model.base_model.bias = torch.nn.Parameter(bias.detach().clone())
     model_pt.input = input.detach().clone()
     model_pt.label = label.detach().clone()
     optimizer_pt = poptorch.optim.RMSprop(model_pt.parameters(), lr=0.02)
+    model_pt.setOptimizer(optimizer_pt)
 
     model_tf = OptimizerTestModel()
-    model_tf.model.weight = torch.nn.Parameter(weight.detach().clone())
-    model_tf.model.bias = torch.nn.Parameter(bias.detach().clone())
+    model_tf.model.base_model.weight = torch.nn.Parameter(
+        weight.detach().clone())
+    model_tf.model.base_model.bias = torch.nn.Parameter(bias.detach().clone())
     model_tf.input = input.detach().clone()
     model_tf.label = label.detach().clone()
     optimizer_tf = poptorch.optim.RMSprop(model_tf.parameters(),
                                           lr=0.02,
                                           use_tf_variant=use_tf_variant)
+    model_tf.setOptimizer(optimizer_tf)
 
-    helpers.assert_allequal(actual=model_pt.model.weight,
-                            expected=model_tf.model.weight)
-    helpers.assert_allequal(actual=model_pt.model.bias,
-                            expected=model_tf.model.bias)
+    helpers.assert_allequal(actual=model_pt.model.base_model.weight.data,
+                            expected=model_tf.model.base_model.weight.data)
+    helpers.assert_allequal(actual=model_pt.model.base_model.bias.data,
+                            expected=model_tf.model.base_model.bias.data)
 
     for _ in range(5):
-        out_pt, loss_pt = model_pt.run(optimizer_pt)
-        out_tf, loss_tf = model_tf.run(optimizer_tf)
+        out_pt, loss_pt = model_pt.run()
+        out_tf, loss_tf = model_tf.run()
 
     if use_tf_variant:
-        assert not torch.allclose(model_pt.model.weight, model_tf.model.weight)
+        assert not torch.allclose(model_pt.model.base_model.weight.data,
+                                  model_tf.model.base_model.weight.data)
         assert not torch.allclose(out_pt, out_tf)
         assert not torch.allclose(loss_pt, loss_tf)
     else:
         helpers.assert_allequal(
-            actual=model_pt.model.weight.detach().clone(),
-            expected=model_tf.model.weight.detach().clone())
+            actual=model_pt.model.base_model.weight.detach().clone(),
+            expected=model_tf.model.base_model.weight.detach().clone())
         helpers.assert_allequal(actual=out_pt, expected=out_tf)
         helpers.assert_allequal(actual=loss_pt, expected=loss_tf)
 

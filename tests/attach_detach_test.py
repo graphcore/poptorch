@@ -5,7 +5,6 @@ import math
 import unittest.mock
 import pytest
 import torch
-import helpers
 import poptorch
 
 
@@ -20,15 +19,27 @@ def test_attach_detach(trace_model):
     target = target.expand([10])
     input = torch.randn(10, 10)
 
-    model = torch.nn.Linear(10, 10)
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 10)
+            self.loss = torch.nn.CrossEntropyLoss()
+
+        def forward(self, data, target=None):
+            out = self.linear(data)
+
+            if target is None:
+                return out
+
+            loss = self.loss(out, target)
+            return out, loss
+
+    model = Model()
 
     opts = poptorch.Options()
     # Ensure that both models use the same IPU
     opts.useIpuId(1)
-
-    training = helpers.trainingModelWithLoss(model,
-                                             options=opts,
-                                             loss=torch.nn.CrossEntropyLoss())
+    training = poptorch.trainingModel(model, options=opts)
 
     opts = opts.clone()
     opts.Jit.traceModel(trace_model)

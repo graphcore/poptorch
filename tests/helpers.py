@@ -1,5 +1,4 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
-import copy
 import functools
 import os
 import re
@@ -82,39 +81,6 @@ def propagateInputShapes(graph, dummyInputs):
     for graphInput, dummyInput in zip(graph.inputs(), dummyInputs):
         graphInput.inferTypeFrom(dummyInput)
     poptorch_core.propagateInputShapes(graph)
-
-
-def trainingModelWithLoss(model, loss, options=None, optimizer=None):
-    class TrainingModelWithLoss(torch.nn.Module):
-        def __init__(self, model, loss):
-            super().__init__()
-            self._real_call = model.__call__
-            # The original model *must* be stored in the wrapper
-            # even if it's not used (The tracer will inspect it
-            # for parameters).
-            self._model = model
-            self._loss = loss
-
-        def forward(self, args, loss_inputs):  # pylint: disable=unused-argument
-            assert False, ("Shouldn't be called, signature should match"
-                           " the one of __call__")
-
-        def __call__(self, args, loss_inputs):
-            output = self._real_call(args)
-            loss = self._loss(output, loss_inputs)
-            return output, loss
-
-    # Create a copy of the original model in case it needs to be wrapped
-    maybe_wrapped_model = copy.copy(model)
-
-    # Store the real __call__ method before PoplarExecutor wraps it
-    training_model = TrainingModelWithLoss(maybe_wrapped_model, loss)
-    return poptorch.PoplarExecutor(model=training_model,
-                                   options=options,
-                                   training=True,
-                                   optimizer=optimizer,
-                                   user_model=model,
-                                   poptorch_version=poptorch.__version__)
 
 
 # Wrapper model with weights to test that gradients are generated
