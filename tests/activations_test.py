@@ -82,7 +82,8 @@ def test_glu(dim):
 def test_activation_numerics(op):
     enable_exceptions = True
     if op in (nn.SELU, nn.ELU, nn.CELU):
-        # TODO(T44221): figure out why these activations are overflowing
+        # These activations rely on exponentials that will overflow
+        # but saturate to a linear function in the range where x >> 0
         enable_exceptions = False
 
     model = op(dim=1) if op in (nn.Softmax, nn.LogSoftmax) else op()
