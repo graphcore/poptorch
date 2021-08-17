@@ -1,4 +1,4 @@
-# PopTorch. PyTorch integration for the GraphCore IPU
+# PopTorch. PyTorch integration for the Graphcore IPU
 
 PopTorch is a set of extensions for PyTorch enabling models
 to be trained, evaluated and used on the Graphcore IPU.

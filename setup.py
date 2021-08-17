@@ -18,7 +18,7 @@ TORCH_VERSION = utils.get_required_torch_version()
 
 LONG_DESCRIPTION = (
     "PopTorch is a set of extensions for PyTorch enabling "
-    "models to be trained, evaluated and used on the GraphCore IPU.")
+    "models to be trained, evaluated and used on the Graphcore IPU.")
 
 # https://www.python.org/dev/peps/pep-0425/
 # The platform tag is simply distutils.util.get_platform() with all hyphens - and periods . replaced with underscore _.
@@ -63,7 +63,7 @@ setup(
     long_description=LONG_DESCRIPTION[3:],
     long_description_content_type="text/markdown",
     url='http://graphcore.ai',
-    author='GraphCore',
+    author='Graphcore',
     author_email='contact@graphcore.ai',
     license='Apache 2.0',
     packages=['poptorch'],
