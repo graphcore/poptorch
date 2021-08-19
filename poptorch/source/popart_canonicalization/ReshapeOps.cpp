@@ -1,4 +1,3 @@
-
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 #include <torch/csrc/jit/ir/ir.h>
@@ -228,6 +227,204 @@ torch::jit::Node *permuteHandler(torch::jit::Graph *graph,
   });
 
   return createTranspose(graph, {node->input(0)}, permutation);
+}
+
+// Get the indices for im2col
+std::vector<int64_t> getGatherIndices(int64_t orig_rows, int64_t orig_cols,
+                                      int64_t kernel_size_x,
+                                      int64_t kernel_size_y, int64_t dilation_x,
+                                      int64_t dilation_y, int64_t padding_x,
+                                      int64_t padding_y, int64_t extra_padding,
+                                      int64_t stride_x, int64_t stride_y) {
+  auto spatial_rows =
+      (orig_rows + 2 * padding_y - dilation_y * (kernel_size_y - 1) - 1) /
+          stride_y +
+      1;
+  auto spatial_cols =
+      (orig_cols + 2 * padding_x - dilation_x * (kernel_size_x - 1) - 1) /
+          stride_x +
+      1;
+
+  auto spatial_row_cols_product = spatial_rows * spatial_cols;
+
+  auto numel = spatial_row_cols_product * kernel_size_x * kernel_size_y;
+
+  std::vector<int64_t> indices;
+  indices.reserve(numel);
+
+  for (int64_t idx = 0; idx < numel; idx++) {
+    auto kernel_offset = idx / spatial_row_cols_product;
+    auto kernel_x_offset = (kernel_offset % kernel_size_x) * dilation_x;
+    auto kernel_y_offset = (kernel_offset / kernel_size_x) * dilation_y;
+
+    auto spatial_offset = idx % spatial_row_cols_product;
+    auto spatial_x_offset = (spatial_offset % spatial_cols) * stride_x;
+    auto spatial_y_offset = (spatial_offset / spatial_cols) * stride_y;
+
+    auto actual_x = spatial_x_offset + kernel_x_offset;
+    auto actual_y = spatial_y_offset + kernel_y_offset;
+
+    auto in_idx =
+        actual_y * (orig_cols + 2 * padding_x + extra_padding) + actual_x;
+
+    if (actual_x < 0 || actual_y < 0) {
+      ERROR("Out of range too low");
+    }
+
+    if (actual_x < 0 || actual_y < 0 ||
+        actual_x >= (orig_cols + 2 * padding_x + 10) ||
+        actual_y >= (orig_rows + 2 * padding_y)) {
+      ERROR("Out of range");
+    }
+    indices.push_back(in_idx);
+  }
+  return indices;
+}
+
+// Reorder the padded im2col input to permit longer slices.
+// Update supplied indices in place to match: these will have longer
+// consecutive sequences.
+torch::jit::Node *reorderBasedOnStride(torch::jit::Graph *graph,
+                                       torch::jit::Value *padded,
+                                       const std::vector<int64_t> &data_shape,
+                                       int64_t stride, int64_t last_dim_size,
+                                       std::vector<int64_t> *indices,
+                                       WrappedIntConstantReuser *consts) {
+  // Reshape to allow slicing based on index modulo stride
+  auto *reshaped =
+      createReshape(graph, padded, {data_shape[0], data_shape[1], -1, stride});
+
+  // Slice and concatenate to order based on module stride
+  std::vector<torch::jit::Value *> stride_sliced_flattened;
+  stride_sliced_flattened.reserve(stride);
+
+  auto *dim_const = consts->getConst(3);
+  for (int64_t start = 0; start < stride; start++) {
+    auto *stride_sliced =
+        createSlice(graph, {reshaped->output(), consts->getConst(start),
+                            consts->getConst(start + 1), dim_const});
+    auto *stride_flattened = createReshape(graph, stride_sliced->output(),
+                                           {data_shape[0], data_shape[1], -1});
+    stride_sliced_flattened.push_back(stride_flattened->output());
+  }
+
+  auto *concat = createConcat(graph, stride_sliced_flattened, 2);
+
+  // Alter the indices to match
+  for (size_t idx = 0; idx < indices->size(); idx++) {
+    uint64_t old_idx = (*indices)[idx];
+    (*indices)[idx] =
+        (old_idx % stride) * (last_dim_size / stride) + old_idx / stride;
+  }
+
+  return concat;
+}
+
+// Convert indices to slices by accumulating consecutive indices into a single
+// slice. Returns slice values as a pair (start, end).
+std::vector<std::pair<int64_t, int64_t>>
+indicesToSlices(const std::vector<int64_t> &indices) {
+  ERROR_ON(indices.empty());
+
+  // Represents the start and end of each slice in a pair
+  std::vector<std::pair<int64_t, int64_t>> slices;
+
+  int64_t slice_start = indices[0];
+  for (auto it = indices.begin() + 1; it != indices.end(); it++) {
+    auto previous = *(it - 1);
+    auto current = *it;
+
+    if (current != previous + 1) {
+      slices.emplace_back(slice_start, previous + 1);
+      slice_start = current;
+    }
+  }
+
+  // Handle the last slice
+  slices.emplace_back(slice_start, indices.back() + 1);
+
+  return slices;
+}
+
+torch::jit::Node *im2colHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  // aten::im2col(Tensor self, int[2] kernel_size, int[2] dilation,
+  //              int[2] padding, int[2] stride) -> Tensor
+
+  torch::jit::Value *data = node->input(0);
+  std::vector<int64_t> data_shape = shapeFromTensor(data);
+  ERROR_ON(data_shape.size() != 4);
+
+  std::vector<std::int64_t> kernel_shape =
+      constantToLongVec(node->input(1)->node());
+  ERROR_ON(kernel_shape.size() != 2);
+
+  std::vector<std::int64_t> dilation =
+      constantToLongVec(node->input(2)->node());
+  ERROR_ON(dilation.size() != 2);
+
+  std::vector<std::int64_t> padding = constantToLongVec(node->input(3)->node());
+  ERROR_ON(padding.size() != 2);
+
+  std::vector<std::int64_t> strides = constantToLongVec(node->input(4)->node());
+  ERROR_ON(strides.size() != 2);
+
+  // First zero-pad the input
+  // Pytorch gives the padding as being the amount to pad in both
+  // directions. Popart has two arguments for each axis, the amount to pad in
+  // each direction along that axis. In the form (Axis0Left, AxisNLeft...,
+  // Axis0Right, AxisNRight) where left and right refer to the direction
+  // along the axis to add zeros to.
+  std::vector<std::int64_t> popart_padding{0, 0, padding[0], padding[1],
+                                           0, 0, padding[0], padding[1]};
+
+  // Increase RHS padding to ensure that the number of cols divides by the
+  // x stride value
+  auto current_width = data_shape[3] + padding[1] * 2;
+  auto extra_padding = strides[1] - (current_width % strides[1]);
+  extra_padding = extra_padding % strides[1];
+  popart_padding.back() += extra_padding;
+  current_width += extra_padding;
+
+  auto *padded =
+      createConstantPad(graph, node->input(0), popart_padding, 0., true);
+
+  // Get the indices as if the spatial dimensions had been flattened
+  auto indices =
+      getGatherIndices(data_shape[2], data_shape[3], kernel_shape[1],
+                       kernel_shape[0], dilation[1], dilation[0], padding[1],
+                       padding[0], extra_padding, strides[1], strides[0]);
+
+  // Use to create or reuse integer constants
+  WrappedIntConstantReuser reuser(graph);
+
+  // Calculate the last dim size as if it was flattened
+  auto last_dim_size = current_width * (data_shape[2] + padding[0] * 2);
+
+  // Reorder to allow fewer slices then each index became a slice
+  auto *rearranged =
+      reorderBasedOnStride(graph, padded->output(), data_shape, strides[1],
+                           last_dim_size, &indices, &reuser);
+  auto slices_start_end = indicesToSlices(indices);
+
+  // Slice and concat for the reordering
+  std::vector<torch::jit::Value *> sliced;
+  auto *dim_const = reuser.getConst(2);
+  sliced.reserve(slices_start_end.size());
+  for (auto slice_start_end : slices_start_end) {
+    sliced.push_back(
+        createSlice(graph, {rearranged->output(),
+                            reuser.getConst(slice_start_end.first),
+                            reuser.getConst(slice_start_end.second), dim_const})
+            ->output());
+  }
+
+  auto *concat = createConcat(graph, sliced, 2);
+
+  // Finally reshape to match PyTorch's expectation
+  return createReshape(
+      graph, concat->output(),
+      {data_shape[0], data_shape[1] * kernel_shape[0] * kernel_shape[1], -1});
 }
 
 torch::jit::Node *transposeHandler(torch::jit::Graph *graph,
@@ -586,6 +783,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::contiguous, contiguousHandler);
   registerHandler(c10::aten::permute, permuteHandler);
   registerHandler(c10::aten::transpose, transposeHandler);
+  registerHandler(c10::aten::im2col, im2colHandler);
   registerHandler(c10::aten::numpy_T, numpyTHandler);
   registerHandler(c10::aten::to, toHandler);
   registerHandler(c10::aten::type_as, toHandler);

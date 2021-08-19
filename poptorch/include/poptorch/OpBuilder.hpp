@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -103,7 +104,8 @@ torch::jit::Node *createInternalCast(torch::jit::Graph *graph,
 torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
                                     torch::jit::Value *A,
                                     const std::vector<int64_t> &pad_shape,
-                                    float constant);
+                                    float constant,
+                                    bool direct_pad_shape_input = false);
 
 torch::jit::Node *createReflectionPad(torch::jit::Graph *graph,
                                       torch::jit::Value *A,
@@ -137,10 +139,26 @@ torch::jit::Node *createAddUntypedInputTensor(torch::jit::Graph *graph,
 torch::jit::Node *createAddOutputTensor(torch::jit::Graph *graph,
                                         torch::jit::Value *output);
 
-template <typename... Ints,
-          std::enable_if_t<std::is_integral<typename std::tuple_element<
-                               0, std::tuple<Ints...>>::type>::value,
-                           int> = 0>
+// A class to allow duplication constant of int64 constants in the IR, by
+// providing them on demand
+class WrappedIntConstantReuser {
+public:
+  explicit WrappedIntConstantReuser(torch::jit::Graph *graph);
+
+  torch::jit::Value *getConst(int64_t val);
+
+private:
+  torch::jit::Graph *_graph;
+
+  std::unordered_map<int64_t, torch::jit::Value *> _consts;
+};
+
+template <typename... Elms>
+using FirstElmType = typename std::tuple_element<0, std::tuple<Elms...>>::type;
+
+template <
+    typename... Ints,
+    std::enable_if_t<std::is_integral<FirstElmType<Ints...>>::value, int> = 0>
 torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph, Ints... values) {
   std::vector<int64_t> data{std::forward<Ints>(values)...};
   return createConstantInt(graph, data,

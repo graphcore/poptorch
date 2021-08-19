@@ -274,6 +274,7 @@ def test_embedding():
     helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
+# pylint: disable=unsubscriptable-object
 def test_embedding_padding_idx():
     class TestEmbedding(torch.nn.Module):
         def __init__(self):
@@ -367,3 +368,35 @@ def test_pixel_shuffle():
     op = torch.nn.PixelShuffle(3)
     x = torch.randn(2, 18, 4, 4)
     op_harness(op, [x])
+
+
+@pytest.mark.parametrize("kernel_size_x", [2, 3])
+@pytest.mark.parametrize("kernel_size_y", [2, 4])
+@pytest.mark.parametrize("dilation_x", [1, 2])
+@pytest.mark.parametrize("dilation_y", [1, 3])
+@pytest.mark.parametrize("stride_x", [1, 3])
+@pytest.mark.parametrize("stride_y", [1, 3])
+def test_unfold(kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
+                stride_y):
+    padding = 2
+    y_in = 19
+    x_in = 23
+
+    unfold_layer = torch.nn.Unfold(kernel_size=(kernel_size_y, kernel_size_x),
+                                   dilation=(dilation_y, dilation_x),
+                                   padding=padding,
+                                   stride=(stride_y, stride_x))
+
+    numel_y = (y_in + 2 * padding - dilation_y *
+               (kernel_size_y - 1) - 1) // stride_y + 1
+    numel_x = (x_in + 2 * padding - dilation_x *
+               (kernel_size_x - 1) - 1) // stride_x + 1
+    numel = numel_y * numel_x
+
+    linear_layer = torch.nn.Linear(numel, numel)
+
+    combined = torch.nn.Sequential(unfold_layer, linear_layer)
+
+    inputs = [torch.rand(1, 1, y_in, x_in)]
+
+    op_harness(combined, inputs)

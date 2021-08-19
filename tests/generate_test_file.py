@@ -43,7 +43,6 @@ short_tests = [
     "inputs_test.py",
     "loop_test.py",
     "lstm_test.py",
-    "misc_nn_layers_test.py",
     "non_contiguous_tensors_test.py",
     "ops_test.py",
     "options_test.py",

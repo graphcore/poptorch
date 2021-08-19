@@ -285,12 +285,15 @@ convertPytorchPads(const std::vector<int64_t> &tensor_shape,
 torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
                                     torch::jit::Value *A,
                                     const std::vector<int64_t> &pad_shape,
-                                    float constant) {
+                                    float constant,
+                                    bool direct_pad_shape_input) {
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::constant_pad, {A},
                           ImplicitCast::None, OutputType::AsFirstInput);
   new_node->is_(c10::Symbol::fromQualString("attr::pads"),
-                convertPytorchPads(shapeFromTensor(A), pad_shape));
+                direct_pad_shape_input
+                    ? pad_shape
+                    : convertPytorchPads(shapeFromTensor(A), pad_shape));
   new_node->f_(c10::Symbol::fromQualString("attr::value"), constant);
   return new_node;
 }
@@ -369,6 +372,17 @@ torch::jit::Node *createAddOutputTensor(torch::jit::Graph *graph,
   torch::jit::Node *new_node =
       graph->create(symbols::poptorch::addOutputTensor, {output}, 0);
   return new_node;
+}
+
+WrappedIntConstantReuser::WrappedIntConstantReuser(torch::jit::Graph *graph)
+    : _graph(graph) {}
+
+torch::jit::Value *WrappedIntConstantReuser::getConst(int64_t val) {
+  if (_consts.count(val) == 0u) {
+    _consts[val] = wrapInConstant1D(_graph, val);
+  }
+
+  return _consts[val];
 }
 
 torch::jit::Node *createEndIf(torch::jit::Graph *graph,

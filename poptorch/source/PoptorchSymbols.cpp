@@ -32,6 +32,7 @@ c10::Symbol cross_entropy_loss;          // NOLINT
 c10::Symbol new_ones;                    // NOLINT
 c10::Symbol new_zeros;                   // NOLINT
 c10::Symbol numpy_T;                     // NOLINT
+c10::Symbol im2col;                      // NOLINT
 c10::Symbol _reshape_alias;              // NOLINT
 
 // Removed in 1.10.
@@ -73,6 +74,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, new_ones);
   SYMBOL_INIT(aten, new_zeros);
   SYMBOL_INIT(aten, numpy_T);
+  SYMBOL_INIT(aten, im2col);
   SYMBOL_INIT(aten, _reshape_alias);
 
 #if TORCH_MINOR_VERSION < 10
