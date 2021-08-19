@@ -636,7 +636,7 @@ void CompilerImpl::detachFromDevice() {
     return;
   }
 
-  logging::trace("Begin detaching device");
+  logging::trace("Begin detaching device {}", _device->getId());
   ERROR_ON_MSG(!_device, "Cannot find a valid device");
   ERROR_ON_MSG(!_device->isAttached(), "The device has already been detached");
   _device->detach();
@@ -925,7 +925,7 @@ void CompilerImpl::attachToDevice() {
     return;
   }
 
-  logging::trace("Begin attaching device");
+  logging::debug("Begin attaching to device {}", _device->getId());
   popart::popx::Devicex &device = session->getDevice();
   auto *device_info = device.getDeviceInfo();
   ERROR_ON_MSG(!device_info, "Cannot find a valid device");
@@ -936,12 +936,12 @@ void CompilerImpl::attachToDevice() {
   do {
     has_attached = device_info->attach();
     ERROR_ON_MSG(!has_attached && !waitIfUnavailable(),
-                 "Failed to acquire device Id " << options.ipu_id
+                 "Failed to acquire device Id " << _device->getId()
                                                 << checkSystemConfig());
   } while (!has_attached && waitForAWhile());
   device.loadEngineAndConnectStreams();
 
-  logging::trace("Finished attaching device");
+  logging::trace("Finished attaching to device {}", _device->getId());
 }
 
 std::string CompilerImpl::getPopartIR() const {
