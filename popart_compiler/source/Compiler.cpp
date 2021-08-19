@@ -870,7 +870,7 @@ poptorch::PopartType Compiler::getPopartType(poptorch::TensorId id) const {
 }
 
 const char *Compiler::tensorName(poptorch::TensorId id) const {
-  return _impl->ids.at(id).str().c_str();
+  return _impl->ids.at(id).c_str();
 }
 
 bool Compiler::tensorIdIsValid(poptorch::TensorId id) const {

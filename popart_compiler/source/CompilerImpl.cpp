@@ -17,7 +17,6 @@
 #include <popart/popx/devicexmanager.hpp>
 #include <popart/session.hpp>
 #include <popart/sgd.hpp>
-#include <popart/tensorid.hpp>
 #include <popart/tensorinfo.hpp>
 #include <popart/tensors.hpp>
 
@@ -29,18 +28,6 @@ namespace poptorch {
 namespace {
 
 std::string toString(const std::vector<std::string> &vec) {
-  std::stringstream ss;
-  ss << "[";
-  std::string sep{};
-  for (const auto &s : vec) {
-    ss << sep << s;
-    sep = ", ";
-  }
-  ss << "]";
-  return ss.str();
-}
-
-std::string toString(const std::vector<popart::TensorId> &vec) {
   std::stringstream ss;
   ss << "[";
   std::string sep{};
