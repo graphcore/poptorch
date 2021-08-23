@@ -626,6 +626,8 @@ You can either set the ``loss_scaling`` factors manually, or you can set :py:fun
 which will automatically set a global loss scaling factor. If you both set ``loss_scaling`` manually and enable automatic loss scaling, the manually
 set factor(s) will be used initially and updated automatically during training.
 
+.. warning:: Automatic loss scaling is an experimental feature and may not behave as expected.
+
 Velocity scaling (SGD combined variant only)
 --------------------------------------------
 

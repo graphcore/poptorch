@@ -378,6 +378,8 @@ class _TrainingOptions(_options_impl.OptionsDict):
         underflow/overflow. This adjustment is known as loss scaling. This
         setting automatically sets a global loss scaling factor during training.
 
+        Note: This is an experimental feature and may not behave as expected.
+
         :param enabled:
             * True: Enable automatic loss scaling on the IPU.
             * False: Disable automatic loss scaling.
