@@ -142,9 +142,8 @@ torch::jit::Node *cloneHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // aten::clone(Tensor self, *, MemoryFormat? memory_format=None) -> Tensor
 
-  // Use cast to same type for cloning
-  at::ScalarType dest_type = getNodeScalarType(node->input(0));
-  return createCast(graph, node->input(0), dest_type);
+  // Identity will just create a copy
+  return createIdentity(graph, {node->input(0)});
 }
 
 torch::jit::Node *copyHandler(torch::jit::Graph *graph,

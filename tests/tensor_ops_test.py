@@ -21,11 +21,11 @@ import poptorch
 
 
 def zeros_and_ones_harness(model, dtype, is_like):
-    assert dtype in [torch.float16, torch.float32, torch.int32]
+    assert dtype in [torch.float16, torch.float32, torch.int32, torch.bool]
     torch.manual_seed(42)
 
-    # Calculating with integers does not produce meaningful gradients (almost always zero)
-    test_training = not dtype is torch.int32
+    # Calculating with ints/bools does not produce meaningful gradients
+    test_training = not dtype in (torch.int32, torch.bool)
 
     inputs = [torch.tensor([1], dtype=dtype)]
     if is_like:
@@ -66,7 +66,7 @@ def zeros_and_ones_harness(model, dtype, is_like):
         poptorch_model.assert_weights_changed()
 
 
-zeros_and_ones_dtypes = [torch.float16, torch.float32, torch.int32]
+zeros_and_ones_dtypes = [torch.float16, torch.float32, torch.int32, torch.bool]
 
 
 @pytest.mark.parametrize("dtype", zeros_and_ones_dtypes)

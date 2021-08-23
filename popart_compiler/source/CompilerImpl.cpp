@@ -819,32 +819,27 @@ CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &tensors,
       shape.begin(), shape.end(), 1, std::multiplies<size_t>()));
 
   if (dtype == "INT32") {
-    std::vector<int32_t> const_buff;
-    const_buff.reserve(total_size);
-    for (size_t i = 0; i < total_size; i++) {
-      const_buff.emplace_back(zeros ? 0 : 1);
-    }
+    std::vector<int32_t> const_buff(total_size, zeros ? 0 : 1);
     PopartConstant popart_const(PopartType::INT32, &const_buff[0], shape);
     return tensorConstant(tensors, popart_const);
   }
   if (dtype == "FLOAT") {
-    std::vector<float> const_buff;
-    const_buff.reserve(total_size);
-    for (size_t i = 0; i < total_size; i++) {
-      const_buff.emplace_back(zeros ? 0 : 1);
-    }
-
+    std::vector<float> const_buff(total_size, zeros ? 0 : 1);
     PopartConstant popart_const(PopartType::FLOAT, &const_buff[0], shape);
     return tensorConstant(tensors, popart_const);
   }
   if (dtype == "FLOAT16") {
-    std::vector<uint16_t> const_buff;
-    const_buff.reserve(total_size);
-    for (size_t i = 0; i < total_size; i++) {
-      const_buff.emplace_back(popart::floatToHalf(zeros ? 0 : 1));
-    }
-
+    std::vector<uint16_t> const_buff(total_size,
+                                     popart::floatToHalf(zeros ? 0 : 1));
     PopartConstant popart_const(PopartType::FLOAT16, &const_buff[0], shape);
+    return tensorConstant(tensors, popart_const);
+  }
+  if (dtype == "BOOL") {
+    struct Bool {
+      bool b;
+    };
+    std::vector<Bool> const_buff(total_size, {!zeros});
+    PopartConstant popart_const(PopartType::BOOL, &(const_buff[0].b), shape);
     return tensorConstant(tensors, popart_const);
   }
   ERROR("Unsupported type " << dtype);

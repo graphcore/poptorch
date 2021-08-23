@@ -12,6 +12,7 @@ New features
 - Support K-dimensional NLLLoss, K-dimensional CrossEntropyLoss
 - Support for non-default affine parameter flags in normalisation ops
 - Support for ``torch.Tensor.T``
+- Support for ``torch.bool`` in ``torch.zeros``, ``torch.zeros_like``, ``torch.ones``, ``torch.ones_like``
 
 API changes
 -----------
