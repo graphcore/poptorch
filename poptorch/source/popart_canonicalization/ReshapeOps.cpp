@@ -392,24 +392,36 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   // aten::upsample_trilinear3d(Tensor self, int[] output_size, bool
   // align_corners, float? scales_d, float? scales_h, float? scales_w) -> Tensor
 
-  torch::jit::Value *x = node->input(0);
-  std::vector<std::int64_t> output_size = shapeFromTensor(node->output());
-  std::vector<std::int64_t> input_size = shapeFromTensor(node->input(0));
+  torch::jit::Value *input = node->input(0);
+  torch::jit::Value *output_size = node->input(1);
+  torch::jit::Value *output_scale = node->input(2);
 
-  ERROR_ON_MSG(output_size.size() != input_size.size(),
-               "Input / output rank mismatch: " << input_size.size() << " != "
-                                                << output_size.size());
+  auto output_rank = shapeFromTensor(node->output()).size();
+  auto input_shape = shapeFromTensor(input);
+  auto input_rank = input_shape.size();
+
+  ERROR_ON_MSG(output_rank != input_rank,
+               "Input / output rank mismatch: " << input_rank
+                                                << " != " << output_rank);
 
   // Omit the leading batch and channel dims for computing the scale
   std::vector<double> scales{1.0, 1.0};
 
-  for (size_t dim = 2; dim < input_size.size(); ++dim) {
-    scales.push_back(static_cast<double>(output_size[dim]) / input_size[dim]);
+  if (!isNone(output_size)) {
+    auto output_shape = handleTensorList(output_size->node());
+    for (size_t dim = 2; dim < input_rank; ++dim) {
+      scales.push_back(constantToFloat(output_shape[dim - 2]->node()) /
+                       input_shape[dim]);
+    }
+  } else {
+    for (auto s : handleTensorList(output_scale->node())) {
+      scales.push_back(constantToFloat(s->node()));
+    }
   }
 
   torch::jit::Node *scales_node = createConstantFloatLike(
-      graph, x, scales, {static_cast<std::int64_t>(scales.size())});
-  return createResize(graph, {x, scales_node->output()}, "nearest");
+      graph, input, scales, {static_cast<std::int64_t>(scales.size())});
+  return createResize(graph, {input, scales_node->output()}, "nearest");
 }
 
 torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,

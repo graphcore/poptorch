@@ -64,6 +64,14 @@ def test_upsample_nearest(scale_factor, input_shape):
     op_harness(op, [x])
 
 
+def test_downsample_nearest():
+    torch.manual_seed(42)
+    # test case from T44610
+    op = torch.nn.Upsample(scale_factor=0.435714, mode="nearest")
+    x = torch.randn(1, 2, 14, 14)
+    op_harness(op, [x])
+
+
 # TODO(T43375): replace scale factor 5 with 3.5
 @pytest.mark.parametrize("scale_factor", [2, 5])
 @pytest.mark.parametrize("input_shape", [(1, 2, 3, 4), (2, 2, 2, 8)])
