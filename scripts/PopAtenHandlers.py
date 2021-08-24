@@ -166,4 +166,10 @@ expand(
     "addmm", lambda x, y, z, c1, c2: op.gemm(y, z, x, cfloat(c1), cfloat(c2),
                                              clong(0), clong(0)))
 
+
+def scatter_handler(input, dim, index, src):
+    dim = dimension(dim, tensor_type(input))
+    return op.scatter(input, index, src, dim)
+
+
 generate(script, "c10::aten", output_dir + "/AtenHandlers.gen.cpp", globals())

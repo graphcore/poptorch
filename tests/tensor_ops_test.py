@@ -232,6 +232,28 @@ def test_gather_5dim(dim):
     op_harness(op, input, indices)
 
 
+@pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
+def test_scatter(dim):
+    shape = (3, 3, 3, 3, 3)
+    input = torch.randn(shape)
+    source = torch.randn(shape)
+
+    indices = torch.randint(0, 3, shape)
+    op = lambda inp, idx, src: inp.scatter_(dim, idx, source)
+    op_harness(op, input, indices, source)
+
+
+@pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
+def test_scatter_(dim):
+    shape = (3, 3, 3, 3, 3)
+    input = torch.randn(shape)
+    source = torch.randn(shape)
+
+    indices = torch.randint(0, 3, shape)
+    op = lambda inp, idx, src: inp.scatter_(dim, idx, source)
+    op_harness(op, input, indices, source)
+
+
 def test_reshape():
     op = lambda x: torch.reshape(x, (1, 1, 2, 2))
 

@@ -60,6 +60,7 @@ PyTorch functions
 * ``torch.index_select``
 * ``torch.reshape``
 * ``torch.roll``
+* ``torch.scatter``
 * ``torch.scatter_add``
 * ``torch.stack``
 * ``torch.split``

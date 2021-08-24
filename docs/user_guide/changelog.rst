@@ -13,6 +13,7 @@ New features
 - Support for non-default affine parameter flags in normalisation ops
 - Support for ``torch.Tensor.T``
 - Support for ``torch.bool`` in ``torch.zeros``, ``torch.zeros_like``, ``torch.ones``, ``torch.ones_like``
+- Support for ``torch.scatter`` and its in-place variant
 
 API changes
 -----------
