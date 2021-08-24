@@ -17,6 +17,12 @@ set(ENABLE_WERROR ON CACHE BOOL "Treat C++ warnings as errors")
 # Note: The next line is also parsed by scripts/utils/_utils.py
 set(TORCH_VERSION 1.9.0)
 
+# Convert to cmake list
+string(REPLACE "." ";" TORCH_VERSION_AS_LIST ${TORCH_VERSION})
+
+# Get the minor component. (Versions are Major.Minor.Patch)
+list(GET TORCH_VERSION_AS_LIST 1 TORCH_MINOR_VERSION)
+
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
 if(NOT CMAKE_BUILD_TYPE)
@@ -123,7 +129,8 @@ add_compile_options(
   -Wcomment
   -Wsequence-point
   -Wundef
-  -Wuninitialized)
+  -Wuninitialized
+  -DTORCH_MINOR_VERSION=${TORCH_MINOR_VERSION})
 
 if(${ENABLE_WERROR})
   add_compile_options(-Werror)

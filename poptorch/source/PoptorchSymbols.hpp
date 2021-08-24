@@ -6,7 +6,6 @@
 // Create all the C10 symbols.
 // For some reason the below symbols are missing from the c10 namespace.
 namespace c10::aten {
-extern c10::Symbol logical_not;                 // NOLINT
 extern c10::Symbol floor_divide;                // NOLINT
 extern c10::Symbol prelu_;                      // NOLINT
 extern c10::Symbol leaky_relu_;                 // NOLINT
@@ -22,8 +21,6 @@ extern c10::Symbol bernoulli_;                  // NOLINT
 extern c10::Symbol clamp_min_;                  // NOLINT
 extern c10::Symbol clamp_max_;                  // NOLINT
 extern c10::Symbol one_hot;                     // NOLINT
-extern c10::Symbol amax;                        // NOLINT
-extern c10::Symbol amin;                        // NOLINT
 extern c10::Symbol pow_;                        // NOLINT
 extern c10::Symbol scatter_add_;                // NOLINT
 extern c10::Symbol feature_dropout_;            // NOLINT
@@ -32,10 +29,17 @@ extern c10::Symbol nll_loss_nd;                 // NOLINT
 extern c10::Symbol cross_entropy_loss;          // NOLINT
 extern c10::Symbol new_ones;                    // NOLINT
 extern c10::Symbol new_zeros;                   // NOLINT
-extern c10::Symbol logical_and;                 // NOLINT
-extern c10::Symbol logical_or;                  // NOLINT
-extern c10::Symbol logical_xor;                 // NOLINT
 extern c10::Symbol numpy_T;                     // NOLINT
+
+// Removed in 1.10.
+#if TORCH_MINOR_VERSION < 10
+extern c10::Symbol amax;        // NOLINT
+extern c10::Symbol amin;        // NOLINT
+extern c10::Symbol logical_not; // NOLINT
+extern c10::Symbol logical_and; // NOLINT
+extern c10::Symbol logical_or;  // NOLINT
+extern c10::Symbol logical_xor; // NOLINT
+#endif
 } // namespace c10::aten
 
 namespace poptorch {

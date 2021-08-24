@@ -8,7 +8,6 @@
 
 namespace c10::aten {
 
-c10::Symbol logical_not;                 // NOLINT
 c10::Symbol floor_divide;                // NOLINT
 c10::Symbol prelu_;                      // NOLINT
 c10::Symbol leaky_relu_;                 // NOLINT
@@ -24,8 +23,6 @@ c10::Symbol bernoulli_;                  // NOLINT
 c10::Symbol clamp_min_;                  // NOLINT
 c10::Symbol clamp_max_;                  // NOLINT
 c10::Symbol one_hot;                     // NOLINT
-c10::Symbol amax;                        // NOLINT
-c10::Symbol amin;                        // NOLINT
 c10::Symbol pow_;                        // NOLINT
 c10::Symbol scatter_add_;                // NOLINT
 c10::Symbol feature_dropout_;            // NOLINT
@@ -34,17 +31,23 @@ c10::Symbol nll_loss_nd;                 // NOLINT
 c10::Symbol cross_entropy_loss;          // NOLINT
 c10::Symbol new_ones;                    // NOLINT
 c10::Symbol new_zeros;                   // NOLINT
-c10::Symbol logical_and;                 // NOLINT
-c10::Symbol logical_or;                  // NOLINT
-c10::Symbol logical_xor;                 // NOLINT
 c10::Symbol numpy_T;                     // NOLINT
+
+// Removed in 1.10.
+#if TORCH_MINOR_VERSION < 10
+c10::Symbol amax;        // NOLINT
+c10::Symbol amin;        // NOLINT
+c10::Symbol logical_not; // NOLINT
+c10::Symbol logical_and; // NOLINT
+c10::Symbol logical_or;  // NOLINT
+c10::Symbol logical_xor; // NOLINT
+#endif
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializeAtenSymbols() {
   // clang-format on
   poptorch::logging::trace("Initializing aten symbols");
-  SYMBOL_INIT(aten, logical_not);
   SYMBOL_INIT(aten, floor_divide);
   SYMBOL_INIT(aten, prelu_);
   SYMBOL_INIT(aten, leaky_relu_);
@@ -60,8 +63,6 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, clamp_min_);
   SYMBOL_INIT(aten, clamp_max_);
   SYMBOL_INIT(aten, one_hot);
-  SYMBOL_INIT(aten, amax);
-  SYMBOL_INIT(aten, amin);
   SYMBOL_INIT(aten, pow_);
   SYMBOL_INIT(aten, scatter_add_);
   SYMBOL_INIT(aten, feature_dropout_);
@@ -70,10 +71,16 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, cross_entropy_loss);
   SYMBOL_INIT(aten, new_ones);
   SYMBOL_INIT(aten, new_zeros);
+  SYMBOL_INIT(aten, numpy_T);
+
+#if TORCH_MINOR_VERSION < 10
+  SYMBOL_INIT(aten, amax);
+  SYMBOL_INIT(aten, amin);
+  SYMBOL_INIT(aten, logical_not);
   SYMBOL_INIT(aten, logical_and);
   SYMBOL_INIT(aten, logical_or);
   SYMBOL_INIT(aten, logical_xor);
-  SYMBOL_INIT(aten, numpy_T);
+#endif
 }
 
 } // namespace c10::aten
