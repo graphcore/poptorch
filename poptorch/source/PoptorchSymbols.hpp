@@ -30,6 +30,7 @@ extern c10::Symbol cross_entropy_loss;          // NOLINT
 extern c10::Symbol new_ones;                    // NOLINT
 extern c10::Symbol new_zeros;                   // NOLINT
 extern c10::Symbol numpy_T;                     // NOLINT
+extern c10::Symbol col2im;                      // NOLINT
 extern c10::Symbol im2col;                      // NOLINT
 extern c10::Symbol _reshape_alias;              // NOLINT
 

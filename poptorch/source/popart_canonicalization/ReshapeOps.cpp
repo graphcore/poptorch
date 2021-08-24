@@ -461,6 +461,125 @@ torch::jit::Node *im2colHandler(torch::jit::Graph *graph,
       graph, concat->output(),
       {data_shape[0], data_shape[1] * kernel_shape[0] * kernel_shape[1], -1});
 }
+// Make the scatter reduces indices for col2im
+at::Tensor getScatterReduceIndices(int64_t num_cols, int64_t orig_rows,
+                                   int64_t orig_cols, int64_t kernel_size_x,
+                                   int64_t kernel_size_y, int64_t dilation_x,
+                                   int64_t dilation_y, int64_t padding_x,
+                                   int64_t padding_y, int64_t stride_x,
+                                   int64_t stride_y) {
+  // Add unity dimensions for batch and channel to facilitate tiling later
+  auto indices = at::empty({1, 1, num_cols},
+                           at::dtype(at::ScalarType::Int)
+                               .memory_format(c10::MemoryFormat::Contiguous));
+
+  auto *indices_ptr = indices.data_ptr<std::int32_t>();
+
+  // The last dim has a mix of all kernel and spatial positions. Calculate
+  // the number of spatial columns.
+  auto spatial_cols =
+      ((orig_cols + 2 * padding_x - dilation_x * (kernel_size_x - 1) - 1) /
+       stride_x) +
+      1;
+
+  // spatial_rows*spatial_cols
+  // (a short cut compared to calculating spatial_rows using the equivalent
+  // expression used for spatial_cols)
+  auto spatial_row_cols_product = num_cols / (kernel_size_x * kernel_size_y);
+
+  // Find the original co-ordinate (x, y) from which the value in col_idx was
+  // copied and calculate what the index would be
+  for (int64_t col_idx = 0; col_idx < num_cols; col_idx++) {
+    auto kernel_offset = col_idx / spatial_row_cols_product;
+    auto kernel_x_offset = (kernel_offset % kernel_size_x) * dilation_x;
+    auto kernel_y_offset = (kernel_offset / kernel_size_x) * dilation_y;
+
+    auto spatial_offset = col_idx % (spatial_row_cols_product);
+    auto spatial_x_offset = (spatial_offset % spatial_cols) * stride_x;
+    auto spatial_y_offset = (spatial_offset / spatial_cols) * stride_y;
+
+    auto actual_x = spatial_x_offset + kernel_x_offset - padding_x;
+    auto actual_y = spatial_y_offset + kernel_y_offset - padding_y;
+
+    auto index = actual_y * orig_cols + actual_x;
+
+    // If out of range, use an out of range index. Poplar will skip this
+    // index.
+    if (actual_x < 0 || actual_y < 0 || actual_x >= orig_cols ||
+        actual_y >= orig_rows) {
+      index = orig_rows * orig_cols;
+    }
+    *indices_ptr = static_cast<int32_t>(index);
+    indices_ptr++; // NOLINT
+  }
+
+  return indices;
+}
+
+torch::jit::Node *col2imHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  // aten::col2im(Tensor self, int[2] output_size, int[2] kernel_size,
+  //              int[2] dilation, int[2] padding, int[2] stride) -> Tensor
+
+  // This is somewhat of an inverse to im2col:
+  // col2im(im2col(input)) == divisor * input with divisor as a tensor
+  // im2col and col2im were used to speed up convolutions via GEMM.
+
+  torch::jit::Value *data = node->input(0);
+  std::vector<int64_t> data_shape = shapeFromTensor(data);
+  ERROR_ON(data_shape.size() != 3);
+
+  std::vector<std::int64_t> output_size =
+      constantToLongVec(node->input(1)->node());
+  ERROR_ON(output_size.size() != 2);
+
+  std::vector<std::int64_t> kernel_shape =
+      constantToLongVec(node->input(2)->node());
+  ERROR_ON(kernel_shape.size() != 2);
+
+  std::vector<std::int64_t> dilation =
+      constantToLongVec(node->input(3)->node());
+  ERROR_ON(dilation.size() != 2);
+
+  std::vector<std::int64_t> padding = constantToLongVec(node->input(4)->node());
+  ERROR_ON(padding.size() != 2);
+
+  std::vector<std::int64_t> stride = constantToLongVec(node->input(5)->node());
+  ERROR_ON(stride.size() != 2);
+
+  // The batch and original channel ordering is unaffected by im2col so we can
+  // reshape to factor them out.
+  auto out_channels = data_shape[1] / (kernel_shape[0] * kernel_shape[1]);
+  auto num_cols = data_shape[2] * (kernel_shape[0] * kernel_shape[1]);
+  auto *reshaped =
+      createReshape(graph, data, {data_shape[0], out_channels, num_cols});
+
+  // Use scatter reduce to add across the relevent positions
+  auto indices = getScatterReduceIndices(
+      num_cols, output_size[0], output_size[1], kernel_shape[1],
+      kernel_shape[0], dilation[1], dilation[0], padding[1], padding[0],
+      stride[1], stride[0]);
+  auto *indices_const = tensorToConstant(graph, indices);
+
+  // The indices are shape (1, 1, num_cols) but need to be tiled for the
+  // scatterreduce
+  auto repeats =
+      at::ones({3}, at::dtype(at::ScalarType::Long)
+                        .memory_format(c10::MemoryFormat::Contiguous));
+  repeats[0] = data_shape[0];
+  repeats[1] = out_channels;
+  auto *repeats_const = tensorToConstant(graph, repeats);
+  auto *indices_tiled =
+      createTile(graph, {indices_const->output(), repeats_const->output()});
+
+  auto *scatter_reduced =
+      createScatterreduce(graph, {reshaped->output(), indices_tiled->output()},
+                          output_size[0] * output_size[1], 2, 0);
+
+  return createReshape(
+      graph, scatter_reduced->output(),
+      {data_shape[0], out_channels, output_size[0], output_size[1]});
+}
 
 torch::jit::Node *transposeHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
@@ -818,6 +937,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::contiguous, contiguousHandler);
   registerHandler(c10::aten::permute, permuteHandler);
   registerHandler(c10::aten::transpose, transposeHandler);
+  registerHandler(c10::aten::col2im, col2imHandler);
   registerHandler(c10::aten::im2col, im2colHandler);
   registerHandler(c10::aten::numpy_T, numpyTHandler);
   registerHandler(c10::aten::to, toHandler);

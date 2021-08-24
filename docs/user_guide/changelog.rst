@@ -17,6 +17,8 @@ New features
   * torch.var_mean
   * torch.std_mean
 
+- Support for ``col2im`` (used by torch.nn.Fold).
+
 API changes
 -----------
 
@@ -41,7 +43,7 @@ New features
 - Support saving and restoring internal optimiser state with PopTorch optimisers via ``optimizer.state_dict()`` and ``optimizer.load_state_dict()``
 - Add ``removeBlocks`` function to remove block annotations from a Model / Layer.
 - Support for CPU ops using ``poptorch.CPU``.
-- Support for ``im2col``.
+- Support for ``im2col`` (used by torch.nn.Unfold).
 - Make optimizers work with LR schedulers.
 - Switched to gold linker by default.
 

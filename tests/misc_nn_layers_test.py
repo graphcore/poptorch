@@ -403,14 +403,14 @@ def test_pixel_shuffle():
     op_harness(op, [x])
 
 
-@pytest.mark.parametrize("kernel_size_x", [2, 3])
-@pytest.mark.parametrize("kernel_size_y", [2, 4])
-@pytest.mark.parametrize("dilation_x", [1, 2])
-@pytest.mark.parametrize("dilation_y", [1, 3])
-@pytest.mark.parametrize("stride_x", [1, 3])
-@pytest.mark.parametrize("stride_y", [1, 3])
-def test_unfold(kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
-                stride_y):
+@pytest.mark.parametrize("params", [(2, 2, 1, 1, 1, 1), (3, 2, 1, 1, 1, 1),
+                                    (2, 4, 1, 1, 1, 1), (2, 2, 2, 1, 1, 1),
+                                    (2, 2, 1, 3, 1, 1), (2, 2, 1, 1, 3, 1),
+                                    (2, 2, 1, 1, 1, 4)])
+# Tests aten::im2col
+def test_unfold(params):
+    (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
+     stride_y) = params
     padding = 2
     y_in = 19
     x_in = 23
@@ -427,9 +427,63 @@ def test_unfold(kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
     numel = numel_y * numel_x
 
     linear_layer = torch.nn.Linear(numel, numel)
-
     combined = torch.nn.Sequential(unfold_layer, linear_layer)
 
     inputs = [torch.rand(1, 1, y_in, x_in)]
 
     op_harness(combined, inputs)
+
+
+@pytest.mark.parametrize("params", [(2, 2, 1, 1, 1, 1), (3, 2, 1, 1, 1, 1),
+                                    (2, 4, 1, 1, 1, 1), (2, 2, 2, 1, 1, 1),
+                                    (2, 2, 1, 3, 1, 1), (2, 2, 1, 1, 3, 1),
+                                    (2, 2, 1, 1, 1, 3)])
+# Tests aten::col2im
+def test_fold(params):
+    (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
+     stride_y) = params
+
+    torch.manual_seed(42)
+    orig_input = torch.rand(2, 3, 11, 13)
+
+    # unfold the input to provide an input to fold
+    unfold_args = {
+        "kernel_size": (kernel_size_y, kernel_size_x),
+        "dilation": (dilation_y, dilation_x),
+        "padding": (0, 0),
+        "stride": (stride_y, stride_x)
+    }
+    unfold = torch.nn.Unfold(**unfold_args)
+    unfolded = unfold(orig_input)
+
+    unfold_args["output_size"] = orig_input.shape[2:]
+
+    op = torch.nn.Fold(**unfold_args)
+    op_harness(op, [unfolded])
+
+
+# Tests aten::col2im with padding
+@pytest.mark.parametrize("stride_x", [1, 3])
+@pytest.mark.parametrize("stride_y", [1, 3])
+def test_fold_with_padding(stride_x, stride_y):
+    torch.manual_seed(42)
+
+    orig_input = torch.rand(2, 2, 11, 13)
+
+    # unfold the input to provide an input to fold
+    unfold_args = {
+        "kernel_size": (2, 2),
+        "dilation": (1, 1),
+        "padding": (2, 2),
+        "stride": (stride_y, stride_x)
+    }
+    unfold = torch.nn.Unfold(**unfold_args)
+    unfolded = unfold(orig_input)
+
+    # Since it is zero-padded, add a little to every value
+    unfolded += 1.0
+
+    unfold_args["output_size"] = orig_input.shape[2:]
+
+    op = torch.nn.Fold(**unfold_args)
+    op_harness(op, [unfolded])
