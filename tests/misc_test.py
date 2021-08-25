@@ -49,11 +49,11 @@ def test_set_popart_log_level(capfd):
     inference_model(torch.randn([2, 2]))
 
     log = helpers.LogChecker(capfd)
-    log.assert_not_contains("[popart:devicex] [trace]")
-    log.assert_not_contains("[popart:ir] [debug]")
-    log.assert_not_contains("[popart:ir] [info]")
-    log.assert_not_contains("[popart:session] [trace]")
-    log.assert_not_contains("[popart:popart] [trace]")
+    log.assert_no_matches(r"popart:devicex \d+\.\d+ T:")
+    log.assert_no_matches(r"popart:ir \d+\.\d+ D:")
+    log.assert_no_matches(r"popart:ir \d+\.\d+ I:")
+    log.assert_no_matches(r"popart:session \d+\.\d+ T:")
+    log.assert_no_matches(r"popart:popart \d+\.\d+ T:")
 
     poptorch._logging.setPopartLogLevel("ERR")  # pylint: disable=protected-access
     poptorch._logging.setPopartLogLevel("OFF")  # pylint: disable=protected-access
@@ -63,11 +63,11 @@ def test_set_popart_log_level(capfd):
     inference_model(torch.randn([2, 2]))
 
     log = helpers.LogChecker(capfd)
-    log.assert_contains("[popart:devicex] [trace]")
-    log.assert_contains("[popart:ir] [debug]")
-    log.assert_contains("[popart:ir] [info]")
-    log.assert_contains("[popart:session] [trace]")
-    log.assert_contains("[popart:popart] [trace]")
+    log.assert_matches(r"popart:devicex \d+\.\d+ T:")
+    log.assert_matches(r"popart:ir \d+\.\d+ D:")
+    log.assert_matches(r"popart:ir \d+\.\d+ I:")
+    log.assert_matches(r"popart:session \d+\.\d+ T:")
+    log.assert_matches(r"popart:popart \d+\.\d+ T:")
 
 
 def test_zero_size_tensor_error():
