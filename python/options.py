@@ -189,6 +189,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
 
         When enabled, an exception will be generated when the IPU encounters
         any one of the following:
+
         * Operation resulting in subtraction of infinities
         * Divisions by zero or by infinity
         * Multiplications between zero and infinity
