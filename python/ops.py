@@ -217,19 +217,25 @@ def serializedMatMul(lhs: "torch.Tensor",
 
 def set_available_memory(tensor: "torch.Tensor",
                          available_memory_proportion: float) -> "torch.Tensor":
-    """Sets the amount of temporary memory made available to a convolution or
-    a matrix multiplication.
+    """Sets the amount of temporary memory made available to an operation.
 
-    When called on the output of a convolution or matrix multiplication, it
-    controls the trade-off between execution cycles and the temporary memory
-    used during the execution of the operation.
+    The operators that can be tuned with this setting include:
+
+    * convolution
+    * matrix multiplication
+    * embedding lookups
+    * indexing operations
+
+    When applied to the output of a supported operation, it controls the
+    trade-off between execution cycles and the temporary memory used during the
+    execution of the operation.
 
     The value should be between 0 and 1 (inclusive) and represents a proportion
     of available memory on the IPU. The default value is 0.6 (therefore, by
     default, PopTorch will not use more than 60% of IPU memory for temporary
     data).
 
-    PopTorch passes this setting to the PopLibs convolution planner, which will
+    PopTorch passes this setting to the PopLibs operator planner, which will
     try to constrain the use of temporary memory to below this value. Generally,
     an operation that has more temporary memory available will run in fewer
     cycles.
@@ -252,8 +258,8 @@ def set_available_memory(tensor: "torch.Tensor",
     ...         out = poptorch.set_available_memory(out, 0.2)
     ...         return out
 
-    :param tensor: Output tensor of a convolution or matrix
-        multiplication (otherwise the statement will be an identity).
+    :param tensor: Output tensor from a supported operation (otherwise the
+        statement will be an identity).
     :param available_memory_proportion: Proportion between 0.0 and 1.0
         of tile memory to be made available for temporary memory (default 0.6).
     :returns: The input tensor, as if calling an identity function.

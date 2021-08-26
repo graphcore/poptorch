@@ -765,9 +765,19 @@ For more information see: :py:func:`~poptorch.serializedMatMul`.
 poptorch.set_available_memory
 -----------------------------
 
-Use this function to override the proportion of tile memory available for use as temporary memory by a convolution or matrix multiplication.
+Use this function to override the default proportion of tile memory available as
+temporary memory for use by operations such as a convolution or matrix
+multiplication.  The operators that can be tuned with this setting include:
 
-For more information see: :py:func:`~poptorch.set_available_memory`.
+* convolution
+* matrix multiplication
+* embedding lookup
+* indexing operations
+
+For more information see:
+
+* :py:func:`~poptorch.set_available_memory`
+* `technical note <https://docs.graphcore.ai/projects/available-memory/en/latest/>`_ on optimising temporary memory usage
 
 Miscellaneous functions
 -----------------------

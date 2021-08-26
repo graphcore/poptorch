@@ -1240,8 +1240,15 @@ class Options(_options_impl.OptionsDict):
 
     def setAvailableMemoryProportion(
             self, available_memory_proportion: Dict[str, float]):
-        """Sets the amount of temporary memory made available for convolutions
-        and matrix multiplications on a per-IPU basis.
+        """Sets the amount of temporary memory made available on a per-IPU basis.
+
+        Use this setting to control the amount of temporary memory available to
+        operations such as:
+
+        * convolution
+        * matrix multiplication
+        * embedding lookups
+        * indexing operations
 
         Parameter should be a dictionary of IPU ids and float values between 0
         and 1. (for example, ``{"IPU0": 0.5}``)
