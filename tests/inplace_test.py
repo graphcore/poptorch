@@ -2,9 +2,9 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import torch
-import pytest
 
 import poptorch
+import helpers
 
 
 def test_inplace_add():
@@ -205,13 +205,11 @@ def test_double_underscore():
         def forward(self, x, l):
             return x[x[0][0].int() & l.item()]
 
-    poptorch_model = poptorch.inferenceModel(Model(),
-                                             options=poptorch.Options())
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model, options=poptorch.Options())
     inp, l = torch.rand(10, 10), torch.LongTensor([2])
 
-    # So far this passed the inplace test without an assert, but fails on
-    # aten::select
+    out = model(inp, l)
+    popout = poptorch_model(inp, l)
 
-    error_msg = ("Unsupported ops found in compiled model")
-    with pytest.raises(poptorch.Error, match=error_msg):
-        poptorch_model(inp, l)
+    helpers.assert_allclose(actual=popout, expected=out)

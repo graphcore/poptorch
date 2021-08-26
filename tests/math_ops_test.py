@@ -342,10 +342,21 @@ def test_modulo_mixed_sign(op):
     op_harness(op, [input1, input2], assert_)
 
 
+def __and__(x, y):
+    return x & y
+
+
+def __or__(x, y):
+    return x | y
+
+
+def __xor__(x, y):
+    return x ^ y
+
+
 binary_op_int = [
-    torch.bitwise_and,
-    torch.bitwise_or,
-    torch.bitwise_xor,
+    torch.bitwise_and, torch.bitwise_or, torch.bitwise_xor, __and__, __or__,
+    __xor__
 ]
 
 

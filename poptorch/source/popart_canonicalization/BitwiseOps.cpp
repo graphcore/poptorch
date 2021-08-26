@@ -62,5 +62,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::bitwise_not, bitwiseNotHandler);
   registerHandler(c10::aten::bitwise_or, bitwiseOrHandler);
   registerHandler(c10::aten::bitwise_xor, bitwiseXorHandler);
+  registerHandler(c10::aten::__and__, bitwiseAndHandler);
+  registerHandler(c10::aten::__or__, bitwiseOrHandler);
+  registerHandler(c10::aten::__xor__, bitwiseXorHandler);
 }
 } // namespace poptorch
