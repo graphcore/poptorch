@@ -56,14 +56,11 @@ void beginIpuBlock(int64_t stage_id, int64_t phase_id, int64_t ipu_id) {
   UNUSED(ipu_id);
 }
 
-void endIpuBlock() {}
-
 void whileLoopBegin(const at::Tensor &condition,           // NOLINT
                     const c10::List<at::Tensor> &inputs) { // NOLINT
   UNUSED(condition);
   UNUSED(inputs);
 }
-void whileLoopEnd() {}
 
 at::Tensor castOp(at::Tensor tensor, std::string &&type) {
   UNUSED(type);
@@ -168,8 +165,6 @@ void clearAttribute(const std::string &attribute, const std::string &key) {
   UNUSED(key);
 }
 
-void ifElse() {}
-
 // We track the outputs of the if in this brach as it is easier to add them
 // immediately before.
 void elseBranch(c10::List<at::Tensor> if_out) { // NOLINT
@@ -203,8 +198,6 @@ void optimizerGroup(int64_t group, c10::List<at::Tensor> &&inputs) {
   UNUSED(inputs);
 }
 
-void beginMultiConv() {}
-
 void endMultiConv(
     c10::optional<c10::List<double>> &&available_memory_proportions,
     c10::optional<c10::List<int64_t>> &&partials_types,
@@ -220,17 +213,13 @@ void endMultiConv(
 
 void pushNameScope(const std::string &&name) { UNUSED(name); }
 
-void popNameScope() {}
-
-void beginAutocast() {}
-
-void suppressAutocast() {}
-
-void restoreAutocast() {}
+// Many operations just appear as having no return or inputs but our passes use
+// them to derive user intent. They can just use this implementation.
+void nullOp() {}
 
 static auto registry =
     torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
-        .op("poptorch::end_ipu_block", &endIpuBlock)
+        .op("poptorch::end_ipu_block", &nullOp)
         .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
         .op("poptorch::internal_cast", &castOp)
         .op("popart::nop", &identityOp)
@@ -238,8 +227,8 @@ static auto registry =
         .op("poptorch::ctc_beam_search_decoder", &ctcBeamSearchDecoder)
         .op("poptorch::identity_loss", &identityLoss)
         .op("poptorch::while_loop_begin", &whileLoopBegin)
-        .op("poptorch::end_loop_begin", &whileLoopEnd)
-        .op("poptorch::start_if_true", &ifElse)
+        .op("poptorch::end_loop_begin", &nullOp)
+        .op("poptorch::start_if_true", &nullOp)
         .op("poptorch::start_if_false", &elseBranch)
         .op("poptorch::end_if", &endIf)
         .op("poptorch::start_for_loop", &startForLoop)
@@ -248,13 +237,13 @@ static auto registry =
         .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
         .op("poptorch::recomputation_checkpoint", &identityOp)
         .op("poptorch::set_available_memory", &setAvailableMemory)
-        .op("poptorch::begin_multi_conv", &beginMultiConv)
+        .op("poptorch::begin_multi_conv", &nullOp)
         .op("poptorch::end_multi_conv", &endMultiConv)
         .op("poptorch::push_name_scope", &pushNameScope)
-        .op("poptorch::pop_name_scope", &popNameScope)
-        .op("poptorch::begin_autocast", &beginAutocast)
-        .op("poptorch::suppress_autocast", &suppressAutocast)
-        .op("poptorch::restore_autocast", &restoreAutocast)
+        .op("poptorch::pop_name_scope", &nullOp)
+        .op("poptorch::begin_autocast", &nullOp)
+        .op("poptorch::suppress_autocast", &nullOp)
+        .op("poptorch::restore_autocast", &nullOp)
         .op("poptorch::end_cpu_op", &endCPUOp)
         .op("poptorch::call_cpu_op", &callCpuOp)
         .op("poptorch::set_attribute", setAttribute)
