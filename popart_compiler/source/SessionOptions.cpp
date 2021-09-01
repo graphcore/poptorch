@@ -359,9 +359,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableFullyConnectedPass);
   ADD_POPART_BOOL_OPTION(enableSerializedMatmuls);
   ADD_POPART_BOOL_OPTION(enableStableNorm);
-  ADD_POPART_BOOL_OPTION(hostAllReduce);
-  ADD_POPART_BOOL_OPTION(hostWeightUpdate);
-  ADD_POPART_BOOL_OPTION(hostAllReduceRemoteBuffer);
   ADD_POPART_BOOL_OPTION(decomposeGradSum);
   ADD_POPART_BOOL_OPTION(enableDistributedReplicatedGraphs);
   ADD_POPART_BOOL_OPTION(groupHostSync);
