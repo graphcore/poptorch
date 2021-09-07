@@ -195,6 +195,7 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
   auto sr = createScatterreduce(graph, {src, index}, axissize, axis, 0);
   return createAdd(graph, {output, sr->output()});
 }
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {

@@ -61,14 +61,15 @@ def test_bmm(optional_out):
     blas_op(torch.bmm, input1, input2, out)
 
 
-def test_matmul_training():
+@pytest.mark.parametrize("bias", [True, False])
+def test_matmul_training(bias):
     N, M, K, C = 100, 9, 7, 5
 
     class Net(torch.nn.Module):
         def __init__(self):
             super(Net, self).__init__()
             torch.manual_seed(42)
-            self.linear = torch.nn.Linear(K, K)
+            self.linear = torch.nn.Linear(K, K, bias=bias)
             self.softmax = torch.nn.LogSoftmax(dim=1)
             self.loss = torch.nn.L1Loss(reduction="mean")
 

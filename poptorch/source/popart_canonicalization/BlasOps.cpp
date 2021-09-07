@@ -14,6 +14,7 @@ namespace {
 
 torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
+  // aten::mm(Tensor self, Tensor mat2) -> (Tensor)
   // "aten::matmul(Tensor self, int dim) -> Tensor"
   // We will fuse the batch dimesion of the matrix A of matmul(A, B),
   // if we find such a pattern:
@@ -97,7 +98,18 @@ torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::matmul, matmulHandler);
+
+  // Matrix-Vector
+  registerHandler(c10::aten::mv, matmulHandler);
+
+  // Vector-Vector
+  registerHandler(c10::aten::dot, matmulHandler);
+
+  // With bias.
   registerHandler(c10::aten::bmm, matmulHandler);
+
+  // No bias.
+  registerHandler(c10::aten::mm, matmulHandler);
 }
 
 } // namespace poptorch

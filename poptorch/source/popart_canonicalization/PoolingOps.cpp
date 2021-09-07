@@ -12,12 +12,18 @@ namespace {
 torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   torch::jit::Symbol kind = node->kind();
+
   // aten::max_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
   // padding, int[] dilation, bool ceil_mode) -> Tensor
   //
   // aten::avg_pool2d(Tensor self, int[] kernel_size, int[] stride, int[]
   //                   padding, bool ceil_mode, bool count_include_pad,
   //                   int? divisor_override) -> Tensor
+
+  // aten::max_pool2d_with_indices(Tensor self, int[2] kernel_size, int[2]
+  // stride=[], int[2] padding=[0, 0], int[2] dilation=[1, 1], bool
+  // ceil_mode=False) -> (Tensor, Tensor)
+
   auto kernel_size = constantToLongVec(node->input(1)->node());
   auto stride = constantToLongVec(node->input(2)->node());
   auto padding = constantToLongVec(node->input(3)->node());
@@ -32,8 +38,14 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
     padding.push_back(padding[pad_index]);
   }
 
-  if (kind == c10::aten::max_pool1d || kind == c10::aten::max_pool2d ||
-      kind == c10::aten::max_pool3d) {
+  const bool is_max_pool = kind == c10::aten::max_pool1d ||
+                           kind == c10::aten::max_pool2d ||
+                           kind == c10::aten::max_pool3d ||
+                           kind == c10::aten::max_pool1d_with_indices ||
+                           kind == c10::aten::max_pool2d_with_indices ||
+                           kind == c10::aten::max_pool3d_with_indices;
+
+  if (is_max_pool) {
     auto dilations = constantToLongVec(node->input(4)->node());
     auto ceil_mode = constantToLong(node->input(5)->node());
 
@@ -120,6 +132,11 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::avg_pool2d, poolingHandler);
   registerHandler(c10::aten::max_pool3d, poolingHandler);
   registerHandler(c10::aten::avg_pool3d, poolingHandler);
+
+  registerHandler(c10::aten::max_pool1d_with_indices, poolingHandler);
+  registerHandler(c10::aten::max_pool2d_with_indices, poolingHandler);
+  registerHandler(c10::aten::max_pool3d_with_indices, poolingHandler);
+
   registerHandler(c10::aten::adaptive_avg_pool1d, adaptivePoolingHandler);
   registerHandler(c10::aten::adaptive_avg_pool2d, adaptivePoolingHandler);
   registerHandler(c10::aten::adaptive_avg_pool3d, adaptivePoolingHandler);

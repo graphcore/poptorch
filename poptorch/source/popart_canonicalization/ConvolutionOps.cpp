@@ -9,6 +9,7 @@
 
 namespace poptorch {
 namespace {
+
 torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
                                      torch::jit::Node *node) {
   // aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[]
@@ -58,6 +59,12 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::conv2d(Tensor input, Tensor weight, Tensor? bias, int[] stride,
   //              int[] padding, int[] dilation, int groups) -> Tensor
+
+  // Or:
+
+  // aten::mkldnn_convolution(Tensor self, Tensor weight, Tensor? bias, int[]
+  // padding, int[] stride, int[] dilation, int groups) -> (Tensor)
+
   auto input = node->input(0);
   auto kernel = node->input(1);
 
@@ -68,8 +75,14 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
     inputs.push_back(node->input(2));
   }
 
-  std::vector<std::int64_t> stride = constantToLongVec(node->input(3)->node());
-  std::vector<std::int64_t> padding = constantToLongVec(node->input(4)->node());
+  const bool is_mkldnn_conv = node->kind() == c10::aten::mkldnn_convolution;
+  const std::uint32_t stride_index = is_mkldnn_conv ? 4 : 3;
+  const std::uint32_t padding_index = is_mkldnn_conv ? 3 : 4;
+
+  std::vector<std::int64_t> stride =
+      constantToLongVec(node->input(stride_index)->node());
+  std::vector<std::int64_t> padding =
+      constantToLongVec(node->input(padding_index)->node());
 
   // Pytorch gives the padding as being the amount to pad in both
   // directions. Popart two arguments for each axis, the amount to pad in
@@ -163,7 +176,9 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::convolution, convolutionHandler);
   registerHandler(c10::aten::_convolution, convolutionHandler);
+  registerHandler(c10::aten::mkldnn_convolution, conv2dHandler);
   registerHandler(c10::aten::conv2d, conv2dHandler);
   registerHandler(c10::aten::cumsum, cumsumHandler);
 }

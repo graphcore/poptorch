@@ -12,7 +12,8 @@ namespace {
 
 torch::jit::Node *addHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   // aten::add(Tensor self, Tensor other, *, Scalar alpha) -> Tensor
-
+  // aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) ->
+  // (Tensor(a!))
   torch::jit::Value *alpha_param = node->input(2);
 
   // If both types are bool, use logical_or
@@ -184,6 +185,7 @@ torch::jit::Node *crossHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::add, addHandler);
+  registerHandler(c10::aten::add_, addHandler);
   registerHandler(c10::aten::trunc, truncHandler);
   registerHandler(c10::aten::frac, fracHandler);
   registerHandler(c10::aten::floor_divide, floorDivideHandler);

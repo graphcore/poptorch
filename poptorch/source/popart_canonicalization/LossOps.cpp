@@ -69,6 +69,23 @@ torch::jit::Node *binaryCrossEntropyHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *nllLossNdHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
+  // "aten::nll_loss2d(Tensor input, Tensor target, Tensor height, Tensor
+  // weight, int reduction, int ignore_index) -> Tensor"
+
+  // aten::nll_loss2d_forward(Tensor self, Tensor target, Tensor? weight, int
+  // reduction, int ignore_index) -> (Tensor output, Tensor total_weight)
+
+  // aten::nll_loss2d() is implemented based on popart:nllloss().
+  // Suppose the input[0] has the shape of (N, C, M, K)
+  // input[0] will be transposed with perm [0, 2, 3, 1],
+  //   and reshaped with (N * M * K, C), pushing C to the last dimension.
+  // input[1] will be reshaped to (N * M * K), before calling nllloss.
+  // The generated IRs are as follows:
+  // %37 : Tensor = popart::transpose[perm=[0, 2, 3, 1]](%35)
+  // %38 : Tensor(500:4, 4:1) = popart::reshape_static_shape[shape=[500,4]](%37)
+  // %39 : Int(500:1) = popart::reshape_static_shape[shape=[500]](%25)
+  // %40 : Float() = popart::nllloss[reduction=1, ignoreIndex=-100](%38, %39)
+
   // aten::nll_loss_nd(Tensor input, Tensor target, Tensor? weight, int
   // reduction, int ignore_index) -> Tensor
   std::int64_t reduction = constantToLong(node->input(3)->node());
@@ -601,7 +618,10 @@ torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::nll_loss2d, nllLossNdHandler);
+  registerHandler(c10::aten::nll_loss2d_forward, nllLossNdHandler);
   registerHandler(c10::aten::nll_loss_nd, nllLossNdHandler);
+  registerHandler(c10::aten::nll_loss_forward, nllLossNdHandler);
   registerHandler(c10::aten::binary_cross_entropy, binaryCrossEntropyHandler);
   registerHandler(c10::aten::kl_div, klDivHandler);
   registerHandler(c10::aten::poisson_nll_loss, poissonNllLossHandler);

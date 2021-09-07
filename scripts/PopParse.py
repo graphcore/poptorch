@@ -36,6 +36,7 @@ logging.basicConfig(level=logging_level)
 
 # List of SessionOptions attributes PopTorch decided to not support
 options_not_handled = [
+    "developerSettings",
     "enableLoadAndOffloadRNGState",
     "prefetchBufferingDepthMap",
     "matmulOptions",

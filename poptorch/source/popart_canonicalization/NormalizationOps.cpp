@@ -88,6 +88,11 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   // running_mean, Tensor? running_var, bool training, float momentum, float
   // eps, bool cudnn_enabled) -> Tensor
 
+  // aten::native_batch_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor?
+  // running_mean, Tensor? running_var, bool training, float momentum, float
+  // eps) -> (Tensor, Tensor, Tensor)
+
+  // Input is value at 0th position.
   torch::jit::Value *input = node->input(0);
 
   auto input_shape = shapeFromTensor(input);
@@ -258,6 +263,7 @@ torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::batch_norm, batchNormHandler);
+  registerHandler(c10::aten::native_batch_norm, batchNormHandler);
   registerHandler(c10::aten::layer_norm, layerNormHandler);
   registerHandler(c10::aten::group_norm, groupNormHandler);
   registerHandler(c10::aten::instance_norm, instanceNormHandler);

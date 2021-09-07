@@ -63,6 +63,7 @@ convert("logical_and", 2)
 convert("logical_or", 2)
 
 expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
+forward("_cat", "cat")
 expand("elu", lambda x, y: op.elu(x, cfloat(y)))
 expand("full_like", lambda x, y: op.expand(y, as_ir(tensor_shape(x))))
 expand("ge", lambda x, y: x >= y)

@@ -60,11 +60,55 @@ torch::jit::Node *expandHandler(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *flattenHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  // flatten.using_ints(Tensor(a) self, int start_dim=0, int end_dim=-1) ->
+  // Tensor(a)
+
+  std::int64_t start_dim = constantToLong(node->input(1)->node());
+  std::int64_t end_dim = constantToLong(node->input(2)->node());
+
+  c10::TensorTypePtr self_tensor =
+      node->input(0)->type()->expect<c10::TensorType>();
+  c10::VaryingShape self_dims = self_tensor->sizes();
+
+  // Respect PyTorch negative dimensions
+  if (end_dim < 0) {
+    end_dim = (*self_dims.sizes()).size() + end_dim;
+  }
+
+  if (start_dim < 0) {
+    start_dim = (*self_dims.sizes()).size() + start_dim;
+  }
+
+  std::vector<std::int64_t> new_shape;
+
+  int dim = 0;
+  std::int64_t flattened_dims = 1;
+
+  // Flatten the selected dimensions.
+  for (auto optional_int : *self_dims.sizes()) {
+    if (dim < start_dim || dim > end_dim) {
+      new_shape.push_back(*optional_int);
+    } else {
+      flattened_dims *= *optional_int;
+    }
+
+    if (dim == end_dim) {
+      new_shape.push_back(flattened_dims);
+    }
+
+    dim++;
+  }
+
+  return createReshape(graph, node->input(0), new_shape);
+}
+
 torch::jit::Node *reshapeHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   // aten::view(Tensor self, int[] size) -> Tensor
   // aten::unsqueeze(Tensor self, int dim) -> Tensor
-
+  // aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
   std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
 
   // Reshape the tensor into that shape.
@@ -501,7 +545,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::expand_as, expandAsHandler);
   registerHandler(c10::aten::view, reshapeHandler);
   registerHandler(c10::aten::unsqueeze, reshapeHandler);
-  registerHandler(c10::aten::flatten, reshapeHandler);
+  registerHandler(c10::aten::flatten, flattenHandler);
   registerHandler(c10::aten::reshape, reshapeHandler);
   registerHandler(c10::aten::select, selectHandler);
   registerHandler(c10::aten::split, splitChunkHandler);
@@ -522,6 +566,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::squeeze, reshapeHandler);
+  registerHandler(c10::aten::as_strided, reshapeHandler);
   registerHandler(c10::aten::stack, stackHandler);
   registerHandler(c10::aten::Int, intHandler);
   registerHandler(symbols::poptorch::autocast, autocastHandler);

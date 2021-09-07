@@ -154,6 +154,13 @@ torch::jit::Node *copyHandler(torch::jit::Graph *graph,
   return createCast(graph, node->input(1), dest_type);
 }
 
+torch::jit::Node *justReturnFalse(torch::jit::Graph *graph,
+                                  torch::jit::Node * /*unused*/) {
+  c10::IValue value{false};
+  torch::jit::Value *val = graph->insertConstant(value);
+  return val->node();
+}
+
 torch::jit::Node *linearHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::linear(Tensor input, Tensor weight, Tensor? bias) -> Tensor
@@ -287,6 +294,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::prim::NumToTensor, numToTensorHandler);
   registerHandler(c10::aten::flip, flipHandler);
   registerHandler(c10::aten::repeat, repeatHandler);
+  registerHandler(c10::aten::is_complex, justReturnFalse);
   registerHandler(c10::aten::roll, rollHandler);
   registerHandler(c10::aten::clone, cloneHandler);
   registerHandler(c10::aten::copy_, copyHandler);

@@ -796,6 +796,7 @@ torch::jit::Node *whereHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::_cat, catHandler);
   registerHandler(c10::aten::abs, absHandler);
   registerHandler(c10::aten::acos, acosHandler);
   registerHandler(c10::aten::acosh, acoshHandler);

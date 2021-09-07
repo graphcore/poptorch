@@ -34,7 +34,7 @@ collapsedGraphInputHierachy(torch::jit::Graph *graph);
 // this is 1, but in case of nested tuples, this is the sum over all.
 size_t numTensorsForType(const c10::TypePtr &type);
 
-// Delete a node and also its users if they are also unused.
+// Delete a node and also its inputs if they are also unused.
 void searchAndPossiblyDestroy(
     const std::unordered_set<torch::jit::Node *> &to_test);
 
