@@ -1411,18 +1411,13 @@ ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
   _impl->line = line;
   _impl->category = ErrorCategory::Other;
   std::string extra_info;
-  switch (popart::getErrorSource(e)) {
-  case popart::ErrorSource::popart_internal: {
+  if (dynamic_cast<const popart::internal_error *>(&e)) {
     _impl->type = "popart_internal_exception";
     _impl->extractStack(dynamic_cast<const popart::error *>(&e));
-    break;
-  }
-  case popart::ErrorSource::popart: {
+  } else if (dynamic_cast<const popart::error *>(&e)) {
     _impl->type = "popart_exception";
     _impl->extractStack(dynamic_cast<const popart::error *>(&e));
-    break;
-  }
-  case popart::ErrorSource::poplar: {
+  } else if (dynamic_cast<const poplar::poplar_error *>(&e)) {
     _impl->type = "poplar_";
     _impl->type += dynamic_cast<const poplar::poplar_error *>(&e)->type;
     if (dynamic_cast<const poplar::link_error *>(&e)) {
@@ -1438,20 +1433,14 @@ ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
     } else if (dynamic_cast<const poplar::unrecoverable_runtime_error *>(&e)) {
       _impl->category = ErrorCategory::RuntimeUnrecoverable;
     }
-    break;
-  }
-  case popart::ErrorSource::poplibs: {
+  } else if (dynamic_cast<const poputil::poplibs_error *>(&e)) {
     _impl->type = "poplibs_exception";
-    break;
-  }
-  default: {
+  } else {
     if (type != nullptr) {
       _impl->type = type;
     } else {
       _impl->type = "std::exception";
     }
-    break;
-  }
   }
   const std::string &what = e.what();
   if (std::count(what.begin(), what.end(), '\n') > 80) {
