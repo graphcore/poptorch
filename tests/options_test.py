@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 import pytest
 import poptorch
+from poptorch.enums import MeanReductionStrategy
 import helpers
 
 
@@ -483,3 +484,44 @@ def test_profile_report():
     x.join()
 
     assert os.path.exists(os.path.join(dirname, "inference", "profile.pop"))
+
+
+mean_reduction_strategy_params = [
+    # accum_type, training, combined_accum, correct_strategy
+
+    # Post should be the float32 default
+    (torch.float32, True, False, MeanReductionStrategy.Post),
+    # Running should be the float16 default
+    (torch.float16, True, False, MeanReductionStrategy.Running),
+    # Running is not supported for combined_accum, so Post should be used
+    (torch.float16, True, True, MeanReductionStrategy.Post),
+    # The default accum_type is float32 so strategy should be Post when this is None
+    (None, True, False, MeanReductionStrategy.Post),
+    # The option isn't used in inference so it should remain as Post by default
+    (None, False, False, MeanReductionStrategy.Post),
+]
+
+
+@pytest.mark.parametrize("params", mean_reduction_strategy_params)
+def test_mean_reduction_strategy(params):
+    accum_type, training, combined_accum, correct_strategy = params
+    t1 = torch.tensor([1.])
+    t2 = torch.tensor([2.])
+
+    # A simple adder model just to test the correctness of the strategy
+    model = helpers.ModelWithWeights(lambda x, y: x + y, t1.shape)
+    options = poptorch.Options()
+    optimizer = poptorch.optim.SGD(model.parameters(),
+                                   lr=0.01,
+                                   accum_type=accum_type,
+                                   use_combined_accum=combined_accum)
+
+    poptorch_model = poptorch.trainingModel(
+        model, options, optimizer) if training else poptorch.inferenceModel(
+            model, options)
+
+    poptorch_model.compile((t1, t2))
+
+    assert (getattr(
+        options,
+        "meanAccumulationAndReplicationReductionStrategy") == correct_strategy)

@@ -18,6 +18,9 @@ New features
 API changes
 -----------
 
+- Default mean reduction strategies have changed from the deprecated PostAndLoss strategy to Post or Running
+  based on optimiser accumulation type
+
 v2.2 (Poplar SDK 2.2)
 =====================
 

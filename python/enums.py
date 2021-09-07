@@ -2,6 +2,27 @@
 import enum
 
 
+class MeanReductionStrategy(enum.IntEnum):
+    """Specify when to divide by a mean reduction factor when
+    ``accumulationAndReplicationReductionType`` is set to
+    ``ReductionType.Mean``.
+
+    - ``Running``: Keeps the reduction buffer as the current mean. This is
+      preferred for numerical stability as the buffer value is never larger than
+      the magnitude of the largest micro batch gradient.
+    - ``Post``: Divides by the accumulationFactor and replicatedGraphCount after
+      all of the gradients have been reduced. In some cases this can be
+      faster then using Running, however is prone to overflow.
+    - ``PostAndLoss`` (deprecated): Divides by the  before the backwards pass,
+      performs the gradient reduction across micro batches, and then divides by
+      the accumulationFactor. This is to support legacy behaviour and is
+      deprecated.
+    """
+    Running = 0
+    Post = 1
+    PostAndLoss = 2
+
+
 class DataLoaderMode(enum.IntEnum):
     """
     - ``Sync``: Access data synchronously

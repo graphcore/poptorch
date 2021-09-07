@@ -5,7 +5,7 @@ import torch
 
 # Do not import any poptorch.* here: it will break the poptorch module
 from ._logging import logger
-from . import optim
+from . import optim, enums
 
 
 class OptimizerAttrTracker:
@@ -123,6 +123,18 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
     # Optimizer variables: global, can change over time.
     #     source: opt.name
     #     format: {name: (value, is_const)}
+
+    # Set MeanReductionStrategy based on accum_type
+    #     float32: Post (default)
+    #     float16: Running
+    if hasattr(optimizer,
+               "accum_type") and optimizer.accum_type == torch.float16:
+        # Only Post MeanReductionStrategy is supported for combined_accum variant
+        if not hasattr(
+                optimizer,
+                "use_combined_accum") or not optimizer.use_combined_accum:
+            options.set(meanAccumulationAndReplicationReductionStrategy=enums.
+                        MeanReductionStrategy.Running)
 
     # pylint: disable=protected-access
     auto_loss_scaling = options._Popart.options.get(
