@@ -1553,6 +1553,27 @@ class Options(_options_impl.OptionsDict):
                         ) -> "poptorch.Options":
         """Enable profiling report generation.
 
+        To generate debug information associated with the profiling
+        data, please specify ``autoReport.directory``, and either
+        ``autoReport.all`` or ``autoReport.outputDebugInfo`` in
+        the ``POPLAR_ENGINE_OPTIONS`` environment variable. e.g.
+
+        .. code-block:: bash
+
+            POPLAR_ENGINE_OPTIONS={"autoReport.directory":"/profile/output",\\
+            "autoReport.all":"true"}``
+
+        or:
+
+        .. code-block:: bash
+
+            POPLAR_ENGINE_OPTIONS={"autoReport.directory":"/profile/output",\\
+            "autoReport.outputDebugInfo":"true"}``
+
+        Debug information and the rest of the profiling data will be stored in
+        ``/profile/output directory``. Values specified in the environment
+        variable take precedence over ``profile_dir`` when both are given.
+
         :param str profile_dir: path to directory where report will be created.
             Defaults to current directory.
         """
