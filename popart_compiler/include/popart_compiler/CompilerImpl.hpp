@@ -314,7 +314,7 @@ public:
   void setOptionIfNotSet(T &option, U value, const std::string &name,
                          const std::string &value_as_string) {
     if (options_set.count(name) && option != static_cast<T>(value)) {
-      logging::warn("{} forced by the user from default of {}", name,
+      logging::warn("{} forced by the user from default to {}", name,
                     value_as_string);
     } else {
       logging::debug("{} set to value {}", name, value_as_string);

@@ -513,8 +513,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
     ERROR("ExecutionMode not supported");
   }
   _impl->setOptionIfNotSet(options.virtualGraphMode, graph_mode,
-                           "virtualGraphMode",
-                           popart::toString(options.virtualGraphMode));
+                           "virtualGraphMode", popart::toString(graph_mode));
 
   _impl->setOptionIfNotSet(options.enableDistributedReplicatedGraphs,
                            _impl->options.num_distributed_processes > 1,
