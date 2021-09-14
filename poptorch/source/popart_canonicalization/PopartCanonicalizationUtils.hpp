@@ -88,6 +88,9 @@ std::int64_t constantToLong(torch::jit::Node *node);
 // Forces a ListConstruct to be a vector of int64_ts
 std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node);
 
+// Forces a ListConstruct to be a vector of floats
+std::vector<float> constantToFloatVec(torch::jit::Node *node);
+
 // Extract a boolean from a constant containing one (encoded as an int32_t)
 bool constantToBool(torch::jit::Node *node);
 

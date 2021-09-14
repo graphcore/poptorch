@@ -471,20 +471,44 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
 torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
   auto input = node->input(0);
-  auto scalar_type = getNodeScalarType(input);
-  auto scales = handleTensorList(node->input(3)->node());
-  auto scalex = constantToFloat(scales[0]->node());
-  auto scaley = constantToFloat(scales[1]->node());
+  auto output_size = node->input(1);
+  auto output_scale = node->input(3);
 
-  ERROR_ON_MSG(scalex != scaley,
-               "Non-uniform bilinear upsampling not supported");
-  ERROR_ON_MSG(scalex != floor(scalex),
-               "Bilinear upsampling with non-integer factor not supported");
+  auto scalar_type = getNodeScalarType(input);
+  auto output_rank = shapeFromTensor(node->output()).size();
+  auto input_shape = shapeFromTensor(input);
+  auto input_rank = input_shape.size();
+
+  ERROR_ON_MSG(output_rank != input_rank,
+               "Input / output rank mismatch: " << input_rank
+                                                << " != " << output_rank);
+
+  // Omit the leading batch and channel dims for computing the scale
+  std::vector<double> scales{1.0, 1.0};
+
+  if (!isNone(output_size)) {
+    auto output_shape = constantToLongVec(output_size->node());
+    for (size_t dim = 2; dim < input_rank; ++dim) {
+      scales.push_back(static_cast<double>(output_shape[dim - 2]) /
+                       input_shape[dim]);
+    }
+  } else {
+    auto scalesxy = constantToFloatVec(output_scale->node());
+
+    ERROR_ON_MSG(scalesxy[0] != scalesxy[1],
+                 "Non-uniform bilinear upsampling not supported");
+    ERROR_ON_MSG(scalesxy[0] != floor(scalesxy[0]),
+                 "Bilinear upsampling with non-integer factor not supported");
+
+    scales.push_back(scalesxy[0]);
+    scales.push_back(scalesxy[1]);
+  }
 
   std::vector<torch::jit::Value *> inputs = {input};
   std::string name = "UpsampleBilinear2d";
   std::string domain = "poptorch.custom_ops";
-  std::string attributes("{\"scaling_factor\":" + std::to_string(scalex) + "}");
+  std::string attributes("{\"scaling_factor\":" + std::to_string(scales[2]) +
+                         "}");
 
   auto new_node =
       createCustomOperation(graph, inputs, name, domain, 1, 1, attributes);

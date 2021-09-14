@@ -75,10 +75,19 @@ def test_downsample_nearest():
 # TODO(T43375): replace scale factor 5 with 3.5
 @pytest.mark.parametrize("scale_factor", [2, 5])
 @pytest.mark.parametrize("input_shape", [(1, 2, 3, 4), (2, 2, 2, 8)])
-def test_upsample_bilinear(scale_factor, input_shape):
+def test_upsample_bilinear_factor(scale_factor, input_shape):
     torch.manual_seed(42)
     op = torch.nn.Upsample(scale_factor=scale_factor, mode="bilinear")
     x = torch.randn(*input_shape)
+    op_harness(op, [x])
+
+
+@pytest.mark.parametrize("shapes", [[(1, 2, 3, 4),
+                                     (6, 8)], [(2, 2, 2, 8), (7, 28)]])
+def test_upsample_bilinear_factor_shapes(shapes):
+    torch.manual_seed(42)
+    op = torch.nn.Upsample(size=shapes[1], mode="bilinear")
+    x = torch.randn(*shapes[0])
     op_harness(op, [x])
 
 

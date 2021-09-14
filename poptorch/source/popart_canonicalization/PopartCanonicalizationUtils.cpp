@@ -231,6 +231,10 @@ std::vector<std::int64_t> constantToLongVec(torch::jit::Node *node) {
   return constantListToVec<std::int64_t>(node, constantToLong);
 }
 
+std::vector<float> constantToFloatVec(torch::jit::Node *node) {
+  return constantListToVec<float>(node, constantToFloat);
+}
+
 bool constantToBool(torch::jit::Node *node) {
   ERROR_ON_MSG(!isTensorConstant(node),
                "Cannot force a non-constant node to a bool");

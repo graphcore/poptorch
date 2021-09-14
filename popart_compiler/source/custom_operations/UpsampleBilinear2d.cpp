@@ -555,10 +555,6 @@ public:
 
     outInfo(0).set(input_info.dataType(),
                    {batch_size, channels, output_height, output_width});
-    std::cerr << "Debug UpsampleGradOp::setup " << _scalingFactor << " ["
-              << batch_size << "," << channels << "," << height << "," << width
-              << "] -> [" << batch_size << "," << channels << ","
-              << output_height << "," << output_width << "]\n";
   }
 
   // function describing the inputs and output(s) of UpsampleGradOp
@@ -638,10 +634,6 @@ public:
 
     outInfo(0).set(input_info.dataType(),
                    {batch_size, channels, output_height, output_width});
-    std::cerr << "Debug UpsampleOp::setup " << _scalingFactor << " << ["
-              << batch_size << "," << channels << "," << height << "," << width
-              << "] -> [" << batch_size << "," << channels << ","
-              << output_height << "," << output_width << "]\n";
   }
 
   std::unique_ptr<Op> clone() const final {
