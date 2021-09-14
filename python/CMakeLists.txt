@@ -57,7 +57,6 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoplarExecutable.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoptorchSymbols.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/RemoveSurplusIdentityLosses.cpp"
-  "${PROJECT_SOURCE_DIR}/poptorch/source/ShapeInference.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/AddListNumElements.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CanonicaliseConstants.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CastUnsupportedInputs.cpp"
@@ -65,8 +64,6 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CheckAndChangeOutputTypes.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/EvaluateConstexprs.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/MakeConstantIntParams.cpp"
-  "${PROJECT_SOURCE_DIR}/poptorch/source/Peephole.cpp"
-  "${PROJECT_SOURCE_DIR}/poptorch/source/EliminateListConstructs.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Utils.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/WarnOnUnsupportedAten.cpp"
   )

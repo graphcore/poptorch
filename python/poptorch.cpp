@@ -6,7 +6,6 @@
 #include <pybind11/stl_bind.h>
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
-#include <torch/csrc/jit/passes/inliner.h>
 #include <torch/csrc/jit/passes/lower_graph.h>
 #include <torch/csrc/jit/passes/lower_tuples.h>
 #include <torch/csrc/jit/passes/peephole.h>
@@ -27,13 +26,10 @@
 
 #include "poptorch/AliasProcessing.hpp"
 #include "poptorch/AutomaticCasting.hpp"
-#include "poptorch/EliminateListConstructs.hpp"
 #include "poptorch/ImplicitCasting.hpp"
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/LowerToPopart.hpp"
-#include "poptorch/Peephole.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
-#include "poptorch/ShapeInference.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -730,23 +726,6 @@ torch::jit::script::Module *asModule(py::handle h) {
           ->value_ptr());
 }
 
-torch::jit::Graph *asGraph(py::handle h) {
-  return reinterpret_cast<torch::jit::Graph *>(
-      pybind11::detail::values_and_holders(
-          reinterpret_cast<pybind11::detail::instance *>(h.ptr()))
-          .begin()
-          ->value_ptr());
-}
-
-void constantPropagation(torch::jit::Graph *graph) {
-  // Create a shared_ptr with a custom deleter that doesn't do anything.
-  std::shared_ptr<torch::jit::Graph> x(graph,
-                                       [](torch::jit::Graph * /*unused*/) {});
-  ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
-  torch::jit::ConstantPropagation(x);
-  ERROR_ON_MSG(x.use_count() != 1, "x should be the only handle to graph");
-}
-
 void identifyZeroSizedTensors(const std::vector<at::Tensor> &tensors) {
   for (const at::Tensor &tensor : tensors) {
     auto sizes = tensor.sizes();
@@ -1157,6 +1136,22 @@ void processPrecisionOptions(py::handle h) {
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+bool pyIsGraphNondeterministic(py::handle h) {
+  try {
+    auto module = asModule(h);
+    auto forward = module->get_method("forward");
+    auto graph_and_tensors =
+        torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
+    auto graph = graph_and_tensors.first;
+    const auto &nodes = graph->nodes();
+    return std::any_of(nodes.begin(), nodes.end(),
+                       [](const torch::jit::Node *n) {
+                         return poptorch::isNondeterministic(*n);
+                       });
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
 void compileWithTraceAndExport(
     py::handle h, const pybind11::dict &python_traced_params,
     const pybind11::tuple &inputs, bool has_converted_any_half,
@@ -1213,160 +1208,6 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
 void throwTestErrorSafe(TestErrorType type) {
   try {
     poptorch::throwTestError(type);
-  }
-  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-}
-std::shared_ptr<poptorch::PoplarExecutable> compileWithScript(
-    py::handle h, py::handle g, const pybind11::dict &python_traced_params,
-    const pybind11::tuple &inputs, const pybind11::dict &options, bool training,
-    const py::function &attribute_accessor, const pybind11::list &anchors) {
-  try {
-    auto module = asModule(h);
-    auto arg_graph = asGraph(g);
-
-    torch::jit::Inline(*arg_graph);
-    constantPropagation(arg_graph);
-    peepholeOptimizations(arg_graph, training);
-
-    auto graph_and_tensors =
-        torch::jit::LowerGraph(*arg_graph, module->_ivalue());
-    auto graph = graph_and_tensors.first;
-    std::vector<at::Tensor> parameter_data;
-    for (const torch::jit::IValue &value : graph_and_tensors.second) {
-      buildTensorList(value, &parameter_data);
-    }
-    graph->dump();
-    std::vector<std::string> parameters =
-        getParameterNames(python_traced_params, parameter_data);
-
-    int loop_count = 0;
-    std::string graph_string;
-    while (true) {
-      propagateInputShapes(graph.get());
-      torch::jit::PeepholeOptimize(graph, true);
-      torch::jit::ConstantPropagation(graph);
-      torch::jit::EliminateDeadCode(graph);
-      peepholeOptimizations(graph.get(), training);
-
-      std::string post_passes_graph = graph->toString(false);
-      if (graph_string == post_passes_graph) {
-        std::cout << "Breaking from const folding after " << loop_count
-                  << " iterations.\n";
-        break;
-      }
-      graph_string = std::move(post_passes_graph);
-
-      loop_count++;
-    }
-
-    SessionOptions parsed_options = parseSessionOptions(options);
-
-    logging::trace("Graph before handling inplace ops:\n{}", *graph);
-
-    auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
-        graph, parameter_data.size(), anchors.size(),
-        parsed_options.replicationFactor() > 1);
-
-    logging::trace("Graph right before casting unsupported inputs:\n{}",
-                   *graph);
-    poptorch::type_and_constant_canonicalization::castUnsupportedInputs(
-        graph.get());
-
-    logging::trace("Graph right before output type changes:\n{}", *graph);
-    poptorch::type_and_constant_canonicalization::checkAndChangeOutputTypes(
-        graph.get());
-
-    logging::trace("Graph right before number constant replacement:\n{}",
-                   *graph);
-    poptorch::type_and_constant_canonicalization::canonicaliseConstants(
-        graph.get());
-
-    logging::debug("Graph right before canonicalization:\n{}", *graph);
-
-    // Convert any unsupported ATEN nodes in the graph to a popart
-    // representation.
-    poptorch::canonicalize(graph.get());
-
-    // Clean up the module as we will likely have stopped using lots of
-    // constants.
-
-    // Create a jit stack from the incoming pytorch tensors.
-    torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
-
-    // And turn convert them into at tensors which we can then resolve the
-    // address of.
-    std::vector<at::Tensor> input_tensors;
-    for (const torch::jit::IValue &value : input_stack) {
-      input_tensors.push_back(value.toTensor());
-    }
-
-    // Find the parameter data from.
-    std::cout << "There should be " << parameter_data.size()
-              << " parameters.\n";
-
-    logging::debug("Graph right before popart:\n{}", *graph);
-
-    AnchorList anchors_list;
-    parseAnchors(&anchors_list, anchors);
-
-    poptorch::LowerToPopart lower(
-        graph.get(), std::move(parameter_data), std::move(parameters),
-        inplace_op_handler, training, {}, parsed_options, attribute_accessor,
-        callbacks, std::move(anchors_list));
-    lower.lower(&input_tensors);
-    auto o = lower.compile();
-    // Clear the callbacks after compilation.
-    callbacks.clear();
-
-    return o;
-  }
-  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-}
-
-bool pyIsGraphNondeterministic(py::handle h) {
-  try {
-    auto module = asModule(h);
-    auto forward = module->get_method("forward");
-    auto graph_and_tensors =
-        torch::jit::LowerGraph(*forward.graph(), module->_ivalue());
-    auto graph = graph_and_tensors.first;
-    const auto &nodes = graph->nodes();
-    return std::any_of(nodes.begin(), nodes.end(),
-                       [](const torch::jit::Node *n) {
-                         return poptorch::isNondeterministic(*n);
-                       });
-  }
-  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-}
-
-void pyPropagateInputShapes(py::handle h) {
-  try {
-    auto graph = asGraph(h);
-    propagateInputShapes(graph);
-  }
-  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-}
-
-void pyPeepholeOptimizations(py::handle h, bool training) {
-  try {
-    auto graph = asGraph(h);
-    peepholeOptimizations(graph, training);
-  }
-  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-}
-
-void pyEliminateListConstructs(py::handle h) {
-  try {
-    auto graph = asGraph(h);
-    eliminateListConstructs(graph);
-  }
-  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-}
-
-void pyCanonicalize(py::handle h) {
-  try {
-    auto graph = asGraph(h);
-    canonicalize(graph);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
@@ -1431,14 +1272,9 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("compileWithTraceAndExport", poptorch::compileWithTraceAndExport);
   m.def("processTraceAndImportExecutable",
         poptorch::processTraceAndImportExecutable);
-  m.def("compileWithScript", poptorch::compileWithScript);
   m.def("execute", poptorch::execute);
   m.def("getTimestamps", poptorch::getTimestamps);
   m.def("loadEngineAndConnectStreams", poptorch::loadEngineAndConnectStreams);
-  m.def("propagateInputShapes", poptorch::pyPropagateInputShapes);
-  m.def("peepholeOptimizations", poptorch::pyPeepholeOptimizations);
-  m.def("eliminateListConstructs", poptorch::pyEliminateListConstructs);
-  m.def("canonicalize", poptorch::pyCanonicalize);
   m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDeviceImpl);
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);
   m.def("ipuHardwareVersion", poptorch::ipuHardwareVersion,

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import unittest.mock
-
 import tempfile
 import os
 import threading
@@ -12,25 +11,6 @@ import pytest
 import poptorch
 from poptorch.enums import MeanReductionStrategy
 import helpers
-
-
-def test_jit_script():
-    class Network(nn.Module):
-        def forward(self, x, y):
-            return x + y
-
-    # Create our model.
-    model = Network()
-    opts = poptorch.Options()
-    opts.Jit.traceModel(False)
-    inference_model = poptorch.inferenceModel(model, opts)
-
-    x = torch.ones(2)
-    y = torch.zeros(2)
-
-    ipu = inference_model(x, y)
-    ref = model(x, y)
-    helpers.assert_allclose(expected=ref, actual=ipu)
 
 
 def test_set_options():

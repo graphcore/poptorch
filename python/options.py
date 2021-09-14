@@ -59,16 +59,14 @@ class _JitOptions(_options_impl.OptionsDict):
 
     def traceModel(self, trace_model: bool) -> "poptorch.options._JitOptions":
         """
-        Controls whether to use PyTorch's tracing or scripting.
+        Controls whether to use PyTorch's tracing or an alternative.
 
-        By default, PopTorch uses PyTorch's JIT tracing however you can use
-        scripting (experimental). See ``torch.jit.trace`` and
-        ``torch.jit.script`` for details about PyTorch's JIT implementations.
+        Currently unused and deadlocked to torch.jit.trace.
 
         :param bool trace_model:
             * True: use `torch.jit.trace <https://pytorch.org/docs/1.9.0/generated/torch.jit.trace.html#torch.jit.trace>`_
-            * False: use `torch.jit.script <https://pytorch.org/docs/1.9.0/generated/torch.jit.script.html#torch.jit.script>`_ (experimental)
        """
+        trace_model = True
         self.set(trace_model=trace_model)
         return self
 

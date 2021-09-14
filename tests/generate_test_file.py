@@ -54,7 +54,6 @@ short_tests = [
     "random_sampling_test.py",
     "replicated_graph_test.py",
     "requires_grad_test.py",
-    "shape_inference_test.py",
     "sharding_test.py",
 ]
 

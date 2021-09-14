@@ -382,26 +382,6 @@ class PoplarExecutor:
                     narrow_tensor_fn)
 
                 self._compileWithTrace(trace_args)
-            else:
-                logger.info('Compiling the model using scripting')
-                self._trace = torch.jit.script(self._model)
-                graph_inputs = list(self._trace.graph.inputs())
-                for graph_input, arg_in in zip(
-                        graph_inputs[1:], in_tensors_trace_view.asTuple()):
-                    if isinstance(arg_in, torch.Tensor):
-                        graph_input.inferTypeFrom(arg_in)
-
-                parameters = {
-                    **dict(self._trace.named_parameters()),
-                    **dict(self._trace.named_buffers())
-                }
-
-                # pylint: disable=protected-access
-                self._executable = poptorch_core.compileWithScript(
-                    self._trace._c, self._trace.graph, parameters,
-                    in_tensors_trace_view.asTuple(), self._options.toDict(),
-                    self._training, accessAttributes,
-                    list(self._options.anchored_tensors.values()))
 
             self._is_attached = self.isAttachedToDevice()
 
@@ -564,9 +544,7 @@ class PoplarExecutor:
         with open(filename, "wb") as f:
             pickle.dump(data, f)
             f.close()
-        assert self._options.Jit.trace_model, (
-            "compileAndExport not supported for"
-            " torch script")
+
         with self._profiling.tracepoint("compileAndExport"):
             in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
                     self._preprocessGraph(
