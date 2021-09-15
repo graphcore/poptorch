@@ -328,6 +328,18 @@ def test_unbind(dim):
     poptorch_model.assert_weights_changed()
 
 
+def test_scalarslice():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return (x / 2)[:]
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    input_tensor = torch.tensor([2])
+    assert poptorch_model(input_tensor) == model(input_tensor)
+
+
 def test_dynamic_length_slice():
     class Model(torch.nn.Module):
         def forward(self, x, l):

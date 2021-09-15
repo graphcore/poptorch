@@ -310,7 +310,6 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor
   // // NOLINT
-
   auto input = node->input(0);
   auto dim = constantToLong(node->input(1)->node());
   auto start_node = node->input(2)->node();
@@ -332,6 +331,11 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
 
   std::int64_t start = constantToLong(start_node);
   std::int64_t end = constantToLong(end_node);
+
+  // If we slice a scalar we should do nothing.
+  if (dims.empty()) {
+    return createIdentity(graph, {input});
+  }
 
   // Based on aten/src/ATen/native/TensorShape.cpp slice()
   if (start < 0) {
