@@ -54,9 +54,14 @@ void warnNonNativeSupport(torch::jit::Node *node,
     return;
   }
 
-  logging::warn("{}: {} is not supported natively on IPU, loss of "
-                "range/precision may occur",
-                nodeToString(node), unsupported_type);
+  static std::unordered_set<std::string> warned_types;
+  if (warned_types.find(unsupported_type) == warned_types.end()) {
+    logging::warn(
+        "{}: {} is not supported natively on IPU, loss of "
+        "range/precision may occur. We will only warn on the first instance.",
+        nodeToString(node), unsupported_type);
+    warned_types.insert(unsupported_type);
+  }
 }
 
 void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
