@@ -441,7 +441,13 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   auto device = _impl->createDevice();
   popart::SessionOptions &options = _impl->popart_options;
 
-  popart::VirtualGraphMode graph_mode = popart::VirtualGraphMode::Off;
+  // 'Auto' mode works if only one IPU is used per replica, and allows
+  // overlapped IO to work. Excerpt from D51863 in PopART:
+  // IO tiles can only be used when virtual graphs are enabled. Virtual graph
+  // modes enable to assign tensors and operations to a subset of IPUs, and
+  // within each IPU, to a subset of tiles (such as compute and IO tiles). The
+  // supported modes are one of: {Manual, Auto, ExecutionPhases}.
+  popart::VirtualGraphMode graph_mode = popart::VirtualGraphMode::Auto;
   // If Pipelining wasn't set: enable it if more than 1 IPU is used.
   switch (_impl->options.execution_mode) {
   case detail::ExecutionMode::Pipelined: {
