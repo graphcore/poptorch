@@ -1024,7 +1024,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     // Create an empty optimizer for inference, this will not be applied.
     std::vector<Optimizer> optimizers;
 
-    if (optimizer_dict) {
+    if (optimizer_dict != nullptr) {
       optimizers = parseOptimizer(*optimizer_dict);
     }
 

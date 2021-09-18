@@ -109,7 +109,7 @@ torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
   auto b = node->input(3);
   auto t2 = constantToInt(b->node());
   // setMatMulSerialization(x, cstr(s), clong(a), cint(b))
-  return createSetMatMulSerialization(graph, x, t0, t1, t2);
+  return createSetMatMulSerialization(graph, x, t0, t1, t2 != 0);
 }
 
 torch::jit::Node *updateparaminplaceHandler(torch::jit::Graph *graph,

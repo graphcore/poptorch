@@ -90,9 +90,10 @@ LoggingContext::LoggingContext() {
   // Get logging output from the POPTORCH_LOG_DEST environment variable.
   // The valid options are "stdout", "stderr", or if it is neither
   // of those it is treated as a filename. The default is stderr.
-  const std::string log_dest = poptorch_log_dest ? poptorch_log_dest : "stderr";
+  const std::string log_dest =
+      poptorch_log_dest != nullptr ? poptorch_log_dest : "stderr";
   const std::string log_level =
-      poptorch_log_level ? poptorch_log_level : "WARN";
+      poptorch_log_level != nullptr ? poptorch_log_level : "WARN";
 
   // Get logging level from OS ENV. The default level is off.
   Level default_level = logLevelFromString(log_level);

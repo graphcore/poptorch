@@ -45,7 +45,7 @@ struct LogContextImpl {
 
 bool LogContextImpl::trace_enabled = []() {
   auto level = std::getenv("POPTORCH_LOG_LEVEL");
-  if (!level) {
+  if (level == nullptr) {
     return false;
   }
   return std::string(level) == "TRACE_ALL";
@@ -93,7 +93,7 @@ void LogContext::clear() {
   if (!_impl->cleared) {
     // Don't restore the saved context if we're handling an exception
     // we might want to recover the context later.
-    if (!std::uncaught_exceptions()) {
+    if (std::uncaught_exceptions() == 0) {
       if (detail::LogContextImpl::trace_enabled && !getContext().empty()) {
         logging::trace("[{}] End", singleLineContext());
       }

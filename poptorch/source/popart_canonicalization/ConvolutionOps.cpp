@@ -45,7 +45,7 @@ torch::jit::Node *convolutionHandler(torch::jit::Graph *graph,
   // torch::jit::Value* output_padding = node->input(8);
   std::int64_t groups = constantToLong(node->input(8)->node());
 
-  if (transposed && *transposed == 0) {
+  if (transposed.has_value() && *transposed) {
     // Create a "normal" convolution.
     return poptorch::createConv(graph, inputs, dilation, groups, {}, padding,
                                 stride);

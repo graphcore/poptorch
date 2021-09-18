@@ -242,7 +242,7 @@ std::unordered_set<torch::jit::Node *> copyInputs(torch::jit::Node *node) {
 
 void searchAndPossiblyDestroyInternal(
     torch::jit::Node *node, std::unordered_set<torch::jit::Node *> *destroyed) {
-  if (destroyed->count(node)) {
+  if (destroyed->count(node) != 0u) {
     return;
   }
   if (!shouldDestroy(node)) {

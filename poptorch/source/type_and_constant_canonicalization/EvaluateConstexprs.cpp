@@ -219,7 +219,7 @@ void ConstExprEvaluator::removeUnusedNodes() {
   // Iterate in reverse so that each node has no users
   for (auto node_it = _graph->nodes().rbegin();
        node_it != _graph->nodes().end(); node_it++) {
-    if (_nodes_map.count(*node_it)) {
+    if (_nodes_map.count(*node_it) != 0u) {
       node_it.destroyCurrent();
     }
   }

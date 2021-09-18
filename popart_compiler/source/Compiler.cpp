@@ -125,7 +125,7 @@ void Optimizer::copyParam(const Optimizer &source_optim, const char *source,
     }
   }
 
-  if (source_float && dest_float) {
+  if ((source_float != nullptr) && (dest_float != nullptr)) {
     ERROR_ON(!source_is_const);
     ERROR_ON(!dest_is_const);
 
@@ -712,7 +712,7 @@ void Compiler::loadEngineAndConnectStreams() {
   }
 
   // Set the random seed (if one was provided) following compilation
-  if (_impl->options_set.count("random_seed")) {
+  if (_impl->options_set.count("random_seed") != 0u) {
     logging::trace("Setting random seed to: {}", _impl->options.random_seed);
     _impl->session->setRandomSeed(_impl->options.random_seed);
   }
@@ -1001,7 +1001,7 @@ void Compiler::setMatMulSerialization(poptorch::TensorId matmul,
                                       const char *mode, std::uint64_t factor,
                                       std::uint64_t keep_precision) {
   _impl->active_builder->setSerializeMatMul({_impl->ids[matmul]}, mode, factor,
-                                            keep_precision);
+                                            keep_precision != 0u);
 }
 
 void Compiler::optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
@@ -1139,7 +1139,9 @@ void Compiler::assertTensorIs(PopartType dataType,
                               poptorch::TensorId id) const {
   PopartType actual_type = _impl->ids_types.at(id);
 
-  if (__builtin_expect(actual_type == PopartType::UNDEFINED, 0)) {
+  if (__builtin_expect(
+          static_cast<std::int64_t>(actual_type == PopartType::UNDEFINED), 0) !=
+      0) {
     // Rare case of input tensor never used, so not in IR
     return;
   }
@@ -1410,29 +1412,31 @@ ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
   _impl->line = line;
   _impl->category = ErrorCategory::Other;
   std::string extra_info;
-  if (dynamic_cast<const popart::internal_error *>(&e)) {
+  if (dynamic_cast<const popart::internal_error *>(&e) != nullptr) {
     _impl->type = "popart_internal_exception";
     _impl->extractStack(dynamic_cast<const popart::error *>(&e));
-  } else if (dynamic_cast<const popart::error *>(&e)) {
+  } else if (dynamic_cast<const popart::error *>(&e) != nullptr) {
     _impl->type = "popart_exception";
     _impl->extractStack(dynamic_cast<const popart::error *>(&e));
-  } else if (dynamic_cast<const poplar::poplar_error *>(&e)) {
+  } else if (dynamic_cast<const poplar::poplar_error *>(&e) != nullptr) {
     _impl->type = "poplar_";
     _impl->type += dynamic_cast<const poplar::poplar_error *>(&e)->type;
-    if (dynamic_cast<const poplar::link_error *>(&e)) {
+    if (dynamic_cast<const poplar::link_error *>(&e) != nullptr) {
       // Note: for some reason this error doesn't set its type in Poplar
       _impl->type = "poplar_link_error";
       extra_info =
           ". Output: " + dynamic_cast<const poplar::link_error *>(&e)->output;
-    } else if (dynamic_cast<const poplar::recoverable_runtime_error *>(&e)) {
+    } else if (dynamic_cast<const poplar::recoverable_runtime_error *>(&e) !=
+               nullptr) {
       _impl->category = ErrorCategory::RuntimeRecoverable;
       _impl->recovery_action = poplar::toString(
           dynamic_cast<const poplar::recoverable_runtime_error *>(&e)
               ->getRecoveryAction());
-    } else if (dynamic_cast<const poplar::unrecoverable_runtime_error *>(&e)) {
+    } else if (dynamic_cast<const poplar::unrecoverable_runtime_error *>(&e) !=
+               nullptr) {
       _impl->category = ErrorCategory::RuntimeUnrecoverable;
     }
-  } else if (dynamic_cast<const poputil::poplibs_error *>(&e)) {
+  } else if (dynamic_cast<const poputil::poplibs_error *>(&e) != nullptr) {
     _impl->type = "poplibs_exception";
   } else {
     if (type != nullptr) {

@@ -239,7 +239,7 @@ bool constantToBool(torch::jit::Node *node) {
   ERROR_ON_MSG(!isTensorConstant(node),
                "Cannot force a non-constant node to a bool");
 
-  return constantToInt(node);
+  return constantToInt(node) != 0;
 }
 
 std::string constantToString(torch::jit::Node *node) {

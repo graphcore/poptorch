@@ -314,7 +314,9 @@ private:
       new_const->f_(c10::attr::value, i_value.toDouble());
     } else if (i_value.isBool()) {
       new_const->output()->setType(c10::BoolType::get());
-      new_const->i_(c10::attr::value, i_value.toBool());
+      new_const->i_(
+          c10::attr::value,
+          static_cast<torch::jit::IntAttr::ConstructorType>(i_value.toBool()));
     } else if (i_value.isNone()) {
       // Assign NoneType so that the node can be skipped over
       // during constant canonicalization

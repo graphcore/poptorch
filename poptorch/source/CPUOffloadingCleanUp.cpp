@@ -94,7 +94,7 @@ void cpuOffloadingCleanup(torch::jit::Graph *graph) {
       // Leave CPU scope.
       cpu_op_in_scope = nullptr;
 
-    } else if (cpu_op_in_scope) {
+    } else if (cpu_op_in_scope != nullptr) {
       // Unfortunately the compiler can put some non-functional SSA unpack ops
       // in the CPU scope that do logically outlive it.
       if (node->kind() != c10::prim::ListUnpack) {

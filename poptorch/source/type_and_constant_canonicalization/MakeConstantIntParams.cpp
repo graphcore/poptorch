@@ -40,7 +40,7 @@ void makeConstantIntParams(
       if (!c10::isFloatingType(current_type)) {
         // Some nodes might not be used, we skip them if so.
         torch::jit::Node *earliest_user = findEarliestUser(value);
-        if (!earliest_user) {
+        if (earliest_user == nullptr) {
           continue;
         }
 

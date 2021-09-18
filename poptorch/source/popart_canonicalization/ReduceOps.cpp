@@ -241,8 +241,9 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
     // behaviour of PopART reduce ops is to do nothing, but PyTorch will
     // still take the absolute value of the tensor, so we need to
     // do the same
-    if (keepdim && std::all_of(axes.begin(), axes.end(),
-                               [&](std::int64_t i) { return shape[i] == 1; })) {
+    if ((keepdim != 0) &&
+        std::all_of(axes.begin(), axes.end(),
+                    [&](std::int64_t i) { return shape[i] == 1; })) {
       return createAbs(graph, {input});
     }
   }
@@ -306,8 +307,9 @@ torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
     // behaviour of PopART reduce ops is to do nothing, but PyTorch will
     // still take the absolute value of the tensor, so we need to
     // do the same
-    if (t2 && std::all_of(t1.begin(), t1.end(),
-                          [&](std::int64_t i) { return shape[i] == 1; })) {
+    if ((t2 != 0) && std::all_of(t1.begin(), t1.end(), [&](std::int64_t i) {
+          return shape[i] == 1;
+        })) {
       return createAbs(graph, {x});
     }
     return createReducel2(graph, {x}, t1, t2);

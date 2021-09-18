@@ -379,7 +379,7 @@ std::string CompilerImpl::checkSystemConfig() const {
     return "\nNo IPU detected in the system: are you sure the gc-driver is "
            "enabled ?";
   }
-  if (options_set.count("ipu_id")) {
+  if (options_set.count("ipu_id") != 0u) {
     return "";
   }
   if (dm.enumerateDevices(options.sync_pattern, num_ipus).empty()) {
@@ -394,7 +394,7 @@ std::string CompilerImpl::checkSystemConfig() const {
 void CompilerImpl::updateUseModelConfig() {
   // The configuration set by the application takes precedence over everything
   // else.
-  if (options_set.count("use_model")) {
+  if (options_set.count("use_model") != 0u) {
     logging::info("From the user configuration: Ipu model: {}",
                   options.ipu_model ? "Enabled" : "Disabled");
   } else if (ipuModelEnvironmentVariableIsEnabled() ||
@@ -584,7 +584,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
       assertSingleInstanceMaxNumIPUs(num_ipus);
       do {
         // Regular IPU hardware target
-        if (!options_set.count("ipu_id")) {
+        if (options_set.count("ipu_id") == 0u) {
           _device =
               popart::DeviceManager::createDeviceManager()
                   .acquireAvailableDevice(num_ipus, 0, options.sync_pattern,
@@ -851,7 +851,7 @@ CompilerImpl::getHostSideConstant(poptorch::TensorId id) const {
 }
 
 bool CompilerImpl::isHostSideConstant(poptorch::TensorId id) const {
-  return _host_side_constants.count(id);
+  return _host_side_constants.count(id) != 0u;
 }
 
 void CompilerImpl::addMultiConvPart(

@@ -632,7 +632,11 @@ class LAMB(torch.optim.Optimizer):
             first_order_momentum_accum_type = torch.float32
         if second_order_momentum_accum_type is None:
             second_order_momentum_accum_type = torch.float32
-        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, max_weight_norm=max_weight_norm)
+        defaults = dict(lr=lr,
+                        betas=betas,
+                        eps=eps,
+                        weight_decay=weight_decay,
+                        max_weight_norm=max_weight_norm)
         super().__init__(params, defaults)
 
         supportedTypes = [torch.float16, torch.float32]

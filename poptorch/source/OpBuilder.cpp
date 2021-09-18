@@ -423,7 +423,7 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
                                       float high, float low,
                                       at::ScalarType dataType) {
   std::vector<torch::jit::Value *> inputs;
-  if (possible_input) {
+  if (possible_input != nullptr) {
     inputs.push_back(possible_input);
   }
 
@@ -436,7 +436,7 @@ torch::jit::Node *createRandomUniform(torch::jit::Graph *graph,
   new_node->f_(c10::attr::low, low);
 
   // At this point, the input is no longer needed
-  if (possible_input) {
+  if (possible_input != nullptr) {
     new_node->removeInput(0);
   }
 
@@ -449,7 +449,7 @@ torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::ipu_print_tensor, {value});
 
-  new_node->i_(c10::Symbol::fromQualString("attr::print_gradient"), true);
+  new_node->i_(c10::Symbol::fromQualString("attr::print_gradient"), 1);
   new_node->s_(c10::Symbol::fromQualString("attr::name"), "");
   new_node->s_(c10::Symbol::fromQualString("attr::title"), title);
 
@@ -502,8 +502,9 @@ torch::jit::Node *createSetMatMulSerialization(torch::jit::Graph *graph,
 
   new_node->s_(c10::Symbol::fromQualString("attr::mode"), mode);
   new_node->i_(c10::Symbol::fromQualString("attr::factor"), factor);
-  new_node->i_(c10::Symbol::fromQualString("attr::keep_precision"),
-               keep_precision);
+  new_node->i_(
+      c10::Symbol::fromQualString("attr::keep_precision"),
+      static_cast<torch::jit::IntAttr::ConstructorType>(keep_precision));
 
   new_node->output()->setType(matmul->type());
 

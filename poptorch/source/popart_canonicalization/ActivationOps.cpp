@@ -60,10 +60,10 @@ torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
   //                                       from [lower, upper]
   // inference: rrelu(x) = x if x >= 0
   //                     = x * ((lower + upper) / 2)
-  auto x = node->input(0);
-  auto lower = constantToFloat(node->input(1)->node());
-  auto upper = constantToFloat(node->input(2)->node());
-  auto is_training = constantToInt(node->input(3)->node());
+  torch::jit::Value *x = node->input(0);
+  const float lower = constantToFloat(node->input(1)->node());
+  const float upper = constantToFloat(node->input(2)->node());
+  const bool is_training = constantToBool(node->input(3)->node());
 
   auto val =
       is_training

@@ -39,7 +39,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     }
 
     // If we have a new node add it and replace the old use.
-    if (new_node) {
+    if (new_node != nullptr) {
       // Mark this node for deletion.
       markNodeForDeletion(node);
       ERROR_ON(node->outputs().size() != new_node->outputs().size());

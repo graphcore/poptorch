@@ -126,7 +126,7 @@ private:
       // Keep track of the first node that consumes the multiconv outputs
       torch::jit::Node *output_user = findEarliestUser(output_i);
 
-      if (!earliest_user || earliest_user->isAfter(output_user)) {
+      if ((earliest_user == nullptr) || earliest_user->isAfter(output_user)) {
         earliest_user = output_user;
       }
 
