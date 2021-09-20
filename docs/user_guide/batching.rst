@@ -126,6 +126,11 @@ Essentially, it is the equivalent of launching the IPU in a loop over that
 number of batches. This is efficient because that loop runs on the IPU
 directly.
 
+Note that the returned output dimensions depend on `poptorch.Options.anchorMode`. The default value for `trainingModel` is `Final`, since you will often not need to
+receive all or any of the output tensors and it is more efficient not to receive them. Therefore, only the last batch of data will be returned to the host under this setting.
+You can change this behaviour by setting the value of `poptorch.Options.anchorMode` to `All`. This returns the result of each batch to the host. See :py:func:`poptorch.Options.anchorMode`
+for more information.
+
 .. literalinclude:: device_iterations.py
   :caption: Use of device iterations and batch size
   :start-after: iterations_start
