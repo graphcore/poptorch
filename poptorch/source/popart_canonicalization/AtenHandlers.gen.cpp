@@ -630,10 +630,9 @@ torch::jit::Node *signHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *siluHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
-  auto x = node->input(0);
-  auto t0 = createSigmoid(graph, {x})->output();
-  // mul(x, sigmoid(x))
-  return createMul(graph, {x, t0});
+  auto i0 = node->input(0);
+  // swish(i0)
+  return createSwish(graph, {i0});
 }
 
 torch::jit::Node *sinHandler(torch::jit::Graph *graph, torch::jit::Node *node) {

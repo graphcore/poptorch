@@ -9,7 +9,7 @@ import helpers
 
 # Non-linear activations (Weighted activations)
 #'torch.nn.ELU', 'torch.nn.Hardshrink', 'torch.nn.Hardtanh', 'torch.nn.LeakyReLU', 'torch.nn.LogSigmoid', 'torch.nn.MultiheadAttention', 'torch.nn.MultiheadAttention.forward',
-#'torch.nn.PReLU', 'torch.nn.ReLU', 'torch.nn.ReLU6', 'torch.nn.RReLU', 'torch.nn.SELU', 'torch.nn.CELU', 'torch.nn.GELU', 'torch.nn.Sigmoid', 'torch.nn.Softplus',
+#'torch.nn.PReLU', 'torch.nn.ReLU', 'torch.nn.ReLU6', 'torch.nn.RReLU', 'torch.nn.SELU', 'torch.nn.SiLU', 'torch.nn.CELU', 'torch.nn.GELU', 'torch.nn.Sigmoid', 'torch.nn.Softplus',
 #'torch.nn.Softshrink', 'torch.nn.Softsign', 'torch.nn.Tanh', 'torch.nn.Tanhshrink', 'torch.nn.Threshold',
 
 # Non-linear activations (other)
@@ -17,7 +17,7 @@ import helpers
 #'torch.nn.AdaptiveLogSoftmaxWithLoss.predict',
 
 activation_functions = [
-    nn.ReLU, nn.Tanh, nn.Sigmoid, nn.PReLU, nn.SELU, nn.ELU, nn.GELU,
+    nn.ReLU, nn.Tanh, nn.Sigmoid, nn.PReLU, nn.SELU, nn.SiLU, nn.ELU, nn.GELU,
     nn.Softmax, nn.LogSoftmax, nn.Softsign, nn.LeakyReLU, nn.Hardtanh,
     nn.Softplus, nn.Softshrink, nn.Hardshrink, nn.CELU
 ]

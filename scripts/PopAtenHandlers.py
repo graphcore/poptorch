@@ -33,6 +33,7 @@ for oper in opers:
     convert(oper, 1)
 
 convert("t", 1, "transpose")
+convert("silu", 1, "swish")
 
 expand("erfc", lambda x: 1. - op.erf(x))
 expand("log2", lambda x: op.log(x) / math.log(2))
@@ -46,7 +47,6 @@ expand(
                                      cfloat(0.), cfloat(1.), output_type()))
 expand("rsqrt", lambda x: 1. / op.sqrt(x))
 expand("selu", lambda x: op.selu(x, cfloat(selu_alpha), cfloat(selu_lambda)))
-expand("silu", lambda x: x * op.sigmoid(x))
 expand("square", lambda x: x * x)
 
 # binary operators
