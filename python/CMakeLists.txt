@@ -18,6 +18,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/ImplicitCasting.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/LowerToPopart.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/OpBuilder.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/OverlappedIO.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ActivationOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/AtenHandlers.gen.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ArithmeticOps.cpp"

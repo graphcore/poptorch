@@ -85,7 +85,8 @@ static void initializeAtenSymbols() {
 
 } // namespace c10::aten
 
-namespace poptorch::symbols {
+namespace poptorch {
+namespace symbols {
 
 #define OP_DECL(Namespace, FuncName, function, OnnxImpl, Args, BodyArgs)       \
   c10::Symbol Namespace::FuncName;
@@ -119,9 +120,7 @@ static void initializeSupportedOperations() {
 #undef OP_DECL_NO_RETURN
 }
 
-} // namespace poptorch::symbols
-
-namespace poptorch::symbols::poptorch {
+namespace poptorch {
 
 c10::Symbol begin_ipu_block;
 c10::Symbol internal_cast;
@@ -129,6 +128,7 @@ c10::Symbol end_ipu_block;
 c10::Symbol identity_loss;
 c10::Symbol set_available_memory;
 c10::Symbol set_matmul_serialization;
+c10::Symbol set_overlap_for_input;
 c10::Symbol optimizer_group;
 c10::Symbol begin_multi_conv;
 c10::Symbol multi_conv_part;
@@ -173,6 +173,7 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, identity_loss);
   SYMBOL_INIT(poptorch, set_available_memory);
   SYMBOL_INIT(poptorch, set_matmul_serialization);
+  SYMBOL_INIT(poptorch, set_overlap_for_input);
   SYMBOL_INIT(poptorch, optimizer_group);
   SYMBOL_INIT(poptorch, begin_multi_conv);
   SYMBOL_INIT(poptorch, multi_conv_part);
@@ -206,4 +207,13 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, clear_attribute);
 }
 
-} // namespace poptorch::symbols::poptorch
+} // namespace poptorch
+} // namespace symbols
+
+c10::Symbol getOverlapSymbol(unsigned int num) {
+  std::stringstream overlap_ss;
+  overlap_ss << "poptorch_overlap" << num;
+  return c10::Symbol::attr(overlap_ss.str());
+}
+
+} // namespace poptorch

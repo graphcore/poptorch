@@ -17,7 +17,8 @@ New features
 - Support for in-place modification to buffers on IPU
 - Support for taking slices of scalars
 - Support version of bilinear upsampling specifying intended output size instead of scale factors
-- Add option for setting number of IO tiles via ``numIOTiles`` in ``poptorch.Options`` (required for :py:meth:`~poptorch.TensorLocationSettings.useIOTilesToLoad`.)
+- Add support for overlapping host IO on inputs via :py:func:`poptorch.set_overlap_for_input`.
+- Add option for setting number of IO tiles via ``numIOTiles`` in ``poptorch.Options`` (required for :py:meth:`~poptorch.TensorLocationSettings.useIOTilesToLoad` and :py:func:`poptorch.set_overlap_for_input`.)
 - Improve PopTorch's parity with PyTorch's Softplus
 - Improve implementation of torch.SiLU by using Poplar's Swish operator
 - Additional support for operation overloads

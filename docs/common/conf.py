@@ -58,6 +58,7 @@ nitpick_ignore = [
     ('py:class', 'poptorch.ConnectionType'),
     ('py:class', 'poptorch.HalfFloatCastingBehavior'),
     ('py:class', 'poptorch.MatMulSerializationMode'),
+    ('py:class', 'poptorch.OverlapMode'),
     ('py:class', 'poptorch.ReductionType'),
     ('py:class', 'poptorch.SyncPattern'),
     ('py:class', 'poptorch.MeanReductionStrategy'),

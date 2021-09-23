@@ -74,6 +74,9 @@ PopTorch Ops
 
 .. autofunction:: poptorch.set_available_memory
 
+.. autofunction:: poptorch.set_overlap_for_input
+
+
 Model wrapping functions
 ========================
 

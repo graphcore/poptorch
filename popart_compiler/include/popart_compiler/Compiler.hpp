@@ -247,7 +247,8 @@ public:
   Compiler(Compiler &&compiler);
 
   poptorch::TensorId addInputTensor(const char *type,
-                                    const std::vector<std::int64_t> &dims);
+                                    const std::vector<std::int64_t> &dims,
+                                    const char *overlap = "no_overlap");
 
   poptorch::TensorId createTensorId(const char *name);
 
@@ -484,6 +485,11 @@ public:
 
 private:
   void assertTensorIs(PopartType dataType, poptorch::TensorId id) const;
+
+  // Make sure no overlap is specified for pipelined mode and that the anchor
+  // return type is supported by PopART.
+  void verifySettingsForOverlappedIO(PopartAnchorTypes anchor_mode);
+
   std::unique_ptr<detail::CompilerImpl> _impl;
 };
 
