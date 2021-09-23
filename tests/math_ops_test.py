@@ -109,8 +109,8 @@ def test_unary_ops_float(op):
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(expected=native_out,
                                 actual=poptorch_out,
-                                atol=1e-04,
-                                rtol=1e-04,
+                                atol=1e-03,
+                                rtol=1e-03,
                                 equal_nan=True)
 
     op_harness(op, [input], assert_, test_training=True)
