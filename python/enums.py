@@ -148,6 +148,22 @@ class Liveness(enum.IntEnum):
     OffChipAfterEachPhase = 3
 
 
+class OverlapMode(enum.Enum):
+    """
+    - ``NoOverlap``: The host will copy the tensor to the IPU only when
+      required: this minimises on-chip memory use at the cost of performance.
+    - ``OverlapAccumulationLoop``: The host will preload values for the next
+      gradient accumulation iteration onto an IO tile.
+    - ``OverlapDeviceIterationLoop``: The host will preload values not just for
+      the next gradient accumulation iteration, but the next device iteration,
+      onto an IO tile. This may require more IO tiles than the previous setting
+      but offers greater performance.
+    - """
+    NoOverlap = "no_overlap"
+    OverlapAccumulationLoop = "overlap_accumulation_loop"
+    OverlapDeviceIterationLoop = "overlap_device_iteration_loop"
+
+
 class AutoStage(enum.IntEnum):
     """Defines how the stages are automatically assigned to blocks when the user
     didn't explicitly provide stages to the ``IExecutionStrategy``'s

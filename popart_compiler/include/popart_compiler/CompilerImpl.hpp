@@ -150,6 +150,7 @@ public:
     ids.emplace_back(""); // None tensor
     ids_types.push_back(PopartType::UNDEFINED);
     active_builder = op_builder.get();
+    using_overlapped_io = false;
   }
   ~CompilerImpl();
 
@@ -189,6 +190,9 @@ public:
   WeightsIO weights;
 
   bool is_training;
+
+  // At least one use of overlapped host IO
+  bool using_overlapped_io;
 
   // Record the final loss, it is guaranteed by previous passes to be just one
   // loss.

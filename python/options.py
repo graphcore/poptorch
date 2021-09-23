@@ -616,8 +616,10 @@ class _TensorLocationOptions(_options_impl.OptionsDict):
         """ Assigns the number of tiles on the IPU to be IO rather than compute.
 
         Allocating IO (input/output) tiles reduces the number of IPU tiles
-        available for computation but allows you to use off-chip memory with
-        reduced latency by setting the option
+        available for computation but allows you to reduce the latency of
+        copying tensors from host ot the IPUs using the function
+        :py:func:`poptorch.set_overlap_for_input` or to use off-chip memory
+        with reduced by setting the option
         :py:meth:`~poptorch.TensorLocationSettings.useIOTilesToLoad`.
         As reducing the number of computation tiles may reduce peformance, you
         should not use any IO tiles until you have successfully run your model

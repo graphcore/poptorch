@@ -961,8 +961,16 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
 
     if (index < num_input_tensors) {
       // Return the input tensor id for input tensor of given type and dims.
+
+      auto overlap_symbol = getOverlapSymbol(index);
+      std::string overlap_str("no_overlap");
+      if (_graph.param_node()->hasAttribute(overlap_symbol)) {
+        overlap_str = _graph.param_node()->s(overlap_symbol);
+      }
+
       auto id = _compiler.addInputTensor(
-          typeToPopartStr(tensor.scalar_type()).c_str(), dims);
+          typeToPopartStr(tensor.scalar_type()).c_str(), dims,
+          overlap_str.c_str());
       _input_tensor_hooks.push_back(id);
     } else {
       ERROR_ON(graph_t_inputs[index]->uses().empty());

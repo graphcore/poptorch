@@ -79,7 +79,7 @@ int64_t dtypeIntFromOnnxStr(const char *onnx_type);
 const char *onnxStrFromDtypeInt(int64_t dtype);
 
 // See popart DataFlow.hpp for a full description of each.
-// Must be kept in sync with AnchorMode in python/__init__.py
+// Must be kept in sync with AnchorMode in python/enums.py
 enum PopartAnchorTypes : std::uint8_t { Final = 0, EveryN, All, Sum, N };
 
 // Must be static so each library gets its own copy,  __attribute__((unused)) is

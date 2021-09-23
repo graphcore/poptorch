@@ -29,6 +29,7 @@
 #include "poptorch/ImplicitCasting.hpp"
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/LowerToPopart.hpp"
+#include "poptorch/OverlappedIO.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
@@ -94,6 +95,11 @@ at::Tensor setMatMulSerialization(at::Tensor matmul, std::string mode, // NOLINT
   UNUSED(factor);
   UNUSED(keep_precision);
   return matmul;
+}
+
+at::Tensor setOverlapForInput(at::Tensor t, const std::string &mode) {
+  UNUSED(mode);
+  return t;
 }
 
 at::Tensor identityOp(at::Tensor t) { return t; }
@@ -231,6 +237,7 @@ static auto registry =
         .op("poptorch::end_for_loop", &endForLoop)
         .op("poptorch::optimizer_group", &optimizerGroup)
         .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
+        .op("poptorch::set_overlap_for_input", &setOverlapForInput)
         .op("poptorch::recomputation_checkpoint", &identityOp)
         .op("poptorch::set_available_memory", &setAvailableMemory)
         .op("poptorch::begin_multi_conv", &nullOp)
@@ -803,8 +810,13 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   torch::jit::LowerSimpleTuples(graph);
   torch::jit::PeepholeOptimize(graph);
 
+  logGraph("Graph before attributising IO overlap specifiers", *graph,
+           has_converted_any_half, input_tensors);
+  poptorch::attributiseOverlappedIO(graph.get());
+
   logGraph("Graph before handling aliases:", *graph, has_converted_any_half,
            input_tensors);
+
   poptorch::resolveAliases(graph.get());
 
   logGraph("Graph before handling inplace ops:", *graph, has_converted_any_half,

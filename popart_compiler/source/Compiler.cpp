@@ -196,10 +196,29 @@ void HostSideConstant::copyDataTo(void *ptr) const {
 
 poptorch::TensorId
 Compiler::addInputTensor(const char *type,
-                         const std::vector<std::int64_t> &dims) {
+                         const std::vector<std::int64_t> &dims,
+                         const char *overlap) {
   // Create the tensor info for our new tensor.
   popart::TensorInfo info{type, dims};
-  auto popart_id = _impl->active_builder->addInputTensor(info);
+  popart::InputSettings settings;
+
+  if (strcmp(overlap, "no_overlap") != 0) {
+    _impl->using_overlapped_io = true;
+  }
+
+  if (strcmp(overlap, "overlap_accumulation_loop") == 0) {
+    settings.setTileSet(popart::TileSet::IO);
+    settings.setExchangeStrategy(popart::ExchangeStrategy::OverlapInnerLoop);
+  } else if (strcmp(overlap, "overlap_device_iteration_loop") == 0) {
+    settings.setTileSet(popart::TileSet::IO);
+    settings.setExchangeStrategy(popart::ExchangeStrategy::OverlapLoops);
+  } else {
+    ERROR_ON(strcmp(overlap, "no_overlap") != 0);
+    settings.setTileSet(popart::TileSet::Compute);
+    settings.setExchangeStrategy(popart::ExchangeStrategy::JustInTime);
+  }
+
+  auto popart_id = _impl->active_builder->addInputTensor(info, settings);
   _impl->inputs.push_back(popart_id);
   _impl->ids.push_back(popart_id);
   return _impl->ids.size() - 1;
@@ -308,6 +327,10 @@ void Compiler::addOutputTensor(poptorch::TensorId output,
     if (anchor_mode == PopartAnchorTypes::EveryN) {
       anchor_return_period = _impl->options.anchor_return_period;
     }
+  }
+
+  if (_impl->using_overlapped_io) {
+    verifySettingsForOverlappedIO(anchor_mode);
   }
 
   const char *as_str = anchorTypeToString(anchor_mode);
@@ -467,7 +490,7 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   case detail::ExecutionMode::Sharded: {
     _impl->setOptionIfNotSet(options.enablePipelining, false,
                              "enablePipelining");
-    if (_impl->used_ipus.size() > 1) {
+    if (_impl->used_ipus.size() > 1 || _impl->using_overlapped_io) {
       graph_mode = popart::VirtualGraphMode::Manual;
     }
     break;
@@ -558,6 +581,17 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   _impl->setOptionIfNotSet(options.enableGradientAccumulation,
                            options.accumulationFactor > 1,
                            "enableGradientAccumulation");
+
+  // This is needed for both overlapped IO and explicit pipelining (not yet)
+  // supported.
+  _impl->setOptionIfNotSet(options.useHostCopyOps, _impl->using_overlapped_io,
+                           "useHostCopyOps");
+
+  // This is needed but may cause regressions for existing models. When it is
+  // more developed, this will become the default.
+  _impl->setOptionIfNotSet(options.enableExplicitMainLoops,
+                           _impl->using_overlapped_io,
+                           "enableExplicitMainLoops");
 
   // Create the anchors, these are used to copy to the host.
   auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
@@ -1347,6 +1381,24 @@ Compiler::getOutputCompleteTimestamps(size_t index) const {
 size_t Compiler::getNumInputs() const { return _impl->inputs.size(); }
 
 size_t Compiler::getNumOutputs() const { return _impl->outputs.size(); }
+
+void Compiler::verifySettingsForOverlappedIO(PopartAnchorTypes anchor_mode) {
+  if (_impl->options.execution_mode == detail::ExecutionMode::Pipelined) {
+    ERROR("Overlapped IO is not supported with poptorch.PipelinedExecution. "
+          "If you are using only one IPU, please switch to "
+          "poptorch.ShardedExecution.");
+  }
+
+  ERROR_ON_MSG(_impl->popart_options.numIOTiles == 0,
+               "No IO tiles allocated. You must allocate at least 32 IO tiles "
+               "using poptorch.Options().TensorLocations.numIOTiles.");
+
+  if (anchor_mode != PopartAnchorTypes::Sum &&
+      anchor_mode != PopartAnchorTypes::All) {
+    ERROR("Unsupported anchor mode for overlapped IO. Please switch anchor "
+          "mode to poptorch.AnchorMode.All or poptorch.AnchorMode.Sum.");
+  }
+}
 
 void setPopartLogLevel(logging::Level level) {
   for (uint64_t module = 0;
