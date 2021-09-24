@@ -25,6 +25,7 @@ New features
 - Support version of bilinear upsampling specifying intended output size instead of scale factors
 - Add support for overlapping host IO on inputs via :py:func:`poptorch.set_overlap_for_input`.
 - Add option for setting number of IO tiles via ``numIOTiles`` in ``poptorch.Options`` (required for :py:meth:`~poptorch.TensorLocationSettings.useIOTilesToLoad` and :py:func:`poptorch.set_overlap_for_input`.)
+- Add method, :py:meth:`~poptorch.PoplarExecutor.cycleCount`, to determine the cycle count of the last model run.
 - Improve PopTorch's parity with PyTorch's Softplus
 - Improve implementation of torch.SiLU by using Poplar's Swish operator
 - Additional support for operation overloads

@@ -1191,6 +1191,14 @@ void compileWithTraceAndExport(
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+uint64_t
+cycleCount(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  try {
+    return executable->getCompiler().getCycleCount();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
 std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
     py::handle h, const pybind11::dict &python_traced_params,
     const pybind11::tuple &inputs, bool has_converted_any_half,
@@ -1320,6 +1328,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("isGraphNondeterministic", poptorch::pyIsGraphNondeterministic);
   m.def("compileWithTrace", poptorch::compileWithTrace);
   m.def("compileWithTraceAndExport", poptorch::compileWithTraceAndExport);
+  m.def("cycleCount", poptorch::cycleCount);
   m.def("processTraceAndImportExecutable",
         poptorch::processTraceAndImportExecutable);
   m.def("execute", poptorch::execute);

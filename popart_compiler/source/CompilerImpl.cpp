@@ -526,6 +526,9 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
     if (popart_options.enableEngineCaching) {
       logging::warn("enableExecutableCaching doesn't work with the IPU model");
     }
+
+    errorOnCycleLogging();
+
     std::map<std::string, std::string> model_options;
     model_options["numIPUs"] = std::to_string(num_ipus);
     std::string env_ipu_model_version = getIpuModelVersion();
@@ -546,6 +549,8 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
       // present on the system.
       ERROR_ON_MSG(options_set.count("ipu_id"),
                    "Offline compilation targeting a specific id not supported");
+      errorOnCycleLogging();
+
       std::map<std::string, std::string> device_options;
       device_options["numIPUs"] = std::to_string(num_ipus);
       device_options["ipuVersion"] =
@@ -978,5 +983,11 @@ void CompilerImpl::cachePopartTypes() {
     ids_types.push_back(getPopartType(idx));
   }
 }
+
+void CompilerImpl::errorOnCycleLogging() const {
+  ERROR_ON_MSG(popart_options.instrumentWithHardwareCycleCounter,
+               "Cycle count logging is only supported on actual IPU hardware.");
+}
+
 } // namespace detail
 } // namespace poptorch

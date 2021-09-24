@@ -367,6 +367,9 @@ public:
   void clearAttribute(const std::string &attribute, const std::string &key);
 
 private:
+  // Raise an error if cycle logging is enabled
+  void errorOnCycleLogging() const;
+
   // Constants which are simply returned (possibly as part of a tuple/list) and
   // do not need to be input into Popart
   std::unordered_map<poptorch::TensorId, HostSideConstant> _host_side_constants;

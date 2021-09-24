@@ -63,6 +63,7 @@ BUFFERS_CAN_CHANGE = (
 )
 
 
+# pylint: disable=too-many-public-methods
 class PoplarExecutor:
     """ This class should not be created directly but is a wrapper around
     the model that was passed into `inferenceModel` or `trainingModel`.
@@ -554,6 +555,29 @@ class PoplarExecutor:
                 in_tensors, in_tensors_trace_view, has_converted_any_half,
                 narrow_tensor_fn)
             poptorch_core.compileWithTraceAndExport(*trace_args, filename)
+
+    def cycleCount(self):
+        """ Returns number of cycles which the IPU ran.
+
+            You must run the model on IPU hardware before calling this method.
+
+            :returns: number of cycles on the IPU for the last modern run. If
+              you are using replicas, the returned value represents the first
+              number of cycles for the first replica only."""
+
+        # pylint: disable=protected-access
+        popart_options = self._options._Popart
+        if not popart_options.options['instrumentWithHardwareCycleCounter']:
+            err_msg = ("Cycle count logging is disabled. Please set option " +
+                       "logCycleCount to True to enable.")
+            raise _impl.createPoptorchError(err_msg)
+
+        if not self.isCompiled():
+            err_msg = ("Please run the model at least once before obtaining " +
+                       "cycle count.")
+            raise _impl.createPoptorchError(err_msg)
+
+        return poptorch_core.cycleCount(self._executable)
 
     def __call__(self, *args: List['torch.Tensor'],
                  **kwargs: Dict[str, 'torch.Tensor']):

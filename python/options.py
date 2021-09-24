@@ -450,6 +450,7 @@ class _PopartOptions:
 
     def __init__(self) -> None:
         self.options = {}
+        self.set("instrumentWithHardwareCycleCounter", False)
         self.set("rearrangeAnchorsOnHost", False)
 
     def set(self, key: str, value: Union[int, float, str, List[str], Set[str]]

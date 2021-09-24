@@ -483,6 +483,10 @@ public:
   const std::vector<double> &getOutputTimestamps(size_t index) const;
   const std::vector<double> &getOutputCompleteTimestamps(size_t index) const;
 
+  // Returns the number of cycles (on replica 0) run by the IPU for the last
+  // model run.
+  uint64_t getCycleCount() const;
+
   size_t getNumInputs() const;
   size_t getNumOutputs() const;
 
@@ -494,6 +498,11 @@ private:
   void verifySettingsForOverlappedIO(PopartAnchorTypes anchor_mode);
 
   std::unique_ptr<detail::CompilerImpl> _impl;
+
+  // Store the cycle account of last run, if the relevant option is enabled,
+  // otherwise no_cycles
+  int64_t _cycle_count;
+  static const int64_t no_cycles = -1;
 };
 
 } // namespace poptorch

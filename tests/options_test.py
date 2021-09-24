@@ -407,7 +407,7 @@ def test_ipu_model(enabled, capfd):
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to count IPU cycles")
-@helpers.overridePoptorchLogLevel("INFO")
+@helpers.overridePoptorchLogLevel("DEBUG")
 def test_log_cycle_count(capfd):
     class LogChecker(helpers.LogChecker):
         def validate(self):
@@ -424,6 +424,8 @@ def test_log_cycle_count(capfd):
     y = torch.tensor([2])
 
     inference_model(x, y)
+
+    assert inference_model.cycleCount() > 0
 
     log = LogChecker(capfd)
     log.validate()

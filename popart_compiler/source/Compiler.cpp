@@ -954,8 +954,8 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
   // Log the number of cycles if instrumentation is enabled
   popart::SessionOptions &options = _impl->popart_options;
   if (options.instrumentWithHardwareCycleCounter) {
-    logging::info("Total number of IPU cycles: {}",
-                  _impl->session->getCycleCount());
+    _cycle_count = _impl->session->getCycleCount();
+    logging::debug("Total number of IPU cycles: {}", _cycle_count);
   }
 }
 
@@ -1104,9 +1104,12 @@ void Compiler::optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
   _impl->optimizerGroup(inputs, group);
 }
 
-Compiler::Compiler(Compiler &&compiler) { _impl = std::move(compiler._impl); }
+Compiler::Compiler(Compiler &&compiler) : _cycle_count(compiler._cycle_count) {
+  _impl = std::move(compiler._impl);
+}
 
-Compiler::Compiler(bool is_training, const SessionOptions &options) {
+Compiler::Compiler(bool is_training, const SessionOptions &options)
+    : _cycle_count(no_cycles) {
   _impl = std::make_unique<detail::CompilerImpl>();
   _impl->is_training = is_training;
   _impl->popart_options = options._impl->popart_options;
@@ -1414,6 +1417,17 @@ const std::vector<double> &
 Compiler::getOutputCompleteTimestamps(size_t index) const {
   auto id = _impl->outputs[index];
   return _impl->stepio.getOutputCompleteTimestamps(id);
+}
+
+uint64_t Compiler::getCycleCount() const {
+  if (_cycle_count != no_cycles) {
+    return _cycle_count;
+  }
+
+  ERROR_ON_MSG(!_impl->popart_options.instrumentWithHardwareCycleCounter,
+               "Cycle count logging is disabled.");
+
+  ERROR("Please run the model at least once before obtaining cycle count.");
 }
 
 size_t Compiler::getNumInputs() const { return _impl->inputs.size(); }

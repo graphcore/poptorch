@@ -355,3 +355,60 @@ def test_nondeterministic_warning_filter():
         assert any([
             f in r for f in expected_filtered_warnings
         ]), f"Compilation generated unexpected warning.\nActual warning: {r}"
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed to test this feature")
+def test_get_cycles_error_msgs():
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    inference_model = poptorch.inferenceModel(Model())
+
+    error_msg = (r"Cycle count logging is disabled. Please set option " +
+                 r"logCycleCount to True to enable.")
+    with pytest.raises(poptorch.Error, match=error_msg):
+        inference_model.cycleCount()
+
+    opts = poptorch.Options()
+    opts.logCycleCount(True)
+
+    inference_model = poptorch.inferenceModel(Model(), options=opts)
+
+    error_msg = (
+        r"Please run the model at least once before obtaining cycle " +
+        r"count.")
+    with pytest.raises(poptorch.Error, match=error_msg):
+        inference_model.cycleCount()
+
+    inference_model.compile(torch.Tensor([1.0]), torch.Tensor([2.0]))
+
+    error_msg = (
+        r"Please run the model at least once before obtaining cycle " +
+        r"count.")
+    with pytest.raises(poptorch.Error, match=error_msg):
+        inference_model.cycleCount()
+
+    inference_model(torch.Tensor([3.0]), torch.Tensor([4.0]))
+    assert inference_model.cycleCount() > 0
+
+
+@pytest.mark.skipif(poptorch.ipuHardwareIsAvailable(),
+                    reason="Test error message when no hardware")
+def test_get_cycles_no_hw():
+    class Model(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    inference_model = poptorch.inferenceModel(Model())
+
+    opts = poptorch.Options()
+    opts.logCycleCount(True)
+
+    inference_model = poptorch.inferenceModel(Model(), options=opts)
+
+    error_msg = (
+        r"Cycle count logging is only supported on actual IPU hardware.")
+    with pytest.raises(poptorch.Error, match=error_msg):
+        inference_model(torch.Tensor([3.0]), torch.Tensor([4.0]))
