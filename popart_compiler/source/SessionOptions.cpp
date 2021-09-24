@@ -342,7 +342,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableGradientAccumulation);
   ADD_POPART_BOOL_OPTION(instrumentWithHardwareCycleCounter);
   ADD_POPART_BOOL_OPTION(enablePipelining);
-  ADD_POPART_BOOL_OPTION(explicitPipelining);
   ADD_POPART_BOOL_OPTION(disableGradAccumulationTensorStreams);
   ADD_POPART_BOOL_OPTION(compileEngine);
   ADD_POPART_BOOL_OPTION(constantWeights);
