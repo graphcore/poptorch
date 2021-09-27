@@ -648,6 +648,10 @@ class Pylint(ILinter):
     def check_version(self):
         return compare_versions_from_output("pylint", "2.5.3")
 
+    def is_enabled(self, filename, autofix):  # pylint: disable=unused-argument
+        # Don't run PyLint on the buildenv config files
+        return re.match(r".*\.buildenv\.py$", filename) is None
+
 
 class Yapf(ILinter):
     def gen_lint_command(self, filename, autofix):

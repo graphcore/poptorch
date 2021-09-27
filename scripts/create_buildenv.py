@@ -4,10 +4,12 @@ import argparse
 import contextlib
 import fcntl
 import hashlib
+import inspect
 import logging
 import os
 import platform
 import subprocess
+import sys
 import tarfile
 import urllib.request
 
@@ -15,6 +17,8 @@ from utils import _utils
 
 logger = logging.getLogger(os.path.basename(__file__))
 _utils.set_logger(logger)
+
+_conda_toolchains_packages = ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
 
 
 def _default_cache_dir():
@@ -32,40 +36,94 @@ def _system_conda_path():
         return None
 
 
-_conda_poptorch_packages = [
-    "ccache=3.7.9",
-    "cmake=3.18.2",
-    "conda-pack=0.5.0",
-    "gdb=8.3",
-    "hunspell=1.7.0",
-    "latexmk=4.55",
-    "make=4.3",
-    "ninja=1.10.2",
-    "pybind11=2.6.1",
-    "pytest=6.2.1",
-    "zip=3.0",
-    "spdlog=1.8.0",
-    "wheel==0.34.2",
-]
+class Installer:
+    """Common interface for all installers"""
 
-_conda_popart_packages = [
-    "boost=1.70.0",
-    "capnproto=0.6.1",
-    "pycapnp=0.6.4",
-    "mypy=0.812",
-]
+    def install(self, env):
+        raise Exception("Must be implemented by child class")
 
-_conda_protobuf_packages = ["libprotobuf-static=3.14.0", "protobuf=3.14.0"]
-_conda_toolchains_packages = ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
-_conda_linters_packages = [
-    "yapf=0.27.0", "cpplint=1.4.4", "pylint=2.5.3", "clang-tools=9.0.0",
-    "python-clang=9.0.0", "pyyaml=5.3.1"
-]
+    def __hash__(self):
+        raise Exception("Must be implemented by child class")
 
-_protobuf_url = "https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-python-3.14.0.tar.gz"
-_onnx_url = "https://github.com/onnx/onnx/archive/v1.7.0.tar.gz"
-_trompeloeil_url = "https://github.com/rollbear/trompeloeil/archive/refs/tags/v35.tar.gz"
-_pip_requirements_file = os.path.join(_utils.sources_dir(), "requirements.txt")
+
+class CondaPackages(Installer):
+    """Install the list of Conda packages in the environment."""
+
+    def __init__(self, *packages):
+        assert all([isinstance(p, str) for p in packages])
+        self.packages = packages
+
+    def __hash__(self):
+        return hash(self.packages)
+
+
+class PipPackages(Installer):
+    """Install the list of pip3 packages in the environment."""
+
+    def __init__(self, *packages):
+        assert all([isinstance(p, str) for p in packages])
+        self.packages = packages
+
+    def install(self, env):
+        env.run_commands("pip3 install " + " ".join(self.packages))
+
+    def __hash__(self):
+        return hash(self.packages)
+
+
+class PipRequirements(Installer):
+    """Install pip3 packages from a requirements file."""
+
+    def __init__(self, filename="requirements.txt"):
+        if not filename.startswith("/"):
+            filename = os.path.join(os.getcwd(), filename)
+        self._requirements_file = filename
+
+    def install(self, env):
+        env.run_commands(f"pip3 install -r {self._requirements_file}")
+
+    def __hash__(self):
+        with open(self._requirements_file, "r") as f:
+            return hash(f.read())
+
+
+class Installers:
+    """Contains the list of installers to install in the environment."""
+
+    def __init__(self):
+        self._installers = []
+
+    def add(self, installer):
+        assert isinstance(
+            installer,
+            Installer), "All package installers must inherit from Installer"
+        self._installers.append(installer)
+
+    def __call__(self):
+        return self._installers
+
+
+class Config:
+    """Contains the configuration for the environment."""
+
+    def __init__(self, **opts):
+        self.__dict__ = opts
+
+
+class Environment:
+    def __init__(self, buildenv_dir, activate_filename):
+        self._buildenv_dir = buildenv_dir
+        self._activate_filename = activate_filename
+
+    @property
+    def prefix(self):
+        return self._buildenv_dir
+
+    def run_commands(self, *cmds):
+        _utils.run_commands(f". {self._activate_filename}", *cmds)
+
+    def rmdir_if_exists(self, path):
+        _utils.rmdir_if_exists(path)
 
 
 class BuildenvManager:
@@ -79,33 +137,91 @@ class BuildenvManager:
                  install_linters=False,
                  poptorch_deps=True):
         python_version = python_version or platform.python_version()
-        self.build_onnx = popart_deps
-        self.build_trompeloeil = popart_deps
-        self.build_protobuf = popart_deps and build_protobuf
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
-        self.conda_packages = [f"python={python_version}"]
-        self.python_packages = []
-        if install_linters:
-            self.conda_packages += _conda_linters_packages
+        self.conda_packages = [
+            f"python={python_version}", "gdb=8.3", "conda-pack=0.5.0"
+        ]
+        self.projects = {}
+        view_dir = os.path.dirname(_utils.sources_dir())
+        # Deprecated: will remove poptorch_deps / popart_deps once configure.py
+        # has been updated in the view
         if poptorch_deps:
-            self.conda_packages += _conda_poptorch_packages
+            self.add_project("poptorch", os.path.join(view_dir, "poptorch"))
+        if popart_deps:
+            self.add_project("popart", os.path.join(view_dir, "popart"))
+
         if use_conda_toolchains:
             self.conda_packages += _conda_toolchains_packages
-        if popart_deps:
-            self.conda_packages += _conda_popart_packages
-            if not build_protobuf:
-                self.conda_packages += _conda_protobuf_packages
-        self.install_pip_reqs = poptorch_deps
 
+        self.config = Config(install_linters=install_linters,
+                             build_protobuf=build_protobuf)
         assert self.output_dir != _utils.sources_dir(), (
             "This script needs "
             "to be called from a build directory. Try mkdir build && cd build"
             " && ../scripts/create_buildenv.py")
 
         # internal constants
-        self.activate_filename = "activate_buildenv.sh"
+        self.activate_filename = os.path.join(self.output_dir,
+                                              "activate_buildenv.sh")
+        self.env = Environment(self.buildenv_dir, self.activate_filename)
+
+    def add_project(self, project, project_dir):
+        assert os.path.exists(project_dir)
+        self.projects[project] = os.path.realpath(project_dir)
+
+    def _collect_installers(self):
+        view_dir = os.path.dirname(_utils.sources_dir())
+        installers = Installers()
+        # We share with the config files all the classes inheriting from Installer
+        exec_locals = {
+            name: c
+            for name, c in inspect.getmembers(sys.modules[__name__],
+                                              inspect.isclass)
+            if Installer in c.__bases__ or c == Installer
+        }
+        exec_locals["installers"] = installers
+        exec_locals["config"] = self.config
+        for p, project_dir in self.projects.items():
+            # Try to find (in that order):
+            # 1) <view_dir>/my_project.buildenv.py
+            # 2) <view_dir>/my_project/config.buildenv.py
+            to_test = [
+                os.path.join(view_dir, p + ".buildenv.py"),
+                os.path.join(project_dir, "config.buildenv.py")
+            ]
+            conf = None
+            for f in to_test:
+                if os.path.exists(f):
+                    conf = f
+                    break
+            if conf is None:
+                logger.warning(
+                    "No requirements found for project '%s' (Tried %s)", p,
+                    to_test)
+                continue
+
+            with open(conf, "r") as f:
+                code = f.read()
+                os.chdir(project_dir)
+                # Share the os module as it's commonly used to get the current
+                # working directory, create directories, etc.
+                # pylint: disable=exec-used
+                exec(code, {"os":os}, exec_locals)
+
+        # Process the installers:
+        other_installers = []
+        for i in installers():
+            if isinstance(i, CondaPackages):
+                self.conda_packages += i.packages
+            else:
+                other_installers.append(i)
+
+        # Make sure the packages are unique and in a deterministic order
+        self.conda_packages = list(sorted(dict.fromkeys(self.conda_packages)))
+
+        return other_installers
 
     def create(self, create_template_if_needed=False):
         os.makedirs(self.output_dir, exist_ok=True)
@@ -114,7 +230,8 @@ class BuildenvManager:
         self._clear_activate_buildenv()
         self._install_conda_if_needed()
 
-        env_hash = self._compute_environment_hash()
+        installers = self._collect_installers()
+        env_hash = self._compute_environment_hash(installers)
         template_name = f"poptorch_{env_hash}.tar.gz"
         full_template_name = os.path.join(self.cache_dir, template_name)
 
@@ -127,98 +244,42 @@ class BuildenvManager:
                 tar = tarfile.open(full_template_name)
                 tar.extractall(self.buildenv_dir)
                 assert os.path.isdir(self.buildenv_dir)
-                _utils.run_commands(f". {self.activate_filename}",
-                                    f". {self.buildenv_dir}/bin/activate",
-                                    "conda-unpack")
+                self.env.run_commands(f". {self.buildenv_dir}/bin/activate",
+                                      "conda-unpack")
                 self._append_to_activate_buildenv(
                     f"conda activate {self.buildenv_dir}", )
             else:
                 logger.info(
                     "Didn't find template %s: creating a new "
                     "environment in %s", full_template_name, self.output_dir)
-                self._create_new_env()
+                self._create_new_env(installers)
                 if create_template_if_needed:
                     os.chdir(self.output_dir)
-                    _utils.run_commands(
-                        f". {self.activate_filename}",
+                    self.env.run_commands(
                         f"conda activate {self.buildenv_dir}",
                         f"conda pack -p {self.buildenv_dir} -o \
                                 {full_template_name}")
 
         os.chdir(self.output_dir)
-        _utils.run_commands(
-            f". {self.activate_filename}",
+        self.env.run_commands(
             """echo "export CCACHE_CPP2=yes" >> %s""" % self.activate_filename,
             """echo "export CC=\\"ccache ${CC:-gcc}\\"" >> %s""" %
             self.activate_filename,
             """echo "export CXX=\\"ccache ${CXX:-g++}\\"" >> %s""" %
             self.activate_filename)
 
-    def _build_onnx(self):
+    def _create_new_env(self, installers):
         os.chdir(self.output_dir)
-        os.makedirs(os.path.join("onnx", "build"))
-        _utils.run_commands(
-            f". {self.activate_filename}",
-            "cd onnx",
-            f"curl -sSL {_onnx_url} | tar zx --strip-components=1",
-            "cd build",
-            "cmake ../ -GNinja -DONNX_ML=0 \
-                -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} \
-                -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON",
-            "ninja install",
-        )
-        _utils.rmdir_if_exists("onnx")
-
-    def _build_trompeloeil(self):
-        os.chdir(self.output_dir)
-        os.makedirs(os.path.join("trompeloeil", "build"))
-        _utils.run_commands(
-            f". {self.activate_filename}",
-            "cd trompeloeil",
-            f"curl -sSL {_trompeloeil_url} | tar zx --strip-components=1",
-            "cd build",
-            "cmake ../ -GNinja \
-                -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX}",
-            "ninja install",
-        )
-        _utils.rmdir_if_exists("trompeloeil")
-
-    def _build_protobuf(self):
-        os.chdir(self.output_dir)
-        os.makedirs("protobuf")
-        _utils.run_commands(
-            f". {self.activate_filename}",
-            "cd protobuf",
-            f"curl -sSL {_protobuf_url} | tar zx --strip-components=1",
-            "CXXFLAGS=-fPIC CFLAGS=-fPIC ./configure --prefix=${CONDA_PREFIX} \
-                    --disable-shared",
-            "make -j`nproc`",
-            "make install",
-        )
-        _utils.rmdir_if_exists("protobuf")
-
-    def _create_new_env(self):
-        os.chdir(self.output_dir)
-        _utils.run_commands(
-            f". {self.activate_filename}",
+        self.env.run_commands(
             f"conda create --prefix {self.buildenv_dir} -c conda-forge "
             f"-y {' '.join(self.conda_packages)}")
 
         self._append_to_activate_buildenv(
             f"conda activate {self.buildenv_dir}", )
 
-        if self.install_pip_reqs:
-            _utils.run_commands(f". {self.activate_filename}",
-                                f"pip3 install -r {_pip_requirements_file}")
-
-        if self.build_protobuf:
-            self._build_protobuf()
-
-        if self.build_onnx:
-            self._build_onnx()
-
-        if self.build_trompeloeil:
-            self._build_trompeloeil()
+        for i in installers:
+            os.chdir(self.output_dir)
+            i.install(self.env)
 
     def _clear_activate_buildenv(self):
         open(self.activate_filename, "w").close()
@@ -282,24 +343,11 @@ class BuildenvManager:
         assert os.path.isfile(conda_sh)
         self._append_to_activate_buildenv(f". {conda_sh}")
 
-    def _pip_requirements(self):
-        if not self.install_pip_reqs:
-            return ""
-        with open(_pip_requirements_file, "r") as f:
-            return f.read()
-
-    def _compute_environment_hash(self):
-        urls_used = ""
-        if self.build_protobuf:
-            urls_used += _protobuf_url
-        if self.build_onnx:
-            urls_used += _onnx_url
-
+    def _compute_environment_hash(self, installers):
+        hashes = [str(hash(i)) for i in installers]
         return str(
-            hashlib.md5(
-                (self._pip_requirements() + " ".join(self.conda_packages) +
-                 urls_used +
-                 " ".join(self.python_packages)).encode("utf-8")).hexdigest())
+            hashlib.md5(" ".join(self.conda_packages +
+                                 hashes).encode("utf-8")).hexdigest())
 
 
 if __name__ == "__main__":
