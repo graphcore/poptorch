@@ -483,12 +483,12 @@ mean_reduction_strategy_params = [
 
 
 @pytest.mark.parametrize("params", mean_reduction_strategy_params)
-def test_mean_reduction_strategy(params):
+def test_mean_reduction_strategy_implicit(params):
     accum_type, training, combined_accum, correct_strategy = params
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 
-    # A simple adder model just to test the correctness of the strategy
+    # A simple adder model just to test the correct strategy is set
     model = helpers.ModelWithWeights(lambda x, y: x + y, t1.shape)
     options = poptorch.Options()
     optimizer = poptorch.optim.SGD(model.parameters(),
@@ -503,5 +503,24 @@ def test_mean_reduction_strategy(params):
     poptorch_model.compile((t1, t2))
 
     assert (getattr(
-        options,
+        options.Training,
         "meanAccumulationAndReplicationReductionStrategy") == correct_strategy)
+
+
+def test_mean_reduction_strategy_explicit():
+    t1 = torch.tensor([1.])
+    t2 = torch.tensor([2.])
+
+    # A simple adder model just to test the correct strategy is set
+    model = helpers.ModelWithWeights(lambda x, y: x + y, t1.shape)
+
+    options = poptorch.Options()
+    options.Training.setMeanAccumulationAndReplicationReductionStrategy(
+        MeanReductionStrategy.Running)
+    poptorch_model = poptorch.trainingModel(model, options)
+
+    poptorch_model.compile((t1, t2))
+
+    assert (getattr(options.Training,
+                    "meanAccumulationAndReplicationReductionStrategy") ==
+            MeanReductionStrategy.Running)

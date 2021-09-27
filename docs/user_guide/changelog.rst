@@ -22,6 +22,7 @@ API changes
 
 - Default mean reduction strategies have changed from the deprecated PostAndLoss strategy to Post or Running
   based on optimiser accumulation type
+- Mean reduction strategy can now be set via ``poptorch.Options.Training.setMeanAccumulationAndReplicationReductionStrategy``.
 
 v2.2 (Poplar SDK 2.2)
 =====================

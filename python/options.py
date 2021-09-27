@@ -274,7 +274,9 @@ class _TrainingOptions(_options_impl.OptionsDict):
                  popart_options: "poptorch.options._PopartOptions") -> None:
         super().__init__(gradient_accumulation=1,
                          accumulation_and_replication_reduction_type=enums.
-                         ReductionType.Mean)
+                         ReductionType.Mean,
+                         meanAccumulationAndReplicationReductionStrategy=enums.
+                         MeanReductionStrategy.Post)
         self._popart_options = popart_options
 
     def gradientAccumulation(self, gradient_accumulation: int
@@ -366,6 +368,29 @@ class _TrainingOptions(_options_impl.OptionsDict):
         self.set(accumulation_and_replication_reduction_type=reduction_type)
         self._warnings_disabled.add(
             "accumulation_and_replication_reduction_type")
+        return self
+
+    def setMeanAccumulationAndReplicationReductionStrategy(
+            self, mean_reduction_strategy: "poptorch.MeanReductionStrategy"
+    ) -> "poptorch.options._TrainingOptions":
+        """Specify when to divide by a mean reduction factor when
+        ``accumulationAndReplicationReductionType`` is set to
+        ``ReductionType.Mean``.
+
+        :param mean_reduction_strategy:
+            * Running: Keeps the reduction buffer as the current mean. This is
+              preferred for numerical stability as the buffer value is never
+              larger than the magnitude of the largest micro batch gradient.
+            * Post: Divides by the accumulationFactor and replicatedGraphCount
+              after all of the gradients have been reduced. In some cases this
+              can be faster then using Running, however is prone to overflow.
+            * PostAndLoss (deprecated): Divides by the replicatedGraphCount
+              before the backwards pass, performs the gradient reduction
+              across micro batches, and then divides by the accumulationFactor.
+              This is to support legacy behaviour and is deprecated.
+        """
+        self.set(meanAccumulationAndReplicationReductionStrategy=
+                 mean_reduction_strategy)
         return self
 
     def setAutomaticLossScaling(self, enabled: bool
@@ -1096,9 +1121,7 @@ class Options(_options_impl.OptionsDict):
                          anchor_return_period=1,
                          connection_type=enums.ConnectionType.Always.value,
                          sync_pattern=enums.SyncPattern.Full.value,
-                         available_memory_proportion={},
-                         meanAccumulationAndReplicationReductionStrategy=enums.
-                         MeanReductionStrategy.Post)
+                         available_memory_proportion={})
         path = os.environ.get("POPTORCH_CACHE_DIR", "")
         if path:
             logger.info("POPTORCH_CACHE_DIR is set: setting cache path to %s",

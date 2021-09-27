@@ -13,10 +13,10 @@ class MeanReductionStrategy(enum.IntEnum):
     - ``Post``: Divides by the accumulationFactor and replicatedGraphCount after
       all of the gradients have been reduced. In some cases this can be
       faster then using Running, however is prone to overflow.
-    - ``PostAndLoss`` (deprecated): Divides by the  before the backwards pass,
-      performs the gradient reduction across micro batches, and then divides by
-      the accumulationFactor. This is to support legacy behaviour and is
-      deprecated.
+    - ``PostAndLoss`` (deprecated): Divides by the replicatedGraphCount before
+      the backwards pass, performs the gradient reduction across micro batches,
+      and then divides by the accumulationFactor. This is to support legacy
+      behaviour and is deprecated.
     """
     Running = 0
     Post = 1

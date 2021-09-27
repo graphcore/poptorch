@@ -133,8 +133,8 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
         if not hasattr(
                 optimizer,
                 "use_combined_accum") or not optimizer.use_combined_accum:
-            options.set(meanAccumulationAndReplicationReductionStrategy=enums.
-                        MeanReductionStrategy.Running)
+            options.Training.setMeanAccumulationAndReplicationReductionStrategy(
+                enums.MeanReductionStrategy.Running)
 
     # pylint: disable=protected-access
     auto_loss_scaling = options._Popart.options.get(
