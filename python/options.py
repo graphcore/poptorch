@@ -612,6 +612,29 @@ class _TensorLocationOptions(_options_impl.OptionsDict):
     ...     poptorch.TensorLocationSettings().useOnChipStorage(False))
     """
 
+    def numIOTiles(self, num_tiles: int) -> "poptorch.TensorLocationSettings":
+        """ Assigns the number of tiles on the IPU to be IO rather than compute.
+
+        Allocating IO (input/output) tiles reduces the number of IPU tiles
+        available for computation but allows you to use off-chip memory with
+        reduced latency by setting the option
+        :py:meth:`~poptorch.TensorLocationSettings.useIOTilesToLoad`.
+        As reducing the number of computation tiles may reduce peformance, you
+        should not use any IO tiles until you have successfully run your model
+        and used profiling to identify "streamCopy" entries which take up a
+        significant proportion of execution time.
+        """
+        assert isinstance(num_tiles, int)
+
+        err_msg = "numIOTiles must be an even number between 32 and 192."
+
+        assert num_tiles >= 32, err_msg
+        assert num_tiles <= 192, err_msg
+        assert num_tiles % 2 == 0, err_msg
+
+        self.createOrSet(numIOTiles=num_tiles)
+        return self
+
     def setActivationLocation(self, location: "poptorch.TensorLocationSettings"
                               ) -> "poptorch.options._TensorLocationOptions":
         """

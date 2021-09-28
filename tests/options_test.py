@@ -524,3 +524,19 @@ def test_mean_reduction_strategy_explicit():
     assert (getattr(options.Training,
                     "meanAccumulationAndReplicationReductionStrategy") ==
             MeanReductionStrategy.Running)
+
+
+def test_num_io_tiles():
+    options = poptorch.Options()
+
+    error_msg = "numIOTiles must be an even number between 32 and 192."
+    with pytest.raises(AssertionError, match=error_msg):
+        options.TensorLocations.numIOTiles(10)
+    with pytest.raises(AssertionError, match=error_msg):
+        options.TensorLocations.numIOTiles(193)
+    with pytest.raises(AssertionError, match=error_msg):
+        options.TensorLocations.numIOTiles(33)
+
+    options.TensorLocations.numIOTiles(32)
+    options.TensorLocations.numIOTiles(192)
+    options.TensorLocations.numIOTiles(100)
