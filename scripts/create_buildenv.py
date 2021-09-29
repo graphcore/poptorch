@@ -304,6 +304,7 @@ class BuildenvManager:
                 self._clear_activate_buildenv()
                 self._install_conda_if_needed(force_reinstall=True)
                 self._create_new_env(installers, is_retry=True)
+                return
             else:
                 raise
 
