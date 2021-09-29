@@ -142,10 +142,8 @@ class BuildenvManager:
                  output_dir=None,
                  python_version=None,
                  use_conda_toolchains=False,
-                 build_protobuf=False,
-                 popart_deps=False,
                  install_linters=False,
-                 poptorch_deps=True):
+                 **config):
         python_version = python_version or platform.python_version()
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
@@ -154,19 +152,11 @@ class BuildenvManager:
             f"python={python_version}", "gdb=8.3", "conda-pack=0.5.0"
         ]
         self.projects = {}
-        view_dir = os.path.dirname(_utils.sources_dir())
-        # Deprecated: will remove poptorch_deps / popart_deps once configure.py
-        # has been updated in the view
-        if poptorch_deps:
-            self.add_project("poptorch", os.path.join(view_dir, "poptorch"))
-        if popart_deps:
-            self.add_project("popart", os.path.join(view_dir, "popart"))
 
         if use_conda_toolchains:
             self.conda_packages += _conda_toolchains_packages
 
-        self.config = Config(install_linters=install_linters,
-                             build_protobuf=build_protobuf)
+        self.config = Config(install_linters=install_linters, **config)
         assert self.output_dir != _utils.sources_dir(), (
             "This script needs "
             "to be called from a build directory. Try mkdir build && cd build"
@@ -364,7 +354,7 @@ class BuildenvManager:
                                 "conda.sh")
         installer = os.path.join(self.cache_dir, "Miniconda_installer.sh")
         with self.cache_lock():
-            if os.path.isfile(conda_sh) or not force_reinstall:
+            if os.path.isfile(conda_sh) and not force_reinstall:
                 logger.info(
                     "System conda not found, using the instance from the cache "
                     "(%s) instead", self.cache_dir)
@@ -415,10 +405,6 @@ if __name__ == "__main__":
     parser.add_argument("--popart-deps",
                         action="store_true",
                         help="Install dependencies to build PopART.")
-    parser.add_argument(
-        "--build-protobuf",
-        action="store_true",
-        help="Build protobuf from sources instead of using the Conda package.")
     parser.add_argument("--no-linters",
                         action="store_true",
                         help="Don't install the linters.")
@@ -449,6 +435,5 @@ if __name__ == "__main__":
 
     manager = BuildenvManager(args.cache_dir, args.output_dir,
                               args.python_version, args.conda_toolchains,
-                              args.build_protobuf, args.popart_deps,
                               not args.no_linters)
     manager.create(args.create_template_if_needed)
