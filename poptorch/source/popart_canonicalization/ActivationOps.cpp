@@ -81,24 +81,19 @@ torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
 torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   auto x = node->input(0);
-  auto beta = node->input(1);
-  auto threshold = node->input(2);
+  auto input_type = getNodeScalarType(x);
+  auto beta = constantToFloat(node->input(1)->node());
+  auto threshold = constantToFloat(node->input(2)->node());
+  std::stringstream ss;
+  ss << "{\"beta\":" << std::to_string(beta)
+     << ",\"threshold\":" << std::to_string(threshold) << "}";
 
-  // beta defaults to 1
-  auto is_default = constantToFloat(beta->node()) == 1.0f;
+  auto output_node = createCustomOperation(
+      graph, {x}, "TorchSoftplus", "poptorch.custom_ops", 1, 1, ss.str());
 
-  if (!is_default) {
-    x = createMul(graph, {x, beta})->output();
-  }
-
-  auto y = createSoftplus(graph, {x})->output();
-
-  if (!is_default) {
-    y = createDiv(graph, {y, beta})->output();
-  }
-
-  auto below_threshold = createLess(graph, {x, threshold})->output();
-  return createWhere(graph, {below_threshold, y, node->input(0)});
+  output_node->output(0)->setType(c10::TensorType::create(
+      input_type, c10::nullopt, c10::nullopt, c10::nullopt));
+  return output_node;
 }
 
 } // namespace

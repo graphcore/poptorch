@@ -29,5 +29,14 @@ const popart::OperatorIdentifier upsample_bilinear2d = {
 const popart::OperatorIdentifier upsample_bilinear2d_grad = {
     "poptorch.custom_ops", "UpsampleBilinear2dGrad", 1};
 
+const popart::OperatorIdentifier torch_softplus = {
+    "poptorch.custom_ops", "TorchSoftplus", 1, {1}, 1};
+
+const popart::OperatorIdentifier torch_softplus_inplace = {
+    "poptorch.custom_ops", "TorchSoftplusInplace", 1, {1}, 1};
+
+const popart::OperatorIdentifier torch_softplus_grad = {
+    "poptorch.custom_ops", "TorchSoftplusGrad", 1, {1}, 1};
+
 } // namespace poptorch_custom_ops
 }
