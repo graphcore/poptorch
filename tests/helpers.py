@@ -69,6 +69,11 @@ def disableSmallModel():
     return {}
 
 
+def forceSmallModel():
+    # POPTORCH_IPU_MODEL takes precedence over POPTORCH_SMALL_IPU_MODEL
+    return {"POPTORCH_IPU_MODEL": "0", "POPTORCH_SMALL_IPU_MODEL": "1"}
+
+
 def disableAllModels():
     return {"POPTORCH_IPU_MODEL": "0", "POPTORCH_SMALL_IPU_MODEL": "0"}
 

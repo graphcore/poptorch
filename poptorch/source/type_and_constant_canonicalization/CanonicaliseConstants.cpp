@@ -63,7 +63,9 @@ UseOfNode getUseOfNode(torch::jit::Node *n) {
           // This must be host use as we have not reached an op which would be
           // run on popart yet.
           host_use = true;
-        } else if (popartOnlyNode(use_kind)) {
+        } else if (popartOnlyNode(use_kind) ||
+                   use_kind == symbols::poptorch::set_available_memory ||
+                   use_kind == symbols::poptorch::set_matmul_serialization) {
           popart_use = true;
         } else {
           // We only need to check the node further if it is neither returned

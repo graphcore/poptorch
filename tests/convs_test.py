@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import unittest.mock
 import torch
 import pytest
 import poptorch
@@ -165,23 +166,27 @@ def test_conv3D(op, padding_mode):
         execute_and_check_wrapper(model, input, training=False)
 
 
+# The test is reliant on an IPU model with limited memory, so force the small model
+@unittest.mock.patch.dict("os.environ", helpers.forceSmallModel())
 def test_available_memory():
     torch.manual_seed(42)
-    input = torch.randn(2, 4, 3, 10)
+    input = torch.randn(1, 4, 10, 10)
 
-    class BasicNetwork(torch.nn.Module):
+    class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.conv = torch.nn.Conv2d(4, 4, 3, stride=2)
+            self.conv = torch.nn.Conv2d(4, 1576, 10, stride=1)
 
-        def forward(self, x):
-            out = self.conv(x)
-            out = poptorch.set_available_memory(out, 0.6)
-            return out
+    Model.forward = lambda self, x: self.conv(x)
+    # Test that the small IPU model runs out of memory without AMP
+    with pytest.raises(poptorch.Error,
+                       match="receives more data than it has total memory"):
+        execute_and_check_wrapper(Model(), input)
 
-    # Just check we don't explode when the value is set.
-    model = BasicNetwork()
-    execute_and_check_wrapper(model, input)
+    Model.forward = lambda self, x: poptorch.set_available_memory(
+        self.conv(x), 0.5)
+    # Test that AMP fixes the OOM error
+    execute_and_check_wrapper(Model(), input)
 
 
 @pytest.mark.parametrize("mode", poptorch.MatMulSerializationMode)
