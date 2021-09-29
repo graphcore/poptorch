@@ -393,7 +393,6 @@ def test_return_and_use_nested_input():
             c = torch.tensor([1.])
 
             c = poptorch.set_available_memory(c, 0.1)
-            c = poptorch.set_available_memory(c, 0.2)
 
             return c, (c, input + c)
 
