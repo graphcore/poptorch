@@ -119,8 +119,18 @@ class Environment:
     def prefix(self):
         return self._buildenv_dir
 
-    def run_commands(self, *cmds):
-        _utils.run_commands(f". {self._activate_filename}", *cmds)
+    def run_commands(self,
+                     *cmds,
+                     env=None,
+                     stop_on_error=True,
+                     stdout_handler=None,
+                     stderr_handler=None):
+        _utils.run_commands(f". {self._activate_filename}",
+                            *cmds,
+                            env=env,
+                            stop_on_error=stop_on_error,
+                            stdout_handler=stdout_handler,
+                            stderr_handler=stderr_handler)
 
     def rmdir_if_exists(self, path):
         _utils.rmdir_if_exists(path)
@@ -166,6 +176,7 @@ class BuildenvManager:
         self.activate_filename = os.path.join(self.output_dir,
                                               "activate_buildenv.sh")
         self.env = Environment(self.buildenv_dir, self.activate_filename)
+        self.lock_already_acquired = False
 
     def add_project(self, project, project_dir):
         assert os.path.exists(project_dir)
@@ -208,7 +219,7 @@ class BuildenvManager:
                 # Share the os module as it's commonly used to get the current
                 # working directory, create directories, etc.
                 # pylint: disable=exec-used
-                exec(code, {"os":os}, exec_locals)
+                exec(code, {"os": os}, exec_locals)
 
         # Process the installers:
         other_installers = []
@@ -268,11 +279,42 @@ class BuildenvManager:
             """echo "export CXX=\\"ccache ${CXX:-g++}\\"" >> %s""" %
             self.activate_filename)
 
-    def _create_new_env(self, installers):
+    def _create_new_env(self, installers, is_retry=False):
+        """
+        Sometimes the Conda install in the NFS cache gets corrupted:
+
+            CondaVerificationError: The package for setuptools located at
+            /nfs/conda//miniconda/pkgs/setuptools-58.0.4-py38h578d9bd_2
+            appears to be corrupted.
+
+        When this happens: delete the conda install and start again with
+        "is_retry=True" to avoid getting stuck in an infinite loop.
+        """
+
         os.chdir(self.output_dir)
-        self.env.run_commands(
-            f"conda create --prefix {self.buildenv_dir} -c conda-forge "
-            f"-y {' '.join(self.conda_packages)}")
+        corrupted = False
+
+        def check_corruption(line):
+            nonlocal corrupted
+            if "CondaVerificationError" in line:
+                corrupted = True
+            logger.error(line)
+
+        stderr_handler = None if is_retry else check_corruption
+        try:
+            self.env.run_commands(
+                f"conda create --prefix {self.buildenv_dir} -c conda-forge "
+                f"-y {' '.join(self.conda_packages)}",
+                stderr_handler=stderr_handler)
+        except AssertionError:
+            if corrupted:
+                # We failed because of some corrupted packages: clear
+                # the environment, reinstall Conda and try again.
+                self._clear_activate_buildenv()
+                self._install_conda_if_needed(force_reinstall=True)
+                self._create_new_env(installers, is_retry=True)
+            else:
+                raise
 
         self._append_to_activate_buildenv(
             f"conda activate {self.buildenv_dir}", )
@@ -291,15 +333,23 @@ class BuildenvManager:
 
     @contextlib.contextmanager
     def cache_lock(self):
+        # Handle nested cache_lock scopes: if we already own the lock then
+        # don't try to lock it again.
+        if self.lock_already_acquired:
+            yield
+            return
+
         lock = os.path.join(self.cache_dir, "conda.lock")
         with open(lock, "w") as f:
             try:
                 fcntl.flock(f, fcntl.LOCK_EX)
+                self.lock_already_acquired = True
                 yield
             finally:
+                self.lock_already_acquired = False
                 fcntl.flock(f, fcntl.LOCK_UN)
 
-    def _install_conda_if_needed(self):
+    def _install_conda_if_needed(self, force_reinstall=False):
         os.makedirs(self.cache_dir, exist_ok=True)
         system_conda = _system_conda_path()
         if system_conda is not None:
@@ -314,7 +364,7 @@ class BuildenvManager:
                                 "conda.sh")
         installer = os.path.join(self.cache_dir, "Miniconda_installer.sh")
         with self.cache_lock():
-            if os.path.isfile(conda_sh):
+            if os.path.isfile(conda_sh) or not force_reinstall:
                 logger.info(
                     "System conda not found, using the instance from the cache "
                     "(%s) instead", self.cache_dir)
@@ -338,6 +388,7 @@ class BuildenvManager:
                             f"as ${installer}")
                     url = f"https://repo.anaconda.com/miniconda/Miniconda3-latest-{conda_os}-x86_64.sh"
                     urllib.request.urlretrieve(url, installer)
+                _utils.rmdir_if_exists(miniconda_install_dir)
                 _utils.run_commands(
                     f"bash {installer} -b -p {miniconda_install_dir}")
         assert os.path.isfile(conda_sh)
