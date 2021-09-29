@@ -71,7 +71,7 @@ public:
   TorchSoftplusComputex(float beta, float threshold)
       : _beta(beta), _threshold(threshold) {}
 
-  void inplace(poplar::program::Sequence &prog, snap::Graph &graph,
+  void inplace(snap::program::Sequence &prog, snap::Graph &graph,
                const snap::Tensor &tensor, const poplar::DebugNameAndId &dnai,
                const std::string &prefix) const final;
 
@@ -97,7 +97,7 @@ public:
 class TorchSoftplusGradOpx : public popart::popx::PopOpx {
 public:
   TorchSoftplusGradOpx(popart::Op *op, popart::popx::Devicex *devicex);
-  void grow(poplar::program::Sequence &prog) const final;
+  void grow(snap::program::Sequence &prog) const final;
 
 private:
   float _beta;

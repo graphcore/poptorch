@@ -126,7 +126,7 @@ TorchSoftplusOpx::TorchSoftplusOpx(popart::Op *op,
   verifyOp<TorchSoftplusOp>(op, {poptorch_custom_ops::torch_softplus});
 }
 
-void TorchSoftplusComputex::inplace(poplar::program::Sequence &prog,
+void TorchSoftplusComputex::inplace(snap::program::Sequence &prog,
                                     snap::Graph &graph,
                                     const snap::Tensor &tensor,
                                     const poplar::DebugNameAndId &dnai,
@@ -167,7 +167,7 @@ void TorchSoftplusComputex::inplace(poplar::program::Sequence &prog,
                                                bx <= pe::Const(_threshold)));
 
   popops::mapInPlace(graph.getPoplarGraph(), *exprs.back(),
-                     {tensor.getPoplarTensor()}, prog,
+                     {tensor.getPoplarTensor()}, prog.getPoplarSequence(),
                      {dnai, "torch_softplus"});
 }
 
@@ -193,7 +193,7 @@ TorchSoftplusGradOpx::TorchSoftplusGradOpx(popart::Op *op,
   _threshold = grad_op.threshold();
 }
 
-void TorchSoftplusGradOpx::grow(poplar::program::Sequence &prog) const {
+void TorchSoftplusGradOpx::grow(snap::program::Sequence &prog) const {
   // The derivative of the softplus activation function is:
   //
   // exp(beta*x)/(exp(beta*x) + 1) = 1/(exp(-beta*x) + 1) = sigmoid(beta*x)
@@ -222,10 +222,10 @@ void TorchSoftplusGradOpx::grow(poplar::program::Sequence &prog) const {
   exprs.push_back(std::make_unique<pe::Select>(*exprs.back(), pe::_1,
                                                bx <= pe::Const(_threshold)));
 
-  auto output =
-      popops::map(graph().getPoplarGraph(), *exprs.back(),
-                  {grad_in.getPoplarTensor(), fwd_input.getPoplarTensor()},
-                  prog, debugContext("torch_softplus_grad"));
+  auto output = popops::map(
+      graph().getPoplarGraph(), *exprs.back(),
+      {grad_in.getPoplarTensor(), fwd_input.getPoplarTensor()},
+      prog.getPoplarSequence(), debugContext("torch_softplus_grad"));
 
   setOutTensor(TorchSoftplusGradOp::getOutIndex(),
                snap::Tensor{output, graph()});
