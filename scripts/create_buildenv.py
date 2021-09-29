@@ -292,6 +292,7 @@ class BuildenvManager:
 
         stderr_handler = None if is_retry else check_corruption
         try:
+            _utils.rmdir_if_exists(self.buildenv_dir)
             self.env.run_commands(
                 f"conda create --prefix {self.buildenv_dir} -c conda-forge "
                 f"-y {' '.join(self.conda_packages)}",
