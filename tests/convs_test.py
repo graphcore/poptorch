@@ -172,21 +172,17 @@ def test_available_memory():
     torch.manual_seed(42)
     input = torch.randn(1, 4, 10, 10)
 
-    class Model(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv = torch.nn.Conv2d(4, 1576, 10, stride=1)
+    model = torch.nn.Conv2d(4, 1576, 10, stride=1)
 
-    Model.forward = lambda self, x: self.conv(x)
     # Test that the small IPU model runs out of memory without AMP
     with pytest.raises(poptorch.Error,
                        match="receives more data than it has total memory"):
-        execute_and_check_wrapper(Model(), input)
+        execute_and_check_wrapper(model, input)
 
-    Model.forward = lambda self, x: poptorch.set_available_memory(
-        self.conv(x), 0.5)
+    model.register_forward_hook(lambda _1, _2, conv: poptorch.
+                                set_available_memory(conv, 0.5))
     # Test that AMP fixes the OOM error
-    execute_and_check_wrapper(Model(), input)
+    execute_and_check_wrapper(model, input)
 
 
 @pytest.mark.parametrize("mode", poptorch.MatMulSerializationMode)

@@ -50,6 +50,7 @@ def test_name_scope():
     assert ir.find('"name":"NameScope/Add:InPlace"') != -1
 
 
+@helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
 def test_available_memory_last_op(capfd):
     class Model(torch.nn.Module):
