@@ -129,6 +129,7 @@ c10::Symbol identity_loss;
 c10::Symbol set_available_memory;
 c10::Symbol set_matmul_serialization;
 c10::Symbol set_overlap_for_input;
+c10::Symbol set_overlap_for_output;
 c10::Symbol optimizer_group;
 c10::Symbol begin_multi_conv;
 c10::Symbol multi_conv_part;
@@ -174,6 +175,7 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, set_available_memory);
   SYMBOL_INIT(poptorch, set_matmul_serialization);
   SYMBOL_INIT(poptorch, set_overlap_for_input);
+  SYMBOL_INIT(poptorch, set_overlap_for_output);
   SYMBOL_INIT(poptorch, optimizer_group);
   SYMBOL_INIT(poptorch, begin_multi_conv);
   SYMBOL_INIT(poptorch, multi_conv_part);
@@ -210,9 +212,9 @@ static void initializePoptorchSymbols() {
 } // namespace poptorch
 } // namespace symbols
 
-c10::Symbol getOverlapSymbol(unsigned int num) {
+c10::Symbol getOverlapSymbol(const char *suffix, unsigned int num) {
   std::stringstream overlap_ss;
-  overlap_ss << "poptorch_overlap" << num;
+  overlap_ss << "poptorch_overlap" << suffix << num;
   return c10::Symbol::attr(overlap_ss.str());
 }
 

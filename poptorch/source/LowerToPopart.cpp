@@ -466,9 +466,17 @@ void LowerToPopartImpl::lowerReturn() {
     } else {
       process_type(value->type());
     }
+
+    uint64_t output_num = 0;
     for (auto id : tensors) {
-      _compiler.addOutputTensor(id);
+      auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
+      ERROR_ON(!_graph.return_node()->hasAttribute(overlap_symbol));
+      auto overlap_str = _graph.return_node()->s(overlap_symbol);
+
+      _compiler.addOutputTensor(id, PopartAnchorTypes::N, 1,
+                                overlap_str.c_str());
       _output_tensor_hooks.push_back(id);
+      output_num++;
     }
   }
   logging::debug("  )");
@@ -967,7 +975,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     if (index < num_input_tensors) {
       // Return the input tensor id for input tensor of given type and dims.
 
-      auto overlap_symbol = getOverlapSymbol(index);
+      auto overlap_symbol = getOverlapSymbol("_for_input", index);
       std::string overlap_str("no_overlap");
       if (_graph.param_node()->hasAttribute(overlap_symbol)) {
         overlap_str = _graph.param_node()->s(overlap_symbol);

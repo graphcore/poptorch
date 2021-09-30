@@ -71,6 +71,7 @@ extern c10::Symbol identity_loss;
 extern c10::Symbol set_available_memory;
 extern c10::Symbol set_matmul_serialization;
 extern c10::Symbol set_overlap_for_input;
+extern c10::Symbol set_overlap_for_output;
 extern c10::Symbol optimizer_group;
 extern c10::Symbol begin_multi_conv;
 extern c10::Symbol multi_conv_part;
@@ -107,7 +108,7 @@ extern c10::Symbol clear_attribute;
 } // namespace symbols::poptorch
 
 // Return the attribute symbol refering to having overlap for a given input
-c10::Symbol getOverlapSymbol(unsigned int num);
+c10::Symbol getOverlapSymbol(const char *suffix, unsigned int num);
 
 } // namespace poptorch
 

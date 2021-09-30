@@ -290,6 +290,29 @@ def set_overlap_for_input(input_tensor: "torch.Tensor",
     return torch.ops.poptorch.set_overlap_for_input(input_tensor, mode.value)
 
 
+def set_overlap_for_output(output_tensor: "torch.Tensor",
+                           mode: "poptorch.OverlapMode") -> "torch.Tensor":
+    """Sets host overlap setting for output_tensor.
+
+    You can increase performance in some cases by overlapping the copying
+    from the IPUs to host with computation. However, this requires a number
+    of IPU tiles to be set aside as IO tiles using
+    :py:func:`poptorch.options._TensorLocationOptions.numIOTiles` which may
+    affect computation performance.
+
+    You should use this function at the end ofyour model's `forward` method
+    for each applicable output just before returning the tensor.
+
+    :param output_tensor: The output tensor for which enable overlapping host
+      IO.
+    :param mode: Control to what extent the host IO overlaps computation.
+    :returns: the output tensor, specified for overlap.
+
+    .. seealso:: :py:class:`poptorch.OverlapMode`.
+    """
+    return torch.ops.poptorch.set_overlap_for_output(output_tensor, mode.value)
+
+
 def _assertIdIsValid(name, value, expected_type):
     assert isinstance(value, expected_type) or \
             (isinstance(value, int) and value >= 0), (

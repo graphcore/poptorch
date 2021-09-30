@@ -101,6 +101,8 @@ void JITDispatch::markOutputs(
     const std::vector<at::Tensor> &outputs,
     const std::vector<at::Tensor> &persistent_data_storage) {
   (void)persistent_data_storage;
+
+  int64_t output_num = 0;
   for (const at::Tensor &tensor : outputs) {
     torch::jit::Value *val = _mapper.getValueForTensor(tensor);
 
@@ -109,6 +111,13 @@ void JITDispatch::markOutputs(
                    val->debugNameBase());
 
     graph.registerOutput(val);
+
+    // For now, disable overlapping host IO on every output
+    auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
+    const std::string value_str = "no_overlap";
+    graph.return_node()->s_(overlap_symbol, value_str);
+
+    output_num++;
   }
 }
 

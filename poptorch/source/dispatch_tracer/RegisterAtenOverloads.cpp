@@ -123,7 +123,12 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 std::shared_ptr<torch::jit::Graph> getTracedGraph() {
   auto jit = dynamic_cast<JITDispatch *>(context.active_dispatch.get());
   ERROR_ON_MSG(jit == nullptr, "[User Unreachable] Tracer context is null.");
-  return jit->graph.copy();
+  auto copied_graph = jit->graph.copy();
+
+  // torch::jit does not copy attributes on the return node, so copy them here
+  copied_graph->return_node()->copyAttributes(*jit->graph.return_node());
+
+  return copied_graph;
 }
 
 // Record these tensors as being the outputs of the graph.

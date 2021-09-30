@@ -11,7 +11,9 @@ INPUT_SIZE = 64
 
 def get_model(num_mat_muls,
               input_a_overlap=poptorch.OverlapMode.NoOverlap,
-              input_b_overlap=poptorch.OverlapMode.NoOverlap):
+              input_b_overlap=poptorch.OverlapMode.NoOverlap,
+              loss_overlap=poptorch.OverlapMode.NoOverlap,
+              sum_all_overlap=poptorch.OverlapMode.NoOverlap):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -54,9 +56,12 @@ def get_model(num_mat_muls,
                                      input_b))
 
                 sum_all = torch.sum(torch.stack(to_sum, dim=0), dim=0)
-                print(sum_all.shape)
 
                 loss = self.loss(sum_all.unsqueeze(dim=0), labels)
+
+                loss = poptorch.set_overlap_for_output(loss, loss_overlap)
+                sum_all = poptorch.set_overlap_for_output(
+                    sum_all, sum_all_overlap)
 
                 return loss, sum_all
 
@@ -157,3 +162,103 @@ def test_input_error_messages():
     opts.TensorLocations.numIOTiles(32)
     poptorch_model = poptorch.inferenceModel(model, options=opts)
     poptorch_model(torch.tensor([1.0]))
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_overlap_host_io_output():
+    num_mat_muls = 20
+    model = get_model(num_mat_muls, poptorch.OverlapMode.NoOverlap,
+                      poptorch.OverlapMode.NoOverlap,
+                      poptorch.OverlapMode.OverlapAccumulationLoop,
+                      poptorch.OverlapMode.OverlapAccumulationLoop)
+
+    num_grad_accumulations = 10
+    num_device_iterations = 20
+
+    opts = poptorch.Options()
+    opts.anchorMode(poptorch.AnchorMode.All)
+    opts.deviceIterations(num_device_iterations)
+    opts.setExecutionStrategy(poptorch.ShardedExecution())
+
+    opts.TensorLocations.numIOTiles(32)
+
+    opts.Training.gradientAccumulation(num_grad_accumulations)
+    poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    total_batch_size = num_grad_accumulations * num_device_iterations
+
+    input_a = torch.randn((total_batch_size, INPUT_SIZE))
+    input_b = torch.randn((total_batch_size, INPUT_SIZE))
+    labels = torch.randint(0, 1, (total_batch_size, INPUT_SIZE))
+
+    poptorch_model(input_a, input_b, labels)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+def test_output_error_messages():
+    class DoubleOutputUseModel(torch.nn.Module):
+        def forward(self, x):
+            y = x + 1
+            y2 = poptorch.set_overlap_for_output(
+                y, poptorch.OverlapMode.OverlapAccumulationLoop)
+            return y, y2
+
+    model = DoubleOutputUseModel()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    err_msg = (
+        r"poptorch\.set_overlap_for_output cannot be used with a tensor that "
+        + r"is returned twice\. Please check all returned tensors including " +
+        r"those nested in tuples/lists\.")
+    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+        poptorch_model(torch.tensor([1.0]))
+
+    opts = poptorch.Options()
+    opts.setExecutionStrategy(poptorch.ShardedExecution())
+
+    opts.TensorLocations.numIOTiles(32)
+
+    class MarkedOutputReuseBeforeModel(torch.nn.Module):
+        def forward(self, x):
+            y = x + 1
+            z = y + 1
+
+            y2 = poptorch.set_overlap_for_output(
+                y, poptorch.OverlapMode.OverlapAccumulationLoop)
+            return y2, z
+
+    model = MarkedOutputReuseBeforeModel()
+    poptorch_model = poptorch.inferenceModel(model, options=opts)
+    poptorch_model(torch.tensor([1.0]))
+
+    class MarkedOutputReuseAfterModel(torch.nn.Module):
+        def forward(self, x):
+            y = x + 1
+            y2 = poptorch.set_overlap_for_output(
+                y, poptorch.OverlapMode.OverlapAccumulationLoop)
+            z = y2 + 1
+            return y2, z
+
+    model = MarkedOutputReuseAfterModel()
+    poptorch_model = poptorch.inferenceModel(model, options=opts)
+    poptorch_model(torch.tensor([1.0]))
+
+    class NonOutputMarked(torch.nn.Module):
+        def forward(self, x):
+            x = poptorch.set_overlap_for_output(
+                x, poptorch.OverlapMode.OverlapAccumulationLoop)
+
+            y = x + 1
+            return y
+
+    model = NonOutputMarked()
+    poptorch_model = poptorch.inferenceModel(model, options=opts)
+
+    err_msg = (
+        r"poptorch\.set_overlap_for_output applied on a node which is " +
+        r"not a tensor output to the model\.")
+
+    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+        poptorch_model(torch.tensor([1.0]))

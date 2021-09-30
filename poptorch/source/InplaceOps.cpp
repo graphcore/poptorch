@@ -140,6 +140,13 @@ void InplaceOpHandler::processInput(size_t input_num) {
 
     if (output_mapping == InplaceOpHandler::no_mapping) {
       output_mapping = _graph->registerOutput(current_alias);
+
+      // Ensure the overlap flag is set to no overlap (any models wanting the
+      // additional efficiency of overalpped host IO should not use inplace
+      // ops.)
+      auto overlap_symbol =
+          getOverlapSymbol("_for_output", _graph->outputs().size() - 1);
+      _graph->return_node()->s_(overlap_symbol, "no_overlap");
     }
     _input_output_mapping.push_back(output_mapping);
   }

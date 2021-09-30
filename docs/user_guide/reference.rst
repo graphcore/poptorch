@@ -76,6 +76,8 @@ PopTorch Ops
 
 .. autofunction:: poptorch.set_overlap_for_input
 
+.. autofunction:: poptorch.set_overlap_for_output
+
 
 Model wrapping functions
 ========================

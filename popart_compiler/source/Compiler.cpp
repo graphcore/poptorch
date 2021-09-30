@@ -37,6 +37,25 @@ std::vector<std::string> convertType(std::vector<const char *> v) {
   return std::vector<std::string>(v.begin(), v.end());
 }
 
+// Convert an overlap string to a PopART TileSet and Exchange Strategy
+std::pair<popart::TileSet, popart::ExchangeStrategy>
+exchangeStrToPopartEnum(const char *overlap) {
+  std::pair<popart::TileSet, popart::ExchangeStrategy> tile_set_and_strat(
+      popart::TileSet::Compute, popart::ExchangeStrategy::JustInTime);
+
+  if (strcmp(overlap, "overlap_accumulation_loop") == 0) {
+    tile_set_and_strat.first = popart::TileSet::IO;
+    tile_set_and_strat.second = popart::ExchangeStrategy::OverlapInnerLoop;
+  } else if (strcmp(overlap, "overlap_device_iteration_loop") == 0) {
+    tile_set_and_strat.first = popart::TileSet::IO;
+    tile_set_and_strat.second = popart::ExchangeStrategy::OverlapLoops;
+  } else {
+    ERROR_ON(strcmp(overlap, "no_overlap") != 0);
+  }
+
+  return tile_set_and_strat;
+}
+
 // Variadic output case. For now we will add all outputs to the graph and
 // allocate them on the same IPU but we will only return one. This means only
 // one output can be used by user IR (but can still be used by the backed via
@@ -202,21 +221,13 @@ Compiler::addInputTensor(const char *type,
   popart::TensorInfo info{type, dims};
   popart::InputSettings settings;
 
-  if (strcmp(overlap, "no_overlap") != 0) {
+  auto tile_set_and_strat = exchangeStrToPopartEnum(overlap);
+  if (tile_set_and_strat.second != popart::ExchangeStrategy::JustInTime) {
     _impl->using_overlapped_io = true;
   }
 
-  if (strcmp(overlap, "overlap_accumulation_loop") == 0) {
-    settings.setTileSet(popart::TileSet::IO);
-    settings.setExchangeStrategy(popart::ExchangeStrategy::OverlapInnerLoop);
-  } else if (strcmp(overlap, "overlap_device_iteration_loop") == 0) {
-    settings.setTileSet(popart::TileSet::IO);
-    settings.setExchangeStrategy(popart::ExchangeStrategy::OverlapLoops);
-  } else {
-    ERROR_ON(strcmp(overlap, "no_overlap") != 0);
-    settings.setTileSet(popart::TileSet::Compute);
-    settings.setExchangeStrategy(popart::ExchangeStrategy::JustInTime);
-  }
+  settings.setTileSet(tile_set_and_strat.first);
+  settings.setExchangeStrategy(tile_set_and_strat.second);
 
   auto popart_id = _impl->active_builder->addInputTensor(info, settings);
   _impl->inputs.push_back(popart_id);
@@ -315,7 +326,8 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
 
 void Compiler::addOutputTensor(poptorch::TensorId output,
                                PopartAnchorTypes anchor_mode,
-                               size_t anchor_return_period) {
+                               size_t anchor_return_period,
+                               const char *overlap) {
   _impl->outputs.push_back(_impl->ids[output]);
 
   if (isHostSideConstant(output)) {
@@ -329,6 +341,17 @@ void Compiler::addOutputTensor(poptorch::TensorId output,
     }
   }
 
+  auto tile_set_and_strat = exchangeStrToPopartEnum(overlap);
+  if (tile_set_and_strat.second != popart::ExchangeStrategy::JustInTime) {
+    _impl->using_overlapped_io = true;
+  }
+
+  // Check for any use of overlapped io
+  // NB this relies on the fact that manual anchors never overlap and other
+  // outputs all have the same anchor_mode. If these assumptions change,
+  // the logic will have to make sure _impl->using_overlapped_io is correct
+  // before any call to this function rather than changed to true on the first
+  // instance.
   if (_impl->using_overlapped_io) {
     verifySettingsForOverlappedIO(anchor_mode);
   }
@@ -337,12 +360,15 @@ void Compiler::addOutputTensor(poptorch::TensorId output,
 
   // If we are returning EveryN we need to pass in the return period.
   if (anchor_mode == PopartAnchorTypes::EveryN) {
-    _impl->anchors.insert(
-        {_impl->ids[output],
-         popart::AnchorReturnType(as_str, anchor_return_period)});
+    _impl->anchors.insert({_impl->ids[output], popart::AnchorReturnType(
+                                                   as_str, anchor_return_period,
+                                                   tile_set_and_strat.first,
+                                                   tile_set_and_strat.second)});
   } else {
     _impl->anchors.insert(
-        {_impl->ids[output], popart::AnchorReturnType(as_str)});
+        {_impl->ids[output],
+         popart::AnchorReturnType(as_str, tile_set_and_strat.first,
+                                  tile_set_and_strat.second)});
   }
 }
 

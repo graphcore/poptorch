@@ -320,7 +320,8 @@ public:
   // clang-format on
   void addOutputTensor(poptorch::TensorId output,
                        PopartAnchorTypes anchor_mode = PopartAnchorTypes::N,
-                       size_t anchor_return_period = 1);
+                       size_t anchor_return_period = 1,
+                       const char *overlap = "no_overlap");
 
   void setUpInputOp(poptorch::TensorId id, float *ptr,
                     const std::vector<std::int64_t> &dims);

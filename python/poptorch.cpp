@@ -104,6 +104,11 @@ at::Tensor setOverlapForInput(at::Tensor t, const std::string &mode) {
   return t;
 }
 
+at::Tensor setOverlapForOutput(at::Tensor t, const std::string &mode) {
+  UNUSED(mode);
+  return t;
+}
+
 at::Tensor identityOp(at::Tensor t) { return t; }
 
 at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
@@ -242,6 +247,7 @@ static auto registry =
         .op("poptorch::optimizer_group", &optimizerGroup)
         .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
         .op("poptorch::set_overlap_for_input", &setOverlapForInput)
+        .op("poptorch::set_overlap_for_output", &setOverlapForOutput)
         .op("poptorch::recomputation_checkpoint", &identityOp)
         .op("poptorch::set_available_memory", &setAvailableMemory)
         .op("poptorch::begin_multi_conv", &nullOp)
