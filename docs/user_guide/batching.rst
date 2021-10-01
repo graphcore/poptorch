@@ -148,7 +148,7 @@ multiple IPUs to allow automatic data parallelism across many IPUs.
   :caption: Use of replication factor
   :start-after: replication_start
   :end-before: replication_end
-  :emphasize-lines: 8
+  :emphasize-lines: 13
   :linenos:
 
 .. _gradient_accumulation:
@@ -170,7 +170,7 @@ See also :py:class:`poptorch.Block`.
   :caption: Use of gradient accumulation
   :start-after: gradient_acc_start
   :end-before: gradient_acc_end
-  :emphasize-lines: 8
+  :emphasize-lines: 12
   :linenos:
 
 In the code example below, :py:class:`poptorch.Block` introduced in

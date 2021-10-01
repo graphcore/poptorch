@@ -54,9 +54,9 @@ class ExampleDataset(torch.utils.data.Dataset):
         return self._all_data[index], self._all_labels[index]
 
 
-def example():
-    # Set the batch size in the conventional sense of being the size that
-    # runs through an operation in the model at any given time
+def device_iterations_example():
+    # Set the number of samples for which activations/gradients are computed
+    # in parallel on a single IPU
     model_batch_size = 2
 
     # Create a poptorch.Options instance to override default options
@@ -77,17 +77,23 @@ def example():
     # Wrap the model in a PopTorch training wrapper
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
-    # Run over the training data with "batch_size" 200 essentially.
+    # Run over the training data, 100 batches at a time (specified in
+    # opts.deviceIterations())
     for batch_number, (data, labels) in enumerate(training_data):
         # Execute the device with a 100 iteration loop of batchsize 2.
-        # "output" and "loss" will be the respective output and loss of the final
-        # batch (the default AnchorMode).
+        # "output" and "loss" will be the respective output and loss of the
+        # final batch (the default AnchorMode).
 
         output, loss = poptorch_model(data, labels)
         print(f"{labels[-1]}, {output}, {loss}")
     # iterations_end
     poptorch_model.destroy()  # release the IPUs
 
+
+# replication_start
+def replication_factor_example():
+    # Set the number of samples for which activations/gradients are computed
+    # in parallel on a single IPU
     model_batch_size = 2
     # replication_start
     # Create a poptorch.Options instance to override default options
@@ -110,21 +116,28 @@ def example():
     # Wrap the model in a PopTorch training wrapper
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
-    # Run over the training data with "batch_size" 200 essentially.
+    # Run over the training data, 100 batches at a time (specified in
+    # opts.deviceIterations())
     for batch_number, (data, labels) in enumerate(training_data):
-        # Execute the device with a 100 iteration loop of batchsize 2 across
-        # 4 IPUs. "output" and "loss" will be the respective output and loss of the
-        # final batch of each replica (the default AnchorMode).
+        # Execute the device with a 100 iteration loop of model batchsize 2
+        # across 4 IPUs (global batchsize = 2 * 4 = 8). "output" and "loss"
+        # will be the respective output and loss of the final batch of each
+        # replica (the default AnchorMode).
         output, loss = poptorch_model(data, labels)
         print(f"{labels[-1]}, {output}, {loss}")
     # replication_end
     poptorch_model.destroy()  # release the IPUs
 
-    # gradient_acc_start
+
+# gradient_acc_start
+def gradient_accumulation_example():
+    # Set the number of samples for which activations/gradients are computed
+    # in parallel on a single IPU
+    model_batch_size = 2
     # Create a poptorch.Options instance to override default options
     opts = poptorch.Options()
 
-    # Run a 100 iteration loop on the IPU, fetching a new batch each time
+    # Run a 400 iteration loop on the IPU, fetching a new batch each time
     opts.deviceIterations(400)
 
     # Accumulate the gradient 8 times before applying it.
@@ -140,16 +153,20 @@ def example():
     # Wrap the model in a PopTorch training wrapper
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
-    # Run over the training data with "batch_size" 200 essentially.
+    # Run over the training data, 400 batches at a time (specified in
+    # opts.deviceIterations())
     for batch_number, (data, labels) in enumerate(training_data):
-        # Execute the device with a 100 iteration loop of batchsize 2 across
-        # 4 IPUs. "output" and "loss" will be the respective output and loss of the
+        # Execute the device with a 100 iteration loop of model batchsize 2
+        # with gradient updates every 8 iterations (global batchsize = 2 * 8 = 16).
+        # "output" and "loss" will be the respective output and loss of the
         # final batch of each replica (the default AnchorMode).
         output, loss = poptorch_model(data, labels)
         print(f"{labels[-1]}, {output}, {loss}")
     # gradient_acc_end
     poptorch_model.destroy()  # release the IPUs
 
+
+def data_accessor_example():
     # Not displayed: just to keep the linter happy
     shape = [3, 2]
     num_tensors = 100
@@ -227,5 +244,8 @@ def process(process_id=0, num_processes=1):
 
 # AsynchronousDataAccessor must run in the main process
 if __name__ == "__main__":
-    example()
+    device_iterations_example()
+    replication_factor_example()
+    gradient_accumulation_example()
+    data_accessor_example()
     process()
