@@ -25,6 +25,7 @@ New features
 - Fix issue where the last use of ``poptorch.set_available_memory`` would be pruned
 - Add documentation on available memory proportion to incorporate embeddings and indexing operations
 - Add documentation on how users can generate debug information
+- Support replicated tensor sharding when running on multiple processes
 
 API changes
 -----------
