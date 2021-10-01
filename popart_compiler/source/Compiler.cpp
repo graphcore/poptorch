@@ -574,6 +574,30 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
 
   auto model_name_set = _impl->options_set.count("model_name") > 0;
 
+  // Tensor location in PopART includes a shardingDomain option which sets
+  // which replicas to shard tensors across when using replicated tensor
+  // sharding. For now, only one option works for multiple processes, which is
+  // to set the type to consecutive across the number of local replica (which
+  // is equal to options.replicatedGraphCount on each process).
+  //
+  // The setting for a single process remains the default (All) which shards
+  // tensors across all replica.
+  //
+  // In future, GCL and PopART will support additional options, which can be
+  // exposed to the user.
+  if (_impl->options.num_distributed_processes > 1) {
+    popart::CommGroup sharding_domain(popart::CommGroupType::Consecutive,
+                                      options.replicatedGraphCount);
+    options.activationTensorLocationSettings.location.shardingDomain =
+        sharding_domain;
+    options.weightTensorLocationSettings.location.shardingDomain =
+        sharding_domain;
+    options.optimizerStateTensorLocationSettings.location.shardingDomain =
+        sharding_domain;
+    options.accumulatorTensorLocationSettings.location.shardingDomain =
+        sharding_domain;
+  }
+
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {
     // Create an inference session.
