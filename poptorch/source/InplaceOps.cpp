@@ -114,7 +114,7 @@ void InplaceOpHandler::processInput(size_t input_num) {
                             "supported when using replication i.e. "
                             "replicationFactor > 1 with poptorch.Options.\n"
                             "Last modification: "
-                                << *to_delete.back());
+                                << *current_alias->node());
 
     // Updating a variable means that the original variable matches
     ERROR_ON(*_collapsed_inputs[input_num]->type() != *current_alias->type());
