@@ -111,12 +111,12 @@ poptorch_model = poptorch.trainingModel(model,
                                         optimizer=torch.optim.Adam(
                                             model.parameters()))
 
-# Run over the training data with "batch_size" 250 essentially.
+# Run over the training data, 5 batches at a time.
 for batch_number, (data, labels) in enumerate(training_data):
     # Execute the device with a 5 iteration loop of batchsize 5 with 10
-    # gradient accumulatuons. "loss" and "accuracy" will be the sum across all
-    # device iterations and gradient accumulations but not across the module
-    # batch size.
+    # gradient accumulations (global batchsize = 5 * 10 = 50). "loss" and
+    # "accuracy" will be the sum across all device iterations and gradient
+    # accumulations but not across the model batch size.
     _, accuracy = poptorch_model(data, labels)
 
     # Correct for iterations
