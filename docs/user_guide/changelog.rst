@@ -14,8 +14,17 @@ New features
 - Support for ``torch.Tensor.T``
 - Support for ``torch.bool`` in ``torch.zeros``, ``torch.zeros_like``, ``torch.ones``, ``torch.ones_like``
 - Support for ``torch.scatter`` and its in-place variant
-
 - Support for in-place modification to buffers on IPU
+- Support for taking slices of scalars
+- Support version of bilinear upsampling specifying intended output size instead of scale factors
+- Add option for setting number of IO tiles via ``numIOTiles`` in ``poptorch.Options``
+- Improve PopTorch's parity with PyTorch's Softplus
+- Improve implementation of torch.SiLU by using Poplar's Swish operator
+- Additional support for operation overloads
+- Fix issue where PopTorch recalculated upsampling scales in fp16
+- Fix issue where the last use of ``poptorch.set_available_memory`` would be pruned
+- Add documentation on available memory proportion to incorporate embeddings and indexing operations
+- Add documentation on how users can generate debug information
 
 API changes
 -----------
