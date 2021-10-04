@@ -98,6 +98,15 @@ private:
                    constantToFloat(back_off));
     }
 
+    // enable_conv_dithering
+    torch::jit::Node *enable_conv_ditherings = end_node->input(5)->node();
+    _to_delete.insert(enable_conv_ditherings);
+    if (!isNone(enable_conv_ditherings)) {
+      std::vector<int64_t> vals = constantToLongVec(enable_conv_ditherings);
+      broadcast(vals, _parts.size());
+      end_node->is_(c10::Symbol::attr("enable_conv_ditherings"), vals);
+    }
+
     // Clear all the options from the end node inputs as they are now
     // incorporated as node attributes
     end_node->removeAllInputs();
