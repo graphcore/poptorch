@@ -305,8 +305,7 @@ class BuildenvManager:
                 self._install_conda_if_needed(force_reinstall=True)
                 self._create_new_env(installers, is_retry=True)
                 return
-            else:
-                raise
+            raise
 
         self._append_to_activate_buildenv(
             f"conda activate {self.buildenv_dir}", )
@@ -438,4 +437,5 @@ if __name__ == "__main__":
     manager = BuildenvManager(args.cache_dir, args.output_dir,
                               args.python_version, args.conda_toolchains,
                               not args.no_linters)
+    manager.add_project("poptorch", _utils.sources_dir())
     manager.create(args.create_template_if_needed)
