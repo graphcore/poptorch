@@ -1243,6 +1243,13 @@ void Compiler::setMultiConvPartialsTypes(
   _impl->multi_conv_builder->setPartialsTypes(partials_types);
 }
 
+void Compiler::setMultiConvEnableConvDithering(
+    const std::vector<int64_t> &conv_ditherings) {
+  ERROR_ON_MSG(_impl->multi_conv_builder == nullptr,
+               "Unexpected poptorch.MultiConv option: enable_conv_dithering");
+  _impl->multi_conv_builder->setEnableConvDithering(conv_ditherings);
+}
+
 void Compiler::setMultiConvPlanType(int64_t plan_type) {
   ERROR_ON_MSG(_impl->multi_conv_builder == nullptr,
                "Unexpected poptorch.MultiConv option: plan_type");

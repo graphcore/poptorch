@@ -459,6 +459,8 @@ public:
   void setMultiConvAvailableMemoryProportions(const std::vector<double> &v);
 
   void setMultiConvPartialsTypes(const std::vector<int64_t> &partials_types);
+  void
+  setMultiConvEnableConvDithering(const std::vector<int64_t> &conv_dithering);
 
   void setMultiConvPlanType(int64_t plan_type);
 

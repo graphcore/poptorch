@@ -28,6 +28,7 @@ New features
 - Add documentation on how users can generate debug information
 - Support replicated tensor sharding when running on multiple processes
 - Allow selection for a non-constant x input.
+- Support for ``enableConvDithering`` convolution option
 
 API changes
 -----------

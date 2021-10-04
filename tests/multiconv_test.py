@@ -92,7 +92,7 @@ def test_multiconv_options_broadcast():
         poptorch.MultiConv().availableMemoryProportions(0.8).partialsTypes(
             torch.float).planType(
                 poptorch.MultiConvPlanType.Parallel).perConvReservedTiles(
-                    100).cycleBackOff(0.3))
+                    100).cycleBackOff(0.3)).enableConvDithering(True)
 
     multiconv_harness(multiconv)
 
@@ -102,7 +102,7 @@ def test_multiconv_options_per_conv():
     multiconv = (poptorch.MultiConv().availableMemoryProportions(
         (0.8, 0.7)).partialsTypes(partials_types).planType(
             poptorch.MultiConvPlanType.Parallel).perConvReservedTiles(
-                120).cycleBackOff(0.4))
+                120).cycleBackOff(0.4)).enableConvDithering(True)
 
     multiconv_harness(multiconv)
 

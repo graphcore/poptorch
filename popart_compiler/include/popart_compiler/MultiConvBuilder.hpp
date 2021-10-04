@@ -49,6 +49,10 @@ public:
     _options.partialsTypes = type_strs;
   }
 
+  void setEnableConvDithering(const std::vector<int64_t> &v) {
+    _options.enableConvDithering = v;
+  }
+
   void setPlanType(int64_t plan_type) {
     if (plan_type == 0) {
       _options.planType = "parallel";
@@ -68,8 +72,8 @@ public:
     return opset.multiconv(_inputs, _dilations, {}, _pads, {}, _strides,
                            _options.availableMemoryProportions,
                            _options.partialsTypes, _options.planType,
-                           _options.perConvReservedTiles,
-                           _options.cycleBackOff);
+                           _options.perConvReservedTiles, _options.cycleBackOff,
+                           _options.enableConvDithering);
   }
 
 private:

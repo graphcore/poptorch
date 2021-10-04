@@ -412,6 +412,23 @@ class _TrainingOptions(_options_impl.OptionsDict):
                                  enabled)
         return self
 
+    def setConvolutionDithering(self, enabled: bool
+                                ) -> "poptorch.options._TrainingOptions":
+        """Enable convolution dithering.
+
+        If true, then convolutions with different parameters will be laid out
+        from different tiles in an effort to improve tile balance in models.
+
+        Use ``MultiConv`` to apply this option to specific set of convolutions.
+
+        :param enabled:
+            Enables or disables convolution dithering for all convolutions.
+        """
+
+        self._popart_options.set("convolutionOptions",
+                                 {"enableConvDithering": enabled})
+        return self
+
 
 class _PopartOptions:
     """Options specific to the PopART backend.

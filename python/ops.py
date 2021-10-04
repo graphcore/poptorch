@@ -733,6 +733,7 @@ class MultiConv():
         self._plan_type = None
         self._per_conv_reserved_tiles = None
         self._cycle_back_off = None
+        self._enable_conv_ditherings = None
 
     @staticmethod
     def _validatePerConvProperty(name, value, expected_scalar_type):
@@ -791,6 +792,30 @@ class MultiConv():
         self._partials_types = value
         return self
 
+    def enableConvDithering(self, value: Union[bool, List[bool]]
+                            ) -> "poptorch.MultiConv":
+        """Enable per-convolution dithering.
+
+        :param value: Can be a ``bool`` value in which case the same value is
+            used for all of the convolutions. Otherwise, can be a ``tuple`` or
+            ``list`` containing as many ``bool`` values as the number of
+            convolutions.
+        :returns: self, to support method chaining
+        """
+
+        if value is None:
+            self._enable_conv_ditherings = value
+        elif isinstance(value, (list, tuple)):
+            for x in value:
+                if not isinstance(x, bool):
+                    raise ValueError("value must be bool or list of bools")
+            self._enable_conv_ditherings = value
+        elif isinstance(value, bool):
+            self._enable_conv_ditherings = (value, )
+        else:
+            raise ValueError("value must be bool or list of bools")
+        return self
+
     def planType(self,
                  value: "poptorch.MultiConvPlanType") -> "poptorch.MultiConv":
         """Select the multi-convolution execution strategy.
@@ -840,7 +865,8 @@ class MultiConv():
         torch.ops.poptorch.end_multi_conv(self._available_memory_proportions,
                                           self._partials_types, plan_type,
                                           self._per_conv_reserved_tiles,
-                                          self._cycle_back_off)
+                                          self._cycle_back_off,
+                                          self._enable_conv_ditherings)
 
 
 class NameScope:

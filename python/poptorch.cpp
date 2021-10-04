@@ -205,12 +205,14 @@ void endMultiConv(
     c10::optional<c10::List<int64_t>> &&partials_types,
     c10::optional<int64_t> &&plan_type,
     c10::optional<int64_t> &&per_conv_reserved_tiles,
-    c10::optional<double> &&cycle_back_off) {
+    c10::optional<double> &&cycle_back_off,
+    c10::optional<c10::List<int64_t>> &&enableConvDithering) {
   UNUSED(available_memory_proportions);
   UNUSED(partials_types);
   UNUSED(plan_type);
   UNUSED(per_conv_reserved_tiles);
   UNUSED(cycle_back_off);
+  UNUSED(enableConvDithering);
 }
 
 void pushNameScope(const std::string &&name) { UNUSED(name); }

@@ -820,6 +820,11 @@ void LowerToPopartImpl::lowerBody() {
         _compiler.setMultiConvPartialsTypes(node->is(partials_types));
       }
 
+      auto conv_ditherings = c10::Symbol::attr("enable_conv_dithering");
+      if (node->hasAttribute(conv_ditherings)) {
+        _compiler.setMultiConvEnableConvDithering(node->is(conv_ditherings));
+      }
+
       auto plan_type = c10::Symbol::attr("plan_type");
       if (node->hasAttribute(plan_type)) {
         _compiler.setMultiConvPlanType(node->i(plan_type));
