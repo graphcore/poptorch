@@ -977,7 +977,7 @@ do this, see the `Custom operators
 chapter of the PopART User Guide.
 
 You can find some examples of PopART custom ops in the `Graphcore GitHub tutorials repository
-<https://github.com/graphcore/tutorials/tree/sdk-release-2.2/feature_examples/popart/custom_operators>`__.
+<https://github.com/graphcore/tutorials/tree/sdk-release-2.3/feature_examples/popart/custom_operators>`__.
 
 Compiling the PopART custom op will create a dynamic library file, which you can
 use with your PyTorch code.
