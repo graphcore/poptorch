@@ -22,6 +22,12 @@ class AdamWNoBias(poptorch.optim.AdamW):
         super().__init__(*args, bias_correction=False, **kwargs)
 
 
+poptorch_optimizers = [
+    poptorch.optim.SGD, poptorch.optim.Adam, poptorch.optim.AdamW,
+    poptorch.optim.RMSprop, poptorch.optim.LAMB, LAMBNoBias, AdamWNoBias
+]
+
+
 class OptimizerTestModel:
     def __init__(self, num_groups=1, options=None):
         layers = [torch.nn.Linear(10, 10) for _ in range(num_groups)]
@@ -54,12 +60,9 @@ class OptimizerTestModel:
         return self.poptorch_model(self.input, self.label)
 
 
-@pytest.mark.parametrize(
-    "opt", {
-        optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop, poptorch.optim.SGD,
-        poptorch.optim.Adam, poptorch.optim.AdamW, poptorch.optim.RMSprop,
-        poptorch.optim.LAMB, AdamWNoBias, LAMBNoBias
-    })
+@pytest.mark.parametrize("opt",
+                         [optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop] +
+                         poptorch_optimizers)
 def test_optimizer(opt):
     torch.manual_seed(42)
 
@@ -367,11 +370,7 @@ def test_optimizer_SGD_nesterov():
                       lr=0.001))
 
 
-@pytest.mark.parametrize(
-    "opt", {
-        poptorch.optim.SGD, poptorch.optim.Adam, poptorch.optim.AdamW,
-        poptorch.optim.RMSprop, poptorch.optim.LAMB, AdamWNoBias, LAMBNoBias
-    })
+@pytest.mark.parametrize("opt", poptorch_optimizers)
 def test_optimizer_const(opt):
     torch.manual_seed(42)
 
@@ -392,11 +391,7 @@ def test_optimizer_const(opt):
     model.run(optimizer)
 
 
-@pytest.mark.parametrize(
-    "opt", {
-        poptorch.optim.SGD, poptorch.optim.Adam, poptorch.optim.AdamW,
-        poptorch.optim.RMSprop, poptorch.optim.LAMB, AdamWNoBias, LAMBNoBias
-    })
+@pytest.mark.parametrize("opt", poptorch_optimizers)
 def test_optimizer_mark_as_variable(opt):
     torch.manual_seed(42)
 
@@ -947,3 +942,16 @@ def test_rmsprop_tf_variant(use_tf_variant):
                                 expected=model_tf.model.weight)
         helpers.assert_allequal(actual=out_pt, expected=out_tf)
         helpers.assert_allequal(actual=loss_pt, expected=loss_tf)
+
+
+@pytest.mark.parametrize("opt", poptorch_optimizers)
+def test_ipu_state_warning(opt):
+    model = torch.nn.Linear(2, 1)
+    # We don't need to actually train so set the LR to zero
+    optimizer = opt(model.parameters(), lr=0.00)
+
+    with pytest.warns(
+            None,
+            match="IPU-specific optimizer states cannot be read from the host."
+    ):
+        optimizer.state_dict()
