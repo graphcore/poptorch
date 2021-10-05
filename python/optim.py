@@ -251,6 +251,11 @@ class SGD(torch.optim.SGD):
         state["velocity_accum_type"] = self.velocity_accum_type
         return state
 
+    def state_dict(self) -> Dict[str, Any]:
+        logger.warning(
+            "IPU-specific optimizer states cannot be read from the host.")
+        return super().state_dict()
+
 
 class Adam(torch.optim.Adam):
     """ Adam optimizer.
@@ -346,6 +351,11 @@ class Adam(torch.optim.Adam):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         return state
+
+    def state_dict(self) -> Dict[str, Any]:
+        logger.warning(
+            "IPU-specific optimizer states cannot be read from the host.")
+        return super().state_dict()
 
 
 class AdamW(torch.optim.AdamW):
@@ -447,6 +457,11 @@ class AdamW(torch.optim.AdamW):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         return state
+
+    def state_dict(self) -> Dict[str, Any]:
+        logger.warning(
+            "IPU-specific optimizer states cannot be read from the host.")
+        return super().state_dict()
 
 
 class RMSprop(torch.optim.RMSprop):
@@ -558,6 +573,11 @@ class RMSprop(torch.optim.RMSprop):
                 self.second_order_momentum_accum_type
         state["use_tf_variant"] = self.use_tf_variant
         return state
+
+    def state_dict(self) -> Dict[str, Any]:
+        logger.warning(
+            "IPU-specific optimizer states cannot be read from the host.")
+        return super().state_dict()
 
 
 class LAMB(torch.optim.Optimizer):
@@ -725,6 +745,11 @@ class LAMB(torch.optim.Optimizer):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         return state
+
+    def state_dict(self) -> Dict[str, Any]:
+        logger.warning(
+            "IPU-specific optimizer states cannot be read from the host.")
+        return super().state_dict()
 
 
 def _check_constructor_match_parent(child_class: Type[torch.optim.Optimizer]
