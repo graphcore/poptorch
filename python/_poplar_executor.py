@@ -7,6 +7,7 @@ import os
 import pickle
 import re
 from typing import Callable, Dict, List, Optional
+import types
 import weakref
 import warnings
 import torch
@@ -1124,3 +1125,80 @@ class PoplarExecutor:
         # cause the tracer to fail, yet is none of the above types, or
         # alternatively, it is one of the above but the deepcopy failed.
         raise _impl.createPoptorchError("Unsupported input type or condition.")
+
+
+class IPUScope:
+    def __init__(self,
+                 inputs,
+                 parameters=None,
+                 options: Optional['poptorch.Options'] = None,
+                 compile_using=enums.Compiler.PopART):
+        self._executable = None
+        self._options = options or Options()
+        self._options = self._options.anchorMode(enums.AnchorMode.All)
+
+        self._compile_using = compile_using
+
+        if isinstance(parameters, types.GeneratorType):
+            parameters = {
+                **dict(parameters),
+            }
+
+        if parameters is None:
+            self._params_and_buffers = {}
+        else:
+            self._params_and_buffers = parameters
+
+        self._outputs = []
+        self._inputs = []
+
+        with torch.no_grad():
+            for tensor in inputs:
+                self._inputs.append(tensor.clone())
+
+        param_list = list(self._params_and_buffers.values())
+
+        # Create the graph. Futured captured calls will be written into this graph behind the scenes.
+        poptorch_core.createGraph(
+            poptorch_core.TracingMode(self._compile_using), inputs, param_list)
+
+    # Start capturing calls.
+    def __enter__(self):
+        poptorch_core.startDispatch()
+        return self
+
+    # Exit the scope. Compile graph and stop capturing call
+    def __exit__(self, type, value, traceback):
+        # Turn off the dispatcher.
+        poptorch_core.endDispatch()
+
+        # Compile for IPU.
+        self._executable = poptorch_core.compileWithManualTracing(
+            self._inputs, list(self._params_and_buffers.values()),
+            list(self._params_and_buffers.keys()), self._options.toDict(),
+            accessAttributes)
+        poptorch_core.copyWeightsToDevice_impl(
+            self._executable, tuple(self._params_and_buffers.keys()),
+            tuple(self._params_and_buffers.values()))
+
+    def __call__(self, *args):
+        # Otherwise run popart.
+        output = poptorch_core.execute(self._executable, args, {})
+
+        if len(output) == 1:
+            return output[0]
+
+        return output
+
+    def outputs(self, tensors):
+        # We don't want to catch anything in here.
+        poptorch_core.endDispatch()
+
+        with torch.no_grad():
+            for tensor in tensors:
+                self._outputs.append(tensor.clone())
+
+        poptorch_core.markOutputs(tensors, self._outputs)
+
+        # Turn dispatch back on.
+        poptorch_core.startDispatch()

@@ -156,6 +156,8 @@ endif()
 find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
 
 add_subdirectory(poptorch_logging)
+
+add_subdirectory(poptorch/source/dispatch_tracer)
 add_subdirectory(popart_compiler)
 add_subdirectory(python)
 

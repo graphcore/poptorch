@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import enum
+from . import poptorch_core  # type: ignore
 
 
 class MeanReductionStrategy(enum.IntEnum):
@@ -221,3 +222,13 @@ class MultiConvPlanType(enum.IntEnum):
     """
     Parallel = 0
     Serial = 1
+
+
+class Compiler(enum.IntEnum):
+    """Compiler to use to create the poplar binary.
+
+    - ``PopART``: Normal PopART backend.
+    - ``MLIR``: Use the new MLIR backend.
+    """
+    PopART = poptorch_core.TracingMode.PopART
+    MLIR = poptorch_core.TracingMode.MLIR

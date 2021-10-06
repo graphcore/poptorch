@@ -113,7 +113,7 @@ torch::jit::Node *celuHandler(torch::jit::Graph *graph,
   return createAdd(graph, {t4, t5});
 }
 
-torch::jit::Node *constantpadndHandler(torch::jit::Graph *graph,
+torch::jit::Node *constantPadNdHandler(torch::jit::Graph *graph,
                                        torch::jit::Node *node) {
   auto x = node->input(0);
   auto l = node->input(1);
@@ -222,7 +222,7 @@ torch::jit::Node *fullHandler(torch::jit::Graph *graph,
   return createCast(graph, t2, t5);
 }
 
-torch::jit::Node *fulllikeHandler(torch::jit::Graph *graph,
+torch::jit::Node *fullLikeHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   auto y = node->input(1);
   auto x = node->input(0);
@@ -278,7 +278,7 @@ torch::jit::Node *hardtanhHandler(torch::jit::Graph *graph,
   return createClip(graph, {x}, t0, t1);
 }
 
-torch::jit::Node *hingeembeddinglossHandler(torch::jit::Graph *graph,
+torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
   auto y = node->input(1);
   auto t0 = createConstantFloatLike(graph, y, {-1.0}, {})->output();
@@ -300,7 +300,7 @@ torch::jit::Node *hingeembeddinglossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {t8}, t10);
 }
 
-torch::jit::Node *indexselectHandler(torch::jit::Graph *graph,
+torch::jit::Node *indexSelectHandler(torch::jit::Graph *graph,
                                      torch::jit::Node *node) {
   auto x = node->input(0);
   auto i = node->input(2);
@@ -318,7 +318,7 @@ torch::jit::Node *isnanHandler(torch::jit::Graph *graph,
   return createIsnan(graph, {i0});
 }
 
-torch::jit::Node *l1lossHandler(torch::jit::Graph *graph,
+torch::jit::Node *l1LossHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -340,7 +340,7 @@ torch::jit::Node *leHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createLogical_or(graph, {t0, t1});
 }
 
-torch::jit::Node *leakyreluHandler(torch::jit::Graph *graph,
+torch::jit::Node *leakyReluHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -382,7 +382,7 @@ torch::jit::Node *log2Handler(torch::jit::Graph *graph,
   return createDiv(graph, {t0, t1});
 }
 
-torch::jit::Node *logsigmoidHandler(torch::jit::Graph *graph,
+torch::jit::Node *logSigmoidHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto x = node->input(0);
   auto t0 = createSigmoid(graph, {x})->output();
@@ -390,7 +390,7 @@ torch::jit::Node *logsigmoidHandler(torch::jit::Graph *graph,
   return createLog(graph, {t0});
 }
 
-torch::jit::Node *logicalandHandler(torch::jit::Graph *graph,
+torch::jit::Node *logicalAndHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto i0 = node->input(0);
   auto i1 = node->input(1);
@@ -398,14 +398,14 @@ torch::jit::Node *logicalandHandler(torch::jit::Graph *graph,
   return createLogical_and(graph, {i0, i1});
 }
 
-torch::jit::Node *logicalnotHandler(torch::jit::Graph *graph,
+torch::jit::Node *logicalNotHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto i0 = node->input(0);
   // logical_not(i0)
   return createLogical_not(graph, {i0});
 }
 
-torch::jit::Node *logicalorHandler(torch::jit::Graph *graph,
+torch::jit::Node *logicalOrHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   auto i0 = node->input(0);
   auto i1 = node->input(1);
@@ -420,7 +420,7 @@ torch::jit::Node *ltHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createLess(graph, {i0, i1});
 }
 
-torch::jit::Node *marginrankinglossHandler(torch::jit::Graph *graph,
+torch::jit::Node *marginRankingLossHandler(torch::jit::Graph *graph,
                                            torch::jit::Node *node) {
   auto y = node->input(2);
   auto t0 = createNeg(graph, {y})->output();
@@ -440,7 +440,7 @@ torch::jit::Node *marginrankinglossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {t5}, t7);
 }
 
-torch::jit::Node *maskedfillHandler(torch::jit::Graph *graph,
+torch::jit::Node *maskedFillHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto i1 = node->input(1);
   auto i2 = node->input(2);
@@ -449,7 +449,7 @@ torch::jit::Node *maskedfillHandler(torch::jit::Graph *graph,
   return createWhere(graph, {i1, i2, i0});
 }
 
-torch::jit::Node *mselossHandler(torch::jit::Graph *graph,
+torch::jit::Node *mseLossHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -488,7 +488,7 @@ torch::jit::Node *normalHandler(torch::jit::Graph *graph,
   return createRandomNormal(graph, {x}, t0, t1, t2);
 }
 
-torch::jit::Node *pixelshuffleHandler(torch::jit::Graph *graph,
+torch::jit::Node *pixelShuffleHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -538,7 +538,7 @@ torch::jit::Node *reciprocalHandler(torch::jit::Graph *graph,
   return createReciprocal(graph, {i0});
 }
 
-torch::jit::Node *reflectionpad1dHandler(torch::jit::Graph *graph,
+torch::jit::Node *reflectionPad1dHandler(torch::jit::Graph *graph,
                                          torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -562,7 +562,7 @@ torch::jit::Node *remainderHandler(torch::jit::Graph *graph,
   return createRemainder(graph, {i0, i1});
 }
 
-torch::jit::Node *replicationpad1dHandler(torch::jit::Graph *graph,
+torch::jit::Node *replicationPad1dHandler(torch::jit::Graph *graph,
                                           torch::jit::Node *node) {
   auto x = node->input(0);
   auto y = node->input(1);
@@ -648,7 +648,7 @@ torch::jit::Node *sinhHandler(torch::jit::Graph *graph,
   return createSinh(graph, {i0});
 }
 
-torch::jit::Node *smoothl1lossHandler(torch::jit::Graph *graph,
+torch::jit::Node *smoothL1LossHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   auto beta = node->input(3);
   auto x = node->input(0);
@@ -672,7 +672,7 @@ torch::jit::Node *smoothl1lossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {t9}, t11);
 }
 
-torch::jit::Node *softmarginlossHandler(torch::jit::Graph *graph,
+torch::jit::Node *softMarginLossHandler(torch::jit::Graph *graph,
                                         torch::jit::Node *node) {
   auto y = node->input(1);
   auto t0 = createNeg(graph, {y})->output();
@@ -808,7 +808,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::cat, catHandler);
   registerHandler(c10::aten::ceil, ceilHandler);
   registerHandler(c10::aten::celu, celuHandler);
-  registerHandler(c10::aten::constant_pad_nd, constantpadndHandler);
+  registerHandler(c10::aten::constant_pad_nd, constantPadNdHandler);
   registerHandler(c10::aten::cos, cosHandler);
   registerHandler(c10::aten::cosh, coshHandler);
   registerHandler(c10::aten::detach, detachHandler);
@@ -822,46 +822,46 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::floor, floorHandler);
   registerHandler(c10::aten::fmod, fmodHandler);
   registerHandler(c10::aten::full, fullHandler);
-  registerHandler(c10::aten::full_like, fulllikeHandler);
+  registerHandler(c10::aten::full_like, fullLikeHandler);
   registerHandler(c10::aten::ge, geHandler);
   registerHandler(c10::aten::gelu, geluHandler);
   registerHandler(c10::aten::gt, gtHandler);
   registerHandler(c10::aten::hardshrink, hardshrinkHandler);
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
-  registerHandler(c10::aten::hinge_embedding_loss, hingeembeddinglossHandler);
-  registerHandler(c10::aten::index_select, indexselectHandler);
+  registerHandler(c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler);
+  registerHandler(c10::aten::index_select, indexSelectHandler);
   registerHandler(c10::aten::isnan, isnanHandler);
-  registerHandler(c10::aten::l1_loss, l1lossHandler);
+  registerHandler(c10::aten::l1_loss, l1LossHandler);
   registerHandler(c10::aten::le, leHandler);
-  registerHandler(c10::aten::leaky_relu, leakyreluHandler);
+  registerHandler(c10::aten::leaky_relu, leakyReluHandler);
   registerHandler(c10::aten::log, logHandler);
   registerHandler(c10::aten::log10, log10Handler);
   registerHandler(c10::aten::log1p, log1pHandler);
   registerHandler(c10::aten::log2, log2Handler);
-  registerHandler(c10::aten::log_sigmoid, logsigmoidHandler);
-  registerHandler(c10::aten::logical_and, logicalandHandler);
-  registerHandler(c10::aten::logical_not, logicalnotHandler);
-  registerHandler(c10::aten::logical_or, logicalorHandler);
+  registerHandler(c10::aten::log_sigmoid, logSigmoidHandler);
+  registerHandler(c10::aten::logical_and, logicalAndHandler);
+  registerHandler(c10::aten::logical_not, logicalNotHandler);
+  registerHandler(c10::aten::logical_or, logicalOrHandler);
   registerHandler(c10::aten::lt, ltHandler);
-  registerHandler(c10::aten::margin_ranking_loss, marginrankinglossHandler);
-  registerHandler(c10::aten::masked_fill, maskedfillHandler);
-  registerHandler(c10::aten::mse_loss, mselossHandler);
+  registerHandler(c10::aten::margin_ranking_loss, marginRankingLossHandler);
+  registerHandler(c10::aten::masked_fill, maskedFillHandler);
+  registerHandler(c10::aten::mse_loss, mseLossHandler);
   registerHandler(c10::aten::ne, neHandler);
   registerHandler(c10::aten::neg, negHandler);
   registerHandler(c10::aten::normal_, normalHandler);
-  registerHandler(c10::aten::pixel_shuffle, pixelshuffleHandler);
+  registerHandler(c10::aten::pixel_shuffle, pixelShuffleHandler);
   registerHandler(c10::aten::pow, powHandler);
   registerHandler(c10::aten::prelu, preluHandler);
   registerHandler(c10::aten::rand, randHandler);
   registerHandler(c10::aten::randn, randnHandler);
   registerHandler(c10::aten::reciprocal, reciprocalHandler);
-  registerHandler(c10::aten::reflection_pad1d, reflectionpad1dHandler);
-  registerHandler(c10::aten::reflection_pad2d, reflectionpad1dHandler);
+  registerHandler(c10::aten::reflection_pad1d, reflectionPad1dHandler);
+  registerHandler(c10::aten::reflection_pad2d, reflectionPad1dHandler);
   registerHandler(c10::aten::relu, reluHandler);
   registerHandler(c10::aten::remainder, remainderHandler);
-  registerHandler(c10::aten::replication_pad1d, replicationpad1dHandler);
-  registerHandler(c10::aten::replication_pad2d, replicationpad1dHandler);
-  registerHandler(c10::aten::replication_pad3d, replicationpad1dHandler);
+  registerHandler(c10::aten::replication_pad1d, replicationPad1dHandler);
+  registerHandler(c10::aten::replication_pad2d, replicationPad1dHandler);
+  registerHandler(c10::aten::replication_pad3d, replicationPad1dHandler);
   registerHandler(c10::aten::round, roundHandler);
   registerHandler(c10::aten::rsqrt, rsqrtHandler);
   registerHandler(c10::aten::rsub, rsubHandler);
@@ -872,8 +872,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::silu, siluHandler);
   registerHandler(c10::aten::sin, sinHandler);
   registerHandler(c10::aten::sinh, sinhHandler);
-  registerHandler(c10::aten::smooth_l1_loss, smoothl1lossHandler);
-  registerHandler(c10::aten::soft_margin_loss, softmarginlossHandler);
+  registerHandler(c10::aten::smooth_l1_loss, smoothL1LossHandler);
+  registerHandler(c10::aten::soft_margin_loss, softMarginLossHandler);
   registerHandler(c10::aten::softshrink, softshrinkHandler);
   registerHandler(c10::aten::sqrt, sqrtHandler);
   registerHandler(c10::aten::square, squareHandler);

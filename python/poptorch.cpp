@@ -4,6 +4,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
+
 #include <torch/csrc/jit/passes/constant_propagation.h>
 #include <torch/csrc/jit/passes/dead_code_elimination.h>
 #include <torch/csrc/jit/passes/lower_graph.h>
@@ -26,6 +27,7 @@
 
 #include "poptorch/AliasProcessing.hpp"
 #include "poptorch/AutomaticCasting.hpp"
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/ImplicitCasting.hpp"
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/LowerToPopart.hpp"
@@ -935,8 +937,8 @@ void copyWeightsToHostImpl(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors) {
+  // Copy the weights or warn if this is before first time compilation.
   try {
-    // Copy the weights or warn if this is before first time compilation.
     if (!executable) {
       logging::warn(
           "Call to copyWeightsToHost ignored as model has not been compiled "
@@ -953,8 +955,8 @@ void copyWeightsToDeviceImpl(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors) {
+  // Copy the weights or warn if this is before first time compilation.
   try {
-    // Copy the weights or warn if this is before first time compilation.
     if (!executable) {
       logging::warn(
           "Call to copyWeightsToDevice ignored as model has not been compiled "
@@ -1224,6 +1226,34 @@ void throwTestErrorSafe(TestErrorType type) {
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
+    std::vector<at::Tensor> &inputs, const std::vector<at::Tensor> &parameters,
+    const std::vector<std::string> &parameter_names,
+    const pybind11::dict &options, const py::function &attribute_accessor) {
+  try {
+    std::cout << "Compile with manual tracing" << std::endl;
+    std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
+
+    std::cout << *graph << std::endl;
+
+    AnchorList anchors_list;
+    std::vector<Optimizer> optimizers;
+
+    auto inplace_op_handler =
+        std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
+
+    poptorch::LowerToPopart lower(
+        graph.get(), parameters, parameter_names, inplace_op_handler, false,
+        std::move(optimizers), parseSessionOptions(options), attribute_accessor,
+        callbacks, std::move(anchors_list));
+
+    lower.lower(&inputs);
+
+    return lower.compile();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
 } // namespace poptorch
 
 class Error : public py::object {
@@ -1300,6 +1330,20 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("registerCPUCallBack", poptorch::registerCPUCallBack);
   m.def("isAlreadyRegistered", poptorch::alreadyRegistered);
   m.def("registerBuffersWithCallback", poptorch::registerBuffersWithCallback);
+
+  py::enum_<poptorch::TracingMode>(m, "TracingMode")
+      .value("PopART", poptorch::TracingMode::POPART)
+      .value("MLIR", poptorch::TracingMode::MLIR)
+      .value("CPU", poptorch::TracingMode::CPU)
+      .value("Sentinel", poptorch::TracingMode::SENTINEL)
+      .export_values();
+
+  m.def("startDispatch", poptorch::startDispatch);
+  m.def("endDispatch", poptorch::endDispatch);
+  m.def("createGraph", poptorch::createGraph);
+  m.def("markOutputs", poptorch::markOutputs);
+  m.def("compileWithManualTracing", poptorch::compileWithManualTracing);
+
   m.def("_throwTestError", poptorch::throwTestErrorSafe);
 
   static Error error(m, "Error");

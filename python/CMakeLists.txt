@@ -73,16 +73,20 @@ pybind11_add_module(poptorch_core SHARED SYSTEM
   ${POPTORCH_CORE_SOURCES}
   )
 
+
 target_link_libraries(poptorch_core PRIVATE
+  popart_compiler
   torch
   ${TORCH_PYTHON_LIBRARY}
-  popart_compiler
-  poptorch_logging)
+  poptorch_logging
+  dispatch_tracer
+)
 
 target_include_directories(poptorch_core PRIVATE
   "${PROJECT_SOURCE_DIR}/poptorch/include"
   "${PROJECT_SOURCE_DIR}/poptorch_logging/include"
-  "${PROJECT_SOURCE_DIR}/popart_compiler/include")
+  "${PROJECT_SOURCE_DIR}/popart_compiler/include"
+)
 
 install(TARGETS poptorch_core
   DESTINATION ${INSTALL_PYDIR})

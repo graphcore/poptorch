@@ -90,10 +90,11 @@ serial_tests = [
 #pylint: enable=line-too-long
 
 
-def add_test(output, test, folder, test_id, test_properties):
-    output.write(f"add_test({test} \"{folder}/timeout_handler.py\" \"python3\""
-                 f" \"-m\" \"pytest\" \"-s\" \"{folder}/{test}\" "
-                 f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
+def add_test(output, test, root_folder, folder, test_id, test_properties):
+    output.write(
+        f"add_test({test} \"{root_folder}/timeout_handler.py\" \"python3\""
+        f" \"-m\" \"pytest\" \"-s\" \"{folder}/{test}\" "
+        f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
 
     props_string = " ".join(f"{k} {v}" for k, v in test_properties.items())
 
@@ -106,7 +107,7 @@ with open(args.output_file, "w") as output:
     test_id = 0
     # Add the short_tests files
     for test in short_tests:
-        add_test(output, test, args.test_dir, test_id, {
+        add_test(output, test, args.test_dir, args.test_dir, test_id, {
             "LABELS": "short",
             "WORKING_DIRECTORY": work_dir
         })
@@ -124,6 +125,20 @@ with open(args.output_file, "w") as output:
             # Use os.path.basename() to ensure we only have
             # the filename
             test_file = os.path.basename(m.group(1))
+
+            dir_path = args.test_dir
+
+            if os.path.dirname(m.group(1)) != "tests":
+                # Convert to a proper path.
+                path = os.path.normpath(m.group(1))
+
+                # Seperate out the dirs and remove the "tests" from the start
+                # and the test name from the end.
+                separate_dirs = path.split(os.sep)[1:-1]
+
+                # Append the dirs to the start of the root dir one.
+                dir_path = os.path.join(dir_path, *separate_dirs)
+
             if test_file in short_tests:
                 continue
             labels = []
@@ -139,5 +154,5 @@ with open(args.output_file, "w") as output:
                 test_properties['LABELS'] = ";".join(labels)
 
             add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
-                     test_id, test_properties)
+                     dir_path, test_id, test_properties)
             test_id += 1
