@@ -27,7 +27,7 @@ from .enums import *
 from .ops import *
 from .options import *
 from ._impl import isRunningOnIpu, createPoptorchError
-from ._poplar_executor import PoplarExecutor
+from ._poplar_executor import PoplarExecutor, IPUScope
 from . import optim
 from . import profiling
 
@@ -560,6 +560,17 @@ def inferenceModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
+
+    #parameters_named = {
+    #    **dict(model.named_parameters()),
+    #    **dict(model.named_buffers())
+    #}
+
+    # Run on IPU.
+    #with poptorch.IPUScope([image_input], parameters_named) as poptorch_model:
+    #    out = model(image_input)
+    #    poptorch_model.outputs([out])
+
     if isinstance(model, PoplarExecutor):
         model = model._user_model  # pylint: disable=protected-access
     return PoplarExecutor(model=copy.copy(model),
@@ -603,3 +614,11 @@ def setLogLevel(level: Union[str, int]):
         * OFF:  Print nothing.
     """
     _logging.setLogLevel(level)
+
+
+def startDispatch():
+    poptorch_core.startDispatch()
+
+
+def endDispatch():
+    poptorch_core.endDispatch()

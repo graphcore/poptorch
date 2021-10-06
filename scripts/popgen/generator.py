@@ -137,5 +137,5 @@ def generate(script, namespace, filename, global_symbols):
 # Parameters:
 #   aten - the name of the operator
 def get_op_name(aten):
-    opname = aten.split(':')[-1].replace('_', '')
+    opname = aten.split(':')[-1]
     return opname
