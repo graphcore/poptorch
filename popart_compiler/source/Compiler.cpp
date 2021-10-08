@@ -565,17 +565,22 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   _impl->setOptionIfNotSet(options.constantWeights, false, "constantWeights");
 
   if (_impl->options.execution_mode == detail::ExecutionMode::Pipelined) {
-    ERROR_ON_MSG(_impl->used_ipus.size() > popartBatchDim(),
-                 "poptorch.Options.deviceIterations("
-                     << _impl->options.steps
-                     << ") * poptorch.Options.gradientAccumulation("
-                     << _impl->popart_options.accumulationFactor
-                     << ") * poptorch.Options.replicationFactor("
-                     << _impl->popart_options.replicatedGraphCount
-                     << ") = " << popartBatchDim()
-                     << " must be greater or equal than the number of IPUs used"
-                        " by the model: "
-                     << _impl->used_ipus.size());
+    ERROR_ON_MSG(
+        _impl->used_ipus.size() > popartBatchDim(),
+        "poptorch.Options.deviceIterations("
+            << _impl->options.steps
+            << (_impl->is_training
+                    ? ") * poptorch.Options.gradientAccumulation("
+                    : "")
+            << (_impl->is_training
+                    ? std::to_string(_impl->popart_options.accumulationFactor)
+                    : "")
+            << ") * poptorch.Options.replicationFactor("
+            << _impl->popart_options.replicatedGraphCount
+            << ") = " << popartBatchDim()
+            << " must be greater or equal than the number of IPUs used"
+               " by the model: "
+            << _impl->used_ipus.size());
   }
 
   _impl->setOptionIfNotSet(options.enableGradientAccumulation,
