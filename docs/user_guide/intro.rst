@@ -79,10 +79,10 @@ detect the loss value to backpropagate the gradients from.
 Parallel and Distributed execution
 ==================================
 
-To scale your models, you can enable :ref:`parallel_execution` using
+To scale your models, you can enable :ref:`execution_strategies` using
 PopTorch's :ref:`annotation_tools` to label or wrap individual parts of your
 model and assign parts of the model to an individual IPU or execution phase.
-You can also use PopTorch's :ref:`execution_strategies` to determine how the
+You can also use PopTorch's :ref:`available_execution_strategies` to determine how the
 model executes the phases.
 
 Having assigned the model to run on one or more IPUs, you can add additional

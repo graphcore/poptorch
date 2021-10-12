@@ -196,21 +196,25 @@ Example:
     :end-before: error_handling_end
     :caption: How to handle recoverable / unrecoverable errors
 
-.. _parallel_execution:
+.. _execution_strategies:
 
-Execution strategies
-====================
+Multi-IPU execution strategies
+==============================
 
 This section describes strategies to run PopTorch code on more than one IPU.
-Some of these allow code to be run in parallel on multiple IPUs.
-We recommended that you use these parallel execution strategies with
-PopTorch code that is already working correctly on a single IPU.
+Some of these allow you to run code in parallel on multiple IPUs.
+You will need to use one of these execution strategies for PopTorch code that
+does not fit on a single IPU.
+
+.. note:: In general, we advise pipelining over as few IPUs as possible.
+  However, You may need to experiment to find the optimal pipeline length.
+  In some corner cases, a longer pipeline can lead to faster throughput.
 
 There are four kinds of execution strategies that you can use to run a model on a
 multi-IPU device:
 
-* :py:class:`~poptorch.ShardedExecution`
 * :py:class:`~poptorch.PipelinedExecution`
+* :py:class:`~poptorch.ShardedExecution`
 * :py:class:`~poptorch.SerialPhasedExecution`
 * :py:class:`~poptorch.ParallelPhasedExecution`
 
@@ -236,22 +240,21 @@ IPUs.
 
 .. _annotation_tools:
 
-Annotation tools
-----------------
+Annotations
+-----------
 
-poptorch.Block, poptorch.BeginBlock and poptorch.BlockFunction
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Model partitioning using blocks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:py:class:`~poptorch.BeginBlock` and :py:class:`~poptorch.Block` are wrapper
-classes used to define model parallelism in a multi-IPU device. They partition
-models into "blocks" to be executed on different IPUs.
+:py:class:`~poptorch.BeginBlock` is a wrapper class, :py:class:`~poptorch.Block`
+is a context manager, and :py:func:`~poptorch.BlockFunction` is a function
+decorator. These partition models into "blocks" that can be executed on
+different IPUs. You can use them to define model sharding on a multi-IPU device.
 
-You can use :py:class:`~poptorch.Block` to define a scope in the context of the
-model.
-
-In the example below, all layers before ``model.bert.encoder.layer[0]`` will be
-put on IPU 0 and all layers from ``model.bert.encoder.layer[0]`` onwards
-(inclusive) will be on IPU 1.
+You can use :py:class:`~poptorch.BeginBlock` to annotate an existing model. Each
+call, with example arguments ``(layer_n, ipu_id=m)``, places all layers before
+``layer_n`` on IPU ``m-1`` and all layers from ``layer_n`` onwards (inclusive)
+on IPU ``m``.
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -261,9 +264,10 @@ put on IPU 0 and all layers from ``model.bert.encoder.layer[0]`` onwards
     :emphasize-lines: 37-38, 41-42, 45-46
     :caption: Annotating existing layers
 
-:py:class:`~poptorch.BeginBlock` is an annotation defined outside the
-model, and applied to current and onward layers. You can use both forms
-interchangeably.
+You can use :py:class:`~poptorch.Block` to annotate a model from within its
+definition. This context manager class defines a scope in the context of
+the model. Everything within that scope is placed on the IPU specified (unless
+overridden by a :py:class:~poptorch.Stage).
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -273,8 +277,10 @@ interchangeably.
     :emphasize-lines: 16, 19, 22, 26
     :caption: Annotating a model directly
 
-In addition, :py:func:`~poptorch.BlockFunction` is a decorator which can
-decorate an existing function.
+In addition, you can use the :py:func:`~poptorch.BlockFunction` function decorator
+to place functions (containing one or more layers) onto a particular block.
+Everything within that function is placed on the IPU specified (unless
+overridden by a :py:class:~poptorch.Stage)
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -284,9 +290,15 @@ decorate an existing function.
     :emphasize-lines: 19, 25
     :caption: Annotating functions
 
-Either annotation is enough to enable parallel execution in the simple cases.
-By default, the layers before the first :py:class:`~poptorch.BeginBlock` will be
-placed on IPU 0.
+You can use any, or a combination, of these three annotation options.
+In the above examples, ``ipu_id`` is used to specify blocks. This alone is
+sufficient to enable parallel execution: by default,
+:py:class`~poptorch.AutoStage` will set up a pipeline for which the pipeline
+stage is equal to the ``ipu_id`` for each block. However, it would be equally
+valid to instead use the ``user_id`` argument to assign names to each block.
+Then, using :py:class`~poptorch.Stage` or :py:class`~poptorch.Phase` classes,
+you can manually assign each block in a pipeline using their names, as outlined
+in the next sections.
 
 :py:class:`~poptorch.BeginBlock`, :py:class:`~poptorch.Block` and
 :py:func:`~poptorch.BlockFunction`  need to follow a set of rules:
@@ -317,7 +329,7 @@ Conceptually, :py:class:`~poptorch.BeginBlock` and
 :py:class:`~poptorch.Block` collect the
 layers of a model into a :py:class:`~poptorch.Stage`.
 You can combine multiple stages into a :py:class:`~poptorch.Phase`.
-Multiple phases form a parallel execution strategy.
+Multiple phases form an execution strategy.
 
 poptorch.Stage
 """"""""""""""
@@ -330,7 +342,7 @@ and identified by their ``user_id``.
 You can define consecutive layers in a model in either the same
 stage or consecutive stages.
 Whether stages run in parallel or sequentially depends on the specific
-parallel execution strategy.
+execution strategy.
 
 Internally, each operation in a model is assigned a ``stage_id``
 through :py:class:`~poptorch.Stage`.
@@ -437,21 +449,56 @@ used:
   :emphasize-lines: 25, 32, 47-48, 51-52
   :name: parallel_phased_example
 
-.. _execution_strategies:
-
-Parallel execution strategies
------------------------------
-
-With the above functions as building blocks, we can set execution strategies
+With the above functions as building blocks, you can set execution strategies
 using the four kinds of execution modes, as shown below.
+
+.. _available_execution_strategies:
+
+Available execution strategies
+------------------------------
 
 Note that you can use the same annotation for each execution strategy.
 They only differ in the method of parallelisation and tensor locations.
 
+Pipelined execution
+^^^^^^^^^^^^^^^^^^^
+
+:py:class:`~poptorch.PipelinedExecution` is the default execution strategy.
+It extends :ref:`sharded_execution` with parallel execution on multiple
+IPUs.
+
+Parallelisation in :py:class:`~poptorch.PipelinedExecution`
+requires :py:meth:`~poptorch.Options.deviceIterations` (required for inference
+only, but speeds up training) and
+:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
+(for training only) as explained in :numref:`efficient_data_batching`.
+:py:meth:`~poptorch.Options.deviceIterations` must be greater than or equal to
+the number of IPUs used by the model.
+:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` must be
+greater than or equal to the number of pipeline stages (forward and backward).
+As well as these constraints, you must also consider the batch dimension, which
+must be a multiple of
+:py:meth:`~poptorch.Options.deviceIterations` *
+:py:meth:`~poptorch.Options.replicationFactor` *
+:py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation` during
+training and :py:meth:`~poptorch.Options.deviceIterations` *
+:py:meth:`~poptorch.Options.replicationFactor` during inference.
+
+After one stage has finished processing a batch
+on one IPU, it immediately starts processing the next batch.
+This creates a pipeline where multiple batches are processed in parallel.
+
+An IPU can only start its own stage of a batch after
+its previous stage of the current batch has been processed.
+Hence, all IPUs will be occupied after a "warm-up" period.
+
+At the end of processing, a "cool-down" period is required to aggregate the results and apply weight
+updates.
+
 .. _sharded_execution:
 
-poptorch.ShardedExecution
-^^^^^^^^^^^^^^^^^^^^^^^^^
+Sharded execution
+^^^^^^^^^^^^^^^^^
 
 In this strategy, each IPU
 will sequentially execute a distinct part of the model.
@@ -474,30 +521,6 @@ You need to place layers that share weights on the same IPU.
 :py:class:`~poptorch.ShardedExecution` can be useful
 for processing a single sample or for debugging.
 Overall, it has low efficiency because only one IPU is used at a time.
-
-
-poptorch.PipelinedExecution
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-This is the default execution strategy.
-It extends :ref:`sharded_execution` with parallel execution on multiple
-IPUs.
-
-Parallelisation in :py:class:`~poptorch.PipelinedExecution`
-requires :py:meth:`~poptorch.Options.deviceIterations`
-and :py:meth:`~poptorch.options._TrainingOptions.gradientAccumulation`
-as explained in :numref:`efficient_data_batching`.
-
-After one stage is finished with processing a batch
-on one IPU, it starts immediately processing the next batch.
-This creates a pipeline where multiple batches are processed in parallel.
-
-An IPU can only start its own stage of a batch after
-its previous stage of the current batch has been processed.
-Hence, all IPUs will be occupied after a "warm-up" period.
-
-At the end of processing, a "cool-down" period is required to aggregate the results and apply weight
-updates.
 
 
 Phased execution
@@ -530,8 +553,8 @@ but you can decide whether a phase is shared by both
 forward and backward passes. In other words, you decide whether to avoid
 a memory transfer of a portion of the weights and activations.
 
-poptorch.SerialPhasedExecution
-""""""""""""""""""""""""""""""
+Serial phased execution
+"""""""""""""""""""""""
 
 In :py:class:`~poptorch.SerialPhasedExecution`,
 phases execute on a single group of IPUs sequentially.
@@ -546,8 +569,8 @@ phases execute on a single group of IPUs sequentially.
 The code above causes all phases to run serially on IPUs 0 and 1.
 (A,B and C on IPU 0, A2, B2, C2 on IPU 1).
 
-poptorch.ParallelPhasedExecution
-""""""""""""""""""""""""""""""""
+Parallel phased execution
+"""""""""""""""""""""""""
 
 In :py:class:`~poptorch.ParallelPhasedExecution`,
 phases are executed in parallel alternating between two groups of IPUs.
