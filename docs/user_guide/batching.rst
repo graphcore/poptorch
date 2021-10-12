@@ -18,6 +18,9 @@ actually sent for a single step.
    accidentally changing the effective batch size for operations which depend on
    it, such as batch normalization.
 
+You can find a detailed tutorial regarding efficient data loading, batching and tuning
+relevant hyperparameters in PopTorch on Graphcore's tutorials repository: `PopTorch tutorial: Efficient data loading  <https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut2_efficient_data_loading>`_.
+
 poptorch.DataLoader
 ===================
 

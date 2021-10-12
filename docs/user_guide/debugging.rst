@@ -30,7 +30,7 @@ be a model output.
 
 You can create an anchor by calling :py:func:`~poptorch.Options.anchorTensor`.
 It takes two mandatory string parameters: a convenient user-defined name for
-the anchor and the name of the chosen tensor. Optionally, you may spacify the
+the anchor and the name of the chosen tensor. Optionally, you may specify the
 anchor mode as well as the anchor return period. In order for this option setting
 to take effect, they must be set before model compilation.
 
@@ -59,4 +59,6 @@ the two tensors we have anchored previously.
   :end-before: tensor_retrieve_end
   :emphasize-lines: 4, 5
 
-
+For a more practical understanding around observing tensors, Graphcore's tutorials
+repository contains a tutorial you can follow about observing tensors, using anchoring and generating a gradient histogram:
+`PopTorch tutorial: Observing tensors <https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut4_observing_tensors>`_.
