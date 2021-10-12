@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 project(poptorch)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Default to local install prefix" FORCE)
 endif()
