@@ -1233,10 +1233,10 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     const std::vector<std::string> &parameter_names,
     const pybind11::dict &options, const py::function &attribute_accessor) {
   try {
-    std::cout << "Compile with manual tracing" << std::endl;
+    logging::debug("Compile with manual tracing");
     std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
 
-    std::cout << *graph << std::endl;
+    logging::debug("Traced graph: {}", *graph);
 
     AnchorList anchors_list;
     std::vector<Optimizer> optimizers;

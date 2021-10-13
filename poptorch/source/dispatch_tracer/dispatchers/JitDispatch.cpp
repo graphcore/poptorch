@@ -195,7 +195,7 @@ at::Tensor JITDispatch::convolution(
                  output.sizes());
 
   // Run our normal canonicalisation passes on it.
-  canonicaliseAndFixOutput(schema, stack, fake_target);
+  canonicaliseAndFixOutput(schema, stack, &fake_target);
 
   return output;
 }
@@ -206,8 +206,11 @@ at::Tensor JITDispatch::detach(const at::Tensor &self) { return self; }
 // Convert the operation into our normal IR style operation.
 void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                                            c10::Stack &stack,
-                                           torch::jit::Node *fake_target) {
-  torch::jit::Node *new_node = canonicalise(schema, fake_target, graph, false);
+                                           torch::jit::Node **fake_target) {
+  torch::jit::Node *new_node = canonicalise(schema, *fake_target, graph, false);
+
+  // Point fake_target at the new node
+  *fake_target = new_node;
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation {}", *new_node);
 
@@ -270,7 +273,8 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *fake_target);
 
   // Run our normal canonicalisation passes on it.
-  canonicaliseAndFixOutput(schema, *stack, fake_target);
+  // The original fake_target node will be deleted but replaced with a new node.
+  canonicaliseAndFixOutput(schema, *stack, &fake_target);
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation {}", *fake_target);
 
