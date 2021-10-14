@@ -901,7 +901,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   printGraphBeforeHalfFloatResolution(*graph);
 
   poptorch::annotateSubgraphs(graph.get());
-  // Resolve
+
   poptorch::resolveHalfOrFloat(graph.get());
 
   // Enforce any constraints that aren't enforced by popart.

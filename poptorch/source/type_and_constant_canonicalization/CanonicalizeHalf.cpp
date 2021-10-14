@@ -18,11 +18,11 @@ class ConvertHalfImpl {
 public:
   explicit ConvertHalfImpl(torch::jit::Graph *g) : _graph(g) {}
 
-  // Convert the inputs to the graph (I.E both user input and parameters.)
+  // Convert the inputs to the graph (i.e. both user input and parameters).
   void convertGraphInputs(const std::vector<at::Tensor> &in_tensors,
                           const std::vector<at::Tensor> &parameters);
 
-  // Resolve types which are ambiguiously between half or float
+  // Resolve types which are ambiguiously between half or float.
   void resolveHalfOrFloat();
 
 private:
@@ -36,6 +36,16 @@ private:
 
   static void resolveNodeDtype(torch::jit::Node *node,
                                at::ScalarType scalar_type);
+
+  // Duplicate poptorch::tensor_constants that are re-used throughout the graph
+  // and have uses resolved to different types as a result of
+  // resolveHalfOrFloat(). Constant re-use only happens in sufficiently large
+  // graphs.
+  void duplicateConstantsWithMixedHalfFloatUses();
+
+  static std::vector<torch::jit::Node *>
+  usersOfScalarType(at::ScalarType type,
+                    const std::vector<torch::jit::Use> &uses);
 
   torch::jit::Graph *_graph;
 };
@@ -157,7 +167,77 @@ void ConvertHalfImpl::resolveHalfOrFloat() {
       }
     }
   }
+  duplicateConstantsWithMixedHalfFloatUses();
 }
+
+std::vector<torch::jit::Node *>
+ConvertHalfImpl::usersOfScalarType(const at::ScalarType type,
+                                   const std::vector<torch::jit::Use> &uses) {
+  std::vector<torch::jit::Node *> users;
+  for (const auto &use : uses) {
+    for (auto output : use.user->outputs()) {
+      auto output_type = output->type()->cast<c10::TensorType>();
+      if (!output_type || !output_type->scalarType()) {
+        continue;
+      }
+      if ((*output_type->scalarType()) == type) {
+        users.push_back(use.user);
+      }
+    }
+  }
+  return users;
+}
+
+void ConvertHalfImpl::duplicateConstantsWithMixedHalfFloatUses() {
+  logging::LogContext ctx_func("DuplicateConstantsWithMixedHalfFloatUses");
+
+  for (auto node : _graph->nodes()) {
+    if (node->kind() != symbols::poptorch::tensor_constant) {
+      continue;
+    }
+
+    // Take only half/float constants into account as we are resolving the
+    // output of a half/float resolution pass.
+    auto tensor_type = node->output()->type()->cast<c10::TensorType>();
+    if (!tensor_type || !tensor_type->scalarType()) {
+      continue;
+    }
+    auto scalar_type = *(tensor_type->scalarType());
+    if (scalar_type != at::ScalarType::Half &&
+        scalar_type != at::ScalarType::Float) {
+      continue;
+    }
+
+    auto invalid_type = scalar_type == at::ScalarType::Float
+                            ? at::ScalarType::Half
+                            : at::ScalarType::Float;
+
+    auto invalid_nodes =
+        usersOfScalarType(invalid_type, node->output()->uses());
+    if (invalid_nodes.empty()) {
+      continue;
+    }
+
+    // Duplicate the constant.
+    auto new_node = _graph->createClone(
+        node, [](torch::jit::Value *value) { return value; });
+    logging::trace("Duplicating constant {} with {}", nodeToString(node),
+                   nodeToString(new_node));
+
+    new_node->output()->setType(
+        new_node->output()->type()->expect<c10::TensorType>()->withScalarType(
+            invalid_type));
+    auto new_tensor =
+        new_node->t(c10::attr::value).to(invalid_type).contiguous();
+    new_node->t_(c10::attr::value, new_tensor);
+
+    new_node->insertBefore(node);
+    for (auto invalid_node : invalid_nodes) {
+      invalid_node->replaceInputWith(node->output(), new_node->output());
+    }
+  }
+}
+
 } // namespace
 
 void canonicaliseHalfInputs(torch::jit::Graph *graph,

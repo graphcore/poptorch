@@ -46,7 +46,7 @@ void canonicaliseHalfInputs(torch::jit::Graph *graph,
                             const std::vector<at::Tensor> &in_tensors,
                             const std::vector<at::Tensor> &parameters);
 
-// Resolve types which are ambiguiously between half or float
+// Resolve types which are ambiguiously between half or float.
 void resolveHalfOrFloat(torch::jit::Graph *graph);
 
 // Clean up the graph if it is using CPU offloading.
