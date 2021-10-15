@@ -118,12 +118,15 @@ struct Optimizer {
 
   explicit Optimizer(OptimizerType t, bool useTfVariant)
       : type(t), accum_types_provided(false), use_tf_variant(useTfVariant) {}
+  explicit Optimizer(OptimizerType t, bool useTfVariant, float maxGradNorm)
+      : type(t), accum_types_provided(false), use_tf_variant(useTfVariant),
+        max_grad_norm(maxGradNorm) {}
   Optimizer(OptimizerType t, bool accumType, bool firstOrderType,
-            bool secondOrderType, bool useTfVariant)
+            bool secondOrderType, bool useTfVariant, float maxGradNorm)
       : type(t), accum_types_provided(true), accum_type_is_half(accumType),
         first_order_momentum_accum_type_is_half(firstOrderType),
         second_order_momentum_accum_type_is_half(secondOrderType),
-        use_tf_variant(useTfVariant) {}
+        use_tf_variant(useTfVariant), max_grad_norm(maxGradNorm) {}
 
   // Copies the value and constness of one parameter to another
   void copyParam(const Optimizer &source_optim, const char *source,
@@ -142,6 +145,7 @@ struct Optimizer {
   bool first_order_momentum_accum_type_is_half;
   bool second_order_momentum_accum_type_is_half;
   bool use_tf_variant;
+  float max_grad_norm;
 
   std::vector<Parameter> parameters;
 };

@@ -95,6 +95,11 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
     def isNeverConst(_value):
         return False
 
+    def isNotNaN(value, name):
+        if value == float("nan"):
+            raise ValueError(f"{name} must not be NaN")
+        return value
+
     # Separate attributes which can be set per group (And therefore are stored
     # in `defaults` and `param_groups`) and the ones which are global and just
     # stored as attributes of the optimizer.
@@ -120,6 +125,8 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
                 _OptimizerGetter(torch.float32), isFloat16)
     _AttrReader(attr_readers, "use_tf_variant", _OptimizerGetter(False),
                 assertRMSProp)
+    _AttrReader(attr_readers, "max_grad_norm", _OptimizerGetter(float("Inf")),
+                isNotNaN)
     # Optimizer variables: global, can change over time.
     #     source: opt.name
     #     format: {name: (value, is_const)}

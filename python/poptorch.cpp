@@ -390,6 +390,11 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
     getOptimizerValue(use_tf_variant, opt, "useTfVariant");
   }
 
+  float max_grad_norm = std::numeric_limits<float>::infinity();
+  if (opt.contains("maxGradNorm")) {
+    getOptimizerValue(max_grad_norm, opt, "maxGradNorm");
+  }
+
   if (opt.contains("accumType")) {
     bool accum_type = false;
     bool first_order_momentum_accum_type = false;
@@ -410,12 +415,13 @@ std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
     // Create one Optimizer per parameter group + 1 for defaults
     for (std::uint64_t i = 0; i <= num_groups; ++i) {
       optimizers.emplace_back(type, accum_type, first_order_momentum_accum_type,
-                              second_order_momentum_accum_type, use_tf_variant);
+                              second_order_momentum_accum_type, use_tf_variant,
+                              max_grad_norm);
     }
   } else {
     // Create one Optimizer per parameter group + 1 for defaults
     for (std::uint64_t i = 0; i <= num_groups; ++i) {
-      optimizers.emplace_back(type, use_tf_variant);
+      optimizers.emplace_back(type, use_tf_variant, max_grad_norm);
     }
   }
 

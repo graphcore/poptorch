@@ -15,6 +15,7 @@ New features
   either for inference (transpose) or gradient calculation.
 
 - Migrated to PyTorch version 1.10.0
+- Support for gradient clipping by norm in ``poptorch.optim`` optimizers
 
 API changes
 -----------

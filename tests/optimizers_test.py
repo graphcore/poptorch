@@ -1124,3 +1124,83 @@ def test_read_ipu_state_cached(caplog, capfd):
     # the internal optimiser state hasn't changed
     training_model.get_optim_state_dict()
     assert "Using cached optimiser state dict" in caplog.text
+
+
+@pytest.mark.parametrize("opt", [(optim.SGD, poptorch.optim.SGD),
+                                 (optim.Adam, poptorch.optim.Adam),
+                                 (optim.AdamW, poptorch.optim.AdamW)],
+                         ids=['SGD', 'Adam', 'AdamW'])
+def test_gradient_clipping(opt):
+    torch.manual_seed(42)
+    max_norm = 0.001
+
+    class Stepper:
+        def __init__(self, model, lr, optimizer):
+            self.lr = lr
+            self.original_model = model
+            self.setup_torch(model, optimizer[0])
+            self.setup_poptorch(model, optimizer[1])
+            self.check_parameters()
+
+        def setup_torch(self, model, optimizer):
+            self.torch_model = copy.deepcopy(model)
+            self.optimizer = optimizer(self.torch_model.parameters(),
+                                       lr=self.lr)
+
+        def setup_poptorch(self, model, optimizer):
+            self.ipu_model = copy.deepcopy(model)
+            ipu_optimizer = optimizer(self.ipu_model.parameters(),
+                                      lr=self.lr,
+                                      max_grad_norm=max_norm)
+            self.training_model = poptorch.trainingModel(
+                self.ipu_model, optimizer=ipu_optimizer)
+
+        def check_parameters(self):
+            for expected, actual in zip(
+                    self.torch_model.named_parameters(),
+                    self.training_model.named_parameters()):
+                expected = expected[1]
+                actual = actual[1]
+                helpers.assert_allclose(actual=actual,
+                                        expected=expected,
+                                        atol=1e-5,
+                                        rtol=1e-5)
+
+        def torch_step(self, batch):
+            self.optimizer.zero_grad()
+            _, loss = self.torch_model(batch)
+            loss = loss.sum()
+            loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(self.torch_model.parameters(),
+                                           max_norm)
+
+            self.optimizer.step()
+            return loss
+
+        def poptorch_step(self, batch):
+            _, loss = self.training_model(batch)
+            return loss
+
+    num_samples = 10
+    X = torch.randn(num_samples)
+    lr = 0.01
+    num_steps = 10
+
+    torch_loss = torch.empty(num_steps)
+    poptorch_loss = torch.empty(num_steps)
+
+    stepper = Stepper(helpers.ModelWithWeights(torch.nn.LogSoftmax(), X.shape),
+                      lr=lr,
+                      optimizer=opt)
+
+    for i in range(num_steps):
+        torch_loss[i] = stepper.torch_step((X, ))
+        poptorch_loss[i] = stepper.poptorch_step((X, ))
+
+        stepper.check_parameters()
+
+    helpers.assert_allclose(expected=torch_loss,
+                            actual=poptorch_loss,
+                            atol=1e-5,
+                            rtol=1e-5)

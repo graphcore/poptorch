@@ -146,6 +146,7 @@ public:
   popart::DataType first_order_momentum_accum_type;
   popart::DataType second_order_momentum_accum_type;
   bool use_tf_variant;
+  float max_grad_norm;
   std::map<std::string, std::pair<float, bool>> params;
 };
 
@@ -164,6 +165,7 @@ std::string OptimizerParameters::debug() const {
     ss << ", secondOrderMomentumAccumType=" << second_order_momentum_accum_type;
   }
   ss << ", useTfVariant=" << use_tf_variant;
+  ss << ", maxGradNorm=" << max_grad_norm;
   return ss.str();
 }
 
@@ -179,7 +181,7 @@ OptimizerParameters::OptimizerParameters(const Optimizer &opt, bool is_default)
           opt.second_order_momentum_accum_type_is_half
               ? popart::DataType::FLOAT16
               : popart::DataType::FLOAT),
-      use_tf_variant(opt.use_tf_variant) {
+      use_tf_variant(opt.use_tf_variant), max_grad_norm(opt.max_grad_norm) {
   // In Popart the attributes which can be specified per group are prefixed with
   // "default" For example learningRate -> defaultLearningRate In order to keep
   // it simple the PopTorch frontend will always use the group name, therefore
@@ -700,12 +702,20 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
   // Print to debug the new optimizer.
   logging::debug("Updating graph optimizer with {}", opt.debug());
 
+  ERROR_ON_MSG(std::isnan(opt.max_grad_norm),
+               "Maximum norm of gradients cannot be NaN");
+
+  std::vector<popart::ClipNormSettings> clipnorms;
+  if (opt.max_grad_norm != std::numeric_limits<float>::infinity()) {
+    clipnorms.push_back(
+        popart::ClipNormSettings::clipAllWeights(opt.max_grad_norm));
+  }
+
   switch (opt.type) {
   case OptimizerType::SGD1: {
     ERROR_ON(!opt.accum_types_provided);
-
     auto optimizer = std::unique_ptr<popart::SGD>(new popart::SGD(
-        opt.params, {}, popart::SGDAccumulatorAndMomentum::Combined,
+        opt.params, clipnorms, popart::SGDAccumulatorAndMomentum::Combined,
         popart::DataType::UNDEFINED, popart::DataType::UNDEFINED));
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
@@ -720,7 +730,7 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
     }
 
     auto optimizer = std::unique_ptr<popart::SGD>(new popart::SGD(
-        opt.params, {}, popart::SGDAccumulatorAndMomentum::Separate,
+        opt.params, clipnorms, popart::SGDAccumulatorAndMomentum::Separate,
         opt.accum_type, opt.first_order_momentum_accum_type));
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
@@ -748,7 +758,7 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
     auto optimizer = std::make_unique<popart::Adam>(
         opt.params, adam_mode, decay_mode, opt.accum_type,
         opt.first_order_momentum_accum_type,
-        opt.second_order_momentum_accum_type);
+        opt.second_order_momentum_accum_type, clipnorms);
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
   }

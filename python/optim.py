@@ -146,7 +146,7 @@ class SGD(torch.optim.SGD):
     # All the attributes and variables which don't exist in the parent optimizer class.
     _child_only = _child_vars + [
         "velocity_scaling", "use_combined_accum", "accum_type",
-        "velocity_accum_type"
+        "velocity_accum_type", "max_grad_norm"
     ]
     # Attributes (from the parent or child class) which can be set per group.
     _group_vars = [
@@ -165,7 +165,8 @@ class SGD(torch.optim.SGD):
                  velocity_scaling: Optional[float] = None,
                  use_combined_accum: Optional[bool] = None,
                  accum_type: Optional[torch.dtype] = None,
-                 velocity_accum_type: Optional[torch.dtype] = None) -> None:
+                 velocity_accum_type: Optional[torch.dtype] = None,
+                 max_grad_norm: Optional[float] = None) -> None:
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate.
@@ -182,6 +183,7 @@ class SGD(torch.optim.SGD):
         :param accum_type: data type used for gradients.
         :param velocity_accum_type: data type used to store
             the velocity values for each parameter.
+        :param max_grad_norm: Maximum norm of gradients. Default is `inf`.
         """
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), SGD._child_only)
@@ -235,6 +237,9 @@ class SGD(torch.optim.SGD):
 
         assert velocity_accum_type in supportedTypes, errString
         self.velocity_accum_type = velocity_accum_type
+        if max_grad_norm is None:
+            max_grad_norm = float("Inf")
+        self.max_grad_norm = max_grad_norm
 
         self.variable_attrs = VariableAttributes(
             variables,
@@ -249,6 +254,7 @@ class SGD(torch.optim.SGD):
         state["use_combined_accum"] = self.use_combined_accum
         state["accum_type"] = self.accum_type
         state["velocity_accum_type"] = self.velocity_accum_type
+        state["max_grad_norm"] = self.max_grad_norm
         return state
 
 
@@ -267,23 +273,24 @@ class Adam(torch.optim.Adam):
     # All the attributes and variables which don't exist in the parent optimizer class.
     _child_only = _child_vars + [
         "accum_type", "first_order_momentum_accum_type",
-        "second_order_momentum_accum_type"
+        "second_order_momentum_accum_type", "max_grad_norm"
     ]
     # Attributes (from the parent or child class) which can be set per group.
     _group_vars = ["lr", "betas", "eps", "weight_decay", "amsgrad"]
 
-    def __init__(self,
-                 params: Iterable,
-                 lr: Optional[float] = None,
-                 betas: Optional[Tuple[float, float]] = None,
-                 eps: Optional[float] = None,
-                 weight_decay: Optional[float] = None,
-                 amsgrad: Optional[bool] = None,
-                 loss_scaling: Optional[float] = None,
-                 accum_type: Optional[torch.dtype] = None,
-                 first_order_momentum_accum_type: Optional[torch.dtype] = None,
-                 second_order_momentum_accum_type: Optional[torch.dtype] = None
-                 ) -> None:
+    def __init__(
+            self,
+            params: Iterable,
+            lr: Optional[float] = None,
+            betas: Optional[Tuple[float, float]] = None,
+            eps: Optional[float] = None,
+            weight_decay: Optional[float] = None,
+            amsgrad: Optional[bool] = None,
+            loss_scaling: Optional[float] = None,
+            accum_type: Optional[torch.dtype] = None,
+            first_order_momentum_accum_type: Optional[torch.dtype] = None,
+            second_order_momentum_accum_type: Optional[torch.dtype] = None,
+            max_grad_norm: Optional[float] = None) -> None:
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate
@@ -298,6 +305,7 @@ class Adam(torch.optim.Adam):
             the first order momentum values for each parameter.
         :param second_order_momentum_accum_type: data type used to store
             the second order momentum values for each parameter.
+        :param max_grad_norm: Maximum norm of gradients. Default is `inf`.
         """
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), Adam._child_only)
@@ -311,6 +319,8 @@ class Adam(torch.optim.Adam):
             first_order_momentum_accum_type = torch.float32
         if second_order_momentum_accum_type is None:
             second_order_momentum_accum_type = torch.float32
+        if max_grad_norm is None:
+            max_grad_norm = float("Inf")
 
         # All the child attributes are global: store them as
         # attributes.
@@ -330,6 +340,8 @@ class Adam(torch.optim.Adam):
         self.second_order_momentum_accum_type = \
              second_order_momentum_accum_type
 
+        self.max_grad_norm = max_grad_norm
+
         self.variable_attrs = VariableAttributes(
             variables,
             list(self.defaults) + Adam._child_vars)
@@ -345,6 +357,7 @@ class Adam(torch.optim.Adam):
                 self.first_order_momentum_accum_type
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
+        state["max_grad_norm"] = self.max_grad_norm
         return state
 
 
@@ -366,23 +379,25 @@ class AdamW(torch.optim.AdamW):
         "accum_type",
         "first_order_momentum_accum_type",
         "second_order_momentum_accum_type",
+        "max_grad_norm",
     ]
     # Attributes (from the parent or child class) which can be set per group.
     _group_vars = ["lr", "betas", "weight_decay", "eps", "amsgrad"]
 
-    def __init__(self,
-                 params: Iterable,
-                 lr: Optional[float] = None,
-                 betas: Optional[Tuple[float, float]] = None,
-                 eps: Optional[float] = None,
-                 weight_decay: Optional[float] = None,
-                 amsgrad: Optional[bool] = None,
-                 loss_scaling: Optional[float] = None,
-                 bias_correction: Optional[bool] = None,
-                 accum_type: Optional[torch.dtype] = None,
-                 first_order_momentum_accum_type: Optional[torch.dtype] = None,
-                 second_order_momentum_accum_type: Optional[torch.dtype] = None
-                 ) -> None:
+    def __init__(
+            self,
+            params: Iterable,
+            lr: Optional[float] = None,
+            betas: Optional[Tuple[float, float]] = None,
+            eps: Optional[float] = None,
+            weight_decay: Optional[float] = None,
+            amsgrad: Optional[bool] = None,
+            loss_scaling: Optional[float] = None,
+            bias_correction: Optional[bool] = None,
+            accum_type: Optional[torch.dtype] = None,
+            first_order_momentum_accum_type: Optional[torch.dtype] = None,
+            second_order_momentum_accum_type: Optional[torch.dtype] = None,
+            max_grad_norm: Optional[float] = None) -> None:
         """
         :param iterable params: parameters to optimize.
         :param lr: learning rate
@@ -398,6 +413,7 @@ class AdamW(torch.optim.AdamW):
             the first order momentum values for each parameter.
         :param second_order_momentum_accum_type: data type used to store
             the second order momentum values for each parameter.
+        :param max_grad_norm: Maximum norm of gradients. Default is `inf`.
         """
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), AdamW._child_only)
@@ -413,6 +429,8 @@ class AdamW(torch.optim.AdamW):
             first_order_momentum_accum_type = torch.float32
         if second_order_momentum_accum_type is None:
             second_order_momentum_accum_type = torch.float32
+        if max_grad_norm is None:
+            max_grad_norm = float("Inf")
 
         self.loss_scaling = loss_scaling
         self.bias_correction = bias_correction
@@ -430,6 +448,9 @@ class AdamW(torch.optim.AdamW):
         assert second_order_momentum_accum_type in supportedTypes, errString
         self.second_order_momentum_accum_type = \
              second_order_momentum_accum_type
+
+        self.max_grad_norm = max_grad_norm
+
         self.variable_attrs = VariableAttributes(
             variables,
             list(self.defaults) + AdamW._child_vars)
@@ -446,6 +467,7 @@ class AdamW(torch.optim.AdamW):
                 self.first_order_momentum_accum_type
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
+        state["max_grad_norm"] = self.max_grad_norm
         return state
 
 
