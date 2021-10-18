@@ -1106,12 +1106,6 @@ to a custom op. PopTorch supports all attributes supported in PopART except for
     :name: many_attribtes_examples_code
 
 
-Profiling
-=========
-
-You can profile a graph produced by PopTorch for analysis using the PopVision Graph Analyser, which can be downloaded from the Graphcore support portal.
-To do this, use the :ref:`POPLAR_ENGINE_OPTIONS <profiling_env>` environment variable.
-
 Precompilation and caching
 ==========================
 
@@ -1284,9 +1278,13 @@ By default, report files are output to the current working directory. You can sp
 
   export POPLAR_ENGINE_OPTIONS='{"autoReport.all":"true", "autoReport.directory":"./tommyFlowers"}'
 
-For more options, refer to the `PopVision Graph Analyser User Guide <https://docs.graphcore.ai/projects/graphcore-popvision-user-guide>`__.
+For more options, refer to the `PopVision Graph Analyser User Guide <https://docs.graphcore.ai/projects/graphcore-popvision-user-guide/en/latest/index.html>`__.
 
-In order to capture the ``pvti`` reports needed for the PopVision System Analyser you only need to set ``PVTI_OPTIONS='{"enable":"true"}'``
+In order to capture the ``pvti`` reports needed for the `PopVision System Analyser <https://docs.graphcore.ai/projects/graphcore-popvision-user-guide/en/latest/system/system.html>`__
+you need to enable the `PopVision Trace Instrumentation library (PVTI) <https://docs.graphcore.ai/projects/libpvti/en/latest/index.html>`__.
+To do so, set ``PVTI_OPTIONS='{"enable":"true"}'``.
+
+.. important:: By default, PopVision will display multiple trace files using relative time. This is because most of the time we want to compare two executions of the same model, for example. However, in this case we want the traces to be aligned on absolute time: this can be done by selecting "Absolute Timing" in the PopVision options.
 
 You can also add extra tracepoints in your own code by using :py:class:`~poptorch.profiling.Channel`.
 
