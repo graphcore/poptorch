@@ -87,7 +87,7 @@ more information.
     :end-before: training_model_end
 
 .. note:: By default, PopTorch will only return the final batch of outputs.
-   Please see :numref:`anchorReturnType` for details on what PopTorch returns
+   Please see :numref:`trainingOutputMode` for details on what PopTorch returns
    when using :py:func:`~poptorch.trainingModel` and how you can calculate
    statistics such as training accuracy over all batches.
 

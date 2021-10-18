@@ -81,10 +81,10 @@ def test_replicas():
     assert_latency_values(poptorch_model)
 
 
-@pytest.mark.parametrize("mode_tuple", [(poptorch.AnchorMode.Final, 1),
-                                        (poptorch.AnchorMode.All, 1),
-                                        (poptorch.AnchorMode.Sum, 1),
-                                        (poptorch.AnchorMode.EveryN, 2)])
+@pytest.mark.parametrize("mode_tuple", [(poptorch.OutputMode.Final, 1),
+                                        (poptorch.OutputMode.All, 1),
+                                        (poptorch.OutputMode.Sum, 1),
+                                        (poptorch.OutputMode.EveryN, 2)])
 @pytest.mark.parametrize("steps", [2, 4])
 @pytest.mark.parametrize("replicas", [1, 2])
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
@@ -92,7 +92,7 @@ def test_replicas():
 def test_inference(mode_tuple, steps, replicas):
     model = Model()
     opts = poptorch.Options()
-    opts.anchorMode(mode_tuple[0], mode_tuple[1])
+    opts.outputMode(mode_tuple[0], mode_tuple[1])
     opts.deviceIterations(steps)
     opts.replicationFactor(replicas)
     poptorch_model = poptorch.inferenceModel(model, opts)
@@ -104,18 +104,18 @@ def test_inference(mode_tuple, steps, replicas):
     perf = poptorch_model.getPerfCounters()
 
     outsteps = steps * replicas
-    if mode_tuple[0] in [poptorch.AnchorMode.Final, poptorch.AnchorMode.Sum]:
+    if mode_tuple[0] in [poptorch.OutputMode.Final, poptorch.OutputMode.Sum]:
         outsteps = replicas
-    elif mode_tuple[0] is poptorch.AnchorMode.EveryN:
+    elif mode_tuple[0] is poptorch.OutputMode.EveryN:
         outsteps = steps // mode_tuple[1] * replicas
     assert_perf_counter_size(perf, 2, 1, steps * replicas, outsteps)
     assert_latency_values(poptorch_model)
 
 
-@pytest.mark.parametrize("mode_tuple", [(poptorch.AnchorMode.Final, 1),
-                                        (poptorch.AnchorMode.All, 1),
-                                        (poptorch.AnchorMode.Sum, 1),
-                                        (poptorch.AnchorMode.EveryN, 2)])
+@pytest.mark.parametrize("mode_tuple", [(poptorch.OutputMode.Final, 1),
+                                        (poptorch.OutputMode.All, 1),
+                                        (poptorch.OutputMode.Sum, 1),
+                                        (poptorch.OutputMode.EveryN, 2)])
 @pytest.mark.parametrize("steps", [2, 4])
 @pytest.mark.parametrize("accums", [1, 2])
 @pytest.mark.parametrize("replicas", [1, 2])
@@ -127,7 +127,7 @@ def test_training(mode_tuple, steps, accums, replicas):
     targets = torch.randn(16, 100)
 
     opts = poptorch.Options()
-    opts.anchorMode(mode_tuple[0], mode_tuple[1])
+    opts.outputMode(mode_tuple[0], mode_tuple[1])
     opts.deviceIterations(steps)
     opts.Training.gradientAccumulation(accums)
     opts.replicationFactor(replicas)
@@ -141,9 +141,9 @@ def test_training(mode_tuple, steps, accums, replicas):
     perf = poptorch_model.getPerfCounters()
 
     outsteps = steps * accums * replicas
-    if mode_tuple[0] in [poptorch.AnchorMode.Final, poptorch.AnchorMode.Sum]:
+    if mode_tuple[0] in [poptorch.OutputMode.Final, poptorch.OutputMode.Sum]:
         outsteps = replicas
-    elif mode_tuple[0] is poptorch.AnchorMode.EveryN:
+    elif mode_tuple[0] is poptorch.OutputMode.EveryN:
         outsteps = steps // mode_tuple[1] * accums * replicas
 
     assert_perf_counter_size(perf, 2, 2, steps * accums * replicas, outsteps)

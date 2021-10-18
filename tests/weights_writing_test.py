@@ -44,7 +44,7 @@ def test_training_and_inference(use_half):
     for _ in range(0, 1000):
         _, loss = poptorch_model(input, label)
 
-        # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
+        # Each batch should NOT report its own loss. As by default training model should have a "Final" output mode.
         assert len(loss.size()) == 0
 
     # Run with trained weights.
@@ -86,7 +86,7 @@ def test_training_inference_parameters(use_half):
     for _ in range(0, 1000):
         _, loss = poptorch_model(input, label)
 
-        # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
+        # Each batch should NOT report its own loss. As by default training model should have a "Final" output mode.
         assert len(loss.size()) == 0
 
     # This will trigger copyWeightsToHost()
@@ -145,7 +145,7 @@ def test_access_parameters(use_half):
     for _ in range(0, 1000):
         _, loss = poptorch_model(input, label)
 
-        # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
+        # Each batch should NOT report its own loss. As by default training model should have a "Final" output mode.
         assert len(loss.size()) == 0
 
     assert original_weights != str(poptorch_model.model.linear.weight)

@@ -31,7 +31,7 @@ be a model output.
 You can create an anchor by calling :py:func:`~poptorch.Options.anchorTensor`.
 It takes two mandatory string parameters: a convenient user-defined name for
 the anchor and the name of the chosen tensor. Optionally, you may specify the
-anchor mode as well as the anchor return period. In order for this option setting
+output mode as well as the output return period. In order for these options setting
 to take effect, they must be set before model compilation.
 
 In the example below, two anchors are created: one for a bias gradient tensor

@@ -76,13 +76,13 @@ def test_set_options_from_file(capfd):
 
         # Ensure that a useful error message is output on malformed input
         f = open(filepath, "a")
-        f.write("\nanchorMode(poptorch.AnchorMode.All")
+        f.write("\noutputMode(poptorch.OutputMode.All")
         f.close()
         with pytest.raises(poptorch.options.ConfigFileError) as e:
             opts.loadFromFile(filepath)
         assert "SyntaxError at line 5 of tmp.conf: unexpected EOF " \
                "while parsing\n" \
-               "> options.anchorMode(poptorch.AnchorMode.All" in str(e.value)
+               "> options.outputMode(poptorch.OutputMode.All" in str(e.value)
 
     # Create the model
     model = Network()

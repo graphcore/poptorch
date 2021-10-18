@@ -87,17 +87,17 @@ class PoplarExecutor:
             self._attribute_tracker = \
                     _optimizer_attributes.OptimizerAttrTracker(
                         options)
-            if options.defaultAnchorMode():
+            if options.defaultOutputMode():
                 # In training it makes sense to see only the last result, by default.
-                options.anchorMode(enums.AnchorMode.Final)
+                options.outputMode(enums.OutputMode.Final)
             if not optimizer:
                 optimizer = torch.optim.SGD(self._user_model.parameters(),
                                             lr=0.01)
             model = _impl.OptimizerWrapper(model, optimizer)
         else:
-            if options.defaultAnchorMode():
+            if options.defaultOutputMode():
                 # In inference it makes sense to see all the results, by default.
-                options.anchorMode(enums.AnchorMode.All)
+                options.outputMode(enums.OutputMode.All)
             assert options.Training.gradient_accumulation == 1, (
                 "Gradient accumulation"
                 " should be left to its default value (1) for inference")
@@ -116,13 +116,13 @@ class PoplarExecutor:
         self._executable_inputs = None
         self._anchor_memory = {}
 
-        # any anchors with unspecified anchor mode should receive the anchor
+        # any anchors with unspecified output mode should receive the output
         # mode used for graph outputs
         for _, anchor in options.anchored_tensors.items():
             if anchor[1]:
-                anchor[2] = options.anchor_mode
-                if anchor[2] == enums.AnchorMode.EveryN:
-                    anchor[3] = options.anchor_return_period
+                anchor[2] = options.output_mode
+                if anchor[2] == enums.OutputMode.EveryN:
+                    anchor[3] = options.output_return_period
 
         self._training = training
         if optimizer:
@@ -762,7 +762,7 @@ class PoplarExecutor:
             return (0., 0., 0.)
 
         # It is possible to have more input timestamps than output timestamps
-        # due to other options such as gradient accumulation and anchor modes.
+        # due to other options such as gradient accumulation and output modes.
         # Whatever the case, the number of input ticks will always be divisible
         # by the number of output ticks.
         assert len(start_times) % len(end_times) == 0, \
@@ -1159,7 +1159,7 @@ class IPUScope:
                  compile_using=enums.Compiler.PopART):
         self._executable = None
         self._options = options or Options()
-        self._options = self._options.anchorMode(enums.AnchorMode.All)
+        self._options = self._options.outputMode(enums.OutputMode.All)
 
         self._compile_using = compile_using
 

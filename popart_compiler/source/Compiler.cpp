@@ -325,8 +325,8 @@ Compiler::addInitializedInputTensor(const char *name, const char *type,
 }
 
 void Compiler::addOutputTensor(poptorch::TensorId output,
-                               PopartAnchorTypes anchor_mode,
-                               size_t anchor_return_period,
+                               PopartOutputMode output_mode,
+                               size_t output_return_period,
                                const char *overlap) {
   _impl->outputs.push_back(_impl->ids[output]);
 
@@ -334,10 +334,10 @@ void Compiler::addOutputTensor(poptorch::TensorId output,
     return; // Nothing more to do
   }
 
-  if (anchor_mode == PopartAnchorTypes::N) {
-    anchor_mode = _impl->options.anchor_mode;
-    if (anchor_mode == PopartAnchorTypes::EveryN) {
-      anchor_return_period = _impl->options.anchor_return_period;
+  if (output_mode == PopartOutputMode::N) {
+    output_mode = _impl->options.output_mode;
+    if (output_mode == PopartOutputMode::EveryN) {
+      output_return_period = _impl->options.output_return_period;
     }
   }
 
@@ -348,20 +348,20 @@ void Compiler::addOutputTensor(poptorch::TensorId output,
 
   // Check for any use of overlapped io
   // NB this relies on the fact that manual anchors never overlap and other
-  // outputs all have the same anchor_mode. If these assumptions change,
+  // outputs all have the same output_mode. If these assumptions change,
   // the logic will have to make sure _impl->using_overlapped_io is correct
   // before any call to this function rather than changed to true on the first
   // instance.
   if (_impl->using_overlapped_io) {
-    verifySettingsForOverlappedIO(anchor_mode);
+    verifySettingsForOverlappedIO(output_mode);
   }
 
-  const char *as_str = anchorTypeToString(anchor_mode);
+  const char *as_str = outputModeToString(output_mode);
 
   // If we are returning EveryN we need to pass in the return period.
-  if (anchor_mode == PopartAnchorTypes::EveryN) {
+  if (output_mode == PopartOutputMode::EveryN) {
     _impl->anchors.insert({_impl->ids[output], popart::AnchorReturnType(
-                                                   as_str, anchor_return_period,
+                                                   as_str, output_return_period,
                                                    tile_set_and_strat.first,
                                                    tile_set_and_strat.second)});
   } else {
@@ -1434,7 +1434,7 @@ size_t Compiler::getNumInputs() const { return _impl->inputs.size(); }
 
 size_t Compiler::getNumOutputs() const { return _impl->outputs.size(); }
 
-void Compiler::verifySettingsForOverlappedIO(PopartAnchorTypes anchor_mode) {
+void Compiler::verifySettingsForOverlappedIO(PopartOutputMode output_mode) {
   if (_impl->options.execution_mode == detail::ExecutionMode::Pipelined) {
     ERROR("Overlapped IO is not supported with poptorch.PipelinedExecution. "
           "If you are using only one IPU, please switch to "
@@ -1445,10 +1445,10 @@ void Compiler::verifySettingsForOverlappedIO(PopartAnchorTypes anchor_mode) {
                "No IO tiles allocated. You must allocate at least 32 IO tiles "
                "using poptorch.Options().TensorLocations.numIOTiles.");
 
-  if (anchor_mode != PopartAnchorTypes::Sum &&
-      anchor_mode != PopartAnchorTypes::All) {
-    ERROR("Unsupported anchor mode for overlapped IO. Please switch anchor "
-          "mode to poptorch.AnchorMode.All or poptorch.AnchorMode.Sum.");
+  if (output_mode != PopartOutputMode::Sum &&
+      output_mode != PopartOutputMode::All) {
+    ERROR("Unsupported output mode for overlapped IO. Please switch output "
+          "mode to poptorch.OutputMode.All or poptorch.OutputMode.Sum.");
   }
 }
 

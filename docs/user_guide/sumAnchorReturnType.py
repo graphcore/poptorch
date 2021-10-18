@@ -92,7 +92,7 @@ opts = poptorch.Options()
 
 opts.deviceIterations(5)
 opts.Training.gradientAccumulation(10)
-opts.anchorMode(poptorch.AnchorMode.Sum)
+opts.outputMode(poptorch.OutputMode.Sum)
 
 training_data = poptorch.DataLoader(opts,
                                     dataset=ExampleClassDataset(

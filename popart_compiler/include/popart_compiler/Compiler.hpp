@@ -311,7 +311,7 @@ public:
   void addOutputType(OutputType type);
 
   // This function marks |output| as being read back from the device by the
-  // host. |anchor_mode| determines how frequently that should happen.
+  // host. |output_mode| determines how frequently that should happen.
   // clang-format off
   // "ALL":  Will return all popart batches.
   // "SUM": Will return the sum of all popart batches (I.E device iterations)
@@ -319,8 +319,8 @@ public:
   // "FINAL": Will return the last batch only
   // clang-format on
   void addOutputTensor(poptorch::TensorId output,
-                       PopartAnchorTypes anchor_mode = PopartAnchorTypes::N,
-                       size_t anchor_return_period = 1,
+                       PopartOutputMode output_mode = PopartOutputMode::N,
+                       size_t output_return_period = 1,
                        const char *overlap = "no_overlap");
 
   void setUpInputOp(poptorch::TensorId id, float *ptr,
@@ -432,8 +432,8 @@ public:
   // GradientAccumulation]
   std::uint64_t popartBatchDim() const;
 
-  // Take the above and work out how much of it is being returned. ID must anbe
-  // an anchor d the batch dim will be mutated depending on what the anchor is
+  // Take the above and work out how much of it is being returned. ID must be
+  // an anchor. The batch dim will be mutated depending on what the anchor is
   // returning.
   std::uint64_t popartBatchDimForAnchor(poptorch::TensorId id) const;
 
@@ -493,9 +493,9 @@ public:
 private:
   void assertTensorIs(PopartType dataType, poptorch::TensorId id) const;
 
-  // Make sure no overlap is specified for pipelined mode and that the anchor
-  // return type is supported by PopART.
-  void verifySettingsForOverlappedIO(PopartAnchorTypes anchor_mode);
+  // Make sure no overlap is specified for pipelined mode and that the output
+  // mode is supported by PopART.
+  void verifySettingsForOverlappedIO(PopartOutputMode output_mode);
 
   std::unique_ptr<detail::CompilerImpl> _impl;
 

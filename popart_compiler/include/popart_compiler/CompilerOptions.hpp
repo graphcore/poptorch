@@ -31,9 +31,9 @@ struct CompilerOptions {
   // Number of times the graph will be executed for each execution.
   std::uint64_t steps;
   // Strategy to adopt for returning the graph's output tensors.
-  PopartAnchorTypes anchor_mode;
-  // 'N' when anchor_mode == PopartAnchorTypes::EveryN
-  std::uint64_t anchor_return_period;
+  PopartOutputMode output_mode;
+  // 'N' when output_mode == PopartOutputMode::EveryN
+  std::uint64_t output_return_period;
   // True if running on the model, False otherwise.
   bool ipu_model;
   // Automatically round up the number of IPUs, if required, to the minimum

@@ -54,7 +54,9 @@ nitpick_ignore = [
     ('py:class', 'torch.utils.data.Dataset'),
     ('py:class', 'torch.utils.data.sampler.Sampler'),
     # Enums already described in functions that use them
+    # TODO(T47959): remove deprecated enum
     ('py:class', 'poptorch.AnchorMode'),
+    ('py:class', 'poptorch.OutputMode'),
     ('py:class', 'poptorch.ConnectionType'),
     ('py:class', 'poptorch.HalfFloatCastingBehavior'),
     ('py:class', 'poptorch.MatMulSerializationMode'),

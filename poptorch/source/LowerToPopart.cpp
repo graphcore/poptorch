@@ -473,7 +473,7 @@ void LowerToPopartImpl::lowerReturn() {
       ERROR_ON(!_graph.return_node()->hasAttribute(overlap_symbol));
       auto overlap_str = _graph.return_node()->s(overlap_symbol);
 
-      _compiler.addOutputTensor(id, PopartAnchorTypes::N, 1,
+      _compiler.addOutputTensor(id, PopartOutputMode::N, 1,
                                 overlap_str.c_str());
       _output_tensor_hooks.push_back(id);
       output_num++;
@@ -483,11 +483,11 @@ void LowerToPopartImpl::lowerReturn() {
 
   for (const auto &anchor : _anchors) {
     const char *name = anchor.name.c_str();
-    PopartAnchorTypes anchor_mode = static_cast<PopartAnchorTypes>(anchor.mode);
+    PopartOutputMode output_mode = static_cast<PopartOutputMode>(anchor.mode);
     size_t return_period = anchor.period;
 
     logging::debug("  anchor ( {} {}/{} )", name,
-                   anchorTypeToString(anchor_mode), return_period);
+                   outputModeToString(output_mode), return_period);
 
     auto id = _compiler.createTensorId(name);
     _compiler.addOutputType({OutputElemType::Tensor});

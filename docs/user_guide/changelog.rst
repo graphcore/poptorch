@@ -8,6 +8,12 @@ v2.4 (Poplar SDK 2.4)
 New features
 ------------
 
+API changes
+-----------
+- Deprecated ``poptorch.Options.anchorMode`` in favour of ``poptorch.Options.outputMode``
+- Deprecated ``poptorch.Options.defaultAnchorMode`` in favour of ``poptorch.Options.defaultOutputMode``
+- Deprecated ``poptorch.AnchorMode`` in favour of ``poptorch.OutputMode``
+
 v2.3 (Poplar SDK 2.3)
 =====================
 

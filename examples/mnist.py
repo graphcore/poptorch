@@ -122,9 +122,9 @@ def example():
 
                 # Pick the highest probability.
                 _, ind = torch.max(output, 1)
-                assert training_data.options.anchor_mode in (
-                    poptorch.AnchorMode.All, poptorch.AnchorMode.Final
-                ), "Only 'Final' and 'All' AnchorMode supported"
+                assert training_data.options.output_mode in (
+                    poptorch.OutputMode.All, poptorch.OutputMode.Final
+                ), "Only 'Final' and 'All' OutputMode supported"
                 # If we're using Final: only keep the last labels, no-op if using All
                 num_labels = ind.shape[0]
                 labels = labels[-num_labels:]

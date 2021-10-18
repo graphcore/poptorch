@@ -113,9 +113,9 @@ SessionOptionsImpl::SessionOptionsImpl() {
   registerSetter(
       uint64_options, "gradient_accumulation",
       [&](std::uint64_t value) { popart_options.accumulationFactor = value; });
-  registerSetter(uint64_options, "anchor_return_period",
+  registerSetter(uint64_options, "output_return_period",
                  [&](std::uint64_t value) {
-                   poptorch_options.anchor_return_period = value;
+                   poptorch_options.output_return_period = value;
                  });
   registerSetter(uint64_options, "replication_factor",
                  [&](std::uint64_t value) {
@@ -131,10 +131,10 @@ SessionOptionsImpl::SessionOptionsImpl() {
                  "Value for Liveness out of range");
     poptorch_options.tensors_liveness = static_cast<Liveness>(value);
   });
-  registerSetter(uint64_options, "anchor_mode", [&](std::uint64_t value) {
-    ERROR_ON_MSG(value >= static_cast<std::uint64_t>(PopartAnchorTypes::N),
-                 "Value for PopartAnchorTypes out of range");
-    poptorch_options.anchor_mode = static_cast<PopartAnchorTypes>(value);
+  registerSetter(uint64_options, "output_mode", [&](std::uint64_t value) {
+    ERROR_ON_MSG(value >= static_cast<std::uint64_t>(PopartOutputMode::N),
+                 "Value for PopartOutputMode out of range");
+    poptorch_options.output_mode = static_cast<PopartOutputMode>(value);
   });
 
   registerSetter(uint64_options, "connection_type", [&](std::uint64_t value) {

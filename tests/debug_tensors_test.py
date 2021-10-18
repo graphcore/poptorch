@@ -69,13 +69,13 @@ def test_tensor_values():
     assert not torch.equal(update1, update2)
 
 
-anchor_modes = [[poptorch.AnchorMode.All, 3, "ALL/1"],
-                [poptorch.AnchorMode.EveryN, 4, "EVERYN/4"],
-                [poptorch.AnchorMode.Final, 1, "FINAL/1"],
-                [poptorch.AnchorMode.Sum, 1, "Sum/1"]]
+output_modes = [[poptorch.OutputMode.All, 3, "ALL/1"],
+                [poptorch.OutputMode.EveryN, 4, "EVERYN/4"],
+                [poptorch.OutputMode.Final, 1, "FINAL/1"],
+                [poptorch.OutputMode.Sum, 1, "Sum/1"]]
 
 
-@pytest.mark.parametrize("mode", anchor_modes)
+@pytest.mark.parametrize("mode", output_modes)
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_tensor_modes(capfd, mode):

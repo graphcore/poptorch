@@ -54,7 +54,7 @@ def test_trainingBatching():
     for _ in range(0, 1000):
         _, loss = poptorch_model(input, label)
 
-        # Each batch should NOT report its own loss. As by default training model should have a "Final" anchor.
+        # Each batch should NOT report its own loss. As by default training model should have a "Final" output mode.
         assert len(loss.size()) == 0
 
     # Run with trained weights.
@@ -64,8 +64,8 @@ def test_trainingBatching():
     helpers.assert_allequal(actual=torch.argmax(out, dim=1), expected=label)
 
 
-@pytest.mark.parametrize("anchor", list(poptorch.AnchorMode))
-def test_inferenceAnchors(anchor):
+@pytest.mark.parametrize("mode", list(poptorch.OutputMode))
+def test_inferenceOutputModes(mode):
     torch.manual_seed(42)
 
     model = torch.nn.Linear(6, 20)
@@ -76,18 +76,18 @@ def test_inferenceAnchors(anchor):
     # Run pytorch native on CPU batchsize 10.
     native_out = model(input)
 
-    # Run on IPU batch size 1 * 10 popart batches. anchor_return_period ignored if not EVERYN
+    # Run on IPU batch size 1 * 10 popart batches. output_return_period ignored if not EVERYN
     opts = poptorch.Options().deviceIterations(10)
-    opts.anchorMode(anchor, anchor_return_period=5)
+    opts.outputMode(mode, output_return_period=5)
     ipuModel = poptorch.inferenceModel(model, opts)
     poptorch_out = ipuModel(input)
 
-    if anchor in [poptorch.AnchorMode.All, poptorch.AnchorMode.Default]:
+    if mode in [poptorch.OutputMode.All, poptorch.OutputMode.Default]:
         # Expect the full batch.
         assert len(poptorch_out.size()) == 4
         assert poptorch_out.size()[0] == 10
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
-    elif anchor == poptorch.AnchorMode.EveryN:
+    elif mode == poptorch.OutputMode.EveryN:
         # Otherwise we are expecting device_iterations / N
         assert len(poptorch_out.size()) == 4
         assert poptorch_out.size()[0] == 2
@@ -101,21 +101,21 @@ def test_inferenceAnchors(anchor):
         assert len(poptorch_out.size()) == 4
         assert poptorch_out.size()[0] == 1
 
-        if anchor == poptorch.AnchorMode.Final:
+        if mode == poptorch.OutputMode.Final:
             # Check we are the same as the last output.
             helpers.assert_allclose(actual=poptorch_out.reshape(
                 native_out[-1].shape),
                                     expected=native_out[-1])
-        elif anchor == poptorch.AnchorMode.Sum:
+        elif mode == poptorch.OutputMode.Sum:
             # Check we are close to the sum of the batch dim.
             sum = torch.sum(native_out, dim=0, keepdim=True)
             helpers.assert_allclose(actual=poptorch_out, expected=sum)
         else:
-            assert False, "Unexpected anchor type %s" % anchor
+            assert False, "Unexpected output mode %s" % mode
 
 
-@pytest.mark.parametrize("anchor", list(poptorch.AnchorMode))
-def test_trainingAnchors(anchor):
+@pytest.mark.parametrize("mode", list(poptorch.OutputMode))
+def test_trainingOutputModes(mode):
     torch.manual_seed(42)
 
     # 1000 Batches of 10.
@@ -133,13 +133,13 @@ def test_trainingAnchors(anchor):
 
     # Run on IPU batch size 1 * 1000 popart batches.
     opts = poptorch.Options().deviceIterations(1000)
-    opts.anchorMode(anchor, anchor_return_period=20)
+    opts.outputMode(mode, output_return_period=20)
     poptorch_model = helpers.trainingModelWithLoss(
         model, options=opts, loss=torch.nn.CrossEntropyLoss())
 
     poptorch_out, loss = poptorch_model(input, label)
 
-    if anchor == poptorch.AnchorMode.All:
+    if mode == poptorch.OutputMode.All:
         # Expect the full batch.
         assert len(poptorch_out.size()) == 2
         assert poptorch_out.size()[0] == 1000
@@ -159,7 +159,7 @@ def test_trainingAnchors(anchor):
 
             previous_average = new_average
 
-    elif anchor == poptorch.AnchorMode.EveryN:
+    elif mode == poptorch.OutputMode.EveryN:
         # Otherwise we are expecting device_iterations / N
         assert len(poptorch_out.size()) == 2
         assert poptorch_out.size()[0] == 50
@@ -174,16 +174,16 @@ def test_trainingAnchors(anchor):
 
         assert len(loss.size()) == 0
 
-        if anchor in [poptorch.AnchorMode.Final, poptorch.AnchorMode.Default]:
+        if mode in [poptorch.OutputMode.Final, poptorch.OutputMode.Default]:
             # We just have to check the loss is small.
             # This is just relative to the previously observed loss values on this test with this seed.
             assert loss < 0.2
 
-        elif anchor == poptorch.AnchorMode.Sum:
+        elif mode == poptorch.OutputMode.Sum:
             # We just have to check that the loss is huge.
             assert loss > 500.0
         else:
-            assert False, "Unexpected anchor type %s" % anchor
+            assert False, "Unexpected output mode %s" % mode
 
 
 def run_gradient_accumulation_test(input, target, gradient_accumulations,
@@ -192,7 +192,7 @@ def run_gradient_accumulation_test(input, target, gradient_accumulations,
     model = torch.nn.Linear(10, 10)
 
     opts = poptorch.Options()
-    opts.anchorMode(poptorch.AnchorMode.All)
+    opts.outputMode(poptorch.OutputMode.All)
     opts.Training.gradientAccumulation(gradient_accumulations)
 
     if accumulation_reduction_type is not None:

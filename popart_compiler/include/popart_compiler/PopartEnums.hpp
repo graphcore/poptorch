@@ -78,47 +78,47 @@ int64_t dtypeIntFromOnnxStr(const char *onnx_type);
 // and Popart ops which take an int64_t dtype argument, a.g. "randomnormal"
 const char *onnxStrFromDtypeInt(int64_t dtype);
 
-// See popart DataFlow.hpp for a full description of each.
-// Must be kept in sync with AnchorMode in python/enums.py
-enum PopartAnchorTypes : std::uint8_t { Final = 0, EveryN, All, Sum, N };
+// See AnchorReturnTypeId in popart/dataflow.hpp for a full description of each.
+// Must be kept in sync with OutputMode in python/enums.py
+enum class PopartOutputMode : std::uint8_t { Final = 0, EveryN, All, Sum, N };
 
 // Must be static so each library gets its own copy,  __attribute__((unused)) is
 // to silence the warning if it is unused in any of them.
-static PopartAnchorTypes anchorTypeFromString(const std::string &str)
+static PopartOutputMode outputModeFromString(const std::string &str)
     __attribute__((unused));
-static const char *anchorTypeToString(PopartAnchorTypes type)
+static const char *outputModeToString(PopartOutputMode type)
     __attribute__((unused));
 
-static PopartAnchorTypes anchorTypeFromString(const std::string &str) {
+static PopartOutputMode outputModeFromString(const std::string &str) {
   if (str == "FINAL") {
-    return PopartAnchorTypes::Final;
+    return PopartOutputMode::Final;
   }
   if (str == "EVERYN") {
-    return PopartAnchorTypes::EveryN;
+    return PopartOutputMode::EveryN;
   }
   if (str == "ALL") {
-    return PopartAnchorTypes::All;
+    return PopartOutputMode::All;
   }
   if (str == "SUM") {
-    return PopartAnchorTypes::Sum;
+    return PopartOutputMode::Sum;
   }
 
-  ERROR("Internal error: unsupported anchor type :" << str);
+  ERROR("Internal error: unsupported output mode :" << str);
 }
 
 // Popart only supports a string interface for them so we have to convert back.
-static const char *anchorTypeToString(PopartAnchorTypes type) {
+static const char *outputModeToString(PopartOutputMode type) {
   switch (type) {
-  case PopartAnchorTypes::Final:
+  case PopartOutputMode::Final:
     return "FINAL";
-  case PopartAnchorTypes::EveryN:
+  case PopartOutputMode::EveryN:
     return "EVERYN";
-  case PopartAnchorTypes::All:
+  case PopartOutputMode::All:
     return "ALL";
-  case PopartAnchorTypes::Sum:
+  case PopartOutputMode::Sum:
     return "Sum";
   default:
-    ERROR("UNREACHABLE: Converting anchor type to string");
+    ERROR("UNREACHABLE: Converting output mode to string");
   }
 }
 

@@ -129,9 +129,9 @@ Essentially, it is the equivalent of launching the IPU in a loop over that
 number of batches. This is efficient because that loop runs on the IPU
 directly.
 
-Note that the returned output dimensions depend on `poptorch.Options.anchorMode`. The default value for `trainingModel` is `Final`, since you will often not need to
+Note that the returned output dimensions depend on `poptorch.Options.outputMode`. The default value for `trainingModel` is `Final`, since you will often not need to
 receive all or any of the output tensors and it is more efficient not to receive them. Therefore, only the last batch of data will be returned to the host under this setting.
-You can change this behaviour by setting the value of `poptorch.Options.anchorMode` to `All`. This returns the result of each batch to the host. See :py:func:`poptorch.Options.anchorMode`
+You can change this behaviour by setting the value of `poptorch.Options.outputMode` to `All`. This returns the result of every batch to the host. See :py:func:`poptorch.Options.outputMode`
 for more information.
 
 .. literalinclude:: device_iterations.py
@@ -220,25 +220,25 @@ through the whole system, as highlighted.
 
    Pipeline execution with gradient accumulation
 
-.. _anchorReturnType:
+.. _trainingOutputMode:
 
-poptorch.Options.Training.anchorReturnType
+poptorch.Options.outputMode
 ==========================================
 
 When you use a :py:func:`~poptorch.inferenceModel`, you will usually want to
 receive all the output tensors. For this reason, PopTorch will return them
 all to you by default. However, you can change this behaviour using
-:py:func:`poptorch.Options.anchorMode`.
+:py:func:`poptorch.Options.outputMode`.
 
 When you use a :py:func:`~poptorch.trainingModel`, you will often not need to
 receive all or any of the output tensors and it is more efficient not to
 receive them. For this reason, PopTorch only returns the last batch of tensors
 by default. As in the the case of ``inferenceModel``, you can change this
-behaviour using :py:func:`poptorch.Options.anchorMode`.
+behaviour using :py:func:`poptorch.Options.outputMode`.
 
 If you want to monitor training using a metric such as loss or accuracy, you
 may wish to take into account all tensors. To do this with minimal or no
-overhead, you can use ``poptorch.AnchorMode.Sum``. For example:
+overhead, you can use ``poptorch.OutputMode.Sum``. For example:
 
  .. literalinclude:: sumAnchorReturnType.py
   :caption: A model which returns training accuracy as a tensor

@@ -79,7 +79,7 @@ def test_io_input():
     num_device_iterations = 20
 
     opts = poptorch.Options()
-    opts.anchorMode(poptorch.AnchorMode.All)
+    opts.outputMode(poptorch.OutputMode.All)
     opts.deviceIterations(num_device_iterations)
     opts.setExecutionStrategy(poptorch.ShardedExecution())
 
@@ -177,7 +177,7 @@ def test_overlap_host_io_output():
     num_device_iterations = 20
 
     opts = poptorch.Options()
-    opts.anchorMode(poptorch.AnchorMode.All)
+    opts.outputMode(poptorch.OutputMode.All)
     opts.deviceIterations(num_device_iterations)
     opts.setExecutionStrategy(poptorch.ShardedExecution())
 

@@ -60,7 +60,7 @@ def test_attach_detach():
     for _ in range(0, 2):
         _, loss = training(input, target)
         # Each batch should NOT report its own loss. As by default training
-        # model should have a "Final" anchor.
+        # model should have a "Final" output mode.
         assert len(loss.size()) == 0
 
         if math.isnan(loss):

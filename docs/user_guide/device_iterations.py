@@ -82,7 +82,7 @@ def device_iterations_example():
     for batch_number, (data, labels) in enumerate(training_data):
         # Execute the device with a 100 iteration loop of batchsize 2.
         # "output" and "loss" will be the respective output and loss of the
-        # final batch (the default AnchorMode).
+        # final batch (the default OutputMode).
 
         output, loss = poptorch_model(data, labels)
         print(f"{labels[-1]}, {output}, {loss}")
@@ -122,7 +122,7 @@ def replication_factor_example():
         # Execute the device with a 100 iteration loop of model batchsize 2
         # across 4 IPUs (global batchsize = 2 * 4 = 8). "output" and "loss"
         # will be the respective output and loss of the final batch of each
-        # replica (the default AnchorMode).
+        # replica (the default OutputMode).
         output, loss = poptorch_model(data, labels)
         print(f"{labels[-1]}, {output}, {loss}")
     # replication_end
@@ -159,7 +159,7 @@ def gradient_accumulation_example():
         # Execute the device with a 100 iteration loop of model batchsize 2
         # with gradient updates every 8 iterations (global batchsize = 2 * 8 = 16).
         # "output" and "loss" will be the respective output and loss of the
-        # final batch of each replica (the default AnchorMode).
+        # final batch of each replica (the default OutputMode).
         output, loss = poptorch_model(data, labels)
         print(f"{labels[-1]}, {output}, {loss}")
     # gradient_acc_end
@@ -234,7 +234,7 @@ def process(process_id=0, num_processes=1):
         # Execute the device with a 100 iteration loop of batchsize 8 across
         # 4 IPUs (batch-size 2 per replica). "output" and "loss" will be the
         # respective output and loss of the final batch of each replica
-        # (the default AnchorMode).
+        # (the default OutputMode).
         output, loss = poptorch_model(data, labels)
         print(f"{batch_number} {labels[-1]}, {output}, {loss}")
 
