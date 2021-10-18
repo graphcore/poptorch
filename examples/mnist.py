@@ -122,7 +122,7 @@ def example():
 
                 # Pick the highest probability.
                 _, ind = torch.max(output, 1)
-                assert training_data.options.output_mode in (
+                assert training_model.options.output_mode in (
                     poptorch.OutputMode.All, poptorch.OutputMode.Final
                 ), "Only 'Final' and 'All' OutputMode supported"
                 # If we're using Final: only keep the last labels, no-op if using All

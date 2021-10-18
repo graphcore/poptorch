@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import abc
+import copy
 import logging
 import torch
 import tqdm
@@ -74,6 +75,14 @@ class OptionsDict:
     def deleteIfExists(self, option):
         if self.exists(option):
             del self._values[option]
+
+    def __deepcopy__(self, memory):
+        opts_class = self.__class__
+        copied_options = opts_class.__new__(opts_class)
+        memory[id(self)] = copied_options
+        for key, val in self.__dict__.items():
+            setattr(copied_options, key, copy.deepcopy(val, memory))
+        return copied_options
 
     def __getstate__(self):
         return self.__dict__

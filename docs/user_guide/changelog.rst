@@ -7,6 +7,7 @@ v2.4 (Poplar SDK 2.4)
 
 New features
 ------------
+- Support for deepcopy functionality in ``poptorch.Options`` class
 
 API changes
 -----------

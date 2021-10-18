@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import copy
 import unittest.mock
 import tempfile
 import os
@@ -9,7 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 import pytest
 import poptorch
-from poptorch.enums import MeanReductionStrategy
+from poptorch.enums import OutputMode, HalfFloatCastingBehavior, MeanReductionStrategy
 import helpers
 
 
@@ -355,6 +356,104 @@ def test_running_statistics(capfd, dtype, setting):
         f"%22 : {dtype_str}(16, strides=[1], requires_grad=0, device=cpu)):")
 
 
+def test_copying_options():
+    # pylint: disable=protected-access
+    opts = poptorch.Options()
+    locationOnChip = poptorch.TensorLocationSettings()
+    locationOnChip.useOnChipStorage(True)
+    locationOutsideChip = poptorch.TensorLocationSettings()
+    locationOutsideChip.useOnChipStorage(False)
+
+    opts.deviceIterations(5)
+    opts.Distributed.configureProcessId(5, 15)
+    opts.anchorTensor("t1", "tensor1", OutputMode.EveryN, 2)
+    opts._Popart.set("autoRecomputation", 3)
+    opts._Popart.set("dummyKey", 5)
+    opts.Training.gradientAccumulation(4)
+    opts.TensorLocations.setWeightLocation(locationOnChip)
+    opts.Precision.halfFloatCasting(HalfFloatCastingBehavior.HalfUpcastToFloat)
+    opts.Precision.runningStatisticsAlwaysFloat(False)
+    deep_copy = copy.deepcopy(opts)
+
+    opts.deviceIterations(4)
+    opts.Distributed.configureProcessId(2, 15)
+    opts.anchorTensor("t2", "tensor2", OutputMode.Final)
+    opts._Popart.set("autoRecomputation", 2)
+    opts.TensorLocations.setWeightLocation(locationOutsideChip)
+    opts.Precision.halfFloatCasting(
+        HalfFloatCastingBehavior.FloatDowncastToHalf)
+
+    assert opts.device_iterations != deep_copy.device_iterations
+    assert opts.anchored_tensors != deep_copy.anchored_tensors
+    assert opts.replication_factor == deep_copy.replication_factor
+    assert opts.log_dir == deep_copy.log_dir
+    assert opts.auto_round_num_ipus == deep_copy.auto_round_num_ipus
+    assert opts.output_mode == deep_copy.output_mode
+    assert opts.output_return_period == deep_copy.output_return_period
+    assert opts.connection_type == deep_copy.connection_type
+    assert opts.sync_pattern == deep_copy.sync_pattern
+    assert (opts.available_memory_proportion ==
+            deep_copy.available_memory_proportion)
+
+    assert (opts.Precision.half_float_casting !=
+            deep_copy.Precision.half_float_casting)
+    assert (opts.Precision.running_statistics_always_float ==
+            deep_copy.Precision.running_statistics_always_float)
+    assert (opts.Precision.autocast_enabled ==
+            deep_copy.Precision.autocast_enabled)
+
+    assert (opts.Distributed.distributed_process_id !=
+            deep_copy.Distributed.distributed_process_id)
+    assert (opts.Distributed.num_distributed_processes ==
+            deep_copy.Distributed.num_distributed_processes)
+
+    assert deep_copy.TensorLocations.location_weight["onChip"]
+    assert not opts.TensorLocations.location_weight["onChip"]
+
+    assert (opts._Popart.options["autoRecomputation"] !=
+            deep_copy._Popart.options["autoRecomputation"])
+    assert (opts._Popart.options["dummyKey"] ==
+            deep_copy._Popart.options["dummyKey"])
+
+    assert (opts.Training.gradient_accumulation ==
+            deep_copy.Training.gradient_accumulation)
+
+    assert opts.Jit.trace_model == deep_copy.Jit.trace_model
+
+
+def test_preserving_options_intact():
+    class ExampleModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.bias = torch.nn.Parameter(torch.zeros(()))
+
+        def forward(self, x):
+            return torch.cat([
+                100 * torch.nn.LeakyReLU()(-x + self.bias),
+                100 * torch.nn.LeakyReLU()(x - self.bias)
+            ],
+                             dim=-1)
+
+    class ExampleModelWithLoss(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = ExampleModel()
+
+        def forward(self, input, target):
+            out = self.model(input)
+            return (torch.nn.functional.softmax(out),
+                    torch.nn.CrossEntropyLoss(reduction="mean")(out, target))
+
+    model = ExampleModelWithLoss()
+    opts = poptorch.Options()
+    training = poptorch.trainingModel(model, opts)
+    inference = poptorch.inferenceModel(model, opts)
+
+    assert opts.defaultOutputMode()
+    assert training.options.output_mode == OutputMode.Final
+    assert inference.options.output_mode == OutputMode.All
+
+
 def test_ipu_context_flag():
     class Network(nn.Module):
         def forward(self, x, y):
@@ -505,7 +604,7 @@ def test_mean_reduction_strategy_implicit(params):
     poptorch_model.compile((t1, t2))
 
     assert (getattr(
-        options.Training,
+        poptorch_model.options.Training,
         "meanAccumulationAndReplicationReductionStrategy") == correct_strategy)
 
 

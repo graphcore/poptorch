@@ -256,6 +256,13 @@ class PoplarExecutor:
         """Access the wrapped Torch model."""
         return self._user_model
 
+    @property
+    def options(self) -> 'poptorch.Options':
+        """Access to the options.
+
+        .. seealso:: :py:class:`poptorch.Options`"""
+        return self._options
+
     def _debugGetPopartIR(self) -> str:
         return poptorch_core._getPopartIR(self._executable)  # pylint: disable=protected-access
 
