@@ -349,6 +349,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableMergeExchange);
   ADD_POPART_BOOL_OPTION(enableFloatingPointChecks);
   ADD_POPART_BOOL_OPTION(enableStochasticRounding);
+  ADD_POPART_BOOL_OPTION(ensureFp32LossScaleTensor);
   ADD_POPART_BOOL_OPTION(explicitRecomputation);
   ADD_POPART_BOOL_OPTION(enableExplicitMainLoops);
   ADD_POPART_BOOL_OPTION(useHostCopyOps);
