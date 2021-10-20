@@ -53,7 +53,7 @@ void addListNumElements(torch::jit::Graph *graph, bool revert) {
 
       // Lists should never be nested as the JIT tracer does not support,
       // but always good to check in case.
-      for (auto input : list_inputs) {
+      for (auto *input : list_inputs) {
         ERROR_ON(input->type()->kind() == c10::TypeKind::ListType);
       }
 

@@ -116,7 +116,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
     returnees.emplace_back(at::empty(
         {dims}, at::dtype(type).memory_format(c10::MemoryFormat::Contiguous)));
 
-    auto data_ptr = returnees.back().toTensor().data_ptr();
+    auto *data_ptr = returnees.back().toTensor().data_ptr();
 
     switch (type) {
     case at::ScalarType::Byte:
@@ -150,7 +150,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
   // Execute the compiled poplar graph.
   _compiler.run(optimizers);
 
-  auto &mapping = _inplace_op_handler->getInputMapping();
+  const auto &mapping = _inplace_op_handler->getInputMapping();
   for (size_t i = 0; i < mapping.size(); i++) {
     if (mapping[i] == InplaceOpHandler::no_mapping) {
       continue;

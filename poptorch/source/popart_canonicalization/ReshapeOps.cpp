@@ -168,7 +168,7 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
   // aten::select(Tensor[] list, int idx) -> Tensor
   std::int64_t dim = constantToLong(node->input(1)->node());
 
-  auto index_node = node->input(2)->node();
+  auto *index_node = node->input(2)->node();
 
   torch::jit::Node *slice_node;
   if (!isTensorConstant(index_node)) {
@@ -360,9 +360,9 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
     index += slice_size;
   }
 
-  auto list_node = createAndInsertNode(graph, at::prim::ListConstruct, slices);
+  auto *list_node = createAndInsertNode(graph, at::prim::ListConstruct, slices);
   ERROR_ON(node->output()->uses().size() != 1);
-  auto unpack = node->output()->uses()[0].user;
+  auto *unpack = node->output()->uses()[0].user;
   ERROR_ON(unpack->kind() != c10::prim::ListUnpack);
   ERROR_ON(slices.size() != unpack->outputs().size());
 
@@ -459,7 +459,7 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
                        input_shape[dim]);
     }
   } else {
-    for (auto s : handleTensorList(output_scale->node())) {
+    for (auto *s : handleTensorList(output_scale->node())) {
       scales.push_back(constantToFloat(s->node()));
     }
   }
@@ -471,9 +471,9 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
-  auto input = node->input(0);
-  auto output_size = node->input(1);
-  auto output_scale = node->input(3);
+  auto *input = node->input(0);
+  auto *output_size = node->input(1);
+  auto *output_scale = node->input(3);
 
   auto scalar_type = getNodeScalarType(input);
   auto output_rank = shapeFromTensor(node->output()).size();
@@ -511,7 +511,7 @@ torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
   std::string attributes("{\"scaling_factor\":" + std::to_string(scales[2]) +
                          "}");
 
-  auto new_node =
+  auto *new_node =
       createCustomOperation(graph, inputs, name, domain, 1, 1, attributes);
   new_node->output(0)->setType(c10::TensorType::create(
       scalar_type, c10::nullopt, c10::nullopt, c10::nullopt));
@@ -537,7 +537,7 @@ torch::jit::Node *stackHandler(torch::jit::Graph *graph,
   std::vector<torch::jit::Value *> transformed_tensors;
 
   transformed_tensors.reserve(values.size());
-  for (auto value : values) {
+  for (auto *value : values) {
     transformed_tensors.push_back(
         createUnsqueeze(graph, {value}, {dim})->output());
   }

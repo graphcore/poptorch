@@ -17,7 +17,7 @@ std::set<torch::jit::Node *> visited_nodes;
 
 torch::jit::Value *possiblyDetachedValue(torch::jit::Graph *graph,
                                          torch::jit::Value *value) {
-  auto producer = value->node();
+  auto *producer = value->node();
   auto producer_kind = producer->kind();
 
   if (value->requires_grad() || producer_kind == c10::prim::Constant ||
@@ -31,7 +31,7 @@ torch::jit::Value *possiblyDetachedValue(torch::jit::Graph *graph,
 
   auto it = detached_values.find(value);
   if (it == detached_values.end()) {
-    auto detach = graph->create(symbols::popart::detach);
+    auto *detach = graph->create(symbols::popart::detach);
     detach->addInput(value);
     detach->insertAfter(producer);
     it = detached_values.insert({value, detach->output(0)}).first;
@@ -51,7 +51,7 @@ void maybeInsertDetachOp(torch::jit::Graph *graph, torch::jit::Node *node) {
   visited_nodes.insert(node);
 
   for (torch::jit::Value *input : node->inputs()) {
-    auto detach = possiblyDetachedValue(graph, input);
+    auto *detach = possiblyDetachedValue(graph, input);
     if (input == detach) {
       maybeInsertDetachOp(graph, input->node());
     }

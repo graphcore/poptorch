@@ -184,15 +184,15 @@ torch::jit::Node *tensordotHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
-  auto output = node->input(0);
-  auto index = node->input(2);
-  auto src = node->input(3);
+  auto *output = node->input(0);
+  auto *index = node->input(2);
+  auto *src = node->input(3);
   auto t = src->type()->expect<c10::TensorType>();
   auto axis = handleDimensionParam(node->input(1), t);
   auto shape = shapeFromTensor(node->output());
   auto axissize = shape.at(axis);
 
-  auto sr = createScatterreduce(graph, {src, index}, axissize, axis, 0);
+  auto *sr = createScatterreduce(graph, {src, index}, axissize, axis, 0);
   return createAdd(graph, {output, sr->output()});
 }
 

@@ -30,7 +30,7 @@ void processInputTensor(torch::jit::Graph *graph, torch::jit::Value *input) {
     return;
   }
 
-  auto earliest_user = findEarliestUser(input);
+  auto *earliest_user = findEarliestUser(input);
   if (earliest_user == nullptr) {
     logging::warn("Unused input");
     return;
@@ -38,7 +38,7 @@ void processInputTensor(torch::jit::Graph *graph, torch::jit::Value *input) {
 
   // This is an identity op but used just to make sure the implicit cast
   // does not end up promoting to a Double/Long
-  auto new_node = graph->create(symbols::poptorch::host_side_cast);
+  auto *new_node = graph->create(symbols::poptorch::host_side_cast);
 
   new_node->insertBefore(earliest_user);
   input->replaceAllUsesWith(new_node->output());
@@ -51,7 +51,7 @@ void processInputTensor(torch::jit::Graph *graph, torch::jit::Value *input) {
 void castUnsupportedInputs(torch::jit::Graph *graph) {
   auto collapsed_inputs = collapsedGraphInputHierachy(graph);
 
-  for (auto input : collapsed_inputs) {
+  for (auto *input : collapsed_inputs) {
     if (input != nullptr) {
       processInputTensor(graph, input);
     }

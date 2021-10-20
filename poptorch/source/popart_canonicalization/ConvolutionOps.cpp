@@ -65,8 +65,8 @@ torch::jit::Node *conv2dHandler(torch::jit::Graph *graph,
   // aten::mkldnn_convolution(Tensor self, Tensor weight, Tensor? bias, int[]
   // padding, int[] stride, int[] dilation, int groups) -> (Tensor)
 
-  auto input = node->input(0);
-  auto kernel = node->input(1);
+  auto *input = node->input(0);
+  auto *kernel = node->input(1);
 
   std::vector<torch::jit::Value *> inputs{input, kernel};
 

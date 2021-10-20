@@ -34,7 +34,7 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
     ctx.clear();
 
     new_node = graph->create(kind, num_outputs);
-    for (auto input : possibly_cast_inputs) {
+    for (auto *input : possibly_cast_inputs) {
       new_node->addInput(input);
     }
   } else {
@@ -137,7 +137,7 @@ void setNodeOutputsTypes(torch::jit::Node *node,
   }
   }
 
-  for (auto output : node->outputs()) {
+  for (auto *output : node->outputs()) {
     output->setType(c10::TensorType::create(resolved_output_type, c10::nullopt,
                                             c10::nullopt, c10::nullopt));
   }
@@ -192,7 +192,6 @@ torch::jit::Node *createConstant(torch::jit::Graph *graph,
     ERROR_ON(total_size != data.size());
     stride = 1;
   }
-
   auto t = at::empty(
       {new_shape},
       at::dtype(scalar_type).memory_format(c10::MemoryFormat::Contiguous));
@@ -200,9 +199,6 @@ torch::jit::Node *createConstant(torch::jit::Graph *graph,
   for (size_t i = 0; i < total_size; i++) {
     *(t.data_ptr<T>() + i) = static_cast<T>(data[i * stride]); // NOLINT
   }
-
-  // Use bounds checking for the last element
-  data.at((total_size - 1) * stride);
 
   return tensorToConstant(graph, t);
 }
@@ -250,7 +246,7 @@ torch::jit::Node *createCast(torch::jit::Graph *graph, torch::jit::Value *A,
                              c10::ScalarType scalar_type) {
   std::string new_type = scalarTypeToOnnxString(scalar_type);
 
-  auto node = createCast(graph, {A}, new_type);
+  auto *node = createCast(graph, {A}, new_type);
 
   const auto tensor_type = A->type()->expect<c10::TensorType>();
   node->output()->setType(tensor_type->withScalarType(scalar_type));

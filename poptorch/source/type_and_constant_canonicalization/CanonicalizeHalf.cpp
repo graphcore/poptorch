@@ -96,7 +96,7 @@ void ConvertHalfImpl::convertGraphInputs(
 bool ConvertHalfImpl::atLeastOneUseHalf(
     const std::vector<torch::jit::Use> &uses) {
   for (const auto &use : uses) {
-    for (auto output : use.user->outputs()) {
+    for (auto *output : use.user->outputs()) {
       auto type = output->type()->cast<c10::TensorType>();
       if (!type || !type->scalarType()) {
         continue;
@@ -128,8 +128,8 @@ void ConvertHalfImpl::resolveNodeDtype(torch::jit::Node *node,
 
 void ConvertHalfImpl::resolveHalfOrFloat() {
   // Iterate the graph in reverse
-  for (auto node : _graph->nodes().reverse()) {
-    for (auto output : node->outputs()) {
+  for (auto *node : _graph->nodes().reverse()) {
+    for (auto *output : node->outputs()) {
       auto output_type = output->type()->cast<c10::TensorType>();
       if (!output_type) {
         continue;
@@ -175,7 +175,7 @@ ConvertHalfImpl::usersOfScalarType(const at::ScalarType type,
                                    const std::vector<torch::jit::Use> &uses) {
   std::vector<torch::jit::Node *> users;
   for (const auto &use : uses) {
-    for (auto output : use.user->outputs()) {
+    for (auto *output : use.user->outputs()) {
       auto output_type = output->type()->cast<c10::TensorType>();
       if (!output_type || !output_type->scalarType()) {
         continue;
@@ -191,7 +191,7 @@ ConvertHalfImpl::usersOfScalarType(const at::ScalarType type,
 void ConvertHalfImpl::duplicateConstantsWithMixedHalfFloatUses() {
   logging::LogContext ctx_func("DuplicateConstantsWithMixedHalfFloatUses");
 
-  for (auto node : _graph->nodes()) {
+  for (auto *node : _graph->nodes()) {
     if (node->kind() != symbols::poptorch::tensor_constant) {
       continue;
     }
@@ -219,7 +219,7 @@ void ConvertHalfImpl::duplicateConstantsWithMixedHalfFloatUses() {
     }
 
     // Duplicate the constant.
-    auto new_node = _graph->createClone(
+    auto *new_node = _graph->createClone(
         node, [](torch::jit::Value *value) { return value; });
     logging::trace("Duplicating constant {} with {}", nodeToString(node),
                    nodeToString(new_node));
@@ -232,7 +232,7 @@ void ConvertHalfImpl::duplicateConstantsWithMixedHalfFloatUses() {
     new_node->t_(c10::attr::value, new_tensor);
 
     new_node->insertBefore(node);
-    for (auto invalid_node : invalid_nodes) {
+    for (auto *invalid_node : invalid_nodes) {
       invalid_node->replaceInputWith(node->output(), new_node->output());
     }
   }

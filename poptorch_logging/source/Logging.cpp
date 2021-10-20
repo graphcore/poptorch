@@ -84,8 +84,8 @@ void setColours(spdlog::sinks::ansicolor_sink<Mutex> &sink) {
 }
 
 LoggingContext::LoggingContext() {
-  auto poptorch_log_dest = std::getenv("POPTORCH_LOG_DEST");
-  auto poptorch_log_level = std::getenv("POPTORCH_LOG_LEVEL");
+  auto *poptorch_log_dest = std::getenv("POPTORCH_LOG_DEST");
+  auto *poptorch_log_level = std::getenv("POPTORCH_LOG_LEVEL");
 
   // Get logging output from the POPTORCH_LOG_DEST environment variable.
   // The valid options are "stdout", "stderr", or if it is neither

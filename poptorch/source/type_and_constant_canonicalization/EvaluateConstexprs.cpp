@@ -27,7 +27,7 @@ size_t numNodesInGraph(const torch::jit::Graph *g) {
 
 size_t numValuesInGraph(const torch::jit::Graph *g) {
   size_t num_values = 0;
-  for (auto node : g->nodes()) {
+  for (const auto *node : g->nodes()) {
     num_values += node->outputs().size();
   }
   return num_values;
@@ -103,18 +103,18 @@ void ConstExprEvaluator::evaluate() {
 void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
   logging::LogContext ctx_func("ConstExprEvaluator");
   std::vector<torch::jit::Node *> nodes_plus_return;
-  for (auto node : _graph->nodes()) {
+  for (auto *node : _graph->nodes()) {
     nodes_plus_return.push_back(node);
   }
   nodes_plus_return.push_back(_graph->return_node());
 
-  for (auto node : nodes_plus_return) {
+  for (auto *node : nodes_plus_return) {
     logging::LogContext ctx("processing " + nodeToString(node));
 
     if (nodeIsConstExpr(*node)) {
       copyNodeToConstexprGraph(node);
     } else {
-      for (auto input : node->inputs()) {
+      for (auto *input : node->inputs()) {
         // Add any outputs to the const expression graph
         if (_values_map.count(input) == 1 &&
             _ins_to_make_consts.count(input) == 0) {
@@ -128,7 +128,7 @@ void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
 }
 
 void ConstExprEvaluator::removeLoneConstants() {
-  for (auto node : _graph->nodes()) {
+  for (auto *node : _graph->nodes()) {
     if (!node->inputs().empty()) {
       continue;
     }
@@ -137,7 +137,7 @@ void ConstExprEvaluator::removeLoneConstants() {
       continue;
     }
 
-    auto new_node = _nodes_map[node];
+    auto *new_node = _nodes_map[node];
     auto uses = new_node->output()->uses();
     if (uses.size() != 1) {
       continue;
@@ -174,9 +174,9 @@ void ConstExprEvaluator::replaceWithConstants(const torch::jit::Stack &stack) {
     constexpr_value_to_out_idx[_constexpr_graph->outputs()[idx]] = idx;
   }
 
-  for (auto value : _ins_to_make_consts) {
+  for (auto *value : _ins_to_make_consts) {
     // Find the matching stack output for the input from the constexpr
-    auto constexpr_value = _values_map[value];
+    auto *constexpr_value = _values_map[value];
 
     // Obtain the resolved value from the stack
     auto resolved_value = stack.at(constexpr_value_to_out_idx[constexpr_value]);
@@ -206,7 +206,7 @@ bool ConstExprEvaluator::nodeIsConstExpr(const torch::jit::Node &node) const {
 
   // Either the node has no inputs, or all inputs are outputs of nodes already
   // copied to the constexpres_graph
-  for (auto input : node.inputs()) {
+  for (const auto *input : node.inputs()) {
     if (_values_map.count(input) == 0) {
       return false;
     }
@@ -226,7 +226,7 @@ void ConstExprEvaluator::removeUnusedNodes() {
 }
 
 void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
-  auto new_node = _constexpr_graph->createClone(
+  auto *new_node = _constexpr_graph->createClone(
       node, [this](torch::jit::Value *v) { return this->_values_map[v]; },
       false);
   _nodes_map[node] = new_node;
@@ -234,8 +234,8 @@ void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
   _constexpr_graph->insertNode(new_node);
 
   // Map the old outputs to the new
-  auto old_it = node->outputs().begin();
-  auto new_it = new_node->outputs().begin();
+  const auto *old_it = node->outputs().begin();
+  const auto *new_it = new_node->outputs().begin();
   for (; old_it != node->outputs().end(); old_it++, new_it++) {
     ERROR_ON(new_it == new_node->outputs().end());
     _values_map[*old_it] = *new_it;

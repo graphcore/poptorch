@@ -99,6 +99,10 @@ class PyLinters(ILinterFamily):
     def __init__(self):
         super().__init__(["py"], linters=[Pylint(), Yapf()])
 
+    def is_enabled(self, filename, autofix):  # pylint: disable=unused-argument
+        # Don't run PyLint on the buildenv config files
+        return re.match(r".*\.buildenv\.py$", filename) is None
+
 
 class ILinter:
     """Base class for all the linters"""
@@ -423,7 +427,7 @@ class ClangFormat(ILinter):
                             print_output=autofix)
 
     def check_version(self):
-        return compare_versions_from_conda("clang-tools", "9.0.0")
+        return compare_versions_from_conda("clang-tools", "12.0.1")
 
 
 class ClangTidy(ILinter):
@@ -492,24 +496,42 @@ class ClangTidy(ILinter):
     def __init__(self):
         self.configs = []
         self.python_includes = ""
-        self.includes = [
-            "${CONDA_PREFIX}/include",
-            "${CONDA_PREFIX}/../poplar",
-            "${CONDA_PREFIX}/../popart",
-            "popart_compiler/include",
-            "poptorch/include",
-            "poptorch_logging/include",
-            "popart_compiler/source/include",
-        ]
+        self.includes = []
+        self.compile_commands = {}
 
         self._assert_poplibs_available()
+
+    def get_compile_commands_flags(self, filename):
+        if filename.endswith("cpp"):
+            if filename in self.compile_commands:
+                return self.compile_commands[filename]
+            logger.warning(
+                "%s is absent from compiler_commands.json: check "
+                "CMakeLists.txt to make sure it's compiled", filename)
+            # Fall through to header path to try to find
+            # flags for files in the same folder
+
+        # If it's a header try to find a cpp file in the same root folder
+        folder = filename.split("/")[0] + "/"
+        for path, flags in self.compile_commands.items():
+            if path.startswith(folder):
+                logger.debug("Found flags for folder %s", folder)
+                return flags
+        logger.warning("No compilation flags found for folder %s", folder)
+        return ("", "")
 
     def gen_lint_command(self, filename, autofix):
         if not self.configs:
             self.check_version()
+        gcc_flags, work_dir = self.get_compile_commands_flags(filename)
         flags = "-std=c++17 -fsized-deallocation -DONNX_NAMESPACE=onnx "
-        flags += self.python_includes
+        flags += self.python_includes + " "
+        flags += gcc_flags
         flags += " -I" + " -I".join(self.includes)
+        cd = ""
+        if work_dir:
+            cd = f"cd {work_dir};"
+
         commands = []
         results = ClangTidy.ResultsProcessor(len(self.configs), autofix)
         # Clang-tidy has a lot of checks so we run them in parallel in
@@ -517,9 +539,10 @@ class ClangTidy(ILinter):
         for i, c in enumerate(self.configs):
             report = os.path.join(results.tmp_folder.name, f"report_{i}.yaml")
             commands.append(
-                CondaCommand("clang-tidy",
+                CondaCommand(cd,
+                             "clang-tidy",
                              "--quiet",
-                             filename,
+                             os.path.realpath(filename),
                              f"--export-fixes={report}",
                              c,
                              "--",
@@ -531,6 +554,29 @@ class ClangTidy(ILinter):
                              print_output=False))
         return commands
 
+    def process_compile_commands(self, commands):
+        # Some flags are not supported by clang-tidy
+        unsupported_flags = ["-fno-semantic-interposition"]
+        for c in commands:
+            gcc_flags = c["command"].split()
+            cmd = " ".join(
+                [f for f in gcc_flags if f not in unsupported_flags])
+            m = re.match(".*/poptorch/(.*)", c["file"])
+            assert m, f"Couldn't find '/poptorch/' in {c['file']}"
+
+            # Exception we've got nested "poptorch" folders, so make sure
+            # the path is the correct one.
+            file_maybe = m.group(1)
+            if not os.path.exists(file_maybe):
+                file_maybe = os.path.join("poptorch", file_maybe)
+
+            if not os.path.exists(file_maybe):
+                logger.warning(
+                    "compile_commands.json: %s/%s ignored: neither file exist",
+                    m.group(1), file_maybe)
+            self.compile_commands[file_maybe] = (cmd, c["directory"])
+
+    # pylint: disable=too-many-return-statements
     def check_version(self):
         config = []
         self.configs = []
@@ -567,6 +613,33 @@ class ClangTidy(ILinter):
                 returncode = 1
             return output, returncode
 
+        def parse_system_includes(output, returncode):
+            if returncode:
+                logger.error("Failed to find system includes: %s", output)
+                return output, returncode
+            include_path_section = False
+            for line in output.split("\n"):
+                if "search starts here" in line:
+                    include_path_section = True
+                if include_path_section and line.startswith(" "):
+                    logger.debug("Adding %s to includes", line)
+                    self.includes.append(line.rstrip())
+            return output, returncode
+
+        def parse_compile_commands_file(output, returncode):
+            if returncode:
+                logger.error("compile_commands.json not found. "
+                             "Make sure to build PopTorch first.")
+                return output, returncode
+
+            self.process_compile_commands(json.loads(output))
+            return output, returncode
+
+        if CondaCommand("g++ -E -x c++ - -v < /dev/null",
+                        print_output=False,
+                        output_processor=parse_system_includes).run():
+            return False
+
         if CondaCommand("python3-config --includes",
                         print_output=False,
                         output_processor=parse_python_includes).run():
@@ -595,7 +668,13 @@ class ClangTidy(ILinter):
                         output_processor=parse_include_tests).run():
             return False
 
-        return compare_versions_from_conda("clang-tools", "9.0.0")
+        # Check if there is a compile_commands.json
+        if CondaCommand("cat ${CONDA_PREFIX}/../compile_commands.json",
+                        print_output=False,
+                        output_processor=parse_compile_commands_file).run():
+            return False
+
+        return compare_versions_from_conda("clang-tools", "12.0.1")
 
     def is_enabled(self, filename, autofix):
         return "custom_cube_op.cpp" not in filename

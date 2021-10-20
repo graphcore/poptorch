@@ -19,7 +19,7 @@ bool registerHandler(c10::Symbol symbol, const SymbolHandler &handler);
 std::vector<std::int64_t>
 reduceHelperDimensionCreator(torch::jit::Value *value);
 
-static inline std::vector<std::int64_t>
+inline std::vector<std::int64_t>
 reduceHelperDimensionCreator(torch::jit::Value *value,
                              const std::vector<std::int64_t> &axes) {
   if (!axes.empty()) {

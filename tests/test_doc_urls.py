@@ -25,7 +25,6 @@ EXCEPTIONS = [
     "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut3_mixed_precision",
     "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut4_observing_tensors",
     "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut2_efficient_data_loading"
-
 ]
 
 

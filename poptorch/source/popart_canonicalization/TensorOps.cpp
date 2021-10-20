@@ -32,7 +32,7 @@ torch::jit::Node *numToTensorHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *flipHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
-  auto input = node->input(0);
+  auto *input = node->input(0);
   auto dims = constantToLongVec(node->input(1)->node());
   std::vector<torch::jit::Value *> args;
   args.push_back(input);
@@ -74,8 +74,8 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
     transform_shape.push_back(padded_dim);
   }
 
-  auto reshape = createReshape(graph, input, transform_shape);
-  auto expand = createExpand(
+  auto *reshape = createReshape(graph, input, transform_shape);
+  auto *expand = createExpand(
       graph, {reshape->output(), intVectorToIrConstant(graph, dim_expands)});
 
   return createReshape(graph, expand->output(), new_shape);
@@ -84,7 +84,7 @@ torch::jit::Node *repeatHandler(torch::jit::Graph *graph,
 torch::jit::Node *rollHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   // aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> Tensor
-  auto input = node->input(0);
+  auto *input = node->input(0);
   auto input_shape = shapeFromTensor(input);
   auto shifts = constantToLongVec(node->input(1)->node());
   auto dims = constantToLongVec(node->input(2)->node());
@@ -124,10 +124,10 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
         current_dim_size;
 
     // Duplicate the rolling dimension and then slice based on the shift.
-    auto duplicated = createConcat(graph, {output, output}, current_dim);
-    auto start = wrapInConstant1D(graph, current_dim_size - current_shift);
-    auto end = wrapInConstant1D(graph, 2 * current_dim_size - current_shift);
-    auto axis = wrapInConstant1D(graph, current_dim);
+    auto *duplicated = createConcat(graph, {output, output}, current_dim);
+    auto *start = wrapInConstant1D(graph, current_dim_size - current_shift);
+    auto *end = wrapInConstant1D(graph, 2 * current_dim_size - current_shift);
+    auto *axis = wrapInConstant1D(graph, current_dim);
     output =
         createSlice(graph, {duplicated->output(), start, end, axis})->output();
   }
@@ -164,12 +164,12 @@ torch::jit::Node *justReturnFalse(torch::jit::Graph *graph,
 torch::jit::Node *linearHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::linear(Tensor input, Tensor weight, Tensor? bias) -> Tensor
-  auto x = node->input(0);
-  auto w = node->input(1);
-  auto b = node->input(2);
+  auto *x = node->input(0);
+  auto *w = node->input(1);
+  auto *b = node->input(2);
 
-  auto w_t = createTranspose(graph, {w}, {1, 0});
-  auto output = createMatmul(graph, {x, w_t->output()});
+  auto *w_t = createTranspose(graph, {w}, {1, 0});
+  auto *output = createMatmul(graph, {x, w_t->output()});
 
   if (!isNone(b)) {
     output = createAdd(graph, {output->output(), b});
@@ -179,10 +179,10 @@ torch::jit::Node *linearHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
-  auto input = node->input(0);
+  auto *input = node->input(0);
   auto tensor_type = input->type()->expect<c10::TensorType>();
   auto axis = handleDimensionParam(node->input(1), tensor_type);
-  auto indices = node->input(2);
+  auto *indices = node->input(2);
   auto scalar_type = getNodeScalarType(input);
   auto input_shape = shapeFromTensor(input);
   auto index_shape = shapeFromTensor(indices);
@@ -228,15 +228,15 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
     axes.resize(input_shape.size() - 1);
     std::iota(axes.begin(), axes.end(), 1);
 
-    auto start_vals =
+    auto *start_vals =
         createConstantInt(graph, start,
                           {static_cast<std::int64_t>(start.size())})
             ->output();
-    auto end_vals =
+    auto *end_vals =
         createConstantInt(graph, plane_shape,
                           {static_cast<std::int64_t>(plane_shape.size())})
             ->output();
-    auto axes_vals =
+    auto *axes_vals =
         createConstantInt(graph, axes, {static_cast<std::int64_t>(axes.size())})
             ->output();
     input =
@@ -256,28 +256,28 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
 
   std::vector<std::int64_t> input_slice_size(input_dims, 1);
   std::vector<std::int64_t> index_slice_size(index_dims, 1);
-  auto input_split =
+  auto *input_split =
       createSplit(graph, {input}, input_dims, 0, input_slice_size);
-  auto index_split =
+  auto *index_split =
       createSplit(graph, {indices}, index_dims, 0, index_slice_size);
 
   std::vector<torch::jit::Value *> planes;
   for (int i = 0; i < index_dims; ++i) {
-    auto plane =
+    auto *plane =
         createConstantFloatLike(graph, input, {0.0}, plane_shape)->output();
 
     for (int j = 0; j < input_dims; ++j) {
-      auto eq =
+      auto *eq =
           createEqual(graph, {index_split->output(i), plane_mask[j]})->output();
-      auto mask = createCast(graph, eq, scalar_type)->output();
-      auto mul = createMul(graph, {input_split->output(j), mask})->output();
+      auto *mask = createCast(graph, eq, scalar_type)->output();
+      auto *mul = createMul(graph, {input_split->output(j), mask})->output();
       plane = createAdd(graph, {plane, mul})->output();
     }
 
     planes.push_back(plane);
   }
 
-  auto result = createConcat(graph, planes, 0)->output();
+  auto *result = createConcat(graph, planes, 0)->output();
 
   // transpose the result
   if (axis != 0) {

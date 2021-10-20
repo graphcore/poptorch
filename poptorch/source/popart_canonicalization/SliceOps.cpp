@@ -29,9 +29,9 @@ void extractAddSubtractConstant(torch::jit::Node *node, std::int64_t *size,
                fail_msg);
   ERROR_ON(node->inputs().size() != 2);
 
-  auto constant = isAnyConstant(node->input(0)->node())
-                      ? node->input(0)->node()
-                      : node->input(1)->node();
+  auto *constant = isAnyConstant(node->input(0)->node())
+                       ? node->input(0)->node()
+                       : node->input(1)->node();
 
   if (node->kind() == symbols::popart::sub) {
     negate = !negate;
@@ -54,7 +54,7 @@ void extractAddSubtractConstant(torch::jit::Node *node, std::int64_t *size,
 torch::jit::Node *getOnlyNonConstantInput(torch::jit::Node *node) {
   torch::jit::Node *only_such_input = nullptr;
 
-  for (auto input : node->inputs()) {
+  for (auto *input : node->inputs()) {
     if (!isAnyConstant(input->node())) {
       if (only_such_input != nullptr) {
         logging::trace("dynamicSliceHandler failed due to a node with multiple "
@@ -87,8 +87,8 @@ bool nodesAlwaysSameOutput(torch::jit::Node *a, torch::jit::Node *b) {
     return false;
   }
 
-  auto a_it = a->inputs().begin();
-  auto b_it = b->inputs().begin();
+  const auto *a_it = a->inputs().begin();
+  const auto *b_it = b->inputs().begin();
   for (; a_it != a->inputs().end(); a_it++, b_it++) {
     if (!nodesAlwaysSameOutput((*a_it)->node(), (*b_it)->node())) {
       return false;
@@ -113,14 +113,14 @@ bool nodesAlwaysSameOutput(torch::jit::Node *a, torch::jit::Node *b) {
 // Convert any inputs to the specified node which are a cast of another
 // constant into a single (already cast) constant
 void resolveCastConstants(torch::jit::Graph *graph, torch::jit::Node *node) {
-  for (auto input : node->inputs()) {
+  for (auto *input : node->inputs()) {
     // Move on if it is not a cast situation
-    auto cast_node = input->node();
+    auto *cast_node = input->node();
     if (cast_node->kind() != symbols::popart::cast) {
       continue;
     }
 
-    auto constant_to_be_cast = cast_node->input()->node();
+    auto *constant_to_be_cast = cast_node->input()->node();
 
     if (constant_to_be_cast->kind() != symbols::poptorch::tensor_constant) {
       continue;
@@ -134,7 +134,7 @@ void resolveCastConstants(torch::jit::Graph *graph, torch::jit::Node *node) {
 
     // Replace node to avoid a cast
     torch::jit::WithInsertPoint insert_point(node);
-    auto replacement_node = tensorToConstant(graph, tensor);
+    auto *replacement_node = tensorToConstant(graph, tensor);
     cast_node->output()->replaceAllUsesWith(replacement_node->output());
 
     markNodeForDeletion(cast_node);
@@ -161,7 +161,7 @@ void populateAncestory(torch::jit::Graph *graph,
     bool end_is_later = end_ancestor->isAfter(start_ancestor);
 
     auto **later_node = end_is_later ? &end_ancestor : &start_ancestor;
-    auto add_to_list = end_is_later ? end_ancestory : start_ancestory;
+    auto *add_to_list = end_is_later ? end_ancestory : start_ancestory;
     add_to_list->push_back(*later_node);
 
     // The algorithm will fail if there is an input that would be a constant but
@@ -218,7 +218,7 @@ determineSizeConstant(const std::vector<torch::jit::Node *> &start_ancestory,
                       const std::vector<torch::jit::Node *> &end_ancestory) {
   std::int64_t size = 0;
 
-  for (auto node : start_ancestory) {
+  for (auto *node : start_ancestory) {
     if (node->kind() == c10::aten::Int ||
         node->kind() == symbols::popart::cast) {
       continue;
@@ -227,7 +227,7 @@ determineSizeConstant(const std::vector<torch::jit::Node *> &start_ancestory,
     extractAddSubtractConstant(node, &size, true);
   }
 
-  for (auto node : end_ancestory) {
+  for (auto *node : end_ancestory) {
     if (node->kind() == c10::aten::Int ||
         node->kind() == symbols::popart::cast) {
       continue;
@@ -287,7 +287,7 @@ torch::jit::Node *dynamicSliceHandler(torch::jit::Graph *graph,
   start_node = createReshape(graph, start_node->output(), {1});
   start_node = createCast(graph, {start_node->output()}, "UINT32");
 
-  auto new_node = createDynamicslice(
+  auto *new_node = createDynamicslice(
       graph, {node->input(0), start_node->output()}, {dim}, {size},
       1); // No overlap 1 assumed
   return new_node;
@@ -310,11 +310,11 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor
   // // NOLINT
-  auto input = node->input(0);
+  auto *input = node->input(0);
   auto dim = constantToLong(node->input(1)->node());
-  auto start_node = node->input(2)->node();
-  auto end_node = node->input(3)->node();
-  auto step_node = node->input(4)->node();
+  auto *start_node = node->input(2)->node();
+  auto *end_node = node->input(3)->node();
+  auto *step_node = node->input(4)->node();
 
   ERROR_ON_MSG(!isTensorConstant(step_node), "Slicing step must be a constant");
 
@@ -325,7 +325,7 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
 
   // If any of the inputs are not constants, dynamicSlice is required
   if (!isTensorConstant(start_node) || !isTensorConstant(end_node)) {
-    auto slice = dynamicSliceHandler(graph, node, start_node, end_node);
+    auto *slice = dynamicSliceHandler(graph, node, start_node, end_node);
     return subsampleSlice(graph, slice, dims.size(), dim, step);
   }
 
@@ -355,7 +355,7 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
     end = dims[dim];
   }
 
-  auto slice = createSlice(
+  auto *slice = createSlice(
       graph, {node->input(0), wrapInConstant1D(graph, start),
               wrapInConstant1D(graph, end), wrapInConstant1D(graph, dim)});
   return subsampleSlice(graph, slice, dims.size(), dim, step);
@@ -365,7 +365,7 @@ torch::jit::Node *unbindHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::unbind(Tensor self, int dim) -> Tensor[]
 
-  auto x = node->input(0);
+  auto *x = node->input(0);
   auto shape = shapeFromTensor(x);
   int dim = constantToInt(node->input(1)->node());
   std::int64_t dim_size = shape[dim];
@@ -374,10 +374,10 @@ torch::jit::Node *unbindHandler(torch::jit::Graph *graph,
   // Select each index in dimension 'dim' of x and add all
   // slices to a vector
   for (std::int64_t i = 0; i < dim_size; i++) {
-    auto inds = wrapInConstant1D(graph, i);
-    auto gather = createGather(graph, {x, inds}, dim);
+    auto *inds = wrapInConstant1D(graph, i);
+    auto *gather = createGather(graph, {x, inds}, dim);
     // Squeeze out the gathered dim
-    auto squeeze = createSqueeze(graph, {gather->output()}, {dim});
+    auto *squeeze = createSqueeze(graph, {gather->output()}, {dim});
     tensors.push_back(squeeze->output());
   }
 

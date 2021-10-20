@@ -100,7 +100,7 @@ void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
                                 << nodeToString(node));
 
     auto replacement = static_cast<int>(replacement_dtype);
-    auto input = node->input(dtype_index)->node();
+    auto *input = node->input(dtype_index)->node();
 
     if (node->input(dtype_index)->uses().size() == 1) {
       // Type constant is only used once, change its value
@@ -111,7 +111,7 @@ void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
         ERROR("A constant should have no inputs");
         return value; // ensures correct output type
       };
-      auto new_type_const = node->owningGraph()->createClone(input, no_inputs);
+      auto *new_type_const = node->owningGraph()->createClone(input, no_inputs);
       new_type_const->i_(c10::attr::value, replacement);
       node->replaceInput(dtype_index, new_type_const->output());
       new_type_const->insertBefore(node);
@@ -153,7 +153,7 @@ void checkAndChangeOutputTypesForOutput(torch::jit::Node *node,
 
 void checkAndChangeOutputTypes(torch::jit::Graph *graph) {
   logging::LogContext ctx_func("CheckAndChangeOutputTypes");
-  for (auto n : graph->nodes()) {
+  for (auto *n : graph->nodes()) {
     // Unpacks will happen before a host side cast, so ignore here
     if (n->kind() == c10::prim::TupleUnpack ||
         n->kind() == c10::prim::ListUnpack) {
@@ -162,7 +162,7 @@ void checkAndChangeOutputTypes(torch::jit::Graph *graph) {
 
     logging::LogContext ctx("processing " + nodeToString(n));
 
-    for (auto output : n->outputs()) {
+    for (auto *output : n->outputs()) {
       logging::LogContext ctx_2(output->debugName());
 
       checkAndChangeOutputTypesForOutput(n, output);

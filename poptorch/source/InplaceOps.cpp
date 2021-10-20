@@ -54,9 +54,9 @@ InplaceOpHandler::InplaceOpHandler(
 void InplaceOpHandler::storeNumTensorOutputs() {
   _num_normal_tensor_outputs = 0;
 
-  for (auto &output : _graph->outputs()) {
+  for (const auto &output : _graph->outputs()) {
     if (output->node()->kind() == c10::prim::ListConstruct) {
-      for (auto &input : output->node()->inputs()) {
+      for (const auto &input : output->node()->inputs()) {
         _num_normal_tensor_outputs += numTensorsForType(input->type());
       }
     } else {
@@ -71,7 +71,7 @@ void InplaceOpHandler::processInput(size_t input_num) {
 
   // Pass through the nodes in topological order rather than jumping through
   // outputs
-  for (auto node : _graph->nodes()) {
+  for (auto *node : _graph->nodes()) {
     // Skip if not in-place
     if (!torch::jit::isInplaceOp(node)) {
       continue;
@@ -89,7 +89,7 @@ void InplaceOpHandler::processInput(size_t input_num) {
       continue;
     }
 
-    auto new_node = outplaceOp(node);
+    auto *new_node = outplaceOp(node);
     to_delete.push_back(node);
     current_alias = new_node->output();
   }
@@ -119,7 +119,7 @@ void InplaceOpHandler::processInput(size_t input_num) {
     // Updating a variable means that the original variable matches
     ERROR_ON(*_collapsed_inputs[input_num]->type() != *current_alias->type());
 
-    auto new_node = _graph->create(symbols::poptorch::update_param_inplace, 1);
+    auto *new_node = _graph->create(symbols::poptorch::update_param_inplace, 1);
     new_node->addInput(_collapsed_inputs[input_num]);
     new_node->addInput(current_alias);
     new_node->insertAfter(current_alias->node());
@@ -151,14 +151,14 @@ void InplaceOpHandler::processInput(size_t input_num) {
     _input_output_mapping.push_back(output_mapping);
   }
 
-  for (auto node : to_delete) {
+  for (auto *node : to_delete) {
     node->destroy();
   }
 }
 
 void InplaceOpHandler::removeRemainingInplaceOps() {
   std::vector<torch::jit::Node *> to_delete;
-  for (auto node : _graph->nodes()) {
+  for (auto *node : _graph->nodes()) {
     // Skip if not in-place
     if (!torch::jit::isInplaceOp(node)) {
       continue;
@@ -173,7 +173,7 @@ void InplaceOpHandler::removeRemainingInplaceOps() {
     to_delete.push_back(node);
   }
 
-  for (auto node : to_delete) {
+  for (auto *node : to_delete) {
     node->destroy();
   }
 }
@@ -190,10 +190,10 @@ torch::jit::Node *InplaceOpHandler::outplaceOp(torch::jit::Node *node) {
   }
 
   torch::jit::WithInsertPoint insert_point(node);
-  auto new_node = _graph->create(new_kind);
+  auto *new_node = _graph->create(new_kind);
   _graph->insertNode(new_node);
 
-  for (auto input : node->inputs()) {
+  for (auto *input : node->inputs()) {
     new_node->addInput(input);
   }
 

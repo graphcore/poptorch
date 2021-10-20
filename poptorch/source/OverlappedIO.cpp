@@ -21,7 +21,7 @@ void attributiseOverlappedInputs(
   logging::LogContext ctx("attributiseOverlappedInputs");
 
   int64_t input_num = -1;
-  for (auto input : graph->inputs()) {
+  for (auto *input : graph->inputs()) {
     input_num++;
     auto input_uses = input->uses();
 
@@ -40,7 +40,7 @@ void attributiseOverlappedInputs(
     if ((input_uses.size() == 1) &&
         (first_user->kind() ==
          poptorch::symbols::poptorch::set_overlap_for_input)) {
-      auto value_node = first_user->input(1)->node();
+      auto *value_node = first_user->input(1)->node();
       ERROR_ON(value_node->kind() != c10::prim::Constant);
       const auto &value_str = value_node->s(c10::attr::value);
       to_delete->push_back(first_user);
@@ -112,7 +112,7 @@ void attributiseOverlappedOutputs(
     if (node->kind() == poptorch::symbols::poptorch::set_overlap_for_output) {
       errorOnDoubleReturnOfOutput(node);
 
-      auto value_node = node->input(1)->node();
+      auto *value_node = node->input(1)->node();
       ERROR_ON(value_node->kind() != c10::prim::Constant);
       const auto &value_str = value_node->s(c10::attr::value);
       to_delete->push_back(node);
@@ -126,7 +126,7 @@ void attributiseOverlappedOutputs(
       output_num++;
     } else if (node->kind() == c10::prim::ListConstruct ||
                node->kind() == c10::prim::TupleConstruct) {
-      for (auto input : node->inputs()) {
+      for (auto *input : node->inputs()) {
         process_node(input->node());
       }
     } else {
@@ -138,7 +138,7 @@ void attributiseOverlappedOutputs(
 
   // Loop over all graph (there may always only be one as multiple inputs are
   // returned as a tuple/list)
-  for (auto output : graph->outputs()) {
+  for (auto *output : graph->outputs()) {
     process_node(output->node());
   }
 }
@@ -151,7 +151,7 @@ void attributiseOverlappedIO(torch::jit::Graph *graph) {
   attributiseOverlappedInputs(graph, &to_erase_output_and_delete, &to_delete);
   attributiseOverlappedOutputs(graph, &to_erase_output_and_delete, &to_delete);
 
-  for (auto node : to_erase_output_and_delete) {
+  for (auto *node : to_erase_output_and_delete) {
     node->eraseOutput(0);
     node->destroy();
   }
@@ -161,7 +161,7 @@ void attributiseOverlappedIO(torch::jit::Graph *graph) {
   }
 
   // Any other use of set_overlap_for_input or set_overlap_for_input is invalid
-  for (auto node : graph->nodes()) {
+  for (auto *node : graph->nodes()) {
     ERROR_ON_MSG(node->kind() ==
                      poptorch::symbols::poptorch::set_overlap_for_input,
                  "poptorch.set_overlap_for_input applied on a node which is "

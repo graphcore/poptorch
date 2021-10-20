@@ -62,7 +62,7 @@ void log(Level l, const char *msg);
 // the MAKE_LOG_TEMPLATE macros instead, e.g.
 // logging::debug("The answer is: {}", 42).
 template <typename... Args>
-void log(Level l, const char *s, const Args &... args) {
+void log(Level l, const char *s, const Args &...args) {
   // Avoid formatting if the logging is disabled anyway.
   if (shouldLog(l)) {
     const std::string str = fmt::format(s, args...);
@@ -74,7 +74,7 @@ void log(Level l, const char *s, const Args &... args) {
 // of the form logging::debug("Msg").
 #define MAKE_LOG_TEMPLATE(fnName, lvl)                                         \
   template <typename... Args>                                                  \
-  inline void fnName(const char *s, const Args &... args) {                    \
+  inline void fnName(const char *s, const Args &...args) {                     \
     log(Level::lvl, s, std::forward<const Args>(args)...);                     \
   }
 

@@ -43,8 +43,8 @@ torch::jit::Value *reshapeWeights(torch::jit::Graph *graph,
 }
 
 torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
-  auto input = node->input(0);
-  auto hx = node->input(1);
+  auto *input = node->input(0);
+  auto *hx = node->input(1);
   auto params = node->input(2)->node()->inputs();
 
   bool bias = constantToBool(node->input(3)->node());
@@ -57,8 +57,8 @@ torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   ERROR_ON_MSG(dropout != 0.0f, "GRU only supports dropout = 0.0");
   ERROR_ON_MSG(bidirectional, "bidirectional GRU not supported");
 
-  auto gate_weights = prependDimension(graph, params[0]);
-  auto recur_weights = prependDimension(graph, params[1]);
+  auto *gate_weights = prependDimension(graph, params[0]);
+  auto *recur_weights = prependDimension(graph, params[1]);
 
   auto input_shape = shapeFromTensor(input);
   unsigned seq_length = input_shape[0];
@@ -72,8 +72,8 @@ torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   torch::jit::Value *biases;
 
   if (bias) {
-    auto gate_biases = prependDimension(graph, params[2]);
-    auto recur_biases = prependDimension(graph, params[3]);
+    auto *gate_biases = prependDimension(graph, params[2]);
+    auto *recur_biases = prependDimension(graph, params[3]);
 
     gate_biases = reshapeWeights(graph, gate_biases, hidden_size);
     recur_biases = reshapeWeights(graph, recur_biases, hidden_size);
@@ -84,17 +84,17 @@ torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
                  ->output();
   }
 
-  auto seq_lens =
+  auto *seq_lens =
       createConstantInt(graph, {seq_length}, {batch_size})->output();
 
   if (batch_first) {
     input = createTranspose(graph, {input}, {1, 0, 2})->output();
   }
 
-  auto gru = createGru(
+  auto *gru = createGru(
       graph, {input, gate_weights, recur_weights, biases, seq_lens, hx});
 
-  auto output = createSqueeze(graph, {gru->output(0)}, {1})->output();
+  auto *output = createSqueeze(graph, {gru->output(0)}, {1})->output();
 
   if (batch_first) {
     output = createTranspose(graph, {output}, {1, 0, 2})->output();
@@ -227,7 +227,7 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
   // (num_directions * num_layers, batch_size, hidden_size), but since we don't
   // support bidirectional or > 1 layers, this dimension is always 1 so we just
   // need to prepend a single dim
-  auto y_c = createUnsqueeze(graph, {lstm->output(1)}, {0});
+  auto *y_c = createUnsqueeze(graph, {lstm->output(1)}, {0});
 
   ERROR_ON(node->outputs().size() != 3);
   if (node->hasUses()) {

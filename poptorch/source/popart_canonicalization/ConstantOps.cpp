@@ -29,8 +29,8 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
   bool is_ones = kind == c10::aten::ones || kind == c10::aten::ones_like ||
                  kind == c10::aten::new_ones;
 
-  auto output = node->output();
-  auto new_node = createAndInsertNode(
+  auto *output = node->output();
+  auto *new_node = createAndInsertNode(
       graph, is_ones ? symbols::poptorch::ones : symbols::poptorch::zeros, {},
       ImplicitCast::None, OutputType::AsDtype, 1, getNodeScalarType(output));
 
@@ -39,7 +39,7 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
   } else {
     auto shape_list = handleTensorList(node->input(1)->node());
     std::vector<int64_t> shape;
-    for (auto size : shape_list) {
+    for (auto *size : shape_list) {
       ERROR_ON_MSG(
           !isTensorConstant(size->node()),
           "Invalid shape for "

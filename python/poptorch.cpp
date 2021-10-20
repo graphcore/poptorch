@@ -661,7 +661,7 @@ void printGraphInputStr(std::ostream &os, const torch::jit::Graph &graph,
                         bool is_trace_input) {
   bool first = true;
   auto it_tensors = input_tensors.begin();
-  for (auto input : graph.inputs()) {
+  for (const auto *input : graph.inputs()) {
     if (!first) {
       os << ",\n      ";
     }
@@ -705,13 +705,13 @@ void logGraph(const char *intro_str, const torch::jit::Graph &graph,
   graph_str << "]\n";
 
   std::vector<const torch::jit::Node *> groups;
-  for (auto n : graph.nodes()) {
+  for (const auto *n : graph.nodes()) {
     n->print(graph_str, 1, &groups, true);
   }
   graph_str << "  return (" << graph.outputs() << ")\n";
   size_t i = 0;
 
-  for (auto fg : groups) {
+  for (const auto *fg : groups) {
     graph_str << "with " << fg->kind().toQualString() << "_" << i++ << " = "
               << *fg->g(torch::jit::attr::Subgraph);
   }
@@ -766,7 +766,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
     const bool added_dummy_output, const py::list &anchors,
     const py::dict &model_parameters) {
-  auto module = asModule(h);
+  auto *module = asModule(h);
 
   auto forward = module->get_method("forward");
   auto graph_and_tensors =
@@ -1057,7 +1057,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
 
     // Reshape the output tensors in the structure expected by the user
     auto tensor_it = output_tensors.begin();
-    auto &output_types = executable->outputTypes();
+    const auto &output_types = executable->outputTypes();
     auto type_it = output_types.begin();
     ERROR_ON(type_it == output_types.end());
 
@@ -1112,7 +1112,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
 std::vector<pybind11::object>
 getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   std::vector<pybind11::object> returnee;
-  auto &compiler = executable->getCompiler();
+  const auto &compiler = executable->getCompiler();
   auto num_inputs = compiler.getNumInputs();
   auto num_outputs = compiler.getNumOutputs();
 
@@ -1160,7 +1160,7 @@ void processPrecisionOptions(py::handle h) {
 
 bool pyIsGraphNondeterministic(py::handle h) {
   try {
-    auto module = asModule(h);
+    auto *module = asModule(h);
     auto forward = module->get_method("forward");
     auto graph_and_tensors =
         torch::jit::LowerGraph(*forward.graph(), module->_ivalue());

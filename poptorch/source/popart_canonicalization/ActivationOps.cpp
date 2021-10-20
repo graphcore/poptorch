@@ -65,22 +65,22 @@ torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
   const float upper = constantToFloat(node->input(2)->node());
   const bool is_training = constantToBool(node->input(3)->node());
 
-  auto val =
+  auto *val =
       is_training
           ? createRandomUniform(graph, x, shapeFromTensor(x), upper, lower)
                 ->output()
           : createConstantFloatLike(graph, x, {(lower + upper) / 2}, {})
                 ->output();
 
-  auto zero = createConstantFloatLike(graph, x, {0}, {})->output();
-  auto xlt0 = createLess(graph, {x, zero})->output();
-  auto mul = createMul(graph, {x, val})->output();
+  auto *zero = createConstantFloatLike(graph, x, {0}, {})->output();
+  auto *xlt0 = createLess(graph, {x, zero})->output();
+  auto *mul = createMul(graph, {x, val})->output();
   return createWhere(graph, {xlt0, mul, x});
 }
 
 torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
-  auto x = node->input(0);
+  auto *x = node->input(0);
   auto input_type = getNodeScalarType(x);
   auto beta = constantToFloat(node->input(1)->node());
   auto threshold = constantToFloat(node->input(2)->node());
@@ -88,7 +88,7 @@ torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
   ss << "{\"beta\":" << std::to_string(beta)
      << ",\"threshold\":" << std::to_string(threshold) << "}";
 
-  auto output_node = createCustomOperation(
+  auto *output_node = createCustomOperation(
       graph, {x}, "TorchSoftplus", "poptorch.custom_ops", 1, 1, ss.str());
 
   output_node->output(0)->setType(c10::TensorType::create(

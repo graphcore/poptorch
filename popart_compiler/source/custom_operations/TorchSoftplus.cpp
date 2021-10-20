@@ -112,7 +112,7 @@ namespace pe = popops::expr;
 
 template <class T>
 std::unique_ptr<popart::popx::EwuComputex> create(popart::Op *op) {
-  auto x = dynamic_cast<T *>(op);
+  auto *x = dynamic_cast<T *>(op);
   if (x == nullptr) {
     throw popart::error("Invalid torch softplus operator.");
   }
@@ -202,8 +202,8 @@ void TorchSoftplusGradOpx::grow(snap::program::Sequence &prog) const {
   //
   // grad_out = grad_in * sigmoid(beta*x) for beta * x <= threshold
   //            grad_in                   for beta * x > threshold
-  auto &grad_in = getInTensor(TorchSoftplusGradOp::getGradInIndex());
-  auto &fwd_input = getInTensor(TorchSoftplusGradOp::getFwdArgInIndex());
+  const auto &grad_in = getInTensor(TorchSoftplusGradOp::getGradInIndex());
+  const auto &fwd_input = getInTensor(TorchSoftplusGradOp::getFwdArgInIndex());
 
   using ExprPtr = std::unique_ptr<pe::Expr>;
   std::vector<ExprPtr> exprs;

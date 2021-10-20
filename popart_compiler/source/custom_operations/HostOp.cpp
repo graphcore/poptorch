@@ -68,6 +68,7 @@ getMetadataFromAttributeMap(const popart::Attributes &attrs) {
   logging::trace("Casted from {} to {}", as_int, as_ptr);
 
   // Cast to the correct type.
+  // NOLINTNEXTLINE performance-no-int-to-ptr
   return reinterpret_cast<poptorch::detail::CallbackInternalMetadata *>(as_ptr);
 }
 
@@ -178,7 +179,8 @@ static popart::OpCreator<poptorch::HostOp> host_op_creator(
     {{poptorch_custom_ops::host_op, {}}},
     [](const popart::OpCreatorInfo &info) {
       // Get the stream info from the attribute map we passed to create the op.
-      auto stream_info = poptorch::getMetadataFromAttributeMap(info.attributes);
+      auto *stream_info =
+          poptorch::getMetadataFromAttributeMap(info.attributes);
 
       return std::unique_ptr<popart::Op>(
           new poptorch::HostOp(info.opid, stream_info, info.settings));
@@ -191,7 +193,7 @@ static popart::popx::OpxCreator<poptorch::HostOpx>
 static popart::RegisterShapeInferenceFunction host_op_shape_inference(
     poptorch_custom_ops::host_op, [](popart::ShapeInferenceContext &ctx) {
       // Get the stream info from the attribute map we passed to create the op.
-      auto stream_info =
+      auto *stream_info =
           poptorch::getMetadataFromAttributeMap(ctx.getAttributes());
 
       // Tell popart what the output should look like.

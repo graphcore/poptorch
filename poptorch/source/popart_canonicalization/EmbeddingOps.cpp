@@ -32,7 +32,7 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
 
   bool scale_grad_by_freq = constantToBool(node->input(3)->node());
   bool sparse = constantToBool(node->input(5)->node());
-  auto padding_idx = node->input(8);
+  auto *padding_idx = node->input(8);
 
   ERROR_ON_MSG(scale_grad_by_freq || sparse,
                "Unsupported aten::embedding_bag operation");
@@ -47,11 +47,11 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
     node->eraseOutput(node->outputs().size() - 1);
   }
 
-  auto weight = node->input(0);
-  auto indices = node->input(1);
-  auto offsets = node->input(2);
+  auto *weight = node->input(0);
+  auto *indices = node->input(1);
+  auto *offsets = node->input(2);
   int64_t mode = constantToLong(node->input(4)->node());
-  auto per_sample_weights = node->input(6);
+  auto *per_sample_weights = node->input(6);
   bool include_last_offset = constantToBool(node->input(7)->node());
 
   auto reduction = [mode](torch::jit::Graph *g, torch::jit::Value *v) {
@@ -75,19 +75,19 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
   }
 
   auto slices = offsets_tensor.accessor<int32_t, 1>();
-  auto zero = wrapInConstant1D(graph, 0);
+  auto *zero = wrapInConstant1D(graph, 0);
   torch::jit::value_list values;
 
   // Use the offsets to extract each bag from the indices.
   // For each bag: Gather then reduce from the embedding matrix
   for (int64_t i = 0; i < offsets_tensor.size(0) - 1; i++) {
-    auto start = wrapInConstant1D(graph, static_cast<int64_t>(slices[i]));
-    auto end = wrapInConstant1D(graph, static_cast<int64_t>(slices[i + 1]));
-    auto bag = createSlice(graph, {indices, start, end, zero})->output();
-    auto gather = createGather(graph, {weight, bag}, 0)->output();
+    auto *start = wrapInConstant1D(graph, static_cast<int64_t>(slices[i]));
+    auto *end = wrapInConstant1D(graph, static_cast<int64_t>(slices[i + 1]));
+    auto *bag = createSlice(graph, {indices, start, end, zero})->output();
+    auto *gather = createGather(graph, {weight, bag}, 0)->output();
 
     if (!isNone(per_sample_weights)) {
-      auto psw =
+      auto *psw =
           createSlice(graph, {per_sample_weights, start, end, zero})->output();
       psw = createUnsqueeze(graph, {psw}, {1})->output();
       gather = createMul(graph, {gather, psw})->output();

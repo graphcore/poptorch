@@ -144,18 +144,18 @@ torch::jit::Node *crossEntropyLossHandler(torch::jit::Graph *graph,
                                           torch::jit::Node *node) {
   // aten::cross_entropy_loss(Tensor self, Tensor target, Tensor? weight, int
   // reduction, int ignore_index)
-  auto input = node->input(0);
-  auto target = node->input(1);
-  auto weight = node->input(2);
+  auto *input = node->input(0);
+  auto *target = node->input(1);
+  auto *weight = node->input(2);
   // TODO(T42695): Support optional weight parameter
   ERROR_ON_MSG(
       !isNone(weight),
       "Parameter \"weight\" is unsupported for aten::cross_entropy_loss");
-  auto reduction = node->input(3);
-  auto ignore_index = node->input(4);
+  auto *reduction = node->input(3);
+  auto *ignore_index = node->input(4);
 
   auto log_softmax_handler = getHandler(c10::aten::log_softmax);
-  auto log_softmax = createHandlerOperation(
+  auto *log_softmax = createHandlerOperation(
       graph, log_softmax_handler, {input, wrapInConstant1D(graph, 1)});
   // logSoftmaxHandler loses shape information required by nllLossNdHandler,
   // so we need to set the type to that of the input, as the type will be the
@@ -558,10 +558,10 @@ torch::jit::Node *tripletMarginLossHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
-  auto log_probs = node->input(0);
-  auto targets = node->input(1);
-  auto input_lengths = node->input(2);
-  auto target_lengths = node->input(3);
+  auto *log_probs = node->input(0);
+  auto *targets = node->input(1);
+  auto *input_lengths = node->input(2);
+  auto *target_lengths = node->input(3);
   auto blank = constantToInt(node->input(4)->node());
   auto reduction = constantToLong(node->input(5)->node());
   auto zero_inf = constantToBool(node->input(6)->node());
@@ -577,7 +577,7 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
   target_lengths = createCast(graph, {target_lengths}, "UINT32")->output();
 
   reduction = convertReduceToPopart(reduction);
-  auto loss =
+  auto *loss =
       create_ctcloss(graph, {log_probs, targets, input_lengths, target_lengths},
                      reduction, blank, "UNDEFINED");
 
@@ -586,8 +586,8 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
                                               torch::jit::Node *node) {
-  auto log_probs = node->input(0);
-  auto lengths = node->input(1);
+  auto *log_probs = node->input(0);
+  auto *lengths = node->input(1);
   auto blank = constantToInt(node->input(2)->node());
   auto width = constantToInt(node->input(3)->node());
   auto top_paths = constantToInt(node->input(4)->node());
@@ -596,13 +596,13 @@ torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
   ERROR_ON_MSG(uses.size() != 1,
                "[Internal Compiler Error] Malformed ctc beam search operator");
 
-  auto unpack = uses[0].user;
+  auto *unpack = uses[0].user;
   ERROR_ON_MSG(unpack->kind() != c10::prim::ListUnpack,
                "[Internal Compiler Error] Malformed ctc beam search operator");
 
   lengths = createCast(graph, {lengths}, "UINT32")->output();
-  auto decoder = createCtcbeamsearchdecoder(graph, {log_probs, lengths}, blank,
-                                            width, top_paths);
+  auto *decoder = createCtcbeamsearchdecoder(graph, {log_probs, lengths}, blank,
+                                             width, top_paths);
   decoder->addOutput();
   decoder->addOutput();
 

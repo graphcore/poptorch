@@ -31,7 +31,7 @@ namespace {
 // Helper to let us filter string arguments into const char*s. This is to catch
 // the std::string produced by some attributes before they cross the ABI
 // boundary.
-template <typename T> T convertType(T &&t) { return t; }
+template <typename T> T convertType(T &&t) { return std::forward<T>(t); }
 
 std::vector<std::string> convertType(std::vector<const char *> v) {
   return std::vector<std::string>(v.begin(), v.end());
@@ -128,7 +128,7 @@ void Optimizer::copyParam(const Optimizer &source_optim, const char *source,
   float *dest_float = nullptr;
   bool *dest_is_const = nullptr;
 
-  for (auto &param : source_optim.parameters) {
+  for (const auto &param : source_optim.parameters) {
     const char *param_name = static_cast<const char *>(param.name);
     if (strcmp(param_name, source) == 0) {
       source_float = &param.value;
@@ -177,7 +177,7 @@ PopartAttribute::PopartAttribute(
     : _name(stringToUniquePtr(name)) {
   std::vector<std::string> strs_new;
   strs_new.reserve(strs.size());
-  for (auto &str : strs) {
+  for (const auto &str : strs) {
     strs_new.emplace_back(str.get());
   }
   _any = std::make_unique<popart::any>(std::move(strs_new));
@@ -938,7 +938,7 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
   // In case several outputs point at the same tensor: duplicate the data
   for (const auto &out : _impl->outgoing_duplicates) {
     auto &src = _impl->popart_outgoing.at(out.first);
-    for (auto ptr : out.second) {
+    for (auto *ptr : out.second) {
       std::memcpy(ptr, src.data(),
                   src.nelms() *
                       popart::getDataTypeInfoMap().at(src.dataType()).nbytes());

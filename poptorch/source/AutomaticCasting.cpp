@@ -112,7 +112,7 @@ bool AutocastPolicy::decision(const torch::jit::Node *node,
   at::ScalarType scalar_type;
 
   // determine whether node has mixed precision inputs or outputs
-  for (auto input : node->inputs()) {
+  for (const auto *input : node->inputs()) {
     if (!valueHasScalarType(input, &scalar_type)) {
       continue;
     }
@@ -121,7 +121,7 @@ bool AutocastPolicy::decision(const torch::jit::Node *node,
     has_half = has_float || scalar_type == at::ScalarType::Half;
   }
 
-  for (auto output : node->outputs()) {
+  for (const auto *output : node->outputs()) {
     if (!valueHasScalarType(output, &scalar_type)) {
       continue;
     }
@@ -200,7 +200,7 @@ torch::jit::Value *castValue(torch::jit::Graph *graph, torch::jit::Value *value,
 
   // create a poptorch::autocast node
   auto current_type = value->type()->cast<c10::TensorType>();
-  auto new_node = graph->create(symbols::poptorch::autocast);
+  auto *new_node = graph->create(symbols::poptorch::autocast);
   new_node->addInput(value);
   new_node->insertAfter(value->node());
   new_node->output(0)->setType(current_type->withScalarType(type));
@@ -234,17 +234,17 @@ void autocastNode(torch::jit::Graph *graph, torch::jit::Node *node) {
   }
 
   // cast half / float inputs
-  for (auto input : node->inputs()) {
+  for (auto *input : node->inputs()) {
     if (!valueNeedsCast(input, new_type)) {
       continue;
     }
 
-    auto new_input = castValue(graph, input, new_type);
+    auto *new_input = castValue(graph, input, new_type);
     node->replaceInputWith(input, new_input);
   }
 
   // change type of half / float outpouts
-  for (auto output : node->outputs()) {
+  for (auto *output : node->outputs()) {
     if (!valueNeedsCast(output, new_type)) {
       continue;
     }
@@ -284,7 +284,7 @@ void automaticCasting(torch::jit::Graph *graph) {
   in_autocast_region.push(0);
 
   // First pass: process nodes in auto-casting regions
-  for (auto node : graph->nodes()) {
+  for (auto *node : graph->nodes()) {
     // begin an autocasting region - increments the top of stack
     if (node->kind() == symbols::poptorch::begin_autocast) {
       in_autocast_region.top()++;
@@ -320,7 +320,7 @@ void automaticCasting(torch::jit::Graph *graph) {
   }
 
   // Finally: remove autocast region markers
-  for (auto node : to_remove) {
+  for (auto *node : to_remove) {
     node->destroy();
   }
 }

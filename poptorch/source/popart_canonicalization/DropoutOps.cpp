@@ -11,7 +11,7 @@ namespace {
 
 torch::jit::Node *dropoutHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
-  auto x = node->input(0);
+  auto *x = node->input(0);
   auto p = constantToFloat(node->input(1)->node());
   auto train = constantToBool(node->input(2)->node());
 

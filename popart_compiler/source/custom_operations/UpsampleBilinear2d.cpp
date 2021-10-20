@@ -233,13 +233,6 @@ computeInputsWeights(const std::vector<GradMultipleVal> &vals,
   return std::make_pair(inputs, weights);
 }
 
-size_t gcd(size_t a, size_t b) {
-  if (b == 0) {
-    return a;
-  }
-  return gcd(b, a % b);
-}
-
 void splitIntervalMultiple(
     poplar::Graph &graph, poplar::ComputeSet &cs, // NOLINT
     size_t tile, const std::vector<poplar::Interval> &intervals,
@@ -523,7 +516,7 @@ class UpsampleGradOpx;
 namespace {
 // for C++11 compatibility, we don't use std::make_unique
 template <typename T, typename... Args>
-std::unique_ptr<T> makeUnique(Args &&... args) {
+std::unique_ptr<T> makeUnique(Args &&...args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 } // namespace

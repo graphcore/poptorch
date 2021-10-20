@@ -54,9 +54,9 @@ UseOfNode getUseOfNode(torch::jit::Node *n) {
   std::vector<torch::jit::Node *> to_check;
   to_check.push_back(n);
   while (!to_check.empty()) {
-    auto cur_node = to_check.back();
+    auto *cur_node = to_check.back();
     to_check.pop_back();
-    for (auto output : cur_node->outputs()) {
+    for (auto *output : cur_node->outputs()) {
       for (auto use : output->uses()) {
         auto use_kind = use.user->kind();
         if (use_kind == c10::prim::Return) {
@@ -96,7 +96,7 @@ void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
   ERROR_ON(n->kind() != c10::prim::Constant);
 
   torch::jit::WithInsertPoint insert_point(n);
-  auto new_node = tensorToConstant(graph, t, getUseOfNode(n));
+  auto *new_node = tensorToConstant(graph, t, getUseOfNode(n));
 
   // Due to tracing ambiguity, a float tensor here could be either float or half
   auto new_type = new_node->output()->type()->expect<c10::TensorType>();
@@ -303,7 +303,7 @@ private:
   void handleConstant(const c10::IValue &i_value) {
     ERROR_ON(_info_stack.empty());
 
-    auto new_const = _graph->create(c10::prim::Constant);
+    auto *new_const = _graph->create(c10::prim::Constant);
 
     if (i_value.isTensor()) {
       new_const->output()->inferTypeFrom(i_value.toTensor());
@@ -347,7 +347,7 @@ private:
       break;
     }
 
-    for (auto element : _info_stack.top().container_nodes) {
+    for (auto *element : _info_stack.top().container_nodes) {
       construct_node->addInput(element->output());
     }
     construct_node->output()->setType(_info_stack.top().container_type);
@@ -380,20 +380,20 @@ void handleListOrTuple(torch::jit::Graph *graph, torch::jit::Node *n,
   // Use the visitor to turn the single list/tuple constant into many
   // constants and List/TupleConstructs.
   ListTupleVisitor visitor(graph);
-  auto &tuple_ivalue = n->ival(c10::attr::value);
+  const auto &tuple_ivalue = n->ival(c10::attr::value);
   tuple_ivalue.visit(std::function<bool(const c10::IValue &)>(
       std::reference_wrapper(visitor)));
 
   // Find the very last node added and use it to replace the original node
-  auto replacement_node = visitor.getLastNode();
-  auto replacement_node_out = replacement_node->output();
+  auto *replacement_node = visitor.getLastNode();
+  auto *replacement_node_out = replacement_node->output();
   replacement_node_out->setType(n->output()->type());
   n->output()->replaceAllUsesWith(replacement_node_out);
 
   // The nodes added in the visitor match those of constants not in lists/tuples
   // *before* canonicalisation (to permit code reuse). Hence, we canonicalise
   // in the same way.
-  for (auto prim_const : visitor.getAllConstNodes()) {
+  for (auto *prim_const : visitor.getAllConstNodes()) {
     torch::jit::WithInsertPoint insert_point_prim_const(prim_const);
 
     // If there are NoneTypes we can skip those
@@ -414,7 +414,7 @@ void recursivelySelectHostAndIPUSideConstants(
     std::unordered_set<torch::jit::Node *> *to_delete) {
   for (size_t output_idx = 0; output_idx < node_to_process->outputs().size();
        output_idx++) {
-    auto output = node_to_process->output(output_idx);
+    auto *output = node_to_process->output(output_idx);
 
     while (!output->uses().empty()) {
       auto use = output->uses()[0];
@@ -428,17 +428,17 @@ void recursivelySelectHostAndIPUSideConstants(
                                ipu_side_replacement->output(output_idx));
         break;
       case UseOfNode::HostSideAndPopART:
-        auto graph = use.user->owningGraph();
+        auto *graph = use.user->owningGraph();
         torch::jit::WithInsertPoint insert_point(use.user);
 
         auto same_value = [](torch::jit::Value *value) { return value; };
 
-        auto host_side_node = graph->createClone(use.user, same_value);
+        auto *host_side_node = graph->createClone(use.user, same_value);
         host_side_node->replaceInput(use.offset,
                                      host_side_replacement->output(output_idx));
         graph->insertNode(host_side_node);
 
-        auto ipu_side_node = graph->createClone(use.user, same_value);
+        auto *ipu_side_node = graph->createClone(use.user, same_value);
         ipu_side_node->replaceInput(use.offset,
                                     ipu_side_replacement->output(output_idx));
         graph->insertNode(ipu_side_node);
@@ -464,7 +464,7 @@ void rectifyHostAndIPUSideConstants(
     torch::jit::Graph *graph,
     std::unordered_set<torch::jit::Node *> *to_delete) {
   logging::LogContext ctx_func("rectifyHostAndIPUSideConstants");
-  for (auto node : graph->nodes()) {
+  for (auto *node : graph->nodes()) {
     logging::LogContext ctx("processing " + nodeToString(node));
 
     if (node->kind() != symbols::poptorch::host_and_ipu_side_tensor_constant) {
@@ -496,7 +496,7 @@ void removeStateChangingNodesFromHostSideBranch(
     torch::jit::Graph *graph,
     std::unordered_set<torch::jit::Node *> *to_delete) {
   logging::LogContext ctx_func("removeStateChangingNodesFromHostSideBranch");
-  for (auto node : graph->nodes()) {
+  for (auto *node : graph->nodes()) {
     logging::LogContext ctx("processsing " + nodeToString(node));
     if (node->kind() != symbols::poptorch::host_side_tensor_constant) {
       continue;
@@ -505,11 +505,11 @@ void removeStateChangingNodesFromHostSideBranch(
     std::vector<torch::jit::Node *> to_process;
     to_process.push_back(node);
     while (!to_process.empty()) {
-      auto cur_node = to_process.back();
+      auto *cur_node = to_process.back();
       to_process.pop_back();
 
       auto outputs = cur_node->outputs();
-      for (auto output : outputs) {
+      for (auto *output : outputs) {
         for (auto use : output->uses()) {
           to_process.push_back(use.user);
         }
@@ -538,7 +538,7 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
   auto nodes = graph->nodes();
   std::unordered_set<torch::jit::Node *> to_delete;
   for (auto it = nodes.begin(); it != nodes.end(); it++) {
-    auto node = *it;
+    auto *node = *it;
 
     logging::LogContext ctx("processing " + nodeToString(node));
 

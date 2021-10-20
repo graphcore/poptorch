@@ -25,7 +25,7 @@ torch::jit::Node *addHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   // Ordinary addition
   torch::jit::Value *alpha_multiplicand = node->input(1);
   if (!hasUnityValue(alpha_param)) {
-    auto alpha_node = createMul(graph, {alpha_param, alpha_multiplicand});
+    auto *alpha_node = createMul(graph, {alpha_param, alpha_multiplicand});
     alpha_multiplicand = alpha_node->output();
   }
   return createAdd(graph, {node->input(0), alpha_multiplicand});
@@ -96,12 +96,12 @@ torch::jit::Node *trueDivideHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *clampHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
-  auto x = node->input(0);
-  auto min_node = node->input(1)->node();
+  auto *x = node->input(0);
+  auto *min_node = node->input(1)->node();
   auto min = isNone(min_node) ? std::numeric_limits<float>::lowest()
                               : constantToFloat(min_node);
 
-  auto max_node = node->input(2)->node();
+  auto *max_node = node->input(2)->node();
   auto max = isNone(max_node) ? std::numeric_limits<float>::max()
                               : constantToFloat(max_node);
   return createClip(graph, {x}, max, min);
@@ -109,18 +109,18 @@ torch::jit::Node *clampHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *clampMinHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
-  auto max = graph->createNone()->output();
-  auto input = node->input(0);
-  auto min = node->input(1);
+  auto *max = graph->createNone()->output();
+  auto *input = node->input(0);
+  auto *min = node->input(1);
   auto clamp_handler = getHandler(c10::aten::clamp);
   return createHandlerOperation(graph, clamp_handler, {input, min, max});
 }
 
 torch::jit::Node *clampMaxHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
-  auto min = graph->createNone()->output();
-  auto input = node->input(0);
-  auto max = node->input(1);
+  auto *min = graph->createNone()->output();
+  auto *input = node->input(0);
+  auto *max = node->input(1);
   auto clamp_handler = getHandler(c10::aten::clamp);
   return createHandlerOperation(graph, clamp_handler, {input, min, max});
 }
@@ -135,9 +135,9 @@ torch::jit::Node *addCDivHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *crossHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
-  auto x = node->input(0);
-  auto y = node->input(1);
-  auto opt_axis = node->input(2)->node();
+  auto *x = node->input(0);
+  auto *y = node->input(1);
+  auto *opt_axis = node->input(2)->node();
 
   auto x_shape = shapeFromTensor(x);
   auto y_shape = shapeFromTensor(y);
@@ -164,18 +164,18 @@ torch::jit::Node *crossHandler(torch::jit::Graph *graph,
   ERROR_ON_MSG(x_shape[axis] != 3,
                "Cross product product axis must have dimension 3");
 
-  auto indices = createConstantInt(graph, {2, 0, 1}, {3})->output();
+  auto *indices = createConstantInt(graph, {2, 0, 1}, {3})->output();
 
   // circular permutation right by 1 along the axis
-  auto x_roll = createGather(graph, {x, indices}, axis)->output();
-  auto y_roll = createGather(graph, {y, indices}, axis)->output();
+  auto *x_roll = createGather(graph, {x, indices}, axis)->output();
+  auto *y_roll = createGather(graph, {y, indices}, axis)->output();
 
   // products of one straight input with the other input permuted
-  auto mul_x_y_roll = createMul(graph, {x, y_roll})->output();
-  auto mul_y_x_roll = createMul(graph, {y, x_roll})->output();
+  auto *mul_x_y_roll = createMul(graph, {x, y_roll})->output();
+  auto *mul_y_x_roll = createMul(graph, {y, x_roll})->output();
 
   // subtraction produces result permuted one position left
-  auto result_roll = createSub(graph, {mul_y_x_roll, mul_x_y_roll})->output();
+  auto *result_roll = createSub(graph, {mul_y_x_roll, mul_x_y_roll})->output();
 
   // permute to compute final result
   return createGather(graph, {result_roll, indices}, axis);

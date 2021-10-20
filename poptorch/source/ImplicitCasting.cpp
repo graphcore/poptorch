@@ -119,13 +119,13 @@ inferExpectedType(const torch::jit::ArrayRef<torch::jit::Value *> &inputs,
   std::vector<at::ScalarType> number_types;
 
   unsigned int input_num = 0;
-  for (auto input : inputs) {
+  for (auto *input : inputs) {
     logging::LogContext ctx(std::string("processing input ") +
                             std::to_string(input_num));
 
     if (!skipInput(implicit_cast, input_num) &&
         input->type()->kind() != c10::TypeKind::NoneType) {
-      auto node = input->node();
+      auto *node = input->node();
       auto tensor_type = input->type()->expect<c10::TensorType>();
       ERROR_ON(!tensor_type->scalarType());
 
@@ -190,7 +190,7 @@ bool needToRetype(const torch::jit::Value *input,
 torch::jit::Value *addCast(torch::jit::Value *input,
                            const c10::ScalarType type) {
   torch::jit::Node *node = input->node();
-  auto new_node = createCast(input->owningGraph(), input, type);
+  auto *new_node = createCast(input->owningGraph(), input, type);
   auto current_type = input->type()->cast<c10::TensorType>();
 
   new_node->output()->setType(current_type->withScalarType(type));
@@ -209,7 +209,7 @@ implicitCastInputs(torch::jit::ArrayRef<torch::jit::Value *> *inputs,
   std::vector<torch::jit::Value *> new_inputs;
 
   unsigned int input_num = 0;
-  for (auto input : *inputs) {
+  for (auto *input : *inputs) {
     if (!skipInput(implicit_cast, input_num) &&
         needToRetype(input, expected_type)) {
       new_inputs.push_back(addCast(input, expected_type));

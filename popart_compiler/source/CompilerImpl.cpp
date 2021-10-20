@@ -198,7 +198,7 @@ OptimizerParameters::OptimizerParameters(const Optimizer &opt, bool is_default)
   }
   std::vector<std::string> provided_names;
   provided_names.reserve(poptorch_names.size());
-  for (auto &p : opt.parameters) {
+  for (const auto &p : opt.parameters) {
     const std::string name = reinterpret_cast<const char *>(p.name);
     provided_names.push_back(name);
     auto idx = indexOf(poptorch_names, name);

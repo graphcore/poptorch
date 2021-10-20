@@ -50,7 +50,7 @@ void makeConstantIntParams(
           tensor = tensor.to(at::ScalarType::Int);
         }
 
-        auto new_node = tensorToConstant(graph, tensor);
+        auto *new_node = tensorToConstant(graph, tensor);
         for (size_t use_idx = 0; use_idx < value->uses().size(); use_idx++) {
           auto u = value->uses()[use_idx];
           u.user->replaceInput(u.offset, new_node->output());

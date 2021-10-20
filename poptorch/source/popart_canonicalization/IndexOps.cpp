@@ -91,12 +91,12 @@ IndexInfo processIndex(torch::jit::Graph *graph, torch::jit::Value *x,
     }
   }
 
-  auto flat_indices = createConstantInt(graph, {0}, {});
+  auto *flat_indices = createConstantInt(graph, {0}, {});
   std::int64_t stride = 1;
   // Calculate indices within partially flattened shape
   // Tensors are automatically broadcast to the correct shape during calculation
   for (std::size_t i = 0; i < indices.size(); i++) {
-    auto offset = indices[indices.size() - i - 1];
+    auto *offset = indices[indices.size() - i - 1];
     if (i != 0) {
       offset =
           createMul(graph, {offset, wrapInConstant1D(graph, stride)})->output();
@@ -113,7 +113,7 @@ IndexInfo processIndex(torch::jit::Graph *graph, torch::jit::Value *x,
               std::back_inserter(flatten_shape));
   // Flatten the tensor being indexed into [-1, u1, u2, ..., uN] where
   // each u is a dimension not being indexed into
-  auto flatten = createReshape(graph, x, flatten_shape);
+  auto *flatten = createReshape(graph, x, flatten_shape);
 
   return {flatten->output(), flat_indices->output()};
 }
@@ -177,7 +177,7 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
 
   // Scatter in first dimension using calculated indices into fully flattened
   // tensor
-  auto scatter = createScatter(
+  auto *scatter = createScatter(
       graph, {info.x_partial_flat, info.indices_partial_flat, v}, 0);
   // Restore original input shape
   return createReshape(graph, scatter->output(), shape);

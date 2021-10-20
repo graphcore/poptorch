@@ -13,14 +13,14 @@
 namespace poptorch {
 
 torch::jit::Node *findEarliestUser(const torch::jit::Value *value) {
-  auto &uses(value->uses());
+  const auto &uses(value->uses());
   if (uses.empty()) {
     return nullptr;
   }
 
   torch::jit::Node *earliest_user = uses[0].user;
   for (size_t i = 1; i < uses.size(); i++) {
-    auto node = uses[i].user;
+    auto *node = uses[i].user;
     if (node->isBefore(earliest_user)) {
       earliest_user = node;
     }
@@ -168,9 +168,9 @@ void processInput(torch::jit::Graph *graph, torch::jit::Value *input,
     // Find the TupleUnpack node
     if (input->hasUses()) {
       ERROR_ON(input->uses().size() != 1);
-      auto unpack = input->uses()[0].user;
+      auto *unpack = input->uses()[0].user;
       ERROR_ON(unpack->kind() != c10::prim::TupleUnpack);
-      for (auto element : unpack->outputs()) {
+      for (auto *element : unpack->outputs()) {
         // Recurse for nested tuple support
         processInput(graph, element, tensors);
       }
@@ -213,7 +213,7 @@ size_t numTensorsForType(const c10::TypePtr &type) {
   case c10::TypeKind::TupleType: {
     size_t num_tensors = 0;
     auto tuple = type->expect<c10::TupleType>();
-    for (auto &element_type : tuple->elements()) {
+    for (const auto &element_type : tuple->elements()) {
       num_tensors += numTensorsForType(element_type);
     }
     return num_tensors;
@@ -264,7 +264,7 @@ void searchAndPossiblyDestroyInternal(
 void searchAndPossiblyDestroy(
     const std::unordered_set<torch::jit::Node *> &to_test) {
   std::unordered_set<torch::jit::Node *> destroyed;
-  for (auto node : to_test) {
+  for (auto *node : to_test) {
     searchAndPossiblyDestroyInternal(node, &destroyed);
   }
 }

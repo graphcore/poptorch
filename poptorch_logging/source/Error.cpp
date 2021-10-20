@@ -44,7 +44,7 @@ struct LogContextImpl {
 };
 
 bool LogContextImpl::trace_enabled = []() {
-  auto level = std::getenv("POPTORCH_LOG_LEVEL");
+  auto *level = std::getenv("POPTORCH_LOG_LEVEL");
   if (level == nullptr) {
     return false;
   }

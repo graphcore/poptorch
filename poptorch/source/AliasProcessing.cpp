@@ -10,7 +10,7 @@ namespace poptorch {
 void resolveAliases(torch::jit::Graph *graph) {
   std::vector<torch::jit::Node *> to_delete;
 
-  for (auto node : graph->nodes()) {
+  for (auto *node : graph->nodes()) {
     if (node->kind() != c10::aten::alias) {
       continue;
     }
@@ -20,7 +20,7 @@ void resolveAliases(torch::jit::Graph *graph) {
     to_delete.push_back(node);
   }
 
-  for (auto node : to_delete) {
+  for (auto *node : to_delete) {
     node->destroy();
   }
 }

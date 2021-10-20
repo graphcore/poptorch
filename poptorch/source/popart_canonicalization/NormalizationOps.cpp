@@ -140,7 +140,7 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   // Output case #1: Y, mean, var, saved_mean, saved_var (training mode)
   // Output case #2: Y (test mode)
   // Popart supports this with "if (output->n() > 1)"
-  auto batch_norm = createBatchnormalization(
+  auto *batch_norm = createBatchnormalization(
       graph, {input, weight, bias, running_mean, running_var}, training ? 5 : 1,
       epsilon, 1.0f - momentum);
 

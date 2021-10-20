@@ -80,7 +80,7 @@ public:
   StepIO() = default;
 
   popart::ConstVoidData in(popart::TensorId id, int64_t num_elems, // NOLINT
-                           bool prefetch)override;
+                           bool prefetch) override;
   void inComplete(popart::TensorId id, int64_t num_elems) override; // NOLINT
   popart::MutableVoidData out(popart::TensorId id,
                               int64_t num_elems) override; // NOLINT
@@ -146,7 +146,7 @@ struct CompilerImpl {
 public:
   friend Compiler;
 
-  CompilerImpl() : op_builder(popart::Builder::create()), loss("") {
+  CompilerImpl() : op_builder(popart::Builder::create()) {
     ids.emplace_back(""); // None tensor
     ids_types.push_back(PopartType::UNDEFINED);
     active_builder = op_builder.get();

@@ -121,7 +121,7 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 }
 
 std::shared_ptr<torch::jit::Graph> getTracedGraph() {
-  auto jit = dynamic_cast<JITDispatch *>(context.active_dispatch.get());
+  auto *jit = dynamic_cast<JITDispatch *>(context.active_dispatch.get());
   ERROR_ON_MSG(jit == nullptr, "[User Unreachable] Tracer context is null.");
   auto copied_graph = jit->graph.copy();
 

@@ -742,7 +742,7 @@ void LowerToPopartImpl::lowerBody() {
     } else if (kind == c10::prim::TupleUnpack ||
                kind == c10::prim::ListUnpack) {
       // Get the torch jit SSA for the input/output values.
-      auto &tensors(_value_map.listTuple(node->input()));
+      const auto &tensors(_value_map.listTuple(node->input()));
       auto tensor_it = tensors.begin();
       // As tuples may be nested, walk recursively to flatten all tensors
       std::function<void(c10::TypePtr, ValueMap::TensorList &)> flattened_tuple;
@@ -768,7 +768,7 @@ void LowerToPopartImpl::lowerBody() {
         }
       };
 
-      for (auto output : node->outputs()) {
+      for (auto *output : node->outputs()) {
         switch (output->type()->kind()) {
         case c10::TypeKind::TensorType: {
           ERROR_ON(tensor_it == tensors.end());
@@ -943,7 +943,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   std::vector<bool> parameter_used(_parameters.size(), true);
   for (size_t index = 0; index < _parameters.size(); index++) {
     ERROR_ON(!parameter_used.at(index));
-    auto value = graph_t_inputs[num_input_tensors + index];
+    auto *value = graph_t_inputs[num_input_tensors + index];
     if (value->uses().empty()) {
       parameter_used.at(index) = false;
 
@@ -1040,7 +1040,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
 
   // Step 3, map the PopART tensor IDs to the JIT Value of the parameters
   for (index = 0; index < parameter_popart_ids.size(); index++) {
-    auto value = graph_t_inputs.at(num_input_tensors + index);
+    auto *value = graph_t_inputs.at(num_input_tensors + index);
     auto &tensor(parameter_popart_ids.at(index));
 
     std::ostringstream ss;

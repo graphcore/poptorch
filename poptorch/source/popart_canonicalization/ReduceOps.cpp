@@ -27,7 +27,7 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   // sum and prod works even for bool types in PyTorch
   auto tensor_type = input->type()->expect<c10::TensorType>();
   if (tensor_type->scalarType() == at::ScalarType::Bool) {
-    auto cast_node = createCast(graph, input, c10::ScalarType::Int);
+    auto *cast_node = createCast(graph, input, c10::ScalarType::Int);
     input = cast_node->output();
   }
 
@@ -74,7 +74,7 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *reduceMedianHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
-  auto input = node->input(0);
+  auto *input = node->input(0);
   std::vector<std::int64_t> axes;
   std::int64_t keepdim = 0;
 
@@ -83,7 +83,7 @@ torch::jit::Node *reduceMedianHandler(torch::jit::Graph *graph,
   if (node->inputs().size() == 1) {
     // aten::median(Tensor self) -> Tensor
     axes = reduceHelperDimensionCreator(input);
-    auto reduced = createReducemedian(graph, {input}, axes, keepdim);
+    auto *reduced = createReducemedian(graph, {input}, axes, keepdim);
     reduced->eraseOutput(1);
     output = reduced;
   } else {
@@ -101,7 +101,7 @@ torch::jit::Node *aMinMaxHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   // aten::max(Tensor self, int[] dim, int keepdim)
   // aten::min(Tensor self, int[] dim, int keepdim)
-  auto input = node->input(0);
+  auto *input = node->input(0);
   auto axes = constantToLongVec(node->input(1)->node());
   auto keepdim = constantToLong(node->input(2)->node());
 
@@ -154,7 +154,7 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
                                            torch::jit::Node *node) {
-  auto x = node->input(0);
+  auto *x = node->input(0);
   auto t0 = x->type()->expect<c10::TensorType>();
   auto dim = handleDimensionParam(node->input(1), t0);
   auto keepdim = constantToBool(node->input(2)->node());
@@ -164,10 +164,10 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
     x = createNeg(graph, {x})->output();
   }
 
-  auto one = tensorToConstant(graph, at::tensor(1L))->output();
-  auto result = createTopk(graph, {x, one}, dim);
-  auto values = result->output(0);
-  auto indices = result->output(1);
+  auto *one = tensorToConstant(graph, at::tensor(1L))->output();
+  auto *result = createTopk(graph, {x, one}, dim);
+  auto *values = result->output(0);
+  auto *indices = result->output(1);
   // TopK returns UINT32 indices, but torch doesn't have unsigned
   // 32 bit integer tensor types so we need to cast back to INT32
   indices = createCast(graph, indices, c10::ScalarType::Int)->output();
@@ -196,13 +196,13 @@ torch::jit::Node *minMaxHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node, ReduceFunc &&reduceFunc,
                                 ExtremaFunc &&extremaFunc) {
   if (node->inputs().size() == 1) {
-    auto x = node->input(0);
+    auto *x = node->input(0);
     auto t0 = reduceHelperDimensionCreator(x);
     return reduceFunc(graph, {x}, t0, 0);
   }
   if (node->inputs().size() == 2) {
-    auto i0 = node->input(0);
-    auto i1 = node->input(1);
+    auto *i0 = node->input(0);
+    auto *i1 = node->input(1);
     return extremaFunc(graph, {i0, i1});
   }
 
@@ -291,16 +291,16 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
 torch::jit::Node *frobeniusnormHandler(torch::jit::Graph *graph,
                                        torch::jit::Node *node) {
   if (node->inputs().size() == 1) {
-    auto x = node->input(0);
+    auto *x = node->input(0);
     auto t0 = reduceHelperDimensionCreator(x);
     return createReducel2(graph, {x}, t0, 0);
   }
   if (node->inputs().size() == 3) {
-    auto x = node->input(0);
-    auto l = node->input(1);
+    auto *x = node->input(0);
+    auto *l = node->input(1);
     auto t0 = constantToLongVec(l->node());
     auto t1 = reduceHelperDimensionCreator(x, t0);
-    auto c = node->input(2);
+    auto *c = node->input(2);
     auto t2 = constantToLong(c->node());
     auto shape = shapeFromTensor(x);
     // If we're reducing over singleton dims and keeping them, the
