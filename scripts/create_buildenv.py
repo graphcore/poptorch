@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import argparse
+import collections
 import contextlib
 import fcntl
 import hashlib
@@ -19,6 +20,26 @@ logger = logging.getLogger(os.path.basename(__file__))
 _utils.set_logger(logger)
 
 _conda_toolchains_packages = ["gcc_linux-64=7.3.0", "gxx_linux-64=7.3.0"]
+
+
+class Version:
+    def __init__(self, version_str):
+        self.version = tuple(int(i) for i in version_str.split("."))
+
+    def __lt__(self, other):
+        return self.version < other.version
+
+    def __eq__(self, other):
+        return self.version == other.version
+
+    def __hash__(self):
+        return hash(self.version)
+
+    def __str__(self):
+        return ".".join([str(v) for v in self.version])
+
+    def __repr__(self):
+        return str(self)
 
 
 def _default_cache_dir():
@@ -219,9 +240,33 @@ class BuildenvManager:
             else:
                 other_installers.append(i)
 
-        # Make sure the packages are unique and in a deterministic order
-        self.conda_packages = list(sorted(dict.fromkeys(self.conda_packages)))
+        packages = collections.defaultdict(list)
+        # Resolve version conflicts
+        # Create a dictionary package name -> [ versions ]
+        for package in self.conda_packages:
+            s = package.replace("==", "=").split("=")
+            name = s[0]
+            version = [Version(s[1])] if len(s) > 1 else []
+            packages[name] += version
 
+        self.conda_packages = []
+        # Make sure the packages are unique and in a deterministic order
+        for name in sorted(packages.keys()):
+            versions = packages[name]
+            if not versions:
+                self.conda_packages.append(name)
+                logger.warning("Version for package %s is not set", name)
+                continue
+            # Sort the versions by descending order and remove duplicates
+            versions = list(set(versions))
+            versions.sort(reverse=True)
+            if len(versions) > 1:
+                logger.warning(
+                    "Conflict: more than one version requested for "
+                    "package %s: %s, selecting %s", name, versions,
+                    versions[0])
+
+            self.conda_packages.append(f"{name}={str(versions[0])}")
         return other_installers
 
     def create(self, create_template_if_needed=False):
