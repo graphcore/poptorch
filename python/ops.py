@@ -777,6 +777,10 @@ class MultiConv():
                                    ) -> "poptorch.MultiConv":
         """The available memory proportion per convolution, each [0, 1).
 
+        For more information, please refer to the `technical note
+        <https://docs.graphcore.ai/projects/available-memory/en/latest/>`_ on
+        optimising temporary memory usage.
+
         :param value: Can be a ``float`` value in which case the same value is
             used for all of the convolutions. Otherwise, can be a ``tuple`` or
             ``list`` containing as many ``float`` values as the number of
