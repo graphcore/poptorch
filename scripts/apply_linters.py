@@ -495,11 +495,8 @@ class ClangTidy(ILinter):
 
     def __init__(self):
         self.configs = []
-        self.python_includes = ""
         self.includes = []
         self.compile_commands = {}
-
-        self._assert_poplibs_available()
 
     def get_compile_commands_flags(self, filename):
         if filename.endswith("cpp"):
@@ -525,7 +522,6 @@ class ClangTidy(ILinter):
             self.check_version()
         gcc_flags, work_dir = self.get_compile_commands_flags(filename)
         flags = "-std=c++17 -fsized-deallocation -DONNX_NAMESPACE=onnx "
-        flags += self.python_includes + " "
         flags += gcc_flags
         flags += " -I" + " -I".join(self.includes)
         cd = ""
@@ -597,17 +593,6 @@ class ClangTidy(ILinter):
                 self.configs.append("--config=\"" + "".join(config) + "\"")
             return output, returncode
 
-        def parse_python_includes(output, returncode):
-            self.python_includes = output.rstrip()
-            return output, returncode
-
-        def append_to_includes(output, returncode):
-            if not output:
-                return output, 1
-            logger.debug("Adding %s to includes", output)
-            self.includes.append(output.rstrip())
-            return output, returncode
-
         def parse_include_tests(output, returncode):
             if output:
                 returncode = 1
@@ -640,17 +625,6 @@ class ClangTidy(ILinter):
                         output_processor=parse_system_includes).run():
             return False
 
-        if CondaCommand("python3-config --includes",
-                        print_output=False,
-                        output_processor=parse_python_includes).run():
-            return False
-        if CondaCommand(
-                "python3 -c \"import os,torch; from pathlib import Path;" +
-                "print(os.path.join(Path(torch.__file__).parent,\'include')" +
-                ")\"",
-                print_output=False,
-                output_processor=append_to_includes).run():
-            return False
         if CondaCommand("clang-tidy --dump-config",
                         print_output=False,
                         output_processor=parse_config).run():
@@ -678,31 +652,6 @@ class ClangTidy(ILinter):
 
     def is_enabled(self, filename, autofix):
         return "custom_cube_op.cpp" not in filename
-
-    @staticmethod
-    def _assert_poplibs_available():
-        """Report an error if poplibs is not available. This occurs if a
-           non-packaged (SDK) version of poplar is relied upon but poplar
-           has not been activated."""
-
-        # If poplar has been activated, poplibs will always be available.
-        if "poplibs/include" in os.environ.get('CPATH', ''):
-            return
-
-        # Use poplin (one element of poplibs) to test for general poplibs
-        # presence in the polar symlink
-        poplibs_avail = not CondaCommand(
-            "test -d ${CONDA_PREFIX}/../poplar/poplin",
-            print_output=False).run()
-
-        # If it is an SDK, poplin, and hence poplibs, will be available
-        if poplibs_avail:
-            return
-
-        logger.error("Poplibs is not in the CPATH nor symbolically linked "
-                     "poplar directory. Please source activate.sh from the "
-                     "poplar_view or use the SDK.")
-        sys.exit(1)
 
 
 class CppLint(ILinter):

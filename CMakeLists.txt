@@ -85,15 +85,6 @@ if(NOT poplar_FOUND)
   find_package(poplar REQUIRED)
 endif()
 
-function(create_symlink_to_include target linkname)
-  get_target_property(dirs ${target} INTERFACE_INCLUDE_DIRECTORIES)
-  list(GET dirs 0 include_dir)
-  file(CREATE_LINK ${include_dir} ${linkname} SYMBOLIC)
-endfunction()
-
-create_symlink_to_include(poplar poplar)
-create_symlink_to_include(popart-only popart)
-
 get_target_property(POPLAR_LIB poplar LOCATION)
 get_filename_component(POPLAR_DIR ${POPLAR_LIB} DIRECTORY)
 # Run an install command that requires PopTorch, PopArt and Poplar to be in the PATH.

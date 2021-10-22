@@ -337,12 +337,12 @@ reduceHelperDimensionCreator(torch::jit::Value *value) {
   c10::TensorTypePtr as_tensor = value->type()->expect<c10::TensorType>();
   c10::VaryingShape dims = as_tensor->sizes();
 
-  std::int64_t index = 0;
   // Convert that IR type into a C++ vector of ints.
   std::vector<std::int64_t> shape;
-  for (auto optional_int : *dims.sizes()) {
-    shape.push_back(index++);
-  }
+  shape.resize(dims.sizes()->size());
+  // Fill the vector with sequentially incrementing values.
+  std::iota(shape.begin(), shape.end(), 0);
+
   return shape;
 }
 
