@@ -730,7 +730,7 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
   case OptimizerType::ADAMW_NO_BIAS:
   case OptimizerType::LAMB:
   case OptimizerType::LAMB_NO_BIAS: {
-    auto adam_mode = popart::AdamMode::AdamNoBias;
+    auto adam_mode = popart::AdamMode::Adam;
     auto decay_mode = popart::WeightDecayMode::Decay;
     if (opt.type == OptimizerType::ADAM) {
       decay_mode = popart::WeightDecayMode::L2Regularization;

@@ -955,3 +955,70 @@ def test_ipu_state_warning(opt):
             match="IPU-specific optimizer states cannot be read from the host."
     ):
         optimizer.state_dict()
+
+
+optimizer_types = [optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop]
+
+
+@pytest.mark.parametrize("opt", optimizer_types)
+def test_optimizer_results(opt):
+    torch.manual_seed(42)
+
+    class Stepper:
+        def __init__(self, model, lr, optimizer):
+            self.lr = lr
+            self.setup_cpu(model, optimizer)
+            self.setup_ipu(model, optimizer)
+            self.check_parameters()
+
+        def setup_cpu(self, model, optimizer):
+            self.cpu_model = copy.deepcopy(model)
+            self.optimizer = optimizer(self.cpu_model.parameters(), lr=self.lr)
+
+        def setup_ipu(self, model, optimizer):
+            self.ipu_model = copy.deepcopy(model)
+            ipu_optimizer = optimizer(self.ipu_model.parameters(), lr=self.lr)
+            self.training_model = poptorch.trainingModel(
+                self.ipu_model, optimizer=ipu_optimizer)
+
+        def check_parameters(self):
+            for cpu, ipu in zip(self.cpu_model.named_parameters(),
+                                self.ipu_model.named_parameters()):
+                cpu = cpu[1]
+                ipu = ipu[1]
+                helpers.assert_allclose(actual=ipu, expected=cpu)
+
+        def cpu_step(self, batch):
+            self.optimizer.zero_grad()
+            _, loss = self.cpu_model(batch)
+            loss = loss.sum()
+            loss.backward()
+            self.optimizer.step()
+            return loss
+
+        def ipu_step(self, batch):
+            _, loss = self.training_model(batch)
+            return loss
+
+    num_samples = 10
+    X = torch.rand(num_samples)
+    lr = 0.01
+    num_steps = 10
+
+    cpu_loss = torch.empty(num_steps)
+    ipu_loss = torch.empty(num_steps)
+
+    stepper = Stepper(helpers.ModelWithWeights(torch.nn.LogSoftmax(), X.shape),
+                      lr=lr,
+                      optimizer=opt)
+
+    for i in range(num_steps):
+        cpu_loss[i] = stepper.cpu_step((X, ))
+        ipu_loss[i] = stepper.ipu_step((X, ))
+
+        stepper.check_parameters()
+
+    helpers.assert_allclose(expected=cpu_loss,
+                            actual=ipu_loss,
+                            atol=1e-5,
+                            rtol=1e-5)
