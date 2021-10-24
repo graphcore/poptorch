@@ -213,3 +213,30 @@ def test_double_underscore():
     popout = poptorch_model(inp, l)
 
     helpers.assert_allclose(actual=popout, expected=out)
+
+
+def test_half_buffer():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer('buff', torch.ones(5, dtype=torch.float16))
+
+        def forward(self, x):
+            # pylint: disable=no-member
+            out = x + self.buff
+            self.buff += 1
+            return out
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    x = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5], dtype=torch.float16)
+    out = poptorch_model(x)
+
+    helpers.assert_allclose(actual=out,
+                            expected=torch.tensor([1.1, 1.2, 1.3, 1.4, 1.5],
+                                                  dtype=torch.float16))
+    poptorch_model.copyWeightsToHost()
+    helpers.assert_allclose(actual=poptorch_model.buff,
+                            expected=torch.tensor([2.0, 2.0, 2.0, 2.0, 2.0],
+                                                  dtype=torch.float16))

@@ -525,7 +525,7 @@ def test_clone_two():
 
 
 @pytest.mark.parametrize("input_shapes", [(1, ), (2, ), (2, 3), (1, 3, 4)])
-@pytest.mark.parametrize("dtype", [torch.float, torch.int])
+@pytest.mark.parametrize("dtype", [torch.float, torch.half, torch.int])
 def test_copy_(input_shapes, dtype):
     torch.manual_seed(42)
 

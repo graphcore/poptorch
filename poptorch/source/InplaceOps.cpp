@@ -83,6 +83,21 @@ void InplaceOpHandler::processInput(size_t input_num) {
       continue;
     }
 
+    // Generally the type will match but a half may be cast to a float for
+    // the sake of tracing. In the case of parameters, the input will already be
+    // a half causing a mismatch here, which needs to be changed.
+    auto current_tensor_type = current_alias->type()->cast<c10::TensorType>();
+    auto output_tensor_type = node->output()->type()->cast<c10::TensorType>();
+    if (current_tensor_type && output_tensor_type) {
+      if (*current_tensor_type->scalarType() == at::ScalarType::Half &&
+          *output_tensor_type->scalarType() == at::ScalarType::Float) {
+        node->output()->setType(
+            current_tensor_type->withScalarType(at::ScalarType::Half));
+      }
+      ERROR_ON(*current_tensor_type->scalarType() !=
+               *output_tensor_type->scalarType());
+    }
+
     // Keep it in place if there is only an inplace version
     if (onlyInplaceOps().count(node->kind()) != 0) {
       current_alias = node->output();
@@ -115,9 +130,6 @@ void InplaceOpHandler::processInput(size_t input_num) {
                             "replicationFactor > 1 with poptorch.Options.\n"
                             "Last modification: "
                                 << *current_alias->node());
-
-    // Updating a variable means that the original variable matches
-    ERROR_ON(*_collapsed_inputs[input_num]->type() != *current_alias->type());
 
     auto *new_node = _graph->create(symbols::poptorch::update_param_inplace, 1);
     new_node->addInput(_collapsed_inputs[input_num]);
