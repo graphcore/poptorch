@@ -702,7 +702,7 @@ class LAMB(torch.optim.Optimizer):
 
                 beta1, beta2 = group["betas"]
 
-                if group["bias_correction"]:
+                if self.bias_correction:
                     bias_correction1 = 1 - beta1**state["step"]
                     bias_correction2 = 1 - beta2**state["step"]
                 else:

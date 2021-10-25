@@ -957,10 +957,10 @@ def test_ipu_state_warning(opt):
         optimizer.state_dict()
 
 
-optimizer_types = [optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop]
+torch_optimizer_types = [optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop]
 
 
-@pytest.mark.parametrize("opt", optimizer_types)
+@pytest.mark.parametrize("opt", [*torch_optimizer_types, *poptorch_optimizers])
 def test_optimizer_results(opt):
     torch.manual_seed(42)
 
