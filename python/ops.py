@@ -704,9 +704,21 @@ class CPU:
 
 
 def identity_loss(x: "torch.Tensor", reduction: "str") -> "torch.Tensor":
-    """Marks this operation as being part of the loss calculation and, as such,
-    will back-propagate through it in the PopTorch autograd. This enables
-    multiple losses and custom losses.
+    """Marks a tensor as being part of the loss calculation and, as such,
+    will backpropagate through it in the PopTorch autograd.
+
+    This function should be called on the (final) loss of a model so that
+    it is used as the start of backpropagation. This is equivalent to calling
+    ``x.backward()`` on a tensor ``x`` when running on the CPU.
+
+    This function is necessary to combine multiple losses into a custom loss.
+    It ensures that the tensor is part of the loss calculation and, as such,
+    should be part of the backpropagation in PopTorch autograd.
+
+    Multiple calls to ``identity_loss`` can be made inside the same model
+    provided they are all dependant: all marked losses must be traceable
+    into a single final tensor itself marked by a call to ``identity_loss``
+    otherwise an error is raised.
 
     :param x: The calculated loss.
     :param reduction: Reduce the loss output as per PyTorch loss
@@ -716,7 +728,7 @@ def identity_loss(x: "torch.Tensor", reduction: "str") -> "torch.Tensor":
         * ``"mean"``: Take the mean of the losses.
         * ``"none"``: Don't reduce the losses.
 
-    :returns: An identity loss custom op.
+    :returns: The loss tensor with the specified reduction applied.
     """
     if reduction == "sum":
         return torch.ops.poptorch.identity_loss(x, 0)
