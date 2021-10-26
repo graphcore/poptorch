@@ -15,6 +15,11 @@ API changes
 - Deprecated ``poptorch.Options.defaultAnchorMode`` in favour of ``poptorch.Options.defaultOutputMode``
 - Deprecated ``poptorch.AnchorMode`` in favour of ``poptorch.OutputMode``
 
+Bug Fixes
+---------
+- Fixed incorrect gradient when using ``torch.nn.Embedding`` with ``padding_idx``
+
+
 v2.3 (Poplar SDK 2.3)
 =====================
 
@@ -36,13 +41,16 @@ New features
 - Improve PopTorch's parity with PyTorch's Softplus
 - Improve implementation of torch.SiLU by using Poplar's Swish operator
 - Additional support for operation overloads
-- Fix issue where PopTorch recalculated upsampling scales in fp16
-- Fix issue where the last use of ``poptorch.set_available_memory`` would be pruned
 - Add documentation on available memory proportion to incorporate embeddings and indexing operations
 - Add documentation on how users can generate debug information
 - Support replicated tensor sharding when running on multiple processes
 - Allow selection for a non-constant x input.
 - Support for ``enableConvDithering`` convolution option
+
+Bug Fixes
+---------
+- Fix issue where PopTorch recalculated upsampling scales in fp16
+- Fix issue where the last use of ``poptorch.set_available_memory`` would be pruned
 
 API changes
 -----------

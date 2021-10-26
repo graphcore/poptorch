@@ -21,7 +21,26 @@ torch::jit::Node *embeddingHandler(torch::jit::Graph *graph,
   ERROR_ON_MSG(scale_grad_by_freq || sparse,
                "Unsupported aten::embedding operation");
 
-  return createGather(graph, {node->input(0), node->input(1)}, 0);
+  auto *weight = node->input(0);
+  auto *indices = node->input(1);
+  auto padding_idx = constantToLong(node->input(2)->node());
+
+  if (padding_idx < 0) {
+    // Default: padding_idx == -1 indicates no padding.
+    return createGather(graph, {node->input(0), node->input(1)}, 0);
+  }
+
+  std::stringstream ss;
+  ss << "{\"padding_idx\":" << std::to_string(padding_idx) << "}";
+
+  auto *out = createCustomOperation(graph, {weight, indices}, "Embedding",
+                                    "poptorch.custom_ops", 1, 1, ss.str());
+
+  auto input_type = getNodeScalarType(weight);
+  auto out_type = c10::TensorType::create(input_type, c10::nullopt,
+                                          c10::nullopt, c10::nullopt);
+  out->output(0)->setType(out_type);
+  return out;
 }
 
 torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,

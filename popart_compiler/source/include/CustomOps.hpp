@@ -38,5 +38,11 @@ const popart::OperatorIdentifier torch_softplus_inplace = {
 const popart::OperatorIdentifier torch_softplus_grad = {
     "poptorch.custom_ops", "TorchSoftplusGrad", 1, {1}, 1};
 
+const popart::OperatorIdentifier embedding = {"poptorch.custom_ops",
+                                              "Embedding", domain};
+
+const popart::OperatorIdentifier embedding_grad = {"poptorch.custom_ops",
+                                                   "EmbeddingGrad", domain};
+
 } // namespace poptorch_custom_ops
 }

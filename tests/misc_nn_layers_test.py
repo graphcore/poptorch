@@ -274,6 +274,35 @@ def test_embedding():
     helpers.assert_allequal(expected=native_out, actual=poptorch_out)
 
 
+def test_embedding_padding_idx():
+    class TestEmbedding(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            torch.manual_seed(0)
+            self.embedding = torch.nn.Embedding(10, 4, padding_idx=0)
+
+        def forward(self, x):
+            y = self.embedding(x)
+            loss = poptorch.identity_loss(y.sum(), "none")
+            return y, loss
+
+    model = TestEmbedding()
+    x = torch.arange(0, model.embedding.weight.shape[0])
+    y, loss = model(x)
+    loss.backward()
+    grad = model.embedding.weight.grad
+
+    options = poptorch.Options()
+    options.anchorTensor("grad_embedding", "Gradient___model.embedding.weight")
+    pop_model = poptorch.trainingModel(TestEmbedding(), options=options)
+    pop_y, pop_loss = pop_model(x)
+    pop_grad = pop_model.getAnchoredTensor("grad_embedding")
+
+    helpers.assert_allclose(actual=pop_y, expected=y)
+    helpers.assert_allclose(actual=pop_loss, expected=loss)
+    helpers.assert_allclose(actual=pop_grad, expected=grad)
+
+
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
 def test_embedding_bag(mode):
     torch.manual_seed(0)
