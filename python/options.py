@@ -1653,8 +1653,10 @@ class Options(_options_impl.OptionsDict):
         return self
 
     def logCycleCount(self, log_cycle_count: bool) -> "poptorch.Options":
-        """Log the number of IPU cycles used in executing the main graph, which is
-        printed by setting the environment variable ``POPTORCH_LOG_LEVEL=INFO``.
+        """Log the number of IPU cycles used in executing the main graph.
+
+        The cycle count will be printed when this option is enabled by
+        setting the environment variable ``POPTORCH_LOG_LEVEL=DEBUG``.
         This option requires IPU hardware to run.
 
         Note: This will have a small detrimental impact on performance.
