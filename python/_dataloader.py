@@ -226,29 +226,7 @@ class _AsynchronousWorkerProcess:
             "AsynchronousDataAccessor worker thread failed to start "
             "(Check above for details)")
 
-    def _mainLoop(self, conn, command_pipe):
-        """Main event loop of the asynchronous worker process
-
-        SIGINT signals appear as KeyboardInterrupts and need to be handled
-        as the ``atexit`` terminate hook is not guaranteed to be called before
-        the signal is propagated to the worker processes.
-
-        See Also:
-            :meth:`_mainLoopNoInterrupt` for the implementation of worker event
-            loop.
-        """
-        try:
-            return self._mainLoopNoInterrupt(conn, command_pipe)
-        except KeyboardInterrupt:
-            # Core interpretter libraries may already be unloaded
-            # so don't do anything. More detail of caveats in the
-            # pytorch note on [ Data Loader Multiprocessing Shutdown Logic ]:
-            # https://github.com/pytorch/pytorch/blob/
-            # aa7da7b09c4a3f972ede5fd8ad0cbc8c13498a00/
-            # torch/utils/data/dataloader.py#L570
-            pass
-
-    def _mainLoopNoInterrupt(self, conn, command_pipe):  # pylint: disable=too-many-statements
+    def _mainLoop(self, conn, command_pipe):  # pylint: disable=too-many-statements
         # Make sure this process's output gets printed (In case of error)
         sys.stdout = io.TextIOWrapper(open(sys.stdout.fileno(), 'wb', 0),
                                       write_through=True)
