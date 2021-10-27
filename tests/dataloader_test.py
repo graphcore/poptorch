@@ -3,6 +3,11 @@ import itertools
 import math
 import time
 import subprocess
+import marshal
+import re
+import os
+import sys
+import signal
 import torch
 import pytest
 import numpy
@@ -1019,3 +1024,124 @@ def test_rebatched_worker_size(DatasetType, dtype, drop_last,
             values.add(v)
 
     assert len(values) == num_expected
+
+
+def process_to_kill_asyncdataloader(iterate_over_data: bool):
+    """A function executed as a script meant to be killed
+    ``test_KeyboardInterrupt_in_async_data_accessor``
+    Creates a dataloader and iterates over it.
+    """
+    # pylint: disable=import-outside-toplevel
+    # pylint: disable=reimported
+    import time
+    import poptorch
+    import torch
+
+    opts = poptorch.Options()
+    opts.deviceIterations(2)
+    opts.replicationFactor(1)
+    features = torch.randn([100, 1, 128, 128])
+    labels = torch.empty([100], dtype=torch.long).random_(10)
+    dataset = torch.utils.data.TensorDataset(features, labels)
+    training_data = poptorch.DataLoader(
+        opts,
+        dataset=dataset,
+        batch_size=16,
+        shuffle=True,
+        drop_last=True,
+        num_workers=2,
+        mode=poptorch.DataLoaderMode.Async,
+    )
+    # Empty iteration through the data alters the state of the accessor
+    if iterate_over_data:
+        for _, _ in training_data:
+            pass
+    # Needed as a cooldown after the iteration, otherwise the accessor
+    # may be in an unsafe state, this is representative of interractive
+    # environments.
+    time.sleep(1)
+    print("[control] Dataloader prepared, waiting for sigint.")
+
+    # Expect the parent process to be force closed in the next 30 seconds
+    try:
+        time.sleep(30)
+        raise RuntimeError(
+            "We should not reach this point, we should receive SIGINT before")
+    except KeyboardInterrupt:
+        print("[control] KeyboardInterrupt received in parent exiting.")
+
+
+@pytest.mark.parametrize("iterate_over_data", [True, False])
+def test_KeyboardInterrupt_in_async_data_accessor(iterate_over_data: bool):
+    """ Reproduces an error seen in Jupyter notebooks where dataloader
+    Asynchronous Accessors get closed before their controller. Leading
+    to error messages being spawned to the notebook command line.
+
+    :args: iterate_over_data: Argument passed to
+        ``process_to_kill_asyncdataloader``. Indicates whether to iterate over
+        the data or not.
+    """
+    print("Starting subprocess")
+    parent = subprocess.Popen(
+        [
+            sys.executable,
+            "-u",  # needed to ensure messages are sent to stdout immediately
+            "-c",
+            f"""
+import os
+# Needed to capture the PID of the AsynchronousDataAccessor
+os.environ["POPTORCH_LOG_LEVEL"] = "DEBUG"
+import marshal, types
+code = marshal.loads({marshal.dumps(process_to_kill_asyncdataloader.__code__)})
+fn = types.FunctionType(code, globals(), "kill_this_process")
+fn({iterate_over_data})
+            """,
+        ],
+        universal_newlines=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    print("Subprocess started - waiting for signal")
+
+    lines = []
+    worker_pid = None
+    kill_worker = False
+    # Capture the PID of AsynchronousDataAccessor and wait for the signal
+    # that the dataloader is ready.
+    for line in parent.stdout:
+        lines.append(line)
+        print("Child - {}".format(line.strip("\n")))
+        find_pid = re.match(
+            r".*AsynchronousDataAccessor worker process: (\d+)", line)
+        if find_pid:
+            worker_pid = int(find_pid.group(1))
+        if re.match(r"\[control\] Dataloader prepared, waiting for sigint\.",
+                    line):
+            kill_worker = True
+            break
+
+    # Check that both the PID and the signal were caught
+    if not kill_worker:
+        parent.send_signal(signal.SIGINT)
+        raise RuntimeError("The termination signal for the worker process " +
+                           "was not received.")
+    if worker_pid is None:
+        parent.send_signal(signal.SIGINT)
+        raise RuntimeError(
+            "Could not kill the AsynchronousDataAccessor, its " +
+            "PID could not be captured from the standard output.")
+
+    print("Sending SIGINT to ", worker_pid)
+    os.kill(worker_pid, signal.SIGINT)
+    parent.send_signal(signal.SIGINT)
+
+    for line in parent.stdout:
+        lines.append(line)
+        print("Child - {}".format(line.strip("\n")))
+
+    unexpected_lines = [
+        line for line in lines
+        if "[debug]" not in line and "[control]" not in line
+    ]
+    assert not unexpected_lines, "Unexpected lines in output:\n%s" % "".join(
+        unexpected_lines)
