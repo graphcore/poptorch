@@ -551,7 +551,7 @@ class PoplarExecutor:
             data = _poptorch_data.PoptorchData(self._poptorch_version,
                                                in_tensors)
         with open(filename, "wb") as f:
-            pickle.dump(data, f)
+            pickle.dump(data, f, protocol=4)
             f.close()
 
         with self._profiling.tracepoint("compileAndExport"):

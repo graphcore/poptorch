@@ -170,7 +170,7 @@ class _AsynchronousWorkerProcess:
             logger.debug("Serialising dataset to file: %s", pickle_file)
             dataset = self._dataset
             with open(pickle_file, "wb") as f:
-                pickle.dump(self._dataset, f)
+                pickle.dump(self._dataset, f, protocol=4)
                 self._dataset = pickle_file
             try:
                 return self._start()
