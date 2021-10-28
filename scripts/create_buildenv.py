@@ -63,7 +63,8 @@ class Installer:
     def install(self, env):
         raise Exception("Must be implemented by child class")
 
-    def __hash__(self):
+    def hashString(self):
+        """Unique string identifying this version of the installer."""
         raise Exception("Must be implemented by child class")
 
 
@@ -73,9 +74,6 @@ class CondaPackages(Installer):
     def __init__(self, *packages):
         assert all([isinstance(p, str) for p in packages])
         self.packages = packages
-
-    def __hash__(self):
-        return hash(self.packages)
 
 
 class PipPackages(Installer):
@@ -88,8 +86,8 @@ class PipPackages(Installer):
     def install(self, env):
         env.run_commands("pip3 install " + " ".join(self.packages))
 
-    def __hash__(self):
-        return hash(self.packages)
+    def hashString(self):
+        return " ".join(self.packages)
 
 
 class PipRequirements(Installer):
@@ -103,9 +101,9 @@ class PipRequirements(Installer):
     def install(self, env):
         env.run_commands(f"pip3 install -r {self._requirements_file}")
 
-    def __hash__(self):
+    def hashString(self):
         with open(self._requirements_file, "r") as f:
-            return hash(f.read())
+            return f.read()
 
 
 class Installers:
@@ -431,7 +429,7 @@ class BuildenvManager:
         self._append_to_activate_buildenv(f". {conda_sh}")
 
     def _compute_environment_hash(self, installers):
-        hashes = [str(hash(i)) for i in installers]
+        hashes = [i.hashString() for i in installers]
         return str(
             hashlib.md5(" ".join(self.conda_packages +
                                  hashes).encode("utf-8")).hexdigest())
