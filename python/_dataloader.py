@@ -398,7 +398,7 @@ class _AsynchronousWorkerProcess:
             ) and not host_handler.priorityCommandWaiting():
                 # (Briefly) sleep the thread if we neither is True.
                 if self._miss_sleep_time_in_ms > 0.0:
-                    time.sleep(self._miss_sleep_time_in_ms)
+                    time.sleep(self._miss_sleep_time_in_ms / 1000.0)
                 host_handler.checkMessages()
             if host_handler.priorityCommandWaiting():
                 continue
