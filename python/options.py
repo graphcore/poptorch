@@ -495,7 +495,8 @@ class _DistributedOptions(_options_impl.OptionsDict):
     def __init__(self) -> None:
         super().__init__(num_distributed_processes=1,
                          distributed_process_id=0,
-                         ipuof_configs={})
+                         ipuof_configs={},
+                         broadcast_buffers=True)
         self._gcd_mappings = {}
         self.setEnvVarNames("OMPI_COMM_WORLD_SIZE", "OMPI_COMM_WORLD_RANK")
 
@@ -533,6 +534,16 @@ class _DistributedOptions(_options_impl.OptionsDict):
         """
         self.set(distributed_process_id=process_id)
         self.set(num_distributed_processes=num_processes)
+        return self
+
+    def broadcastBuffers(self, broadcast_buffers: bool = True):
+        """Broadcast buffers to all replicas.
+
+        Only non-broadcast buffers are currently supported, which means each
+        replica will hold a set of buffers not in sync with other replicas'
+        buffers. To enable non-broadcast buffers, set this option to `False`.
+        """
+        self.set(broadcast_buffers=broadcast_buffers)
         return self
 
     @property

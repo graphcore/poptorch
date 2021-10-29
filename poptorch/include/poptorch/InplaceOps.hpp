@@ -28,7 +28,7 @@ namespace poptorch {
 class InplaceOpHandler {
 public:
   InplaceOpHandler(const std::shared_ptr<torch::jit::Graph> &graph,
-                   size_t num_parameters, size_t num_anchors, bool replicas);
+                   size_t num_parameters, size_t num_anchors);
 
   // Returns the mapping between each input tensor and the output tensor used
   // to update the input. If the input tensor is not changed in place, it will
@@ -91,10 +91,6 @@ private:
   // (possibly nested) tuples to include the number of tensors retuurned,
   // including those which are elements of tuples.
   size_t _num_normal_tensor_outputs;
-
-  // Whether or not there is at least one replica: this is relevant in the case
-  // of buffers modified in place, which is not supported with replicas
-  bool _replicas;
 };
 
 } // namespace poptorch

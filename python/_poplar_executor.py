@@ -932,6 +932,18 @@ class PoplarExecutor:
 
         return buffer_addresses, parameter_addresses
 
+    def _error_on_broadcast_buffer_with_replication(self, addresses):
+        have_buffers = len(addresses[0]) > 0
+        if (self._options.replication_factor > 1) \
+            and (self._options.Distributed.broadcast_buffers) \
+            and have_buffers:
+            err_msg = ("PopTorch does not support broadcast buffers. " +
+                       "If your model is able to tolerate buffers becoming " +
+                       "out of sync between replicas, you can disable " +
+                       "broadcast buffers using " +
+                       "poptorch.Options.Distributed.broadcastBuffers(False).")
+            raise _impl.createPoptorchError(err_msg)
+
     def _error_on_buffer_parameter_address_change(self, old_addresses):
         new_addresses = self._buffer_parameter_addresses()
 
@@ -1029,6 +1041,7 @@ class PoplarExecutor:
                 raise e
 
         self._error_on_buffer_parameter_address_change(buff_param_addresses)
+        self._error_on_broadcast_buffer_with_replication(buff_param_addresses)
 
         # Restore half to its old meaning.
         torch.Tensor.half = old_half

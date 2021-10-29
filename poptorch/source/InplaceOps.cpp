@@ -29,8 +29,8 @@ const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
 
 InplaceOpHandler::InplaceOpHandler(
     const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters,
-    size_t num_anchors, bool replicas)
-    : _graph(graph.get()), _num_anchors(num_anchors), _replicas(replicas) {
+    size_t num_anchors)
+    : _graph(graph.get()), _num_anchors(num_anchors) {
   _collapsed_inputs = collapsedGraphInputHierachy(graph.get());
   _num_tensor_inputs = _collapsed_inputs.size() - num_parameters;
 
@@ -109,13 +109,6 @@ void InplaceOpHandler::processInput(size_t input_num) {
   }
 
   if (is_parameter) {
-    // This is not supported with replicas
-    ERROR_ON_MSG(_replicas, "Model modifies a buffer in place. This is not "
-                            "supported when using replication i.e. "
-                            "replicationFactor > 1 with poptorch.Options.\n"
-                            "Last modification: "
-                                << *current_alias->node());
-
     // Updating a variable means that the original variable matches
     ERROR_ON(*_collapsed_inputs[input_num]->type() != *current_alias->type());
 

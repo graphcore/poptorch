@@ -955,7 +955,7 @@ Unlike when running on the CPU, the following PyTorch code does not increment
 
 This is because the PyTorch tracer will capture the value for ``model.i`` when
 tracing happens and then freeze the value as a constant.
-In fact, the value captured is `6.0` as the PyTorch has traced or called the
+In fact, the value captured is `6.0` as PyTorch has traced or called the
 forward method five times before it captures the constant.
 
 You can keep the value of a tensor between runs by registering it as a buffer
@@ -973,6 +973,14 @@ in PyTorch, as the following examples shows:
   modifies will not be implicitly copied to the host. You will need to call
   :py:func:`~poptorch.PoplarExecutor.copyWeightsToHost` before reading the value
   of a buffer which has been changed as a result of a model call.
+
+.. note:: PopTorch does not support broadcasting of buffers between replicas.
+  You can make each replica use its own buffer by setting the PopTorch option
+  :py:func:`~poptorch.options._DistributedOptions.broadcastBuffers` to False:
+  ``poptorch.Options().Distributed.broadcastBuffers(False)``
+
+  You need to ensure that your model still works with each replica using a
+  separate buffer.
 
 
 .. _creating_custom_ops:
