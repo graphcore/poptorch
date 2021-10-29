@@ -7,6 +7,7 @@
 
 #include <CustomOps.hpp>
 #include <popart/op.hpp>
+#include <popart/op/gather.hpp>
 #include <popart/opmanager.hpp>
 #include <popart/opserialiser.hpp>
 #include <popart/popx/irlowering.hpp>
@@ -23,14 +24,17 @@ namespace poptorch_custom_ops {
 
 class EmbeddingGradOp;
 
-class EmbeddingOp : public popart::Op {
+// EmbeddingOp needs to be convertible to popart::GatherOp so that the tied
+// gather pattern can match this implementation.
+class EmbeddingOp : public popart::GatherOp {
 public:
   EmbeddingOp(const popart::OperatorIdentifier &_opid,
               const nonstd::optional<int64_t> &padding_idx,
-              const nonstd::optional<float> &available_memory_proportion,
+              const nonstd::optional<float> &available_memory_proportion_,
               const popart::Op::Settings &settings_)
-      : popart::Op(_opid, settings_), _padding_idx(padding_idx),
-        _available_memory_proportion(available_memory_proportion) {}
+      : popart::GatherOp(_opid, /*axis=*/0, settings_,
+                         available_memory_proportion_),
+        _padding_idx(padding_idx) {}
 
   std::unique_ptr<popart::Op> clone() const final {
     return std::make_unique<EmbeddingOp>(*this);
@@ -42,34 +46,19 @@ public:
     return result;
   }
 
-  void setup() final {
-    const auto &weight_info = inInfo(weightInIndex());
-    auto out_shape = inShape(indicesInIndex());
-    out_shape.push_back(weight_info.shape_szt().at(1));
-    outInfo(outIndex()) = popart::TensorInfo(weight_info.dataType(), out_shape);
-  }
-
   static popart::InIndex weightInIndex() { return 0; }
   static popart::InIndex indicesInIndex() { return 1; }
   static popart::OutIndex outIndex() { return 0; }
 
   void appendOutlineAttributes(popart::OpSerialiserBase &os) const final {
-    popart::Op::appendOutlineAttributes(os);
+    popart::GatherOp::appendOutlineAttributes(os);
     os.appendAttribute("padding_idx", paddingIndex());
-    os.appendAttribute(popart::sAvailMemAttribute, availableMemoryProportion());
   }
-
-  float getSubgraphValue() const final { return getLowSubgraphValue(); }
 
   nonstd::optional<int64_t> paddingIndex() const { return _padding_idx; }
 
-  nonstd::optional<float> availableMemoryProportion() const {
-    return _available_memory_proportion;
-  }
-
 private:
   nonstd::optional<int64_t> _padding_idx;
-  nonstd::optional<float> _available_memory_proportion;
 };
 
 class EmbeddingGradOp : public popart::Op {
@@ -77,7 +66,7 @@ public:
   explicit EmbeddingGradOp(const EmbeddingOp &fwd_op)
       : popart::Op(poptorch_custom_ops::embedding_grad, fwd_op.getSettings()),
         _padding_idx(fwd_op.paddingIndex()),
-        _available_memory_proportion(fwd_op.availableMemoryProportion()),
+        _available_memory_proportion(fwd_op.getAvailableMemoryProportion()),
         _wieght_info(fwd_op.inInfo(EmbeddingOp::weightInIndex())) {}
 
   std::unique_ptr<popart::Op> clone() const final {
@@ -203,7 +192,7 @@ public:
 
     auto options = popart::popx::createSlicePlanOptions(
         popart::popx::SlicePlanUsedFor::Slice,
-        getOp<EmbeddingOp>().availableMemoryProportion());
+        getOp<EmbeddingOp>().getAvailableMemoryProportion());
 
     _plan = popart::popx::createSlicePlan(
         graph(), inInfo(EmbeddingOp::weightInIndex()),
