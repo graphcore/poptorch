@@ -86,9 +86,9 @@ at::Tensor setAvailableMemory(at::Tensor t, double mem) {
   return t;
 }
 
-at::Tensor ipuPrintTensor(at::Tensor t, std::string &&title) {
+at::Tensor ipuPrintTensor(const at::Tensor &t, std::string &&title) {
   UNUSED(title);
-  return t;
+  return t.clone();
 }
 
 at::Tensor setMatMulSerialization(at::Tensor matmul, std::string mode, // NOLINT
@@ -109,11 +109,23 @@ at::Tensor setOverlapForOutput(at::Tensor t, const std::string &mode) {
   return t;
 }
 
-at::Tensor identityOp(at::Tensor t) { return t; }
+at::Tensor identityOp(const at::Tensor &t) { return t.clone(); }
 
-at::Tensor identityLoss(at::Tensor t, int64_t reduction) {
-  UNUSED(reduction);
-  return t;
+at::Tensor identityLoss(const at::Tensor &t, int64_t reduction) {
+  constexpr int64_t sum = 0;
+  constexpr int64_t mean = 1;
+  constexpr int64_t none = 2;
+
+  if (reduction == sum) {
+    return at::sum(t);
+  }
+
+  if (reduction == mean) {
+    return at::mean(t);
+  }
+
+  ERROR_ON(reduction != none);
+  return t.clone();
 }
 
 c10::List<at::Tensor>

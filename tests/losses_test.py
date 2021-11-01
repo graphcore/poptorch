@@ -494,3 +494,33 @@ def test_CTCLoss(blank, reduction):
                  input_lengths=input_lengths,
                  target_lengths=target_lengths,
                  blank=blank)
+
+
+@pytest.mark.parametrize("reduction", ("mean", "sum"))
+def test_identity_with_linear_out_returned(reduction):
+    torch.manual_seed(42)
+
+    el_in = 2
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(el_in, el_in)
+
+        def forward(self, x):
+            out = self.lin(x)
+            loss = poptorch.identity_loss(out, reduction=reduction)
+            return loss, out
+
+    x = torch.rand(1, 1, el_in)
+
+    model = Model()
+    native_loss, native_out = model(x)
+
+    poptorch_model = poptorch.trainingModel(model)
+    poptorch_loss, poptorch_out = poptorch_model(x)
+
+    helpers.assert_allclose(actual=poptorch_loss, expected=native_loss)
+    helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    assert native_loss.shape != native_out.shape
