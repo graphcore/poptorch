@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+import collections
 import copy
-import copyreg
 import ctypes
 import json
 import os
@@ -14,6 +14,7 @@ import torch
 
 # Do not import any poptorch.* here: it will break the poptorch module
 from . import _impl
+from . import _utils
 from . import _args_parser
 from . import _optimizer_attributes
 from . import enums
@@ -175,6 +176,30 @@ class PoplarExecutor:
                         self.copyWeightsToHostIfNeeded()
                     return attribute
 
+                def state_dict(self,
+                               destination=None,
+                               prefix="",
+                               keep_vars=False):
+                    """Return a shallow copy of the wrapped model's state dictionary.
+
+                    Note: all the elements in the state dictionary are
+                    unwrapped which means the state can be reloaded in an
+                    environment where PopTorch is not installed.
+                    """
+                    out = collections.OrderedDict()
+                    for k, v in super().state_dict(destination, prefix,
+                                                   keep_vars).items():
+                        # If the object is wrapped then the shallow copy will
+                        # call _impl._pickleUnwrapObject and the new object will be in
+                        # the wrapped registry.
+                        v = copy.copy(v)
+                        # Unwrap the object if needed.
+                        out[k] = _impl.unwrapIfWrapped(v)
+                    return out
+
+            _utils.assert_signatures_match(PoptorchModel.state_dict,
+                                           torch.nn.Module.state_dict)
+
             # The mere existence of the "__torch_function__" results in a
             # "__getattribute__" call and hence weight copying if required.
             # "check_has_torch_function" and "handle_torch_function_getter"
@@ -225,10 +250,12 @@ class PoplarExecutor:
             PoptorchModel.__name__ = "Poptorch%s" % type(
                 self._user_model).__name__
             self._user_model.__class__ = PoptorchModel
-            # Register custom function to copy / serialize wrappers
-            copyreg.pickle(PoptorchModel, _impl.pickleUnwrapObject)
-            copyreg.pickle(PoptorchParameter, _impl.pickleUnwrapObject)
-            copyreg.pickle(PoptorchBuffer, _impl.pickleUnwrapObject)
+
+            # Register the wrapper types so that custom functions to
+            # copy / serialize wrapped objects are set up.
+            _impl.registerWrapperType(PoptorchModel)
+            _impl.registerWrapperType(PoptorchParameter)
+            _impl.registerWrapperType(PoptorchBuffer)
 
     def load_state_dict(self,
                         state_dict: Dict[str, 'torch.Tensor'],

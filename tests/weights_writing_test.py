@@ -5,6 +5,8 @@ import os
 import types
 import copy
 import tempfile
+import unittest.mock
+
 import numpy as np
 import pytest
 import torch
@@ -652,3 +654,40 @@ def test_copy_after_compile():
     # If we haven't copied the weights, Popart will fire an exception
     # when trying to execute the model.
     poptorch_model(input, target)
+
+
+def test_torch_save_unwrapped():
+    torch.manual_seed(42)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv2d(2, 2, 1, padding=0)
+            self.register_buffer("test_buffer",
+                                 torch.zeros([2], dtype=torch.float32))
+            self.register_parameter("test_param",
+                                    torch.nn.Parameter(torch.empty(10)))
+
+        def forward(self, inp):
+            return self.conv(inp)
+
+    model = Model()
+    # Only training models instrument the model so we can't use poptporch.inferenceModel
+    training_model = helpers.trainingModelWithLoss(model,
+                                                   loss=torch.nn.L1Loss())
+
+    # An inference model sharing its user model with a training model will be instrumented though.
+    poptorch.inferenceModel(training_model)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        torch_file = os.path.join(tmp, "torch_saved.pt")
+        torch.save(model.state_dict(), torch_file)
+
+        # Ensure the state dictionaries returned by the training and inference models don't contain any PopTorch wrapper.
+        with unittest.mock.patch.object(
+                poptorch._impl,  # pylint: disable=protected-access
+                "_pickleRestoreWrapperIfPossible",
+                wraps=poptorch._impl._pickleRestoreWrapperIfPossible  # pylint: disable=protected-access
+        ) as restore_fn:
+            torch.load(torch_file)
+            restore_fn.assert_not_called()

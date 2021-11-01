@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 import copy
+import copyreg
 import fcntl
 import hashlib
 import os
@@ -164,6 +165,8 @@ def distributedCacheLock(model, opts):
 # therefore we keep the object unwrapped. (It will be wrapped again when passed
 # to poptorch.trainingModel anyway)
 _wrapper_registry: Dict[int, Any] = {}
+# List of all the wrapper types used by PopTorch.
+_wrapper_types = []
 
 
 def _pickleRestoreWrapperIfPossible(obj):
@@ -173,7 +176,7 @@ def _pickleRestoreWrapperIfPossible(obj):
     return obj
 
 
-def pickleUnwrapObject(obj):
+def _pickleUnwrapObject(obj):
     global _wrapper_registry
     wrapperType = obj.__class__
     obj.__class__ = obj.__class__.__bases__[0]
@@ -181,3 +184,21 @@ def pickleUnwrapObject(obj):
     _wrapper_registry[id(other)] = wrapperType
     obj.__class__ = wrapperType
     return _pickleRestoreWrapperIfPossible, (other, )
+
+
+def registerWrapperType(wrapper_type):
+    global _wrapper_types
+    assert wrapper_type not in _wrapper_types
+    _wrapper_types.append(wrapper_type)
+    copyreg.pickle(wrapper_type, _pickleUnwrapObject)
+
+
+def isWrapped(obj):
+    global _wrapper_types
+    return isinstance(obj, tuple(_wrapper_types))
+
+
+def unwrapIfWrapped(obj):
+    if isWrapped(obj):
+        obj.__class__ = obj.__class__.__bases__[0]
+    return obj

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import functools
+import inspect
 
 from ._logging import logger
 
@@ -20,3 +21,11 @@ def deprecated(domain, since_version, reason):
         return wrapped_func
 
     return deprecated_func
+
+
+def assert_signatures_match(poptorch_method, reference_method):
+    reference_params = inspect.signature(reference_method).parameters
+    poptorch_params = inspect.signature(poptorch_method).parameters
+    assert poptorch_params == reference_params, (
+        "Arguments mismatch: expected "
+        f"{reference_params} but got {poptorch_params}")
