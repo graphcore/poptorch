@@ -167,15 +167,20 @@ class BuildenvManager:
         self.output_dir = os.path.realpath(output_dir or os.getcwd())
         self.cache_dir = cache_dir or _default_cache_dir()
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
-        self.conda_packages = [
-            f"python={python_version}", "gdb=8.3", "conda-pack=0.5.0"
-        ]
+        self.conda_packages = [f"python={python_version}", "conda-pack=0.5.0"]
+
+        is_aarch64 = _utils.get_arch_type() == "aarch64"
+        if not is_aarch64:
+            self.conda_packages.append("gdb=8.3")
+
         self.projects = {}
 
         if use_conda_toolchains:
             self.conda_packages += _conda_toolchains_packages
 
-        self.config = Config(install_linters=install_linters, **config)
+        self.config = Config(install_linters=install_linters,
+                             is_aarch64=is_aarch64,
+                             **config)
         assert self.output_dir != _utils.sources_dir(), (
             "This script needs "
             "to be called from a build directory. Try mkdir build && cd build"
@@ -420,7 +425,8 @@ class BuildenvManager:
                             "installer for your platform from "
                             "https://repo.anaconda.com/miniconda/ and save it "
                             f"as ${installer}")
-                    url = f"https://repo.anaconda.com/miniconda/Miniconda3-latest-{conda_os}-x86_64.sh"
+                    arch_type = _utils.get_arch_type()
+                    url = f"https://repo.anaconda.com/miniconda/Miniconda3-latest-{conda_os}-{arch_type}.sh"
                     urllib.request.urlretrieve(url, installer)
                 _utils.rmdir_if_exists(miniconda_install_dir)
                 _utils.run_commands(

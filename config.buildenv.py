@@ -6,8 +6,6 @@ installers.add(
     CondaPackages(
         "ccache=4.3",
         "cmake=3.18.2",
-        "hunspell=1.7.0",
-        "latexmk=4.55",
         "lld=" + _llvm_version,
         "llvmdev=" + _llvm_version,
         "make=4.3",
@@ -18,6 +16,14 @@ installers.add(
         "spdlog=1.8.0",
         "wheel=0.34.2",
         "zip=3.0",
+    ))
+
+if not config.is_aarch64:
+    # These packages don't exist on AArch64 but they're only needed to
+    # build the documentation
+    installers.add(CondaPackages(
+        "hunspell=1.7.0",
+        "latexmk=4.55",
     ))
 
 installers.add(PipRequirements("requirements.txt"))

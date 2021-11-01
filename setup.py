@@ -28,9 +28,13 @@ if "macosx" in platform:
     REQUIRES += [f'torch=={TORCH_VERSION}']
     LIBS = ["*.dylib", "*.so"]
 else:
-    REQUIRES += [
-        f'torch @ https://download.pytorch.org/whl/cpu/torch-{TORCH_VERSION}%2Bcpu-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{platform}.whl',
-    ]
+    if "aarch64" in utils.get_arch_type():
+        # There is no +cpu variant of Torch on Arm
+        REQUIRES += [f'torch=={TORCH_VERSION}']
+    else:
+        REQUIRES += [
+            f'torch @ https://download.pytorch.org/whl/cpu/torch-{TORCH_VERSION}%2Bcpu-{get_abbr_impl()}{get_impl_ver()}-{get_abi_tag()}-{platform}.whl',
+        ]
     LIBS = ["*.so"]
 
 

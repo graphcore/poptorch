@@ -182,6 +182,10 @@ def _get_package_os_type():
     return f"{distrib}_{version}"
 
 
+def get_arch_type():
+    return platform.processor()
+
+
 def get_os_type():
     p = platform.uname()
     if p.system == "Darwin":
