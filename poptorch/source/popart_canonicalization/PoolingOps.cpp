@@ -24,9 +24,33 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
   // stride=[], int[2] padding=[0, 0], int[2] dilation=[1, 1], bool
   // ceil_mode=False) -> (Tensor, Tensor)
 
+  torch::jit::Value *x = node->input(0);
   auto kernel_size = constantToLongVec(node->input(1)->node());
   auto stride = constantToLongVec(node->input(2)->node());
   auto padding = constantToLongVec(node->input(3)->node());
+  auto shape = shapeFromTensor(x);
+  bool reshape_after = false;
+
+  // The torch input might be missing the batch dimension, so add one if
+  // necessary
+  // (C, *in) -> (1, C, *in)
+  if (shape.size() != stride.size() + 2) {
+    shape.push_back(1);
+    // simple rotation to the right
+    std::rotate(shape.rbegin(), shape.rbegin() + 1, shape.rend());
+    x = createReshape(graph, x, shape)->output();
+    reshape_after = true;
+  }
+
+  // If we reshape, the output shape will be (1, C, *out) but torch expects
+  // (C, *out)
+  auto maybe_reshape_output = [&](torch::jit::Node *output) {
+    if (reshape_after) {
+      return createReshape(graph, output->output(),
+                           shapeFromTensor(node->output()));
+    }
+    return output;
+  };
 
   // Pytorch gives the padding as being the amount to pad in both
   // directions. Popart two arguments for each axis, the amount to pad in
@@ -49,38 +73,39 @@ torch::jit::Node *poolingHandler(torch::jit::Graph *graph,
     auto dilations = constantToLongVec(node->input(4)->node());
     auto ceil_mode = constantToLong(node->input(5)->node());
 
-    return createMaxpool(graph, {node->input(0)}, 1, kernel_size, ceil_mode,
-                         dilations, padding, 0, stride);
+    auto *output = createMaxpool(graph, {x}, 1, kernel_size, ceil_mode,
+                                 dilations, padding, 0, stride);
+    return maybe_reshape_output(output);
   }
 
   // divisor_override is ignored for now due to not being supported directly in
   // popart.
   auto ceil_mode = constantToLong(node->input(4)->node());
 
-  torch::jit::Value *new_value = node->input(0);
-
   bool count_include_pad = constantToBool(node->input(5)->node());
   // count_include_pad isn't supported in PopART so we check and pad manually if
   // the average pool is supposed to include the padding in its average.
   if (count_include_pad) {
-    new_value = createConstantPad(graph, new_value, padding, 0.f)->output();
+    x = createConstantPad(graph, x, padding, 0.f)->output();
     // Ensure that padding isn't added twice.
     padding = {};
   }
 
   // popart only supports float types for avgpool
-  auto input_type = getNodeScalarType(new_value);
+  auto input_type = getNodeScalarType(x);
 
   if (input_type == c10::kFloat) {
-    return createAveragepool(graph, {new_value}, kernel_size, ceil_mode, 0,
-                             padding, stride);
+    auto *output = createAveragepool(graph, {x}, kernel_size, ceil_mode, 0,
+                                     padding, stride);
+    return maybe_reshape_output(output);
   }
 
-  // all ather types require casting via float
-  auto *new_node = createCast(graph, new_value, c10::kFloat);
-  new_node = createAveragepool(graph, {new_node->output()}, kernel_size,
-                               ceil_mode, 0, padding, stride);
-  return createCast(graph, new_node->output(), input_type);
+  // all other types require casting via float
+  x = createCast(graph, x, c10::kFloat)->output();
+  x = createAveragepool(graph, {x}, kernel_size, ceil_mode, 0, padding, stride)
+          ->output();
+  auto *output = createCast(graph, x, input_type);
+  return maybe_reshape_output(output);
 }
 
 torch::jit::Node *adaptivePoolingHandler(torch::jit::Graph *graph,

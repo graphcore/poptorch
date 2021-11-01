@@ -159,13 +159,13 @@ static at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
 // _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
 // device=None, bool? pin_memory=None, bool non_blocking=False, MemoryFormat?
 // memory_format=None) -> Tensor
-at::Tensor _to_copy(const at::Tensor &self,
-                    c10::optional<at::ScalarType> dtype = c10::nullopt,
-                    c10::optional<at::Layout> layout = c10::nullopt,
-                    c10::optional<at::Device> device = c10::nullopt,
-                    c10::optional<bool> pin = c10::nullopt,
-                    bool non_blocking = false,
-                    c10::optional<c10::MemoryFormat> fmt = c10::nullopt) {
+at::Tensor toCopy(const at::Tensor &self,
+                  c10::optional<at::ScalarType> dtype = c10::nullopt,
+                  c10::optional<at::Layout> layout = c10::nullopt,
+                  c10::optional<at::Device> device = c10::nullopt,
+                  c10::optional<bool> pin = c10::nullopt,
+                  bool non_blocking = false,
+                  c10::optional<c10::MemoryFormat> fmt = c10::nullopt) {
   if (!context.isDispatchOn()) {
     return at::native::_to_copy(self, dtype, layout, device, pin, non_blocking,
                                 fmt);
@@ -174,8 +174,8 @@ at::Tensor _to_copy(const at::Tensor &self,
   DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting aten::_to_copy");
 
-  at::Tensor out =
-      context.active_dispatch_->_to_copy(self, dtype, layout, device, pin, fmt);
+  at::Tensor out = context.active_dispatch->toCopyInplace(self, dtype, layout,
+                                                          device, pin, fmt);
   return out;
 }
 #endif
@@ -296,7 +296,7 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("copy_", &poptorch::copyInplace);
 
 #if TORCH_MINOR_VERSION >= 10
-  m.impl("_to_copy", &poptorch::_to_copy);
+  m.impl("_to_copy", &poptorch::toCopy);
 #endif
 
   m.impl("empty.memory_format", &poptorch::emptyMemoryFormat);
@@ -333,7 +333,7 @@ TORCH_LIBRARY_IMPL(aten, BackendSelect, m) {
   m.impl("empty_strided", &poptorch::emptyStrided);
 
 #if TORCH_MINOR_VERSION >= 10
-  m.impl("_to_copy", &poptorch::_to_copy);
+  m.impl("_to_copy", &poptorch::toCopy);
 #endif
 
   // Turn logging back on.

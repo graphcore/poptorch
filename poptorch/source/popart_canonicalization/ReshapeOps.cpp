@@ -572,6 +572,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::unsqueeze, reshapeHandler);
   registerHandler(c10::aten::flatten, flattenHandler);
   registerHandler(c10::aten::reshape, reshapeHandler);
+  registerHandler(c10::aten::_reshape_alias, reshapeHandler);
   registerHandler(c10::aten::select, selectHandler);
   registerHandler(c10::aten::split, splitChunkHandler);
   registerHandler(c10::aten::split_with_sizes, splitChunkHandler);

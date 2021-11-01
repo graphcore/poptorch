@@ -30,6 +30,7 @@ extern c10::Symbol cross_entropy_loss;          // NOLINT
 extern c10::Symbol new_ones;                    // NOLINT
 extern c10::Symbol new_zeros;                   // NOLINT
 extern c10::Symbol numpy_T;                     // NOLINT
+extern c10::Symbol _reshape_alias;              // NOLINT
 
 // Removed in 1.10.
 #if TORCH_MINOR_VERSION < 10

@@ -28,11 +28,11 @@ To run a PyTorch model on the IPU, you must wrap your model with either:
 * :py:func:`poptorch.inferenceModel`
 * :py:func:`poptorch.trainingModel`
 
-Both of these functions accept a PyTorch model (`torch.nn.Module <https://pytorch.org/docs/1.9.0/generated/torch.nn.Module.html#torch.nn.Module>`_) and create a
+Both of these functions accept a PyTorch model (`torch.nn.Module <https://pytorch.org/docs/1.10.0/generated/torch.nn.Module.html#torch.nn.Module>`_) and create a
 representation of the model that can be executed on the IPU hardware.
 
 In training mode, PopTorch uses its own automatic differentiation engine
-(autograd) that differs from native PyTorch.  The input model (`torch.nn.Module <https://pytorch.org/docs/1.9.0/generated/torch.nn.Module.html#torch.nn.Module>`_)
+(autograd) that differs from native PyTorch.  The input model (`torch.nn.Module <https://pytorch.org/docs/1.10.0/generated/torch.nn.Module.html#torch.nn.Module>`_)
 is required to have at least one loss built into the forward pass.  PopTorch
 backpropagates the gradients from the loss value(s) to update the model
 parameters. This is all taken care of automatically so your training loop does not
@@ -61,7 +61,7 @@ this means you will just pass in data of the normal batch size. However, there a
 number of options provided in PopTorch which will enable more efficient data
 loading. See :numref:`efficient_data_batching` for more information.
 
-Notice that the `torch.optim.AdamW <https://pytorch.org/docs/1.9.0/optim.html#torch.optim.AdamW>`_ optimiser is passed as an input argument to the
+Notice that the `torch.optim.AdamW <https://pytorch.org/docs/1.10.0/optim.html#torch.optim.AdamW>`_ optimiser is passed as an input argument to the
 :py:func:`poptorch.trainingModel` wrapper which applies the optimiser algorithm
 during training on the IPU.  The optimiser state is automatically managed by the
 PopART framework so there is no need to call the ``.step()`` method.  Another
@@ -100,13 +100,13 @@ IPU-POD hosts. Please refer to the `PopRun an PopDist user guide <https://docs.g
 Constraints
 ===========
 
-PopTorch uses PyTorch's `torch.jit.trace <https://pytorch.org/docs/1.9.0/generated/torch.jit.trace.html#torch.jit.trace>`_ API. That means it inherits the
+PopTorch uses PyTorch's `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_ API. That means it inherits the
 constraints of that API. These include:
 
    * Inputs must be PyTorch tensors or tuples containing PyTorch tensors.
    * ``None`` can be used as a default value for a parameter but cannot be
      explicitly passed as an input value.
-   * `torch.jit.trace <https://pytorch.org/docs/1.9.0/generated/torch.jit.trace.html#torch.jit.trace>`_ cannot handle control flow or shape variations within the
+   * `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_ cannot handle control flow or shape variations within the
      model. That is, the inputs passed at run-time cannot vary the control flow of the
      model or the shapes/sizes of results. If you attempt this, the graph will be
      frozen to whichever control flow path was traced as a result of the first inputs

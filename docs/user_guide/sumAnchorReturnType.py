@@ -36,7 +36,7 @@ class ExampleClassDataset(torch.utils.data.Dataset):
         # decomposition
         torch.manual_seed(RAND_SEED)
         R = torch.rand([vec_length, vec_length])
-        R += R.transpose(0, 1)
+        R = R + R.transpose(0, 1)
         self._R = torch.eig(R, eigenvectors=True).eigenvectors
 
         # # For now, use identity for R

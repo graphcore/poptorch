@@ -62,11 +62,6 @@ EXPECTED_FAILURES = {
     "test_nn_MaxPool2d_3d_input": "Invalid length of strides vector",
     "test_nn_LPPool2d_norm": "Invalid length of padding vector",
 
-    "test_nn_AdaptiveMaxPool2d_single": "T30564",
-    "test_nn_AdaptiveMaxPool2d_tuple": "T30564",
-    "test_nn_AdaptiveMaxPool2d_tuple_none": "T30564",
-    "test_nn_AdaptiveMaxPool2d_alert_nondeterministic": "T30564",
-
     "test_nn_AdaptiveAvgPool1d": "margin of error",
     "test_nn_AdaptiveAvgPool1d_one_output": "margin of error",
     "test_nn_AdaptiveAvgPool2d_single": "margin of error",
@@ -104,6 +99,7 @@ EXPECTED_FAILURES = {
     "test_nn_AvgPool3d_divisor_stride1_pad0_gpu_input": "AssertionError: With rtol=0.0001 and atol=1e-05, found 48 element(s) (out of 48) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 15.688140630722046 (16.29153060913086 vs. 0.6033899784088135), which occurred at index (0, 2, 0, 0, 0).",
     "test_nn_AvgPool3d_divisor_stride_pad_gpu_input_nooverlap": "AssertionError: With rtol=0.0001 and atol=1e-05, found 114 element(s) (out of 162) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 5.383516907691956 (6.152590751647949 vs. 0.7690738439559937), which occurred at index (0, 2, 1, 1, 1).",
     "test_nn_GELU": "AssertionError: With rtol=0.0001 and atol=1e-05, found 7 element(s) (out of 30) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.00013697147369384766 (0.7933593392372131 vs. 0.7932223677635193), which occurred at index (0, 1, 3).",
+    "test_nn_GELU_no_batch_dim": "AssertionError: Tensor-likes are not close",
     "test_nn_softmax_spatial_special": "AssertionError: With rtol=0.0001 and atol=1e-05, found 1024 element(s) (out of 1024) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.009421411203220487 (0.012496765702962875 vs. 0.0030753544997423887), which occurred at index (0, 114, 0, 0).",
     "test_nn_softmax_spatial": "AssertionError: With rtol=0.0001 and atol=1e-05, found 64 element(s) (out of 64) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.6575267650187016 (0.7020591497421265 vs. 0.04453238472342491), which occurred at index (1, 0, 1, 0).",
     "test_nn_softmax_functional_dim0": "AssertionError: With rtol=0.0001 and atol=1e-05, found 120 element(s) (out of 120) whose difference(s) exceeded the margin of error (including 0 nan comparisons). The greatest difference was 0.7021725764498115 (0.7146565914154053 vs. 0.012484014965593815), which occurred at index (0, 1, 2, 1).",
@@ -180,7 +176,11 @@ EXPECTED_FAILURES = {
     "test_nn_InstanceNorm2d_tracking_stats": "Unsupported op(s): aten::instance_norm",
 
     "test_nn_FractionalMaxPool2d_ratio": "T30594",
+    "test_nn_FractionalMaxPool2d_ratio_no_batch_dim": "T30594",
+    "test_nn_FractionalMaxPool2d_ratio_no_batch_dim_no_random_samples": "T30594",
     "test_nn_FractionalMaxPool2d_size": "T30594",
+    "test_nn_FractionalMaxPool2d_size_no_batch_dim": "T30594",
+    "test_nn_FractionalMaxPool2d_size_no_batch_dim_no_random_samples": "T30594",
     "test_nn_FractionalMaxPool2d_alert_nondeterministic": "T30594",
     "test_nn_FractionalMaxPool3d_ratio": "T30594",
     "test_nn_FractionalMaxPool3d_size": "T30594",
@@ -208,11 +208,6 @@ EXPECTED_FAILURES = {
     "test_nn_MultiMarginLoss_p_no_reduce": "T30603",
     "test_nn_MultiMarginLoss_margin_no_reduce": "T30603",
     "test_nn_MultiMarginLoss_weights_no_reduce": "T30603",
-    "test_nn_AdaptiveMaxPool1d": "T30564",
-    "test_nn_AdaptiveMaxPool3d_tuple": "T30564",
-    "test_nn_AdaptiveMaxPool3d_tuple_none": "T30564",
-    "test_nn_AdaptiveMaxPool3d_single_nonatomic": "T30564",
-    "test_nn_AdaptiveMaxPool3d_tuple_nonatomic": "T30564",
     "test_nn_Fold": "T30606",
     "test_nn_Unfold_int_input": "T30606",
     "test_nn_Fold_int_input": "T30606",
@@ -220,10 +215,31 @@ EXPECTED_FAILURES = {
     "test_nn_AdaptiveMaxPool3d_single": "T30564",
     "test_nn_Unfold": "T30606",
 
+
+    # TODO(T30564): Support adaptive max pool
+    "test_nn_AdaptiveMaxPool1d": "T30564",
+    "test_nn_AdaptiveMaxPool1d_no_batch_dim": "T30564",
+    "test_nn_AdaptiveMaxPool2d_single": "T30564",
+    "test_nn_AdaptiveMaxPool2d_tuple": "T30564",
+    "test_nn_AdaptiveMaxPool2d_tuple_none": "T30564",
+    "test_nn_AdaptiveMaxPool2d_alert_nondeterministic": "T30564",
+    "test_nn_AdaptiveMaxPool2d_no_batch_dim": "T30564",
+    "test_nn_AdaptiveMaxPool3d_no_batch_dim": "T30564",
+    "test_nn_AdaptiveMaxPool3d_tuple": "T30564",
+    "test_nn_AdaptiveMaxPool3d_tuple_none": "T30564",
+    "test_nn_AdaptiveMaxPool3d_single_nonatomic": "T30564",
+    "test_nn_AdaptiveMaxPool3d_tuple_nonatomic": "T30564",
+
+    # Input dims indivisible by output dims, output doesn't match torch
+    "test_nn_AdaptiveAvgPool1d_no_batch_dim": "Output differs from torch due to implementation detail",
+    "test_nn_AdaptiveAvgPool2d_no_batch_dim": "Output differs from torch due to implementation detail",
+    "test_nn_AdaptiveAvgPool3d_no_batch_dim": "Output differs from torch due to implementation detail",
+
     # torch.complex128 not supported
     "test_nn_L1Loss_no_reduce_complex": "torch.complex128 not supported",
     "test_nn_ReflectionPad1d_complex": "torch.complex128 not supported",
     "test_nn_ReflectionPad2d_complex": "torch.complex128 not supported",
+    "test_nn_ReflectionPad3d_complex": "torch.complex128 not supported",
     "test_nn_ReplicationPad1d_complex": "torch.complex128 not supported",
     "test_nn_ReplicationPad2d_complex": "torch.complex128 not supported",
     "test_nn_ConstantPad1d_complex": "torch.complex128 not supported",
@@ -253,6 +269,21 @@ EXPECTED_FAILURES = {
     # TODO(T42772): Support torch.nn.Mish
     "test_nn_Mish": "T42772",
     "test_nn_Mish_scalar": "T42772",
+    "test_nn_Mish_no_batch_dim": "T42772",
+
+    # TODO(T46296): Support torch.nn.Hardswish, torch.nn.Hardsigmoid
+    "test_nn_Hardsigmoid_no_batch_dim": "T46296",
+    "test_nn_Hardswish_no_batch_dim": "T46296",
+
+    # TODO(T48781): Support torch.nn.Unflatten
+    "test_nn_Unflatten_no_batch_dim": "T48781",
+
+    # TODO(T49021): Support torch.nn.ReflectionPad3d
+    "test_nn_ReflectionPad3d": "T49021",
+    "test_nn_ReflectionPad3d_no_batch_dim": "T49021",
+
+    # TODO(T49073): Match torch 1.10 implementation
+    "test_nn_GroupNorm_1d_affine_large_batch": "T49073",
 
     # unsupported upsampling modes downstream
     "test_nn_interpolate_linear_1d": "Upsample mode not supported",
@@ -294,9 +325,15 @@ EXPECTED_FAILURES = {
     "test_nn_EmbeddingBag_max_padding_idx": "padding_idx not supported",
 }
 
+FLOAT_EXPECTED_FAILURES = {
+    # Tests that fail on float only, e.g. due to OOM on the small IPU model
+    "test_nn_LayerNorm_3d_no_affine_large_feature": "Tile 0 receives more data than it has total memory in exchange",
+}
+
 HALF_EXPECTED_FAILURES = {
     # T30731 - tests failing with very large error
     "test_nn_BatchNorm1d_affine_simple_average": "AssertionError: With rtol=0.05 and atol=0.0001",
+    "test_nn_BatchNorm1d_not_tracking_stats": "Tensor-likes are not close",
     "test_nn_BatchNorm2d_momentum": "AssertionError: With rtol=0.05 and atol=0.0001",
     "test_nn_BatchNorm3d_momentum": "AssertionError: With rtol=0.05 and atol=0.0001",
     "test_nn_BatchNorm1d_3d_input": "AssertionError: With rtol=0.05 and atol=0.0001",
@@ -310,20 +347,23 @@ HALF_EXPECTED_FAILURES = {
 
 HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
+    "test_nn_Conv1d_pad2": (0.05, 1e-3),
     "test_nn_Conv2d_depthwise_padded": (0.05, 1e-3), # TODO(T31811)?
     "test_nn_Conv3d_dilated": (0.05, 1e-3),
     "test_nn_Conv2d_groups": (0.05, 1e-3),
     "test_nn_Conv3d_groups": (0.05, 1e-3),
     "test_nn_LayerNorm_1d_elementwise_affine": (0.05, 0.002),
     "test_nn_LayerNorm_3d_elementwise_affine": (0.05, 0.002),
+    "test_nn_LayerNorm_3d_no_affine_large_feature": (0.05, 0.002),
     "test_nn_BatchNorm2d_not_tracking_stats": (0.05, 1e-3),
     "test_nn_BatchNorm3d_not_tracking_stats": (0.05, 1e-2),
     "test_nn_TransformerDecoderLayer_relu_activation": (0.05, 1e-2),
     "test_nn_Linear_no_bias": (0.05, 1e-3),
     "test_nn_Conv2d_replicate_stride2_pad2": (0.05, 1e-3),
     "test_nn_Transformer_multilayer_coder": (0.05, 1e-2),
-    "test_nn_GroupNorm_1d_affine_large_batch": (0.05, 1e-3),
     "test_nn_GroupNorm_2d_affine_large_feature": (0.05, 1e-2),
+    "test_nn_GroupNorm_2d_no_affine_large_feature": (0.05, 1e-2),
+    "test_nn_KLDivLoss_with_target_no_reduce": (0.05, 1e-2),
 }
 
 # pylint: enable=line-too-long
@@ -389,8 +429,9 @@ def assert_allclose(native_out, poptorch_out, rtol, atol):
 @pytest.mark.parametrize("use_half", [False, True])
 def test_pytorch_nn(test_name, use_half):
     reason = EXPECTED_FAILURES.get(test_name)
-    if reason is None and use_half:
-        reason = HALF_EXPECTED_FAILURES.get(test_name)
+    if reason is None:
+        reason = HALF_EXPECTED_FAILURES.get(
+            test_name) if use_half else FLOAT_EXPECTED_FAILURES.get(test_name)
     if reason:
         pytest.skip(reason)
 

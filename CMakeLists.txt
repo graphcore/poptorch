@@ -17,7 +17,7 @@ set(COPY_TESTS OFF CACHE BOOL "Copy tests files to the build folder (instead of 
 set(ENABLE_WERROR ON CACHE BOOL "Treat C++ warnings as errors")
 
 # Note: The next line is also parsed by scripts/utils/_utils.py
-set(TORCH_VERSION 1.9.0)
+set(TORCH_VERSION 1.10.0)
 
 # Convert to cmake list
 string(REPLACE "." ";" TORCH_VERSION_AS_LIST ${TORCH_VERSION})
@@ -98,6 +98,13 @@ function(run_poptorch_install_command cmd working_directory cmd_name)
     endif()")
 endfunction()
 
+function(remove_use_distributed_definition target)
+	get_target_property(compile_options ${target} INTERFACE_COMPILE_DEFINITIONS)
+	list(REMOVE_ITEM compile_options USE_DISTRIBUTED)
+	list(REMOVE_ITEM compile_options USE_RPC)
+	set_target_properties(${target} PROPERTIES INTERFACE_COMPILE_DEFINITIONS "${compile_options}")
+endfunction()
+
 file(WRITE ${CMAKE_BINARY_DIR}/tmp/test.sh "#!$ENV{SHELL}
   source ${CMAKE_BINARY_DIR}/enable.sh
   export POPTORCH_TEST_TIMEOUT=3600
@@ -147,6 +154,8 @@ else()
 endif()
 
 find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
+
+remove_use_distributed_definition(torch_cpu)
 
 add_subdirectory(poptorch_logging)
 

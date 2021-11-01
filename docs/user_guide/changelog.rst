@@ -11,6 +11,8 @@ New features
 - Support reading internal optimiser state via ``optimizer.state_dict()``
 - Added functionality to add a name scope for each operator present in the module. This function is enabled by default. It can be disabled using ``poptorch.Options.disableModuleNamescope``.
 
+- Migrated to PyTorch version 1.10.0
+
 API changes
 -----------
 - Deprecated ``poptorch.Options.anchorMode`` in favour of ``poptorch.Options.outputMode``

@@ -942,8 +942,9 @@ def test_rmsprop_tf_variant(use_tf_variant):
         assert not torch.allclose(out_pt, out_tf)
         assert not torch.allclose(loss_pt, loss_tf)
     else:
-        helpers.assert_allequal(actual=model_pt.model.weight,
-                                expected=model_tf.model.weight)
+        helpers.assert_allequal(
+            actual=model_pt.model.weight.detach().clone(),
+            expected=model_tf.model.weight.detach().clone())
         helpers.assert_allequal(actual=out_pt, expected=out_tf)
         helpers.assert_allequal(actual=loss_pt, expected=loss_tf)
 

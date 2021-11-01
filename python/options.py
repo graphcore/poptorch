@@ -65,7 +65,7 @@ class _JitOptions(_options_impl.OptionsDict):
         Currently unused and deadlocked to torch.jit.trace.
 
         :param bool trace_model:
-            * True: use `torch.jit.trace <https://pytorch.org/docs/1.9.0/generated/torch.jit.trace.html#torch.jit.trace>`_
+            * True: use `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_
        """
         trace_model = True
         self.set(trace_model=trace_model)

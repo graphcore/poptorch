@@ -3,6 +3,7 @@
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch {
@@ -14,34 +15,55 @@ torch::jit::Node *pairwiseDistanceHandler(torch::jit::Graph *graph,
   //                         bool keepdim)
 
   // Input 1
-  torch::jit::Value *x1 = node->input(0);
+  auto *x1 = node->input(0);
   // Input 2
-  torch::jit::Value *x2 = node->input(1);
+  auto *x2 = node->input(1);
   // Norm degree
-  torch::jit::Value *p = node->input(2);
+  auto *p = node->input(2);
   // Small value to avoid division by zero
-  torch::jit::Value *eps = node->input(3);
+  auto *eps = node->input(3);
   // Whether to keep vector dimension
-  torch::jit::Value *keepdim = node->input(4);
+  auto *keepdim = node->input(4);
+  auto input_shape = shapeFromTensor(x1);
+  bool reshape_output = false;
+
+  // No batch dim, append one to front
+  // (D) -> (N, D), N = 1
+  if (input_shape.size() == 1) {
+    input_shape = {1, input_shape[0]};
+    x1 = createUnsqueeze(graph, {x1}, {0})->output();
+    reshape_output = true;
+  }
 
   // tensorNormHandler
   auto norm_handler = getHandler(c10::aten::norm);
 
   // x1 - x2
-  torch::jit::Node *x1_minus_x2 = createSub(graph, {x1, x2});
+  auto *x1_minus_x2 = createSub(graph, {x1, x2})->output();
   // x1 - x2 + eps
-  torch::jit::Node *x1_minus_x2_plus_eps =
-      createAdd(graph, {x1_minus_x2->output(), eps});
+  auto *x1_minus_x2_plus_eps = createAdd(graph, {x1_minus_x2, eps})->output();
+  x1_minus_x2_plus_eps->setType(
+      x1_minus_x2_plus_eps->type()->expect<c10::TensorType>()->withSizes(
+          input_shape));
+
   // 1
-  torch::jit::Node *ones = createConstantInt(graph, {1}, {});
+  auto *ones = wrapInConstant1D(graph, 1);
   // tensorNormHandler expects ListConstruct for dims
   torch::jit::Node *ones_list =
-      createAndInsertNode(graph, c10::prim::ListConstruct, {ones->output()});
+      createAndInsertNode(graph, c10::prim::ListConstruct, {ones});
 
-  std::vector<torch::jit::Value *> norm_inputs = {
-      x1_minus_x2_plus_eps->output(), p, ones_list->output(), keepdim};
+  std::vector<torch::jit::Value *> norm_inputs = {x1_minus_x2_plus_eps, p,
+                                                  ones_list->output(), keepdim};
   // norm(x1 - x2 + eps, p, 1, keepdim)
-  return createHandlerOperation(graph, norm_handler, norm_inputs);
+  auto *out = createHandlerOperation(graph, norm_handler, norm_inputs);
+
+  // If passed inputs of size (1, N), the output of norm will have shape
+  // torch.Size([1]), but torch outputs torch.Size([]), so reshape
+  if (reshape_output) {
+    out = createReshape(graph, out->output(), shapeFromTensor(node->output(0)));
+  }
+
+  return out;
 }
 } // namespace
 
