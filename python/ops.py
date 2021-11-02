@@ -396,7 +396,6 @@ class Block(torch.nn.Module):
 # in a fresh python process. Hence, the easier way to recreate the object is to
 # store the original model and call BeginBlock again
 def _pickle_reduce_block(model):
-    print(model.__class__)
     user_id = model.__dict__['_user_id']
     ipu_id = model.__dict__['_ipu_id']
 
