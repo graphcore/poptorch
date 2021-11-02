@@ -188,6 +188,7 @@ public:
 
   StepIO stepio;
   WeightsIO weights;
+  WeightsIO optim_state_tensors;
 
   bool is_training;
 

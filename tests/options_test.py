@@ -210,19 +210,9 @@ def test_popart_partials(capfd, dtype, ptype):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @helpers.printCapfdOnExit
 def test_automatic_loss_scaling(capfd, optim):
-
+    input = torch.ones(5)
     # Just a simple model with weights and a loss function
-    class Model(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.lin = nn.Linear(5, 2)
-
-        def forward(self, x):
-            x = self.lin(x)
-            return poptorch.identity_loss(x, reduction='mean')
-
-    # Create our model.
-    model = Model()
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
     opts = poptorch.Options()
     opts.Training.setAutomaticLossScaling(True)
 
@@ -233,7 +223,7 @@ def test_automatic_loss_scaling(capfd, optim):
         optimizer = optim(model.parameters(), lr=0.0)
     training_model = poptorch.trainingModel(model, opts, optimizer)
 
-    training_model(torch.ones(5))
+    training_model((input, ))
 
     log = helpers.LogChecker(capfd)
     log.assert_contains(

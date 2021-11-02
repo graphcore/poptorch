@@ -27,6 +27,12 @@ poptorch_optimizers = [
     poptorch.optim.RMSprop, poptorch.optim.LAMB, LAMBNoBias, AdamWNoBias
 ]
 
+supported_torch_optimizers = [
+    optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop
+]
+
+all_optimizers = poptorch_optimizers + supported_torch_optimizers
+
 
 class OptimizerTestModel:
     def __init__(self, num_groups=1, options=None):
@@ -60,9 +66,7 @@ class OptimizerTestModel:
         return self.poptorch_model(self.input, self.label)
 
 
-@pytest.mark.parametrize("opt",
-                         [optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop] +
-                         poptorch_optimizers)
+@pytest.mark.parametrize("opt", all_optimizers)
 def test_optimizer(opt):
     torch.manual_seed(42)
 
@@ -944,23 +948,7 @@ def test_rmsprop_tf_variant(use_tf_variant):
         helpers.assert_allequal(actual=loss_pt, expected=loss_tf)
 
 
-@pytest.mark.parametrize("opt", poptorch_optimizers)
-def test_ipu_state_warning(opt):
-    model = torch.nn.Linear(2, 1)
-    # We don't need to actually train so set the LR to zero
-    optimizer = opt(model.parameters(), lr=0.00)
-
-    with pytest.warns(
-            None,
-            match="IPU-specific optimizer states cannot be read from the host."
-    ):
-        optimizer.state_dict()
-
-
-torch_optimizer_types = [optim.SGD, optim.Adam, optim.AdamW, optim.RMSprop]
-
-
-@pytest.mark.parametrize("opt", [*torch_optimizer_types, *poptorch_optimizers])
+@pytest.mark.parametrize("opt", all_optimizers)
 def test_optimizer_results(opt):
     torch.manual_seed(42)
 
@@ -1022,3 +1010,115 @@ def test_optimizer_results(opt):
                             actual=ipu_loss,
                             atol=1e-5,
                             rtol=1e-5)
+
+
+@pytest.mark.parametrize("optim", all_optimizers)
+def test_read_ipu_state(optim):
+    torch.manual_seed(42)
+    input = torch.randn(3)
+    # A simple model with weights and a loss function
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
+
+    lr = 0.05
+    wd = 0.025
+
+    kwargs = {"lr": lr, "weight_decay": wd}
+    # Only poptorch optimisers take a loss scaling parameter in the constructor
+    if optim in poptorch_optimizers:
+        ls = 0.75
+        kwargs["loss_scaling"] = ls
+    else:
+        ls = 1.0
+    optimizer = optim(model.parameters(), **kwargs)
+    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+
+    # Before the model is compiled, the state_dict should be empty
+    assert len(optimizer.state_dict()) == 0
+
+    # Compiling should signal an optimiser state read on the next call
+    # to state_dict()
+    training_model.compile((input, ))
+    s0 = optimizer.state_dict()
+
+    sgd_param_keys = [
+        "scaledLearningRate0___specific___model.lin.bias",
+        "scaledLearningRate0___specific___model.lin.weight",
+        "weightDecayScaleFactor0___specific___model.lin.bias",
+        "weightDecayScaleFactor0___specific___model.lin.weight"
+    ]
+    non_sgd_param_keys = [
+        "learningRate___specific___model.lin.bias",
+        "learningRate___specific___model.lin.weight",
+        "weightDecay___specific___model.lin.bias",
+        "weightDecay___specific___model.lin.weight"
+    ]
+
+    # Check that shared keys are present and user provided values are read
+    # back correctly
+    if isinstance(optimizer, torch.optim.SGD):
+        for k in sgd_param_keys:
+            assert k in s0["param"].keys()
+
+        # weightDecayScaleFactor0 =
+        # 1 - lr * (1 - dm) * wd, dm = 0
+        wdsf0 = 1 - lr * wd
+        helpers.assert_allclose(
+            actual=s0["param"]
+            ["weightDecayScaleFactor0___specific___model.lin.bias"],
+            expected=torch.tensor(wdsf0))
+
+        # scaledLearningRate0 =
+        # lr *  (1 - dm) / ls, dm = 0
+        slr0 = lr / ls
+        helpers.assert_allclose(
+            actual=s0["param"]
+            ["scaledLearningRate0___specific___model.lin.bias"],
+            expected=torch.tensor(slr0))
+    else:
+        # Only non-SGD optimisers have state tensors
+        state_keys = ["Accl1___model.lin.weight", "Accl1___model.lin.bias"]
+        for k in non_sgd_param_keys:
+            assert k in s0["param"].keys()
+        for k in state_keys:
+            assert k in s0["state"].keys()
+
+        helpers.assert_allclose(
+            actual=s0["param"]["learningRate___specific___model.lin.bias"],
+            expected=torch.tensor(lr))
+        helpers.assert_allclose(
+            actual=s0["param"]["weightDecay___specific___model.lin.bias"],
+            expected=torch.tensor(wd))
+
+        # Run the model, get the updated state dict and check optimiser state tensors have changed
+        training_model((input, ))
+        s1 = optimizer.state_dict()
+        assert not all([
+            torch.equal(s0["state"][k], s1["state"][k])
+            for k in s0["state"].keys()
+        ])
+
+    if optim in poptorch_optimizers:
+        helpers.assert_allclose(actual=s0["param"]["lossScaling_FLOAT"],
+                                expected=torch.tensor(ls))
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+def test_read_ipu_state_cached(caplog, capfd):
+    input = torch.ones(3)
+    # A simple model with weights and a loss function
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
+    optimizer = optim.SGD(model.parameters(), lr=0.0)
+
+    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+
+    training_model.compile((input, ))
+    # Compilation should trigger an optimiser state IPU->host copy
+    optimizer.state_dict()
+    log = helpers.LogChecker(capfd)
+    log.assert_matches("Writing optimiser state tensors from IPU to host.")
+
+    # The second invocation should use the cached state dict, since
+    # the internal optimiser state hasn't changed
+    optimizer.state_dict()
+    assert "Using cached optimiser state dict" in caplog.text

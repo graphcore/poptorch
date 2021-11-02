@@ -19,6 +19,16 @@ class ConstVoidData;
 
 namespace poptorch {
 
+// PopTorch abstraction of popart::MutableVoidData to be used across the ABI
+// boundary
+struct TensorMetadata {
+  const char *id;
+  std::vector<int64_t> shape;
+  const char *dtype;
+  void *data = nullptr;
+  int64_t num_bytes = -1;
+};
+
 /*
   We use this callback structure to capture data from the poptorch python
   frontend. We get the function to call as well as pointers to the output/input
@@ -448,6 +458,11 @@ public:
 
   void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
                       int64_t group);
+
+  std::vector<TensorMetadata> optimizerTensorMetadataList() const;
+
+  void fillHostOptimizerStateTensorData(
+      const std::vector<void *> &host_buffers) const;
 
   std::unique_ptr<char[]> getExecutionInfo() const;
 

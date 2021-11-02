@@ -1109,9 +1109,42 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+py::dict readOptimizerState(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  py::dict optim_state;
+  py::dict state_tensors;
+  py::dict param_tensors;
+  try {
+    const auto &compiler = executable->getCompiler();
+    std::vector<TensorMetadata> metadata_list =
+        compiler.optimizerTensorMetadataList();
+
+    std::vector<void *> host_buffers;
+    for (const TensorMetadata &meta : metadata_list) {
+      at::Tensor tensor =
+          at::empty({meta.shape}, onnxStrToScalarType(meta.dtype)).contiguous();
+
+      if (meta.num_bytes == -1) {
+        // num_bytes == -1 indicates it's an optimiser state tensor (variable)
+        host_buffers.push_back(tensor.data_ptr());
+        state_tensors[py::cast(meta.id)] = py::cast(tensor);
+      } else {
+        // Otherwise it's a stream/constant optimiser parameter that we can copy
+        // immediately
+        std::memcpy(tensor.data_ptr(), meta.data, meta.num_bytes);
+        param_tensors[py::cast(meta.id)] = py::cast(tensor);
+      }
+    }
+    compiler.fillHostOptimizerStateTensorData(host_buffers);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+  optim_state["state"] = std::move(state_tensors);
+  optim_state["param"] = std::move(param_tensors);
+  return optim_state;
+}
+
 std::vector<pybind11::object>
 getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
-  std::vector<pybind11::object> returnee;
   const auto &compiler = executable->getCompiler();
   auto num_inputs = compiler.getNumInputs();
   auto num_outputs = compiler.getNumOutputs();
@@ -1333,6 +1366,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
         poptorch::processTraceAndImportExecutable);
   m.def("execute", poptorch::execute);
   m.def("getTimestamps", poptorch::getTimestamps);
+  m.def("readOptimizerState", poptorch::readOptimizerState);
   m.def("loadEngineAndConnectStreams", poptorch::loadEngineAndConnectStreams);
   m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDeviceImpl);
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);

@@ -1104,6 +1104,45 @@ void Compiler::optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
   _impl->optimizerGroup(inputs, group);
 }
 
+std::vector<TensorMetadata> Compiler::optimizerTensorMetadataList() const {
+  std::vector<TensorMetadata> metadata_list;
+  auto fn_add_tensor_data = [&](popart::Tensor *t, bool state_tensor) {
+    TensorMetadata tm;
+    tm.id = t->id.c_str();
+    tm.shape = t->info.shape();
+    tm.dtype = t->info.data_type().c_str();
+
+    // Optimiser state tensors are variables in PopART, and must be read/written
+    // via WeightsIO. Optimiser parameters such as learning rate and loss
+    // scaling are either stream or constant tensors, and so can be read/written
+    // directly via memcpy
+    if (state_tensor) {
+      if (!_impl->optim_state_tensors.contains(t->id)) {
+        _impl->optim_state_tensors.registerParameter(t->id, t->info);
+      }
+    } else {
+      tm.data = t->tensorData()->data();
+      tm.num_bytes = t->info.nbytes();
+    }
+    metadata_list.push_back(std::move(tm));
+  };
+  for (auto *t : _impl->session->getIr().optimizerStateTensors()) {
+    fn_add_tensor_data(t, true);
+  }
+  for (auto *t : _impl->session->getIr().optimizerTensors()) {
+    fn_add_tensor_data(t, false);
+  }
+  return metadata_list;
+}
+
+void Compiler::fillHostOptimizerStateTensorData(
+    const std::vector<void *> &host_buffers) const {
+  logging::info("Writing optimiser state tensors from IPU to host.");
+  _impl->session->weightsToHost();
+  _impl->optim_state_tensors.updateData(host_buffers);
+  _impl->session->readWeights(_impl->optim_state_tensors);
+}
+
 Compiler::Compiler(Compiler &&compiler) : _cycle_count(compiler._cycle_count) {
   _impl = std::move(compiler._impl);
 }

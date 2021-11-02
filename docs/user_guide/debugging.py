@@ -44,3 +44,11 @@ poptorch_model(input, label)
 grad = poptorch_model.getAnchoredTensor('grad_bias')
 update = poptorch_model.getAnchoredTensor('update_weight')
 # tensor_retrieve_end
+
+# optim_state_dict_start
+optim = poptorch.optim.SGD(model.parameters(), lr=0.01)
+poptorch_model = poptorch.trainingModel(model, opts, optim)
+poptorch_model(input, label)
+
+state = optim.state_dict()
+# optim_state_dict_end

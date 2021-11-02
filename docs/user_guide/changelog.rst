@@ -8,6 +8,7 @@ v2.4 (Poplar SDK 2.4)
 New features
 ------------
 - Support for deepcopy functionality in ``poptorch.Options`` class
+- Support reading internal optimiser state via ``optimizer.state_dict()``
 
 API changes
 -----------
@@ -18,7 +19,6 @@ API changes
 Bug Fixes
 ---------
 - Fixed incorrect gradient when using ``torch.nn.Embedding`` with ``padding_idx``
-
 
 v2.3 (Poplar SDK 2.3)
 =====================
