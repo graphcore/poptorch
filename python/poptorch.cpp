@@ -837,7 +837,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::type_and_constant_canonicalization::addListNumElements(graph.get());
 
   auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
-      graph, traced_parameter_tensors.size(), anchors.size());
+      graph, traced_parameter_tensors.size(), anchors.size(),
+      parsed_options.replicationFactor() > 1);
 
   // Any types with ListTypeWithNumElements must be revereted (revert = true)
   // to allow constant evaluation to proceed
@@ -1254,7 +1255,8 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     AnchorList anchors_list;
     std::vector<Optimizer> optimizers;
 
-    auto inplace_op_handler = std::make_shared<InplaceOpHandler>(graph, 0, 0);
+    auto inplace_op_handler =
+        std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
 
     poptorch::LowerToPopart lower(
         graph.get(), parameters, parameter_names, inplace_op_handler, false,

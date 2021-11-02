@@ -95,9 +95,6 @@ SessionOptionsImpl::SessionOptionsImpl() {
   registerSetter(bool_options, "separate_backward_phase", [&](bool value) {
     poptorch_options.separate_backward_phase = value;
   });
-  registerSetter(bool_options, "broadcast_buffers", [&](bool value) {
-    poptorch_options.broadcast_buffers = value;
-  });
   registerSetter(uint64_options, "device_iterations",
                  [&](std::uint64_t value) { poptorch_options.steps = value; });
   registerSetter(uint64_options, "num_distributed_processes",

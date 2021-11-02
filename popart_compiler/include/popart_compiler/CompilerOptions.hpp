@@ -138,9 +138,6 @@ struct CompilerOptions {
 
   // Debug name for the model
   std::string model_name;
-
-  // Broadcast the buffers between replicas
-  bool broadcast_buffers;
 };
 
 } // namespace detail
