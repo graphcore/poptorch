@@ -1159,6 +1159,7 @@ class Options(_options_impl.OptionsDict):
         self._execution_strategy = PipelinedExecution()
 
         super().__init__(replication_factor=1,
+                         broadcast_buffers=True,
                          device_iterations=1,
                          log_dir=".",
                          auto_round_num_ipus=False,
@@ -1354,6 +1355,16 @@ class Options(_options_impl.OptionsDict):
             Number of replicas of the model to create.
         """
         self.set(replication_factor=replication_factor)
+        return self
+
+    def broadcastBuffers(self, broadcast_buffers: bool = True):
+        """Broadcast buffers to all replicas.
+
+        Only non-broadcast buffers are currently supported, which means each
+        replica will hold a set of buffers not in sync with other replicas'
+        buffers. To enable non-broadcast buffers, set this option to `False`.
+        """
+        self.set(broadcast_buffers=broadcast_buffers)
         return self
 
     def logDir(self, log_dir: str) -> "poptorch.Options":

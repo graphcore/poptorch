@@ -174,6 +174,7 @@ public:
   void insertStringPairOption(const char *option, const char *key,
                               const char *value);
 
+  bool broadcastBuffers() const;
   std::uint64_t replicationFactor() const;
 
 private:

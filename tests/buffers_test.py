@@ -203,12 +203,25 @@ def test_failing_on_replicas():
     dummy_input = torch.ones([4, 2, 2, 2])
     dummy_target = torch.zeros_like(dummy_input)
 
-    error_msg = (
-        r"Model modifies a buffer in place\. This is not supported" +
-        r" when using replication i\.e\. replicationFactor > 1 with " +
-        r"poptorch.Options\.")
+    error_msg = (r"PopTorch does not support broadcasting buffers. " +
+                 r"If your model is able to tolerate buffers becoming " +
+                 r"out of sync between replicas, you can disable " +
+                 r"buffer broadcasting using " +
+                 r"poptorch.Options.broadcastBuffers\(False\).")
+
     with pytest.raises(poptorch.Error, match=error_msg):
         poptorch_model(dummy_input, dummy_target)
+
+
+def test_constant_buffer_with_replicas():
+    # This should not have an error as the buffer is constant
+    model = ConstantBuffer()
+
+    opts = poptorch.Options()
+    opts.replicationFactor(2)
+
+    poptorch_model = poptorch.inferenceModel(model, opts)
+    poptorch_model(torch.tensor([1, 2]))
 
 
 def test_no_input_but_one_buffer():
@@ -229,3 +242,35 @@ def test_no_input_but_one_buffer():
     assert poptorch_model() == 3.
     assert poptorch_model() == 4.
     assert poptorch_model() == 5.
+
+
+def test_unsynchronised_replicated_buffers():
+    class ReplicaBufferModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("buffer", torch.zeros(1, 2))
+
+        def forward(self, x):
+            buffer_update = self.buffer + x
+            self.buffer.copy_(buffer_update)
+            return poptorch.identity_loss(self.buffer, reduction='none')
+
+    num_replica = 2
+    torch.manual_seed(43)
+    opts = poptorch.Options()
+    opts.replicationFactor(num_replica)
+    opts.deviceIterations(1)
+    opts.broadcastBuffers(False)
+
+    model = ReplicaBufferModel()
+    model.float()
+    poptorch_model = poptorch.inferenceModel(model, opts)
+
+    x = torch.tensor([[9], [2]])
+
+    # Each replica update its buffer in place with a random value 50 times.
+    for _ in range(50):
+        y = poptorch_model(x)
+
+    assert y[0][-1] == x[0] * 50
+    assert y[1][-1] == x[1] * 50

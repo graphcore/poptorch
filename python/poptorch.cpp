@@ -838,7 +838,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
       graph, traced_parameter_tensors.size(), anchors.size(),
-      parsed_options.replicationFactor() > 1);
+      parsed_options.replicationFactor() > 1 &&
+          parsed_options.broadcastBuffers());
 
   // Any types with ListTypeWithNumElements must be revereted (revert = true)
   // to allow constant evaluation to proceed

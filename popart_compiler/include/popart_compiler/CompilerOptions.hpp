@@ -138,6 +138,10 @@ struct CompilerOptions {
 
   // Debug name for the model
   std::string model_name;
+
+  // (Not yet supported) Whether each buffer should be broadcasted from the
+  // first to other replicas on each training step.
+  bool broadcast_buffers;
 };
 
 } // namespace detail

@@ -95,6 +95,9 @@ SessionOptionsImpl::SessionOptionsImpl() {
   registerSetter(bool_options, "separate_backward_phase", [&](bool value) {
     poptorch_options.separate_backward_phase = value;
   });
+  registerSetter(bool_options, "broadcast_buffers", [&](bool value) {
+    poptorch_options.broadcast_buffers = value;
+  });
   registerSetter(uint64_options, "device_iterations",
                  [&](std::uint64_t value) { poptorch_options.steps = value; });
   registerSetter(uint64_options, "num_distributed_processes",
@@ -414,6 +417,10 @@ void SessionOptions::insertStringPairOption(const char *option, const char *key,
                                             const char *value) {
   _impl->set(option, std::pair<std::string, std::string>(key, value),
              _impl->container_options, "map");
+}
+
+bool SessionOptions::broadcastBuffers() const {
+  return _impl->poptorch_options.broadcast_buffers;
 }
 
 std::uint64_t SessionOptions::replicationFactor() const {

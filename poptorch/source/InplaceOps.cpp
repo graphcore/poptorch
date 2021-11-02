@@ -29,8 +29,9 @@ const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
 
 InplaceOpHandler::InplaceOpHandler(
     const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters,
-    size_t num_anchors, bool replicas)
-    : _graph(graph.get()), _num_anchors(num_anchors), _replicas(replicas) {
+    size_t num_anchors, bool replicas_needing_broadcast)
+    : _graph(graph.get()), _num_anchors(num_anchors),
+      _replicas_needing_broadcast(replicas_needing_broadcast) {
   _collapsed_inputs = collapsedGraphInputHierachy(graph.get());
   _num_tensor_inputs = _collapsed_inputs.size() - num_parameters;
 
@@ -124,12 +125,12 @@ void InplaceOpHandler::processInput(size_t input_num) {
   }
 
   if (is_parameter) {
-    // This is not supported with replicas
-    ERROR_ON_MSG(_replicas, "Model modifies a buffer in place. This is not "
-                            "supported when using replication i.e. "
-                            "replicationFactor > 1 with poptorch.Options.\n"
-                            "Last modification: "
-                                << *current_alias->node());
+    // This is not supported with replicas needing broadcast
+    ERROR_ON_MSG(_replicas_needing_broadcast,
+                 "PopTorch does not support broadcasting buffers. If your "
+                 "model is able to tolerate buffers becoming out of sync "
+                 "between replicas, you can disable buffer broadcasting using "
+                 "poptorch.Options.broadcastBuffers(False).");
 
     auto *new_node = _graph->create(symbols::poptorch::update_param_inplace, 1);
     new_node->addInput(_collapsed_inputs[input_num]);
