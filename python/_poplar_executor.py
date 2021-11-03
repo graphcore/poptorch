@@ -1058,6 +1058,9 @@ class PoplarExecutor:
 
         # The CPU execution happening during trace represents the IPU codepath.
         _impl.setIpuContext(True)
+        module_namescope = _impl.NameScopeHook(
+            self._user_model
+        ) if self.options._module_namescope_enabled else None
 
         # Override half so user can use it in their models.
         def NewHalf(tensor):
@@ -1098,6 +1101,8 @@ class PoplarExecutor:
         self._model.load_state_dict(temp_model)
 
         # Restore to non-IPU codepath.
+        if module_namescope:
+            module_namescope.remove()
         _impl.setIpuContext(False)
 
         self._options._execution_strategy.onEndTracing()

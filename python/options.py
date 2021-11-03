@@ -1176,6 +1176,7 @@ class Options(_options_impl.OptionsDict):
 
         self.relaxOptimizerAttributesChecks(False)
         self.showCompilationProgressBar(True)
+        self._module_namescope_enabled = True
 
     def showCompilationProgressBar(self,
                                    show: bool = True) -> "poptorch.Options":
@@ -1711,6 +1712,27 @@ class Options(_options_impl.OptionsDict):
         opts['autoReport.directory'] = profile_dir or '.'
         opts['autoReport.all'] = 'true'
         self._popart.setEngineOptions(opts)
+        return self
+
+    def disableModuleNamescope(self) -> "poptorch.Options":
+        """ Disable option adding name scope for each operator
+        present in the module. This option is enabled by default.
+        The operator name scope is be based on the names appearing
+        in the named_modules function from torch.nn.Module.
+
+        For example:
+
+        >>> class Model(torch.nn.Module):
+        >>>     def __init__(self, num_groups, num_channels):
+        >>>         super().__init__()
+        >>>         self.gn = torch.nn.GroupNorm(num_groups, num_channels)
+        >>>     def forward(self, x):
+        >>>         return self.gn2(x)
+
+        With namescope enabled the name will be gn/GroupNormalization,
+        with disabled it will be GroupNormalization.
+        """
+        self._module_namescope_enabled = False
         return self
 
     def toDict(self) -> Dict[str, Any]:

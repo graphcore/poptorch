@@ -343,7 +343,7 @@ def test_running_statistics(capfd, dtype, setting):
         setting is None or setting else "Half"
 
     log.assert_contains(
-        f"%22 : {dtype_str}(16, strides=[1], requires_grad=0, device=cpu)):")
+        f"%24 : {dtype_str}(16, strides=[1], requires_grad=0, device=cpu)):")
 
 
 def test_copying_options():
@@ -442,6 +442,49 @@ def test_preserving_options_intact():
     assert opts.defaultOutputMode()
     assert training.options.output_mode == OutputMode.Final
     assert inference.options.output_mode == OutputMode.All
+
+
+@pytest.mark.parametrize("namescopes_enabled", [True, False])
+def test_name_scope_hook_disabled(namescopes_enabled):
+    class Network(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer1 = torch.nn.Sequential(torch.nn.Conv2d(1, 4, 5),
+                                              torch.nn.MaxPool2d(2),
+                                              torch.nn.ReLU())
+            self.layer2 = torch.nn.Sequential(torch.nn.Linear(40, 10),
+                                              torch.nn.ReLU())
+            self.softmax = torch.nn.LogSoftmax(1)
+
+        def forward(self, x):
+            x = self.layer1(x)
+            x = x.view(5, 40)
+            x = self.layer2(x)
+            x = self.softmax(x)
+            return x
+
+    model = Network()
+    options = poptorch.Options()
+    if not namescopes_enabled:
+        options.disableModuleNamescope()
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    input = torch.randn(2, 1, 15, 15)
+    _ = poptorch_model(input)
+
+    ir = poptorch_model._debugGetPopartIR()  # pylint: disable=protected-access
+
+    expected_namescopes = [
+        'layer1/0/', 'layer1/1/', 'layer1/1/', 'layer2/0/', 'layer2/1/',
+        'softmax'
+    ]
+    base_names = ['Conv', 'MaxPool', 'Relu', 'MatMul', 'Relu', 'LogSoftmax']
+    assert len(expected_namescopes) == len(base_names)
+
+    for i, name in enumerate(base_names):
+        namescope = expected_namescopes[i] if namescopes_enabled else ''
+        expected_output = f'"name":"{namescope}{name}'
+        assert ir.find(expected_output)
 
 
 def test_ipu_context_flag():

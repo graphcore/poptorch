@@ -9,6 +9,7 @@ New features
 ------------
 - Support for deepcopy functionality in ``poptorch.Options`` class
 - Support reading internal optimiser state via ``optimizer.state_dict()``
+- Added functionality to add a name scope for each operator present in the module. This function is enabled by default. It can be disabled using ``poptorch.Options.disableModuleNamescope``.
 
 API changes
 -----------

@@ -6,6 +6,7 @@ import copyreg
 import fcntl
 import hashlib
 import os
+from functools import partial
 from typing import Dict, Any
 import torch
 
@@ -16,6 +17,35 @@ from . import poptorch_core
 # A flag to tell the user if the current target is IPU. This is to allow
 # divergent IPU/CPU codepaths within one model.
 _is_ipu_context = False
+
+
+class NameScopeHook:
+    """ Create a name scope for each operator present in the module.
+        The operator name scope will be based on the names appearing in the
+        named_modules function from torch.nn.Module..
+    """
+
+    def __init__(self, module: 'torch.nn.Module'):
+        self.hooks = []
+        for name, m in module.named_modules():
+            if len(name) > 0:
+                self.hooks.append(
+                    m.register_forward_pre_hook(
+                        partial(self._enter_fn, name=name)))
+                self.hooks.append(m.register_forward_hook(self._exit_fn))
+
+    def _enter_fn(self, module, input, name):  # pylint: disable=unused-argument
+        torch.ops.poptorch.push_name_scope(name.split(".")[-1])
+
+    def _exit_fn(self, module, input, output):  # pylint: disable=unused-argument
+        torch.ops.poptorch.pop_name_scope()
+
+    def remove(self):
+        """ Remove all existing hooks related to creating a name scope for
+            operators.
+        """
+        for hook in self.hooks:
+            hook.remove()
 
 
 def createPoptorchError(msg):

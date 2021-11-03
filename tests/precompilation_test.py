@@ -84,7 +84,6 @@ def test_export_no_python_then_load():
         model = ExampleModelWithLoss()
 
         opts = poptorch.Options()
-
         poptorch_model = poptorch.trainingModel(model, opts)
         poptorch_model.loadExecutable(filename)
 

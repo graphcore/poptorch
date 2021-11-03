@@ -267,7 +267,8 @@ def test_outline_attribute(capfd):
 
     testlog = helpers.LogChecker(capfd)
 
-    get_regex = lambda op_name: (r"Op [0-9]+ of type ai\.graphcore\."
+    get_regex = lambda op_name: (f'Op "{op_name}/GroupNormalization", '
+                                 r"[0-9]+ of type ai\.graphcore\."
                                  "GroupNormalization:1"
                                  r"(?:\n.+)+"
                                  f"{op_name}"

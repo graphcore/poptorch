@@ -280,8 +280,6 @@ class LogChecker(helpers.LogChecker):
 
         for phase in range(3):
             op_label = ':0'
-            if phase > 0:
-                op_label += '/' + str(phase)
             self.assert_contains(
                 'Transpose{} [float32({}, {}), mode(Phased), ipu(0), phase({})]'
                 .format(op_label, 8 - phase, 7 - phase, phase * stride))

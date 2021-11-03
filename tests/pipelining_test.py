@@ -212,8 +212,8 @@ def test_api_wrap(capfd):
 
     log = helpers.LogChecker(capfd)
     log.assert_contains("enablePipelining set to value 0")
-    log.assert_contains(" Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
-    log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(0), stage(0)")
+    log.assert_contains(" l1/Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
+    log.assert_contains(" l2/Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
 
 
 @helpers.printCapfdOnExit
@@ -253,9 +253,9 @@ def test_api_wrap_2stages(capfd):
 
     log = helpers.LogChecker(capfd)
     log.assert_contains("enablePipelining set to value 1")
-    log.assert_contains(" Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
-    log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
-    log.assert_contains(" Mul:0/2 ", " mode(Pipelined), ipu(1), stage(1)")
+    log.assert_contains(" l0/Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
+    log.assert_contains(" l1/Mul:0 ", " mode(Pipelined), ipu(1), stage(1)")
+    log.assert_contains(" l2/Mul:0 ", " mode(Pipelined), ipu(1), stage(1)")
 
 
 @helpers.printCapfdOnExit
@@ -329,10 +329,10 @@ def test_api_AutoIncrement(capfd):
 
     log = helpers.LogChecker(capfd)
     log.assert_contains("enablePipelining set to value 1")
-    log.assert_contains(" Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
-    log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
-    log.assert_contains(" Mul:0/2 ", " mode(Pipelined), ipu(2), stage(2)")
-    log.assert_contains(" Mul:0/3 ", " mode(Pipelined), ipu(1), stage(3)")
+    log.assert_contains(" l1/Mul:0 ", " mode(Pipelined), ipu(0), stage(0)")
+    log.assert_contains(" l2/Mul:0 ", " mode(Pipelined), ipu(1), stage(1)")
+    log.assert_contains(" l3/Mul:0 ", " mode(Pipelined), ipu(2), stage(2)")
+    log.assert_contains(" l4/Mul:0 ", " mode(Pipelined), ipu(1), stage(3)")
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
