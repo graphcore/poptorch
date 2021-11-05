@@ -1012,6 +1012,7 @@ def test_optimizer_results(opt):
                             rtol=1e-5)
 
 
+# TODO(T44800): Replace training_model._get_optim_state_dict() -> optimizer.state_dict() once load_state_dict() is done
 @pytest.mark.parametrize("optim", all_optimizers)
 def test_read_ipu_state(optim):
     torch.manual_seed(42)
@@ -1033,12 +1034,12 @@ def test_read_ipu_state(optim):
     training_model = poptorch.trainingModel(model, optimizer=optimizer)
 
     # Before the model is compiled, the state_dict should be empty
-    assert len(optimizer.state_dict()) == 0
+    assert len(training_model.get_optim_state_dict()) == 0
 
     # Compiling should signal an optimiser state read on the next call
     # to state_dict()
     training_model.compile((input, ))
-    s0 = optimizer.state_dict()
+    s0 = training_model.get_optim_state_dict()
 
     sgd_param_keys = [
         "scaledLearningRate0___specific___model.lin.bias",
@@ -1091,7 +1092,7 @@ def test_read_ipu_state(optim):
 
         # Run the model, get the updated state dict and check optimiser state tensors have changed
         training_model((input, ))
-        s1 = optimizer.state_dict()
+        s1 = training_model.get_optim_state_dict()
         assert not all([
             torch.equal(s0["state"][k], s1["state"][k])
             for k in s0["state"].keys()
@@ -1114,11 +1115,11 @@ def test_read_ipu_state_cached(caplog, capfd):
 
     training_model.compile((input, ))
     # Compilation should trigger an optimiser state IPU->host copy
-    optimizer.state_dict()
+    training_model.get_optim_state_dict()
     log = helpers.LogChecker(capfd)
     log.assert_matches("Writing optimiser state tensors from IPU to host.")
 
     # The second invocation should use the cached state dict, since
     # the internal optimiser state hasn't changed
-    optimizer.state_dict()
+    training_model.get_optim_state_dict()
     assert "Using cached optimiser state dict" in caplog.text

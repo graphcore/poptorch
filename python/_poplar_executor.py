@@ -8,7 +8,6 @@ import pickle
 import re
 from typing import Callable, Dict, List, Optional
 import types
-from types import MethodType
 import weakref
 import warnings
 import torch
@@ -134,8 +133,9 @@ class PoplarExecutor:
 
             # Replace the optimiser's state_dict function with one that returns the internal optimiser
             # state
-            optimizer.state_dict = MethodType(
-                PoplarExecutor._get_optim_state_dict, self)
+            # TODO(T44800): Re-enable when load_state_dict has also been overridden
+            # optimizer.state_dict = MethodType(
+            #    PoplarExecutor._get_optim_state_dict, self)
         else:
             self._dict_optimizer = {}
 
@@ -267,7 +267,7 @@ class PoplarExecutor:
             _impl.registerWrapperType(PoptorchParameter)
             _impl.registerWrapperType(PoptorchBuffer)
 
-    def _get_optim_state_dict(self):
+    def get_optim_state_dict(self):
         if self._update_optimizer_state:
             self._optim_state_dict = poptorch_core.readOptimizerState(
                 self._executable)
@@ -381,8 +381,9 @@ class PoplarExecutor:
             optimizer, self._attribute_tracker, self._options)
         # Replace the optimiser's state_dict function with one that returns the internal optimiser
         # state
-        optimizer.state_dict = MethodType(PoplarExecutor._get_optim_state_dict,
-                                          self)
+        # TODO(T44800): Re-enable when load_state_dict has also been overridden
+        # optimizer.state_dict = MethodType(PoplarExecutor._get_optim_state_dict,
+        #                                   self)
 
     def _compileWithTrace(self, trace_args):
         """On POD we want to separate compilation from device
