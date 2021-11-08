@@ -215,7 +215,7 @@ def test_double_underscore():
     helpers.assert_allclose(actual=popout, expected=out)
 
 
-def test_half_buffer():
+def test_half_buffer_inplace():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -240,3 +240,38 @@ def test_half_buffer():
     helpers.assert_allclose(actual=poptorch_model.buff,
                             expected=torch.tensor([2.0, 2.0, 2.0, 2.0, 2.0],
                                                   dtype=torch.float16))
+
+
+def test_float_to_half_buffer_inplace_with_training():
+    torch.manual_seed(42)
+
+    # pylint: disable=attribute-defined-outside-init
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            # need at least one parameter for a training model
+            self.param = torch.nn.Parameter(torch.ones(5, 5))
+
+            self.register_buffer("buff", torch.ones(5))
+            self.loss = torch.nn.MSELoss()
+
+        def forward(self, x):
+            # pylint: disable=no-member
+            out = self.buff + self.param
+            self.buff += 1
+            return out, self.loss(out, x)
+
+    model = Model().train().half()
+    poptorch_model = poptorch.trainingModel(model)
+
+    x = torch.rand(5, 5).half()
+    native_out, native_loss = model(x)
+
+    # Reset buff
+    model.buff = torch.ones(5, 5)
+
+    poptorch_out, poptorch_loss = poptorch_model(x)
+
+    helpers.assert_allclose(actual=native_out, expected=poptorch_out)
+    helpers.assert_allclose(actual=native_loss, expected=poptorch_loss)

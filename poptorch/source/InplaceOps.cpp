@@ -94,6 +94,7 @@ void InplaceOpHandler::processInput(size_t input_num) {
           *output_tensor_type->scalarType() == at::ScalarType::Float) {
         node->output()->setType(
             current_tensor_type->withScalarType(at::ScalarType::Half));
+        output_tensor_type = node->output()->type()->cast<c10::TensorType>();
       }
       ERROR_ON(*current_tensor_type->scalarType() !=
                *output_tensor_type->scalarType());
