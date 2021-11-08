@@ -290,7 +290,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 assert rebatched_worker_size <= self._combined_batch_size, (
                     f"The rebatched_worker_size ({rebatched_worker_size})"
                     " must be <= to the combined batch size ("
-                    "{self._combined_batch_size})")
+                    f"{self._combined_batch_size})")
                 dataset_batch_size = rebatched_worker_size
         super().__init__(dataset,
                          batch_size=dataset_batch_size,
