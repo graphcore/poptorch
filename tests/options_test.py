@@ -733,3 +733,40 @@ def test_num_io_tiles():
     options.TensorLocations.numIOTiles(32)
     options.TensorLocations.numIOTiles(192)
     options.TensorLocations.numIOTiles(100)
+
+
+# pylint: disable=protected-access
+def test_options_change_after_use():
+    model = torch.nn.Linear(10, 10)
+    opts = poptorch.Options()
+    poptorch_model = helpers.trainingModelWithLoss(
+        model, options=opts, loss=torch.nn.CrossEntropyLoss())
+
+    with pytest.raises(Exception):
+        opts.randomSeed(42)
+    with pytest.raises(Exception):
+        poptorch_model.options.set(random_seed=42)
+    with pytest.raises(Exception):
+        opts.Training.gradientAccumulation(0)
+    with pytest.raises(Exception):
+        popart_opts = opts._Popart
+        opts._Popart.set("groupNormStridedChannelGrouping", True)
+
+    opts = poptorch.Options()
+    features = torch.randn([100, 1, 128, 128])
+    labels = torch.empty([100], dtype=torch.long).random_(10)
+    dataset = torch.utils.data.TensorDataset(features, labels)
+
+    poptorch_data_loader = poptorch.DataLoader(
+        opts,
+        dataset=dataset,
+    )
+    with pytest.raises(Exception):
+        opts.randomSeed(42)
+    with pytest.raises(Exception):
+        poptorch_data_loader.options.set(random_seed=42)
+    with pytest.raises(Exception):
+        poptorch_data_loader.Training.gradientAccumulation(0)
+    with pytest.raises(Exception):
+        popart_opts = poptorch_data_loader._Popart
+        popart_opts.set("groupNormStridedChannelGrouping", True)

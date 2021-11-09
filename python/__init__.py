@@ -205,6 +205,7 @@ class DataLoader(torch.utils.data.DataLoader):
             constructor.
         """
         assert isinstance(options, Options)
+        options._freeze()  # pylint: disable=protected-access
         if persistent_workers is None:
             persistent_workers = num_workers > 0
 

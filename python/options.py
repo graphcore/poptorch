@@ -85,6 +85,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
 
     def __init__(self,
                  popart_options: "poptorch.options._PopartOptions") -> None:
+        self._popart_options = popart_options
         super().__init__(
             autocast_enabled=True,
             autocast_policy=autocasting.default,
@@ -92,7 +93,6 @@ class _PrecisionOptions(_options_impl.OptionsDict):
             half_float_casting=enums.HalfFloatCastingBehavior.
             FloatDowncastToHalf,
             running_statistics_always_float=True)
-        self._popart_options = popart_options
 
     def autocastEnabled(self, autocast_enabled: bool
                         ) -> "poptorch.options._PrecisionOptions":
@@ -273,12 +273,12 @@ class _TrainingOptions(_options_impl.OptionsDict):
 
     def __init__(self,
                  popart_options: "poptorch.options._PopartOptions") -> None:
+        self._popart_options = popart_options
         super().__init__(gradient_accumulation=1,
                          accumulation_and_replication_reduction_type=enums.
                          ReductionType.Mean,
                          meanAccumulationAndReplicationReductionStrategy=enums.
                          MeanReductionStrategy.Post)
-        self._popart_options = popart_options
 
     def gradientAccumulation(self, gradient_accumulation: int
                              ) -> "poptorch.options._TrainingOptions":
@@ -450,12 +450,20 @@ class _PopartOptions:
     """
 
     def __init__(self) -> None:
+        self._is_frozen = False
         self.options = {}
         self.set("instrumentWithHardwareCycleCounter", False)
         self.set("rearrangeAnchorsOnHost", False)
 
+    def checkIsFrozen(self, option=None):
+        # Skip check during object initialization.
+        if hasattr(self, '_is_frozen'):
+            if option != '_is_frozen' and self._is_frozen:
+                raise AttributeError("Can't modify frozen Options")
+
     def set(self, key: str, value: Union[int, float, str, List[str], Set[str]]
             ) -> "poptorch.options._PopartOptions":
+        self.checkIsFrozen()
         self.options[key] = value
         return self
 
@@ -473,6 +481,7 @@ class _PopartOptions:
         :param level: Integer value corresponding to the
             ``popart::PatternsLevel`` to use to initialise the ``Patterns``.
         """
+        self.checkIsFrozen()
         assert isinstance(level, int)
         assert isinstance(patterns, dict)
         self.options["patterns_level"] = level
@@ -493,10 +502,10 @@ class _DistributedOptions(_options_impl.OptionsDict):
     """
 
     def __init__(self) -> None:
+        self._gcd_mappings = {}
         super().__init__(num_distributed_processes=1,
                          distributed_process_id=0,
                          ipuof_configs={})
-        self._gcd_mappings = {}
         self.setEnvVarNames("OMPI_COMM_WORLD_SIZE", "OMPI_COMM_WORLD_RANK")
 
     def disable(self) -> "poptorch.options._DistributedOptions":
@@ -1158,6 +1167,9 @@ class Options(_options_impl.OptionsDict):
         self._tensor_locations = _TensorLocationOptions()
         self._execution_strategy = PipelinedExecution()
 
+        self.relaxOptimizerAttributesChecks(False)
+        self.showCompilationProgressBar(True)
+        self._module_namescope_enabled = True
         super().__init__(replication_factor=1,
                          broadcast_buffers=True,
                          device_iterations=1,
@@ -1174,10 +1186,6 @@ class Options(_options_impl.OptionsDict):
             logger.info("POPTORCH_CACHE_DIR is set: setting cache path to %s",
                         path)
             self.enableExecutableCaching(path)
-
-        self.relaxOptimizerAttributesChecks(False)
-        self.showCompilationProgressBar(True)
-        self._module_namescope_enabled = True
 
     def showCompilationProgressBar(self,
                                    show: bool = True) -> "poptorch.Options":

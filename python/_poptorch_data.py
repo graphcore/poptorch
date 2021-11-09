@@ -46,6 +46,7 @@ def parse(filename: str, expected_version: str):
         assert data.executable_inputs, (f"Invalid file {filename}:"
                                         " executable inputs are missing")
         if data.options:
+            data.options._unfreeze()  # pylint: disable=protected-access
             # Remove usefOfflineIpuTarget related flags if used
             data.options.deleteIfExists("ipu_version")
             if data.options.connection_type == enums.ConnectionType.Never.value:

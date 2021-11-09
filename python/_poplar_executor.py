@@ -144,6 +144,7 @@ class PoplarExecutor:
 
         if optimizer:
             self.setOptimizer(optimizer)
+        self._options._freeze()
 
         if self._training:
             # We don't want the pytorch model to keep the PopTorch one

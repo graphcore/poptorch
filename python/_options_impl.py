@@ -39,8 +39,6 @@ class OptionsDict:
     """
 
     def __init__(self, **default_values):
-        self._values = default_values
-
         # Keep a dictionary of warnings messages based on the parameter options:
         # these are printed when the dictionarys are consolidated. The use of a
         # dictionary allows a warning to be removed by the key, e.g. if there is
@@ -51,7 +49,14 @@ class OptionsDict:
         # Allow warnings to be disabled by adding them to the list
         self._warnings_disabled = set()
 
+        # Option object will be frozen after first use.
+        self._is_frozen = False
+
+        # _values must be the last attribute set in the __init__
+        self._values = default_values
+
     def set(self, **kwargs):
+        self.checkIsFrozen()
         for option, value in kwargs.items():
             assert self.exists(option), ("Invalid option %s, valid options"
                                          " are %s") % (option,
@@ -63,6 +68,7 @@ class OptionsDict:
             self._values[option] = value
 
     def createOrSet(self, **kwargs):
+        self.checkIsFrozen()
         for option, value in kwargs.items():
             if option in self._values:
                 self.set(**{option: value})
@@ -76,11 +82,41 @@ class OptionsDict:
         if self.exists(option):
             del self._values[option]
 
+    def _hasattr(self, option):
+        if option.startswith("_"):
+            return option in self.__getstate__().keys()
+        return self.exists(option)
+
+    # pylint: disable=protected-access
+    def _changeFreezeState(self, new_state):
+        self._is_frozen = new_state
+        for _, value in self.__dict__.items():
+            if isinstance(value, OptionsDict):
+                if value._hasattr('_is_frozen'):
+                    value._is_frozen = new_state
+            else:
+                if hasattr(value, '_is_frozen'):
+                    value._is_frozen = new_state
+
+    def _freeze(self):
+        self._changeFreezeState(True)
+
+    def _unfreeze(self):
+        self._changeFreezeState(False)
+
+    def checkIsFrozen(self, option=None):
+        # Skip check during object initialization.
+        if self._hasattr('_is_frozen'):
+            if option != '_is_frozen' and self._is_frozen:
+                raise AttributeError("Can't modify frozen Options")
+
     def __deepcopy__(self, memory):
         opts_class = self.__class__
         copied_options = opts_class.__new__(opts_class)
         memory[id(self)] = copied_options
         for key, val in self.__dict__.items():
+            if key == '_is_frozen':
+                val = False
             setattr(copied_options, key, copy.deepcopy(val, memory))
         return copied_options
 
@@ -90,10 +126,26 @@ class OptionsDict:
     def __setstate__(self, state):
         self.__dict__.update(state)
 
+    def __setattr__(self, option, value):
+        # Private attributes are allowed, but should be set in the __init__ before _values
+        # public ones must be declared in default_values.
+
+        self.checkIsFrozen(option)
+        if option.startswith("_"):
+            # Option cannot be defined after _values definition.
+            if self._hasattr('_values') and not self._hasattr(option):
+                raise AttributeError(
+                    f"Invalid private attribute {option}. "
+                    f"Valid attributes: {list(self.__dict__.keys())}")
+            super().__setattr__(option, value)
+        else:
+            self.set(**{option: value})
+
     def __getattr__(self, option):
-        assert self.exists(
-            option), ("Invalid option %s, "
-                      "valid options are %s") % (option, self._values.keys())
+        if not self._hasattr(option):
+            raise AttributeError(f"Invalid attribute {option}.")
+        if option.startswith("_"):
+            return self.__getstate__()[option]
         return self._values[option]
 
     def update(self, other):
@@ -110,10 +162,7 @@ class OptionsDict:
         return self.update({})
 
     def __call__(self, option):
-        assert self.exists(
-            option), ("Invalid option %s, "
-                      "valid options are %s") % (option, self._values.keys())
-        return self._values[option]
+        return getattr(self, option)
 
 
 class IStageManager(abc.ABC):
