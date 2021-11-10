@@ -267,7 +267,7 @@ on IPU ``m``.
 You can use :py:class:`~poptorch.Block` to annotate a model from within its
 definition. This context manager class defines a scope in the context of
 the model. Everything within that scope is placed on the IPU specified (unless
-overridden by a :py:class:~poptorch.Stage).
+overridden by a :py:class:`~poptorch.Stage`).
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -280,7 +280,7 @@ overridden by a :py:class:~poptorch.Stage).
 In addition, you can use the :py:func:`~poptorch.BlockFunction` function decorator
 to place functions (containing one or more layers) onto a particular block.
 Everything within that function is placed on the IPU specified (unless
-overridden by a :py:class:~poptorch.Stage)
+overridden by a :py:class:`~poptorch.Stage`)
 
 .. literalinclude:: pipeline_simple.py
     :language: python
@@ -293,10 +293,10 @@ overridden by a :py:class:~poptorch.Stage)
 You can use any, or a combination, of these three annotation options.
 In the above examples, ``ipu_id`` is used to specify blocks. This alone is
 sufficient to enable parallel execution: by default,
-:py:class`~poptorch.AutoStage` will set up a pipeline for which the pipeline
+:py:class:`~poptorch.AutoStage` will set up a pipeline for which the pipeline
 stage is equal to the ``ipu_id`` for each block. However, it would be equally
 valid to instead use the ``user_id`` argument to assign names to each block.
-Then, using :py:class`~poptorch.Stage` or :py:class`~poptorch.Phase` classes,
+Then, using :py:class:`~poptorch.Stage` or :py:class:`~poptorch.Phase` classes,
 you can manually assign each block in a pipeline using their names, as outlined
 in the next sections.
 
