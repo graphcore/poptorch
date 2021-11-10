@@ -42,7 +42,7 @@ enable=indexing-exception,old-raise-syntax
 # --enable=similarities". If you want to run only the classes checker, but have
 # no Warning level messages displayed, use"--disable=all --enable=classes
 # --disable=W"
-disable=global-statement,no-self-use,import-error,missing-docstring,invalid-name,redefined-builtin,too-few-public-methods,redefined-outer-name,no-name-in-module,not-callable,too-many-instance-attributes,too-many-branches,too-many-locals,too-many-arguments
+disable=global-statement,no-self-use,import-error,missing-docstring,invalid-name,redefined-builtin,too-few-public-methods,redefined-outer-name,no-name-in-module,not-callable,too-many-instance-attributes,too-many-branches,too-many-locals,too-many-arguments,too-many-statements
 
 # not-callable leads to false positives due to PyTorch's tensor.py
 

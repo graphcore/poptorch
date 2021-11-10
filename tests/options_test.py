@@ -100,7 +100,9 @@ def test_set_options_from_file(capfd):
     testlog.validate()
 
 
-def test_set_popart_options():
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+def test_set_popart_options(capfd):
     # pylint: disable=protected-access
     class Network(nn.Module):
         def forward(self, x, y):
@@ -114,6 +116,11 @@ def test_set_popart_options():
     opts._Popart.set("engineOptions", {
         "debug.allowOutOfMemory": "true",
     })
+    opts._Popart.set("reportOptions", {"reportOptA": "A", "reportOptB": "B"})
+    opts._Popart.set("convolutionOptions", {"convOptA": "A", "convOptB": "B"})
+    opts._Popart.set("matmulOptions", {"matOptA": "A", "matOptB": "B"})
+    opts._Popart.set("lstmOptions", {"lstmOptA": "A", "lstmOptB": "B"})
+    opts._Popart.set("gclOptions", {"gclOptA": "A", "gclOptB": "B"})
     opts._Popart.set("customCodelets", [])
     opts._Popart.set("autoRecomputation", 1)
     opts._Popart.set("enableOutlining", True)
@@ -139,7 +146,59 @@ def test_set_popart_options():
     # The options above don't really make sense so check they're being passed
     # to the backend without causing any error but don't actually run the
     # model.
-    inference_model.compile(x, y)
+    with pytest.raises(poptorch.Error, match=r"is not a valid .* option"):
+        inference_model.compile(x, y)
+
+    log = helpers.LogChecker(capfd)
+    log.assert_contains("poptorch.Options added 0 to hardwareInstrumentations")
+    log.assert_contains("poptorch.Options added 1 to hardwareInstrumentations")
+    log.assert_contains("poptorch.Options added 0 to dotChecks")
+    log.assert_contains("poptorch.Options added 1 to dotChecks")
+    log.assert_contains(
+        "poptorch.Options set engineOptions[debug.allowOutOfMemory] to true")
+    log.assert_contains("poptorch.Options set reportOptions[reportOptA] to A")
+    log.assert_contains("poptorch.Options set reportOptions[reportOptB] to B")
+    log.assert_contains(
+        "poptorch.Options set convolutionOptions[convOptA] to A")
+    log.assert_contains(
+        "poptorch.Options set convolutionOptions[convOptB] to B")
+    log.assert_contains("poptorch.Options set matmulOptions[matOptA] to A")
+    log.assert_contains("poptorch.Options set matmulOptions[matOptB] to B")
+    log.assert_contains("poptorch.Options set lstmOptions[lstmOptA] to A")
+    log.assert_contains("poptorch.Options set lstmOptions[lstmOptB] to B")
+    log.assert_contains("poptorch.Options set gclOptions[gclOptA] to A")
+    log.assert_contains("poptorch.Options set gclOptions[gclOptB] to B")
+    log.assert_contains("poptorch.Options set autoRecomputation to value 1")
+    log.assert_contains("poptorch.Options set enableOutlining to value true")
+    log.assert_contains(
+        "poptorch.Options set batchSerializationSettings.factor to value 1")
+    log.assert_contains(
+        "poptorch.Options set "
+        "batchSerializationSettings.concatOnVirtualGraphChange to value true")
+    log.assert_contains(
+        "poptorch.Options set "
+        "batchSerializationSettings.concatOnExecutionPhaseChange to value true"
+    )
+    log.assert_contains(
+        "poptorch.Options set "
+        "batchSerializationSettings.concatOnPipelineStageChange to value true")
+    log.assert_contains(
+        "poptorch.Options set "
+        "batchSerializationSettings.transformContext to value 0")
+    log.assert_contains(
+        "poptorch.Options set batchSerializationSettings.method to value 0")
+    log.assert_contains(
+        "poptorch.Options set batchSerializationSettings.batchSchedule "
+        "to value 1")
+    log.assert_contains(
+        "poptorch.Options set accumulateOuterFragmentSettings.schedule "
+        "to value 1")
+    log.assert_contains(
+        "poptorch.Options added 0 to "
+        "accumulateOuterFragmentSettings.excludedVirtualGraphs")
+    log.assert_contains(
+        "poptorch.Options added 1 to "
+        "accumulateOuterFragmentSettings.excludedVirtualGraphs")
 
 
 def test_popart_patterns():

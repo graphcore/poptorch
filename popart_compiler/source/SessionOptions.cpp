@@ -40,6 +40,14 @@
 #include "poptorch_logging/Logging.hpp"
 
 namespace {
+
+// To avoid code duplication we use the same std::pair<string,string> inserter
+// to add values in map, vector, set containers but in practice only map
+// actually takes a pair of values (The others take a single element). So, for
+// containers taking only a single value, this magic string should be passed as
+// the second element of the pair.
+const std::string value_not_set = "__poptorch_value_not_set__";
+
 // Wrapper functor used to print to the debug channel the value
 // of the options set by poptorch.Options
 template <typename Value> class Setter {
@@ -57,8 +65,13 @@ template <>
 void Setter<std::pair<std::string, std::string>>::operator()(
     std::pair<std::string, std::string> value) { // NOLINT
   _fn(value);
-  poptorch::logging::debug("poptorch.Options set {}[{}] to {}", _name,
-                           value.first, value.second);
+  if (value.second == value_not_set) {
+    poptorch::logging::debug("poptorch.Options added {} to {}", value.first,
+                             _name);
+  } else {
+    poptorch::logging::debug("poptorch.Options set {}[{}] to {}", _name,
+                             value.first, value.second);
+  }
 }
 
 template <typename Value> void Setter<Value>::operator()(Value value) {
@@ -248,6 +261,11 @@ SessionOptionsImpl::SessionOptionsImpl() {
                    popart_options.convolutionOptions.emplace(p);
                  });
 
+  registerSetter(container_options, "matmulOptions",
+                 [&](const std::pair<std::string, std::string> &p) {
+                   popart_options.matmulOptions.emplace(p);
+                 });
+
   registerSetter(container_options, "lstmOptions",
                  [&](const std::pair<std::string, std::string> &p) {
                    popart_options.lstmOptions.emplace(p);
@@ -409,7 +427,7 @@ void SessionOptions::addDoubleOption(const char *option, double value) {
 }
 
 void SessionOptions::insertStringOption(const char *option, const char *value) {
-  _impl->set(option, std::pair<std::string, std::string>(value, ""),
+  _impl->set(option, std::pair<std::string, std::string>(value, value_not_set),
              _impl->container_options, "set / vector");
 }
 
