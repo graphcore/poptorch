@@ -48,13 +48,16 @@ def _default_cache_dir():
 
 
 def _system_conda_path():
+    #pylint: disable=broad-except
     try:
         conda_root = subprocess.check_output(["conda", "info", "--base"],
                                              stderr=None)
         conda_root = conda_root.decode("utf-8").strip()
         return conda_root
-    except FileNotFoundError:
+    except (FileNotFoundError, Exception):
+        logger.debug('Conda Root Not Found')
         return None
+    #pylint: enable=broad-except
 
 
 class Installer:
