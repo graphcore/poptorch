@@ -183,7 +183,9 @@ def _get_package_os_type():
 
 
 def get_arch_type():
-    return platform.processor()
+    arch = platform.machine()
+    assert arch in ["aarch64", "x86_64"]
+    return arch
 
 
 def get_os_type():
