@@ -184,6 +184,36 @@ def test_chunk():
     op_harness(op, x, out_fn=lambda x: x[0])
 
 
+def test_cat_chunk_slice():
+    def forward(x, mems):
+        index = 8
+        cat = torch.cat([mems, x], 0)
+        split, _ = torch.chunk(cat, 2, dim=2)
+        split2 = split[index:]
+        return split2
+
+    mems = torch.randn(1600, 1, 10, 10, 5)
+    x = torch.randn(8, 1, 10, 10, 5)
+
+    op = forward
+    op_harness(op, x, mems, test_training=False)
+
+
+def test_cat_chunk_slice_multiple_slices():
+    def forward(x, mems):
+        index = 8
+        cat = torch.cat([mems, x], 0)
+        _, _, split2, _, _ = torch.chunk(cat, 5, dim=2)
+        split5 = split2[index:]
+        return split5
+
+    mems = torch.randn(1600, 1, 10, 10, 5)
+    x = torch.randn(8, 1, 10, 10, 5)
+
+    op = forward
+    op_harness(op, x, mems, test_training=False)
+
+
 @pytest.mark.parametrize("dim", [0, 1, 2, -1, -2])
 def test_gather_3dim(dim):
     torch.manual_seed(42)

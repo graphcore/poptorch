@@ -365,10 +365,15 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   auto *unpack = node->output()->uses()[0].user;
   ERROR_ON(unpack->kind() != c10::prim::ListUnpack);
   ERROR_ON(slices.size() != unpack->outputs().size());
-
+  std::vector<int64_t> v;
+  for (std::uint64_t i = 0; i < *dims.size(); ++i) {
+    v.push_back(*dims[i]);
+  }
   // Propagate types
   for (size_t i = 0; i < slices.size(); i++) {
-    unpack->output(i)->setType(slices[i]->type());
+    v[axis] = size_of_each_split[i];
+    auto type = slices[i]->type()->expect<c10::TensorType>()->withSizes(v);
+    unpack->output(i)->setType(type);
   }
 
   return list_node;
