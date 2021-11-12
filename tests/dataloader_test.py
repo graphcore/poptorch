@@ -77,6 +77,22 @@ class IncrementDatasetWithLabels(torch.utils.data.Dataset):
                 torch.full((1, ), index, dtype=torch.long))
 
 
+class IncrementDatasetWithLabelsDict(torch.utils.data.Dataset):
+    def __init__(self, shape, length):
+        super().__init__()
+        self._shape = shape
+        self._length = length
+
+    def __len__(self):
+        return self._length
+
+    def __getitem__(self, index):
+        return {
+            "data": torch.full(self._shape, index, dtype=torch.float32),
+            "label": torch.full((1, ), index, dtype=torch.long)
+        }
+
+
 class CheckOrderModel(torch.nn.Module):
     def forward(self, data, expected):
         # return expected + 1 if data was what we expected
@@ -836,6 +852,38 @@ def test_indexable_dataloader_len(mode, dtype):
     for n, _ in enumerate(loader):
         pass
     assert n + 1 == num_tensors // batch_size
+
+
+@pytest.mark.parametrize(
+    "mode", {
+        poptorch.DataLoaderMode.Async, poptorch.DataLoaderMode.AsyncRebatched,
+        poptorch.DataLoaderMode.Sync
+    })
+def test_dictionary_dataset(mode):
+    shape = [2, 3]
+    num_tensors = 500
+
+    opts = poptorch.Options()
+    opts.deviceIterations(2)
+    opts.replicationFactor(3)
+
+    loader = poptorch.DataLoader(opts,
+                                 IncrementDatasetWithLabelsDict(
+                                     shape, num_tensors),
+                                 num_workers=3,
+                                 mode=mode)
+    shape_with_batch = [loader.combinedBatchSize] + shape
+    it = 0
+    for d in loader:
+        assert isinstance(d, dict)
+        assert len(d) == 2
+        assert "data" in d
+        assert "label" in d
+        assert d["data"].shape == torch.Size(shape_with_batch)
+        assert d["label"].shape == torch.Size([loader.combinedBatchSize, 1])
+        it += 1
+
+    assert it == num_tensors // loader.combinedBatchSize
 
 
 @pytest.mark.parametrize(

@@ -30,8 +30,8 @@ class AsynchronousWorker:
         self._worker_started = False
 
         # Keep end of file events in a special buffer shared between worker and device. This is due to the worker reseting automatically.
-        (self._command_pipe, self._is_single_tensor, self._eof,
-         self._data_buffers) = self._process.start()
+        (self._command_pipe, self._is_single_tensor, self._dict_keys,
+         self._eof, self._data_buffers) = self._process.start()
 
     def terminate(self):
         if self._process.isAlive():
@@ -106,11 +106,20 @@ class AsynchronousWorker:
             # left over value.
             self._eof.setFlag(self._data_buffers.currentIndex())
 
-        # Return either one tensor or the list.
+        # The worker process always sends us a tuple of tensors, however
+        # the user data can actually be either:
+        # - A list
+        # - A single tensor
+        # - A dictionary string -> Tensor
+
+        # If it's a single tensor: return the first element of the list.
         if self._is_single_tensor:
             return data[0]
+        if self._dict_keys:
+            # If it's a dictionary: associate the data to the keys here.
+            return dict(zip(self._dict_keys, data))
 
-        # Else return the list.
+        # Else return the list as is.
         return data
 
     def assertNoError(self):
@@ -206,6 +215,7 @@ class _AsynchronousWorkerProcess:
             indices_mem = read_data_pipe.recv()
             data_len = read_data_pipe.recv()
             is_single_tensor = read_data_pipe.recv()
+            dict_keys = read_data_pipe.recv()
             eof_mem = read_data_pipe.recv()
             buffers = _DataRingBufferReader(self._buffer_size, data_len,
                                             indices_mem)
@@ -217,7 +227,7 @@ class _AsynchronousWorkerProcess:
 
             # We're all set: let the worker know.
             write_command_pipe.send(_HostCommand.SetupComplete)
-            return (write_command_pipe, is_single_tensor,
+            return (write_command_pipe, is_single_tensor, dict_keys,
                     _EndOfFileFlag(eof_mem), buffers)
         except EOFError:
             pass
@@ -278,9 +288,15 @@ class _AsynchronousWorkerProcess:
 
         # We support either a single tensor or a flat 1D iterable of tensors.
         is_single_tensor = False
+        dict_keys = []
         if isinstance(data, torch.Tensor):
             is_single_tensor = True
             data = (data, )
+        elif isinstance(data, dict):
+            # If the data is a dictionary: the keys must be the same for each
+            # instance returned by the dataloader so save the list of keys here.
+            dict_keys = list(data.keys())
+            data = tuple([data[k] for k in dict_keys])
 
         # Tell the host how many tensors we will be sending.
         data_length = len(data)
@@ -293,6 +309,7 @@ class _AsynchronousWorkerProcess:
 
         conn.send(data_length)
         conn.send(is_single_tensor)
+        conn.send(dict_keys)
 
         eof = _EndOfFileFlag(eof_mem=None)
         conn.send(eof.eof_mem)
@@ -301,10 +318,11 @@ class _AsynchronousWorkerProcess:
         for index, tensor in enumerate(data):
             assert isinstance(
                 tensor,
-                torch.Tensor), ("Tensor at index %d is not a torch tensor."
+                torch.Tensor), (f"Tensor at index {index} is not a torch "
+                                f"tensor ({type(tensor)})."
                                 " AsynchronousDataAccessor expects data to "
                                 "be organised as a flat 1D container of "
-                                "tensors.") % index
+                                "tensors.")
 
             # Shared with parent process.
             tensor_size = [*tensor.size()]
@@ -387,6 +405,14 @@ class _AsynchronousWorkerProcess:
                     data = next(dataset_iterator)
                     if isinstance(data, torch.Tensor):
                         data = (data, )
+                    elif isinstance(data, dict):
+                        # If the data is a dictionary: we expect the keys to
+                        # be strings and always the same, and the values to
+                        # all be tensors. As a result we only need to pass
+                        # the tensors as a tuple to the main process and
+                        # re-assemble the dictionary there.
+                        assert len(data) == len(dict_keys)
+                        data = tuple([data[k] for k in dict_keys])
                 except StopIteration:
                     logger.debug(
                         "AsynchronousDataAccessor worker: end of dataset"
