@@ -7,6 +7,7 @@ import fcntl
 import hashlib
 import inspect
 import logging
+import re
 import os
 import platform
 import subprocess
@@ -131,6 +132,11 @@ class Config:
     def __init__(self, **opts):
         self.__dict__ = opts
 
+    def setDefault(self, **opts):
+        for k, v in opts.items():
+            if k not in self.__dict__:
+                self.__dict__[k] = v
+
 
 class Environment:
     def __init__(self, buildenv_dir, activate_filename):
@@ -217,7 +223,8 @@ class BuildenvManager:
             # 2) <view_dir>/my_project/config.buildenv.py
             to_test = [
                 os.path.join(view_dir, p + ".buildenv.py"),
-                os.path.join(project_dir, "config.buildenv.py")
+                os.path.join(project_dir, "config.buildenv.py"),
+                os.path.join(project_dir, p + ".buildenv.py"),
             ]
             conf = None
             for f in to_test:
@@ -479,6 +486,8 @@ if __name__ == "__main__":
         action="store_true",
         help="Create a template archive in the cache directory "
         "if one doesn't already exist")
+    parser.add_argument(
+        "--path", help="Path to the project sources or a project.buildenv.py")
 
     args = parser.parse_args()
 
@@ -489,5 +498,19 @@ if __name__ == "__main__":
     manager = BuildenvManager(args.cache_dir, args.output_dir,
                               args.python_version, args.conda_toolchains,
                               not args.no_linters)
-    manager.add_project("poptorch", _utils.sources_dir())
+    if args.path:
+        path_dir = os.path.realpath(args.path)
+        project = None
+        # If a file was provided: use the containing directory
+        if os.path.isfile(path_dir):
+            filename = os.path.basename(path_dir)
+            m = re.match("(.*).buildenv.py", filename)
+            if m and m.group(1) != "config":
+                project = m.group(1)
+            path_dir = os.path.dirname(path_dir)
+        if project is None:
+            project = path_dir.split(os.path.sep)[-1]
+        manager.add_project(project, path_dir)
+    else:
+        manager.add_project("poptorch", _utils.sources_dir())
     manager.create(args.create_template_if_needed)
