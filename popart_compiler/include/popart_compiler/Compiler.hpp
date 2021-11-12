@@ -469,6 +469,9 @@ public:
   void fillHostOptimizerStateTensorData(
       const std::vector<void *> &host_buffers) const;
 
+  void writeDeviceOptimizerStateTensorData(
+      const std::vector<void *> &host_buffers) const;
+
   std::unique_ptr<char[]> getExecutionInfo() const;
 
   void addMultiConvPart(const std::vector<poptorch::TensorId> &inputs,

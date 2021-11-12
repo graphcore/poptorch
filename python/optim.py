@@ -54,7 +54,6 @@ def _parseArgs(all_args: Dict[str, Any],
     args = all_args.copy()
     # Remove special local() variables
     del args["self"]
-    del args["__class__"]
     # Attributes explicitly set by the user are considered variable
     not_const = [k for k, v in args.items() if v is not None]
     # Filter out the child class attributes
@@ -65,7 +64,41 @@ def _parseArgs(all_args: Dict[str, Any],
     return parent_args, not_const
 
 
-class SGD(torch.optim.SGD):
+class Optimizer:
+    def __init__(self):
+        self._state_dict = {}
+
+    # These functions must be overridden so that the optimiser state can be set
+    # when the model is created
+    def state_dict(self):
+        return self.get_state_dict()
+
+    def load_state_dict(self, state):
+        self.set_state_dict(state)
+
+    # Getter/setter for local state dict after the above functions been overridden by PoplarExecutor
+    def get_state_dict(self):
+        if len(self._state_dict.items()) == 0:
+            raise RuntimeError(
+                "You must compile or run a training model with this optimizer"
+                " before the state can be read.")
+        return self._state_dict
+
+    def set_state_dict(self, state):
+        if len(state.items()) == 0:
+            raise RuntimeError(
+                "Cannot load optimizer state dictionary because it is empty.")
+        if not ("ipu_state" in state and "ipu_param" in state):
+            raise RuntimeError(
+                "Only IPU optimizer states can be loaded onto the IPU.")
+        self._state_dict = state
+
+    def has_state(self):
+        return ("ipu_state" in self._state_dict
+                and "ipu_param" in self._state_dict)
+
+
+class SGD(Optimizer, torch.optim.SGD):
     # pylint: disable=line-too-long
     """ Stochastic gradient descent with optional momentum.
 
@@ -185,9 +218,11 @@ class SGD(torch.optim.SGD):
             the velocity values for each parameter.
         :param max_grad_norm: Maximum norm of gradients. Default is `inf`.
         """
+        # pylint: disable=unused-argument
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), SGD._child_only)
-        super().__init__(**parent_args)
+        Optimizer.__init__(self)
+        torch.optim.SGD.__init__(self, **parent_args)
 
         # Loss scaling is a global setting: store it as an attribute
         if loss_scaling is None:
@@ -246,7 +281,7 @@ class SGD(torch.optim.SGD):
             list(self.defaults) + SGD._child_vars)
 
     def __getstate__(self) -> Dict[str, Any]:
-        state = super().__getstate__()
+        state = torch.optim.SGD.__getstate__(self)
         # Manually save the attributes
         # (groups / defaults are saved by the parent)
         state["variable_attrs"] = self.variable_attrs
@@ -255,10 +290,11 @@ class SGD(torch.optim.SGD):
         state["accum_type"] = self.accum_type
         state["velocity_accum_type"] = self.velocity_accum_type
         state["max_grad_norm"] = self.max_grad_norm
+        state["_state_dict"] = self._state_dict
         return state
 
 
-class Adam(torch.optim.Adam):
+class Adam(Optimizer, torch.optim.Adam):
     """ Adam optimizer.
 
     This optimizer matches PyTorch's implementation
@@ -307,9 +343,11 @@ class Adam(torch.optim.Adam):
             the second order momentum values for each parameter.
         :param max_grad_norm: Maximum norm of gradients. Default is `inf`.
         """
+        # pylint: disable=unused-argument
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), Adam._child_only)
-        super().__init__(**parent_args)
+        Optimizer.__init__(self)
+        torch.optim.Adam.__init__(self, **parent_args)
 
         if loss_scaling is None:
             loss_scaling = 1.0
@@ -347,7 +385,7 @@ class Adam(torch.optim.Adam):
             list(self.defaults) + Adam._child_vars)
 
     def __getstate__(self) -> Dict[str, Any]:
-        state = super().__getstate__()
+        state = torch.optim.Adam.__getstate__(self)
         # Manually save the attributes
         # (groups / defaults are saved by the parent)
         state["variable_attrs"] = self.variable_attrs
@@ -358,10 +396,11 @@ class Adam(torch.optim.Adam):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         state["max_grad_norm"] = self.max_grad_norm
+        state["_state_dict"] = self._state_dict
         return state
 
 
-class AdamW(torch.optim.AdamW):
+class AdamW(Optimizer, torch.optim.AdamW):
     """ Adam optimizer with true weight decay.
 
     This optimizer matches PyTorch's implementation
@@ -415,9 +454,11 @@ class AdamW(torch.optim.AdamW):
             the second order momentum values for each parameter.
         :param max_grad_norm: Maximum norm of gradients. Default is `inf`.
         """
+        # pylint: disable=unused-argument
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), AdamW._child_only)
-        super().__init__(**parent_args)
+        Optimizer.__init__(self)
+        torch.optim.AdamW.__init__(self, **parent_args)
 
         if loss_scaling is None:
             loss_scaling = 1.0
@@ -456,7 +497,7 @@ class AdamW(torch.optim.AdamW):
             list(self.defaults) + AdamW._child_vars)
 
     def __getstate__(self) -> Dict[str, Any]:
-        state = super().__getstate__()
+        state = torch.optim.AdamW.__getstate__(self)
         # Manually save the attributes
         # (groups / defaults are saved by the parent)
         state["variable_attrs"] = self.variable_attrs
@@ -468,10 +509,11 @@ class AdamW(torch.optim.AdamW):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         state["max_grad_norm"] = self.max_grad_norm
+        state["_state_dict"] = self._state_dict
         return state
 
 
-class RMSprop(torch.optim.RMSprop):
+class RMSprop(Optimizer, torch.optim.RMSprop):
     """ RMSprop optimizer with optional L2 penalty.
 
     This optimizer matches PyTorch's implementation (
@@ -532,9 +574,11 @@ class RMSprop(torch.optim.RMSprop):
         :param use_tf_variant: False: If True, use the TensorFlow variant
             of RMSProp.
         """
+        # pylint: disable=unused-argument
         # Call to locals() must be at the very top of  __init__
         parent_args, variables = _parseArgs(locals(), RMSprop._child_only)
-        super().__init__(**parent_args)
+        Optimizer.__init__(self)
+        torch.optim.RMSprop.__init__(self, **parent_args)
 
         if loss_scaling is None:
             loss_scaling = 1.0
@@ -568,7 +612,7 @@ class RMSprop(torch.optim.RMSprop):
             list(self.defaults) + RMSprop._child_vars)
 
     def __getstate__(self) -> Dict[str, Any]:
-        state = super().__getstate__()
+        state = torch.optim.RMSprop.__getstate__(self)
         # Manually save the attributes
         # (groups / defaults are saved by the parent)
         state["variable_attrs"] = self.variable_attrs
@@ -579,10 +623,11 @@ class RMSprop(torch.optim.RMSprop):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         state["use_tf_variant"] = self.use_tf_variant
+        state["_state_dict"] = self._state_dict
         return state
 
 
-class LAMB(torch.optim.Optimizer):
+class LAMB(Optimizer, torch.optim.Optimizer):
     """ Layer-wise Adaptive Moments (LAMB) optimizer (biased version).
 
         Based on "Large Batch Optimization for Deep Learning: Training BERT
@@ -632,6 +677,7 @@ class LAMB(torch.optim.Optimizer):
         :param second_order_momentum_accum_type: data type used to store
            the second order momentum values for each parameter.
         """
+        # pylint: disable=unused-argument
         # Call to locals() must be at the very top of  __init__
         _, variables = _parseArgs(locals(), [])
         if max_weight_norm is None:
@@ -659,7 +705,8 @@ class LAMB(torch.optim.Optimizer):
                         eps=eps,
                         weight_decay=weight_decay,
                         max_weight_norm=max_weight_norm)
-        super().__init__(params, defaults)
+        Optimizer.__init__(self)
+        torch.optim.Optimizer.__init__(self, params, defaults)
 
         supportedTypes = [torch.float16, torch.float32]
         errString = """Accumulation types must be either torch.float32
@@ -735,7 +782,7 @@ class LAMB(torch.optim.Optimizer):
         return loss
 
     def __getstate__(self) -> Dict[str, Any]:
-        state = super().__getstate__()
+        state = torch.optim.Optimizer.__getstate__(self)
         # Manually save the attributes
         # (groups / defaults are saved by the parent)
         state["variable_attrs"] = self.variable_attrs
@@ -746,12 +793,13 @@ class LAMB(torch.optim.Optimizer):
                 self.first_order_momentum_accum_type
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
+        state["_state_dict"] = self._state_dict
         return state
 
 
 def _check_constructor_match_parent(child_class: Type[torch.optim.Optimizer]
                                     ) -> None:
-    parent = child_class.__bases__[0]
+    parent = child_class.__bases__[1]
     parent_params = inspect.signature(parent.__init__).parameters
     child_params = inspect.signature(child_class.__init__).parameters
     extra_args = child_class._child_only  # pylint: disable=protected-access

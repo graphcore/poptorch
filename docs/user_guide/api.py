@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import tempfile
+import os
 import torch
 import poptorch
 
@@ -128,3 +130,22 @@ opt = torch.optim.SGD(model.parameters(), lr=0.01, momentum=1.0)
 opts = poptorch.Options()
 opts.loadFromFile("tmp/poptorch.conf")
 # conf_load_end
+
+with tempfile.TemporaryDirectory() as d:
+    PATH = os.path.join(d, "checkpoint.pt")
+    # optim_state_dict_start
+    optimizer = poptorch.optim.Adam(model.parameters())
+    poptorch_model = poptorch.trainingModel(model, optimizer=optimizer)
+    poptorch_model(input, target)
+
+    # Saving the optimizer state
+    torch.save({'optimizer_state_dict': optimizer.state_dict()}, PATH)
+
+    new_optimizer = poptorch.optim.Adam(model.parameters())
+    # Loading the optimizer state back
+    checkpoint = torch.load(PATH)
+    new_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    # The new training model will use the loaded optimizer state
+    new_poptorch_model = poptorch.trainingModel(model, optimizer=optimizer)
+    # optim_state_dict_end

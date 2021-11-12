@@ -1157,9 +1157,37 @@ py::dict readOptimizerState(
     compiler.fillHostOptimizerStateTensorData(host_buffers);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-  optim_state["state"] = std::move(state_tensors);
-  optim_state["param"] = std::move(param_tensors);
+  optim_state["ipu_state"] = std::move(state_tensors);
+  optim_state["ipu_param"] = std::move(param_tensors);
   return optim_state;
+}
+
+void writeOptimizerState(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable,
+    const py::dict &optim_state) {
+  try {
+    const auto &compiler = executable->getCompiler();
+    std::vector<TensorMetadata> metadata_list =
+        compiler.optimizerTensorMetadataList();
+
+    std::vector<void *> host_buffers;
+    for (const TensorMetadata &meta : metadata_list) {
+      if (meta.num_bytes == -1) {
+        // num_bytes == -1 indicates it's an optimiser state tensor (variable)
+        at::Tensor tensor =
+            optim_state["ipu_state"][py::cast(meta.id)].cast<at::Tensor>();
+        host_buffers.push_back(tensor.data_ptr());
+      } else {
+        // Otherwise it's a stream/constant optimiser parameter that we can copy
+        // immediately
+        at::Tensor tensor =
+            optim_state["ipu_param"][py::cast(meta.id)].cast<at::Tensor>();
+        std::memcpy(meta.data, tensor.data_ptr(), meta.num_bytes);
+      }
+    }
+    compiler.writeDeviceOptimizerStateTensorData(host_buffers);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 std::vector<pybind11::object>
@@ -1386,6 +1414,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("execute", poptorch::execute);
   m.def("getTimestamps", poptorch::getTimestamps);
   m.def("readOptimizerState", poptorch::readOptimizerState);
+  m.def("writeOptimizerState", poptorch::writeOptimizerState);
   m.def("loadEngineAndConnectStreams", poptorch::loadEngineAndConnectStreams);
   m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDeviceImpl);
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);

@@ -705,6 +705,20 @@ There is no method to override this behaviour which is why we recommend you alwa
 
 .. note:: There is an exception: ``lr`` is always marked as variable.
 
+Reading and writing optimizer state
+-----------------------------------
+
+When you use a ``poptorch.optim`` optimizer with a :py:func:`~poptorch.trainingModel`, you can use the optimizer's ``state_dict()`` and ``load_state_dict()`` functions to read/write optimizer state to/from the IPU.
+This can be used to restart training from a checkpoint saved previously.
+
+.. literalinclude:: api.py
+  :caption: Reading and writing optimiser state
+  :start-after: optim_state_dict_start
+  :end-before: optim_state_dict_end
+  :emphasize-lines: 6,11
+
+.. note:: The structure of the state dictionary, as well as the keys within, will differ from those in PyTorch. As such, you cannot load a state dictionary with PopTorch that was obtained by running native PyTorch.
+
 PopTorch ops
 ============
 

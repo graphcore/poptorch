@@ -8,6 +8,7 @@ import pickle
 import re
 from typing import Callable, Dict, List, Optional
 import types
+from types import MethodType
 import weakref
 import warnings
 import torch
@@ -24,6 +25,7 @@ from . import _poptorch_data
 from ._logging import logger
 from .ops import ATTR_PREFIX
 from .options import Options
+from .optim import Optimizer
 
 
 # Allow access to attributes
@@ -125,22 +127,11 @@ class PoplarExecutor:
                 if anchor[2] == enums.OutputMode.EveryN:
                     anchor[3] = options.output_return_period
 
-        self._training = training
-
-        if optimizer:
-            self._dict_optimizer = _optimizer_attributes.convertOptimizerToDict(
-                optimizer, self._attribute_tracker, options)
-
-            # Replace the optimiser's state_dict function with one that returns the internal optimiser
-            # state
-            # TODO(T44800): Re-enable when load_state_dict has also been overridden
-            # optimizer.state_dict = MethodType(
-            #    PoplarExecutor._get_optim_state_dict, self)
-        else:
-            self._dict_optimizer = {}
-
         self._new_optimizer = optimizer
-        self._dict_new_optimizer = self._dict_optimizer
+        self._dict_new_optimizer = {}
+        self._dict_optimizer = {}
+        self._update_optimizer_state = False
+        self._training = training
         self._dirty_host_weights = False
         self._trace = None
         self._is_attached = False
@@ -150,8 +141,9 @@ class PoplarExecutor:
         self._profiling.instrument(self, "copyWeightsToHost",
                                    "copyWeightsToDevice", "setOptimizer",
                                    "compile", "destroy")
-        self._update_optimizer_state = False
-        self._optim_state_dict = {}
+
+        if optimizer:
+            self.setOptimizer(optimizer)
 
         if self._training:
             # We don't want the pytorch model to keep the PopTorch one
@@ -267,14 +259,22 @@ class PoplarExecutor:
             _impl.registerWrapperType(PoptorchParameter)
             _impl.registerWrapperType(PoptorchBuffer)
 
-    def get_optim_state_dict(self):
+    def _read_optim_state_dict(self):
         if self._update_optimizer_state:
-            self._optim_state_dict = poptorch_core.readOptimizerState(
-                self._executable)
+            assert self.isCompiled()
+            assert isinstance(self._new_optimizer, Optimizer)
+            self._new_optimizer.set_state_dict(
+                poptorch_core.readOptimizerState(self._executable))
             self._update_optimizer_state = False
         else:
             logger.debug("Using cached optimiser state dict")
-        return self._optim_state_dict
+        return self._new_optimizer.get_state_dict()
+
+    def _write_optim_state_dict(self):
+        assert self.isCompiled()
+        assert isinstance(self._new_optimizer, Optimizer)
+        poptorch_core.writeOptimizerState(self._executable,
+                                          self._new_optimizer.state_dict())
 
     def load_state_dict(self,
                         state_dict: Dict[str, 'torch.Tensor'],
@@ -376,14 +376,30 @@ class PoplarExecutor:
         previous one. Supported optimisers: ``optim.SGD``, ``optim.Adam``,
         ``optim.AdamW``, ``optim.RMSProp``, ``optim.LAMB``.
         """
+        # Optimiser state functions require a compiled executable
+        if self.isCompiled() and optimizer != self._new_optimizer:
+            # If we're setting a new optimiser, make sure the internal state of the old
+            # optimiser has been read back so it's not lost, and then detach the old
+            # optimiser so that its subsequent state_dict/load_state_dict calls don't
+            # trigger optimiser state read/writes anymore
+            if self._new_optimizer and isinstance(self._new_optimizer,
+                                                  Optimizer):
+                self._read_optim_state_dict()
+                self._new_optimizer.state_dict = \
+                self._new_optimizer.get_state_dict
+            # If the new optimiser already has state (i.e. from a checkpoint), write it
+            # to device
+            if isinstance(optimizer, Optimizer) and optimizer.has_state():
+                self._new_optimizer = optimizer
+                self._write_optim_state_dict()
+        if isinstance(optimizer, Optimizer):
+            optimizer.state_dict = MethodType(
+                PoplarExecutor._read_optim_state_dict, self)
         self._new_optimizer = optimizer
         self._dict_new_optimizer = _optimizer_attributes.convertOptimizerToDict(
             optimizer, self._attribute_tracker, self._options)
-        # Replace the optimiser's state_dict function with one that returns the internal optimiser
-        # state
-        # TODO(T44800): Re-enable when load_state_dict has also been overridden
-        # optimizer.state_dict = MethodType(PoplarExecutor._get_optim_state_dict,
-        #                                   self)
+        if not self._dict_optimizer:
+            self._dict_optimizer = self._dict_new_optimizer
 
     def _compileWithTrace(self, trace_args):
         """On POD we want to separate compilation from device
@@ -414,6 +430,15 @@ class PoplarExecutor:
         if not self.isCompiled():
             self._executable = poptorch_core.compileWithTrace(*trace_args)
 
+            if self._new_optimizer and isinstance(self._new_optimizer,
+                                                  Optimizer):
+                # If the optimiser has state to be written (from a checkpoint),
+                # write it immediately after compilation
+                if self._new_optimizer.has_state():
+                    self._write_optim_state_dict()
+                else:
+                    self._update_optimizer_state = True
+
         # Load the engine and connect the streams in all the processes.
         #
         # Note: no sync point was added because we expect the above
@@ -428,10 +453,6 @@ class PoplarExecutor:
         # to concurrent compilation processes.
         if self._options.connection_type != enums.ConnectionType.Never:
             poptorch_core.loadEngineAndConnectStreams(self._executable)
-
-        # Model has been compiled - signal the optimiser that it can now fetch
-        # the internal optimiser state
-        self._update_optimizer_state = True
 
     def _compile(self, in_tensors):
         with self._profiling.tracepoint("modelCompilation"):
@@ -713,10 +734,9 @@ class PoplarExecutor:
         if self._training:
             self._dirty_host_weights = True
 
-        # The internal optimiser state has changed so signal the host-side
-        # optimiser that it needs to fetch a new state on the next call to
-        # state_dict()
-        self._update_optimizer_state = True
+        if self._new_optimizer and isinstance(self._new_optimizer, Optimizer):
+            # The internal optimiser state has changed so read it back
+            self._update_optimizer_state = True
 
         # Provide a useful error message if the user attempts to call
         # backward() on an output tensor

@@ -1143,6 +1143,14 @@ void Compiler::fillHostOptimizerStateTensorData(
   _impl->session->readWeights(_impl->optim_state_tensors);
 }
 
+void Compiler::writeDeviceOptimizerStateTensorData(
+    const std::vector<void *> &host_buffers) const {
+  logging::info("Writing optimiser state tensors from host to IPU memory.");
+  _impl->optim_state_tensors.updateData(host_buffers);
+  _impl->session->writeWeights(_impl->optim_state_tensors);
+  _impl->session->weightsFromHost();
+}
+
 Compiler::Compiler(Compiler &&compiler) : _cycle_count(compiler._cycle_count) {
   _impl = std::move(compiler._impl);
 }
