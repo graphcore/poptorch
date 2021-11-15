@@ -1,5 +1,4 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <string>
@@ -10,6 +9,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "dispatchers/JitDispatch.hpp"
+#include "dispatchers/MlirDispatch.hpp"
 #include "dispatchers/Tracer.hpp"
 
 namespace poptorch {
@@ -77,6 +77,11 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
                  const std::vector<at::Tensor> &parameters) {
   if (mode == TracingMode::POPART) {
     context.active_dispatch = std::make_unique<JITDispatch>();
+  } else if (mode == TracingMode::MLIR) {
+// We don't build this on Centos TODO(T49566)
+#if POPTORCH_BUILD_MLIR_COMPILER
+    context.active_dispatch = std::make_unique<MLIRDispatch>();
+#endif
   } else {
     ERROR("Unsupported target");
   }
@@ -119,6 +124,17 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 
   context.active_dispatch->fallback(op, stack);
 }
+
+// We don't build this on Centos TODO(T49566)
+#if POPTORCH_BUILD_MLIR_COMPILER
+
+std::shared_ptr<MLIRExecutable> compileMLIR() {
+  auto *mlir = dynamic_cast<MLIRDispatch *>(context.active_dispatch.get());
+  ERROR_ON(mlir == nullptr);
+  return mlir->compile();
+}
+
+#endif
 
 std::shared_ptr<torch::jit::Graph> getTracedGraph() {
   auto *jit = dynamic_cast<JITDispatch *>(context.active_dispatch.get());
@@ -209,23 +225,26 @@ at::Tensor emptyMemoryFormat(
     c10::optional<at::Device> device = c10::nullopt,
     c10::optional<bool> pin_memory = c10::nullopt,
     c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
-  // We have to be careful with backend select kernels, we must return the
-  // original result if we are not tracing.
+
   if (!context.isDispatchOn()) {
     return at::native::empty_cpu(size, dtype, layout, device, pin_memory,
                                  memory_format);
   }
-
+  logging::trace("[TRACING-2] Intercepting empty_base");
   return poptorch::emptyBase(size, dtype, layout, device, pin_memory,
                              memory_format);
 }
-
-// empty.out(int[] size, *, MemoryFormat? memory_format=None, Tensor(a!) out) ->
-// Tensor(a!)
+// empty.out(int[] size, *, MemoryFormat? memory_format=None, Tensor(a!) out)
+// -> Tensor(a!)
 at::Tensor &emptyOut(at::IntArrayRef size, c10::optional<at::MemoryFormat> fmt,
                      at::Tensor &out) {
-  out = poptorch::emptyBase(size, out.scalar_type(), out.layout(), out.device(),
-                            out.is_pinned(), fmt);
+  if (!context.isDispatchOn()) {
+    return at::native::empty_out(size, fmt, out);
+  }
+  DisableDispatchScope guard;
+  logging::trace("[TRACING-2] Intercepting empty.out");
+
+  context.active_dispatch->registerEmptyTensor(out);
   return out;
 }
 

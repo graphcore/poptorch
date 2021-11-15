@@ -40,6 +40,7 @@ bool ValueMapper::isDirectAlias(const at::Tensor &t) {
       continue;
     }
 
+    addTensor(t, record->mlir);
     addTensor(t, record->jit);
     return true;
   }
@@ -48,11 +49,25 @@ bool ValueMapper::isDirectAlias(const at::Tensor &t) {
 }
 
 // Add a tensor to the IR.
+void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
+  // If the tensor is already being tracked then we will update the MLIR
+  // value being tracked. Otherwise we insert and add the MLIR value.
+  auto itr = tensors.insert({t.unsafeGetTensorImpl(), TrackedTensor{t}}).first;
+  itr->second.mlir = id;
+
+  // If this map insert fails then we add the storage to the existing list.
+  auto pair = storage_map.insert({t.storage().unsafeGetStorageImpl(), {}});
+  pair.first->second.push_back(&itr->second);
+}
+
 void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
-  // If the tensor is already being tracked then we will update the the JIT
+  // If the tensor is already being tracked then we will update the JIT
   // value being tracked. Otherwise we insert and add the jit value.
   auto itr = tensors.insert({t.unsafeGetTensorImpl(), TrackedTensor{t}});
   itr.first->second.jit = val;
+
+  // Ensure we maintain a lookup of torch::jit to pytorch tensor.
+  values_map.insert({val, &itr.first->second});
 
   // If this map insert fails then we add the storage to the existing list.
   auto pair = storage_map.insert({t.storage().unsafeGetStorageImpl(), {}});
@@ -78,6 +93,26 @@ torch::jit::Value *ValueMapper::getValueForTensor(const at::Tensor &t) {
   }
 
   return nullptr;
+}
+
+poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const at::Tensor &t) {
+  auto itr = tensors.find(t.unsafeGetTensorImpl());
+
+  if (itr != tensors.end()) {
+    return itr->second.mlir;
+  }
+
+  return poptorch_ir::tensor_error_id;
+}
+
+poptorch_ir::TensorId ValueMapper::getMLIRForJit(torch::jit::Value *val) {
+  auto itr = values_map.find(val);
+
+  if (itr != values_map.end()) {
+    return itr->second->mlir;
+  }
+
+  return poptorch_ir::tensor_error_id;
 }
 
 } // namespace poptorch

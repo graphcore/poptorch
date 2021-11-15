@@ -1,0 +1,88 @@
+# We provide a mapping from each aten node onto the mlir implementation node.
+# We don't need to map every node and nodes which are unmapped may be caught
+# by the JIT path which will decompose some operations to onnx.
+
+# Basic format is:
+# - func: {ATEN_NODE}
+#    PopTorchDirect: {POPTORCH_NODE}
+
+# More attributes can be added as need be. Currently we have:
+
+# PopTorchDirect : FUNC     The mlir implementation of this class with the name
+# PopTorchDirectInplace : FUNC   The inplace mlir implementation of this class with the name
+
+# The two above can be used together when the op may or may not be inplace or individually.
+
+# * IgnoreArgs: Ignore these arguments on the schema
+
+# * UnusedOutputArguments: Mark a given input as being unused in the function]
+#                        and is instead just used to mark the output. In Aten
+#                        this is common as many operations will have an argument
+#                        (!out) which is the storage location of the output. If
+#                        it matches an input it is inplace.
+
+#
+
+#
+# Views and reshapes
+#
+
+# aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
+- func: as_strided
+  PopTorchDirect: as_strided
+  IgnoreArgs: {'storage_offset'}
+
+# aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> (Tensor(a))
+- func: expand
+  PopTorchDirect: expand
+  IgnoreArgs: {'implicit'}
+
+# aten::reshape(Tensor(a) self, int[] shape) -> (Tensor(a))
+- func: reshape
+  PopTorchDirect: reshape
+
+- func: transpose.int
+  PopTorchDirect: transpose
+
+# aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
+- func: view
+  PopTorchDirect: reshape
+
+#
+#  Element wise
+#
+
+# aten::mul.out(Tensor self, Tensor other, *, Tensor(a!) out) -> (Tensor(a!))
+- func: mul.out
+  PopTorchDirect: mul
+  PopTorchDirectInplace: mul_
+  UnusedOutputArguments: {out}
+
+# aten::div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> (Tensor(a!))
+- func: div.out
+  PopTorchDirect: div
+  PopTorchDirectInplace: div_
+  UnusedOutputArguments: {out}
+
+# aten::zero_(Tensor(a!) self) -> (Tensor(a!))
+- func: zero_
+  PopTorchDirectInplace: zero_
+
+
+# fill_.Scalar(Tensor(a!) self, Scalar value) -> Tensor(a!)
+- func: fill_.Scalar
+  PopTorchDirectInplace: fill_
+
+
+# sub.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
+- func: sub.out
+  PopTorchDirect: sub
+  PopTorchDirectInplace: sub_
+  UnusedOutputArguments: {out}
+
+
+# add.out(Tensor self, Tensor other, *, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
+- func: add.out
+  PopTorchDirect: add
+  PopTorchDirectInplace: add_
+  UnusedOutputArguments: {out}

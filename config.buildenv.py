@@ -11,6 +11,7 @@ installers.add(
         "make=4.3",
         "mlir=" + _llvm_version,
         "ninja=1.10.2",
+        "pyyaml=5.3.1",
         "pybind11=2.6.1",
         "pytest=6.2.1",
         "spdlog=1.8.0",
@@ -35,6 +36,5 @@ if config.install_linters:
             "cpplint=1.4.4",
             "pylint=2.5.3",
             "python-clang=" + _llvm_version,
-            "pyyaml=5.3.1",
             "yapf=0.27.0",
         ))

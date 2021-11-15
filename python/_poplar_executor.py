@@ -1243,6 +1243,10 @@ class PoplarExecutor:
         raise _impl.createPoptorchError("Unsupported input type or condition.")
 
 
+def hasMlirSupportOnPlatform():
+    return poptorch_core.mlirIsSupportedOnPlatform()
+
+
 class IPUScope:
     def __init__(self,
                  inputs,
@@ -1265,14 +1269,15 @@ class IPUScope:
         else:
             self._params_and_buffers = parameters
 
+        param_list = list(self._params_and_buffers.values())
+
         self._outputs = []
         self._inputs = []
 
+        # Unpack the inputs.
         with torch.no_grad():
             for tensor in inputs:
                 self._inputs.append(tensor.clone())
-
-        param_list = list(self._params_and_buffers.values())
 
         # Create the graph. Futured captured calls will be written into this graph behind the scenes.
         poptorch_core.createGraph(
@@ -1289,17 +1294,30 @@ class IPUScope:
         poptorch_core.endDispatch()
 
         # Compile for IPU.
-        self._executable = poptorch_core.compileWithManualTracing(
-            self._inputs, list(self._params_and_buffers.values()),
-            list(self._params_and_buffers.keys()), self._options.toDict(),
-            accessAttributes)
-        poptorch_core.copyWeightsToDevice_impl(
-            self._executable, tuple(self._params_and_buffers.keys()),
-            tuple(self._params_and_buffers.values()))
+
+        if self._compile_using == enums.Compiler.PopART:
+            # Compile the captured graph using PopART.
+            self._executable = poptorch_core.compileWithManualTracing(
+                self._inputs, list(self._params_and_buffers.values()),
+                list(self._params_and_buffers.keys()), self._options.toDict(),
+                accessAttributes)
+            poptorch_core.copyWeightsToDevice_impl(
+                self._executable, tuple(self._params_and_buffers.keys()),
+                tuple(self._params_and_buffers.values()))
+        else:
+            # Compile the captured graph using MLIR.
+            self._executable = poptorch_core.compileWithMlir()
+            self._executable.weightsToDevice()
 
     def __call__(self, *args):
         # Otherwise run popart.
-        output = poptorch_core.execute(self._executable, args, {})
+        if self._compile_using == enums.Compiler.PopART:
+            # Run via PopART.
+            output = poptorch_core.execute(self._executable, args, {})
+        elif self._compile_using == enums.Compiler.MLIR:
+            # Run via the MLIR compiled binary.
+            self._executable.execute(args)
+            output = self._outputs
 
         if len(output) == 1:
             return output[0]

@@ -800,6 +800,10 @@ class Linters:
             time.sleep(1)
 
     def _gen_lint_commands(self, filename, autofix):
+        # TODO(T49191)
+        if "poptorch_compiler" in filename:
+            return None
+
         cmd = self._cpp_linters.gen_lint_commands(
             filename, autofix) + self._py_linters.gen_lint_commands(
                 filename, autofix)

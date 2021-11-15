@@ -6,7 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "pytorch_bridge/CompilerTypes.hpp"
+
 namespace poptorch {
+
 /*
  * The value mapper is the core of the tracer functionality. It provides the
  * system by which we map an incoming at::Tensor onto the compiler IRs. We take
@@ -21,7 +24,8 @@ public:
   struct TrackedTensor {
     explicit TrackedTensor(const at::Tensor &tensor)
         : tensor_impl(tensor.unsafeGetTensorImpl()),
-          tracker(tensor.getIntrusivePtr()), jit(nullptr) {}
+          tracker(tensor.getIntrusivePtr()), jit(nullptr),
+          mlir(poptorch_ir::tensor_error_id) {}
 
     // The PyTorch tensor impl. Most of the time it is "the tensor" on the
     // PyTorch side. However the autograd can create non-view aliases so
@@ -42,8 +46,11 @@ public:
     // The value in JIT IR
     torch::jit::Value *jit;
 
+    // The value in our mlir backend.
+    poptorch_ir::TensorId mlir;
+
     // Autograd can create tensors which mirror the original tensor storage.
-    bool isSame(const at::Tensor &other) const {
+    bool isSame(const at::Tensor &other) {
       // If we share storage then we are an alias.
       return tensor_impl->storage().is_alias_of(other.storage());
     }
@@ -58,18 +65,25 @@ public:
   std::unordered_map<at::StorageImpl *, std::vector<TrackedTensor *>>
       storage_map;
 
+  // We also need to map the values to the mlir so we can query the mlir for a
+  // given value.
+  std::unordered_map<torch::jit::Value *, TrackedTensor *> values_map;
+
   TrackedTensor *rawTensorRecord(const at::Tensor &t);
 
   torch::jit::Value *getValueForTensor(const at::Tensor &t);
 
+  poptorch_ir::TensorId getMLIRForTensor(const at::Tensor &t);
+
+  poptorch_ir::TensorId getMLIRForJit(torch::jit::Value *val);
+
   void addTensor(const at::Tensor &t, torch::jit::Value *val);
+
+  void addTensor(const at::Tensor &t, poptorch_ir::TensorId id);
 
   // Returns true if this is a direct alias and adds it to the approved alias
   // map.
   bool isDirectAlias(const at::Tensor &t);
-
-  // The node we last processed in the graph.
-  torch::jit::Node *last_processed_node;
 };
 
 } // namespace poptorch

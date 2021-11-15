@@ -284,6 +284,8 @@ bool alreadyRegistered(const std::string &ID) {
   return callbacks.find(ID) != callbacks.end();
 }
 
+bool mlirIsSupportedOnPlatform() { return POPTORCH_BUILD_MLIR_COMPILER == 1; }
+
 void registerBuffersWithCallback(
     const std::string &ID,
     std::vector<at::Tensor> &input_tensors, // NOLINT
@@ -1430,6 +1432,17 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("isAlreadyRegistered", poptorch::alreadyRegistered);
   m.def("registerBuffersWithCallback", poptorch::registerBuffersWithCallback);
 
+  m.def("mlirIsSupportedOnPlatform", poptorch::mlirIsSupportedOnPlatform);
+
+#if POPTORCH_BUILD_MLIR_COMPILER
+  py::class_<poptorch::MLIRExecutable,
+             std::shared_ptr<poptorch::MLIRExecutable>>(m, "MLIRExecutable")
+      .def("execute", &poptorch::MLIRExecutable::execute)
+      .def("weightsToDevice", &poptorch::MLIRExecutable::weightsToDevice)
+      .def("weightsToHost", &poptorch::MLIRExecutable::weightsToHost);
+  m.def("compileWithMlir", poptorch::compileMLIR);
+#endif
+
   py::enum_<poptorch::TracingMode>(m, "TracingMode")
       .value("PopART", poptorch::TracingMode::POPART)
       .value("MLIR", poptorch::TracingMode::MLIR)
@@ -1442,7 +1455,6 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("createGraph", poptorch::createGraph);
   m.def("markOutputs", poptorch::markOutputs);
   m.def("compileWithManualTracing", poptorch::compileWithManualTracing);
-
   m.def("_throwTestError", poptorch::throwTestErrorSafe);
 
   static Error error(m, "Error");

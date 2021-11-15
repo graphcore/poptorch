@@ -35,6 +35,25 @@ enum TracingMode {
   SENTINEL
 };
 
+/*
+ * When we compile we have two kinds of outputs. JIT or MLIR. JIT just returns
+ * the JIT graph to be compiled by a slightly modified compile step in
+ * poptorch.cpp. MLIR actually compiles the graph so returns a proper
+ * executable which stores all of the state needed to execute the graph.
+ */
+class MLIRExecutable {
+public:
+  explicit MLIRExecutable(
+      std::unique_ptr<poptorch_ir::PoptorchExecutorWrapper> &&);
+  ~MLIRExecutable();
+  void execute(const std::vector<at::Tensor> &inputs);
+  void weightsToDevice();
+  void weightsToHost();
+
+private:
+  std::unique_ptr<poptorch_ir::PoptorchExecutorWrapper> _impl;
+};
+
 // Create a new graph.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
                  const std::vector<at::Tensor> &parameters);
@@ -49,6 +68,10 @@ void markOutputs(const std::vector<at::Tensor> &outputs,
 // Get the captured JIT graph. In reality is just returning the
 // torch::jit::Graph it's already been compiling during the dispatch process.
 std::shared_ptr<torch::jit::Graph> getTracedGraph();
+
+// Compile MLIR. Is a full roundtrip compile and spits out a runable poplar
+// binary at the end, wrapped by `MLIRExecutable`.
+std::shared_ptr<MLIRExecutable> compileMLIR();
 
 // Start capturing calls.
 void startDispatch();

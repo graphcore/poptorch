@@ -25,6 +25,38 @@ string(REPLACE "." ";" TORCH_VERSION_AS_LIST ${TORCH_VERSION})
 # Get the minor component. (Versions are Major.Minor.Patch)
 list(GET TORCH_VERSION_AS_LIST 1 TORCH_MINOR_VERSION)
 
+# Build compiler parts by default.
+set(POPTORCH_BUILD_MLIR_COMPILER 1)
+
+# Centos is redhat
+file (GLOB IS_REDHAT /etc/redhat-release)
+
+message(STATUS "Is red hat : ${IS_REDHAT}")
+# Only on CENTOS 7.6 do we not build it.
+if (NOT IS_REDHAT STREQUAL "")
+  # Get centos version info.
+  file (READ /etc/redhat-release CENTOS_INFO)
+
+  # If it is in fact centos and not some other redhat.
+  string(FIND ${CENTOS_INFO} "CentOS" IS_CENTOS)
+
+  # Is the version number 7.6
+  string(FIND ${CENTOS_INFO} " 7.6" IS_SEVEN_POINT_SIX)
+
+  message(STATUS "Centos info : ${CENTOS_INFO}")
+
+  # If both centos and 7.6 we turn off the compiler build.
+  if(NOT ${IS_CENTOS} EQUAL -1)
+    if(NOT ${IS_SEVEN_POINT_SIX} EQUAL -1)
+      message(STATUS "This is 7.6, compiler is NOT getting built.")
+      set(POPTORCH_BUILD_MLIR_COMPILER 0)
+    endif()
+  endif()
+endif()
+
+# Tell the source files if we have built MLIR or not so it can be exposed via python.
+add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=${POPTORCH_BUILD_MLIR_COMPILER})
+
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
 if(NOT CMAKE_BUILD_TYPE)
@@ -158,6 +190,10 @@ find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
 remove_use_distributed_definition(torch_cpu)
 
 add_subdirectory(poptorch_logging)
+
+if (POPTORCH_BUILD_MLIR_COMPILER)
+  add_subdirectory(poptorch_compiler)
+endif()
 
 add_subdirectory(poptorch/source/dispatch_tracer)
 add_subdirectory(popart_compiler)
