@@ -14,21 +14,13 @@ URL_PATTERN = re.compile(r"\bhttps?:[^\s>]+")
 #
 # Make sure to add a TODO(TXXXX) comment to remove the exception once the link
 # is fixed.
-EXCEPTIONS = [
-    #TODO(T47138): remove exceptions after 2.3 release
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/feature_examples/pytorch",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/simple_applications/pytorch",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/feature_examples/popart/custom_operators",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut1_basics",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/feature_examples/pytorch/custom_op",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut3_mixed_precision",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut4_observing_tensors",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut2_efficient_data_loading"
-]
+EXCEPTIONS = []
 
 
 def get_all_links_from_file(rst_file_name):
+    # Known issue: if a link is split over multiple lines, only the first line
+    # (containing 'http') will be considered matched.
+
     print(f"Reading {rst_file_name}")
 
     all_links = []
@@ -44,15 +36,15 @@ def get_all_links_from_file(rst_file_name):
     return all_links
 
 
-def assert_url_works(url):
+def check_url_works(url):
     print(f"Testing {url}")
 
     try:
         r = requests.head(url)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         # Allow the test to succeed with intermitent issues.
-        # (TooManyReditects is not caught as could be a broken url.)
-        return
+        # (TooManyRedirects is not caught as could be a broken url.)
+        return None
 
     code = r.status_code
     message = requests.status_codes._codes[code][0]  # pylint: disable=protected-access
@@ -60,26 +52,32 @@ def assert_url_works(url):
     print(message + f" ({code})")
 
     if r.status_code == 302:
-        assert_url_works(r.headers['Location'])
+        check_url_works(r.headers['Location'])
     else:
         # Allow any non 4xx status code, as other failures could be temporary
         # and break the CI tests.
-        assert r.status_code < 400 or r.status_code >= 500, (
-            f"{url}: {message} ({code})")
+        if r.status_code >= 400 and r.status_code < 500:
+            return url, message, code
         print()
+
+    return None
 
 
 def test_all_links():
     user_guide_path = os.path.realpath(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), DOC_FOLDER))
+    failed_urls = []
 
     for rst_file in glob.glob(f"{user_guide_path}/*.rst"):
         for url in get_all_links_from_file(rst_file):
-            try:
-                assert_url_works(url)
-            except AssertionError as e:
+            url_result = check_url_works(url)
+            if url_result is not None:
+                url, message, code = url_result
                 if url in EXCEPTIONS:
-                    print(f"{url} found in exceptions: ignoring {e}")
+                    print(f"{url} found in exceptions: ",
+                          f"ignoring {message} ({code})")
                 else:
-                    raise
-        print()
+                    failed_urls.append(f"{url}: {message} ({code})")
+            print()
+
+    assert not failed_urls, failed_urls
