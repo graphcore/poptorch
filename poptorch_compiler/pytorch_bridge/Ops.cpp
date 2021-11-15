@@ -13,16 +13,15 @@ template <typename T> T convert(T a, std::vector<mlir::Value> & /*unused*/) {
   return a;
 }
 
-/* UNUSED IN THIS PATCH
-llvm::SmallVector<mlir::Value, 4>
+[[maybe_unused]] llvm::SmallVector<mlir::Value, 4>
 convert(const std::vector<poptorch_ir::TensorId> &inputs,
         std::vector<mlir::Value> &values) {
   llvm::SmallVector<mlir::Value, 4> tmp;
   for (TensorId id : inputs) {
     tmp.push_back(values[id]);
   }
-  return std::move(tmp);
-}*/
+  return tmp;
+}
 
 mlir::Value convert(poptorch_ir::TensorId input,
                     std::vector<mlir::Value> &values) {

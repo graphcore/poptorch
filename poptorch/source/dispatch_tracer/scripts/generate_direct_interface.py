@@ -163,7 +163,36 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
         stack_at_index = "stack.at(" + str(arg_index) + ")"
         arg_type = arg[1]
 
-        if 'Tensor' in arg_type:
+        # Handle tensor list e.g "_cat(Tensor[] tensors, int dim=0) -> Tensor"
+        if 'Tensor[]' in arg_type:
+            # Error if this is not a list.
+            function_decl += "ERROR_ON_MSG(!" + stack_at_index
+            function_decl += ".isTensorList(), \"Expected list of tensors for"
+            function_decl += " operation: {}\");\n".format(op_target['func'])
+
+            # Create the list converted into poptorch compiler tensors.
+            function_decl += "\t[[maybe_unused]] std::vector<"
+            function_decl += "poptorch_ir::TensorId> " + arg[0] + ";\n"
+
+            # Placeholder value to store each IValue in the list
+            loop_placeholder = arg[0] + "_pytorch"
+
+            # Iterate over the list.
+            function_decl += "for (c10::IValue " + loop_placeholder + " : "
+            function_decl += stack_at_index + ".toTensorVector()) {\n"
+
+            # Extract the tensor from the list and look it up.
+            function_decl += "\t\t" + arg[0] + ".push_back(findTensor("
+            function_decl += "{}.toTensor()) );\n".format(loop_placeholder)
+
+            # Update the requires grad stuff.
+            function_decl += "\t\trequires_grad |= " + loop_placeholder
+            function_decl += ".toTensor().requires_grad();\n\n"
+
+            # end loop
+            function_decl += "}"
+
+        elif 'Tensor' in arg_type:
             # Special tensor handling
             function_decl += "\t// Get the pytorch tensor, find the MLIR IR"
             function_decl += " mapped tensor for that tensor, and check if "
