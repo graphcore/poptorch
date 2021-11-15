@@ -259,7 +259,7 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 
   // Otherwise we convert the node into PyTorch JIT first and work with that
   // instead of direct mapping.
-  ERROR("Unimplemmented in this patch.");
+  ERROR("Could not find implementation for operation of name: " + schema_key);
 }
 
 std::shared_ptr<MLIRExecutable> MLIRDispatch::compile() {
