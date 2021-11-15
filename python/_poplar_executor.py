@@ -215,8 +215,8 @@ class PoplarExecutor:
 
                     return object.__getattribute__(self, name)
 
-                def __torch_function__(self, func, types, args=(),
-                                       kwargs=None):
+                @classmethod
+                def __torch_function__(cls, func, types, args=(), kwargs=None):
                     if kwargs is None:
                         kwargs = {}
                     return super().__torch_function__(func, types, args,
@@ -232,8 +232,8 @@ class PoplarExecutor:
 
                     return super().__getattribute__(name)
 
-                def __torch_function__(self, func, types, args=(),
-                                       kwargs=None):
+                @classmethod
+                def __torch_function__(cls, func, types, args=(), kwargs=None):
                     if kwargs is None:
                         kwargs = {}
                     return super().__torch_function__(func, types, args,
