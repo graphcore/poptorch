@@ -424,6 +424,17 @@ class LegacyBeginBlockFn(torch.nn.Module):
         return out
 
 
+def removeBlocks(module: torch.nn.Module):
+    """Recursively remove BeginBlock annotations from a Module if it
+    contains any.
+
+    :param module: Module to recursively unwrap.
+    """
+    assert isinstance(module, torch.nn.Module)
+    for m in module.modules():
+        _impl.unwrapIfWrapped(m)
+
+
 def BeginBlock(layer_to_call: torch.nn.Module,
                user_id: str = None,
                ipu_id: int = None) -> torch.nn.Module:
@@ -479,6 +490,7 @@ def BeginBlock(layer_to_call: torch.nn.Module,
             "module has already been assigned to a block.")
 
     BlockModule.__name__ = type(layer_to_call).__name__
+    _impl.registerWrapperType(BlockModule)
     layer_to_call.__class__ = BlockModule
     layer_to_call.__dict__['_user_id'] = user_id
     layer_to_call.__dict__['_ipu_id'] = ipu_id

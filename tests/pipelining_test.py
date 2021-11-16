@@ -594,3 +594,95 @@ def test_begin_block_with_function():
 
     with tempfile.TemporaryFile() as f:
         torch.save(block, f)
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+def test_removeBlocks(capfd):
+    class Block(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.relu = torch.nn.ReLU()
+
+            self.l1 = torch.nn.Linear(3, 5)
+            self.l2 = torch.nn.Linear(5, 5)
+            self.l3 = torch.nn.Linear(5, 3)
+
+        def forward(self, x):
+            x = self.relu(self.l1(x))
+            x = self.relu(self.l2(x))
+            x = self.relu(self.l3(x))
+            return x
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.b1 = Block()
+            self.b2 = Block()
+
+        def forward(self, x):
+            x = self.b1(x)
+            x = self.b2(x)
+            return x
+
+    def compile_model(m):
+        opts = poptorch.Options()
+        opts.deviceIterations(10)
+        if poptorch.ipuHardwareIsAvailable():
+            opts.useOfflineIpuTarget()
+        poptorch_model = poptorch.inferenceModel(m, opts)
+        poptorch_model.compile(torch.randn(10, 3))
+
+    def assert_is_not_pipelined(m):
+        compile_model(m)
+        log = helpers.LogChecker(capfd)
+        log.assert_contains("enablePipelining set to value 0")
+        log.assert_contains(" b1/l1/MatMul:0 ",
+                            " mode(Pipelined), ipu(0), stage(0)")
+        log.assert_contains(" b1/l2/MatMul:0 ",
+                            " mode(Pipelined), ipu(0), stage(0)")
+        log.assert_contains(" b1/l3/MatMul:0 ",
+                            " mode(Pipelined), ipu(0), stage(0)")
+        log.assert_contains(" b2/l1/MatMul:0 ",
+                            " mode(Pipelined), ipu(0), stage(0)")
+        log.assert_contains(" b2/l2/MatMul:0 ",
+                            " mode(Pipelined), ipu(0), stage(0)")
+        log.assert_contains(" b2/l3/MatMul:0 ",
+                            " mode(Pipelined), ipu(0), stage(0)")
+
+    def assert_is_pipelined(m):
+        compile_model(m)
+        log = helpers.LogChecker(capfd)
+        log.assert_contains("enablePipelining set to value 1")
+        log.assert_contains(" b1/l1/MatMul:0 ",
+                            " mode(Pipelined), ipu(0), stage(0)")
+        log.assert_contains(" b1/l2/MatMul:0 ",
+                            " mode(Pipelined), ipu(1), stage(1)")
+        log.assert_contains(" b1/l3/MatMul:0 ",
+                            " mode(Pipelined), ipu(1), stage(1)")
+        log.assert_contains(" b2/l1/MatMul:0 ",
+                            " mode(Pipelined), ipu(2), stage(2)")
+        log.assert_contains(" b2/l2/MatMul:0 ",
+                            " mode(Pipelined), ipu(2), stage(2)")
+        log.assert_contains(" b2/l3/MatMul:0 ",
+                            " mode(Pipelined), ipu(2), stage(2)")
+
+    m = Model()
+
+    poptorch.BeginBlock(m.b1.l2, ipu_id=1)
+    poptorch.BeginBlock(m.b2, ipu_id=2)
+
+    assert_is_pipelined(m)
+
+    with pytest.raises(poptorch.Error,
+                       match="module has already been assigned to a block"):
+        poptorch.BeginBlock(m.b1.l2, ipu_id=1)
+
+    poptorch.removeBlocks(m)
+
+    assert_is_not_pipelined(m)
+
+    poptorch.BeginBlock(m.b1.l2, ipu_id=1)
+    poptorch.BeginBlock(m.b2, ipu_id=2)
+
+    assert_is_pipelined(m)
