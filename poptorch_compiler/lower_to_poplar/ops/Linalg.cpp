@@ -1,0 +1,55 @@
+// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include "lower_to_poplar/CompilerHelpers.hpp"
+#include <poplin/ConvParams.hpp>
+#include <poplin/MatMul.hpp>
+
+namespace poptorch_ir {
+
+void matmul::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor input2 = context.fromSsa(this->in2());
+
+  // We are always going to want to add a batch dim, even if one exists it's
+  // only 1 so should be free.
+  input1 = input1.expand({0});
+  input2 = input2.expand({0});
+
+  // Broadcast Vector-Vector.
+  if (input1.rank() == 2 && input2.rank() == 2) {
+    input1 = input1.expand({1});
+    input2 = input2.expand({2});
+  }
+
+  // Broadcast Matrix-Vector to Batch-matrix.
+  if (input1.rank() == 2) {
+    input1 = input1.expand({2});
+  }
+
+  if (input2.rank() == 2) {
+    input2 = input2.expand({2});
+  }
+
+  if (input1.rank() > 3) {
+    input1 = input1.flatten(0, input1.rank() - 2);
+  }
+
+  if (input2.rank() > 3) {
+    input2 = input2.flatten(0, input2.rank() - 2);
+  }
+
+  poplar::Tensor out = poplin::matMulGrouped(context.graph, input1, input2,
+                                             context.seq, input1.elementType());
+
+  // Reshape into target shape. Jump through some array ref stuff.
+  auto llvm_ref =
+      this->result().getType().cast<mlir::RankedTensorType>().getShape();
+  poplar::ArrayRef<std::uint64_t> poplar_ref{
+      (const std::uint64_t *)llvm_ref.data(), llvm_ref.size()};
+
+  out = out.reshape(poplar_ref);
+
+  // Record the result.
+  context.tensors.insert({this->result(), out});
+}
+
+} // namespace poptorch_ir

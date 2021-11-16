@@ -86,3 +86,32 @@
   PopTorchDirect: add
   PopTorchDirectInplace: add_
   UnusedOutputArguments: {out}
+
+
+
+
+#
+# Linalg
+#
+
+# aten::mm(Tensor self, Tensor mat2) -> (Tensor)
+# Matrix-matrix multiplication
+- func: mm
+  PopTorchDirect: matmul
+
+# aten::mm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> (Tensor(a!))
+- func: mm.out
+  PopTorchDirect: matmul
+  UnusedOutputArguments: {out}
+
+# Matrix-vector
+- func: mv
+  PopTorchDirect: matmul
+
+# vector-vector
+- func: dot
+  PopTorchDirect: matmul
+
+# BatchMatrix-Matrix
+- func: bmm
+  PopTorchDirect: matmul
