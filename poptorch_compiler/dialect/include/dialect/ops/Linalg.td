@@ -2,6 +2,51 @@
  * Linalg operations.
  */
 
+
+def Poptorch_conv : Poptorch_Op<"conv", []> {
+  let arguments = (ins Poptorch_tensor:$input,
+                        Poptorch_tensor:$weight,
+                        Optional<Poptorch_tensor>:$bias,
+                        I64ArrayAttr:$strides, I64ArrayAttr:$padding, 
+                        I64ArrayAttr:$dilation, I64ArrayAttr:$output_padding, I64Attr:$groups);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$weights, "mlir::Value":$bias,
+                                "const std::vector<std::int64_t>&":$strides,
+                                "const std::vector<std::int64_t>&":$padding, "const std::vector<std::int64_t>&":$dilation,
+                                "const std::vector<std::int64_t>&":$output_padding, "std::int64_t":$groups), [{
+        if (bias) {
+            $_state.addOperands({input, weights, bias});
+        } else {
+            $_state.addOperands({input, weights});
+        }
+        $_state.addAttribute("strides",$_builder.getI64ArrayAttr(strides));
+        $_state.addAttribute("padding",$_builder.getI64ArrayAttr(padding));
+        $_state.addAttribute("dilation",$_builder.getI64ArrayAttr(dilation));
+        $_state.addAttribute("output_padding",$_builder.getI64ArrayAttr(output_padding));
+        $_state.addAttribute("groups",$_builder.getI64IntegerAttr(groups));
+
+
+        mlir::RankedTensorType weight_shape = weights.getType().cast<mlir::RankedTensorType>();
+
+        mlir::RankedTensorType input_shape = input.getType().cast<mlir::RankedTensorType>();
+
+        llvm::SmallVector<std::int64_t, 4> out_shape {input_shape.getShape().begin(), input_shape.getShape().end()};
+
+        // See https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html for deduction rules.
+        out_shape[1] = weight_shape.getShape()[0];
+
+        for (std::size_t i = 0; i < out_shape.size() - 2; ++i) {
+            const std::size_t i_dim = i + 2;
+            out_shape[i_dim] = ((input_shape.getShape()[i_dim] + 2 * padding[i] - dilation[i] * (weight_shape.getShape()[i_dim] -1) - 1) / strides[i]) + 1;
+        }
+
+
+        $_state.addTypes(mlir::RankedTensorType::get(out_shape, input_shape.getElementType()));
+  }]>];
+}
+
+
 def Poptorch_matmul : Poptorch_Op<"matmul", []> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);

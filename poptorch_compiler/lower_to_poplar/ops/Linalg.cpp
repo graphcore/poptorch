@@ -1,9 +1,64 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "lower_to_poplar/CompilerHelpers.hpp"
 #include <poplin/ConvParams.hpp>
+#include <poplin/Convolution.hpp>
 #include <poplin/MatMul.hpp>
 
 namespace poptorch_ir {
+
+void conv::lowerToPoplar(CompilerContext &context) {
+  // Convert the inputs to poplar tensors.
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor weight = context.fromSsa(this->weight());
+
+  // Extract the attributes into something usable. Oddly/annoyingly the API
+  // requests unsigned but stores as size_t.
+  std::vector<unsigned> strides = convertIntArray<unsigned>(this->strides());
+  std::vector<unsigned> padding = convertIntArray<unsigned>(this->padding());
+  std::vector<unsigned> dilation = convertIntArray<unsigned>(this->dilation());
+  std::vector<unsigned> output_padding =
+      convertIntArray<unsigned>(this->output_padding());
+  const std::size_t groups = this->groups();
+
+  std::vector<std::size_t> input_field_shape;
+  std::vector<std::size_t> weight_shape;
+
+  for (std::size_t i = 0; i < weight.rank() - 2; ++i) {
+    input_field_shape.push_back(input.dim(i + 2));
+    weight_shape.push_back(weight.dim(i + 2));
+  }
+
+  // We will create this as part of the planning stage and cache it somewhere in
+  // the future.
+  poplin::ConvParams params(
+      poplar::FLOAT /*input type*/, input.dim(0) /*batch_size*/,
+      input_field_shape /*input field shape*/, weight_shape /*kernel shape*/,
+      weight.dim(1) /*input channels per group*/,
+      weight.dim(0) / groups /*output channels per group*/, groups /*groups*/);
+
+  params.inputTransform.paddingLower = padding;
+  params.inputTransform.paddingUpper = padding;
+
+  params.kernelTransform.dilation = dilation;
+
+  params.outputTransform.stride = strides;
+  params.outputTransform.paddingLower = output_padding;
+  params.outputTransform.paddingUpper = output_padding;
+
+  weight = weight.reshapePartial(
+      0, 2, {groups, weight.dim(0) / groups, weight.dim(1)});
+
+  poplar::Tensor output = poplin::convolution(context.graph, input, weight,
+                                              params, false, context.seq);
+
+  // MLIR value converts to bool so optional biases will be ignored.
+  if (this->bias()) {
+    poplar::Tensor bias = context.fromSsa(this->bias());
+    poplin::addBias(context.graph, output, bias, context.seq);
+  }
+
+  context.tensors.insert({this->result(), output});
+}
 
 void matmul::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());

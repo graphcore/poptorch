@@ -87,12 +87,18 @@
   PopTorchDirectInplace: add_
   UnusedOutputArguments: {out}
 
-
-
-
 #
 # Linalg
 #
+
+
+# convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride,
+#             int[] padding, int[] dilation, bool transposed,
+#             int[] output_padding, int groups) -> Tensor
+- func: convolution
+  PopTorchDirect: conv
+  IgnoreArgs: {'transposed'}
+
 
 # aten::mm(Tensor self, Tensor mat2) -> (Tensor)
 # Matrix-matrix multiplication

@@ -184,20 +184,32 @@ at::Tensor &MLIRDispatch::copyInplace(at::Tensor &self, const at::Tensor &src) {
 
 void packStack(c10::Stack & /*unused*/) {}
 
+// A small helper to populate the c10::stack.
 template <typename T, typename... Args>
 void packStack(c10::Stack &stack, T &arg, Args... args) {
   stack.push_back(arg);
-  pack_stack(stack, args...);
+  packStack(stack, args...);
 }
 
 at::Tensor MLIRDispatch::convolution(
-    const at::Tensor &input, const at::Tensor & /*weight*/,
-    const c10::optional<at::Tensor> & /*bias*/,
-    const at::IntArrayRef /*stride*/, const at::IntArrayRef /*padding*/,
-    const at::IntArrayRef /*dilation*/, const bool /*transposed*/,
-    const at::IntArrayRef /*output_padding*/, const int64_t /*groups*/) {
-  ERROR("Unimplemmented in this patch.");
-  return input;
+    const at::Tensor &input, const at::Tensor &weight,
+    const c10::optional<at::Tensor> &bias, const at::IntArrayRef strides,
+    const at::IntArrayRef padding, const at::IntArrayRef dilation,
+    const bool /*transposed*/, const at::IntArrayRef output_padding,
+    const int64_t groups) {
+  // Create the stack which is just a vector of IValues, I.e all of the above
+  // arguments.
+  c10::Stack stack;
+
+  // An optional bias is actually an undefined tensor, not 100% why they have
+  // two layers of indirection (optional AND undefined).
+  packStack(stack, input, weight, *bias, strides, padding, dilation,
+            output_padding, groups);
+
+  // Unpack the above and create the MLIR convolution node.
+  this->convolution(stack);
+
+  return stack.at(0).toTensor();
 }
 
 // _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
