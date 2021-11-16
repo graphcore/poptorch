@@ -2,22 +2,19 @@
 #ifndef POPTORCH_CODEGEN_POPTORCH_IR_H_
 #define POPTORCH_CODEGEN_POPTORCH_IR_H_
 
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
-
-#include <mlir/IR/BuiltinAttributes.h>
-#include <mlir/IR/BuiltinOps.h>
-#include <mlir/IR/BuiltinTypes.h>
-#include <mlir/IR/OpImplementation.h>
+#include "mlir/IR/OpImplementation.h"
 
 /*
  * Custom traits.
  */
 
-// TODO in next LLVM version (Current 12.0) we can move this into our own namespace
-// TODO: It's actually possible in this version (Current 13.0)
-// namespace.
+// TODO(T49565) in next LLVM version (Current 12.0) we can move this into our
+// own namespace
 namespace mlir {
 namespace OpTrait {
 
@@ -29,14 +26,15 @@ public:
 };
 
 template <typename ConcreteType>
-class DontGenerateBridgeCxx : public TraitBase<ConcreteType, DontGenerateBridgeCxx> {};
+class DontGenerateBridgeCxx
+    : public TraitBase<ConcreteType, DontGenerateBridgeCxx> {};
 
 } // namespace OpTrait
 } // namespace mlir
 
 namespace poptorch_ir {
 
-class CompilerContext;
+struct CompilerContext;
 
 // Add our interfaces. These allow us to call poptorch specific functions on
 // generic ops.

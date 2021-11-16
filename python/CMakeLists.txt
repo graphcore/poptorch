@@ -13,6 +13,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 add_compile_options(-fsized-deallocation)
 endif()
 
+add_library(poptorch_core_headers INTERFACE)
+target_include_directories(poptorch_core_headers INTERFACE ${PROJECT_SOURCE_DIR}/poptorch/include)
+
 set(POPTORCH_CORE_SOURCES
   "poptorch.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/ImplicitCasting.cpp"
@@ -80,12 +83,7 @@ target_link_libraries(poptorch_core PRIVATE
   ${TORCH_PYTHON_LIBRARY}
   poptorch_logging
   dispatch_tracer
-)
-
-target_include_directories(poptorch_core PRIVATE
-  "${PROJECT_SOURCE_DIR}/poptorch/include"
-  "${PROJECT_SOURCE_DIR}/poptorch_logging/include"
-  "${PROJECT_SOURCE_DIR}/popart_compiler/include"
+  poptorch_core_headers
 )
 
 install(TARGETS poptorch_core

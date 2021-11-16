@@ -29,11 +29,11 @@ public:
 
   void init();
 
-  TensorId addInput(void *ptr,const std::vector<std::int64_t>& shape, Type,
+  TensorId addInput(void *ptr, const std::vector<std::int64_t> &shape, Type,
                     const char *);
-  TensorId addParameter(void *ptr, const std::vector<std::int64_t>&  shape, Type,
+  TensorId addParameter(void *ptr, const std::vector<std::int64_t> &shape, Type,
                         const char *);
-  TensorId addBuffer(void *ptr, const std::vector<std::int64_t>& shape, Type,
+  TensorId addBuffer(void *ptr, const std::vector<std::int64_t> &shape, Type,
                      const char *);
 
   void addOutput(TensorId id, void *ptr, const char *);
@@ -53,10 +53,10 @@ public:
 // op using non-pytorch, non-mlir types. Tensors are poptorch_ir::TensorId.
 // Functions return void, poptorch_ir::TensorId, or
 // std::vector<poptorch_ir::TensorId> depending on their type.
-#include "pytorch_bridge/helpers/AutogenCompiler.hpp.inc"
+#include "dialect/AutogenCompiler.hpp.inc"
 
 private:
-  std::unique_ptr<detail::PoptorchCompilerImpl> impl;
+  std::unique_ptr<detail::PoptorchCompilerImpl> _impl;
 };
 
 } // namespace poptorch_ir

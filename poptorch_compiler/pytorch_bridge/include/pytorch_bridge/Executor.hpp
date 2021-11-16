@@ -26,7 +26,7 @@ public:
   void weightsToHost();
 
 private:
-  std::shared_ptr<detail::PoptorchExecutorWrapperImpl> impl;
+  std::shared_ptr<detail::PoptorchExecutorWrapperImpl> _impl;
 };
 
 } // namespace poptorch_ir

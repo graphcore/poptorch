@@ -23,15 +23,16 @@ add_library(dispatch_tracer STATIC
         ValueMapper.cpp
 )
 
-
-# Run the script to generate the C++.
-add_dependencies(dispatch_tracer generate_supported_ops_interface)
-
 target_link_libraries(dispatch_tracer
   PUBLIC
     torch
   PRIVATE
-  poptorch_logging)
+  poptorch_core_headers
+  poptorch_logging
+  poptorch_compiler
+  popart_compiler
+  generated_supported_ops_interface
+  )
 
 # Add the compiler if we are to build that.
 if (POPTORCH_BUILD_MLIR_COMPILER)
@@ -39,10 +40,3 @@ if (POPTORCH_BUILD_MLIR_COMPILER)
 endif()
 
 set_property(TARGET dispatch_tracer PROPERTY CXX_STANDARD 17)
-
-target_include_directories(dispatch_tracer PRIVATE
-  "${PROJECT_SOURCE_DIR}/poptorch/include"
-  "${PROJECT_SOURCE_DIR}/popart_compiler/include"
-  # Include the codegen.
-  "${PROJECT_SOURCE_DIR}/poptorch_compiler/pytorch_bridge/include"
-)

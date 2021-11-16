@@ -17,11 +17,9 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 
-
 #include <string>
 #include <utility>
 #include <vector>
-
 
 #include <poprithms/logging/timepartitionlogger.hpp>
 
@@ -30,16 +28,13 @@
 
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
-#include "pytorch_bridge/Compiler.hpp"
+#include "pytorch_bridge/PoptorchCompiler.hpp"
 
 namespace poptorch_ir {
 namespace detail {
 
 class PoptorchCompilerImpl {
 public:
-  friend PoptorchCompiler;
-  friend PoptorchExecutorWrapper;
-
   PoptorchCompilerImpl();
 
   mlir::Type convertType(Type type);
@@ -50,10 +45,9 @@ public:
   // We have to jump through some hoops to add a new input after creation.
   // There's nicer ways of doing this in LLVM tree, once we upgrade should
   // change this.
-  // TODO: Once we move from LLVM-13. See insertArgument in new API.
+  // TODO(T49565): Once we move from LLVM-13. See insertArgument in new API.
   mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
 
-private:
   // We need to maintain some MLIR state.
 
   // The global context.
@@ -95,8 +89,8 @@ private:
   poprithms::logging::ManualTimePartitionLogger timing_manager;
 
   // clang-format off
-  // TODO: In LLVM 13 MLIR provides a really nice timing wrapper which we can
-  // use and it integrates with all our passes.
+  // TODO(T49565): In LLVM 13 MLIR provides a really nice timing wrapper
+  // which we can use and it integrates with all our passes.
 
   // A timer for us to record how long it takes to compile each stage.
   //mlir::DefaultTimingManager timing_manager_

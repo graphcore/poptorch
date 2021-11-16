@@ -7,23 +7,19 @@
 #include <vector>
 
 #include "lower_to_poplar/PoplarExecutor.hpp"
-#include "pytorch_bridge/Compiler.hpp"
+#include "pytorch_bridge/PoptorchCompiler.hpp"
 
 namespace poptorch_ir {
 namespace detail {
 
 class PoptorchExecutorWrapperImpl {
 public:
-  friend PoptorchExecutorWrapper;
-
   PoptorchExecutorWrapperImpl(std::vector<std::string> &&callbacks,
                               poptorch_ir::PoplarExecutable &&exe)
-      : input_callbacks(std::move(callbacks)),
-        executable(std::move(exe)) {}
+      : input_callbacks(std::move(callbacks)), executable(std::move(exe)) {}
 
   ~PoptorchExecutorWrapperImpl();
 
-private:
   // Input and output callbacks to give to poplar.
   std::vector<std::string> input_callbacks;
 

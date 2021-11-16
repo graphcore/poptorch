@@ -1,9 +1,14 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+
+#include "lower_to_poplar/PoplarExecutor.hpp"
+
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Transforms/Passes.h>
+
+#include <utility>
 
 #include <model_runtime/DeviceManager.hpp>
 #include <poplar/Device.hpp>
@@ -14,20 +19,18 @@
 #include <poplar/Target.hpp>
 #include <poprithms/logging/timepartitionlogger.hpp>
 
-#include "poptorch_logging/Logging.hpp"
-#include "poptorch_logging/Error.hpp"
 #include "lower_to_poplar/CompilerHelpers.hpp"
 #include "lower_to_poplar/LowerToPoplar.hpp"
-#include "lower_to_poplar/PoplarExecutor.hpp"
-
+#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch_ir {
 namespace detail {
 
 class PoplarExecutableImpl {
 public:
-
-  PoplarExecutableImpl(mlir::ModuleOp op, std::shared_ptr<model_runtime::Device>device);
+  PoplarExecutableImpl(mlir::ModuleOp op,
+                       std::shared_ptr<model_runtime::Device> device);
 
   void compile(poprithms::logging::ManualTimePartitionLogger &timer);
 
@@ -44,9 +47,9 @@ public:
   std::unique_ptr<poplar::Engine> engine;
 };
 
-PoplarExecutableImpl::PoplarExecutableImpl(mlir::ModuleOp op,
-                                           std::shared_ptr<model_runtime::Device> d)
-    : device(d), the_graph(device->device().getTarget()), module(op),
+PoplarExecutableImpl::PoplarExecutableImpl(
+    mlir::ModuleOp op, std::shared_ptr<model_runtime::Device> d)
+    : device(std::move(d)), the_graph(device->device().getTarget()), module(op),
       context(the_graph) {}
 
 void PoplarExecutableImpl::execute() { engine->run(Programs::MainGraph); }
@@ -119,8 +122,7 @@ PoplarExecutable::PoplarExecutable(mlir::ModuleOp module) {
   }
   ERROR_ON_MSG(!device, "Failed to acquire a device");
 
-  _impl =
-      std::make_unique<detail::PoplarExecutableImpl>(module, device);
+  _impl = std::make_unique<detail::PoplarExecutableImpl>(module, device);
 }
 
 PoplarExecutable::PoplarExecutable(PoplarExecutable &&other) {

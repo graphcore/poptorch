@@ -12,7 +12,7 @@
 
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
-#include "pytorch_bridge/Compiler.hpp"
+#include "pytorch_bridge/PoptorchCompiler.hpp"
 #endif
 
 #include "../ValueMapper.hpp"

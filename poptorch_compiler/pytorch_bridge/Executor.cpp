@@ -9,20 +9,20 @@ PoptorchExecutorWrapperImpl::~PoptorchExecutorWrapperImpl() {}
 } // namespace detail
 
 PoptorchExecutorWrapper PoptorchCompiler::compile() {
-  impl->executable.compile(impl->timing_manager);
+  _impl->executable.compile(_impl->timing_manager);
 
   // Connect up the outputs.
-  for (auto &pair : impl->output_callbacks) {
-    impl->executable.connectStream(pair.first, pair.second);
+  for (auto &pair : _impl->output_callbacks) {
+    _impl->executable.connectStream(pair.first, pair.second);
   }
 
-  for (auto &pair : impl->weight_callbacks) {
-    impl->executable.connectStream("Write-" + pair.first, pair.second);
-    impl->executable.connectStream("Read-" + pair.first, pair.second);
+  for (auto &pair : _impl->weight_callbacks) {
+    _impl->executable.connectStream("Write-" + pair.first, pair.second);
+    _impl->executable.connectStream("Read-" + pair.first, pair.second);
   }
 
   PoptorchExecutorWrapper executor;
-  executor.compile(*impl);
+  executor.compile(*_impl);
   return executor;
 }
 
@@ -31,28 +31,27 @@ PoptorchExecutorWrapper::~PoptorchExecutorWrapper() {}
 void PoptorchExecutorWrapper::compile(
     detail::PoptorchCompilerImpl &compiler_impl) {
 
-  impl = std::make_shared<detail::PoptorchExecutorWrapperImpl>(
+  _impl = std::make_shared<detail::PoptorchExecutorWrapperImpl>(
       std::move(compiler_impl.input_callbacks),
       std::move(compiler_impl.executable));
 }
 
 void PoptorchExecutorWrapper::execute(const std::vector<void *> &ptrs) {
-
   // Connect up the inputs.
-  for (std::size_t i = 0; i < impl->input_callbacks.size(); ++i) {
-    impl->executable.connectStream(impl->input_callbacks[i], ptrs[i]);
+  for (std::size_t i = 0; i < _impl->input_callbacks.size(); ++i) {
+    _impl->executable.connectStream(_impl->input_callbacks[i], ptrs[i]);
   }
 
   // Execute.
-  impl->executable.execute();
+  _impl->executable.execute();
 }
 
 void PoptorchExecutorWrapper::weightsToDevice() {
-  impl->executable.weightsToDevice();
+  _impl->executable.weightsToDevice();
 }
 
 void PoptorchExecutorWrapper::weightsToHost() {
-  impl->executable.weightsToHost();
+  _impl->executable.weightsToHost();
 }
 
 } // namespace poptorch_ir

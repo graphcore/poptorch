@@ -18,7 +18,7 @@ set_property(TARGET popart_compiler PROPERTY CXX_STANDARD 14)
 
 target_link_libraries(popart_compiler PRIVATE popart-only poptorch_logging)
 
-target_include_directories(popart_compiler PRIVATE "include" "source/include")
+target_include_directories(popart_compiler PUBLIC include PRIVATE source/include)
 
 install(TARGETS popart_compiler
   DESTINATION ${INSTALL_PYDIR})

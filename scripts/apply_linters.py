@@ -467,12 +467,18 @@ class ClangTidy(ILinter):
                 # line_mapping[filename] = { offset : (line, col) }
                 line_mappings = {}
                 for filename, file_offsets in offsets.items():
+                    # Don't lint files in the build folder
+                    if not os.path.isabs(filename):
+                        continue
                     line_mappings[filename] = offset_to_line(
                         filename, file_offsets)
                 printed = []
                 for diag in diagnostics:
                     msg = diag["DiagnosticMessage"]
                     filename = msg["FilePath"]
+                    # Don't lint files in the build folder
+                    if not os.path.isabs(filename):
+                        continue
                     line, col = line_mappings[filename][msg["FileOffset"]]
                     error = "error"
                     if self.autofix and msg["Replacements"]:
@@ -508,8 +514,30 @@ class ClangTidy(ILinter):
             # Fall through to header path to try to find
             # flags for files in the same folder
 
-        # If it's a header try to find a cpp file in the same root folder
-        folder = filename.split("/")[0] + "/"
+        folder = os.path.dirname(filename)
+        filename = os.path.basename(filename)
+        path = folder.split(os.path.sep)
+        # If it's a public header then it will be in
+        # poptorch/component/include/component/my_header.hpp
+        # and the cpp files will be in /component/source/
+        #
+        # Therefore we need to replace "include/component" with "source"
+        # to find a cpp file with the compilation flags we want.
+        if "include" in path:
+            # Remove folders in path up to "include"
+            while path.pop() != "include":
+                continue
+
+            # TODO(T49191) lower_to_poplar, dialect and pytorch_bridge don't
+            # have their sources in a "source" subfolder at the moment.
+            if not any(comp in path for comp in
+                       ["lower_to_poplar", "pytorch_bridge", "dialect"]):
+                # Point at "source" instead
+                path.append("source")
+        # else it's a private header: nothing to do, it's already in the same
+        # folder as the source files.
+        folder = os.path.join(*path)
+
         for path, flags in self.compile_commands.items():
             if path.startswith(folder):
                 logger.debug("Found flags for folder %s", folder)
@@ -800,10 +828,6 @@ class Linters:
             time.sleep(1)
 
     def _gen_lint_commands(self, filename, autofix):
-        # TODO(T49191)
-        if "poptorch_compiler" in filename:
-            return None
-
         cmd = self._cpp_linters.gen_lint_commands(
             filename, autofix) + self._py_linters.gen_lint_commands(
                 filename, autofix)

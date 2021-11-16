@@ -131,10 +131,10 @@ function(run_poptorch_install_command cmd working_directory cmd_name)
 endfunction()
 
 function(remove_use_distributed_definition target)
-	get_target_property(compile_options ${target} INTERFACE_COMPILE_DEFINITIONS)
-	list(REMOVE_ITEM compile_options USE_DISTRIBUTED)
-	list(REMOVE_ITEM compile_options USE_RPC)
-	set_target_properties(${target} PROPERTIES INTERFACE_COMPILE_DEFINITIONS "${compile_options}")
+  get_target_property(compile_options ${target} INTERFACE_COMPILE_DEFINITIONS)
+  list(REMOVE_ITEM compile_options USE_DISTRIBUTED)
+  list(REMOVE_ITEM compile_options USE_RPC)
+  set_target_properties(${target} PROPERTIES INTERFACE_COMPILE_DEFINITIONS "${compile_options}")
 endfunction()
 
 file(WRITE ${CMAKE_BINARY_DIR}/tmp/test.sh "#!$ENV{SHELL}
@@ -193,6 +193,9 @@ add_subdirectory(poptorch_logging)
 
 if (POPTORCH_BUILD_MLIR_COMPILER)
   add_subdirectory(poptorch_compiler)
+else()
+  # We still need some headers from pytorch_bridge
+  add_subdirectory(poptorch_compiler/pytorch_bridge)
 endif()
 
 add_subdirectory(poptorch/source/dispatch_tracer)

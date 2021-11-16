@@ -6,14 +6,16 @@
 #include <mlir/IR/OpImplementation.h>
 
 namespace poptorch_ir {
-class CompilerContext;
+struct CompilerContext;
 }
 
 // TODO(T49565): Needed in LLVM-13
 //#include "dialect/PoptorchDialect.cpp.inc"
 
 // Easier to handle the tablegen include.
-using namespace mlir;
+// Lint exception: Do not use namespace using-directives.
+// Use using-declarations instead.
+using namespace mlir; // NOLINT
 
 namespace poptorch_ir {
 
@@ -41,9 +43,8 @@ void PoptorchDialect::initialize() {
 
 } // namespace poptorch_ir
 
-#include "mlir/IR/OpImplementation.h"
-
 // Include the operation definitions.
 #define GET_OP_CLASSES
-#include "dialect/Poptorch.cpp.inc"
+// Lint exception: file already included above
+#include "dialect/Poptorch.cpp.inc" // NOLINT
 #undef GET_OP_CLASSES

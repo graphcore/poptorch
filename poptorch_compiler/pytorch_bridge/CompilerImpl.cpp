@@ -7,8 +7,7 @@ namespace detail {
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
     : builder(&context), default_loc(mlir::UnknownLoc::get(&context)),
-      the_module(mlir::ModuleOp::create(default_loc)),
-      executable(the_module) {
+      the_module(mlir::ModuleOp::create(default_loc)), executable(the_module) {
   // Load the dialect.
   context.loadDialect<poptorch_ir::PoptorchDialect>();
 

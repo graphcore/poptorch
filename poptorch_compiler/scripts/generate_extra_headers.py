@@ -163,7 +163,7 @@ builder_call_translations = {
 #    [{"def": "Poptorch_tensor", "kind": "def", "printable": "Poptorch_tensor"}, "standard_deviation"]]
 
 #define ARG(Name, Type) Type Name
-#define BODY_ARG(Name) convert(Name, impl->value_map)
+#define BODY_ARG(Name) convert(Name, _impl->value_map)
 
 for op_name in poptorch_ops:
     # Create a function with the same name as the compiler function to call.
@@ -190,7 +190,7 @@ for op_name in poptorch_ops:
         arg_type = args[1]
 
         func_args += builder_call_translations[arg_type] + " " + name + " ,"
-        parameters += ", convert(" + name + ", impl->value_map)"
+        parameters += ", convert(" + name + ", _impl->value_map)"
 
     # Remove the last commas.
     func_args = func_args[:-1]
@@ -202,25 +202,25 @@ for op_name in poptorch_ops:
     cppFunction += func_args + ") {\n"
 
     # Create the IR op.
-    cppFunction += "auto tmp = impl->builder.create<poptorch_ir::"
-    cppFunction += op_name + ">(impl->default_loc"
+    cppFunction += "auto tmp = _impl->builder.create<poptorch_ir::"
+    cppFunction += op_name + ">(_impl->default_loc"
     cppFunction += parameters + ");\n"
 
     # Add the IR op to the graph.
-    cppFunction += "impl->main_graph.front().push_back(tmp);\n"
+    cppFunction += "_impl->main_graph.front().push_back(tmp);\n"
 
     # Map the output[s] into the IR map.
     if num_returns == 1:
-        cppFunction += "impl->value_map.push_back(tmp);"
-        cppFunction += "return impl->value_map.size() - 1;"
+        cppFunction += "_impl->value_map.push_back(tmp);"
+        cppFunction += "return _impl->value_map.size() - 1;"
     elif num_returns > 1:
         # Create a temp vector for the new tensor IDs to return to the user
         cppFunction += "std::vector<poptorch_ir::TensorId> ids;\n"
         cppFunction += "ids.reserve(tmp.getNumResults());\n"
 
         cppFunction += "for(mlir::Value value : tmp.getResults()) {\n"
-        cppFunction += "    impl->value_map.push_back(value);\n"
-        cppFunction += "   ids.push_back(impl->value_map.size() - 1);\n"
+        cppFunction += "    _impl->value_map.push_back(value);\n"
+        cppFunction += "   ids.push_back(_impl->value_map.size() - 1);\n"
         cppFunction += "}\n"
 
         cppFunction += "return ids;"
