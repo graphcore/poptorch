@@ -1331,7 +1331,10 @@ class IPUScope:
 
         with torch.no_grad():
             for tensor in tensors:
-                self._outputs.append(tensor.clone())
+                if tensor.dtype == torch.torch.long:
+                    self._outputs.append(tensor.int())
+                else:
+                    self._outputs.append(tensor.clone())
 
         poptorch_core.markOutputs(tensors, self._outputs)
 

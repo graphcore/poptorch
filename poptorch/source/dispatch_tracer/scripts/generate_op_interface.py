@@ -54,12 +54,46 @@ for function in native_functions:
     function_name = function['func'].split('(')[0]
 
     if function_name in ops_to_generate_dict:
-
         # The poptorch target i.e the yml entry we have added for this class.
         op_target = ops_to_generate_dict[function_name]
 
         # Split around the function return.
         signature, outputs = function['func'].split(' -> ')
+
+        # Some operations return multiple outputs, e.g: (Tensor(a!) values, Tensor(b!) indices)
+        # pylint: disable=literal-comparison
+        is_multiple_outputs = outputs[0] is '('
+
+        # If so convert into a list.
+        if is_multiple_outputs:
+            # Remove the `(` and `)`
+            outputs = outputs[1:-1]
+
+            # Split along the `,`
+            tmp = outputs.split(', ')
+
+            # Each output type.
+            outputs = []
+
+            # Currently we are only handling multiple tensor outputs, might need to change this in the future but prob not.
+            for output in tmp:
+                # Remove whitespace.
+                output = output.split(' ')
+
+                # Just add it if we don't need to look at the name.
+                if len(output) == 1:
+                    outputs.append(output[0])
+                    continue
+
+                # PyTorch sometimes gives them names, we only want the type it already contains an identifier.
+                the_type = output[0]
+                the_name = output[1]
+
+                # Add it to the list
+                outputs.append(the_type)
+        else:
+            # Otherwise we just have a single output, still add it to a list so the rest of the code can be cleaner.
+            outputs = [outputs]
 
         # Remove the function name and the `(`/`)` argument brackets from the signature
         signature = signature[len(function_name) + 1:-1]

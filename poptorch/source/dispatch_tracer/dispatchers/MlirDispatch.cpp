@@ -52,9 +52,7 @@ void MLIRExecutable::weightsToHost() { _impl->weightsToHost(); }
 
 MLIRDispatch::MLIRDispatch() { this->generateDispatchTable(); }
 
-static poptorch_ir::Type toCompilerType(const at::Tensor &tensor) {
-  at::ScalarType elem_type = tensor.scalar_type();
-
+static poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type) {
   switch (elem_type) {
   case at::ScalarType::Bool:
     return poptorch_ir::Type::BOOL;
@@ -74,6 +72,12 @@ static poptorch_ir::Type toCompilerType(const at::Tensor &tensor) {
   default:
     ERROR("Unsupported tensor input type from pytorch.");
   }
+}
+
+static poptorch_ir::Type toCompilerType(const at::Tensor &tensor) {
+  at::ScalarType elem_type = tensor.scalar_type();
+
+  return toCompilerType(elem_type);
 }
 
 void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
@@ -227,7 +231,8 @@ at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
       at::native::empty_cpu(self.sizes(), dtype, layout, device, pin, fmt);
 
   // Make an empty IR node.
-  poptorch_ir::TensorId out_id = _compiler.empty_tensor(self.sizes().vec());
+  poptorch_ir::TensorId out_id =
+      _compiler.empty_tensor(self.sizes().vec(), toCompilerType(*dtype));
 
   // Track it in our mapper.
   _mapper.addTensor(out, out_id);
@@ -239,7 +244,8 @@ at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
 void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
   // Don't bother intercepting on JIT as we automatically promote unknown nodes
   // to empty tensors.
-  poptorch_ir::TensorId id = _compiler.empty_tensor(tensor.sizes().vec());
+  poptorch_ir::TensorId id =
+      _compiler.empty_tensor(tensor.sizes().vec(), toCompilerType(tensor));
   _mapper.addTensor(tensor, id);
 }
 
@@ -359,9 +365,9 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
 
 at::Tensor MLIRDispatch::outputIsInplaceOf(poptorch_ir::TensorId output_id,
                                            const at::Tensor &original_input) {
-  at::Tensor new_output = at::Tensor(original_input.getIntrusivePtr());
-  _mapper.addTensor(new_output, output_id);
-  return new_output;
+  poptorch_ir::TensorId actual_output = findTensor(original_input);
+  _compiler.copy_(actual_output, output_id);
+  return original_input;
 }
 
 at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,

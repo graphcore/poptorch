@@ -41,13 +41,17 @@ def canonicalise_tensor(tensor):
 
 
 def add_outplace_op(function, parameters, outputs, named_tensors, scope=""):
-    output_info = canonicalise_tensor(outputs)
-    tensor_id = output_info[0]
-    is_inplace = output_info[1]
-    is_view = output_info[2]
+    # If it is mutliple outputs
+    is_multiple_outputs = len(outputs) > 1
+
+    # Return either a vector or single tensor.
+    if is_multiple_outputs:
+        return_type = "\tstd::vector<poptorch_ir::TensorId> mlir_output ="
+    else:
+        return_type = "\tpoptorch_ir::TensorId mlir_output ="
 
     # Generate the call to the compiler function.
-    function_decl = scope + "\tpoptorch_ir::TensorId mlir_output = _compiler."
+    function_decl = "{}\t{} _compiler.".format(scope, return_type)
     function_decl += function + "(" + parameters + ");\n"
 
     # Clear the stack and add the outputs.
@@ -56,18 +60,39 @@ def add_outplace_op(function, parameters, outputs, named_tensors, scope=""):
 
     # Add each of the outputs
     function_decl += scope + "\t// Push the new outputs onto the stack\n"
-    function_decl += scope
 
-    if is_inplace:
-        function_decl += "\tstack.push_back(outputIsInplaceOf(mlir_output, "
-        function_decl += named_tensors[tensor_id] + "_pytorch));\n"
-    elif is_view:
-        function_decl += "\tstack.push_back(outputIsViewOf(mlir_output, "
-        function_decl += named_tensors[
-            tensor_id] + "_pytorch, requires_grad));\n"
-    else:
-        function_decl += "\tstack.push_back(makeEmptyOutputTensor(mlir_output"
-        function_decl += ", requires_grad));\n"
+    index = 0
+
+    # Handle each of the outputs.
+    for output in outputs:
+        # Capture all metadata related to each of the output tensors.
+        output_info = canonicalise_tensor(output)
+        tensor_id = output_info[0]
+        is_inplace = output_info[1]
+        is_view = output_info[2]
+
+        # We either are expecting one tensor or a vector of tensors.
+        if not is_multiple_outputs:
+            output_id = "mlir_output"
+        else:
+            output_id = "mlir_output[" + str(index) + "]"
+            index += 1
+
+        # For each output tensor return it to pytorch in a different way depending on what the schema tells us.
+        if is_inplace:
+            # Inplace operations should be inplaced versions of a certain input.
+            function_decl += "\tstack.push_back(outputIsInplaceOf("
+            function_decl += output_id + ", " + named_tensors[tensor_id]
+            function_decl += "_pytorch));\n"
+        elif is_view:
+            # Views should be a view of a given input.
+            function_decl += "\tstack.push_back(outputIsViewOf(" + output_id
+            function_decl += ", " + named_tensors[tensor_id]
+            function_decl += "_pytorch, requires_grad));\n"
+        else:
+            # Otherwise we are returning a new tensor.
+            function_decl += "\tstack.push_back(makeEmptyOutputTensor("
+            function_decl += output_id + ", requires_grad));\n"
 
     return function_decl
 

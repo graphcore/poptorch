@@ -56,6 +56,7 @@ decl_types = {
     "StrAttr": "STRING",
     "BoolAttr": "BOOL",
     "Poptorch_tensor": "TENSOR",
+    "TypeAttr": "TYPE"
 }
 
 # Is a bit easier to work with if we convert the JSON into the old macro format even if we don't end up saving that to disk.
@@ -154,7 +155,8 @@ builder_call_translations = {
     "STRING": "const char *",
     "TENSOR": "poptorch_ir::TensorId",
     "TENSOR_VEC": "const std::vector<poptorch_ir::TensorId> &",
-    "BOOL": "bool"
+    "BOOL": "bool",
+    "TYPE": "poptorch_ir::Type"
 }
 
 #"results": {"args": [
@@ -190,7 +192,13 @@ for op_name in poptorch_ops:
         arg_type = args[1]
 
         func_args += builder_call_translations[arg_type] + " " + name + " ,"
-        parameters += ", convert(" + name + ", _impl->value_map)"
+
+        # If the argument is an MLIR type we want to convert it first.
+        # pylint: disable=literal-comparison
+        if arg_type is "TYPE":
+            parameters += ", _impl->convertType(" + name + ")"
+        else:
+            parameters += ", convert(" + name + ", _impl->value_map)"
 
     # Remove the last commas.
     func_args = func_args[:-1]
@@ -242,7 +250,8 @@ disptach_cxx_cases = {
     "INT": "std::int64_t",
     "FLOAT": "float",
     "STRING": "const char*",
-    "BOOL": "bool"
+    "BOOL": "bool",
+    "TYPE": "poptorch_ir::Type"
 }
 
 # Generate the JIT dispatch table.

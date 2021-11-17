@@ -1,12 +1,12 @@
 
-
 def Poptorch_empty_tensor: Poptorch_Op<"empty_tensor", []> {
-    let arguments = (ins I64ArrayAttr:$size);
+    let arguments = (ins I64ArrayAttr:$size, TypeAttr:$type);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "const std::vector<std::int64_t>&":$size),[{
+    let builders = [OpBuilderDAG<(ins "const std::vector<std::int64_t>&":$size, "mlir::Type":$type),[{
         $_state.addAttribute("size", $_builder.getI64ArrayAttr(size));
-        $_state.addTypes(mlir::RankedTensorType::get(size, $_builder.getF32Type()));
+        $_state.addAttribute("type", mlir::TypeAttr::get(type));
+        $_state.addTypes(mlir::RankedTensorType::get(size, type));
      }]>];
 }
 
