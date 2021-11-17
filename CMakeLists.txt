@@ -16,6 +16,10 @@ set(BUILD_DOCS OFF CACHE BOOL "Build PopTorch's documentation")
 set(COPY_TESTS OFF CACHE BOOL "Copy tests files to the build folder (instead of running them from the sources folder)")
 set(ENABLE_WERROR ON CACHE BOOL "Treat C++ warnings as errors")
 
+# Always use the gold linker to avoid segfaults with PopART / Poplar on some OSes.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=gold")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -fuse-ld=gold")
+
 # Note: The next line is also parsed by scripts/utils/_utils.py
 set(TORCH_VERSION 1.10.0)
 
@@ -26,7 +30,7 @@ string(REPLACE "." ";" TORCH_VERSION_AS_LIST ${TORCH_VERSION})
 list(GET TORCH_VERSION_AS_LIST 1 TORCH_MINOR_VERSION)
 
 # Build compiler parts by default.
-set(POPTORCH_BUILD_MLIR_COMPILER 1)
+set(POPTORCH_BUILD_MLIR_COMPILER ON CACHE BOOL "Build the PopTorch compiler")
 
 # Centos is redhat
 file (GLOB IS_REDHAT /etc/redhat-release)
@@ -49,13 +53,13 @@ if (NOT IS_REDHAT STREQUAL "")
   if(NOT ${IS_CENTOS} EQUAL -1)
     if(NOT ${IS_SEVEN_POINT_SIX} EQUAL -1)
       message(STATUS "This is 7.6, compiler is NOT getting built.")
-      set(POPTORCH_BUILD_MLIR_COMPILER 0)
+      set(POPTORCH_BUILD_MLIR_COMPILER OFF)
     endif()
   endif()
 endif()
 
 # Tell the source files if we have built MLIR or not so it can be exposed via python.
-add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=${POPTORCH_BUILD_MLIR_COMPILER})
+add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=$<BOOL:${POPTORCH_BUILD_MLIR_COMPILER}>)
 
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
