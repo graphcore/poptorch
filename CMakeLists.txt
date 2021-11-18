@@ -45,14 +45,14 @@ if (NOT IS_REDHAT STREQUAL "")
   string(FIND ${CENTOS_INFO} "CentOS" IS_CENTOS)
 
   # Is the version number 7.6
-  string(FIND ${CENTOS_INFO} " 7.6" IS_SEVEN_POINT_SIX)
+  string(FIND ${CENTOS_INFO} " 7." IS_SEVEN_POINT)
 
   message(STATUS "Centos info : ${CENTOS_INFO}")
 
   # If both centos and 7.6 we turn off the compiler build.
   if(NOT ${IS_CENTOS} EQUAL -1)
-    if(NOT ${IS_SEVEN_POINT_SIX} EQUAL -1)
-      message(STATUS "This is 7.6, compiler is NOT getting built.")
+    if(NOT ${IS_SEVEN_POINT} EQUAL -1)
+      message(STATUS "This is 7.x, compiler is NOT getting built.")
       set(POPTORCH_BUILD_MLIR_COMPILER OFF)
     endif()
   endif()
