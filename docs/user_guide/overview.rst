@@ -1300,9 +1300,9 @@ By default, report files are output to the current working directory. You can sp
 
   export POPLAR_ENGINE_OPTIONS='{"autoReport.all":"true", "autoReport.directory":"./tommyFlowers"}'
 
-For more options, refer to the `PopVision Graph Analyser User Guide <https://docs.graphcore.ai/projects/graphcore-popvision-user-guide/en/latest/index.html>`__.
+For more options, refer to the `PopVision Graph Analyser User Guide <https://docs.graphcore.ai/projects/graph-analyser-userguide/en/latest/index.html>`__.
 
-In order to capture the ``pvti`` reports needed for the `PopVision System Analyser <https://docs.graphcore.ai/projects/graphcore-popvision-user-guide/en/latest/system/system.html>`__
+In order to capture the ``pvti`` reports needed for the `PopVision System Analyser <https://docs.graphcore.ai/projects/system-analyser-userguide/en/latest/index.html>`__
 you need to enable the `PopVision Trace Instrumentation library (PVTI) <https://docs.graphcore.ai/projects/libpvti/en/latest/index.html>`__.
 To do so, set ``PVTI_OPTIONS='{"enable":"true"}'``.
 
