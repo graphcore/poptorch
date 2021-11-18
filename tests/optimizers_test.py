@@ -9,6 +9,7 @@ import tempfile
 import pytest
 import torch
 import torch.optim as optim
+from torch.optim.lr_scheduler import ExponentialLR
 import helpers
 import poptorch
 
@@ -1296,11 +1297,18 @@ def test_write_ipu_state_before_override(capfd):
 def test_write_ipu_state_from_checkpoint():
     input = torch.ones(2)
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
-    optimizer = poptorch.optim.Adam(model.parameters())
+    optimizer = poptorch.optim.Adam(model.parameters(), lr=1.0)
+    # Halve the LR after each training step
+    scheduler = ExponentialLR(optimizer, 0.5)
     training_model = poptorch.trainingModel(model, optimizer=optimizer)
 
     # Compile and run the model
     training_model((input, ))
+    # Step the scheduler for the next epoch
+    # lr: 1.0 -> 0.5
+    scheduler.step()
+    # Set the new LR
+    training_model.setOptimizer(optimizer)
     s1 = optimizer.state_dict()
 
     with tempfile.TemporaryDirectory() as d:
@@ -1311,13 +1319,26 @@ def test_write_ipu_state_from_checkpoint():
         checkpoint = torch.load(path)
 
         # Create a new optimizer and load the checkpoint
-        new_optimizer = poptorch.optim.Adam(model.parameters())
-        new_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        training_model.setOptimizer(new_optimizer)
+        optimizer = poptorch.optim.Adam(model.parameters(), lr=0.1)
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        s2 = new_optimizer.state_dict()
+        s2 = optimizer.state_dict()
         # Ensure the new optimizer state matches the one saved
         for k, v in s1["ipu_state"].items():
             helpers.assert_allequal(actual=s2["ipu_state"][k], expected=v)
         for k, v in s1["ipu_param"].items():
             helpers.assert_allequal(actual=s2["ipu_param"][k], expected=v)
+
+        # Now continue training to test that the updated LR is used
+        scheduler = ExponentialLR(optimizer, 0.5)
+        training_model.setOptimizer(optimizer)
+        # New LR is set internally when the model is run
+        training_model((input, ))
+        s3 = optimizer.state_dict()
+        torch_lr = torch.tensor(s3["param_groups"][0]["lr"])
+        poptorch_lr = s3["ipu_param"][
+            "learningRate___specific___model.lin.bias"]
+        # Ensure the torch LR parameter is correct
+        helpers.assert_allclose(actual=torch_lr, expected=torch.tensor(0.5))
+        # Ensure the internal LR parameter matches
+        helpers.assert_allclose(actual=poptorch_lr, expected=torch_lr)

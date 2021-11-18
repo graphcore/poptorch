@@ -264,8 +264,12 @@ class PoplarExecutor:
         if self._update_optimizer_state:
             assert self.isCompiled()
             assert isinstance(self._new_optimizer, Optimizer)
-            self._new_optimizer.set_state_dict(
-                poptorch_core.readOptimizerState(self._executable))
+            # We need to return both the internal state dict and torch's
+            # state dict so that LR schedulers work
+            self._new_optimizer.set_state_dict({
+                **poptorch_core.readOptimizerState(self._executable),
+                **torch.optim.Optimizer.state_dict(self._new_optimizer)
+            })
             self._update_optimizer_state = False
         else:
             logger.debug("Using cached optimiser state dict")
