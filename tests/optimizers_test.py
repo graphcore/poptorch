@@ -1342,3 +1342,52 @@ def test_write_ipu_state_from_checkpoint():
         helpers.assert_allclose(actual=torch_lr, expected=torch.tensor(0.5))
         # Ensure the internal LR parameter matches
         helpers.assert_allclose(actual=poptorch_lr, expected=torch_lr)
+
+def test_setOptimizer_frozen_options_ok():
+    input = torch.ones(2)
+    opts = poptorch.Options()
+    opts.Training.setMeanAccumulationAndReplicationReductionStrategy(
+        poptorch.MeanReductionStrategy.Post)
+
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
+    # This will freeze the options
+    data = poptorch.DataLoader(opts, [(torch.ones(2), )])
+
+    optimizer = poptorch.optim.Adam(model.parameters(),
+                                    lr=0.5,
+                                    accum_type=torch.half)
+
+    # will set the reduction strategy to Running
+    training_model = poptorch.trainingModel(model,
+                                            optimizer=optimizer,
+                                            options=opts)
+    training_model.compile(next(iter(data)))
+    assert training_model.options.Training.meanAccumulationAndReplicationReductionStrategy == poptorch.MeanReductionStrategy.Running  # pylint: disable=line-too-long
+
+    optimizer.param_groups[0]['lr'] = 0.01
+    training_model.setOptimizer(optimizer)
+
+
+def test_setOptimizer_frozen_options_broken():
+    input = torch.ones(2)
+    opts = poptorch.Options()
+    opts.Training.setMeanAccumulationAndReplicationReductionStrategy(
+        poptorch.MeanReductionStrategy.Post)
+
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
+    # This will freeze the options
+    data = poptorch.DataLoader(opts, [(torch.ones(2), )])
+
+    optimizer = poptorch.optim.Adam(model.parameters(), lr=0.5)
+
+    # will set the reduction strategy to Running
+    training_model = poptorch.trainingModel(model,
+                                            optimizer=optimizer,
+                                            options=opts)
+    training_model.compile(next(iter(data)))
+    assert training_model.options.Training.meanAccumulationAndReplicationReductionStrategy == poptorch.MeanReductionStrategy.Post  # pylint: disable=line-too-long
+
+    optimizer.param_groups[0]['lr'] = 0.01
+    optimizer.accum_type = torch.half
+    with pytest.raises(ValueError, match="is already compiled"):
+        training_model.setOptimizer(optimizer)

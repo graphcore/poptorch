@@ -50,7 +50,7 @@ class OptimizerAttrTracker:
 
 
 # pylint: disable=too-many-statements
-def convertOptimizerToDict(optimizer, attr_tracker, options):
+def convertOptimizerToDict(optimizer, attr_tracker, options, is_compiled):
     optimizer_type = _toPoptorchOptimizer(optimizer)
     attr_tracker.setType(optimizer_type)
 
@@ -140,8 +140,20 @@ def convertOptimizerToDict(optimizer, attr_tracker, options):
         if not hasattr(
                 optimizer,
                 "use_combined_accum") or not optimizer.use_combined_accum:
-            options.Training.setMeanAccumulationAndReplicationReductionStrategy(
-                enums.MeanReductionStrategy.Running)
+            if not is_compiled:
+                # If the executable hasn't been compiled yet then it's ok to change
+                # the reduction strategy.
+                options._unfreeze()  # pylint: disable=protected-access
+                options.Training.setMeanAccumulationAndReplicationReductionStrategy(  # pylint: disable=line-too-long
+                    enums.MeanReductionStrategy.Running)
+                options._freeze()  # pylint: disable=protected-access
+            elif options.Training.meanAccumulationAndReplicationReductionStrategy != enums.MeanReductionStrategy.Running:  # pylint: disable=line-too-long
+                raise ValueError(
+                    "Invalid optimizer: the new optimizer would "
+                    "require changing options.Training."
+                    "meanAccumulationAndReplicationReductionStrategy to "
+                    "poptorch.MeanReductionStrategy.Running but the "
+                    "executable is already compiled.")
 
     # pylint: disable=protected-access
     auto_loss_scaling = options._Popart.options.get(

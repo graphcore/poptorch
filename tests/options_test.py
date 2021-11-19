@@ -770,3 +770,13 @@ def test_options_change_after_use():
     with pytest.raises(Exception):
         popart_opts = poptorch_data_loader._Popart
         popart_opts.set("groupNormStridedChannelGrouping", True)
+
+
+def test_wrap_options():
+    """Popdist wraps poptorch Options using something similar"""
+
+    class _Distributed(poptorch.options._DistributedOptions):
+        pass
+
+    opts = poptorch.Options()
+    opts.Distributed.__class__ = _Distributed

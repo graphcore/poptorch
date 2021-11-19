@@ -83,6 +83,8 @@ class OptionsDict:
             del self._values[option]
 
     def _hasattr(self, option):
+        if option == "__class__":
+            return True
         if option.startswith("_"):
             return option in self.__getstate__().keys()
         return self.exists(option)

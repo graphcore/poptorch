@@ -402,7 +402,8 @@ class PoplarExecutor:
                 PoplarExecutor._read_optim_state_dict, self)
         self._new_optimizer = optimizer
         self._dict_new_optimizer = _optimizer_attributes.convertOptimizerToDict(
-            optimizer, self._attribute_tracker, self._options)
+            optimizer, self._attribute_tracker, self._options,
+            self.isCompiled())
         if not self._dict_optimizer:
             self._dict_optimizer = self._dict_new_optimizer
 
