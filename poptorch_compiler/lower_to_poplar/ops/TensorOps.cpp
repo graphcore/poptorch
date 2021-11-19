@@ -48,4 +48,10 @@ void tensorconstant::lowerToPoplar(CompilerContext &context) {
   //  context.graph.setInitialValue(input, as_float);
 }
 
+void concat::lowerToPoplar(CompilerContext &context) {
+  std::vector<poplar::Tensor> tensors = context.fromSsa(this->tensors());
+
+  context.tensors[this->result()] = poplar::concat(tensors, this->dim());
+}
+
 } // namespace poptorch_ir

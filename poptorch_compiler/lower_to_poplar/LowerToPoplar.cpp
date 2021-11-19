@@ -165,6 +165,17 @@ poplar::Tensor CompilerContext::fromSsa(mlir::Value value) {
   return tensor;
 }
 
+std::vector<poplar::Tensor>
+CompilerContext::fromSsa(mlir::ValueRange value_range) {
+  std::vector<poplar::Tensor> poplar_tensors;
+
+  for (mlir::Value value : value_range) {
+    poplar_tensors.push_back(fromSsa(value));
+  }
+
+  return poplar_tensors;
+}
+
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createLowerToPoplarPass(poplar::Graph &graph, CompilerContext &context) {
   return std::make_unique<LowerToPoplar>(graph, context);

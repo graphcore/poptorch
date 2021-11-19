@@ -23,9 +23,9 @@
 
 #
 
-#
+######################
 # Views and reshapes
-#
+######################
 
 # aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
 - func: as_strided
@@ -47,10 +47,14 @@
 # aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
 - func: view
   PopTorchDirect: reshape
+  
+# _cat(Tensor[] tensors, int dim=0) -> Tensor(a!)
+- func: _cat
+  PopTorchDirect: concat
 
-#
-#  Element wise
-#
+################
+# Element wise
+################
 
 # aten::mul.out(Tensor self, Tensor other, *, Tensor(a!) out) -> (Tensor(a!))
 - func: mul.out

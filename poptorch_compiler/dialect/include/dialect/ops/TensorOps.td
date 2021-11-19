@@ -47,3 +47,36 @@ def Poptorch_tensorconstant : Poptorch_Op<"tensorconstant", []> {
     ];
 
 }
+
+def Poptorch_concat: Poptorch_Op<"concat", []> {
+
+    let arguments = (ins Poptorch_tensorlist:$tensors,
+                         I64Attr:$dim);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$tensors,
+                                      "std::uint64_t":$dim),[{
+        $_state.addOperands(tensors);
+
+        mlir::RankedTensorType first_type = tensors[0].getType().cast<mlir::RankedTensorType>();
+
+        llvm::SmallVector<std::int64_t, 4> out_shape {first_type.getShape().begin(),
+                                                      first_type.getShape().end()};
+                                                      
+        if (dim < 0) {
+          dim += out_shape.size();
+        }
+
+        for (auto i = 1u; i < tensors.size(); i++) {
+          out_shape[dim] += tensors[i].getType().cast<mlir::RankedTensorType>().getDimSize(dim);
+        }
+
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+        auto out_type = mlir::RankedTensorType::get(out_shape, first_type.getElementType());
+
+        $_state.addTypes({out_type});
+     }]>
+    ];
+}

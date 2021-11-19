@@ -39,6 +39,8 @@ struct CompilerContext {
   std::unordered_map<std::string, poplar::DataStream> streams;
 
   poplar::Tensor fromSsa(mlir::Value value);
+
+  std::vector<poplar::Tensor> fromSsa(mlir::ValueRange value_range);
 };
 
 template <typename T>
