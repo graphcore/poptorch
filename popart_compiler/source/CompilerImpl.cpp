@@ -409,6 +409,25 @@ void CompilerImpl::updateUseModelConfig() {
   }
 }
 
+std::uint64_t CompilerImpl::numPipelineStages() {
+  ERROR_ON(options.execution_mode != ExecutionMode::Pipelined);
+
+  // Every time the IPU ID changes, there is an additional stage. In PopTorch,
+  // two blocks/stages with the same IPU ID will be merged.
+  std::uint64_t forward_stages = num_ipu_switches + 1;
+
+  // If training, there are twice the number of stages for backpropagation
+  // minus one (because on the last IPU, the backpropagation happens as part of
+  // the same pipeline stage).
+  // (NB this is an upper bound, as tensor.detach() could cut off stages, but
+  // we ignore unusual edge cases.)
+  if (is_training) {
+    return forward_stages * 2 - 1;
+  }
+
+  return forward_stages;
+}
+
 void CompilerImpl::addMemoryToOutput(poptorch::TensorId id, void *ptr,
                                      std::unique_ptr<popart::IArray> &&memory) {
   if (isHostSideConstant(id)) {

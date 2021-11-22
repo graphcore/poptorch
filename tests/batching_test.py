@@ -213,7 +213,7 @@ def run_gradient_accumulation_test(input, target, gradient_accumulations,
     return poptorch_model.weight.data
 
 
-def test_gradient_accumulation():
+def test_gradient_accumulation_training():
     torch.manual_seed(42)
 
     target = torch.randn(4, 10)
@@ -256,3 +256,114 @@ def test_gradient_accumulation():
         0.01,
     )
     helpers.assert_allclose(actual=w_with_1, expected=w_with_2)
+
+
+class FourBlockModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lin1 = torch.nn.Linear(1, 1)
+        self.lin2 = torch.nn.Linear(1, 1)
+        self.lin3 = torch.nn.Linear(1, 1)
+        self.lin4 = torch.nn.Linear(1, 1)
+
+    def forward(self, x):
+        with poptorch.Block("B1", ipu_id=0):
+            out = self.lin1(x)
+        with poptorch.Block("B2", ipu_id=1):
+            out = self.lin2(out)
+        with poptorch.Block("B3", ipu_id=2):
+            out = self.lin3(out)
+        with poptorch.Block("B4", ipu_id=3):
+            out = self.lin4(out)
+
+        return out
+
+
+@pytest.mark.parametrize("num_grad_accums", (4, 5, 7))
+@pytest.mark.parametrize("device_iterations", (1, 2))
+def test_gradient_accumulation_pipelined_training(num_grad_accums,
+                                                  device_iterations):
+    class TrainingFourBlockModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.four_block = FourBlockModel()
+
+        def forward(self, x):
+            out = self.four_block(x)
+            with poptorch.Block("B4", ipu_id=3):
+                loss = poptorch.identity_loss(out, reduction="mean")
+
+            return out, loss
+
+    model = TrainingFourBlockModel()
+    opts = poptorch.Options()
+    opts.deviceIterations(device_iterations)
+    opts.Training.gradientAccumulation(num_grad_accums)
+
+    poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    if num_grad_accums in (4, 5):
+        err_msg = (
+            r"poptorch\.Options\(\)\.Training\.gradientAccumulation " +
+            r"must be greater than or equal to the number of pipeline" +
+            r" stages \(7\) when using poptorch\.PipelinedExecution\. " +
+            r"Please note that a model with 4 pipeline stages in " +
+            r"PopTorch will have an additional 3 stages when training.")
+
+        with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+            poptorch_model(torch.zeros(num_grad_accums * device_iterations))
+    else:
+        poptorch_model(torch.zeros(num_grad_accums * device_iterations))
+
+
+@pytest.mark.parametrize("pipelined", [True, False])
+def test_gradient_accumulation_inference(pipelined):
+    model = FourBlockModel()
+    opts = poptorch.Options()
+
+    if pipelined:
+        # pylint: disable=protected-access
+        assert isinstance(opts._execution_strategy,
+                          poptorch.PipelinedExecution)
+    else:
+        opts.setExecutionStrategy(poptorch.ShardedExecution())
+
+    opts.Training.gradientAccumulation(2)
+
+    err_msg = (r"You must set " +
+               r"poptorch\.Options\(\)\.Training\.gradientAccumulation to 1 " +
+               r"or leave it as its default value \(1\) when running a " +
+               r"poptorch\.inferenceModel\(\)\.")
+
+    if pipelined:
+        err_msg += (r" Use poptorch\.Options\(\)\.deviceIterations() to " +
+                    r"process a sufficient number of batches each run for " +
+                    r"pipelined execution instead.")
+
+    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+        poptorch.inferenceModel(model, options=opts)
+
+
+@pytest.mark.parametrize("pipelined", [True, False])
+@pytest.mark.parametrize("device_iterations", (2, 4))
+def test_device_iterations_inference(pipelined, device_iterations):
+    model = FourBlockModel()
+    opts = poptorch.Options()
+
+    if pipelined:
+        # pylint: disable=protected-access
+        assert isinstance(opts._execution_strategy,
+                          poptorch.PipelinedExecution)
+    else:
+        opts.setExecutionStrategy(poptorch.ShardedExecution())
+
+    opts.deviceIterations(device_iterations)
+
+    poptorch_model = poptorch.inferenceModel(model, options=opts)
+
+    if pipelined and device_iterations == 2:
+        err_msg = (r"poptorch\.Options\(\)\.deviceIterations must be greater")
+        with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+            poptorch_model(torch.zeros(device_iterations))
+    else:
+        poptorch_model(torch.zeros(device_iterations))

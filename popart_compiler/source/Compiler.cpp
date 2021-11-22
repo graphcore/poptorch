@@ -591,22 +591,33 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
   _impl->setOptionIfNotSet(options.constantWeights, false, "constantWeights");
 
   if (_impl->options.execution_mode == detail::ExecutionMode::Pipelined) {
-    ERROR_ON_MSG(
-        _impl->used_ipus.size() > popartBatchDim(),
-        "poptorch.Options.deviceIterations("
-            << _impl->options.steps
-            << (_impl->is_training
-                    ? ") * poptorch.Options.gradientAccumulation("
-                    : "")
-            << (_impl->is_training
-                    ? std::to_string(_impl->popart_options.accumulationFactor)
-                    : "")
-            << ") * poptorch.Options.replicationFactor("
-            << _impl->popart_options.replicatedGraphCount
-            << ") = " << popartBatchDim()
-            << " must be greater or equal than the number of IPUs used"
-               " by the model: "
-            << _impl->used_ipus.size());
+    auto num_pipeline_stages = _impl->numPipelineStages();
+
+    if (_impl->is_training) {
+      auto num_forward_stages = (num_pipeline_stages + 1) / 2;
+      auto num_backward_stages = (num_pipeline_stages - 1) / 2;
+
+      std::stringstream err_msg;
+      err_msg << "poptorch.Options().Training.gradientAccumulation must be "
+              << "greater than or equal to the number of pipeline stages ("
+              << num_pipeline_stages << ") when using "
+              << "poptorch.PipelinedExecution. Please note that a model with "
+              << num_forward_stages << " pipeline stages in PopTorch will have "
+              << "an additional " << num_backward_stages << " stages when "
+              << "training.";
+
+      ERROR_ON_MSG(_impl->popart_options.accumulationFactor <
+                       static_cast<int64_t>(num_pipeline_stages),
+                   err_msg.str());
+    } else {
+      std::stringstream err_msg;
+      err_msg << "poptorch.Options().deviceIterations must be greater than or "
+              << "equal to the number of pipeline stages ("
+              << num_pipeline_stages << ") when using "
+              << "PopTorch.PipelinedExecution.";
+
+      ERROR_ON_MSG(_impl->options.steps < num_pipeline_stages, err_msg.str());
+    }
   }
 
   _impl->setOptionIfNotSet(options.enableGradientAccumulation,
@@ -1040,7 +1051,18 @@ void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
   default:
     ERROR("Unsupported ExecutionMode");
   }
+
+  // Record a number of times the IPU switches as this is needed to calculate
+  // number of pipeline stages.
+  if (static_cast<uint64_t>(ipu_id) != _impl->last_ipu_used) {
+    _impl->num_ipu_switches++;
+  }
+
   _impl->active_ipu = ipu_id;
+
+  // The previous will revert to -1 but this will remain ipu_id until another
+  // IPU is used.
+  _impl->last_ipu_used = ipu_id;
 }
 
 bool Compiler::isHostSideConstant(poptorch::TensorId id) const {

@@ -24,7 +24,7 @@ from . import poptorch_core  # type: ignore
 from . import _poptorch_data
 from ._logging import logger
 from .ops import ATTR_PREFIX
-from .options import Options
+from .options import Options, PipelinedExecution, ShardedExecution
 from .optim import Optimizer
 
 
@@ -101,9 +101,26 @@ class PoplarExecutor:
             if options.defaultOutputMode():
                 # In inference it makes sense to see all the results, by default.
                 options.outputMode(enums.OutputMode.All)
-            assert options.Training.gradient_accumulation == 1, (
-                "Gradient accumulation"
-                " should be left to its default value (1) for inference")
+
+            if options.Training.gradient_accumulation != 1:
+                err_msg = (
+                    "You must set " +
+                    "poptorch.Options().Training.gradientAccumulation to 1 " +
+                    "or leave it as its default value (1) when running a " +
+                    "poptorch.inferenceModel().")
+
+                is_pipelined = (isinstance(options._execution_strategy,
+                                           PipelinedExecution)
+                                and not isinstance(options._execution_strategy,
+                                                   ShardedExecution))
+                if is_pipelined:
+                    err_msg += (" Use poptorch.Options().deviceIterations " +
+                                "to process a sufficient number of batches " +
+                                "each run for pipelined execution instead.")
+
+                raise _impl.createPoptorchError(err_msg)
+
+            assert options.Training.gradient_accumulation == 1, ()
             assert not optimizer, "Optimizer should be None for inference"
         self._model = model
 

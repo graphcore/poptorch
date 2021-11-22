@@ -209,6 +209,9 @@ public:
   // We add operations using a state based system so the user would set the
   // active IPU and all subsequent operations will be added to that IPU until
   // stopped.
+  // By default, the active IPU is 0 in case setActiveIpu is never used.
+  // However, clearActiveIpu will set it to -1 making future use of
+  // setActiveIpu compulsory.
   std::int64_t active_ipu{0};
   std::uint64_t active_stage{0};
   std::int64_t active_phase{0};
@@ -218,7 +221,20 @@ public:
   // Number of ipus used (set by createDevice())
   std::uint64_t num_ipus{0};
 
+  // Which IPUs are being used
+  // Note that this does not take into account replication and so the number of
+  // IPUs actually used is multiplied by popart_options.replicatedGraphCount.
+  // Due to rounding and the issues with skipping an IPU in a range, the number
+  // of IPUs required may increase further.
   std::unordered_set<std::uint64_t> used_ipus;
+
+  // Keep the number of ipu switches to work out the number of pipeline stages
+  // if relevant.
+  std::uint64_t num_ipu_switches{0};
+
+  // Store the last ipu used: this will always match active_ipu unless
+  // active_ipu is set to -1.
+  std::uint64_t last_ipu_used{0};
 
   // Map of the pytorch variable update group to the popart weight.
   std::map<std::uint64_t, std::vector<popart::TensorId>> grad_update_groups;
@@ -227,6 +243,9 @@ public:
 
   // Dynamic container for all the callbacks to live in.
   std::list<CallbackInternalMetadata> callbacks;
+
+  // Returns the number of pipeline stages in the model execution
+  std::uint64_t numPipelineStages();
 
   // General helpers.
 
