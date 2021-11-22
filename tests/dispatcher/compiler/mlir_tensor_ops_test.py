@@ -9,7 +9,7 @@ from poptorch import enums
 cat_params = [
     # dim, dtype, alias
     (0, torch.float32, torch.cat),
-    # (1, torch.int32, torch.concat), TODO(T50502): Support int inputs
+    (1, torch.int32, torch.concat),
 ]
 
 

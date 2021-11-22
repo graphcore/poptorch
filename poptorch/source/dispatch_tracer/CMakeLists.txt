@@ -15,6 +15,7 @@ add_library(dispatch_tracer STATIC
         RegisterAtenOverloads.cpp
         CommonHelperFunctions.cpp
         dispatchers/JitDispatch.cpp
+        dispatchers/MlirDispatchUtils.cpp
 
         # The mlir dispatcher or null.
         ${MLIR_SOURCE_FILE}

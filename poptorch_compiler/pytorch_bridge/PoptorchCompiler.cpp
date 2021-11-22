@@ -8,6 +8,7 @@
 
 #include "CompilerImpl.hpp"
 #include "ExecutorImpl.hpp"
+#include "pytorch_bridge/PytorchBridgeUtils.hpp"
 
 namespace poptorch_ir {
 
@@ -115,12 +116,18 @@ bool PoptorchCompiler::isView(poptorch_ir::TensorId id) const {
 }
 
 std::vector<std::int64_t> PoptorchCompiler::getSize(TensorId id) const {
+  return getRankedTensorType(id).getShape();
+}
+
+Type PoptorchCompiler::getType(TensorId id) const {
+  return mlirTypeToCompilerType(getRankedTensorType(id).getElementType());
+}
+
+mlir::RankedTensorType
+PoptorchCompiler::getRankedTensorType(TensorId id) const {
   mlir::Value val = _impl->value_map[id];
   mlir::Type t1 = val.getType();
-
-  //
-  mlir::RankedTensorType t1_tensor = t1.cast<mlir::RankedTensorType>();
-  return t1_tensor.getShape();
+  return t1.cast<mlir::RankedTensorType>();
 }
 
 void PoptorchCompiler::addReturn() {

@@ -7,6 +7,7 @@ if (POPTORCH_BUILD_MLIR_COMPILER)
     CompilerImpl.cpp
     Executor.cpp
     Ops.cpp
+    PytorchBridgeUtils.cpp
   )
 
 # This is needed as PopIR will look for its symbols in our MLIR static libs when it links against PopTorch.

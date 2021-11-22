@@ -8,6 +8,7 @@
 
 #include "../../PoptorchSymbols.hpp"
 #include "../../popart_canonicalization/PopartCanonicalizationUtils.hpp"
+#include "MlirDispatchUtils.hpp"
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
@@ -373,8 +374,10 @@ at::Tensor MLIRDispatch::outputIsInplaceOf(poptorch_ir::TensorId output_id,
 at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
                                                bool requires_grad) {
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
+  poptorch_ir::Type compiler_type = _compiler.getType(output_id);
+  auto dtype = compilerTypeToScalarType(compiler_type);
   // Create new tensor
-  at::Tensor new_output = at::native::empty_cpu(shape);
+  at::Tensor new_output = at::native::empty_cpu(shape, dtype);
   new_output.set_requires_grad(requires_grad);
   _mapper.addTensor(new_output, output_id);
 

@@ -26,6 +26,8 @@ enum class Type : std::uint8_t {
   UNSIGNED_INT,
   HALF,
   FLOAT,
+  BFLOAT16,
+  UNDEFINED,
 };
 
 } // namespace poptorch_ir

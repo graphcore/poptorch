@@ -2,13 +2,14 @@
 #ifndef POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_HPP_
 #define POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_HPP_
 
+#include <mlir/IR/BuiltinTypes.h>
+
 #include <memory>
 #include <string>
 #include <vector>
 
-#include <pytorch_bridge/Executor.hpp>
-
 #include "pytorch_bridge/CompilerTypes.hpp"
+#include "pytorch_bridge/Executor.hpp"
 
 namespace poptorch_ir {
 
@@ -56,6 +57,8 @@ public:
 #include "dialect/AutogenCompiler.hpp.inc"
 
 private:
+  mlir::RankedTensorType getRankedTensorType(TensorId id) const;
+
   std::unique_ptr<detail::PoptorchCompilerImpl> _impl;
 };
 
