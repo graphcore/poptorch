@@ -2,14 +2,16 @@
 #ifndef POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_HPP_
 #define POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_HPP_
 
-#include <mlir/IR/BuiltinTypes.h>
-
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
 #include "pytorch_bridge/Executor.hpp"
+
+namespace mlir {
+class RankedTensorType;
+}
 
 namespace poptorch_ir {
 
