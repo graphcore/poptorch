@@ -455,6 +455,15 @@ class _PopartOptions:
         self.set("instrumentWithHardwareCycleCounter", False)
         self.set("rearrangeAnchorsOnHost", False)
 
+    def __deepcopy__(self, memory):
+        copied_options = _PopartOptions()
+        memory[id(self)] = copied_options
+        for key, val in self.__dict__.items():
+            if key == '_is_frozen':
+                val = False
+            setattr(copied_options, key, copy.deepcopy(val, memory))
+        return copied_options
+
     def checkIsFrozen(self, option=None):
         # Skip check during object initialization.
         if hasattr(self, '_is_frozen'):

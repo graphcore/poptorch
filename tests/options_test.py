@@ -761,15 +761,38 @@ def test_options_change_after_use():
         opts,
         dataset=dataset,
     )
+
     with pytest.raises(Exception):
         opts.randomSeed(42)
     with pytest.raises(Exception):
         poptorch_data_loader.options.set(random_seed=42)
     with pytest.raises(Exception):
-        poptorch_data_loader.Training.gradientAccumulation(0)
+        poptorch_data_loader.options.Training.gradientAccumulation(0)
     with pytest.raises(Exception):
-        popart_opts = poptorch_data_loader._Popart
+        popart_opts = poptorch_data_loader.options._Popart
         popart_opts.set("groupNormStridedChannelGrouping", True)
+
+
+def test_copied_options_unfrozen():
+    opts = poptorch.Options()
+    # Freeze the opts.
+    _ = poptorch.DataLoader(
+        opts,
+        dataset=torch.utils.data.TensorDataset(
+            torch.randn([100, 1, 128, 128]),
+            torch.empty([100], dtype=torch.long).random_(10),
+        ),
+    )
+    copied_opts = copy.deepcopy(opts)
+
+    # Make sure that no 'Can't modify frozen Options' errors are raised.
+    copied_opts.deviceIterations(5)
+    copied_opts.Distributed.configureProcessId(5, 15)
+    copied_opts._Popart.set("autoRecomputation", 3)
+    copied_opts.Training.gradientAccumulation(4)
+    copied_opts.TensorLocations.setWeightLocation(
+        poptorch.TensorLocationSettings().useIOTilesToStore(True))
+    copied_opts.Precision.setPartialsType(torch.float16)
 
 
 def test_wrap_options():
