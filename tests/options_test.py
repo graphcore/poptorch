@@ -112,7 +112,7 @@ def test_set_popart_options(capfd):
     model = Network()
     opts = poptorch.Options()
     opts._Popart.set("hardwareInstrumentations", set([0, 1]))
-    opts._Popart.set("dotChecks", ["FINAL", "ALL"])
+    opts._Popart.set("dotChecks", [0, 1])
     opts._Popart.set("engineOptions", {
         "debug.allowOutOfMemory": "true",
     })
@@ -152,8 +152,8 @@ def test_set_popart_options(capfd):
     log = helpers.LogChecker(capfd)
     log.assert_contains("poptorch.Options added 0 to hardwareInstrumentations")
     log.assert_contains("poptorch.Options added 1 to hardwareInstrumentations")
-    log.assert_contains("poptorch.Options added FINAL to dotChecks")
-    log.assert_contains("poptorch.Options added ALL to dotChecks")
+    log.assert_contains("poptorch.Options added 0 to dotChecks")
+    log.assert_contains("poptorch.Options added 1 to dotChecks")
     log.assert_contains(
         "poptorch.Options set engineOptions[debug.allowOutOfMemory] to true")
     log.assert_contains("poptorch.Options set reportOptions[reportOptA] to A")

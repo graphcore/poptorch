@@ -220,10 +220,14 @@ SessionOptionsImpl::SessionOptionsImpl() {
     poptorch_options.model_name = value;
   });
 
-  registerSetter(container_options, "dotChecks",
-                 [&](const std::pair<std::string, std::string> &p) {
-                   popart_options.dotChecks.insert(p.first);
-                 });
+  registerSetter(
+      container_options, "dotChecks",
+      [&](const std::pair<std::string, std::string> &p) {
+        std::uint64_t value = std::stoul(p.first);
+        ERROR_ON_MSG(value >= static_cast<std::uint64_t>(popart::DotCheck::N),
+                     "Value for DotCheck out of range");
+        popart_options.dotChecks.insert(static_cast<popart::DotCheck>(value));
+      });
 
   registerSetter(container_options, "hardwareInstrumentations",
                  [&](const std::pair<std::string, std::string> &p) {
