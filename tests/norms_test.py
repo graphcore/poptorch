@@ -187,10 +187,6 @@ def test_layerNormPretrainedWeights():
 
 @pytest.mark.parametrize("dims", {2, 3, 4, 5})
 def test_groupNorm(dims):
-    if dims == 2:
-        # TODO(T49073): Match torch 1.10 GroupNorm implementation
-        pytest.skip("Numerical differences between PyTorch and PopTorch")
-
     torch.manual_seed(42)
 
     affine = dims % 2 == 0
@@ -216,31 +212,6 @@ def test_groupNorm(dims):
 
     # Training test - check weights changed
     poptorch_model.assert_weights_changed()
-
-
-def test_groupNorm_exfail():
-    torch.manual_seed(42)
-
-    shape = [3, 10]
-
-    input = torch.randn(shape)
-    groupNorm = nn.GroupNorm(5, 10)
-
-    # Run pytorch native on CPU.
-    native_output = groupNorm(input)
-
-    opts = poptorch.Options()
-    opts._Popart.set("groupNormStridedChannelGrouping", True)  # pylint: disable=protected-access
-
-    # Run on IPU.
-    ipuModel = poptorch.inferenceModel(groupNorm, opts)
-    poptorch_out = ipuModel(input)
-
-    # Group norm is pending correctness changes in popart/poplar so we will just test the shape/type for now.
-    assert poptorch_out.size() == native_output.size()
-    assert poptorch_out.type() == native_output.type()
-
-    assert not torch.allclose(poptorch_out, native_output, atol=1e-1, rtol=0.1)
 
 
 instance_norm_params = [
