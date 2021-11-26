@@ -594,8 +594,8 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
         if (options_set.count("ipu_id") == 0u) {
           _device =
               popart::DeviceManager::createDeviceManager()
-                  .acquireAvailableDevice(num_ipus, 0, options.sync_pattern,
-                                          options.connection_type);
+                  .tryAcquireAvailableDevice(num_ipus, 0, options.sync_pattern,
+                                             options.connection_type);
           ERROR_ON_MSG(!_device && !waitIfUnavailable(),
                        "Failed to acquire " << num_ipus << " IPU(s)"
                                             << this->checkSystemConfig());
@@ -605,7 +605,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
           }
         } else {
           _device =
-              popart::DeviceManager::createDeviceManager().acquireDeviceById(
+              popart::DeviceManager::createDeviceManager().tryAcquireDeviceById(
                   options.ipu_id, options.sync_pattern,
                   options.connection_type);
           ERROR_ON_MSG(!_device && !waitIfUnavailable(),
