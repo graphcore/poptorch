@@ -2,6 +2,7 @@ add_library(lower_to_poplar STATIC
         PoplarExecutor.cpp
         LowerToPoplar.cpp
         ops/ElementWise.cpp
+        ops/Generated.cpp
         ops/Linalg.cpp
         ops/Ops.cpp
         ops/Reshapes.cpp

@@ -6,6 +6,7 @@ include "PoptorchDialect.td"
 
 
 include "ops/ElementWise.td"
+include "ops/Generated.td"
 include "ops/Linalg.td"
 include "ops/Reshapes.td"
 include "ops/TensorOps.td"

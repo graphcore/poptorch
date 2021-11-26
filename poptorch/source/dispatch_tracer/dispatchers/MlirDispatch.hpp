@@ -74,6 +74,12 @@ public:
   at::Tensor makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
                                    bool requires_grad);
 
+  // If an MLIR implementation is unavailable we will create the MLIR by first
+  // lowering to JIT, canonicalising it, and lowering each of the composite
+  // nodes one at a time.
+  void canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
+                                  c10::Stack &stack);
+
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
 #include "AtenToMlirInterface.hpp.inc"
@@ -88,6 +94,12 @@ private:
   // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
   // types.
   ValueMapper _mapper;
+
+  // The JIT graph we are building up.
+  torch::jit::Graph _graph;
+
+  // The node we last processed in the graph.
+  torch::jit::Node *_last_processed_node;
 
   // We genenerate the lookup tables at object creation. This is the mechanism
   // by which that we use to target the right MLIR operation for a given aten

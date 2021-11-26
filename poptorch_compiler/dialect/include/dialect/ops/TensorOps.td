@@ -63,7 +63,7 @@ def Poptorch_concat: Poptorch_Op<"concat", []> {
 
         llvm::SmallVector<std::int64_t, 4> out_shape {first_type.getShape().begin(),
                                                       first_type.getShape().end()};
-                                                      
+
         if (dim < 0) {
           dim += out_shape.size();
         }

@@ -113,15 +113,3 @@
 - func: mm.out
   PopTorchDirect: matmul
   UnusedOutputArguments: {out}
-
-# Matrix-vector
-- func: mv
-  PopTorchDirect: matmul
-
-# vector-vector
-- func: dot
-  PopTorchDirect: matmul
-
-# BatchMatrix-Matrix
-- func: bmm
-  PopTorchDirect: matmul
