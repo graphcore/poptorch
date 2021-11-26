@@ -1295,12 +1295,16 @@ class IPUScope:
         return self
 
     # Exit the scope. Compile graph and stop capturing call
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, exc_type, value, traceback):
         # Turn off the dispatcher.
         poptorch_core.endDispatch()
 
-        # Compile for IPU.
+        # Dispatch stopped because of an exception: don't try to compile
+        # the graph.
+        if exc_type is not None:
+            return
 
+        # Compile for IPU.
         if self._compile_using == enums.Compiler.PopART:
             # Compile the captured graph using PopART.
             self._executable = poptorch_core.compileWithManualTracing(
