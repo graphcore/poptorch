@@ -391,23 +391,6 @@ def Poptorch_dequantizelinear : Poptorch_Op<"dequantizelinear", []> {
 
 }
 
-def Poptorch_dropout : Poptorch_Op<"dropout", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$num_outputs, F32Attr:$ratio);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "std::int64_t":$num_outputs, "float":$ratio), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("num_outputs",$_builder.getI64IntegerAttr(num_outputs));
-        $_state.addAttribute("ratio",$_builder.getF32FloatAttr(ratio));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_isinf : Poptorch_Op<"isinf", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$detect_negative, I64Attr:$detect_positive);
   let results = (outs Poptorch_tensor:$result);

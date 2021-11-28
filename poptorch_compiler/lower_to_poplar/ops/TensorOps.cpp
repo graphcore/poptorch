@@ -4,6 +4,7 @@
 #include <poplar/Graph.hpp>
 #include <popops/Fill.hpp>
 #include <popops/Zero.hpp>
+#include <poprand/RandomGen.hpp>
 
 namespace poptorch_ir {
 
@@ -52,6 +53,34 @@ void concat::lowerToPoplar(CompilerContext &context) {
   std::vector<poplar::Tensor> tensors = context.fromSsa(this->tensors());
 
   context.tensors[this->result()] = poplar::concat(tensors, this->dim());
+}
+
+void dropout::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor tensor = context.fromSsa(this->input());
+  const float p = this->p().convertToFloat();
+  const bool training = this->training();
+
+  if (training) {
+    // Special case of p=1: return all zeros
+    if (p == 1.0) {
+      poplar::Tensor result = context.graph.clone(tensor.elementType(), tensor);
+      popops::zero(context.graph, result, context.seq);
+      context.tensors[this->result()] = result;
+      return;
+    }
+    // NB: Seeds not implemented yet.
+    // Need to implement setting seed, seedModifier, and reference tensor
+    // TODO(T51096)
+    poplar::Tensor seed = context.graph.addVariable(
+        poplar::UNSIGNED_INT, {2}, poplar::VariableMappingMethod::LINEAR);
+    popops::fill(context.graph, seed, context.seq, 42);
+    poplar::Tensor result =
+        poprand::dropout(context.graph, &seed, 0, tensor, tensor, 1. - p,
+                         1. / (1. - p), context.seq);
+    context.tensors[this->result()] = result;
+  } else {
+    context.tensors[this->result()] = tensor;
+  }
 }
 
 } // namespace poptorch_ir

@@ -7,7 +7,7 @@ import poptorch
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_simple_adder():
     t1 = torch.randn([20])
     t2 = torch.randn([20])
@@ -28,7 +28,7 @@ def test_simple_adder():
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_zero_inplace():
     t1 = torch.randn([20])
 
@@ -44,7 +44,7 @@ def test_zero_inplace():
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_simple_inplace():
     t1 = torch.randn([20])
 
@@ -64,7 +64,7 @@ def test_simple_inplace():
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_simple_inplace_add():
     t1 = torch.randn([20])
 
@@ -84,7 +84,7 @@ def test_simple_inplace_add():
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_add_with_alpha():
     t1 = torch.randn([20])
 
@@ -104,7 +104,7 @@ def test_add_with_alpha():
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_sub_with_alpha():
     t1 = torch.randn([20])
 
@@ -125,7 +125,7 @@ def test_sub_with_alpha():
 
 # TODO: Non-doubles.
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_wrapped_values():
     t1 = torch.randn([20])
 

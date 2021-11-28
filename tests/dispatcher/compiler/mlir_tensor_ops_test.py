@@ -22,7 +22,7 @@ def cat_stack_harness(op, dim, dtype):
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 @pytest.mark.parametrize(
     "params",
     [
@@ -36,7 +36,7 @@ def test_cat(params):
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 @pytest.mark.parametrize(
     "params",
     [

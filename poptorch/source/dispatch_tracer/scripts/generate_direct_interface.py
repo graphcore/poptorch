@@ -5,6 +5,7 @@ schemaToCpp = {
     "int[]": "toIntVector",
     "int": "toInt",
     "bool": "toBool",
+    "float": "toDouble",
     # We treat all scalars as double for now.
     "Scalar": "toDouble"
 }

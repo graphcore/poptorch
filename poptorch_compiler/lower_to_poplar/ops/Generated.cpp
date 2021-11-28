@@ -185,12 +185,6 @@ void dequantizelinear::lowerToPoplar(CompilerContext & /*context*/) {
                   "dequantizelinear"
                   " is currently unimplemented.");
 }
-void dropout::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "dropout"
-                  " is currently unimplemented.");
-}
 void isinf::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

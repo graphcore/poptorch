@@ -25,7 +25,7 @@ to_test = [
 
 @pytest.mark.parametrize("size", to_test)
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_matmul(size):
     torch.manual_seed(42)
 

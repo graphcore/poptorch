@@ -52,7 +52,7 @@ to_test = [
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+                    reason="CentOS 7 is not currently supported in MLIR.")
 @pytest.mark.parametrize("num_dims", [1, 2, 3])
 @pytest.mark.parametrize("size", to_test)
 def test_conv(num_dims, size):

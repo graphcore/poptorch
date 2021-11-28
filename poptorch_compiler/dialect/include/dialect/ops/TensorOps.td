@@ -80,3 +80,17 @@ def Poptorch_concat: Poptorch_Op<"concat", []> {
      }]>
     ];
 }
+
+def Poptorch_dropout : Poptorch_Op<"dropout", []> {
+    let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$training);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "float":$p, "bool":$training),[{
+        $_state.addOperands({input});
+        $_state.addAttribute("p", $_builder.getF32FloatAttr(p));
+        $_state.addAttribute("training", $_builder.getBoolAttr(training));
+        $_state.addTypes({input.getType()});
+      }]>
+    ];
+}

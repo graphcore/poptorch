@@ -91,6 +91,12 @@
   PopTorchDirectInplace: add_
   UnusedOutputArguments: {out}
 
+
+# dropout(Tensor input, float p, bool train) -> Tensor
+- func: dropout
+  PopTorchDirect: dropout
+
+
 #
 # Linalg
 #

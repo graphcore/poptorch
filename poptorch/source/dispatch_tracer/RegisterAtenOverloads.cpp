@@ -330,6 +330,9 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
 
   m.impl("expand",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("dropout",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 }
 
 /*
