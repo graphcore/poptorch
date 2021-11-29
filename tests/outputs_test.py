@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import pytest
 import torch
 import torch.nn as nn
 import poptorch
 import helpers
 
 
-def test_multiple_tensors():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_multiple_tensors(trace_model):
     class Network(nn.Module):
         def forward(self, x, y):
 
@@ -18,7 +20,9 @@ def test_multiple_tensors():
 
     # Create our model.
     model = Network()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     x = torch.ones(2)
     y = torch.zeros(2)
@@ -28,7 +32,8 @@ def test_multiple_tensors():
     helpers.assert_allclose(actual=ipu, expected=ref)
 
 
-def test_simple_list():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_simple_list(trace_model):
     class Network(nn.Module):
         def forward(self, x, y):
 
@@ -39,7 +44,9 @@ def test_simple_list():
 
     # Create our model.
     model = Network()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     x = torch.ones(2)
     y = torch.zeros(2)
@@ -49,7 +56,8 @@ def test_simple_list():
     helpers.assert_allclose(actual=ipu, expected=ref)
 
 
-def test_simple_tuple():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_simple_tuple(trace_model):
     class Network(nn.Module):
         def forward(self, x, y):
 
@@ -60,7 +68,9 @@ def test_simple_tuple():
 
     # Create our model.
     model = Network()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     x = torch.ones(2)
     y = torch.zeros(2)
@@ -70,7 +80,8 @@ def test_simple_tuple():
     helpers.assert_allclose(actual=ipu, expected=ref)
 
 
-def test_nested_tuples():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_nested_tuples(trace_model):
     class Network(nn.Module):
         def forward(self, x, y):
 
@@ -81,7 +92,9 @@ def test_nested_tuples():
 
     # Create our model.
     model = Network()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     x = torch.ones(2)
     y = torch.zeros(2)
@@ -92,7 +105,8 @@ def test_nested_tuples():
     helpers.assert_allclose(actual=ipu, expected=ref)
 
 
-def test_same_tensor():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_same_tensor(trace_model):
     class Network(nn.Module):
         def forward(self, x, y):
 
@@ -103,7 +117,9 @@ def test_same_tensor():
 
     # Create our model.
     model = Network()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     x = torch.ones(2)
     y = torch.zeros(2)

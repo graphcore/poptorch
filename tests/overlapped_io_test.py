@@ -99,7 +99,8 @@ def test_io_input():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-def test_input_error_messages():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_input_error_messages(trace_model):
     class DoubleInputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -108,7 +109,9 @@ def test_input_error_messages():
             return y, x2
 
     model = DoubleInputUseModel()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     err_msg = (
         r"poptorch\.set_overlap_for_input must be the only op applied " +
@@ -124,7 +127,7 @@ def test_input_error_messages():
             return y, y2
 
     model = NotOnInputModel()
-    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     err_msg = (r"poptorch\.set_overlap_for_input applied on a node which is " +
                r"not a tensor input to the model\.")
@@ -139,7 +142,7 @@ def test_input_error_messages():
             return y
 
     model = NormalModel()
-    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     err_msg = (
         r"Overlapped IO is not supported with poptorch\.Pipelined" +
@@ -150,7 +153,7 @@ def test_input_error_messages():
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ShardedExecution())
-
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options=opts)
 
     err_msg = (
@@ -197,7 +200,8 @@ def test_overlap_host_io_output():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-def test_output_error_messages():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_output_error_messages(trace_model):
     class DoubleOutputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -206,7 +210,9 @@ def test_output_error_messages():
             return y, y2
 
     model = DoubleOutputUseModel()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     err_msg = (
         r"poptorch\.set_overlap_for_output cannot be used with a tensor that "
@@ -217,6 +223,7 @@ def test_output_error_messages():
 
     opts = poptorch.Options()
     opts.setExecutionStrategy(poptorch.ShardedExecution())
+    opts.Jit.traceModel(trace_model)
 
     opts.TensorLocations.numIOTiles(32)
 

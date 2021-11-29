@@ -1,45 +1,58 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import pytest
 import torch
 import poptorch
 import helpers
 
 
-def test_print_tensor():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_print_tensor(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return poptorch.ipu_print_tensor(x)
 
-    m = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    m = poptorch.inferenceModel(Model(), options)
     m(torch.randn(5))
 
 
-def test_print_tensor_with_title():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_print_tensor_with_title(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return poptorch.ipu_print_tensor(x, "my_tensor")
 
-    m = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    m = poptorch.inferenceModel(Model(), options)
     m(torch.randn(5))
 
 
-def test_nop():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_nop(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return poptorch.nop(x) * 2
 
-    m = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    m = poptorch.inferenceModel(Model(), options)
     m(torch.randn(5))
 
 
-def test_name_scope():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_name_scope(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             with poptorch.NameScope("NameScope"):
                 return x + y
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     torch.manual_seed(42)
     x = torch.randn(10, 10)
@@ -52,14 +65,17 @@ def test_name_scope():
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
-def test_available_memory_last_op(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_available_memory_last_op(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = torch.matmul(x, x)
             return poptorch.set_available_memory(x, 0.3)
 
     input = torch.randn(10, 10)
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     poptorch_model.compile(input)
 
     # Check the trace log to make sure set_available_memory isn't pruned

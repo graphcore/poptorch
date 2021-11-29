@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import pytest
 import torch
 import poptorch
 import helpers
@@ -11,11 +12,14 @@ class FiveAdder(torch.nn.Module):
         return in_1 + in_2 + in_3 + in_4 + in_5
 
 
-def test_non_contiguous():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_non_contiguous(trace_model):
     torch.manual_seed(23148)
 
     model = FiveAdder()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     OUTER_DIM = 1000
     INNER_DIM = 40
