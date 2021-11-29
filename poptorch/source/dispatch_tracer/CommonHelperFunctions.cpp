@@ -93,6 +93,7 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
   }
 
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(&graph);
+  poptorch::resolveHalfOrFloat(&graph);
 
   return aten_target;
 }

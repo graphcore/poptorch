@@ -59,6 +59,7 @@ torch::jit::Node *logSoftmaxHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::softmax, softmaxHandler);
+  registerHandler(c10::aten::_softmax, softmaxHandler);
   registerHandler(c10::aten::log_softmax, logSoftmaxHandler);
   registerHandler(c10::aten::_log_softmax, logSoftmaxHandler);
 }

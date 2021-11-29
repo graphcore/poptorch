@@ -309,7 +309,6 @@ torch::jit::Node *subsampleSlice(torch::jit::Graph *graph,
 torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
   // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor
-  // // NOLINT
   auto *input = node->input(0);
   auto dim = constantToLong(node->input(1)->node());
   auto *start_node = node->input(2)->node();

@@ -55,15 +55,31 @@ torch::jit::Node *gluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
 
 torch::jit::Node *rreluHandler(torch::jit::Graph *graph,
                                torch::jit::Node *node) {
+  // clang-format off
+  // aten::rrelu(Tensor self, Scalar lower=0.125,
+  //             Scalar upper=0.3333333333333333,
+  //             bool training=False, Generator? generator=None) -> Tensor
+  // aten::rrelu_with_noise(Tensor self, Tensor noise,
+  //                        Scalar lower, Scalar upper,
+  //                        bool training, Generator? generator) -> Tensor
+  //
   // training: rrelu(x)  = x if x >= 0
   //                     = a * x if x < 0, where a uniformly random value
   //                                       from [lower, upper]
   // inference: rrelu(x) = x if x >= 0
   //                     = x * ((lower + upper) / 2)
+  // clang-format on
   torch::jit::Value *x = node->input(0);
-  const float lower = constantToFloat(node->input(1)->node());
-  const float upper = constantToFloat(node->input(2)->node());
-  const bool is_training = constantToBool(node->input(3)->node());
+  int64_t next_idx = 1;
+  if (node->kind() == c10::aten::rrelu_with_noise) {
+    torch::jit::Value *noise = node->input(next_idx++);
+    ERROR_ON_MSG(noise->node()->kind() != c10::prim::Uninitialized,
+                 "Internal error: noise parameter not supported for "
+                 "aten::rrelu_with_noise");
+  }
+  const float lower = constantToFloat(node->input(next_idx++)->node());
+  const float upper = constantToFloat(node->input(next_idx++)->node());
+  const bool is_training = constantToBool(node->input(next_idx++)->node());
 
   auto *val =
       is_training
@@ -101,6 +117,7 @@ torch::jit::Node *softplusHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::glu, gluHandler);
   registerHandler(c10::aten::rrelu, rreluHandler);
+  registerHandler(c10::aten::rrelu_with_noise, rreluHandler);
   registerHandler(c10::aten::softplus, softplusHandler);
 }
 

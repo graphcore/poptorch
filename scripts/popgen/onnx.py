@@ -1,5 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved
 import logging
+import json
 import os
 import re
 from ctypes.util import find_library
@@ -23,11 +24,23 @@ nodeBlacklist = {
 def find_popart_includes():
     assert "CONDA_PREFIX" in os.environ, ("You need to run this script from "
                                           "inside an activated buildenv")
-    expected_path = os.path.realpath(
-        os.path.join(os.environ["CONDA_PREFIX"], "..", "popart"))
-    assert os.path.isdir(expected_path), ("You need to configure your build "
-                                          "by running cmake")
-    return expected_path
+    compile_commands = os.path.realpath(
+        os.path.join(os.environ["CONDA_PREFIX"], "..",
+                     "compile_commands.json"))
+    assert os.path.isfile(compile_commands), (
+        "You need to configure your build "
+        "by running cmake")
+    with open(compile_commands, "r") as f:
+        cmds = json.load(f)
+    for c in cmds:
+        if "popart_compiler" in c["file"]:
+            m = re.match(".*-isystem (.*popart/include) .*", c["command"])
+            if not m:
+                continue
+            return m.group(1)
+
+    raise RuntimeError(
+        "Failed to find path to PopART in compile_commands.json")
 
 
 # init(popart_path=None, clang_path=None, debug=False):
@@ -53,7 +66,8 @@ def init(popart_path=None, clang_path=None, debug=False):
 
     logger.info('Will pick up popART headers from: %s', popart_include_dir)
     for (i, fname) in enumerate(popart_files):
-        popart_files[i] = os.path.join(popart_include_dir, "popart", fname)
+        popart_files[i] = os.path.realpath(
+            os.path.join(popart_include_dir, "popart", fname))
 
     if clang.cindex.Config.loaded:
         # Already initialised
@@ -203,6 +217,7 @@ def parse_signatures():
         'nonstd::optional<std::string>': ['cstr', 'None'],
         'nonstd::optional<std::vector<int64_t> >':
         ['clong_list', 'dimension_list', 'None'],
+        'Attributes::Float': ['cfloat'],
         'Attributes::Int': ['clong'],
         'Attributes::Ints': ['clong_list', 'empty_initializer'],
         'popart::ReductionType': ['cint', 'reduction'],

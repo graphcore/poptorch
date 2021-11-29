@@ -155,8 +155,10 @@ torch::jit::Node *eluHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto *x = node->input(0);
   auto *y = node->input(1);
   auto t0 = constantToFloat(y->node());
-  // elu(x, cfloat(y))
-  return createElu(graph, {x}, t0);
+  auto *z = node->input(2);
+  auto t1 = constantToFloat(z->node());
+  // selu(x, cfloat(y), cfloat(z))
+  return createSelu(graph, {x}, t0, t1);
 }
 
 torch::jit::Node *eqHandler(torch::jit::Graph *graph, torch::jit::Node *node) {

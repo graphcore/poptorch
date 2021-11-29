@@ -2,15 +2,18 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import math
+import os
 from popgen.api import convert, expand, forward, generate, simplify
 from popgen.helpers import as_ir, alpha, cfloat, cint, clong, clong_list, \
                            cstr, dimension, empty_initializer, output_shape, \
                            output_type, reduction, tensor_list, tensor_long, \
                            tensor_shape, tensor_type
 from popgen.operatorfactory import op
+from utils import _utils
 
 script = "PopAtenHandlers.py"
-output_dir = "poptorch/source/popart_canonicalization"
+output_dir = os.path.join(_utils.sources_dir(),
+                          "poptorch/source/popart_canonicalization")
 
 selu_alpha = 1.6732632423543772848170429916717
 selu_lambda = 1.0507009873554804934193349852946
@@ -64,7 +67,7 @@ convert("logical_or", 2)
 
 expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
 forward("_cat", "cat")
-expand("elu", lambda x, y: op.elu(x, cfloat(y)))
+expand("elu", lambda x, y, z: op.selu(x, cfloat(y), cfloat(z)))
 expand("full_like", lambda x, y: op.expand(y, as_ir(tensor_shape(x))))
 expand("ge", lambda x, y: x >= y)
 expand("le", lambda x, y: x <= y)
