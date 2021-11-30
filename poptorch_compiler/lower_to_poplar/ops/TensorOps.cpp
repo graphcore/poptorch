@@ -36,7 +36,7 @@ void zero_::lowerToPoplar(CompilerContext &context) {
   popops::zero(context.graph, input, context.seq);
 }
 
-void tensorconstant::lowerToPoplar(CompilerContext &context) {
+void tensorconstant_float::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input = context.fromSsa(this->result());
 
   float as_float = 0.0f;
@@ -47,6 +47,17 @@ void tensorconstant::lowerToPoplar(CompilerContext &context) {
 
   popops::fill(context.graph, input, context.seq, as_float);
   //  context.graph.setInitialValue(input, as_float);
+}
+
+void tensorconstant_int::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->result());
+
+  int as_int = 0;
+  // Right now just support 1 value.
+  for (mlir::Attribute dimension : this->data()) {
+    as_int = dimension.cast<mlir::IntegerAttr>().getInt();
+  }
+  popops::fill(context.graph, input, context.seq, as_int);
 }
 
 void concat::lowerToPoplar(CompilerContext &context) {

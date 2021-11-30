@@ -35,17 +35,24 @@ def Poptorch_print_tensor : Poptorch_Op<"print_tensor", []> {
 }
 
 
-def Poptorch_tensorconstant : Poptorch_Op<"tensorconstant", []> {
+def Poptorch_tensorconstant_float : Poptorch_Op<"tensorconstant_float", []> {
     let arguments = (ins F32ArrayAttr:$data);
     let results = (outs Poptorch_tensor:$result);
-
 
     let builders = [OpBuilderDAG<(ins "const std::vector<float>&":$data),[{
         $_state.addAttribute("data", $_builder.getF32ArrayAttr(data));
         $_state.addTypes(mlir::RankedTensorType::get(1, $_builder.getF32Type()));
-     }]>
-    ];
+     }]>];
+}
 
+def Poptorch_tensorconstant_int : Poptorch_Op<"tensorconstant_int", []> {
+    let arguments = (ins I32ArrayAttr:$data);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "const std::vector<std::int32_t>&":$data),[{
+        $_state.addAttribute("data", $_builder.getI32ArrayAttr(data));
+        $_state.addTypes(mlir::RankedTensorType::get(1, $_builder.getIntegerType(32, true)));
+     }]>];
 }
 
 def Poptorch_concat: Poptorch_Op<"concat", []> {

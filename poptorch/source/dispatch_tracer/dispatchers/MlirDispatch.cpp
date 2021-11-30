@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "MlirDispatch.hpp"
 
+#include <limits>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -569,16 +570,40 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
     if (tensor.unsafeGetTensorImpl()->is_wrapped_number()) {
       ERROR_ON(tensor.numel() != 1);
 
-      // TODO(T49190): More than just doubles.
-      std::vector<float> tmp(tensor.numel());
-
-      std::stringstream ss;
-      for (std::uint32_t i = 0; i < tensor.numel(); ++i) {
-        logging::trace("\tWrapped value: {}", *tensor.data_ptr<double>());
-        tmp[i] = tensor.data_ptr<double>()[i];
+      // TODO(T49190): More than just doubles and longs.
+      switch (tensor.scalar_type()) {
+      case c10::ScalarType::Double: {
+        std::vector<float> tmp(tensor.numel());
+        for (auto i = 0u; i < tensor.numel(); ++i) {
+          double wrapped_value = tensor.data_ptr<double>()[i];
+          logging::trace("\tWrapped value: {}", wrapped_value);
+          tmp[i] = wrapped_value;
+        }
+        val = _compiler.tensorconstant_float(tmp);
+        break;
       }
-
-      val = _compiler.tensorconstant(tmp);
+      case c10::ScalarType::Long: {
+        std::vector<std::int32_t> tmp(tensor.numel());
+        for (auto i = 0u; i < tensor.numel(); ++i) {
+          std::int64_t wrapped_value = tensor.data_ptr<std::int64_t>()[i];
+          logging::trace("\tWrapped value: {}", wrapped_value);
+          // Ensure the wrapped value fits in 32 bit
+          ERROR_ON_MSG(
+              wrapped_value > std::numeric_limits<std::int32_t>::max() ||
+                  wrapped_value < std::numeric_limits<std::int32_t>::lowest(),
+              "Cannot convert wrapped wrapped integer value ("
+                  << wrapped_value
+                  << ") to 32-bit signed representation, as the value is "
+                     "outside the representable range.");
+          tmp[i] = wrapped_value;
+        }
+        val = _compiler.tensorconstant_int(tmp);
+        break;
+      }
+      default:
+        ERROR("Wrapped values of scalar type " << tensor.scalar_type()
+                                               << " are not supported.");
+      }
       _mapper.addTensor(tensor, val);
 
       logging::trace(
@@ -638,7 +663,8 @@ at::Tensor MLIRDispatch::outputIsViewOf(poptorch_ir::TensorId output_id,
   std::vector<std::int64_t> shape = _compiler.getSize(output_id);
 
   // Create new tensor
-  at::Tensor new_output = at::native::empty_cpu(shape);
+  at::Tensor new_output =
+      at::native::empty_cpu(shape, original_input.scalar_type());
 
   const std::int64_t old_numel = new_output.numel();
 

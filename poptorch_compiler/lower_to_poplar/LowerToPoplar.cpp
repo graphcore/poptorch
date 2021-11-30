@@ -65,29 +65,25 @@ poplar::Type elementTypeFromMLIR(mlir::Type elementType) {
   if (elementType.isF32()) {
     return poplar::FLOAT;
   }
-  if (elementType.isInteger(8)) {
-    return poplar::SIGNED_CHAR;
-  }
-  if (elementType.isSignedInteger(8)) {
-    return poplar::CHAR;
-  }
-  if (elementType.isSignedInteger(16)) {
-    return poplar::SHORT;
-  }
-  if (elementType.isSignedInteger(32)) {
-    return poplar::INT;
-  }
-  if (elementType.isSignedInteger(64)) {
-    return poplar::LONG;
-  }
   if (elementType.isUnsignedInteger(8)) {
     return poplar::UNSIGNED_CHAR;
   }
   if (elementType.isUnsignedInteger(16)) {
     return poplar::UNSIGNED_SHORT;
   }
-  if (elementType.isUnsignedInteger(32)) {
+  if (elementType.isUnsignedInteger(32) || elementType.isUnsignedInteger(64)) {
     return poplar::UNSIGNED_INT;
+  }
+  // We use isInteger from here onwards to capture both
+  // isSignedInteger and isSignlessInteger
+  if (elementType.isInteger(8)) {
+    return poplar::SIGNED_CHAR;
+  }
+  if (elementType.isInteger(16)) {
+    return poplar::SHORT;
+  }
+  if (elementType.isInteger(32) || elementType.isInteger(64)) {
+    return poplar::INT;
   }
   assert(false && "Unsupported MLIR type");
 
