@@ -918,34 +918,6 @@ def Poptorch_nonzero : Poptorch_Op<"nonzero", []> {
   }]>];
 }
 
-def Poptorch_relu : Poptorch_Op<"relu", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-}
-
-def Poptorch_gelu : Poptorch_Op<"gelu", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-}
-
 def Poptorch_onehot : Poptorch_Op<"onehot", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$axis);
   let results = (outs Poptorch_tensor:$result);
