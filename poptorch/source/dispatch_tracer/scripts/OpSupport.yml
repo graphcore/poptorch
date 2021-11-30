@@ -24,6 +24,53 @@
 #
 
 ######################
+# Activations
+######################
+
+- func: hardsigmoid.out
+  PopTorchDirect: hardsigmoid
+  PopTorchDirectInplace: hardsigmoid_
+  UnusedOutputArguments: {out}
+
+- func: relu_
+  PopTorchDirectInplace: relu_
+
+# tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: tanh.out
+  PopTorchDirect: tanh
+  UnusedOutputArguments: {out}
+
+
+# sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: sigmoid.out
+  PopTorchDirect: sigmoid
+  UnusedOutputArguments: {out}
+
+- func: silu.out
+  PopTorchDirect: swish
+  PopTorchDirectInplace: swish_
+  UnusedOutputArguments: {out}
+
+# gelu.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: gelu.out
+  PopTorchDirect: gelu
+  UnusedOutputArguments: {out}
+
+# aten::sigmoid_(Tensor(a!) self) -> Tensor(a!) 
+- func: sigmoid_
+  PopTorchDirectInplace: sigmoid_
+
+# _softmax(Tensor self, int dim, bool half_to_float) -> Tensor
+- func: _softmax
+  PopTorchDirect: softmax
+
+# _softmax.out(Tensor self, int dim, bool half_to_float, *, Tensor(a!) out) -> Tensor(a!)
+- func: _softmax.out
+  PopTorchDirect: softmax
+  UnusedOutputArguments: {out}
+
+
+######################
 # Views and reshapes
 ######################
 

@@ -5,7 +5,10 @@
 include "PoptorchDialect.td"
 
 
-include "ops/ElementWise.td"
+// Now included in activations.
+//include "ops/ElementWise.td"
+
+include "ops/Activations.td"
 include "ops/Generated.td"
 include "ops/Linalg.td"
 include "ops/Reshapes.td"
