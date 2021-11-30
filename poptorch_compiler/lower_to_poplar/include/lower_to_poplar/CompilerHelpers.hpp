@@ -41,6 +41,8 @@ struct CompilerContext {
   poplar::Tensor fromSsa(mlir::Value value);
 
   std::vector<poplar::Tensor> fromSsa(mlir::ValueRange value_range);
+
+  std::int64_t graph_const_count = 0;
 };
 
 template <typename T>
@@ -64,6 +66,15 @@ std::vector<T> convertIntArray(const mlir::ArrayAttr &array) {
   }
 
   return output;
+}
+
+template <typename T>
+poplar::Tensor createConstant(CompilerContext &context, poplar::Type type,
+                              const std::vector<uint64_t> &shape,
+                              const std::vector<T> &data) {
+  poplar::Tensor constant = context.graph.addConstant<T>(type, shape, data);
+  context.graph.setTileMapping(constant, context.graph_const_count++);
+  return constant;
 }
 
 } // namespace poptorch_ir
