@@ -119,3 +119,9 @@
 - func: mm.out
   PopTorchDirect: matmul
   UnusedOutputArguments: {out}
+
+# native_batch_norm(Tensor input, Tensor? weight, Tensor? bias,
+#                   Tensor? running_mean, Tensor? running_var,
+#                   bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)
+- func: native_batch_norm
+  PopTorchDirect: batch_norm
