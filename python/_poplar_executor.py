@@ -87,6 +87,8 @@ class PoplarExecutor:
         options.Precision.autocast_policy.apply(self._user_model, options)
 
         if training:
+            # TODO(T51159): Add support for dispatch tracing + training.
+            assert options.Jit.trace_model, "training not supported for now"
             self._attribute_tracker = \
                     _optimizer_attributes.OptimizerAttrTracker(
                         options)
@@ -424,7 +426,23 @@ class PoplarExecutor:
         if not self._dict_optimizer:
             self._dict_optimizer = self._dict_new_optimizer
 
-    def _compileWithTrace(self, trace_args):
+    def _compileWithDispatch(self, in_tensors):
+        self._executable_inputs = in_tensors.clone()
+
+        def all_data(model):
+            yield from model.named_parameters()
+            yield from model.named_buffers()
+
+        with IPUScope(in_tensors.asTuple(),
+                      parameters=all_data(self._model),
+                      options=self._options) as ipu:
+            outputs = self._model(*in_tensors.asTuple())
+            if not isinstance(outputs, (list, tuple)):
+                outputs = (outputs, )
+            ipu.outputs(outputs)
+        return ipu._executable  # pylint: disable=protected-access
+
+    def _compile(self, in_tensors):
         """On POD we want to separate compilation from device
         initialisation because we want only one process to compile the model,
         but ``loadEngineAndConnectStreams()`` must happen at the same time in
@@ -439,63 +457,67 @@ class PoplarExecutor:
         The caller will then call the regular ``_compile()`` method in all the
         processes at the same time and they should all hit the cache.
         """
-        # Note: in single process execution or if the cache is disabled
-        # should_compile will always be False.
-        with _impl.distributedCacheLock(self._model,
-                                        self._options) as should_compile:
-            # Only the first process should compile
-            if should_compile:
-                self._executable = poptorch_core.compileWithTrace(*trace_args)
-
-        # In distributed execution mode:
-        # At that point only the first process will have a compiled executable:
-        # trigger the compilation process in all the other processes.
-        if not self.isCompiled():
-            self._executable = poptorch_core.compileWithTrace(*trace_args)
-
-            if self._new_optimizer and isinstance(self._new_optimizer,
-                                                  Optimizer):
-                # If the optimiser has state to be written (from a checkpoint),
-                # write it immediately after compilation
-                if self._new_optimizer.has_state():
-                    self._write_optim_state_dict()
-                else:
-                    self._update_optimizer_state = True
-
-        # Load the engine and connect the streams in all the processes.
-        #
-        # Note: no sync point was added because we expect the above
-        # compileWithTrace call to be quick as all the processes should
-        # hit the cache.
-        #
-        # If the cache is disabled then we expect the compilation process
-        # to roughly take the same amount of time in all processes.
-        #
-        # Note: if multiple processes run on the same host, it's recommended
-        # to enable executable caching to avoid out of memory issues due
-        # to concurrent compilation processes.
-        if self._options.connection_type != enums.ConnectionType.Never:
-            poptorch_core.loadEngineAndConnectStreams(self._executable)
-
-    def _compile(self, in_tensors):
         with self._profiling.tracepoint("modelCompilation"):
-            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
-                    self._preprocessGraph(
-                        in_tensors)
-
             # Compile the poplar executable based on the batchsize.
             if self._options.Jit.trace_model:
+                (in_tensors_trace_view, has_converted_any_half,
+                 narrow_tensor_fn) = self._preprocessGraph(in_tensors)
+
                 trace_args = self._trace_model_and_get_compile_args(
                     in_tensors, in_tensors_trace_view, has_converted_any_half,
                     narrow_tensor_fn)
 
-                self._compileWithTrace(trace_args)
+            # Note: in single process execution or if the cache is disabled
+            # should_compile will always be False.
+            with _impl.distributedCacheLock(self._model,
+                                            self._options) as should_compile:
+                # Only the first process should compile
+                if should_compile:
+                    if self._options.Jit.trace_model:
+                        self._executable = poptorch_core.compileWithTrace(
+                            *trace_args)
+                    else:
+                        self._executable = self._compileWithDispatch(
+                            in_tensors)
+
+            # In distributed execution mode:
+            # At that point only the first process will have a compiled executable:
+            # trigger the compilation process in all the other processes.
+            if not self.isCompiled():
+                if self._options.Jit.trace_model:
+                    self._executable = poptorch_core.compileWithTrace(
+                        *trace_args)
+                else:
+                    self._executable = self._compileWithDispatch(in_tensors)
+
+            # Load the engine and connect the streams in all the processes.
+            #
+            # Note: no sync point was added because we expect the above
+            # compileWithTrace call to be quick as all the processes should
+            # hit the cache.
+            #
+            # If the cache is disabled then we expect the compilation process
+            # to roughly take the same amount of time in all processes.
+            #
+            # Note: if multiple processes run on the same host, it's recommended
+            # to enable executable caching to avoid out of memory issues due
+            # to concurrent compilation processes.
+            if self._options.connection_type != enums.ConnectionType.Never:
+                poptorch_core.loadEngineAndConnectStreams(self._executable)
 
             self._is_attached = self.isAttachedToDevice()
 
             if self._is_attached:
                 # Upload the weights to the IPU
                 self.copyWeightsToDevice()
+                if self._new_optimizer and isinstance(self._new_optimizer,
+                                                      Optimizer):
+                    # If the optimiser has state to be written (from a checkpoint),
+                    # write it immediately after compilation
+                    if self._new_optimizer.has_state():
+                        self._write_optim_state_dict()
+                    else:
+                        self._update_optimizer_state = True
 
     def _preprocessGraph(self, in_tensors):
         with self._profiling.tracepoint("graphPreprocessing"):
@@ -593,11 +615,19 @@ class PoplarExecutor:
             in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
                     self._preprocessGraph(
                         data.executable_inputs)
-            trace_args = self._trace_model_and_get_compile_args(
-                data.executable_inputs, in_tensors_trace_view,
-                has_converted_any_half, narrow_tensor_fn)
-            self._executable = poptorch_core.processTraceAndImportExecutable(
-                *trace_args, filename, exe_offset)
+
+            if data.options is None or data.options.Jit.trace_model:
+                trace_args = self._trace_model_and_get_compile_args(
+                    data.executable_inputs, in_tensors_trace_view,
+                    has_converted_any_half, narrow_tensor_fn)
+                self._executable = \
+                        poptorch_core.processTraceAndImportExecutable(
+                            *trace_args, filename, exe_offset)
+            else:
+                # TODO(T51159) Support dispatch tracing + serialized executables
+                raise _impl.createPoptorchError(
+                    "Not supported: can't deserialize "
+                    " dispatch traced executable.")
             self._is_attached = self.isAttachedToDevice()
 
             if self._is_attached:
@@ -626,6 +656,7 @@ class PoplarExecutor:
             before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
             to restore the executable.
         """
+        assert self._options.Jit.trace_model, "Only Jit tracing supported"
         in_tensors = self._args_parser(args, kwargs, False)
         dst_dir = os.path.dirname(filename)
         if dst_dir:
@@ -648,19 +679,27 @@ class PoplarExecutor:
                                                self._new_optimizer)
         else:
             data = _poptorch_data.PoptorchData(self._poptorch_version,
-                                               in_tensors)
+                                               in_tensors, self._options)
         with open(filename, "wb") as f:
             pickle.dump(data, f, protocol=4)
             f.close()
 
         with self._profiling.tracepoint("compileAndExport"):
-            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
-                    self._preprocessGraph(
-                        in_tensors)
-            trace_args = self._trace_model_and_get_compile_args(
-                in_tensors, in_tensors_trace_view, has_converted_any_half,
-                narrow_tensor_fn)
-            poptorch_core.compileWithTraceAndExport(*trace_args, filename)
+            if self._options.Jit.trace_model:
+                (in_tensors_trace_view,
+                 has_converted_any_half,
+                 narrow_tensor_fn) = \
+                        self._preprocessGraph(
+                            in_tensors)
+                trace_args = self._trace_model_and_get_compile_args(
+                    in_tensors, in_tensors_trace_view, has_converted_any_half,
+                    narrow_tensor_fn)
+                poptorch_core.compileWithTraceAndExport(*trace_args, filename)
+            else:
+                # TODO(T51159) Support dispatch trace + serialized executables
+                raise _impl.createPoptorchError(
+                    "Not supported: can't compileAndExport "
+                    "dispatch traced executable.")
 
     def cycleCount(self):
         """ Returns number of cycles which the IPU ran.
@@ -1278,7 +1317,8 @@ class IPUScope:
                  compile_using=enums.Compiler.PopART):
         self._executable = None
         self._options = options or Options()
-        self._options = self._options.outputMode(enums.OutputMode.All)
+        if self._options.defaultOutputMode():
+            self._options = self._options.outputMode(enums.OutputMode.All)
 
         self._compile_using = compile_using
 
@@ -1296,6 +1336,7 @@ class IPUScope:
 
         self._outputs = []
         self._inputs = []
+        self._upload_weights = True
 
         # Unpack the inputs.
         with torch.no_grad():
@@ -1328,15 +1369,20 @@ class IPUScope:
                 self._inputs, list(self._params_and_buffers.values()),
                 list(self._params_and_buffers.keys()), self._options.toDict(),
                 accessAttributes)
-            poptorch_core.copyWeightsToDevice_impl(
-                self._executable, tuple(self._params_and_buffers.keys()),
-                tuple(self._params_and_buffers.values()))
         else:
             # Compile the captured graph using MLIR.
             self._executable = poptorch_core.compileWithMlir()
-            self._executable.weightsToDevice()
 
     def __call__(self, *args):
+        if self._upload_weights:
+            if self._compile_using == enums.Compiler.PopART:
+                poptorch_core.copyWeightsToDevice_impl(
+                    self._executable, tuple(self._params_and_buffers.keys()),
+                    tuple(self._params_and_buffers.values()))
+            else:
+                self._executable.weightsToDevice()
+            self._upload_weights = False
+
         # Otherwise run popart.
         if self._compile_using == enums.Compiler.PopART:
             # Run via PopART.

@@ -79,7 +79,8 @@ def test_glu(dim):
 
 
 @pytest.mark.parametrize("op", activation_functions)
-def test_activation_numerics(op):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_activation_numerics(op, trace_model):
     enable_exceptions = True
     if op in (nn.SELU, nn.ELU, nn.CELU):
         # These activations rely on exponentials that will overflow
@@ -92,6 +93,7 @@ def test_activation_numerics(op):
 
     options = poptorch.Options()
     options.Precision.enableFloatingPointExceptions(enable_exceptions)
+    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options=options)
     poptorch_out = poptorch_model(x)
 
@@ -132,7 +134,8 @@ def test_rrelu_training():
     poptorch_model.assert_weights_changed()
 
 
-def test_rrelu_inference():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_rrelu_inference(trace_model):
     torch.manual_seed(42)
     input = torch.randn([200])
 
@@ -141,6 +144,8 @@ def test_rrelu_inference():
     # in inference there is no randomness - check results directly
     model.eval()
     native_out = model(input)
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options=options)
     poptorch_out = poptorch_model(input)
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)

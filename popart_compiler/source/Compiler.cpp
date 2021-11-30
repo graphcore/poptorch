@@ -1167,6 +1167,9 @@ void Compiler::fillHostOptimizerStateTensorData(
 
 void Compiler::writeDeviceOptimizerStateTensorData(
     const std::vector<void *> &host_buffers) const {
+  ERROR_ON_MSG(!_impl->session, "Session should be initialised first");
+  ERROR_ON_MSG(!isAttachedToDevice(), "Must be attached to a device to "
+                                      "write the optimizer state.");
   logging::info("Writing optimiser state tensors from host to IPU memory.");
   _impl->optim_state_tensors.updateData(host_buffers);
   _impl->session->writeWeights(_impl->optim_state_tensors);

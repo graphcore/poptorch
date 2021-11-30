@@ -562,6 +562,13 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
                  "not supported for the IPU model");
     _device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
         model_options);
+    // Acquired HW devices will be attached if the used connection type is
+    // Always but createIpuModelDevice() doesn't take a connection type
+    // so we manually attach to the device if the connection type is needed.
+    if (options.connection_type == popart::DeviceConnectionType::Always) {
+      ERROR_ON_MSG(!_device->attach(), "Internal error: attach can't fail for "
+                                       "model devices");
+    }
     logging::debug("Instantiated device, running on IPU model with {} tiles.",
                    num_tiles_per_ipu);
   } else {
