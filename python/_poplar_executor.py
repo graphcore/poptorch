@@ -305,11 +305,14 @@ class PoplarExecutor:
         self._read_optim_state_dict_if_needed()
         return self._new_optimizer.get_state_dict()
 
-    def _write_optim_state_dict(self):
+    def _write_optim_state_dict_if_needed(self):
         assert self.isCompiled()
-        assert isinstance(self._new_optimizer, Optimizer)
-        poptorch_core.writeOptimizerState(self._executable,
-                                          self._new_optimizer.state_dict())
+        # If the new optimiser already has state (i.e. from a checkpoint), write it
+        # to device
+        if isinstance(self._new_optimizer,
+                      Optimizer) and self._new_optimizer.has_state():
+            poptorch_core.writeOptimizerState(self._executable,
+                                              self._new_optimizer.state_dict())
 
     def load_state_dict(self,
                         state_dict: Dict[str, 'torch.Tensor'],
@@ -422,11 +425,9 @@ class PoplarExecutor:
                 self._read_optim_state_dict_if_needed()
                 self._new_optimizer.state_dict = \
                 self._new_optimizer.get_state_dict
-            # If the new optimiser already has state (i.e. from a checkpoint), write it
-            # to device
-            if isinstance(optimizer, Optimizer) and optimizer.has_state():
-                self._new_optimizer = optimizer
-                self._write_optim_state_dict()
+            # _new_optimizer is used inside _write_optim_state_dict_if_needed
+            self._new_optimizer = optimizer
+            self._write_optim_state_dict_if_needed()
         if isinstance(optimizer, Optimizer):
             optimizer.state_dict = MethodType(
                 PoplarExecutor._get_optim_state_dict, self)
@@ -526,7 +527,7 @@ class PoplarExecutor:
                     # If the optimiser has state to be written (from a checkpoint),
                     # write it immediately after compilation
                     if self._new_optimizer.has_state():
-                        self._write_optim_state_dict()
+                        self._write_optim_state_dict_if_needed()
                     else:
                         self._update_optimizer_state = True
 
@@ -1289,8 +1290,9 @@ class PoplarExecutor:
         poptorch_core.attachToDevice(self._executable)
         poptorch_core.loadEngineAndConnectStreams(self._executable)
         self._is_attached = True
-        # Upload the weights to the IPU
+        # Upload the weights and optimizer state to the IPU
         self.copyWeightsToDevice()
+        self._write_optim_state_dict_if_needed()
         # PopART save / restore the optimizer state with the weight,
         # but parameters  need to be re-uploaded
         self._dict_optimizer = {}
