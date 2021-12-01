@@ -236,12 +236,6 @@ class SGD(Optimizer, torch.optim.SGD):
             loss_scaling = 1.0
 
         if use_combined_accum is None:
-            logger.warning(
-                "Default SGD implementation has changed to the "
-                "more stable but more memory intensive separate "
-                "variant. To suppress set use_combined_accum=False "
-                "with poptorch.optim.SGD; to restore old behaviour, "
-                "set use_combined_accum=True")
             use_combined_accum = False
         self.use_combined_accum = use_combined_accum
 

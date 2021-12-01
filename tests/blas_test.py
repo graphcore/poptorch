@@ -8,7 +8,7 @@ import poptorch
 import helpers
 
 
-def blas_op(op, input1, input2, out):
+def blas_op(op, input1, input2, out, trace_model):
     class Model(torch.nn.Module):
         def __init__(self, op):
             super(Model, self).__init__()
@@ -25,7 +25,9 @@ def blas_op(op, input1, input2, out):
     native_out = model(*args)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(*args)
 
     helpers.assert_allclose(expected=native_out,
@@ -42,23 +44,25 @@ def blas_op(op, input1, input2, out):
 
 
 @pytest.mark.parametrize("optional_out", [True, False])
-def test_matmul(optional_out):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_matmul(optional_out, trace_model):
     torch.manual_seed(42)
 
     input1 = torch.randn([10, 200])
     input2 = torch.randn([200, 45])
     out = torch.randn([10, 45]) if optional_out else None
 
-    blas_op(torch.matmul, input1, input2, out)
+    blas_op(torch.matmul, input1, input2, out, trace_model)
 
 
 @pytest.mark.parametrize("optional_out", [True, False])
-def test_bmm(optional_out):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_bmm(optional_out, trace_model):
     input1 = torch.randn([12, 10, 200])
     input2 = torch.randn([12, 200, 33])
     out = torch.randn([12, 10, 33]) if optional_out else None
 
-    blas_op(torch.bmm, input1, input2, out)
+    blas_op(torch.bmm, input1, input2, out, trace_model)
 
 
 @pytest.mark.parametrize("bias", [True, False])

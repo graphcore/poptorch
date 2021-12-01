@@ -18,14 +18,17 @@ test_tensors = [
 @pytest.mark.parametrize("op", reduce_ops)
 @pytest.mark.parametrize("t_1", test_tensors)
 @pytest.mark.parametrize("t_2", test_tensors)
-def test_reduce_two_bool_types(op, t_1, t_2):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_reduce_two_bool_types(op, t_1, t_2, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return op(x == y)
 
     model = Model()
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     native_out = model(t_1, t_2)
     poptorch_out = poptorch_model(t_1, t_2)
     #expected = no dims (scalar)
@@ -35,7 +38,8 @@ def test_reduce_two_bool_types(op, t_1, t_2):
     assert poptorch_out.dtype == torch.int32
 
 
-def test_logits():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_logits(trace_model):
     class Model(torch.nn.Module):
         def forward(self, logits, y):
             acc = torch.sum(torch.argmax(logits, -1) == y) / float(y.size(0))
@@ -46,7 +50,9 @@ def test_logits():
     logits = torch.tensor([[1.0, 2.0, 3.0], [3.0, 1.0, 2.0], [2.0, 3.0, 1.0]])
     y = torch.tensor([[0], [2], [1]])
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     native_out = model(logits, y)
     poptorch_out = poptorch_model(logits, y)
 

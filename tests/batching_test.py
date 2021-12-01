@@ -7,7 +7,8 @@ import helpers
 import poptorch
 
 
-def test_inferenceBatching():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inferenceBatching(trace_model):
     torch.manual_seed(42)
 
     model = torch.nn.Linear(6, 20)
@@ -20,6 +21,7 @@ def test_inferenceBatching():
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
+    opts.Jit.traceModel(trace_model)
     ipuModel = poptorch.inferenceModel(model, opts)
     poptorch_out = ipuModel(input)
 
@@ -65,7 +67,8 @@ def test_trainingBatching():
 
 
 @pytest.mark.parametrize("mode", list(poptorch.OutputMode))
-def test_inferenceOutputModes(mode):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inferenceOutputModes(mode, trace_model):
     torch.manual_seed(42)
 
     model = torch.nn.Linear(6, 20)
@@ -79,6 +82,7 @@ def test_inferenceOutputModes(mode):
     # Run on IPU batch size 1 * 10 popart batches. output_return_period ignored if not EVERYN
     opts = poptorch.Options().deviceIterations(10)
     opts.outputMode(mode, output_return_period=5)
+    opts.Jit.traceModel(trace_model)
     ipuModel = poptorch.inferenceModel(model, opts)
     poptorch_out = ipuModel(input)
 

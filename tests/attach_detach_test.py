@@ -12,7 +12,8 @@ import poptorch
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "0"})
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test this feature")
-def test_attach_detach():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_attach_detach(trace_model):
     torch.manual_seed(42)
 
     target = torch.randint(0, 10, [1])
@@ -29,6 +30,8 @@ def test_attach_detach():
                                              options=opts,
                                              loss=torch.nn.CrossEntropyLoss())
 
+    opts = opts.clone()
+    opts.Jit.traceModel(trace_model)
     inference = poptorch.inferenceModel(model, options=opts)
 
     _, initial_loss = training(input, target)
@@ -74,7 +77,8 @@ def test_attach_detach():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test this feature")
-def test_attach_detach_accuracy():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_attach_detach_accuracy(trace_model):
     class TrainingModelWithLoss(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -91,6 +95,7 @@ def test_attach_detach_accuracy():
     torch.manual_seed(42)
 
     model_opts = poptorch.Options()
+    model_opts.Jit.traceModel(trace_model)
     input_data = torch.Tensor([[1.], [-1.]])
     labels_data = torch.Tensor([0, 1]).long()
     model_with_loss = TrainingModelWithLoss()

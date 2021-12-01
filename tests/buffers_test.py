@@ -19,17 +19,23 @@ class ConstantBuffer(torch.nn.Module):
         return torch.sum(x + new_stuff)
 
 
-def test_constant_buffer():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_constant_buffer(trace_model):
     model = ConstantBuffer()
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     assert poptorch_model(torch.tensor([2])) == 15
 
 
-def test_constant_buffer_repeat():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_constant_buffer_repeat(trace_model):
     model = ConstantBuffer()
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     assert poptorch_model(torch.tensor([2])) == 15
     assert poptorch_model(torch.tensor([2])) == 15
 
@@ -63,7 +69,8 @@ def test_buffer_implicit_copy():
                             expected=input[0, :] * momentum)
 
 
-def test_error_on_remove_buffer():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_error_on_remove_buffer(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -77,7 +84,9 @@ def test_error_on_remove_buffer():
 
     model = Model()
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     error_msg = (r"Buffer y is removed from the model when calling the " +
                  r"forward method\.")
@@ -85,7 +94,8 @@ def test_error_on_remove_buffer():
         poptorch_model(torch.tensor([5.0]))
 
 
-def test_error_on_redefine_buffer():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_error_on_redefine_buffer(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -98,7 +108,9 @@ def test_error_on_redefine_buffer():
 
     model = Model()
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     error_msg = (r"Buffer y is reassigned within the model when calling the " +
                  r"forward method\. This is not supported\. Consider using " +
                  r"self\.y\.copy_\(src\) to copy data " +
@@ -213,18 +225,21 @@ def test_failing_on_replicas():
         poptorch_model(dummy_input, dummy_target)
 
 
-def test_constant_buffer_with_replicas():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_constant_buffer_with_replicas(trace_model):
     # This should not have an error as the buffer is constant
     model = ConstantBuffer()
 
     opts = poptorch.Options()
     opts.replicationFactor(2)
+    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(torch.tensor([1, 2]))
 
 
-def test_no_input_but_one_buffer():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_no_input_but_one_buffer(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -236,7 +251,9 @@ def test_no_input_but_one_buffer():
             return self.x
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     assert poptorch_model() == 2.
     assert poptorch_model() == 3.
@@ -244,7 +261,8 @@ def test_no_input_but_one_buffer():
     assert poptorch_model() == 5.
 
 
-def test_unsynchronised_replicated_buffers():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_unsynchronised_replicated_buffers(trace_model):
     class ReplicaBufferModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -261,6 +279,7 @@ def test_unsynchronised_replicated_buffers():
     opts.replicationFactor(num_replica)
     opts.deviceIterations(1)
     opts.broadcastBuffers(False)
+    opts.Jit.traceModel(trace_model)
 
     model = ReplicaBufferModel()
     model.float()
