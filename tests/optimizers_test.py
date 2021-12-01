@@ -1240,6 +1240,16 @@ def test_read_ipu_state_on_detach(caplog, capfd, optim):
 
     optimizer.load_state_dict(state)
 
+    training_model.attachToDevice()
+    # Detach should trigger an optimiser state IPU->host copy for PopTorch optimizers
+    log = helpers.LogChecker(capfd)
+    if isinstance(optimizer, poptorch.optim.Optimizer):
+        log.assert_matches(
+            "Writing optimiser state tensors from host to IPU memory")
+    else:
+        log.assert_no_matches(
+            "Writing optimiser state tensors from host to IPU memory")
+
 
 @pytest.mark.parametrize("optim", poptorch_optimizers)
 def test_write_ipu_state(optim):
