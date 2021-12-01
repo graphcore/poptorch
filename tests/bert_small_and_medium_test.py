@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import pytest
 import transformers
 import torch
 import poptorch
 import helpers
 
 
-def test_bert_small():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_bert_small(trace_model):
     torch.manual_seed(42)
 
     # Bert small.
@@ -19,7 +21,9 @@ def test_bert_small():
     # It *just* fits on one IPU but if the sequence length is too big it will need two.
     input_ids = torch.tensor([tokenizer.encode("E")])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     poptorch_out = inference_model(input_ids)
 
     native = model(input_ids)
@@ -31,7 +35,8 @@ def test_bert_small():
                                 atol=1e-02)
 
 
-def test_bert_small_half():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_bert_small_half(trace_model):
     torch.manual_seed(42)
 
     # Bert small.
@@ -44,14 +49,17 @@ def test_bert_small_half():
     input_ids = torch.tensor([tokenizer.encode("E")])
 
     model.half()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     poptorch_out = inference_model(input_ids)
 
     # Just check that we compile for now.
     assert poptorch_out[0].dtype == torch.half
 
 
-def test_bert_medium_result():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_bert_medium_result(trace_model):
     torch.manual_seed(42)
 
     pretrained_weights = 'mrm8488/bert-medium-finetuned-squadv2'
@@ -95,6 +103,7 @@ def test_bert_medium_result():
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
+    opts.Jit.traceModel(trace_model)
 
     model.bert.embeddings.position_embeddings = poptorch.BeginBlock(
         model.bert.embeddings.position_embeddings, ipu_id=1)

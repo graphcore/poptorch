@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+import pytest
 import torch
 import poptorch
 
@@ -10,7 +11,8 @@ class Model(torch.nn.Module):
         return poptorch.ctc_beam_search_decoder(log_probs, lengths)
 
 
-def test_ctc_decoder():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_ctc_decoder(trace_model):
     input_size = 9
     batch_size = 3
     num_classes = 10
@@ -20,7 +22,9 @@ def test_ctc_decoder():
     lengths = torch.randint(5, input_size, (batch_size, ), dtype=torch.int)
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     result = poptorch_model(log_probs, lengths)
 

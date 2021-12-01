@@ -7,7 +7,8 @@ import poptorch
 import helpers
 
 
-def test_one_hot():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_one_hot(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return torch.nn.functional.one_hot(x, num_classes=10)
@@ -19,13 +20,16 @@ def test_one_hot():
     nativeOut = model(input)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(input)
 
     helpers.assert_allequal(actual=poptorch_out.long(), expected=nativeOut)
 
 
-def test_one_hot_invalid():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_one_hot_invalid(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return torch.nn.functional.one_hot(x, num_classes=-1)
@@ -36,11 +40,14 @@ def test_one_hot_invalid():
     msg = "OneHot num classes must be specified and must be constant."
     # Run on IPU.
     with pytest.raises(poptorch.Error, match=msg):
-        poptorch_model = poptorch.inferenceModel(model)
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        poptorch_model = poptorch.inferenceModel(model, options)
         poptorch_model(input)
 
 
-def test_one_hot_casted():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_one_hot_casted(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = torch.nn.functional.one_hot(x, num_classes=10)
@@ -53,7 +60,9 @@ def test_one_hot_casted():
     nativeOut = model(input)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(input)
 
     assert poptorch_out.dtype == torch.half

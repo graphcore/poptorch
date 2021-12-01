@@ -6,12 +6,13 @@ import torch
 import poptorch
 
 
-def harness(setting, Model, args):
+def harness(setting, Model, args, trace_model):
     opts = poptorch.Options()
     if setting == "true":
         opts.Precision.enableFloatingPointExceptions(True)
     elif setting == "false":
         opts.Precision.enableFloatingPointExceptions(False)
+    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.inferenceModel(Model(), opts)
 
@@ -25,61 +26,66 @@ def harness(setting, Model, args):
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Floating point exception not supported on model")
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
-def test_div0(setting):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_div0(setting, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return x / y
 
     x = torch.ones(10, 10)
     y = torch.zeros(10, 10)
-    harness(setting, Model, [x, y])
+    harness(setting, Model, [x, y], trace_model)
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Floating point exception not supported on model")
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
-def test_mul0inf(setting):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_mul0inf(setting, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return x * y
 
     x = torch.zeros(10, 10)
     y = torch.div(torch.ones(10, 10), torch.zeros(10, 10))
-    harness(setting, Model, [x, y])
+    harness(setting, Model, [x, y], trace_model)
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Floating point exception not supported on model")
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
-def test_nonreal(setting):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_nonreal(setting, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return torch.sqrt(x)
 
     x = torch.Tensor([-1, -2])
-    harness(setting, Model, [x])
+    harness(setting, Model, [x], trace_model)
 
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Floating point exception not supported on model")
-def test_nan(setting):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_nan(setting, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return x > y
 
     x = torch.ones(10, 10)
     y = torch.div(torch.zeros(10, 10), torch.zeros(10, 10))
-    harness(setting, Model, [x, y])
+    harness(setting, Model, [x, y], trace_model)
 
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Floating point exception not supported on model")
-def test_ovf(setting):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_ovf(setting, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return torch.exp(x)
 
     x = torch.Tensor([3800, 4203])
-    harness(setting, Model, [x])
+    harness(setting, Model, [x], trace_model)

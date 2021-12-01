@@ -18,7 +18,8 @@ for single_so in myso:
     ctypes.cdll.LoadLibrary(single_so)
 
 
-def test_float_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -33,14 +34,17 @@ def test_float_attribute():
 
     x = torch.tensor([5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
     expected = torch.tensor([8.5])
 
     helpers.assert_allclose(actual=out[0], expected=expected)
 
 
-def test_float_attribute_too_low():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_attribute_too_low(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -54,7 +58,9 @@ def test_float_attribute_too_low():
     model = Model()
 
     x = torch.tensor([5.0])
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(
             poptorch.Error,
@@ -63,7 +69,8 @@ def test_float_attribute_too_low():
         inference_model(x)
 
 
-def test_float_attribute_too_high():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_attribute_too_high(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -77,7 +84,9 @@ def test_float_attribute_too_high():
     model = Model()
 
     x = torch.tensor([5.0])
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(
             poptorch.Error,
@@ -86,7 +95,8 @@ def test_float_attribute_too_high():
         inference_model(x)
 
 
-def test_int_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_int_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -101,14 +111,17 @@ def test_int_attribute():
 
     x = torch.tensor([5])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allequal(actual=out[0],
                             expected=torch.tensor([8], dtype=torch.int32))
 
 
-def test_float_list_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_list_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -123,14 +136,17 @@ def test_float_list_attribute():
 
     x = torch.tensor([3.0, 4.0, 5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allclose(actual=out[0],
                             expected=torch.tensor([4.0, 6.0, 8.0]))
 
 
-def test_float_list_attribute_too_low():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_list_attribute_too_low(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op(
@@ -146,7 +162,9 @@ def test_float_list_attribute_too_low():
 
     x = torch.tensor([3.0, 4.0, 5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     with pytest.raises(
             poptorch.Error,
             match=r"-1\.79769e\+308 is too low for a Popart float " +
@@ -154,7 +172,8 @@ def test_float_list_attribute_too_low():
         inference_model(x)
 
 
-def test_float_list_attribute_too_high():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_list_attribute_too_high(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op(
@@ -170,7 +189,9 @@ def test_float_list_attribute_too_high():
 
     x = torch.tensor([3.0, 4.0, 5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     with pytest.raises(
             poptorch.Error,
             match=r"1\.79769e\+308 is too high for a Popart float " +
@@ -178,7 +199,8 @@ def test_float_list_attribute_too_high():
         inference_model(x)
 
 
-def test_float_tuple_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_tuple_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -193,14 +215,17 @@ def test_float_tuple_attribute():
 
     x = torch.tensor([3.0, 4.0, 5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allclose(expected=out[0],
                             actual=torch.tensor([4.0, 6.0, 8.0]))
 
 
-def test_int_list_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_int_list_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -215,7 +240,9 @@ def test_int_list_attribute():
 
     x = torch.tensor([3, 4, 5])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allequal(actual=out[0],
@@ -223,7 +250,8 @@ def test_int_list_attribute():
                                                   dtype=torch.int32))
 
 
-def test_float_combined_attributes():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_combined_attributes(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -241,14 +269,17 @@ def test_float_combined_attributes():
 
     x = torch.tensor([3.0, 4.0, 5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allequal(actual=out[0],
                             expected=torch.tensor([8.0, 12.0, 16.0]))
 
 
-def test_int_two_attributes():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_int_two_attributes(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -269,7 +300,9 @@ def test_int_two_attributes():
 
     x = torch.tensor([5])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allequal(actual=out[0],
@@ -277,7 +310,8 @@ def test_int_two_attributes():
 
 
 @pytest.mark.parametrize("attr", ("sum", "mean"))
-def test_string_attribute(attr):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_string_attribute(attr, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -292,7 +326,9 @@ def test_string_attribute(attr):
 
     x = torch.tensor([5.0, 6.0, 7.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     if attr == "mean":
@@ -301,7 +337,8 @@ def test_string_attribute(attr):
         helpers.assert_allclose(actual=out[0], expected=torch.tensor(18.0))
 
 
-def test_non_ascii_string_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_non_ascii_string_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -316,14 +353,17 @@ def test_non_ascii_string_attribute():
 
     x = torch.tensor([5.0, 6.0, 7.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(ValueError,
                        match="a\u1f00b contains non-ASCII characters."):
         inference_model(x)
 
 
-def test_string_list_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_string_list_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
             x = poptorch.custom_op(
@@ -341,7 +381,9 @@ def test_string_list_attribute():
     y = torch.tensor([2.0, 3.0, 4.0])
     z = torch.tensor([3.0, 4.0, 5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x, y, z)
 
     helpers.assert_allequal(actual=out[0], expected=torch.tensor(2.0))
@@ -349,7 +391,8 @@ def test_string_list_attribute():
     helpers.assert_allequal(actual=out[2], expected=torch.tensor(4.0))
 
 
-def test_non_asciistring_list_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_non_asciistring_list_attribute(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
             x = poptorch.custom_op(
@@ -367,7 +410,9 @@ def test_non_asciistring_list_attribute():
     y = torch.tensor([2.0, 3.0, 4.0])
     z = torch.tensor([3.0, 4.0, 5.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     with pytest.raises(ValueError,
                        match="a\u1f00b contains non-ASCII characters."):
         inference_model(x, y, z)
@@ -388,7 +433,8 @@ ALL_ATTRIBUTES = {
 
 
 @pytest.mark.parametrize("seed", range(10))
-def test_many_attributes(seed):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_attributes(seed, trace_model):
     attr_keys = list(ALL_ATTRIBUTES.keys())
     random.seed(seed)
     random.shuffle(attr_keys)
@@ -411,7 +457,9 @@ def test_many_attributes(seed):
 
     x = torch.tensor([0.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allequal(actual=out[0],
@@ -419,7 +467,8 @@ def test_many_attributes(seed):
 
 
 @pytest.mark.parametrize("seed", range(3))
-def test_many_attributes_one_wrong(seed):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_attributes_one_wrong(seed, trace_model):
     attr_keys = list(ALL_ATTRIBUTES.keys())
     random.seed(seed)
     random.shuffle(attr_keys)
@@ -443,7 +492,9 @@ def test_many_attributes_one_wrong(seed):
 
     x = torch.tensor([0.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allequal(actual=out[0],
@@ -451,7 +502,8 @@ def test_many_attributes_one_wrong(seed):
 
 
 #many_attribtes_examples_start
-def test_many_attributes_examples():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_attributes_examples(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             attributes = {
@@ -480,5 +532,7 @@ def test_many_attributes_examples():
 
     x = torch.tensor([0.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     inference_model(x)

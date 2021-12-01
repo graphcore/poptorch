@@ -2,6 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import ctypes
 import pathlib
+
+import pytest
 import torch
 import torch.nn as nn
 import helpers
@@ -20,7 +22,8 @@ myop = ctypes.cdll.LoadLibrary(myso[0])
 
 
 #inference_start
-def test_inference():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inference(trace_model):
     class BasicNetwork(nn.Module):
         def forward(self, x, bias):
             x, y = poptorch.custom_op([x, bias],
@@ -37,7 +40,9 @@ def test_inference():
     x = torch.full((1, 8), 2.0)
     bias = torch.full((1, 8), 4.0)
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x, bias)
 
     expected = (torch.full((1, 8), 12.0), torch.full((1, 8), 8.0))
@@ -133,7 +138,8 @@ def test_training_both_sides():
     assert torch.argmax(out[0]) == 42
 
 
-def test_inference_with_an_attribute():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inference_with_an_attribute(trace_model):
     #inference_with_attribute_start
     class Model(torch.nn.Module):
         def forward(self, x):
@@ -151,7 +157,9 @@ def test_inference_with_an_attribute():
 
     x = torch.tensor([-1.0, -0.5, 0.0, 0.5, 1.0])
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(x)
 
     helpers.assert_allclose(actual=out,

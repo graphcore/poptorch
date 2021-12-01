@@ -12,7 +12,7 @@ import helpers
 import poptorch
 
 
-def inference_process(event):
+def inference_process(event, trace_model):
     assert os.environ.get('POPTORCH_WAIT_FOR_IPU') is not None
 
     torch.manual_seed(42)
@@ -25,6 +25,7 @@ def inference_process(event):
     opts = poptorch.Options()
     # Ensure that both models use the same IPU
     opts.useIpuId(1)
+    opts.Jit.traceModel(trace_model)
 
     inference = poptorch.inferenceModel(model, options=opts)
     inference.compile(torch.randn(10))
@@ -38,7 +39,8 @@ def inference_process(event):
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test POPTORCH_WAIT_FOR_IPU")
 @helpers.overridePoptorchLogLevel("TRACE")
-def test_attach_detach_wait_for_ipu(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_attach_detach_wait_for_ipu(capfd, trace_model):
 
     torch.manual_seed(42)
 
@@ -59,7 +61,7 @@ def test_attach_detach_wait_for_ipu(capfd):
     ctx = mp.get_context('spawn')
     mgr = mp.Manager()
     event = mgr.Event()
-    process = ctx.Process(target=inference_process, args=(event, ))
+    process = ctx.Process(target=inference_process, args=(event, trace_model))
 
     process.start()
     event.wait()
