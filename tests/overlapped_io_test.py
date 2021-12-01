@@ -162,6 +162,7 @@ def test_input_error_messages(trace_model):
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
 
+    opts = opts.clone()
     opts.TensorLocations.numIOTiles(32)
     poptorch_model = poptorch.inferenceModel(model, options=opts)
     poptorch_model(torch.tensor([1.0]))

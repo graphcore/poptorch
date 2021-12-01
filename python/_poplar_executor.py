@@ -77,12 +77,18 @@ class PoplarExecutor:
     # pylint: disable=too-many-statements
     def __init__(self,
                  model: 'torch.nn.Module',
-                 options: 'poptorch.Options',
+                 options: Optional['poptorch.Options'],
                  training: bool,
                  poptorch_version: str,
                  optimizer: Optional['torch.optim.Optimizer'] = None,
                  user_model: Optional['torch.nn.Module'] = None):
-        options = options or Options()
+        if options:
+            # Prevent the user from modifying these options.
+            options._freeze()
+            options = options.clone()
+        else:
+            options = Options()
+
         self._user_model = user_model or model
 
         options.Precision.autocast_policy.apply(self._user_model, options)

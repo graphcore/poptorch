@@ -1787,3 +1787,8 @@ class Options(_options_impl.OptionsDict):
             out["compilation_progress_bar_fn"] = _options_impl.ProgressBar()
 
         return out
+
+    def clone(self) -> "poptorch.Options":
+        """Create an unfrozen deep copy of the current options.
+        """
+        return copy.deepcopy(self)

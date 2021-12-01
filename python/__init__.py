@@ -528,8 +528,6 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
-    local_options = copy.deepcopy(options) if options else Options()
-
     if isinstance(model, PoplarExecutor):
         model = model._user_model  # pylint: disable=protected-access
 
@@ -537,7 +535,7 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     maybe_wrapped_model = copy.copy(model)
 
     return PoplarExecutor(model=maybe_wrapped_model,
-                          options=local_options,
+                          options=options,
                           training=True,
                           optimizer=optimizer,
                           user_model=model,
@@ -563,13 +561,12 @@ def inferenceModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
-    local_options = copy.deepcopy(options) if options else Options()
 
     if isinstance(model, PoplarExecutor):
         model = model._user_model  # pylint: disable=protected-access
 
     return PoplarExecutor(model=copy.copy(model),
-                          options=local_options,
+                          options=options,
                           training=False,
                           poptorch_version=__version__)
 
