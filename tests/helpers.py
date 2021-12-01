@@ -255,9 +255,12 @@ class LogIterator:
 
 
 class LogChecker:
-    def __init__(self, capfd):
-        out, err = capfd.readouterr()
-        self._log = out + err
+    def __init__(self, capfd_or_str):
+        if isinstance(capfd_or_str, str):
+            self._log = capfd_or_str
+        else:
+            out, err = capfd_or_str.readouterr()
+            self._log = out + err
         self._lines = self._log.split('\n')
 
     def createIterator(self):

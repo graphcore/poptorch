@@ -1207,6 +1207,40 @@ def test_read_ipu_state_cached(caplog, capfd):
     assert "Using cached optimiser state dict" in caplog.text
 
 
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+@pytest.mark.parametrize("optim", [poptorch.optim.SGD, torch.optim.SGD])
+def test_read_ipu_state_on_detach(caplog, capfd, optim):
+    input = torch.ones(3)
+    # A simple model with weights and a loss function
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
+    optimizer = optim(model.parameters(), lr=0.0)
+
+    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+
+    training_model.compile((input, ))
+    training_model.detachFromDevice()
+
+    # Detach should trigger an optimiser state IPU->host copy for PopTorch optimizers
+    log = helpers.LogChecker(capfd)
+    if isinstance(optimizer, poptorch.optim.Optimizer):
+        log.assert_matches("Writing optimiser state tensors from IPU to host.")
+    else:
+        log.assert_no_matches(
+            "Writing optimiser state tensors from IPU to host.")
+
+    # The second invocation should use the cached state dict, since
+    # the internal optimiser state hasn't changed
+    state = optimizer.state_dict()
+    log = helpers.LogChecker(caplog.text)
+    if isinstance(optimizer, poptorch.optim.Optimizer):
+        log.assert_matches("Using cached optimiser state dict")
+    else:
+        log.assert_no_matches("Using cached optimiser state dict")
+
+    optimizer.load_state_dict(state)
+
+
 @pytest.mark.parametrize("optim", poptorch_optimizers)
 def test_write_ipu_state(optim):
     torch.manual_seed(42)
@@ -1342,6 +1376,7 @@ def test_write_ipu_state_from_checkpoint():
         helpers.assert_allclose(actual=torch_lr, expected=torch.tensor(0.5))
         # Ensure the internal LR parameter matches
         helpers.assert_allclose(actual=poptorch_lr, expected=torch_lr)
+
 
 def test_setOptimizer_frozen_options_ok():
     input = torch.ones(2)

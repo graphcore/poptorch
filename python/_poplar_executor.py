@@ -19,6 +19,7 @@ from . import _utils
 from . import _args_parser
 from . import _optimizer_attributes
 from . import enums
+from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
 from . import _poptorch_data
@@ -96,8 +97,7 @@ class PoplarExecutor:
                 # In training it makes sense to see only the last result, by default.
                 options.outputMode(enums.OutputMode.Final)
             if not optimizer:
-                optimizer = torch.optim.SGD(self._user_model.parameters(),
-                                            lr=0.01)
+                optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
             model = _impl.OptimizerWrapper(model, optimizer)
         else:
             if options.defaultOutputMode():
@@ -279,10 +279,11 @@ class PoplarExecutor:
             _impl.registerWrapperType(PoptorchParameter)
             _impl.registerWrapperType(PoptorchBuffer)
 
-    def _read_optim_state_dict(self):
+    def _read_optim_state_dict_if_needed(self):
+        if not isinstance(self._new_optimizer, Optimizer):
+            return
         if self._update_optimizer_state:
             assert self.isCompiled()
-            assert isinstance(self._new_optimizer, Optimizer)
             # We need to return both the internal state dict and torch's
             # state dict so that LR schedulers work
             self._new_optimizer.set_state_dict({
@@ -292,6 +293,10 @@ class PoplarExecutor:
             self._update_optimizer_state = False
         else:
             logger.debug("Using cached optimiser state dict")
+
+    def _get_optim_state_dict(self):
+        assert isinstance(self._new_optimizer, Optimizer)
+        self._read_optim_state_dict_if_needed()
         return self._new_optimizer.get_state_dict()
 
     def _write_optim_state_dict(self):
@@ -408,7 +413,7 @@ class PoplarExecutor:
             # trigger optimiser state read/writes anymore
             if self._new_optimizer and isinstance(self._new_optimizer,
                                                   Optimizer):
-                self._read_optim_state_dict()
+                self._read_optim_state_dict_if_needed()
                 self._new_optimizer.state_dict = \
                 self._new_optimizer.get_state_dict
             # If the new optimiser already has state (i.e. from a checkpoint), write it
@@ -418,7 +423,7 @@ class PoplarExecutor:
                 self._write_optim_state_dict()
         if isinstance(optimizer, Optimizer):
             optimizer.state_dict = MethodType(
-                PoplarExecutor._read_optim_state_dict, self)
+                PoplarExecutor._get_optim_state_dict, self)
         self._new_optimizer = optimizer
         self._dict_new_optimizer = _optimizer_attributes.convertOptimizerToDict(
             optimizer, self._attribute_tracker, self._options,
@@ -1253,11 +1258,12 @@ class PoplarExecutor:
         if not self.isCompiled():
             raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
 
-        if self._training:
-            self.copyWeightsToHostIfNeeded()
-
         if not self._is_attached:
             raise _impl.createPoptorchError("Device is not attached")
+
+        if self._training:
+            self.copyWeightsToHostIfNeeded()
+            self._read_optim_state_dict_if_needed()
 
         poptorch_core.detachFromDevice(self._executable)
         self._is_attached = False
