@@ -315,14 +315,19 @@ void registerBuffersWithCallback(
 
 // Python interface to map a given CPU op with the IR calls.
 void registerCPUCallBack(const py::object &obj, const std::string &ID) {
+  // Map the string identifier to the metadata.
+  bool inserted;
+  decltype(callbacks)::iterator it;
+  std::tie(it, inserted) = callbacks.try_emplace(ID);
+
   // Skip if we've already added a callback for this function.
-  if (callbacks.find(ID) != callbacks.end()) {
+  if (!inserted) {
     return;
   }
 
   // Structure to store the information given by python to be forwarded to the
   // backend.
-  CallbackMetadata metadata;
+  CallbackMetadata &metadata = it->second;
 
   // Wrap that in a lambda so we don't have to expose the naked pytorch function
   // pointer thing.
@@ -334,9 +339,6 @@ void registerCPUCallBack(const py::object &obj, const std::string &ID) {
   metadata.buffer_registration_callback = [=]() {
     obj.attr("registerPersistentData")();
   };
-
-  // Map the string identifier to the metadata.
-  callbacks.insert({ID, metadata});
 }
 
 void initCallbackBuffers() {
