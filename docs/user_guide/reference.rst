@@ -59,6 +59,9 @@ PopTorch Ops
    :members:
 
 .. autoclass:: poptorch.CPU
+   :special-members: __init__
+
+.. autoclass:: poptorch.IPUScope
    :members:
 
 .. autoclass:: poptorch.NameScope
@@ -77,7 +80,6 @@ PopTorch Ops
 .. autofunction:: poptorch.set_overlap_for_input
 
 .. autofunction:: poptorch.set_overlap_for_output
-
 
 Model wrapping functions
 ========================
@@ -104,6 +106,8 @@ Parallel execution
    :special-members: __init__
 
 .. autofunction:: poptorch.BlockFunction
+
+.. autofunction:: poptorch.removeBlocks
 
 .. autoclass:: poptorch.Stage
    :special-members: __init__
@@ -174,6 +178,33 @@ Enumerations
 ============
 
 .. autoclass:: poptorch.SharingStrategy
+   :members:
+
+.. autoclass:: poptorch.Compiler
+   :members:
+
+.. autoclass:: poptorch.OverlapMode
+   :members:
+
+.. autoclass:: poptorch.MatMulSerializationMode
+   :members:
+
+.. autoclass:: poptorch.SyncPattern
+   :members:
+
+.. autoclass:: poptorch.ReductionType
+   :members:
+
+.. autoclass:: poptorch.HalfFloatCastingBehavior
+   :members:
+
+.. autoclass:: poptorch.ConnectionType
+   :members:
+
+.. autoclass:: poptorch.OutputMode
+   :members:
+
+.. autoclass:: poptorch.MeanReductionStrategy
    :members:
 
 Autocasting
