@@ -748,73 +748,81 @@ void Compiler::loadEngineAndConnectStreams() {
   logging::trace("Loading engine");
   _impl->session->loadEngineAndConnectStreams();
 
-  // For each individual CPU operation (multiple calls to one op = still one op)
-  for (detail::CallbackInternalMetadata &stream_data : _impl->callbacks) {
-    const std::uint32_t number_of_inputs = stream_data.input_handles.size();
+  static const std::map<std::reference_wrapper<const poplar::Type>,
+                        std::uint8_t, std::less<poplar::Type>>
+      host_sizes{// word types
+                 {poplar::UNSIGNED_INT, 4},
+                 {poplar::INT, 4},
+                 {poplar::FLOAT, 4},
+                 // half types
+                 {poplar::UNSIGNED_SHORT, 2},
+                 {poplar::SHORT, 2},
+                 {poplar::HALF, 2},
+                 // byte types
+                 {poplar::BOOL, 1},
+                 {poplar::CHAR, 1},
+                 {poplar::SIGNED_CHAR, 1},
+                 {poplar::UNSIGNED_CHAR, 1}};
 
+  // For each individual CPU operation (multiple calls to one op = still one op)
+  for (detail::CallbackInternalMetadata &cb_data : _impl->callbacks) {
     // For each input we create a special callback which tracks how many inputs
     // have been added and once they're all in it calls back into python.
-    for (std::uint32_t input = 0; input < number_of_inputs; ++input) {
-      /*
-        Multipurpose callback. Firstly copy from the IPU input buffer into the
-        buffer on host. Secondly if this is the last input call, call the
-        pytorch host function.
-      */
-      auto poplar_callback = [=, &stream_data](void *buffer) {
-        const std::vector<std::size_t> &shape = stream_data.input_shapes[input];
-        std::size_t number_of_elems = 1;
-        for (std::size_t elem : shape) {
-          number_of_elems = number_of_elems * elem;
-        }
+    auto to_size_bytes = [&](const auto &shape, const auto &type) {
+      const poplar::Type ptype = poptorch::poplarTypeFromPoptorch(type);
 
-        std::size_t size_in_bytes = number_of_elems;
+      auto it = host_sizes.find(ptype);
+      ERROR_ON_MSG(it == host_sizes.end(), "Unsupported host op type");
 
-        const poplar::Type type =
-            poptorch::poplarTypeFromPoptorch(stream_data.input_types[input]);
+      std::size_t number_of_elems = std::accumulate(
+          shape.begin(), shape.end(), 1, std::multiplies<std::size_t>());
 
-        if (type == poplar::UNSIGNED_SHORT || type == poplar::SHORT ||
-            type == poplar::HALF) {
-          size_in_bytes *= 2;
-        } else if (type == poplar::UNSIGNED_INT || type == poplar::INT ||
-                   type == poplar::FLOAT) {
-          size_in_bytes *= 4;
-        } else {
-          const bool single_byte_type =
-              type == poplar::BOOL || type == poplar::CHAR ||
-              type == poplar::SIGNED_CHAR || type == poplar::UNSIGNED_CHAR;
+      return number_of_elems * it->second;
+    };
 
-          ERROR_ON_MSG(!single_byte_type, "Unsupported host op type");
-        }
+    // Store the amount of data to be transferred for each of the function's
+    // input and output arguments.
+    std::vector<std::size_t> input_sizes(cb_data.input_shapes.size());
+    std::transform(cb_data.input_shapes.begin(), cb_data.input_shapes.end(),
+                   cb_data.input_types.begin(), input_sizes.begin(),
+                   to_size_bytes);
 
-        // Copy from IPU into the waiting pytorch tensor on host.
-        std::memcpy(reinterpret_cast<char *>(stream_data.input_pointers[input]),
-                    reinterpret_cast<char *>(buffer), size_in_bytes);
+    std::vector<std::size_t> output_sizes(cb_data.output_shapes.size());
+    std::transform(cb_data.output_shapes.begin(), cb_data.output_shapes.end(),
+                   cb_data.output_types.begin(), output_sizes.begin(),
+                   to_size_bytes);
 
-        // Mark this as another tensor ready.
-        stream_data.number_of_input_streams_inited++;
-
-        // Call the callback once all tensors are ready.
-        if (stream_data.number_of_input_streams_inited == number_of_inputs) {
+    auto poplar_callback =
+        [input_sizes = std::move(input_sizes),
+         output_sizes = std::move(output_sizes),
+         &cb_data](const void *const *inputs, size_t number_of_inputs,
+                   void *const *outputs, size_t number_of_outputs) {
+          ERROR_ON_MSG(number_of_inputs != input_sizes.size(),
+                       "Number of inputs does not match");
+          ERROR_ON_MSG(number_of_outputs != output_sizes.size(),
+                       "Number of outputs does not match");
+          for (std::size_t input = 0; input < number_of_inputs; ++input) {
+            // Copy from IPU into the waiting pytorch tensor on host.
+            std::memcpy(reinterpret_cast<char *>(cb_data.input_pointers[input]),
+                        reinterpret_cast<const char *>(inputs[input]),
+                        input_sizes[input]);
+          }
           // Call the pytorch function on CPU.
-          stream_data.the_callback();
+          cb_data.the_callback();
 
-          // Reset counter.
-          stream_data.number_of_input_streams_inited = 0;
-        }
-      };
+          // We then do the outputs, these are much simpler since it is a
+          // straight up dependency free data copy.
+          for (std::size_t output = 0; output < number_of_outputs; ++output) {
+            std::memcpy(
+                reinterpret_cast<char *>(outputs[output]),
+                reinterpret_cast<const char *>(cb_data.output_pointers[output]),
+                output_sizes[output]);
+          }
+        };
 
-      // Tell poplar about the callback.
-      _impl->session->connectStreamToCallback(stream_data.input_handles[input],
-                                              poplar_callback);
-    }
-
-    // We then do the outputs, these are much simpler since it is a straight up
-    // dependency free data copy.
-    for (std::uint32_t output = 0; output < stream_data.output_handles.size();
-         ++output) {
-      _impl->session->connectStream(stream_data.output_handles[output],
-                                    stream_data.output_pointers[output]);
-    }
+    // Tell poplar about the callback.
+    _impl->session->connectHostFunction(cb_data.handle,
+                                        std::move(poplar_callback));
   }
 
   // Set the random seed (if one was provided) following compilation
@@ -1395,6 +1403,7 @@ Compiler::addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
 
   // Usual poptorch -> popart tensor conversion/lookup.
   std::vector<popart::TensorId> ins;
+  ins.reserve(inputs.size());
   std::transform(inputs.begin(), inputs.end(), std::back_inserter(ins),
                  [&](poptorch::TensorId index) { return _impl->ids[index]; });
 
@@ -1420,20 +1429,9 @@ Compiler::addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
 
   // Create an ID for each op so we can give a unique name to poplar for each
   // output/input.
-  const std::string op_id =
+  metadata.handle =
       "poptorch.host_op_" +
       std::to_string(detail::CallbackInternalMetadata::number_of_added_ops);
-
-  for (std::uint32_t i = 0; i < callback.input_pointers.size(); ++i) {
-    const std::string input_id = op_id + ".input." + std::to_string(i);
-    metadata.input_handles.push_back(input_id);
-  }
-
-  const std::uint32_t num_outputs = callback.output_pointers.size();
-  for (std::uint32_t i = 0; i < num_outputs; ++i) {
-    const std::string output_id = op_id + ".output." + std::to_string(i);
-    metadata.output_handles.push_back(output_id);
-  }
 
   metadata.input_types = std::move(input_types);
   metadata.input_shapes = std::move(input_shapes);
@@ -1450,10 +1448,11 @@ Compiler::addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
   std::int64_t to_int64 = static_cast<std::int64_t>(as_int);
 
   logging::trace("Add CPU callback has added pointer {}", to_int64);
-  attributes_map.insert({"stream_info", to_int64});
+  attributes_map.insert({poptorch_custom_ops::host_op_metadata_attr, to_int64});
 
   std::vector<popart::TensorId> output = _impl->active_builder->customOp(
-      poptorch_custom_ops::host_op, 1, ins, num_outputs, attributes_map);
+      poptorch_custom_ops::host_op, 1, ins, metadata.output_types.size(),
+      attributes_map);
 
   // Convert the popart tensors back to poptorch tensors.
   return HandleOutput<decltype(output)>{}(output, false, _impl.get());

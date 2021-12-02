@@ -45,11 +45,10 @@ struct CallbackInternalMetadata {
   std::vector<void *> input_pointers;
   std::vector<void *> output_pointers;
 
-  // The names of each buffer which we make on creation. The custom op needs to
-  // see these to create the FIFOs and the compiler needs to see them to create
+  // The names of the operation which we give on creation. The custom op needs
+  // to see these to create the operation and the compiler needs it to attach
   // the callbacks.
-  std::vector<std::string> input_handles;
-  std::vector<std::string> output_handles;
+  std::string handle;
 
   // Type and shape info for the input and outputs.
   std::vector<poptorch::PopartType> input_types;

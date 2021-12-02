@@ -20,6 +20,7 @@ constexpr std::uint32_t domain = 1;
 constexpr std::uint32_t min_inputs = 0;
 constexpr std::uint32_t max_inputs = 64;
 
+extern const char host_op_metadata_attr[];
 const popart::OperatorIdentifier host_op = {"poptorch.custom_ops",
                                             "HostOp",
                                             domain,
