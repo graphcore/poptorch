@@ -424,11 +424,11 @@ class LegacyBeginBlockFn(torch.nn.Module):
         return out
 
 
-def removeBlocks(module: torch.nn.Module):
+def removeBlocks(module):
     """Recursively remove BeginBlock annotations from a Module if it
     contains any.
 
-    :param module: Module to recursively unwrap.
+    :param torch.nn.Module module: Module to recursively unwrap.
     """
     assert isinstance(module, torch.nn.Module)
     for m in module.modules():
@@ -659,7 +659,37 @@ def custom_op(inputs: Tuple["torch.Tensor"],
 
 
 class CPU:
-    def __init__(self, layer_to_call, ID):
+    """Allow to execute a CPU op in the middle of an inference IPU graph.
+
+    .. important:: CPU ops are only supported in inference graphs.
+
+    Example:
+
+    >>> class Model(torch.nn.Module):
+    >>>     def __init__(self):
+    >>>         super().__init__()
+    >>>         self.cpu = poptorch.CPU(self.myCpuOp, "MyCPUOp")
+
+    >>>     def myCpuOp(self, x):
+    >>>         return x * 2.0
+
+    >>>     def forward(self, x):
+    >>>         # The arguments passed to "cpu" are forwarded to "myCpuOp"
+    >>>         out = self.cpu(x)
+    >>>         out = self.cpu(out)
+    >>>         out = self.cpu(out)
+    >>>         return out
+    """
+
+    def __init__(self, layer_to_call: Callable, ID: str):
+        """
+        Execute a given function on the CPU.
+
+        :param: layer_to_call Python function to execute on the CPU. The
+                              arguments passed when the CPU wrapper is called
+                              will be forwarded to layer_to_call.
+        :param: ID            Name of the CPU op.
+        """
         self._layer_to_call = layer_to_call
 
         self._ID = ID
@@ -667,6 +697,7 @@ class CPU:
         self.outputs = None
 
     def execute(self):
+        """Implementation detail."""
         outs = self._layer_to_call(*self.inputs)
 
         if isinstance(outs, (list, tuple)):
@@ -676,14 +707,17 @@ class CPU:
             self.outputs[0].copy_(outs)
 
     def createPersistentData(self, input, outputs):
+        """Implementation detail."""
         self.inputs = input
         self.outputs = [output.clone().contiguous() for output in outputs]
 
     def registerPersistentData(self):
+        """Implementation detail."""
         poptorch_core.registerBuffersWithCallback(self._ID, self.inputs,
                                                   self.outputs)
 
     def __call__(self, *input, **kwargs):
+        """Implementation detail."""
         # Mark all subsquent ops as happening on the host.
         torch.ops.poptorch.call_cpu_op([*input], self._ID)
 

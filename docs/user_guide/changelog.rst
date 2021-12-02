@@ -26,7 +26,14 @@ New features
   either for inference (transpose) or gradient calculation.
 - Migrated to PyTorch version 1.10.0
 - Support for gradient clipping by norm in ``poptorch.optim`` optimizers
-- Support saving and restoring internal optimiser state with PopTorch optimisers via ``optimizer.state_dict()`` and``optimizer.load_state_dict()``
+- Support saving and restoring internal optimiser state with PopTorch optimisers via ``optimizer.state_dict()`` and ``optimizer.load_state_dict()``
+- Add ``removeBlocks`` function to remove block annotations from a Model / Layer.
+- Support for CPU ops using ``poptorch.CPU``.
+- Support for ``im2col``.
+- Introduce tracing v2 / dispatch tracing.
+- Introduce experimental new backend compiler.
+- Make optimizers work with LR schedulers.
+- Switched to gold linker by default.
 
 API changes
 -----------
