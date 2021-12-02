@@ -1,6 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import atexit
 import copy
+import os
 from typing import Any, Callable, Dict, Iterator, Optional, Union
 import pickle
 
@@ -17,6 +18,14 @@ assert torch.__version__.startswith("@TORCH_VERSION@"), (
     " of PopTorch only works with torch==@TORCH_VERSION@ but the version "
     f"installed is {torch.__version__}")
 
+# On POD the RDMA driver will hang if the parent process is forked after the
+# driver was initialised.
+# This would typically happen when a PyTorch Dataloader creates some workers.
+# To avoid the issue we need to explicitly enable safe fork.
+if "RDMAV_FORK_SAFE" not in os.environ:
+    os.environ["RDMAV_FORK_SAFE"] = "1"
+
+# pylint: disable=wrong-import-position
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 from poptorch.poptorch_core import Error, RecoverableError, UnrecoverableError
@@ -30,6 +39,7 @@ from ._impl import isRunningOnIpu, createPoptorchError
 from ._poplar_executor import PoplarExecutor, IPUScope, hasMlirSupportOnPlatform
 from . import optim
 from . import profiling
+# pylint: enable=wrong-import-position
 
 __version__ = "@VERSION@-@SNAPSHOT@"
 
