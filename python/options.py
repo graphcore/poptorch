@@ -361,7 +361,7 @@ class _TrainingOptions(_options_impl.OptionsDict):
         accumulation.
 
         :param reduction_type:
-            * Mean: Reduce gradients by calculating the mean of them.
+            * Mean (default): Reduce gradients by calculating the mean of them.
             * Sum: Reduce gradients by calculating the sum of them.
         """
         self._check_reduction_arg(reduction_type,
@@ -378,6 +378,12 @@ class _TrainingOptions(_options_impl.OptionsDict):
         """Specify when to divide by a mean reduction factor when
         ``accumulationAndReplicationReductionType`` is set to
         ``ReductionType.Mean``.
+
+        The default reduction strategy depends on the optimizer used. The
+        default strategy is `Running` when the `accum_type` of the optimizer is
+        set to half-precision (float16) format. Otherwise the `Post` strategy
+        is used as this strategy is typically more performant but the `Post`
+        strategy is less numerically robust.
 
         :param mean_reduction_strategy:
             * Running: Keeps the reduction buffer as the current mean. This is
