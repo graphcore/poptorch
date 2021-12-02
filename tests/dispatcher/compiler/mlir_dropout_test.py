@@ -23,6 +23,8 @@ def test_dropout_eval():
     assert (t1 == t2).all()
 
 
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="IPU Model's random generator is insufficient.")
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
 @pytest.mark.parametrize("p", [0.0, 0.1, 0.5, 1.0])
@@ -31,6 +33,7 @@ def test_dropout_train(p):
 
     n = 1000
     t1 = torch.randn(n)
+
     with poptorch.IPUScope([t1],
                            compile_using=poptorch.enums.Compiler.MLIR) as ipu:
         out = F.dropout(t1, p=p, training=True)
