@@ -201,7 +201,8 @@ def test_set_popart_options(capfd):
         "accumulateOuterFragmentSettings.excludedVirtualGraphs")
 
 
-def test_popart_patterns():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_popart_patterns(trace_model):
     # pylint: disable=protected-access
     class Network(nn.Module):
         def forward(self, x, y):
@@ -212,6 +213,7 @@ def test_popart_patterns():
     opts = poptorch.Options()
     patterns = {"PadSum": True}
     opts._Popart.setPatterns(patterns, 0)
+    opts.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
     y = torch.zeros(2)
@@ -223,7 +225,8 @@ def test_popart_patterns():
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("ptype", [torch.half, torch.float])
 @helpers.overridePoptorchLogLevel("TRACE")
-def test_popart_partials(capfd, dtype, ptype):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_popart_partials(capfd, dtype, ptype, trace_model):
     # pylint: disable=protected-access
     torch.manual_seed(42)
     x = torch.randn((1, 16, 16), dtype=dtype)
@@ -234,6 +237,7 @@ def test_popart_partials(capfd, dtype, ptype):
 
     opts = poptorch.Options()
     opts.Precision.setPartialsType(ptype)
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x)
 
@@ -374,7 +378,8 @@ def test_tensor_location():
 @pytest.mark.parametrize("dtype", [torch.half, torch.float])
 @pytest.mark.parametrize("setting", [True, False, None])
 @helpers.overridePoptorchLogLevel("TRACE")
-def test_running_statistics(capfd, dtype, setting):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_running_statistics(capfd, dtype, setting, trace_model):
     x = torch.randn((16, 16), dtype=dtype)
 
     model = torch.nn.Sequential()
@@ -387,6 +392,7 @@ def test_running_statistics(capfd, dtype, setting):
     opts = poptorch.Options()
     if setting is not None:
         opts.Precision.runningStatisticsAlwaysFloat(setting)
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
     poptorch_model(x)
 
@@ -504,7 +510,8 @@ def test_preserving_options_intact():
 
 
 @pytest.mark.parametrize("namescopes_enabled", [True, False])
-def test_name_scope_hook_disabled(namescopes_enabled):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_name_scope_hook_disabled(namescopes_enabled, trace_model):
     class Network(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -526,6 +533,7 @@ def test_name_scope_hook_disabled(namescopes_enabled):
     options = poptorch.Options()
     if not namescopes_enabled:
         options.disableModuleNamescope()
+    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
 
     input = torch.randn(2, 1, 15, 15)
@@ -546,7 +554,8 @@ def test_name_scope_hook_disabled(namescopes_enabled):
         assert ir.find(expected_output)
 
 
-def test_ipu_context_flag():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_ipu_context_flag(trace_model):
     class Network(nn.Module):
         def forward(self, x, y):
             if poptorch.isRunningOnIpu():
@@ -558,7 +567,9 @@ def test_ipu_context_flag():
 
     model = Network()
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     x = torch.tensor([50])
     y = torch.tensor([2])
@@ -599,7 +610,8 @@ def test_ipu_model(enabled, capfd):
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to count IPU cycles")
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_log_cycle_count(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_log_cycle_count(capfd, trace_model):
     class LogChecker(helpers.LogChecker):
         def validate(self):
             self.assert_contains("Total number of IPU cycles: ")
@@ -609,6 +621,7 @@ def test_log_cycle_count(capfd):
             return x + y
 
     opts = poptorch.Options().logCycleCount(True)
+    opts.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(Network(), opts)
 
     x = torch.tensor([1])
@@ -622,12 +635,14 @@ def test_log_cycle_count(capfd):
     log.validate()
 
 
-def test_profile_report_with_model_name():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_profile_report_with_model_name(trace_model):
     def test(dirname):
         model = torch.nn.Linear(100, 100)
         opts = poptorch.Options()
         opts.modelName("tommyflowers")
         opts.enableProfiling(dirname)
+        opts.Jit.traceModel(trace_model)
 
         poptorch_model = poptorch.inferenceModel(model, opts)
         x = torch.randn(100, 100)
@@ -641,11 +656,13 @@ def test_profile_report_with_model_name():
     assert os.path.exists(os.path.join(dirname, "tommyflowers", "profile.pop"))
 
 
-def test_profile_report():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_profile_report(trace_model):
     def test(dirname):
         model = torch.nn.Linear(100, 100)
         opts = poptorch.Options()
         opts.enableProfiling(dirname)
+        opts.Jit.traceModel(trace_model)
 
         poptorch_model = poptorch.inferenceModel(model, opts)
         x = torch.randn(100, 100)

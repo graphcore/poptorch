@@ -49,7 +49,9 @@ def zeros_and_ones_harness(model, dtype, is_like):
         native_out, _ = model_copy(inputs)
     else:
         native_out = model(*inputs)
-        poptorch_model = poptorch.inferenceModel(model)
+        options = poptorch.Options()
+        options.Jit.traceModel(False)
+        poptorch_model = poptorch.inferenceModel(model, options)
         poptorch_out = poptorch_model(*inputs)
 
     # Inference test - check outputs
@@ -152,7 +154,9 @@ def op_harness(op,
         if native_out is None:
             native_out = model(*inputs)
 
-        poptorch_model = poptorch.inferenceModel(model)
+        options = poptorch.Options()
+        options.Jit.traceModel(False)
+        poptorch_model = poptorch.inferenceModel(model, options)
         # Run on IPU.
         poptorch_out = poptorch_model(*inputs)
 
@@ -527,7 +531,8 @@ def test_clone_one(input_shapes, dtype):
     op_harness(op, x, test_training=test_training, assert_fn=assert_fn)
 
 
-def test_clone_two():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_clone_two(trace_model):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -547,7 +552,9 @@ def test_clone_two():
 
     native_out = model(dummy_x.clone(), dummy_y.clone(), dummy_z.clone())
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(dummy_x.clone(), dummy_y.clone(),
                                   dummy_z.clone())
 
@@ -641,9 +648,12 @@ def test_detach_and_clone(with_clone, with_detach):
 
 
 @helpers.printCapfdOnExit
-def test_requires_grad_true(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_requires_grad_true(capfd, trace_model):
     model = torch.nn.Linear(1, 1)
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     poptorch_model(torch.tensor([0.0], requires_grad=True))
     log = helpers.LogChecker(capfd)

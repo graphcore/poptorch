@@ -30,7 +30,8 @@ def test_set_log_level():
 
 @helpers.printCapfdOnExit
 @helpers.overridePopartLogLevel()
-def test_set_popart_log_level(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_set_popart_log_level(capfd, trace_model):
     # Only strings are allowed
     with pytest.raises(ValueError, match="Level must be one of"):
         poptorch._logging.setPopartLogLevel(0)  # pylint: disable=protected-access
@@ -45,7 +46,9 @@ def test_set_popart_log_level(capfd):
 
     model = torch.nn.Linear(2, 2)
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     inference_model(torch.randn([2, 2]))
 
     log = helpers.LogChecker(capfd)
@@ -59,7 +62,7 @@ def test_set_popart_log_level(capfd):
     poptorch._logging.setPopartLogLevel("OFF")  # pylint: disable=protected-access
     poptorch._logging.setPopartLogLevel("TRACE")  # pylint: disable=protected-access
 
-    inference_model = poptorch.inferenceModel(model)
+    inference_model = poptorch.inferenceModel(model, options)
     inference_model(torch.randn([2, 2]))
 
     log = helpers.LogChecker(capfd)
@@ -70,7 +73,8 @@ def test_set_popart_log_level(capfd):
     log.assert_matches(r"popart:popart \d+\.\d+ T:")
 
 
-def test_zero_size_tensor_error():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_zero_size_tensor_error(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             # The operation doesn't matter, we just want to produce the
@@ -79,7 +83,9 @@ def test_zero_size_tensor_error():
             return torch.nn.functional.interpolate(x, size=(10, 10))
 
     x = torch.randn(0, 2, 5, 5)
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
 
     with pytest.raises(
             poptorch.Error,
@@ -96,8 +102,11 @@ orig_input_trace_tensors = [
 ]
 
 
-def print_orig_input_trace_harness(capfd, model, orig_types, *input_args):
-    inference_model = poptorch.inferenceModel(model)
+def print_orig_input_trace_harness(trace_model, capfd, model, orig_types,
+                                   *input_args):
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     inference_model(*input_args)
 
     testlog = helpers.LogChecker(capfd)
@@ -110,13 +119,14 @@ def print_orig_input_trace_harness(capfd, model, orig_types, *input_args):
 
 @helpers.overridePoptorchLogLevel("TRACE")
 @helpers.printCapfdOnExit
-def test_print_orig_input_trace_nested_tuple_tensors(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_print_orig_input_trace_nested_tuple_tensors(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, xss):
             return xss[0][0] + xss[0][1] + xss[1][0]
 
     print_orig_input_trace_harness(
-        capfd, Model(),
+        trace_model, capfd, Model(),
         "%xss : ((Half(1, strides=[1], requires_grad=0, device=cpu), " +
         "Float(1, strides=[1], requires_grad=0, device=cpu)), " +
         "(Int(1, strides=[1], requires_grad=0, device=cpu)))",
@@ -126,13 +136,14 @@ def test_print_orig_input_trace_nested_tuple_tensors(capfd):
 
 @helpers.overridePoptorchLogLevel("TRACE")
 @helpers.printCapfdOnExit
-def test_print_orig_input_trace_tuple_tensors(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_print_orig_input_trace_tuple_tensors(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, xs):
             return xs[0] + xs[1] + xs[2]
 
     print_orig_input_trace_harness(
-        capfd, Model(),
+        trace_model, capfd, Model(),
         "%xs : (Half(1, strides=[1], requires_grad=0, device=cpu), " +
         "Float(1, strides=[1], requires_grad=0, device=cpu), " +
         "Int(1, strides=[1], requires_grad=0, device=cpu))",
@@ -142,13 +153,14 @@ def test_print_orig_input_trace_tuple_tensors(capfd):
 
 @helpers.overridePoptorchLogLevel("TRACE")
 @helpers.printCapfdOnExit
-def test_print_orig_input_trace_tensors(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_print_orig_input_trace_tensors(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
             return x + y + z
 
     print_orig_input_trace_harness(
-        capfd, Model(),
+        trace_model, capfd, Model(),
         "%x : Half(1, strides=[1], requires_grad=0, device=cpu),\n      " +
         "%y : Float(1, strides=[1], requires_grad=0, device=cpu),\n      " +
         "%z : Int(1, strides=[1], requires_grad=0, device=cpu)",
@@ -156,13 +168,16 @@ def test_print_orig_input_trace_tensors(capfd):
         orig_input_trace_tensors[2])
 
 
-def test_untracable_type_error():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_untracable_type_error(trace_model):
     class Model(torch.nn.Module):
         def forward(self, t, f):
             return t + torch.tensor([f])
 
     x = torch.tensor([3.4])
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
 
     with pytest.raises(
             TypeError,
@@ -247,7 +262,8 @@ def test_specific_error_handling():
 
 @helpers.printCapfdOnExit
 @helpers.overridePopartLogLevel("DEBUG")
-def test_outline_attribute(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_outline_attribute(capfd, trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -261,7 +277,9 @@ def test_outline_attribute(capfd):
 
     input = torch.randn(3, 8)
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
 
     poptorch_model(input)
 

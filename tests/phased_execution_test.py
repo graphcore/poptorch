@@ -489,7 +489,8 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
 @pytest.mark.parametrize("liveness", list(poptorch.Liveness))
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_serial_tensor_liveness(capfd, liveness):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_serial_tensor_liveness(capfd, liveness, trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
@@ -513,6 +514,7 @@ def test_serial_tensor_liveness(capfd, liveness):
     strategy.setTensorsLiveness(liveness)
     opts = poptorch.Options()
     opts.setExecutionStrategy(strategy)
+    opts.Jit.traceModel(trace_model)
 
     model = Model()
     model = poptorch.inferenceModel(model, opts)

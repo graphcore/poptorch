@@ -15,10 +15,11 @@ import poptorch
 # 'torch.nn.InstanceNorm1d', 'torch.nn.InstanceNorm2d', 'torch.nn.InstanceNorm3d', 'torch.nn.LayerNorm', 'torch.nn.LocalResponseNorm',
 
 batch_norm_params = [
-    # Norm, affine, running_stats, training
-    (nn.BatchNorm1d, False, False, False),
-    (nn.BatchNorm2d, True, True, True),
-    (nn.BatchNorm3d, False, True, True),
+    # Norm, affine, running_stats, training, trace_model
+    (nn.BatchNorm1d, False, False, False, True),
+    (nn.BatchNorm1d, False, False, False, False),
+    (nn.BatchNorm2d, True, True, True, True),
+    (nn.BatchNorm3d, False, True, True, True),
 ]
 
 
@@ -28,7 +29,7 @@ def test_batchNorm(params):
     torch.manual_seed(42)
     C = 4
     input_shape = [3, C, 5]
-    batch_norm, affine, running_stats, training = params
+    batch_norm, affine, running_stats, training, trace_model = params
     if batch_norm in (nn.BatchNorm2d, nn.BatchNorm3d):
         input_shape.append(6)
     if batch_norm is nn.BatchNorm3d:
@@ -47,8 +48,11 @@ def test_batchNorm(params):
     # Run pytorch native on CPU.
     native_out, _ = model((input, ))
 
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(
-        model) if training else poptorch.inferenceModel(model)
+        model, options) if training else poptorch.inferenceModel(
+            model, options)
     # Run on IPU.
     poptorch_out, _ = poptorch_model((input, ))
 
@@ -129,7 +133,8 @@ def test_layerNorm(norm_dim):
     poptorch_model.assert_weights_changed()
 
 
-def test_layerNormPretrainedWeights():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_layerNormPretrainedWeights(trace_model):
     torch.manual_seed(42)
 
     class Model(nn.Module):
@@ -150,7 +155,9 @@ def test_layerNormPretrainedWeights():
     modelOut = model(input)
 
     # Run on IPU.
-    ipuModel = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuModel = poptorch.inferenceModel(model, options)
     poptorch_out = ipuModel(input)
 
     # Marginally more leeway.
@@ -173,7 +180,7 @@ def test_layerNormPretrainedWeights():
 
     model.eval()
     # Run on IPU with trained weights.
-    ipuModel = poptorch.inferenceModel(model)
+    ipuModel = poptorch.inferenceModel(model, options)
     poptorch_out = ipuModel(input)
 
     # Run on CPU again with trained weights.
@@ -218,7 +225,8 @@ def test_groupNorm(dims):
     poptorch_model.assert_weights_changed()
 
 
-def test_groupNorm_exfail():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_groupNorm_exfail(trace_model):
     torch.manual_seed(42)
 
     shape = [3, 10]
@@ -231,6 +239,7 @@ def test_groupNorm_exfail():
 
     opts = poptorch.Options()
     opts._Popart.set("groupNormStridedChannelGrouping", True)  # pylint: disable=protected-access
+    opts.Jit.traceModel(trace_model)
 
     # Run on IPU.
     ipuModel = poptorch.inferenceModel(groupNorm, opts)

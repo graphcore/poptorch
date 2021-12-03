@@ -6,7 +6,8 @@ import pytest
 import poptorch
 
 
-def test_loop_constant():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_constant(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             def body(x):
@@ -14,14 +15,17 @@ def test_loop_constant():
 
             return poptorch.for_loop(10, body, [x])[0]
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     x = torch.tensor([1.])
 
     assert inference_model(x) == pow(2, 10)
 
 
-def test_loop_simple():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_simple(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             def body(x):
@@ -29,14 +33,17 @@ def test_loop_simple():
 
             return poptorch.for_loop(10, body, [x])[0]
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     x = torch.tensor([1.])
     y = torch.tensor([2.])
     assert inference_model(x, y) == pow(2, 10)
 
 
-def test_loop_multiple_inputs():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_multiple_inputs(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y, z, w):
             def body(x, y, z, w):
@@ -44,7 +51,9 @@ def test_loop_multiple_inputs():
 
             return poptorch.for_loop(10, body, [x, y, z, w])
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     x = torch.tensor([0.1])
     y = torch.tensor([0.2])
@@ -70,7 +79,8 @@ def test_loop_multiple_inputs():
         assert host == ipu
 
 
-def test_loop_non_tensor_in():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_non_tensor_in(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, _):
             def body(x, y):
@@ -78,7 +88,9 @@ def test_loop_non_tensor_in():
 
             return poptorch.for_loop(10, body, [x, 5])
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     x = torch.tensor([1.])
     y = torch.tensor([2.])
@@ -88,7 +100,8 @@ def test_loop_non_tensor_in():
         inference_model(x, y)
 
 
-def test_loop_non_list_in():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_non_list_in(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             def body(x):
@@ -96,7 +109,9 @@ def test_loop_non_list_in():
 
             return poptorch.for_loop(10, body, x)
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     x = torch.tensor([1.])
     y = torch.tensor([2.])
@@ -108,7 +123,8 @@ def test_loop_non_list_in():
 
 # TODO(T33273)
 @pytest.mark.skip(reason="Popart doesn't support weights in loop oddly")
-def test_loop_weights():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_weights(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -125,7 +141,9 @@ def test_loop_weights():
 
             return poptorch.for_loop(10, body, [x])[0]
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     x = torch.tensor([1.])
 

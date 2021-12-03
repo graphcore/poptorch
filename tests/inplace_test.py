@@ -3,11 +3,13 @@
 
 import torch
 
+import pytest
 import poptorch
 import helpers
 
 
-def test_inplace_add():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_add(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -17,7 +19,9 @@ def test_inplace_add():
             else:
                 x += 1
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 2.0
@@ -33,12 +37,15 @@ def test_inplace_add():
     assert list_in[0] == 3.0
 
 
-def test_inplace_add_multi_elements():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_add_multi_elements(trace_model):
     class Model(torch.nn.Module):
         def forward(self, _x, y):
             y += 1
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     nested_tuple_in = ((torch.Tensor([1.0]), torch.Tensor([1.0])),
                        (torch.Tensor([1.0])))
     tensor_in = torch.Tensor([1.0])
@@ -47,7 +54,8 @@ def test_inplace_add_multi_elements():
     assert tensor_in == 2.0
 
 
-def test_inplace_sub():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_sub(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -57,7 +65,9 @@ def test_inplace_sub():
             else:
                 x -= 1
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 0.0
@@ -73,7 +83,8 @@ def test_inplace_sub():
     assert list_in[0] == -1.0
 
 
-def test_inplace_div():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_div(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -83,7 +94,9 @@ def test_inplace_div():
             else:
                 x /= 2
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 0.5
@@ -99,7 +112,8 @@ def test_inplace_div():
     assert list_in[0] == 0.25
 
 
-def test_inplace_mul():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_mul(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
@@ -109,7 +123,9 @@ def test_inplace_mul():
             else:
                 x *= 2
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     tensor_in = torch.Tensor([1.0])
     assert poptorch_model(tensor_in) is None
     assert tensor_in == 2.0
@@ -125,12 +141,15 @@ def test_inplace_mul():
     assert list_in[0] == 4.0
 
 
-def test_inplace_masked_fill():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_masked_fill(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x.masked_fill_(x > 0.5, 1.0)
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.tensor([[0, 0.7], [0.2, 3.5]])
     poptorch_model(x)
 
@@ -140,7 +159,8 @@ def test_inplace_masked_fill():
     assert x[1][1] == 1.0
 
 
-def test_inplace_zero():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_zero(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             # (Simply setting it to zero gets pruned by PopART)
@@ -148,7 +168,9 @@ def test_inplace_zero():
             x.zero_()
             x += a
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.tensor([[0, 0.5], [0.25, 2.0]])
     poptorch_model(x)
 
@@ -158,14 +180,17 @@ def test_inplace_zero():
     assert x[1][1] == 2.75
 
 
-def test_inplace_fill():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_fill(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             a = torch.sum(x)
             x.fill_(1.0)
             x += a
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.tensor([[0, 0.5], [0.25, 2.0]])
     poptorch_model(x)
 
@@ -175,14 +200,17 @@ def test_inplace_fill():
     assert x[1][1] == 3.75
 
 
-def test_inplace_non_input():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_non_input(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             a = x + 1
             a += 1
             return a
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.tensor([[0, 0.5], [0.25, 2.0]])
 
     y = poptorch_model(x)
@@ -198,7 +226,8 @@ def test_inplace_non_input():
     assert y[1][1] == 4.0
 
 
-def test_double_underscore():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_double_underscore(trace_model):
     # This tests aten::__and__ is not treated as inplace
 
     class Model(torch.nn.Module):
@@ -206,7 +235,9 @@ def test_double_underscore():
             return x[x[0][0].int() & l.item()]
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model, options=poptorch.Options())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     inp, l = torch.rand(10, 10), torch.LongTensor([2])
 
     out = model(inp, l)
@@ -215,7 +246,8 @@ def test_double_underscore():
     helpers.assert_allclose(actual=popout, expected=out)
 
 
-def test_half_buffer_inplace():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_half_buffer_inplace(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -228,7 +260,9 @@ def test_half_buffer_inplace():
             return out
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     x = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5], dtype=torch.float16)
     out = poptorch_model(x)
