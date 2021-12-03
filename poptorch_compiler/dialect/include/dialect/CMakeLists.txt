@@ -24,17 +24,27 @@ set(LLVM_TARGET_DEFINITIONS Poptorch.td)
 tablegen(LLVM Poptorch.tblgen.out --dump-json)
 add_public_tablegen_target(poptorch_raw_tablegen)
 
+add_custom_command(
+  OUTPUT
+    ${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/JitToMlirDispatch.hpp.inc
 
-add_custom_target(poptorch_decls)
-add_dependencies(poptorch_decls poptorch_raw_tablegen)
+  COMMAND python3 ${SCRIPTS_DIR}/generate_extra_headers.py
+    --input-file "${CMAKE_CURRENT_BINARY_DIR}/Poptorch.tblgen.out"
+    --interface-header-file "${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.hpp.inc"
+    --interface-cpp-file "${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.cpp.inc"
+    --jit-dispatch-table-output-file "${CMAKE_CURRENT_BINARY_DIR}/JitToMlirDispatch.hpp.inc"
+  DEPENDS
+    poptorch_raw_tablegen
+  )
 
-add_custom_command(TARGET poptorch_decls
-                COMMAND python3 ${SCRIPTS_DIR}/generate_extra_headers.py
-                            --input-file "${CMAKE_CURRENT_BINARY_DIR}/Poptorch.tblgen.out"
-                            --interface-header-file "${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.hpp.inc"
-                            --interface-cpp-file "${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.cpp.inc"
-                            --jit-dispatch-table-output-file "${CMAKE_CURRENT_BINARY_DIR}/JitToMlirDispatch.hpp.inc"
-                )
+add_custom_target(poptorch_decls
+  DEPENDS
+    ${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/JitToMlirDispatch.hpp.inc
+)
 
 add_library(generated_poptorch_decls INTERFACE)
 target_include_directories(generated_poptorch_decls INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/..)
