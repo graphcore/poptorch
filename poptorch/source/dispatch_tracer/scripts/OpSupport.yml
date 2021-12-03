@@ -178,6 +178,18 @@
 - func: native_batch_norm
   PopTorchDirect: batch_norm
 
+# max_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=0, int[1] dilation=1, bool ceil_mode=False) -> Tensor
+- func: max_pool1d
+  PopTorchDirect: max_pool1d
+
+# max_pool1d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=0, int[2] dilation=1, bool ceil_mode=False) -> Tensor
+- func: max_pool2d
+  PopTorchDirect: max_pool2d
+
+# max_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=0, int[3] dilation=1, bool ceil_mode=False) -> Tensor
+- func: max_pool3d
+  PopTorchDirect: max_pool3d
+
 # adaptive_avg_pool1d(Tensor self, int[1] output_size) -> Tensor(a!)
 - func: adaptive_avg_pool1d
   PopTorchDirect: adaptive_avg_pool1d

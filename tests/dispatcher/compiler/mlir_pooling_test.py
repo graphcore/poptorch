@@ -10,6 +10,45 @@ from poptorch.enums import Compiler
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.parametrize("op", [(nn.MaxPool1d, 1), (nn.MaxPool2d, 2),
+                                (nn.MaxPool3d, 3)])
+@pytest.mark.parametrize(
+    "params",
+    [
+        # kernel_size, stride, padding, ceil_mode
+        (3, 2, 0, False),
+        (3, 2, 0, True),
+        ((3, 2, 2), (2, 1, 2), 0, False),
+        (3, 2, 1, False),
+    ])
+def test_max_pool(op, params):
+    torch.manual_seed(42)
+
+    pool_op, spatial_dims = op
+    kernel_size, stride, padding, ceil_mode = params
+    if isinstance(kernel_size, tuple):
+        kernel_size = kernel_size[:spatial_dims]
+        stride = stride[:spatial_dims]
+
+    shape = [1, 2]
+    shape.extend([10 for _ in range(spatial_dims)])
+    t = torch.randn(shape)
+
+    pool = pool_op(kernel_size, stride, padding, ceil_mode=ceil_mode)
+
+    # Run pytorch native on CPU.
+    torch_out = pool(t)
+
+    # Run on IPU.
+    with poptorch.IPUScope([t], compile_using=Compiler.MLIR) as ipu:
+        ipu.outputs([pool(t)])
+
+    # pylint: disable=no-member
+    helpers.assert_allclose(actual=ipu(t), expected=torch_out)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
 @pytest.mark.parametrize(
     "params",
     [
