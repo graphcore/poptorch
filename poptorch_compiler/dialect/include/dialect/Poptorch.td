@@ -11,6 +11,8 @@ include "PoptorchDialect.td"
 include "ops/Activations.td"
 include "ops/Generated.td"
 include "ops/Linalg.td"
+include "ops/NormOps.td"
+include "ops/PoolingOps.td"
 include "ops/Reshapes.td"
 include "ops/TensorOps.td"
 

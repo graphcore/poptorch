@@ -3,6 +3,9 @@
 # PyTorch Schema types to C++ convertor.
 schemaToCpp = {
     "int[]": "toIntVector",
+    "int[1]": "toIntVector",
+    "int[2]": "toIntVector",
+    "int[3]": "toIntVector",
     "int": "toInt",
     "bool": "toBool",
     "float": "toDouble",

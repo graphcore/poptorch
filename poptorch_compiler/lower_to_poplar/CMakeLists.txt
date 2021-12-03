@@ -5,7 +5,9 @@ add_library(lower_to_poplar STATIC
         ops/ElementWise.cpp
         ops/Generated.cpp
         ops/Linalg.cpp
+        ops/NormOps.cpp
         ops/Ops.cpp
+        ops/PoolingOps.cpp
         ops/Reshapes.cpp
         ops/TensorOps.cpp)
 

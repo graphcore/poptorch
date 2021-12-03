@@ -43,8 +43,7 @@ def test_batch_norm(params):
 
     # Run on IPU.
     with poptorch.IPUScope([t], weights, compile_using=Compiler.MLIR) as ipu:
-        n = norm(t)
-        ipu.outputs([n])
+        ipu.outputs([norm(t)])
 
     # pylint: disable=no-member
     helpers.assert_allclose(actual=ipu(t), expected=torch_out)

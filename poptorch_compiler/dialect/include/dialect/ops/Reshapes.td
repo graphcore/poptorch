@@ -1,6 +1,4 @@
-
-
-
+// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
 def Poptorch_as_strided: Poptorch_Op<"as_strided", [ViewOp]> {
@@ -65,5 +63,3 @@ class Poptorch_reshape_generic<string name> : Poptorch_Op<name, [ViewOp]> {
 // Reshape and expand have the exact same setup but reshape is just a reshape while exapand is a broadcast under the hood.
 def Poptorch_reshape : Poptorch_reshape_generic<"reshape"> {}
 def Poptorch_expand : Poptorch_reshape_generic<"expand"> {}
-
-
