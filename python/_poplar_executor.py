@@ -83,6 +83,10 @@ class PoplarExecutor:
                  optimizer: Optional['torch.optim.Optimizer'] = None,
                  user_model: Optional['torch.nn.Module'] = None):
         if options:
+            if not isinstance(options, Options):
+                raise _impl.createPoptorchError(
+                    "Invalid type: 'options' is of "
+                    f"type {type(options)} (Expected poptorch.Options)")
             # Prevent the user from modifying these options.
             options._freeze()
             options = options.clone()

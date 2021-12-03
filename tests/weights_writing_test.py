@@ -16,7 +16,8 @@ import poptorch
 
 
 @pytest.mark.parametrize("use_half", [True, False])
-def test_training_and_inference(use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_training_and_inference(use_half, trace_model):
     torch.manual_seed(42)
 
     # 10 Batches of 10.
@@ -35,7 +36,9 @@ def test_training_and_inference(use_half):
     opts = poptorch.Options().deviceIterations(10)
     poptorch_model = helpers.trainingModelWithLoss(
         model, options=opts, loss=torch.nn.CrossEntropyLoss())
-    inference = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference = poptorch.inferenceModel(model, options)
 
     # Run all 10 batches as batchsize 10.
     out = inference(input)
@@ -77,7 +80,9 @@ def test_training_inference_parameters(use_half):
     opts = poptorch.Options().deviceIterations(10)
     poptorch_model = helpers.trainingModelWithLoss(
         model, options=opts, loss=torch.nn.CrossEntropyLoss())
-    inference = poptorch.inferenceModel(model)
+    opts = opts.clone()
+    opts.Jit.traceModel(False)
+    inference = poptorch.inferenceModel(model, opts)
 
     # Run all 10 batches as batchsize 10.
     out = inference(input)
@@ -104,7 +109,8 @@ def test_training_inference_parameters(use_half):
 
 
 @pytest.mark.parametrize("use_half", [True, False])
-def test_access_parameters(use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_access_parameters(use_half, trace_model):
     torch.manual_seed(42)
 
     # 10 Batches of 10.
@@ -134,7 +140,9 @@ def test_access_parameters(use_half):
         model, options=opts, loss=torch.nn.CrossEntropyLoss())
 
     original_weights = str(model.linear.weight)
-    inference = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference = poptorch.inferenceModel(model, options)
 
     # Run all 10 batches as batchsize 10.
     out = inference(input)
@@ -361,7 +369,8 @@ def train_N_times_and_check_copying(N, inference_model, training_model, input,
     return out_inference
 
 
-def test_weights_sharing_ipus():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_weights_sharing_ipus(trace_model):
     torch.manual_seed(42)
     model = torch.nn.Linear(10, 10)
 
@@ -378,7 +387,9 @@ def test_weights_sharing_ipus():
         deviceToHostWrapper, training_model)
 
     # Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     target = torch.randn(10)
     input = torch.randn(10)
 
@@ -401,7 +412,8 @@ def test_weights_sharing_ipus():
                             atol=1e-02)
 
 
-def test_implicit_first_time_copy():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_implicit_first_time_copy(trace_model):
     torch.manual_seed(42)
 
     # Train on host.
@@ -438,7 +450,9 @@ def test_implicit_first_time_copy():
                             atol=1e-02)
 
     # Run on IPU.
-    ipuModel = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuModel = poptorch.inferenceModel(model, options)
     poptorch_out = ipuModel(input)
 
     # Check IPU returns same value as native without the weights explicitly being copied.
@@ -449,7 +463,8 @@ def test_implicit_first_time_copy():
                             atol=1e-02)
 
 
-def test_implicit_first_time_copy_negative():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_implicit_first_time_copy_negative(trace_model):
     torch.manual_seed(42)
 
     # Train on host.
@@ -466,7 +481,9 @@ def test_implicit_first_time_copy_negative():
     assert not torch.allclose(native, target, rtol=1e-02, atol=1e-02)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(input)
 
     # Weights should be copied so check we are matching host but NOT the target.
@@ -677,7 +694,9 @@ def test_torch_save_unwrapped():
                                                    loss=torch.nn.L1Loss())
 
     # An inference model sharing its user model with a training model will be instrumented though.
-    poptorch.inferenceModel(training_model)
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    poptorch.inferenceModel(training_model, options)
 
     with tempfile.TemporaryDirectory() as tmp:
         torch_file = os.path.join(tmp, "torch_saved.pt")

@@ -94,19 +94,23 @@ def test_upsample_bilinear_factor_shapes(shapes):
 @pytest.mark.parametrize("mode, input_shape", [("linear", (1, 2, 3)),
                                                ("bicubic", (1, 2, 3, 4)),
                                                ("trilinear", (1, 2, 3, 4, 5))])
-def test_unsupported_upsample(mode, input_shape):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_unsupported_upsample(mode, input_shape, trace_model):
     torch.manual_seed(42)
     scale_factor = 2
     model = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)
     x = torch.randn(*input_shape)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     with pytest.raises(poptorch.Error, match="only 'nearest' is supported"):
         poptorch_model(x)
 
 
-def test_linear():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_linear(trace_model):
     torch.manual_seed(42)
     model = torch.nn.Linear(20, 30)
     x = torch.randn(128, 20)
@@ -115,7 +119,9 @@ def test_linear():
     native_out = model(x)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(x)
 
     assert native_out.size() == poptorch_out.size()
@@ -145,7 +151,8 @@ dropout_ops = [torch.nn.Dropout, torch.nn.Dropout2d, torch.nn.Dropout3d]
 
 
 @pytest.mark.parametrize("dropout_op", dropout_ops)
-def test_dropout_inference(dropout_op):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dropout_inference(dropout_op, trace_model):
     torch.manual_seed(42)
     model = dropout_op()
     model.eval()
@@ -156,7 +163,9 @@ def test_dropout_inference(dropout_op):
     native_out = model(x)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(x)
 
     msg = f"{dropout_op.__name__} in inference session should equal identity."
@@ -259,7 +268,8 @@ def test_dropout3d_training():
     op_harness(dropout_op, [x], check_ratio)
 
 
-def test_embedding():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_embedding(trace_model):
     model = torch.nn.Embedding(10, 3)
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
 
@@ -267,7 +277,9 @@ def test_embedding():
     native_out = model(x)
 
     # Run on IPU.
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(x)
 
     assert native_out.size() == poptorch_out.size()
@@ -305,17 +317,21 @@ def test_embedding_padding_idx():
 
 
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
-def test_embedding_bag(mode):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_embedding_bag(mode, trace_model):
     torch.manual_seed(0)
     model = torch.nn.EmbeddingBag(10, 3, mode=mode)
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
     cpu_out = model(x)
-    pop_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    pop_model = poptorch.inferenceModel(model, options)
     pop_out = pop_model(x)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
-def test_embedding_bag_per_sample_weights():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_embedding_bag_per_sample_weights(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
@@ -331,13 +347,16 @@ def test_embedding_bag_per_sample_weights():
     model = Model()
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
     cpu_out = model(x)
-    pop_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    pop_model = poptorch.inferenceModel(model, options)
     pop_out = pop_model(x)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
-def test_embedding_bag_include_last_offset(mode):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_embedding_bag_include_last_offset(mode, trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
@@ -358,7 +377,9 @@ def test_embedding_bag_include_last_offset(mode):
     model = Model()
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
     cpu_out = model(x)
-    pop_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    pop_model = poptorch.inferenceModel(model, options)
     pop_out = pop_model(x)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 

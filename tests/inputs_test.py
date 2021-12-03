@@ -9,7 +9,8 @@ import helpers
 
 
 @pytest.mark.parametrize("use_half", [True, False])
-def test_simple_tuple(use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_simple_tuple(use_half, trace_model):
     class SimpleAdder(nn.Module):
         def forward(self, t):
             assert isinstance(t, tuple)
@@ -19,7 +20,9 @@ def test_simple_tuple(use_half):
             return x + y
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
@@ -31,7 +34,8 @@ def test_simple_tuple(use_half):
     assert inference_model((t1, t2)).float() == 3.0
 
 
-def test_type_change():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_type_change(trace_model):
     class SimpleAdder(nn.Module):
         def forward(self, t):
             assert isinstance(t, tuple)
@@ -41,7 +45,9 @@ def test_type_change():
             return x + y
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
@@ -61,7 +67,8 @@ def test_type_change():
 
 @pytest.mark.parametrize("use_half", [True, False])
 @pytest.mark.parametrize("thing_to_test", ['List', 'Tuple', 'Mixed'])
-def test_nested_tuples_and_lists(use_half, thing_to_test):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_nested_tuples_and_lists(use_half, thing_to_test, trace_model):
     class SimpleAdder(nn.Module):
         def forward(self, tpl1, t2, tpl34567):
             (t1, ) = tpl1
@@ -80,7 +87,9 @@ def test_nested_tuples_and_lists(use_half, thing_to_test):
             return t1 + t2 + t3 + t4 + t5 + t6 + t7
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
@@ -114,7 +123,8 @@ def test_nested_tuples_and_lists(use_half, thing_to_test):
 
 
 @pytest.mark.parametrize("use_half", [True, False])
-def test_optional_inputs(use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optional_inputs(use_half, trace_model):
     dtype = torch.float16 if use_half else torch.float32
 
     class SimpleAdder(nn.Module):
@@ -126,7 +136,9 @@ def test_optional_inputs(use_half):
             return t1 * t3 + t2 * t4
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
@@ -144,7 +156,8 @@ def test_optional_inputs(use_half):
 
 
 @pytest.mark.parametrize("use_half", [True, False])
-def test_list_inputs(use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_list_inputs(use_half, trace_model):
     class SimpleAdder(nn.Module):
         def forward(self, t1, t2, x):
             l = [t1, t2]
@@ -153,7 +166,9 @@ def test_list_inputs(use_half):
             return l
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
@@ -175,22 +190,28 @@ def test_list_inputs(use_half):
     assert [t.float() for t in inference_model(t1, t2, t3)] == expected
 
 
-def test_unused_tuple():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_unused_tuple(trace_model):
     class SimpleAdder(nn.Module):
         def forward(self, x, y, z):  # pylint: disable=unused-argument
             return x + y
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
     z = (torch.tensor([1.]), torch.tensor([1.]))
     inference_model(t1, t2, z)
 
 
-def test_input_plain_dict():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_input_plain_dict(trace_model):
     model = torch.nn.ReLU()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(TypeError) as excinfo:
         inference_model({'a': torch.tensor([1])})
@@ -201,9 +222,12 @@ def test_input_plain_dict():
             "Received dict input = {'a': tensor([1])}")
 
 
-def test_input_nested_dict():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_input_nested_dict(trace_model):
     model = torch.nn.ReLU()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(TypeError) as excinfo:
         inference_model(
@@ -217,14 +241,17 @@ def test_input_nested_dict():
             "{'b': tensor([4])}")
 
 
-def test_input_three_agg_nested_dict():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_input_three_agg_nested_dict(trace_model):
     class ThreeIdentity(nn.Module):
         def forward(self, x, y, z):
             return x, y, z
 
     model = ThreeIdentity()
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(TypeError) as excinfo:
         inference_model(torch.tensor([0]),
@@ -260,68 +287,90 @@ class Model(torch.nn.Module):
         return torch.tanh(x)
 
 
-def test_none_input_pass_one_kwarg():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_pass_one_kwarg(trace_model):
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z, t=None)
     poptorch_out = poptorch_model(x, y, z, t=None)
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-def test_none_input_pass_two_kwarg():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_pass_two_kwarg(trace_model):
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z=None, t=None)
     poptorch_out = poptorch_model(x, y, z=None, t=None)
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-def test_none_input_pass_skip_one_kwarg():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_pass_skip_one_kwarg(trace_model):
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z=None)
     poptorch_out = poptorch_model(x, y, z=None)
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-def test_none_input_fail_non_default_kwarg():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_fail_non_default_kwarg(trace_model):
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(AssertionError):
         poptorch_model(x, y=None)
 
 
-def test_none_input_pass_last_arg():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_pass_last_arg(trace_model):
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z, None)
     poptorch_out = poptorch_model(x, y, z, None)
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-def test_none_input_pass_two_arg():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_pass_two_arg(trace_model):
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, None, None)
     poptorch_out = poptorch_model(x, y, None, None)
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-def test_none_input_fail_non_default_arg():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_fail_non_default_arg(trace_model):
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(AssertionError):
         poptorch_model(x, None, None, None)
 
 
-def test_none_input_fail():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_none_input_fail(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x=None, y=ones):
             if x is None:
@@ -331,13 +380,16 @@ def test_none_input_fail():
             return torch.add(x, y)
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(AssertionError):
         poptorch_model(x, None)
 
 
-def test_no_inputs():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_no_inputs(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -349,7 +401,9 @@ def test_no_inputs():
             return self.x
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     # It appears that forward is called enough time as to make the value 7 as
     # part of the tracing.
@@ -358,7 +412,8 @@ def test_no_inputs():
     assert poptorch_model() == 7.
 
 
-def test_no_inputs_no_output():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_no_inputs_no_output(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -368,26 +423,32 @@ def test_no_inputs_no_output():
             self.x += self.x
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_model()
     poptorch_model()
 
 
-def test_return_and_use_input():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_return_and_use_input(trace_model):
     class Model(torch.nn.Module):
         def forward(self, input):
             c = torch.tensor([1.])
             return c, input + c
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     assert poptorch_model(torch.tensor([0.])) == (torch.tensor([1.]),
                                                   torch.tensor([1.]))
     assert poptorch_model(torch.tensor([1.])) == (torch.tensor([1.]),
                                                   torch.tensor([2.]))
 
 
-def test_return_and_use_nested_input():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_return_and_use_nested_input(trace_model):
     class Model(torch.nn.Module):
         def forward(self, input):
             c = torch.tensor([1.])
@@ -397,7 +458,9 @@ def test_return_and_use_nested_input():
             return c, (c, input + c)
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     assert poptorch_model(torch.tensor([0.])) == (torch.tensor([1.]),
                                                   (torch.tensor([1.]),
                                                    torch.tensor([1.])))

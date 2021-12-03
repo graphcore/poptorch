@@ -18,7 +18,9 @@ def get_simple_adder(return_type):
         def forward(self, x, y):
             return (x + y).type(return_type)
 
-    return poptorch.inferenceModel(SimpleAdder())
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    return poptorch.inferenceModel(SimpleAdder(), options)
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
@@ -58,7 +60,9 @@ def get_simple_add_two():
         def forward(self, x):
             return x + 2
 
-    return poptorch.inferenceModel(GetSimpleAddTwo())
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    return poptorch.inferenceModel(GetSimpleAddTwo(), options)
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
@@ -76,7 +80,9 @@ def get_simple_incrementer(constant_type, return_type):
         def forward(self, x):
             return (x + torch.tensor(1, dtype=constant_type)).type(return_type)
 
-    return poptorch.inferenceModel(SimpleIncrementer())
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    return poptorch.inferenceModel(SimpleIncrementer(), options)
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
@@ -97,12 +103,16 @@ def test_many_constant_implicit_cast(input_type, constant_type, output_type):
 
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
-def test_many_implicit_cast_greater_than(input_1_type, input_2_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast_greater_than(input_1_type, input_2_type,
+                                         trace_model):
     class GreaterThan(nn.Module):
         def forward(self, x, y):
             return x > y
 
-    model = poptorch.inferenceModel(GreaterThan())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(GreaterThan(), options)
 
     t1 = torch.tensor([1, -1, 2.0, 550.4], dtype=input_1_type)
     t2 = torch.tensor([2.4, 2, 1.0, 32.4], dtype=input_2_type)
@@ -112,12 +122,15 @@ def test_many_implicit_cast_greater_than(input_1_type, input_2_type):
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-def test_many_implicit_cast_greater_than_one(input_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast_greater_than_one(input_type, trace_model):
     class GreaterThanOne(nn.Module):
         def forward(self, x):
             return x > 1
 
-    model = poptorch.inferenceModel(GreaterThanOne())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(GreaterThanOne(), options)
 
     t = torch.tensor([2.5, -1, 2.0, 550.4], dtype=input_type)
 
@@ -127,12 +140,15 @@ def test_many_implicit_cast_greater_than_one(input_type):
 
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
-def test_many_implicit_cast_equals(input_1_type, input_2_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast_equals(input_1_type, input_2_type, trace_model):
     class Equals(nn.Module):
         def forward(self, x, y):
             return x == y
 
-    model = poptorch.inferenceModel(Equals())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(Equals(), options)
 
     t1 = torch.tensor([1, -1, 2.0, 550.4], dtype=input_1_type)
     t2 = torch.tensor([2.4, 2, 2.0, 550.4], dtype=input_2_type)
@@ -152,12 +168,15 @@ def test_many_implicit_cast_equals(input_1_type, input_2_type):
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-def test_many_implicit_cast_equals_one(input_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast_equals_one(input_type, trace_model):
     class EqualsOne(nn.Module):
         def forward(self, x):
             return x == 1
 
-    model = poptorch.inferenceModel(EqualsOne())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(EqualsOne(), options)
 
     t = torch.tensor([2.5, 1, 2.0, 550.4], dtype=input_type)
 
@@ -167,12 +186,15 @@ def test_many_implicit_cast_equals_one(input_type):
 
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
-def test_many_implicit_cast_less_than(input_1_type, input_2_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast_less_than(input_1_type, input_2_type, trace_model):
     class LessThan(nn.Module):
         def forward(self, x, y):
             return x < y
 
-    model = poptorch.inferenceModel(LessThan())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(LessThan(), options)
 
     t1 = torch.tensor([1, -1, 2.0, 550.4], dtype=input_1_type)
     t2 = torch.tensor([2.4, 2, 1.0, 32.4], dtype=input_2_type)
@@ -182,12 +204,15 @@ def test_many_implicit_cast_less_than(input_1_type, input_2_type):
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-def test_many_implicit_cast_less_than_one(input_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast_less_than_one(input_type, trace_model):
     class LessThanOne(nn.Module):
         def forward(self, x):
             return x < 1
 
-    model = poptorch.inferenceModel(LessThanOne())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(LessThanOne(), options)
 
     t = torch.tensor([2.5, -1, 2.0, 550.4], dtype=input_type)
 
@@ -196,12 +221,15 @@ def test_many_implicit_cast_less_than_one(input_type):
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-def test_many_implicit_cast_one_less_than(input_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast_one_less_than(input_type, trace_model):
     class OneLessThan(nn.Module):
         def forward(self, x):
             return 1 < x  # pylint: disable=misplaced-comparison-constant
 
-    model = poptorch.inferenceModel(OneLessThan())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(OneLessThan(), options)
 
     t = torch.tensor([2.5, -1, 2.0, 550.4], dtype=input_type)
 
@@ -210,7 +238,8 @@ def test_many_implicit_cast_one_less_than(input_type):
 
 
 @pytest.mark.parametrize("input_type", [torch.int8, torch.uint8])
-def test_int8(input_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_int8(input_type, trace_model):
     class Model(nn.Module):
         def forward(self, x):
             return x.float()
@@ -220,7 +249,9 @@ def test_int8(input_type):
     # Convert to int8/uint8
     input = input.to(input_type)
 
-    model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(Model(), options)
 
     output = model(input)
 
@@ -229,7 +260,8 @@ def test_int8(input_type):
 
 
 @pytest.mark.parametrize("input_type", [torch.int8, torch.uint8])
-def test_int8_return(input_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_int8_return(input_type, trace_model):
     class Model(nn.Module):
         def forward(self, x):
             return x, x.float() + x.float()
@@ -239,7 +271,9 @@ def test_int8_return(input_type):
     # Convert to int8/uint8
     input = input.to(input_type)
 
-    model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = poptorch.inferenceModel(Model(), options)
 
     output, _ = model(input)
 
@@ -247,7 +281,8 @@ def test_int8_return(input_type):
     helpers.assert_allequal(actual=output, expected=input)
 
 
-def test_tuple_and_list_constant():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_tuple_and_list_constant(trace_model):
     const1 = torch.tensor([1., 2.])
     const2 = torch.tensor([3., 4.])
 
@@ -256,14 +291,17 @@ def test_tuple_and_list_constant():
             return torch.tensor(1), const1 + const2, [const1, const2]
 
     model = Model()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     poptorch_out = inference_model()
     native = model()
     helpers.assert_allclose(actual=poptorch_out, expected=native)
 
 
-def test_tuple_and_list_constant_double_nested():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_tuple_and_list_constant_double_nested(trace_model):
     const1 = torch.tensor([1., 2.])
     const2 = torch.tensor([3., 4.])
 
@@ -273,7 +311,9 @@ def test_tuple_and_list_constant_double_nested():
                     ([const1, const2], [const1, const2]), const2)
 
     model = Model()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     poptorch_out = inference_model()
     native = model()

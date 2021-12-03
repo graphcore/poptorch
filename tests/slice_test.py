@@ -71,7 +71,8 @@ def test_slice_with_branch(step):
                        torch.tensor([-3.0]), start_fn, end_fn, step)
 
 
-def dynamic_slice_harness(tensor_in,
+def dynamic_slice_harness(trace_model,
+                          tensor_in,
                           extra_in,
                           start_fn,
                           end_fn,
@@ -99,14 +100,17 @@ def dynamic_slice_harness(tensor_in,
         native_out = model(tensor_in, extra_in)
 
         # Run on IPU.
-        poptorch_model = poptorch.inferenceModel(model)
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        poptorch_model = poptorch.inferenceModel(model, options)
         poptorch_out = poptorch_model(tensor_in, extra_in)
 
     helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_dynamic_slice_one_dim_add(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_add(step, trace_model):
     def start_fn(extra_in):
         return extra_in
 
@@ -114,12 +118,13 @@ def test_dynamic_slice_one_dim_add(step):
         return extra_in + 4
 
     dynamic_slice_harness(
-        torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        trace_model, torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
         torch.tensor([1]), start_fn, end_fn, step)
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_dynamic_slice_one_dim_subtract(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_subtract(step, trace_model):
     def start_fn(extra_in):
         return extra_in - 4
 
@@ -127,12 +132,13 @@ def test_dynamic_slice_one_dim_subtract(step):
         return extra_in
 
     dynamic_slice_harness(
-        torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        trace_model, torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
         torch.tensor([5]), start_fn, end_fn, step)
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_dynamic_slice_one_dim_mix_up(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_mix_up(step, trace_model):
     def start_fn(extra_in):
         tmp = extra_in + 3
         tmp = tmp - 10
@@ -146,12 +152,13 @@ def test_dynamic_slice_one_dim_mix_up(step):
         return tmp
 
     dynamic_slice_harness(
-        torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        trace_model, torch.tensor([2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
         torch.tensor([5]), start_fn, end_fn, step)
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_dynamic_slice_two_dims(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_two_dims(step, trace_model):
     def start_fn(extra_in):
         return extra_in.to(torch.int32)
 
@@ -159,6 +166,7 @@ def test_dynamic_slice_two_dims(step):
         return extra_in.to(torch.int32) + 1
 
     dynamic_slice_harness(
+        trace_model,
         torch.tensor([[2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
                       [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]]),
         torch.tensor([0]), start_fn, end_fn, step)
@@ -193,7 +201,8 @@ def test_dynamic_slice_two_dims_twice_sliced(step):
     poptorch_model.assert_weights_changed()
 
 
-def test_dynamic_slice_one_dim_equal():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_equal(trace_model):
     def start_fn(extra_in):
         return extra_in
 
@@ -204,8 +213,9 @@ def test_dynamic_slice_one_dim_equal():
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
-        dynamic_slice_harness(torch.tensor(
-            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        dynamic_slice_harness(trace_model,
+                              torch.tensor(
+                                  [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                               torch.tensor([5]),
                               start_fn,
                               end_fn,
@@ -213,7 +223,8 @@ def test_dynamic_slice_one_dim_equal():
                               test_training=False)
 
 
-def test_dynamic_slice_one_dim_less_than():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_less_than(trace_model):
     def start_fn(extra_in):
         return extra_in
 
@@ -225,8 +236,9 @@ def test_dynamic_slice_one_dim_less_than():
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
-        dynamic_slice_harness(torch.tensor(
-            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        dynamic_slice_harness(trace_model,
+                              torch.tensor(
+                                  [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                               torch.tensor([5]),
                               start_fn,
                               end_fn,
@@ -234,7 +246,8 @@ def test_dynamic_slice_one_dim_less_than():
                               test_training=False)
 
 
-def test_dynamic_slice_one_dim_multiply():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_multiply(trace_model):
     def start_fn(extra_in):
         return extra_in
 
@@ -247,8 +260,9 @@ def test_dynamic_slice_one_dim_multiply():
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
-        dynamic_slice_harness(torch.tensor(
-            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        dynamic_slice_harness(trace_model,
+                              torch.tensor(
+                                  [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                               torch.tensor([5]),
                               start_fn,
                               end_fn,
@@ -256,7 +270,8 @@ def test_dynamic_slice_one_dim_multiply():
                               test_training=False)
 
 
-def test_dynamic_slice_one_dim_add_non_factor():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_add_non_factor(trace_model):
     def start_fn(extra_in):
         return extra_in
 
@@ -268,8 +283,9 @@ def test_dynamic_slice_one_dim_add_non_factor():
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
-        dynamic_slice_harness(torch.tensor(
-            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        dynamic_slice_harness(trace_model,
+                              torch.tensor(
+                                  [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                               torch.tensor([1]),
                               start_fn,
                               end_fn,
@@ -277,7 +293,8 @@ def test_dynamic_slice_one_dim_add_non_factor():
                               test_training=False)
 
 
-def test_dynamic_slice_one_dim_mix_up_float():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_one_dim_mix_up_float(trace_model):
     def start_fn(extra_in):
         tmp = extra_in + 3
         tmp = tmp - 10.5
@@ -298,8 +315,9 @@ def test_dynamic_slice_one_dim_mix_up_float():
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
-        dynamic_slice_harness(torch.tensor(
-            [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        dynamic_slice_harness(trace_model,
+                              torch.tensor(
+                                  [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                               torch.tensor([5]),
                               start_fn,
                               end_fn,
@@ -328,25 +346,31 @@ def test_unbind(dim):
     poptorch_model.assert_weights_changed()
 
 
-def test_scalarslice():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_scalarslice(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return (x / 2)[:]
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
 
     input_tensor = torch.tensor([2])
     assert poptorch_model(input_tensor) == model(input_tensor)
 
 
-def test_dynamic_length_slice():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_length_slice(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, l):
             return x[l:]
 
     model = Model()
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     inp, l = torch.rand(10, 10), torch.LongTensor([2])
 
     error_msg = (

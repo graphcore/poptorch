@@ -12,7 +12,8 @@ import poptorch
 
 
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_missing_block():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_missing_block(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -27,6 +28,7 @@ def test_missing_block():
     opts.deviceIterations(2)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
     with pytest.raises(poptorch.Error, match="No active Block"):
@@ -35,7 +37,8 @@ def test_missing_block():
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_api_inline(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_api_inline(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -49,6 +52,7 @@ def test_api_inline(capfd):
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(2, 5))
@@ -184,7 +188,8 @@ def test_recomputation_checkpoint_tensor_tuple_inputs():
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_api_wrap(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_api_wrap(capfd, trace_model):
     """
     stage "0" ipu(0) stage(0) l0 l1 l2
     """
@@ -210,6 +215,7 @@ def test_api_wrap(capfd):
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(2, 5))
@@ -222,7 +228,8 @@ def test_api_wrap(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_api_wrap_2stages(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_api_wrap_2stages(capfd, trace_model):
     """
     stage "0" ipu(0) stage(0) l0
     stage "1" ipu(1) stage(1) l1 / l2
@@ -251,6 +258,7 @@ def test_api_wrap_2stages(capfd):
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(2, 5))
@@ -264,7 +272,8 @@ def test_api_wrap_2stages(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_inline_AutoIncrement(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inline_AutoIncrement(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -284,6 +293,7 @@ def test_inline_AutoIncrement(capfd):
     opts.deviceIterations(4).autoRoundNumIPUs(True)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
     m.compile(torch.randn(4, 5))
@@ -298,7 +308,8 @@ def test_inline_AutoIncrement(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_api_AutoIncrement(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_api_AutoIncrement(capfd, trace_model):
     class Block(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -327,6 +338,7 @@ def test_api_AutoIncrement(capfd):
     opts.deviceIterations(4).autoRoundNumIPUs(True)
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(4, 5))
@@ -341,7 +353,8 @@ def test_api_AutoIncrement(capfd):
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Round up only needed for IPU Hardware")
-def test_ipu_round_up_error():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_ipu_round_up_error(trace_model):
     class Block(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -367,6 +380,7 @@ def test_ipu_round_up_error():
     opts = poptorch.Options()
     opts.setExecutionStrategy(
         poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement))
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
 
@@ -398,11 +412,13 @@ class BlockFnModel(torch.nn.Module):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_block_function(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_block_function(capfd, trace_model):
     m = BlockFnModel()
 
     opts = poptorch.Options()
     opts.deviceIterations(2)
+    opts.Jit.traceModel(trace_model)
 
     m = poptorch.inferenceModel(m, opts)
     m(torch.randn(2, 5))
@@ -413,9 +429,12 @@ def test_block_function(capfd):
     log.assert_contains(" Mul:0/1 ", " mode(Pipelined), ipu(1), stage(1)")
 
 
-def test_block_function_saving():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_block_function_saving(trace_model):
     m = BlockFnModel()
-    m = poptorch.inferenceModel(m)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    m = poptorch.inferenceModel(m, options)
 
     with tempfile.TemporaryFile() as f:
         torch.save(m, f)
@@ -602,7 +621,8 @@ def test_begin_block_with_function():
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_removeBlocks(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_removeBlocks(capfd, trace_model):
     class Block(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -632,6 +652,7 @@ def test_removeBlocks(capfd):
     def compile_model(m):
         opts = poptorch.Options()
         opts.deviceIterations(10)
+        opts.Jit.traceModel(trace_model)
         if poptorch.ipuHardwareIsAvailable():
             opts.useOfflineIpuTarget()
         poptorch_model = poptorch.inferenceModel(m, opts)

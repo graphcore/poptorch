@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import pytest
 import torch
 import torch.nn as nn
 import poptorch
 import helpers
 
 
-def test_lstm():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm(trace_model):
     torch.manual_seed(42)
     lstm = nn.LSTM(3, 3)
-    ipuLstm = poptorch.inferenceModel(lstm)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuLstm = poptorch.inferenceModel(lstm, options)
     inputs = [torch.randn(1, 3) for _ in range(5)]
     # initialize the hidden state.
     hidden = (torch.randn(1, 1, 3), torch.randn(1, 1, 3))
@@ -25,12 +29,15 @@ def test_lstm():
         hidden = newHidden
 
 
-def test_lstm2():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm2(trace_model):
     torch.manual_seed(42)
     numHidden = 5
     inputSize = 3
     lstm = nn.LSTM(3, numHidden)
-    ipuLstm = poptorch.inferenceModel(lstm)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuLstm = poptorch.inferenceModel(lstm, options)
     inputs = [torch.randn(1, inputSize) for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), 1, -1)
@@ -42,12 +49,15 @@ def test_lstm2():
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
-def test_lstm_twice():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm_twice(trace_model):
     torch.manual_seed(42)
     numHidden = 5
     inputSize = 3
     lstm = nn.LSTM(3, numHidden)
-    ipuLstm = poptorch.inferenceModel(lstm)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuLstm = poptorch.inferenceModel(lstm, options)
     inputs = [torch.randn(1, inputSize) for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), 1, -1)
@@ -66,12 +76,15 @@ def test_lstm_twice():
     helpers.assert_allclose(expected=ipuOut, actual=ipuOut2)
 
 
-def test_lstm_batch_first():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm_batch_first(trace_model):
     torch.manual_seed(42)
     numHidden = 5
     inputSize = 3
     lstm = nn.LSTM(3, numHidden, batch_first=True)
-    ipuLstm = poptorch.inferenceModel(lstm)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuLstm = poptorch.inferenceModel(lstm, options)
     inputs = [torch.randn(1, inputSize) for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(1, len(inputs), -1)
@@ -83,13 +96,16 @@ def test_lstm_batch_first():
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
-def test_lstm_batched():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm_batched(trace_model):
     torch.manual_seed(42)
     numHidden = 5
     inputSize = 3
     batch = 4
     lstm = nn.LSTM(3, numHidden)
-    ipuLstm = poptorch.inferenceModel(lstm)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuLstm = poptorch.inferenceModel(lstm, options)
     inputs = [torch.randn(batch, inputSize) for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), batch, -1)
@@ -103,13 +119,16 @@ def test_lstm_batched():
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
-def test_lstm_batched_batch_first():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm_batched_batch_first(trace_model):
     torch.manual_seed(42)
     numHidden = 5
     inputSize = 3
     batch = 4
     lstm = nn.LSTM(3, numHidden, batch_first=True)
-    ipuLstm = poptorch.inferenceModel(lstm)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuLstm = poptorch.inferenceModel(lstm, options)
     inputs = [torch.randn(batch, inputSize) for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(batch, len(inputs), -1)

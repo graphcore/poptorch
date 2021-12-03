@@ -21,7 +21,10 @@ class ExampleModelWithLoss(torch.nn.Module):
         return fc
 
 
-def _compileAndExport(filename, export_model=True, training=True):
+def _compileAndExport(filename,
+                      export_model=True,
+                      training=True,
+                      trace_model=True):
     torch.manual_seed(42)
     model = ExampleModelWithLoss()
 
@@ -30,6 +33,7 @@ def _compileAndExport(filename, export_model=True, training=True):
 
     opts = poptorch.Options()
     opts.useOfflineIpuTarget(poptorch.ipuHardwareVersion())
+    opts.Jit.traceModel(trace_model)
 
     if training:
         model.train()
@@ -92,19 +96,25 @@ def test_export_no_python_then_load():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-def test_export_train_validate_no_python():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_export_train_validate_no_python(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
         input, target = _compileAndExport(train_filename, export_model=False)
-        _compileAndExport(valid_filename, export_model=False, training=False)
+        _compileAndExport(valid_filename,
+                          export_model=False,
+                          training=False,
+                          trace_model=trace_model)
 
         model = ExampleModelWithLoss()
         training_model = poptorch.trainingModel(model)
         training_model.loadExecutable(train_filename)
 
         model.eval()
-        validation_model = poptorch.inferenceModel(model)
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        validation_model = poptorch.inferenceModel(model, options)
         validation_model.loadExecutable(valid_filename)
 
         # Make sure the first run doesn't already pass the test.
@@ -129,15 +139,20 @@ def test_export_train_validate_no_python():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-def test_export_train_validate():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_export_train_validate(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
         input, target = _compileAndExport(train_filename)
-        _compileAndExport(valid_filename, training=False)
+        _compileAndExport(valid_filename,
+                          training=False,
+                          trace_model=trace_model)
 
         training_model = poptorch.load(train_filename)
-        validation_model = poptorch.inferenceModel(training_model)
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        validation_model = poptorch.inferenceModel(training_model, options)
         validation_model.model.eval()
         validation_model.loadExecutable(valid_filename)
 
@@ -163,7 +178,8 @@ def test_export_train_validate():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-def test_export_train_save_validate():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_export_train_save_validate(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
@@ -172,6 +188,7 @@ def test_export_train_save_validate():
         training_model = poptorch.load(train_filename)
         opts = poptorch.Options()
         opts.useOfflineIpuTarget(poptorch.ipuHardwareVersion())
+        opts.Jit.traceModel(trace_model)
         validation_model = poptorch.inferenceModel(training_model, opts)
         validation_model.model.eval()
 
@@ -234,12 +251,15 @@ def test_export_train_save_train():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-def test_export_train_save_validate_load_weights():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_export_train_save_validate_load_weights(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
         weights_filename = os.path.join(tmp, "weights.poptorch")
-        _compileAndExport(valid_filename, training=False)
+        _compileAndExport(valid_filename,
+                          training=False,
+                          trace_model=trace_model)
         input, target = _compileAndExport(train_filename)
 
         training_model = poptorch.load(train_filename)

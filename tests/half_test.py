@@ -3,19 +3,23 @@
 
 import os  # pylint: disable=unused-import
 import unittest.mock
+import pytest
 import torch
 import torchvision.models as models
 import helpers
 import poptorch
 
 
-def test_half_float_default_option():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_half_float_default_option(trace_model):
     class SimpleAdder(torch.nn.Module):
         def forward(self, x, y):
             return x + y
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     t1 = torch.tensor([1.]).half()
     t2 = torch.tensor([2.]).float()
@@ -25,13 +29,14 @@ def test_half_float_default_option():
 
     # Refresh and try the other way
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     outHalf = inference_model(t2, t1)
     assert outHalf.dtype == torch.half
 
 
-def test_half_float_downcast_option():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_half_float_downcast_option(trace_model):
     class SimpleAdder(torch.nn.Module):
         def forward(self, x, y):
             return x + y
@@ -40,6 +45,7 @@ def test_half_float_downcast_option():
     opts = poptorch.Options()
     opts.Precision.halfFloatCasting(
         poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)
+    opts.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, opts)
 
     t1 = torch.tensor([1.]).half()
@@ -50,13 +56,16 @@ def test_half_float_downcast_option():
 
     # Refresh and try the other way
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     outHalf = inference_model(t2, t1)
     assert outHalf.dtype == torch.half
 
 
-def test_half_float_upcast_option():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_half_float_upcast_option(trace_model):
     class SimpleAdder(torch.nn.Module):
         def forward(self, x, y):
             return x + y
@@ -65,6 +74,7 @@ def test_half_float_upcast_option():
     opts = poptorch.Options()
     opts.Precision.halfFloatCasting(
         poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
+    opts.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, opts)
 
     t1 = torch.tensor([1.]).half()
@@ -102,11 +112,14 @@ def test_resnet():
     assert loss.dtype == torch.half
 
 
-def test_model_with_weights():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_model_with_weights(trace_model):
     model = torch.nn.Linear(1, 10).half()
     t1 = torch.tensor([1.]).half()
 
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
     out = inference_model(t1)
 
     assert out.dtype == torch.half
@@ -121,13 +134,16 @@ def test_model_with_weights():
                             atol=1e-04)
 
 
-def test_simple_model():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_simple_model(trace_model):
     class SimpleAdder(torch.nn.Module):
         def forward(self, x, y, z, w):
             return x + y + 5, z + w + 5
 
     model = SimpleAdder()
-    inference_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
 
     t1 = torch.tensor([1.]).half()
     t2 = torch.tensor([2.]).half()
@@ -144,13 +160,16 @@ def test_simple_model():
     assert outFloat == 12.0
 
 
-def test_lstm():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm(trace_model):
     torch.manual_seed(42)
     numHidden = 5
     inputSize = 3
     lstm = torch.nn.LSTM(3, numHidden)
     lstm.half()
-    ipuLstm = poptorch.inferenceModel(lstm)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipuLstm = poptorch.inferenceModel(lstm, options)
     inputs = [torch.randn(1, inputSize).half() for _ in range(5)]
     # Add the extra 2nd dimension
     inputs = torch.cat(inputs).view(len(inputs), 1, -1)
@@ -162,20 +181,24 @@ def test_lstm():
     assert isinstance(ipuOut[0], torch.HalfTensor)
 
 
-def test_ipu_print_tensor():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_ipu_print_tensor(trace_model):
     class SimplePrinter(torch.nn.Module):
         def forward(self, x):
             return poptorch.ipu_print_tensor(x)
 
     t1 = torch.tensor([1.], dtype=torch.float16)
-    inference_model = poptorch.inferenceModel(SimplePrinter())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(SimplePrinter(), options)
     out = inference_model(t1)
     assert out == 1.0
     assert out.dtype == torch.float16
 
 
 # pylint: disable=protected-access
-def test_half_tracing():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_half_tracing(trace_model):
     def check_param_types(module, dtype):
         for param in module.parameters():
             assert param.dtype == dtype
@@ -187,25 +210,28 @@ def test_half_tracing():
     model.add_module('linear1', torch.nn.Linear(10, 10))
     model.add_module('linear2', torch.nn.Linear(10, 10))
 
-    popmodel = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+
+    popmodel = poptorch.inferenceModel(model, options)
     popmodel(x)
     check_param_types(popmodel._trace.linear1, torch.float)
     check_param_types(popmodel._trace.linear2, torch.float)
 
     model.linear2.half()
-    popmodel = poptorch.inferenceModel(model)
+    popmodel = poptorch.inferenceModel(model, options)
     popmodel(x)
     check_param_types(popmodel._trace.linear1, torch.float)
     check_param_types(popmodel._trace.linear2, torch.half)
 
     model.half()
-    popmodel = poptorch.inferenceModel(model)
+    popmodel = poptorch.inferenceModel(model, options)
     popmodel(x)
     check_param_types(popmodel._trace.linear1, torch.half)
     check_param_types(popmodel._trace.linear2, torch.half)
 
     model.linear1.float()
-    popmodel = poptorch.inferenceModel(model)
+    popmodel = poptorch.inferenceModel(model, options)
     popmodel(x)
     check_param_types(popmodel._trace.linear1, torch.float)
     check_param_types(popmodel._trace.linear2, torch.half)
@@ -216,7 +242,8 @@ def test_half_tracing():
     check_param_types(popmodel._trace.linear2, torch.float)
 
 
-def test_buffers():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_buffers(trace_model):
     torch.manual_seed(42)
     fake_data = torch.ones(1, 64, 10, 10).half()
 
@@ -239,7 +266,9 @@ def test_buffers():
 
     model.bn.half()
 
-    poptorch_model = poptorch.inferenceModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
     _, ipu_var, ipu_mean = poptorch_model(fake_data)
 
     # We lose some precision in the half conversion.

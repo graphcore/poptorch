@@ -19,7 +19,8 @@ import poptorch
                     reason="Hardware IPU needed")
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_ExecutableCaching(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_ExecutableCaching(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -27,6 +28,7 @@ def test_ExecutableCaching(capfd):
     with tempfile.TemporaryDirectory() as cache:
         opts = poptorch.Options()
         opts.enableExecutableCaching(cache)
+        opts.Jit.traceModel(trace_model)
         m = poptorch.inferenceModel(Model(), opts)
         m.compile(torch.rand(2, 3))
         m.destroy()
@@ -44,7 +46,8 @@ def test_ExecutableCaching(capfd):
                     reason="Hardware IPU needed")
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_ExecutableCaching_env(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_ExecutableCaching_env(capfd, trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -52,6 +55,7 @@ def test_ExecutableCaching_env(capfd):
     with tempfile.TemporaryDirectory() as cache:
         os.environ["POPTORCH_CACHE_DIR"] = cache
         opts = poptorch.Options()
+        opts.Jit.traceModel(trace_model)
         m = poptorch.inferenceModel(Model(), opts)
         m.compile(torch.rand(2, 3))
         m.destroy()
@@ -82,9 +86,11 @@ def _create_model_and_export(opts, filename):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
-def test_offline_ipu_compileAndExport_file(filename=None):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_offline_ipu_compileAndExport_file(trace_model, filename=None):
     # Force-disable the IPU model
     opts = poptorch.Options().useOfflineIpuTarget()
+    opts.Jit.traceModel(trace_model)
 
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
@@ -93,9 +99,11 @@ def test_offline_ipu_compileAndExport_file(filename=None):
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
-def test_precompile_then_load():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_precompile_then_load(trace_model):
     opts = poptorch.Options().useOfflineIpuTarget(
         poptorch.ipuHardwareVersion())
+    opts.Jit.traceModel(trace_model)
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
         _create_model_and_export(opts, filename)
@@ -112,7 +120,8 @@ def test_precompile_then_load():
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
-def test_offline_ipu_compileAndExport_dir():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_offline_ipu_compileAndExport_dir(trace_model):
     class Network(torch.nn.Module):
         def forward(self, x, y):
             return x + y
@@ -120,6 +129,7 @@ def test_offline_ipu_compileAndExport_dir():
     model = Network()
     # Force-disable the IPU model
     opts = poptorch.Options().useOfflineIpuTarget()
+    opts.Jit.traceModel(trace_model)
     poptorch.inferenceModel(model, opts)
 
     inference_model = poptorch.inferenceModel(model, opts)
@@ -135,7 +145,8 @@ def test_offline_ipu_compileAndExport_dir():
         assert len(files) == 1, "Expected exactly 1 file"
 
 
-def test_inference_attributes():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inference_attributes(trace_model):
     class Model(torch.nn.Module):
         def __init__(self, attr):
             super().__init__()
@@ -147,7 +158,9 @@ def test_inference_attributes():
         def forward(self, x, y):
             return x + y + 5
 
-    poptorch_model = poptorch.inferenceModel(Model("MyAttr"))
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model("MyAttr"), options)
 
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
@@ -315,7 +328,8 @@ def test_distributed_compile(capfd):
         includes_compilation = False
 
 
-def test_nondeterministic_warning_filter():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_nondeterministic_warning_filter(trace_model):
     # This simple model generates a few jit warnings including the
     # non-deterministic ones that we filter in poptorch.  This test checks that
     # these additional warnings are still emitted.
@@ -336,9 +350,11 @@ def test_nondeterministic_warning_filter():
 
     jit_warns = set(str(w.message) for w in native_warnings)
 
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     # compile with poptorch and capture all warnings
     with warnings.catch_warnings(record=True) as filtered_warnings:
-        poptorch.inferenceModel(model).compile()
+        poptorch.inferenceModel(model, options).compile()
 
     pop_warns = set(str(w.message) for w in filtered_warnings)
 
@@ -359,12 +375,15 @@ def test_nondeterministic_warning_filter():
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test this feature")
-def test_get_cycles_error_msgs():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_get_cycles_error_msgs(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return x + y
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     error_msg = (r"Cycle count logging is disabled. Please set option " +
                  r"logCycleCount to True to enable.")
@@ -373,6 +392,7 @@ def test_get_cycles_error_msgs():
 
     opts = poptorch.Options()
     opts.logCycleCount(True)
+    opts.Jit.traceModel(trace_model)
 
     inference_model = poptorch.inferenceModel(Model(), options=opts)
 
@@ -396,15 +416,19 @@ def test_get_cycles_error_msgs():
 
 @pytest.mark.skipif(poptorch.ipuHardwareIsAvailable(),
                     reason="Test error message when no hardware")
-def test_get_cycles_no_hw():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_get_cycles_no_hw(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x, y):
             return x + y
 
-    inference_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
 
     opts = poptorch.Options()
     opts.logCycleCount(True)
+    opts.Jit.traceModel(trace_model)
 
     inference_model = poptorch.inferenceModel(Model(), options=opts)
 
