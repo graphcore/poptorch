@@ -119,17 +119,18 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
 
     auto current_dim_size = input_shape.at(current_dim);
     // Handle overreaching and negative shifts.
-    auto current_shift =
-        ((shifts.at(i) % current_dim_size) + current_dim_size) %
-        current_dim_size;
-
+    auto current_shift = (-shifts.at(i) + current_dim_size) % current_dim_size;
     // Duplicate the rolling dimension and then slice based on the shift.
-    auto *duplicated = createConcat(graph, {output, output}, current_dim);
-    auto *start = wrapInConstant1D(graph, current_dim_size - current_shift);
-    auto *end = wrapInConstant1D(graph, 2 * current_dim_size - current_shift);
+    auto *split = wrapInConstant1D(graph, current_shift);
+    auto *start = wrapInConstant1D(graph, 0);
+    auto *end = wrapInConstant1D(graph, current_dim_size);
     auto *axis = wrapInConstant1D(graph, current_dim);
+    auto *first_block = createSlice(graph, {output, start, split, axis});
+    auto *second_block = createSlice(graph, {output, split, end, axis});
     output =
-        createSlice(graph, {duplicated->output(), start, end, axis})->output();
+        createConcat(graph, {second_block->output(), first_block->output()},
+                     current_dim)
+            ->output();
   }
 
   if (reshape_output) {
