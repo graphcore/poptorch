@@ -4,6 +4,7 @@ import torch
 import pytest
 import helpers
 import poptorch
+from poptorch.enums import Compiler
 
 to_test = [
     # Vector-Vector
@@ -32,8 +33,7 @@ def test_matmul(size):
     t1 = torch.randn(size[0])
     t2 = torch.randn(size[1])
 
-    with poptorch.IPUScope([t1, t2],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
+    with poptorch.IPUScope([t1, t2], compile_using=Compiler.MLIR) as ipu:
         out = torch.matmul(t1, t2)
         ipu.outputs([out])
 
@@ -52,3 +52,35 @@ def test_matmul(size):
                             atol=1e-05,
                             rtol=1e-05,
                             equal_nan=True)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.parametrize(
+    "params",
+    [
+        # input_shape, beta, alpha
+        ((3, 7), 1.0, 1.0),
+        ((3, 1), 1.0, 0.75),
+        ((1, 7), 0.75, 1.0),
+        ((1), 0.75, 0.75),
+    ])
+def test_addmm(params):
+    torch.manual_seed(42)
+
+    input_shape, beta, alpha = params
+
+    t1 = torch.randn(input_shape)
+    t2 = torch.randn(3, 5)
+    t3 = torch.randn(5, 7)
+
+    torch_out = torch.addmm(t1, t2, t3, beta=beta, alpha=alpha)
+
+    with poptorch.IPUScope([t1, t2, t3], compile_using=Compiler.MLIR) as ipu:
+        out = torch.addmm(t1, t2, t3, beta=beta, alpha=alpha)
+        ipu.outputs([out])
+
+    poptorch_out = ipu(t1, t2, t3)
+
+    # pylint: disable=no-member
+    helpers.assert_allclose(expected=torch_out, actual=poptorch_out)

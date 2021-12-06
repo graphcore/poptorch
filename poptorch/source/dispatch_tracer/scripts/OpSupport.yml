@@ -172,6 +172,11 @@
   PopTorchDirect: matmul
   UnusedOutputArguments: {out}
 
+# addmm.out(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
+- func: addmm.out
+  PopTorchDirect: addmm
+  UnusedOutputArguments: {out}
+
 # native_batch_norm(Tensor input, Tensor? weight, Tensor? bias,
 #                   Tensor? running_mean, Tensor? running_var,
 #                   bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)

@@ -3,6 +3,11 @@
 #include <poplin/ConvParams.hpp>
 #include <poplin/Convolution.hpp>
 #include <poplin/MatMul.hpp>
+#include <popops/ElementWise.hpp>
+#include <popops/ScaledAdd.hpp>
+#include <poputil/Broadcast.hpp>
+
+namespace pe = popops::expr;
 
 namespace poptorch_ir {
 
@@ -105,6 +110,33 @@ void matmul::lowerToPoplar(CompilerContext &context) {
 
   // Record the result.
   context.tensors.insert({this->result(), out});
+}
+
+void addmm::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor mat1 = context.fromSsa(this->mat1());
+  poplar::Tensor mat2 = context.fromSsa(this->mat2());
+  float beta = this->beta().convertToFloat();
+  float alpha = this->alpha().convertToFloat();
+
+  poplar::Tensor out = poplin::matMul(context.graph, mat1, mat2, context.seq,
+                                      mat1.elementType());
+
+  // alpha * mm
+  if (alpha != 1.0f) {
+    auto expr = pe::Mul(pe::_1, pe::Const(alpha));
+    popops::mapInPlace(context.graph, expr, {out}, context.seq);
+  }
+
+  if (beta != 1.0f) {
+    poputil::broadcastToMatch(out, input);
+    // scaledAdd(alpha * mm, input, beta)
+    popops::scaledAddTo(context.graph, out, input, beta, context.seq);
+  } else {
+    popops::addInPlace(context.graph, out, input, context.seq);
+  }
+
+  context.tensors[this->result()] = out;
 }
 
 } // namespace poptorch_ir

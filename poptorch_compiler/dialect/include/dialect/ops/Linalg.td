@@ -142,3 +142,25 @@ def Poptorch_matmul : Poptorch_Op<"matmul", []> {
         }
     }];
 }
+
+def Poptorch_addmm : Poptorch_Op<"addmm", []> {
+    let arguments = (ins Poptorch_tensor:$input,
+                         Poptorch_tensor:$mat1,
+                         Poptorch_tensor:$mat2,
+                         F32Attr:$beta,
+                         F32Attr:$alpha);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+                                      "mlir::Value":$mat1,
+                                      "mlir::Value":$mat2,
+                                      "float":$beta,
+                                      "float":$alpha),[{
+        $_state.addOperands({input, mat1, mat2});
+        $_state.addAttribute("beta", $_builder.getF32FloatAttr(beta));
+        $_state.addAttribute("alpha", $_builder.getF32FloatAttr(alpha));
+
+        $_state.addTypes(input.getType());
+     }]>
+    ];
+}
