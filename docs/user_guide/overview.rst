@@ -858,7 +858,7 @@ Some operations may result in the model running in float32 where float16 would
 be expected, or vice versa (see :numref:`float_16_op_support` for full details).
 
 Graphcore's tutorials repository contains a walkthrough on using half and mixed precision
-in PopTorch: `Half and mixed precision tutorial <https://github.com/graphcore/tutorials/tree/sdk-release-2.3/tutorials/pytorch/tut3_mixed_precision>`_.
+in PopTorch: `Half and mixed precision tutorial <https://github.com/graphcore/tutorials/tree/sdk-release-2.4/tutorials/pytorch/tut3_mixed_precision>`_.
 
 Automatic mixed-precision casting
 =================================
@@ -1024,7 +1024,7 @@ do this, see the `Custom operators
 chapter of the PopART User Guide.
 
 You can find some examples of PopART custom ops in the `Graphcore GitHub tutorials repository
-<https://github.com/graphcore/tutorials/tree/sdk-release-2.3/feature_examples/popart/custom_operators>`__.
+<https://github.com/graphcore/tutorials/tree/sdk-release-2.4/feature_examples/popart/custom_operators>`__.
 
 Compiling the PopART custom op will create a dynamic library file, which you can
 use with your PyTorch code.
@@ -1068,7 +1068,7 @@ You can also call this custom op inside a training model using
 :py:class:`~poptorch.custom_op` and the backward op will be called automatically.
 
 The Graphcore tutorials repository contains a feature example demonstrating
-how to load and in and use a custom op in a PopTorch model: `PopTorch example: Custom op <https://github.com/graphcore/tutorials/tree/sdk-release-2.3/feature_examples/pytorch/custom_op>`_.
+how to load and in and use a custom op in a PopTorch model: `PopTorch example: Custom op <https://github.com/graphcore/tutorials/tree/sdk-release-2.4/feature_examples/pytorch/custom_op>`_.
 
 Passing attributes to the custom op
 -----------------------------------
