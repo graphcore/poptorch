@@ -19,6 +19,12 @@ namespace poptorch {
 
 namespace {
 
+std::string toString(const at::Tensor &t) {
+  std::stringstream ss;
+  ss << "sizes=" << t.sizes() << ", type=" << t.scalar_type();
+  return ss.str();
+}
+
 c10::intrusive_ptr<at::TensorImpl>
 getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema) {
   logging::trace("[TRACING-2][JIT] Looking for inplace argument in schema {}",
@@ -106,9 +112,10 @@ void JITDispatch::markOutputs(
   for (const at::Tensor &tensor : outputs) {
     torch::jit::Value *val = _mapper.getValueForTensor(tensor);
 
-    logging::trace("[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir {}",
-                   reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-                   val->debugNameBase());
+    logging::trace(
+        "[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} {}",
+        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+        val->debugNameBase(), toString(tensor));
 
     graph.registerOutput(val);
 
@@ -239,9 +246,9 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       val->inferTypeFrom(tensor);
       _mapper.addTensor(tensor, val);
 
-      logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir {}",
+      logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
                      reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-                     val->debugNameBase());
+                     val->debugNameBase(), toString(tensor));
 
       output_index++;
     }
@@ -278,14 +285,14 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
   fixFakeTargetOutput(fake_target, *stack);
-
   logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *fake_target);
 
   // Run our normal canonicalisation passes on it.
   // The original fake_target node will be deleted but replaced with a new node.
   canonicaliseAndFixOutput(schema, *stack, &fake_target);
 
-  logging::trace("[TRACING-2][JIT] Post canonicalisation {}", *fake_target);
+  logging::trace("[TRACING-2][JIT] Post canonicalisation and fix output {}",
+                 *fake_target);
 
   std::size_t i = 0;
   for (c10::IValue value : *stack) {

@@ -51,6 +51,10 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
       axes.push_back(constantToLong(node->input(1)->node()));
     } else {
       axes = constantToLongVec(node->input(1)->node());
+      // PopART doesn't like axes to be empty.
+      if (axes.empty()) {
+        axes.push_back(0);
+      }
     }
 
     keepdim = constantToLong(node->input(2)->node());

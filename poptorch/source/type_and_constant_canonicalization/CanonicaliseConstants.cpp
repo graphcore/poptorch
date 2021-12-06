@@ -276,8 +276,13 @@ public:
     return _all_const_nodes;
   }
 
-  torch::jit::Node *getLastNode() const {
-    ERROR_ON(_last_node == nullptr);
+  torch::jit::Node *getLastNode() {
+    if (_last_node == nullptr) {
+      // There is no last node: it means the list or tuple construction hasn't
+      // been triggered (For example if it's an empty list/tuple).
+      handleTupleOrListConstruction();
+      ERROR_ON(_last_node == nullptr);
+    }
     return _last_node;
   }
 
