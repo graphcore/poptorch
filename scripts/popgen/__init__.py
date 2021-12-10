@@ -98,7 +98,7 @@ class Value:
         self.emit_annotations(tabs, f)
 
         # split tensor and non-tensor arguments
-        if isinstance(self.args[0], NonTensorValue):
+        if not self.args or isinstance(self.args[0], NonTensorValue):
             tensors = []
             non_tensors = [values[arg] for arg in self.args]
             self.tensor_braces = False
@@ -109,7 +109,6 @@ class Value:
             tensors = [values[arg] for arg in self.args[:last_tensor]]
             non_tensors = [values[arg] for arg in self.args[last_tensor:]]
 
-        capital_op = self.op[0].upper() + self.op[1:]
         suffix = ";\n"
         if not root:
             suffix = "->output();\n"
@@ -118,8 +117,12 @@ class Value:
         left_brace = ["{"] if self.tensor_braces else []
         right_brace = ["}"] if self.tensor_braces else []
 
-        self.emit_call("create" + capital_op, ["graph"] + left_brace +
-                       tensors + right_brace + non_tensors, suffix, f)
+        if self.op is None:
+            f.write("nullptr" + suffix)
+        else:
+            capital_op = self.op[0].upper() + self.op[1:]
+            self.emit_call("create" + capital_op, ["graph"] + left_brace +
+                           tensors + right_brace + non_tensors, suffix, f)
 
         return val_id
 
@@ -204,6 +207,8 @@ class Value:
     #
     # Returns a string image of this object. Used for C++ annotations.
     def render(self):
+        if self.op is None:
+            return "<pass through>"
         string = self.op + '('
         for i, arg in enumerate(self.args):
             if i > 0:

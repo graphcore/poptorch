@@ -109,12 +109,17 @@ torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
 
   if (SymbolHandler handler = getHandler(symbol)) {
     new_node = handler(&graph, aten_target);
+    // No new node: keep the existing one.
+    if (new_node == nullptr) {
+      new_node = aten_target;
+    } else {
+      // If we have a new node add it and replace the old use.
+      std::unordered_set<torch::jit::Node *> to_delete;
+      to_delete.insert(aten_target);
 
-    std::unordered_set<torch::jit::Node *> to_delete;
-    to_delete.insert(aten_target);
-
-    // Clean up any dead nodes.
-    searchAndPossiblyDestroy(to_delete);
+      // Clean up any dead nodes.
+      searchAndPossiblyDestroy(to_delete);
+    }
   } else {
     // In the JIT path we are not allowed to fail as we only have the
     // canonicaliser to rely on. In the MLIR path we have our own 1:1 handlers

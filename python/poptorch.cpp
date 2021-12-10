@@ -245,7 +245,7 @@ static auto registry =
         .op("poptorch::end_ipu_block", &nullOp)
         .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
         .op("poptorch::internal_cast", &castOp)
-        .op("popart::nop", &identityOp)
+        .op("poptorch::nop", &identityOp)
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::ctc_beam_search_decoder", &ctcBeamSearchDecoder)
         .op("poptorch::identity_loss", &identityLoss)

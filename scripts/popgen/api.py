@@ -62,6 +62,9 @@ def forward(source, dest):
 #   global_symbols - dictionary of global_symbols from top-level
 def generate(script, namespace, filename, global_symbols=globals()):
     generator.generate(script, namespace, filename, global_symbols)
+    print("File successfullly generated, remember to run "
+          "'./scripts/apply_linters.py -a " + filename +
+          "' before checking the file in")
 
 
 # simplify(name, fn)

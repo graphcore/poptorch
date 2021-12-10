@@ -34,16 +34,9 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   std::vector<std::int64_t> axes{};
   std::int64_t keepdim = 0;
 
-  // Case 2.
-  if (node->inputs().size() == 2) {
-    // Need to use reshape as "Flatten" is for 2D output
-    auto numels_optional = tensor_type->numel();
-    ERROR_ON(!numels_optional);
-    input =
-        createReshape(graph, input, {static_cast<int64_t>(*numels_optional)})
-            ->output();
-    axes = {0};
-  } else {
+  // Case 2 or case 1 with no dimension specified.
+  bool flatten = node->inputs().size() == 2;
+  if (!flatten) {
     // Case 1.
     // Sometimes the dimensions are just one int.
 
@@ -51,13 +44,22 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
       axes.push_back(constantToLong(node->input(1)->node()));
     } else {
       axes = constantToLongVec(node->input(1)->node());
-      // PopART doesn't like axes to be empty.
+      // No dimension specified: this is actually a case 1.
       if (axes.empty()) {
-        axes.push_back(0);
+        flatten = true;
       }
     }
-
     keepdim = constantToLong(node->input(2)->node());
+  }
+  if (flatten) {
+    // Need to use reshape as "Flatten" is for 2D output
+    auto numels_optional = tensor_type->numel();
+    ERROR_ON(!numels_optional);
+    input =
+        createReshape(graph, input, {static_cast<int64_t>(*numels_optional)})
+            ->output();
+    axes = {0};
+    keepdim = 0;
   }
 
   // Output the correct reduction.

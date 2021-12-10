@@ -147,7 +147,7 @@ def nop(tensor: "torch.Tensor") -> "torch.Tensor":
     :param tensor: the tensor to pass to the no-op.
     :returns: The same tensor which was input.
     """
-    return torch.ops.popart.nop(tensor)
+    return torch.ops.poptorch.nop(tensor)
 
 
 def recomputationCheckpoint(*tensors: List["torch.Tensor"]

@@ -13,7 +13,13 @@ namespace poptorch {
 
 namespace {
 
-torch::jit::Node *beginipublockHandler(torch::jit::Graph *graph,
+torch::jit::Node *beginAutocastHandler(torch::jit::Graph * /*graph*/,
+                                       torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *beginIpuBlockHandler(torch::jit::Graph *graph,
                                        torch::jit::Node *node) {
   auto *x = node->input(0);
   auto t0 = constantToLong(x->node());
@@ -25,7 +31,13 @@ torch::jit::Node *beginipublockHandler(torch::jit::Graph *graph,
   return createBeginIpuBlock(graph, t0, t1, t2);
 }
 
-torch::jit::Node *callcpuopHandler(torch::jit::Graph *graph,
+torch::jit::Node *beginMultiConvHandler(torch::jit::Graph * /*graph*/,
+                                        torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *callCpuOpHandler(torch::jit::Graph *graph,
                                    torch::jit::Node *node) {
   auto *x = node->input(0);
   auto t0 = handleTensorList(x->node());
@@ -36,7 +48,13 @@ torch::jit::Node *callcpuopHandler(torch::jit::Graph *graph,
   return createCallCpuOp(graph, t0, t1, original_node);
 }
 
-torch::jit::Node *endforloopHandler(torch::jit::Graph *graph,
+torch::jit::Node *endCpuOpHandler(torch::jit::Graph * /*graph*/,
+                                  torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *endForLoopHandler(torch::jit::Graph *graph,
                                     torch::jit::Node *node) {
   auto *output = node->input(0);
   auto *inputs = node->input(1);
@@ -46,7 +64,19 @@ torch::jit::Node *endforloopHandler(torch::jit::Graph *graph,
   return createEndForLoop(graph, output, inputs, t0);
 }
 
-torch::jit::Node *identitylossHandler(torch::jit::Graph *graph,
+torch::jit::Node *endIpuBlockHandler(torch::jit::Graph * /*graph*/,
+                                     torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *endLoopBeginHandler(torch::jit::Graph * /*graph*/,
+                                      torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *identityLossHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   auto *x = node->input(0);
   auto *r = node->input(1);
@@ -55,7 +85,7 @@ torch::jit::Node *identitylossHandler(torch::jit::Graph *graph,
   return createIdentityloss(graph, {x}, t0);
 }
 
-torch::jit::Node *internalcastHandler(torch::jit::Graph *graph,
+torch::jit::Node *internalCastHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   auto *tensor = node->input(0);
   auto *dtype = node->input(1);
@@ -64,7 +94,7 @@ torch::jit::Node *internalcastHandler(torch::jit::Graph *graph,
   return createInternalCast(graph, tensor, t0);
 }
 
-torch::jit::Node *ipuprinttensorHandler(torch::jit::Graph *graph,
+torch::jit::Node *ipuPrintTensorHandler(torch::jit::Graph *graph,
                                         torch::jit::Node *node) {
   auto *x = node->input(0);
   auto *s = node->input(1);
@@ -73,7 +103,13 @@ torch::jit::Node *ipuprinttensorHandler(torch::jit::Graph *graph,
   return createPrintIpuTensor(graph, x, t0);
 }
 
-torch::jit::Node *optimizergroupHandler(torch::jit::Graph *graph,
+torch::jit::Node *nopHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  auto *x = node->input(0);
+  // nop(x)
+  return createNop(graph, {x});
+}
+
+torch::jit::Node *optimizerGroupHandler(torch::jit::Graph *graph,
                                         torch::jit::Node *node) {
   auto *x = node->input(0);
   auto t0 = constantToLong(x->node());
@@ -83,14 +119,26 @@ torch::jit::Node *optimizergroupHandler(torch::jit::Graph *graph,
   return createOptimizerGroup(graph, t0, t1);
 }
 
-torch::jit::Node *recomputationcheckpointHandler(torch::jit::Graph *graph,
+torch::jit::Node *popNameScopeHandler(torch::jit::Graph * /*graph*/,
+                                      torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *recomputationCheckpointHandler(torch::jit::Graph *graph,
                                                  torch::jit::Node *node) {
   auto *i0 = node->input(0);
   // recomputationCheckpoint(i0)
   return createRecomputationCheckpoint(graph, i0);
 }
 
-torch::jit::Node *setavailablememoryHandler(torch::jit::Graph *graph,
+torch::jit::Node *restoreAutocastHandler(torch::jit::Graph * /*graph*/,
+                                         torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *setAvailableMemoryHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
   auto *x = node->input(0);
   auto *y = node->input(1);
@@ -99,7 +147,7 @@ torch::jit::Node *setavailablememoryHandler(torch::jit::Graph *graph,
   return createSetAvailableMemory(graph, x, t0);
 }
 
-torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
+torch::jit::Node *setMatmulSerializationHandler(torch::jit::Graph *graph,
                                                 torch::jit::Node *node) {
   auto *x = node->input(0);
   auto *s = node->input(1);
@@ -112,7 +160,19 @@ torch::jit::Node *setmatmulserializationHandler(torch::jit::Graph *graph,
   return createSetMatMulSerialization(graph, x, t0, t1, t2 != 0);
 }
 
-torch::jit::Node *updateparaminplaceHandler(torch::jit::Graph *graph,
+torch::jit::Node *startIfTrueHandler(torch::jit::Graph * /*graph*/,
+                                     torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *suppressAutocastHandler(torch::jit::Graph * /*graph*/,
+                                          torch::jit::Node * /*node*/) {
+  // <pass through>
+  return nullptr;
+}
+
+torch::jit::Node *updateParamInplaceHandler(torch::jit::Graph *graph,
                                             torch::jit::Node *node) {
   auto *i0 = node->input(0);
   auto *i1 = node->input(1);
@@ -123,21 +183,32 @@ torch::jit::Node *updateparaminplaceHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
-  registerHandler(symbols::poptorch::begin_ipu_block, beginipublockHandler);
-  registerHandler(symbols::poptorch::call_cpu_op, callcpuopHandler);
-  registerHandler(symbols::poptorch::end_for_loop, endforloopHandler);
-  registerHandler(symbols::poptorch::identity_loss, identitylossHandler);
-  registerHandler(symbols::poptorch::internal_cast, internalcastHandler);
-  registerHandler(symbols::poptorch::ipu_print_tensor, ipuprinttensorHandler);
-  registerHandler(symbols::poptorch::optimizer_group, optimizergroupHandler);
+  registerHandler(symbols::poptorch::begin_autocast, beginAutocastHandler);
+  registerHandler(symbols::poptorch::begin_ipu_block, beginIpuBlockHandler);
+  registerHandler(symbols::poptorch::begin_multi_conv, beginMultiConvHandler);
+  registerHandler(symbols::poptorch::call_cpu_op, callCpuOpHandler);
+  registerHandler(symbols::poptorch::end_cpu_op, endCpuOpHandler);
+  registerHandler(symbols::poptorch::end_for_loop, endForLoopHandler);
+  registerHandler(symbols::poptorch::end_ipu_block, endIpuBlockHandler);
+  registerHandler(symbols::poptorch::end_loop_begin, endLoopBeginHandler);
+  registerHandler(symbols::poptorch::identity_loss, identityLossHandler);
+  registerHandler(symbols::poptorch::internal_cast, internalCastHandler);
+  registerHandler(symbols::poptorch::ipu_print_tensor, ipuPrintTensorHandler);
+  registerHandler(symbols::poptorch::nop, nopHandler);
+  registerHandler(symbols::poptorch::optimizer_group, optimizerGroupHandler);
+  registerHandler(symbols::poptorch::pop_name_scope, popNameScopeHandler);
   registerHandler(symbols::poptorch::recomputation_checkpoint,
-                  recomputationcheckpointHandler);
+                  recomputationCheckpointHandler);
+  registerHandler(symbols::poptorch::restore_autocast, restoreAutocastHandler);
   registerHandler(symbols::poptorch::set_available_memory,
-                  setavailablememoryHandler);
+                  setAvailableMemoryHandler);
   registerHandler(symbols::poptorch::set_matmul_serialization,
-                  setmatmulserializationHandler);
+                  setMatmulSerializationHandler);
+  registerHandler(symbols::poptorch::start_if_true, startIfTrueHandler);
+  registerHandler(symbols::poptorch::suppress_autocast,
+                  suppressAutocastHandler);
   registerHandler(symbols::poptorch::update_param_inplace,
-                  updateparaminplaceHandler);
+                  updateParamInplaceHandler);
 }
 
 } // namespace poptorch

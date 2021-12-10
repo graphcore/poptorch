@@ -66,9 +66,11 @@ namespace symbols {
 } // namespace symbols
 
 namespace symbols::poptorch {
+extern c10::Symbol nop;
 extern c10::Symbol begin_ipu_block;
 extern c10::Symbol internal_cast;
 extern c10::Symbol end_ipu_block;
+extern c10::Symbol end_loop_begin;
 extern c10::Symbol identity_loss;
 extern c10::Symbol set_available_memory;
 extern c10::Symbol set_matmul_serialization;

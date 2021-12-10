@@ -154,5 +154,8 @@ class OperatorFactory:
         check_operator_signature(value, poptorch.signatures)
         return value
 
+    def passThrough(self):
+        return Value(None, [])
+
 
 op = OperatorFactory()

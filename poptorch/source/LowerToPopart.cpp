@@ -918,7 +918,7 @@ void LowerToPopartImpl::lowerBody() {
           node->s(c10::Symbol::fromQualString("attr::key"));
       _compiler.clearAttribute(attribute.c_str(), key.c_str());
     } else {
-      ERROR("Couldn't find a registered operation for node");
+      ERROR("Couldn't find a registered operation for node " << *node);
     }
   }
 }

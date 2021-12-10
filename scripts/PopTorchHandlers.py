@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import os
 
 from popgen.api import expand, convert, generate
 from popgen.helpers import cfloat, cint, clong, cstr, tensor_list
 from popgen.values import OriginalNode
 from popgen.operatorfactory import op
+from utils import _utils
 
 script = "PopTorchHandlers.py"
-output_dir = "poptorch/source/popart_canonicalization"
+output_dir = os.path.join(_utils.sources_dir(),
+                          "poptorch/source/popart_canonicalization")
 
 convert("recomputation_checkpoint", 1, "recomputationCheckpoint")
 convert("update_param_inplace", 2, "copyvarupdate")
@@ -31,6 +34,20 @@ expand(
 expand(
     "end_for_loop", lambda output, inputs, trip_count: op.endForLoop(
         output, inputs, clong(trip_count)))
+
+expand("nop", op.nop)
+
+# These are graph annotations: they don't take any arguments and don't return
+# anything: we just want to pass them through to the lowering stage.
+expand("end_ipu_block", op.passThrough)
+expand("end_loop_begin", op.passThrough)
+expand("start_if_true", op.passThrough)
+expand("begin_multi_conv", op.passThrough)
+expand("pop_name_scope", op.passThrough)
+expand("begin_autocast", op.passThrough)
+expand("suppress_autocast", op.passThrough)
+expand("restore_autocast", op.passThrough)
+expand("end_cpu_op", op.passThrough)
 
 generate(script, "symbols::poptorch", output_dir + "/PoptorchHandlers.gen.cpp",
          globals())

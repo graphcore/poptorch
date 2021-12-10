@@ -398,3 +398,70 @@ TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse2, m) {
   // Once we have our own device target we can target this kernel.
   // m.impl("convolution_overrideable", &poptorch::convolutionKernel);
 }
+
+TORCH_LIBRARY_IMPL(poptorch, PrivateUse2, m) {
+  m.impl("ipu_print_tensor",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("nop",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("begin_ipu_block",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("end_ipu_block",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("internal_cast",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("custom_operation",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("ctc_beam_search_decoder",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("identity_loss",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("while_loop_begin",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("end_loop_begin",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("start_if_true",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("start_if_false",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("end_if",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("start_for_loop",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("end_for_loop",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("optimizer_group",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("set_matmul_serialization",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("set_overlap_for_input",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("set_overlap_for_output",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("recomputation_checkpoint",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("set_available_memory",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("begin_multi_conv",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("end_multi_conv",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("push_name_scope",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("pop_name_scope",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("begin_autocast",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("suppress_autocast",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("restore_autocast",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("end_cpu_op",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("call_cpu_op",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("set_attribute",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("clear_attribute",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+}

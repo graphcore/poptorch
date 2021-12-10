@@ -126,9 +126,11 @@ static void initializeSupportedOperations() {
 
 namespace poptorch {
 
+c10::Symbol nop;
 c10::Symbol begin_ipu_block;
 c10::Symbol internal_cast;
 c10::Symbol end_ipu_block;
+c10::Symbol end_loop_begin;
 c10::Symbol identity_loss;
 c10::Symbol set_available_memory;
 c10::Symbol set_matmul_serialization;
@@ -172,9 +174,11 @@ __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
 static void initializePoptorchSymbols() {
   // clang-format on
   logging::trace("Initializing poptorch symbols");
+  SYMBOL_INIT(poptorch, nop);
   SYMBOL_INIT(poptorch, begin_ipu_block);
   SYMBOL_INIT(poptorch, internal_cast);
   SYMBOL_INIT(poptorch, end_ipu_block);
+  SYMBOL_INIT(poptorch, end_loop_begin);
   SYMBOL_INIT(poptorch, identity_loss);
   SYMBOL_INIT(poptorch, set_available_memory);
   SYMBOL_INIT(poptorch, set_matmul_serialization);
