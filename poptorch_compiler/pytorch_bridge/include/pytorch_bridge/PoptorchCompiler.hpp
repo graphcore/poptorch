@@ -3,6 +3,7 @@
 #define POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_HPP_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 

@@ -112,8 +112,17 @@ for key in json_in.keys():
                 is_optional = "Optional" in type_info[
                     "!superclasses"] and type_info["baseType"][
                         "def"] in decl_types
+
+                is_optional_attr = "OptionalAttr" in type_info[
+                    "!superclasses"] and type_info["baseAttr"][
+                        "def"] in decl_types
+
                 if is_optional:
                     arg_type = decl_types[type_info["baseType"]["def"]]
+
+                if is_optional_attr:
+                    arg_type = "OPTIONAL_" + decl_types[type_info["baseAttr"]
+                                                        ["def"]]
 
             else:
                 arg_type = decl_types[arg_type]
@@ -155,6 +164,7 @@ builder_call_translations = {
     "LONG_VEC": "const std::vector<std::int64_t> &",
     "INT": "std::int32_t",
     "LONG": "std::int64_t",
+    "OPTIONAL_LONG": "std::optional<std::int64_t>",
     "FLOAT": "float",
     "STRING": "const char *",
     "TENSOR": "poptorch_ir::TensorId",
@@ -254,6 +264,7 @@ disptach_cxx_cases = {
     "LONG_VEC": "const std::vector<std::int64_t> &",
     "INT": "std::int32_t",
     "LONG": "std::int64_t",
+    "OPTIONAL_LONG": "std::optional<std::int64_t>",
     "FLOAT": "float",
     "STRING": "const char*",
     "BOOL": "bool",

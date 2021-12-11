@@ -7,25 +7,48 @@ import helpers
 import poptorch
 from poptorch.enums import Compiler
 
+spatial_dim_map = {
+    nn.MaxPool1d: 1,
+    nn.MaxPool2d: 2,
+    nn.MaxPool3d: 3,
+    nn.AvgPool1d: 1,
+    nn.AvgPool2d: 2,
+    nn.AvgPool3d: 3,
+    nn.AdaptiveAvgPool1d: 1,
+    nn.AdaptiveAvgPool2d: 2,
+    nn.AdaptiveAvgPool3d: 3,
+}
+
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
-@pytest.mark.parametrize("op", [(nn.MaxPool1d, 1), (nn.MaxPool2d, 2),
-                                (nn.MaxPool3d, 3)])
 @pytest.mark.parametrize(
     "params",
     [
-        # kernel_size, stride, padding, ceil_mode
-        (3, 2, 0, False),
-        (3, 2, 0, True),
-        ((3, 2, 2), (2, 1, 2), 0, False),
-        (3, 2, 1, False),
+        # op, kernel_size, stride, padding, ceil_mode, count_include_pad
+        (3, 2, 0, False, True),
+        (3, 2, 0, True, True),
+        ((3, 2, 2), (2, 1, 2), 0, False, True),
+        (3, 2, 1, False, True),
+        (3, 2, 0, False, False),
     ])
-def test_max_pool(op, params):
+@pytest.mark.parametrize("op", [
+    nn.MaxPool1d,
+    nn.MaxPool2d,
+    nn.MaxPool3d,
+    nn.AvgPool1d,
+    nn.AvgPool2d,
+    nn.AvgPool3d,
+])
+def test_pool(op, params):
     torch.manual_seed(42)
 
-    pool_op, spatial_dims = op
-    kernel_size, stride, padding, ceil_mode = params
+    spatial_dims = spatial_dim_map[op]
+
+    kernel_size, stride, padding, ceil_mode, count_include_pad = params
+    extra_args = {}
+    if op in (nn.AvgPool1d, nn.AvgPool2d, nn.AvgPool3d):
+        extra_args["count_include_pad"] = count_include_pad
     if isinstance(kernel_size, tuple):
         kernel_size = kernel_size[:spatial_dims]
         stride = stride[:spatial_dims]
@@ -34,7 +57,7 @@ def test_max_pool(op, params):
     shape.extend([10 for _ in range(spatial_dims)])
     t = torch.randn(shape)
 
-    pool = pool_op(kernel_size, stride, padding, ceil_mode=ceil_mode)
+    pool = op(kernel_size, stride, padding, ceil_mode=ceil_mode, **extra_args)
 
     # Run pytorch native on CPU.
     torch_out = pool(t)
@@ -50,30 +73,23 @@ def test_max_pool(op, params):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
 @pytest.mark.parametrize(
-    "params",
-    [
-        # op, spatial dims
-        (nn.AdaptiveAvgPool1d, 1),
-        (nn.AdaptiveAvgPool2d, 2),
-        (nn.AdaptiveAvgPool3d, 3),
-    ])
-def test_adaptive_avg_pool(params):
+    "op", [nn.AdaptiveAvgPool1d, nn.AdaptiveAvgPool2d, nn.AdaptiveAvgPool3d])
+def test_adaptive_avg_pool(op):
     torch.manual_seed(42)
     # AdaptiveAvgPool1d: [1, 2, 4]       -> [1, 2, 2]
     # AdaptiveAvgPool2d: [1, 2, 4, 6]    -> [1, 2, 2, 3]
     # AdaptiveAvgPool3d: [1, 2, 4, 6, 8] -> [1, 2, 2, 3, 4]
     # TODO(T31335): Match PyTorch's implementation so that we can test cases where
     #               input dims are not divisible by corresponding output dims
-
-    pool_op, n_output_dims = params
+    spatial_dims = spatial_dim_map[op]
 
     shape = [1, 2]
-    shape.extend([2 * i + 4 for i in range(n_output_dims)])
+    shape.extend([2 * i + 4 for i in range(spatial_dims)])
 
     t = torch.randn(shape)
-    output_size = [i + 2 for i in range(n_output_dims)]
+    output_size = [i + 2 for i in range(spatial_dims)]
 
-    pool = pool_op(output_size)
+    pool = op(output_size)
     # Run pytorch native on CPU.
     torch_out = pool(t)
 

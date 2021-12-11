@@ -3,6 +3,7 @@
 
 #include <limits>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -714,6 +715,13 @@ inline std::vector<std::int64_t> toIntVector(c10::IValue &value) {
 inline std::int64_t toInt(c10::IValue &value) { return value.toInt(); }
 
 inline bool toBool(c10::IValue &value) { return value.toBool(); }
+
+inline std::optional<std::int64_t> toOptionalInt(c10::IValue &value) {
+  if (value.isNone()) {
+    return std::nullopt;
+  }
+  return value.toInt();
+}
 
 inline double toDouble(c10::IValue &value) {
   if (value.isDouble()) {

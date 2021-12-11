@@ -1,24 +1,21 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include <llvm/ADT/APInt.h>
+
 #include <poplar/Graph.hpp>
 #include <popnn/Pooling.hpp>
+#include <popops/Pad.hpp>
 
 #include "lower_to_poplar/CompilerHelpers.hpp"
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch_ir {
 
-poplar::Tensor maxPool(CompilerContext &context, const poplar::Tensor &input,
-                       const std::vector<std::size_t> &kernel_size,
-                       const std::vector<unsigned> &stride,
-                       const std::vector<std::size_t> &padding,
-                       const std::vector<std::size_t> &dilation,
-                       bool ceil_mode) {
-  for (auto d : dilation) {
-    ERROR_ON_MSG(
-        d != 1,
-        "Pooling dilations of value other than 1 are currently not supported.");
-  }
-
+template <typename RemainderFn>
+poplar::Tensor pool(CompilerContext &context, const poplar::Tensor &input,
+                    const std::vector<std::size_t> &kernel_size,
+                    const std::vector<unsigned> &stride,
+                    const std::vector<std::size_t> &padding, bool ceil_mode,
+                    popnn::PoolingType pool_type, RemainderFn &&remainder_fn) {
   auto input_shape = input.shape();
   std::size_t n_spatial_dims = kernel_size.size();
 
@@ -36,10 +33,8 @@ poplar::Tensor maxPool(CompilerContext &context, const poplar::Tensor &input,
     if (ceil_mode) {
       // Calculate the remainder from the division portion of the output size
       // calculation (from
-      // https://pytorch.org/docs/stable/generated/torch.nn.MaxPool1d.html)
-      std::size_t remainder = (input_shape[2 + s] + 2 * padding[s] -
-                               dilation[s] * (kernel_size[s] - 1) - 1) %
-                              stride[s];
+      // https://pytorch.org/docs/stable/generated/torch.nn.AvgPool1d.html)
+      std::size_t remainder = remainder_fn(s);
       // ceil_mode only makes a difference if ceil(x) != floor(x)
       if (remainder > 0) {
         extra_ceil_pad = stride[s] - remainder;
@@ -47,31 +42,45 @@ poplar::Tensor maxPool(CompilerContext &context, const poplar::Tensor &input,
     }
     padding_lower.push_back(padding[s]);
     padding_upper.push_back(padding[s] + extra_ceil_pad);
-    input_size.push_back(input_shape[2 + s]);
+    input_size.push_back(input.shape()[2 + s]);
   }
 
   popnn::pooling::PoolParams pool_params{
-      popnn::PoolingType::MAX, input_size,    kernel_size,    stride,
-      padding_lower,           padding_upper, input_shape[1], /* num_channels */
-      input_shape[0],                                         /* batch_size */
+      pool_type,          input_size,    kernel_size,    stride,
+      padding_lower,      padding_upper, input_shape[1], /* num_channels */
+      input_shape[0],                                    /* batch_size */
       input.elementType()};
 
   return popnn::pooling::pool(context.graph, pool_params, input, context.seq);
 }
 
-void max_pool1d::lowerToPoplar(CompilerContext &context) {
+void avg_pool::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input = context.fromSsa(this->input());
   auto kernel_size = convertIntArray<std::size_t>(this->kernel_size());
   auto stride = convertIntArray<unsigned>(this->stride());
   auto padding = convertIntArray<std::size_t>(this->padding());
-  auto dilation = convertIntArray<std::size_t>(this->dilation());
   bool ceil_mode = this->ceil_mode();
+  if (this->count_include_pad()) {
+    std::vector<std::ptrdiff_t> pad_vec = {0, 0};
+    std::copy(padding.begin(), padding.end(), std::back_inserter(pad_vec));
+    input = popops::pad(context.graph, input, pad_vec, pad_vec);
+    for (auto &dim : padding) {
+      dim = 0;
+    }
+  }
+  llvm::Optional<std::uint64_t> divisor_override = this->divisor_override();
+  ERROR_ON_MSG(divisor_override.hasValue(),
+               "divisor_override is not supported for average pooling.");
 
-  context.tensors[this->result()] = maxPool(context, input, kernel_size, stride,
-                                            padding, dilation, ceil_mode);
+  auto remainder_fn = [&](std::size_t s) {
+    return (input.shape()[2 + s] + 2 * padding[s] - kernel_size[s]) % stride[s];
+  };
+  context.tensors[this->result()] =
+      pool(context, input, kernel_size, stride, padding, ceil_mode,
+           popnn::PoolingType::AVG, remainder_fn);
 }
 
-void max_pool2d::lowerToPoplar(CompilerContext &context) {
+void max_pool::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input = context.fromSsa(this->input());
   auto kernel_size = convertIntArray<std::size_t>(this->kernel_size());
   auto stride = convertIntArray<unsigned>(this->stride());
@@ -79,28 +88,29 @@ void max_pool2d::lowerToPoplar(CompilerContext &context) {
   auto dilation = convertIntArray<std::size_t>(this->dilation());
   bool ceil_mode = this->ceil_mode();
 
-  context.tensors[this->result()] = maxPool(context, input, kernel_size, stride,
-                                            padding, dilation, ceil_mode);
-}
+  for (auto d : dilation) {
+    ERROR_ON_MSG(
+        d != 1,
+        "Pooling dilations of value other than 1 are currently not supported.");
+  }
 
-void max_pool3d::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-  auto kernel_size = convertIntArray<std::size_t>(this->kernel_size());
-  auto stride = convertIntArray<unsigned>(this->stride());
-  auto padding = convertIntArray<std::size_t>(this->padding());
-  auto dilation = convertIntArray<std::size_t>(this->dilation());
-  bool ceil_mode = this->ceil_mode();
-
-  context.tensors[this->result()] = maxPool(context, input, kernel_size, stride,
-                                            padding, dilation, ceil_mode);
+  auto remainder_fn = [&](std::size_t s) {
+    return (input.shape()[2 + s] + 2 * padding[s] -
+            dilation[s] * (kernel_size[s] - 1) - 1) %
+           stride[s];
+  };
+  context.tensors[this->result()] =
+      pool(context, input, kernel_size, stride, padding, ceil_mode,
+           popnn::PoolingType::MAX, remainder_fn);
 }
 
 // Implemented using average pooling until adaptive pooling is
 // available in poplibs. This means the output will match PyTorch as
 // long as the input dimensions are divisible by the output dimensions
-poplar::Tensor adaptiveAvgPool(CompilerContext &context,
-                               const poplar::Tensor &input,
-                               const std::vector<std::size_t> &output_size) {
+void adaptive_avg_pool::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  std::vector<std::size_t> output_size =
+      convertIntArray<std::size_t>(this->output_size());
   std::size_t n_spatial_dims = output_size.size();
   std::vector<unsigned> stride(n_spatial_dims);
   std::vector<std::size_t> kernel_shape(n_spatial_dims);
@@ -139,34 +149,8 @@ poplar::Tensor adaptiveAvgPool(CompilerContext &context,
                                          input_shape[0], /* batch_size */
                                          input.elementType()};
 
-  return popnn::pooling::pool(context.graph, pool_params, input, context.seq);
-}
-
-void adaptive_avg_pool1d::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-
-  std::vector<std::size_t> output_size =
-      convertIntArray<std::size_t>(this->output_size());
   context.tensors[this->result()] =
-      adaptiveAvgPool(context, input, output_size);
-}
-
-void adaptive_avg_pool2d::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-
-  std::vector<std::size_t> output_size =
-      convertIntArray<std::size_t>(this->output_size());
-  context.tensors[this->result()] =
-      adaptiveAvgPool(context, input, output_size);
-}
-
-void adaptive_avg_pool3d::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->input());
-
-  std::vector<std::size_t> output_size =
-      convertIntArray<std::size_t>(this->output_size());
-  context.tensors[this->result()] =
-      adaptiveAvgPool(context, input, output_size);
+      popnn::pooling::pool(context.graph, pool_params, input, context.seq);
 }
 
 } // namespace poptorch_ir

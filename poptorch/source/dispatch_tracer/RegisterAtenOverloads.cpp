@@ -334,6 +334,12 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("dropout",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
+  m.impl("avg_pool2d.out",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("avg_pool3d.out",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
   m.impl("max_pool1d",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
