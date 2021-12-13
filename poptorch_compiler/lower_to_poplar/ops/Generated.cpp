@@ -311,18 +311,6 @@ void cosh::lowerToPoplar(CompilerContext & /*context*/) {
                   "cosh"
                   " is currently unimplemented.");
 }
-void reducemean::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "cosh"
-                  " is currently unimplemented.");
-}
-void reducesum::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "cosh"
-                  " is currently unimplemented.");
-}
 void eyelike::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

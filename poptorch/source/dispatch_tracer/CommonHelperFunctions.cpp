@@ -159,4 +159,33 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
   return createAtenTarget(graph, schema, inputs, stack, mapper);
 }
 
+c10::intrusive_ptr<at::TensorImpl>
+getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema) {
+  logging::trace("[TRACING-2][JIT] Looking for inplace argument in schema {}",
+                 schema);
+
+  for (std::size_t arg = 0; arg < schema.arguments().size(); ++arg) {
+    const c10::Argument &argument = schema.arguments()[arg];
+    c10::IValue value = stack[arg];
+
+    if (value.isTensor()) {
+      at::Tensor tensor = value.toTensor();
+
+      // Undefined tensors are optional tensors.
+      if (!tensor.defined()) {
+        continue;
+      }
+
+      if (argument.alias_info() && argument.alias_info()->isWrite()) {
+        // We just return the first inplace argument but more than one can
+        // technically be inplace.
+        return tensor.getIntrusivePtr();
+      }
+    }
+  }
+
+  // Assigned null in constructor.
+  return {};
+}
+
 } // namespace poptorch

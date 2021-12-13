@@ -832,44 +832,6 @@ def Poptorch_less : Poptorch_Op<"less", []> {
 
 }
 
-def Poptorch_reducemean : Poptorch_Op<"reducemean", []> {
-    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$axes, BoolAttr:$keepdim);
-
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values,
-                                      "const std::vector<std::int64_t>&":$axes,
-                                      "std::int64_t":$keepdim),[{
-        $_state.addOperands(values);
-        $_state.addAttribute("axes", $_builder.getI64ArrayAttr(axes));
-        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-}
-
-def Poptorch_reducesum : Poptorch_Op<"reducesum", []> {
-    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$axes, BoolAttr:$keepdim);
-
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values,
-                                      "const std::vector<std::int64_t>&":$axes,
-                                      "std::int64_t":$keepdim),[{
-        $_state.addOperands(values);
-        $_state.addAttribute("axes", $_builder.getI64ArrayAttr(axes));
-        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-}
-
 def Poptorch_maxunpool : Poptorch_Op<"maxunpool", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$kernel_shape, I64ArrayAttr:$pads, I64ArrayAttr:$strides);
   let results = (outs Poptorch_tensor:$result);

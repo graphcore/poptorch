@@ -31,6 +31,11 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
                                   c10::Stack *stack, torch::jit::Graph &graph,
                                   ValueMapper &mapper);
 
+// From the schema deduce which argument if any is inplace. Only return the
+// first one which is inplace.
+c10::intrusive_ptr<at::TensorImpl>
+getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema);
+
 } // namespace poptorch
 
 #endif // POPTORCH_DISPATCH_COMMON_HELPERS_HPP_

@@ -229,3 +229,33 @@ def Poptorch_scaledadd_: Poptorch_scaled<"scaled_add_"> {}
 
 def Poptorch_scaledsub_: Poptorch_scaled<"scaled_sub_"> {}
 
+class Poptorch_addcX<string name> : Poptorch_Op<name, []> {
+    let arguments = (ins Poptorch_tensor:$input, Poptorch_tensor:$tensor1, Poptorch_tensor:$tensor2, F32Attr:$value);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2, "float":$value),[{
+        $_state.addOperands({input, tensor1, tensor2});
+        $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
+     }]>
+    ];
+}
+
+
+class Poptorch_addcOutplaceX<string name> : Poptorch_addcX<name> {
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2, "float":$value),[{
+        $_state.addOperands({input, tensor1, tensor2});
+        $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
+        $_state.addTypes(input.getType());
+     }]>
+    ];
+}
+
+// aten::addcmul.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!)
+def Poptorch_addcmul : Poptorch_addcOutplaceX<"addcmul"> {}
+def Poptorch_addcmul_ : Poptorch_addcX<"addcmul_"> {}
+
+
+// aten::addcdiv.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
+def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
+def Poptorch_addcdiv_ : Poptorch_addcX<"addcdiv_"> {}

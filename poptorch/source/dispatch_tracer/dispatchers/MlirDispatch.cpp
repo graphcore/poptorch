@@ -421,6 +421,11 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
   // the "last".
   poptorch_ir::TensorId output_id = poptorch_ir::tensor_error_id;
 
+  // Run through the schema to find out if one of the operators is supposed to
+  // be inplace.
+  c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
+      getInplaceArgument(stack, schema);
+
   // We use the last processed node as the start point for the jit. This is the
   // last node which has been added to the graph, so we can tell what nodes have
   // just been added.
@@ -476,7 +481,8 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
       // Call the normal PopART handler.
       output_id = jit_handler->second(*itr, mlir_ids);
     } else if (kind == symbols::popart::identityloss) {
-      // Full reduction.
+      // We treat identity loss as a special case so we can directly handle the
+      // reductions.
       std::vector<std::int64_t> axes = _compiler.getSize(mlir_ids[0]);
 
       for (std::size_t i = 0; i < axes.size(); ++i) {
@@ -508,9 +514,26 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
     }
   }
 
-  // JIT cannot be inplace.
-  at::Tensor new_output = at::native::empty_cpu(shape);
-  new_output.set_requires_grad(requires_grad);
+  // The output to return
+  at::Tensor new_output;
+
+  // If we are inplace copy the result into that tensor.
+  if (inplace_tensor) {
+    new_output = outputIsInplaceOf(output_id, at::Tensor{inplace_tensor});
+  } else {
+    poptorch_ir::Type compiler_type = _compiler.getType(output_id);
+    auto dtype = compilerTypeToScalarType(compiler_type);
+
+    // Otherwise create a tensor to return to the user.
+    new_output = at::native::empty_cpu(shape, dtype);
+    new_output.set_requires_grad(requires_grad);
+
+    // Add the tensor + track the jit node.
+    _mapper.addTensor(new_output, new_node->output(0));
+
+    // Track the MLIR node as well.
+    _mapper.addTensor(new_output, output_id);
+  }
 
   // Clear the stack of inputs and add the output (as per the PyTorch calling
   // convention)

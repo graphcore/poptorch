@@ -127,4 +127,69 @@ void scaledsub_::lowerToPoplar(CompilerContext &context) {
   popops::scaledSubtractFrom(context.graph, input1, input2, scale, context.seq);
 }
 
+void addcmul::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor tensor1 = context.fromSsa(this->tensor1());
+  poplar::Tensor tensor2 = context.fromSsa(this->tensor2());
+  float value = this->value().convertToFloat();
+
+  auto expr = pe::Add(pe::_1, pe::Mul(pe::_3, pe::_2));
+  if (value != 1.0f) {
+    expr = pe::Add(pe::_1, pe::Mul(pe::Const(value), pe::Mul(pe::_3, pe::_2)));
+  }
+
+  poplar::Tensor out =
+      popops::map(context.graph, expr, {input, tensor1, tensor2}, context.seq);
+
+  context.tensors.insert({this->result(), out});
+}
+
+void addcmul_::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor tensor1 = context.fromSsa(this->tensor1());
+  poplar::Tensor tensor2 = context.fromSsa(this->tensor2());
+  float value = this->value().convertToFloat();
+
+  auto expr = pe::Add(pe::_1, pe::Mul(pe::_3, pe::_2));
+  if (value != 1.0f) {
+    expr = pe::Add(pe::_1, pe::Mul(pe::Const(value), pe::Mul(pe::_3, pe::_2)));
+  }
+
+  popops::mapInPlace(context.graph, expr, {input, tensor1, tensor2},
+                     context.seq);
+}
+
+void addcdiv::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor tensor1 = context.fromSsa(this->tensor1());
+  poplar::Tensor tensor2 = context.fromSsa(this->tensor2());
+  float value = this->value().convertToFloat();
+
+  auto expr = pe::Add(pe::_1, pe::Divide(pe::_2, pe::_3));
+  if (value != 1.0f) {
+    expr =
+        pe::Add(pe::_1, pe::Mul(pe::Const(value), pe::Divide(pe::_2, pe::_3)));
+  }
+  poplar::Tensor out =
+      popops::map(context.graph, expr, {input, tensor1, tensor2}, context.seq);
+
+  context.tensors.insert({this->result(), out});
+}
+
+void addcdiv_::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor tensor1 = context.fromSsa(this->tensor1());
+  poplar::Tensor tensor2 = context.fromSsa(this->tensor2());
+  float value = this->value().convertToFloat();
+
+  auto expr = pe::Add(pe::_1, pe::Divide(pe::_2, pe::_3));
+  if (value != 1.0f) {
+    expr =
+        pe::Add(pe::_1, pe::Mul(pe::Const(value), pe::Divide(pe::_2, pe::_3)));
+  }
+
+  popops::mapInPlace(context.graph, expr, {input, tensor1, tensor2},
+                     context.seq);
+}
+
 } // namespace poptorch_ir

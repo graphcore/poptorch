@@ -143,6 +143,18 @@
   PopTorchDirectInplace: add_
   UnusedOutputArguments: {out}
 
+# aten::addcmul.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
+- func: addcmul.out
+  PopTorchDirect: addcmul
+  PopTorchDirectInplace: addcmul_
+  UnusedOutputArguments: {out}
+
+
+# aten::addcdiv.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
+- func: addcdiv.out
+  PopTorchDirect: addcdiv
+  PopTorchDirectInplace: addcdiv_
+  UnusedOutputArguments: {out}
 
 # dropout(Tensor input, float p, bool train) -> Tensor
 - func: dropout
@@ -188,6 +200,14 @@
 #                   bool training, float momentum, float eps) -> (Tensor, Tensor, Tensor)
 - func: native_batch_norm
   PopTorchDirect: batch_norm
+
+#
+# Losses
+#
+
+# aten::mse_loss_backward(Tensor grad_output, Tensor self, Tensor target, int reduction) -> (Tensor)
+- func: mse_loss_backward
+  PopTorchDirect: mse_loss_backward
 
 
 ###########
