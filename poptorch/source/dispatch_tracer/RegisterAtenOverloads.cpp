@@ -14,9 +14,10 @@
 
 namespace poptorch {
 
+namespace {
 // This is just a useful helper since sometimes we need to pass both keys in.
-static c10::DispatchKeySet dispatch_key_set{
-    c10::DispatchKey::PrivateUse2, c10::DispatchKey::AutogradPrivateUse2};
+c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::PrivateUse2,
+                                     c10::DispatchKey::AutogradPrivateUse2};
 
 /*
  * The dispatchers are statically registered and called without any additional
@@ -41,20 +42,7 @@ struct GlobalTracerContext {
   bool dispatch_on;
 };
 
-static GlobalTracerContext context;
-
-// Turn on.
-void startDispatch() {
-  context.raii_dispatch_context =
-      std::make_unique<c10::impl::IncludeDispatchKeyGuard>(dispatch_key_set);
-  context.dispatch_on = true;
-}
-
-// Turn off.
-void endDispatch() {
-  context.dispatch_on = false;
-  context.raii_dispatch_context.reset();
-}
+GlobalTracerContext context;
 
 /*
  * Small helper to stop us from intercepting CPU calls called by us.
@@ -70,6 +58,35 @@ struct DisableDispatchScope {
 
   ~DisableDispatchScope() { context.dispatch_on = true; }
 };
+
+at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
+                        bool non_blocking) {
+  if (!context.isDispatchOn()) {
+    return at::native::copy_(self, src, non_blocking);
+  }
+  // We will also catch pytorch calls called via C++ so we need to disable our
+  // dispatch catcher while it is running.
+  DisableDispatchScope guard;
+  logging::trace("[TRACING-2] Intercepting aten::copy_");
+  context.active_dispatch->copyInplace(self, src);
+
+  return self;
+}
+
+} // namespace
+
+// Turn on.
+void startDispatch() {
+  context.raii_dispatch_context =
+      std::make_unique<c10::impl::IncludeDispatchKeyGuard>(dispatch_key_set);
+  context.dispatch_on = true;
+}
+
+// Turn off.
+void endDispatch() {
+  context.dispatch_on = false;
+  context.raii_dispatch_context.reset();
+}
 
 // Take the inputs to the graph and turn them into our IR graph
 // inputs/parameters.
@@ -154,20 +171,6 @@ void markOutputs(const std::vector<at::Tensor> &outputs,
   // dispatch catcher while it is running.
   DisableDispatchScope guard;
   context.active_dispatch->markOutputs(outputs, data_storage);
-}
-
-static at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
-                               bool non_blocking) {
-  if (!context.isDispatchOn()) {
-    return at::native::copy_(self, src, non_blocking);
-  }
-  // We will also catch pytorch calls called via C++ so we need to disable our
-  // dispatch catcher while it is running.
-  DisableDispatchScope guard;
-  logging::trace("[TRACING-2] Intercepting aten::copy_");
-  context.active_dispatch->copyInplace(self, src);
-
-  return self;
 }
 
 // Appears in 1.10.

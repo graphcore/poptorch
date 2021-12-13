@@ -449,7 +449,19 @@ class PoplarExecutor:
             yield from model.named_parameters()
             yield from model.named_buffers()
 
-        with IPUScope(in_tensors.asTuple(),
+        # Unpack the inputs.
+        inputs = []
+
+        def unroll(tensor_or_list):
+            if isinstance(tensor_or_list, (list, tuple)):
+                for t in tensor_or_list:
+                    unroll(t)
+            else:
+                assert isinstance(tensor_or_list, torch.Tensor)
+                inputs.append(tensor_or_list)
+
+        unroll(in_tensors.asTuple())
+        with IPUScope(inputs,
                       parameters=all_data(self._model),
                       options=self._options) as ipu:
             outputs = self._model(*in_tensors.asTuple())
@@ -1329,8 +1341,8 @@ def hasMlirSupportOnPlatform():
 
 class IPUScope:
     def __init__(self,
-                 inputs,
-                 parameters=None,
+                 inputs: List['torch.Tensor'],
+                 parameters: Optional[Dict[str, 'torch.Tensor']] = None,
                  options: Optional['poptorch.Options'] = None,
                  compile_using=enums.Compiler.PopART):
         self._executable = None
@@ -1339,6 +1351,11 @@ class IPUScope:
             self._options = self._options.outputMode(enums.OutputMode.All)
 
         self._compile_using = compile_using
+
+        assert isinstance(inputs,
+                          (list, tuple)), "inputs must be a list or tuple"
+        assert all(isinstance(i, torch.Tensor)
+                   for i in inputs), "All inputs must be tensors"
 
         if isinstance(parameters, types.GeneratorType):
             parameters = {
@@ -1356,10 +1373,8 @@ class IPUScope:
         self._inputs = []
         self._upload_weights = True
 
-        # Unpack the inputs.
         with torch.no_grad():
-            for tensor in inputs:
-                self._inputs.append(tensor.clone())
+            self._inputs = [t.clone() for t in inputs]
 
         # Create the graph. Futured captured calls will be written into this graph behind the scenes.
         poptorch_core.createGraph(

@@ -227,11 +227,14 @@ torch::jit::Node *fullHandler(torch::jit::Graph *graph,
 torch::jit::Node *fullLikeHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   auto *y = node->input(1);
+  auto *t0 = node->output(0);
+  auto t2 = getNodeScalarType(t0);
+  auto *t3 = createCast(graph, y, t2)->output();
   auto *x = node->input(0);
-  auto t0 = shapeFromTensor(x);
-  auto *t1 = intVectorToIrConstant(graph, t0);
-  // expand(y, AsIr(tensor_shape(x)))
-  return createExpand(graph, {y, t1});
+  auto t4 = shapeFromTensor(x);
+  auto *t5 = intVectorToIrConstant(graph, t4);
+  // expand(cast(y, scalar_type(output0)), AsIr(tensor_shape(x)))
+  return createExpand(graph, {t3, t5});
 }
 
 torch::jit::Node *geHandler(torch::jit::Graph *graph, torch::jit::Node *node) {

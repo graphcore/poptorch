@@ -68,7 +68,9 @@ convert("logical_or", 2)
 expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
 forward("_cat", "cat")
 expand("elu", lambda x, y, z: op.selu(x, cfloat(y), cfloat(z)))
-expand("full_like", lambda x, y: op.expand(y, as_ir(tensor_shape(x))))
+expand(
+    "full_like", lambda x, y: op.expand(op.cast(y, output_type()),
+                                        as_ir(tensor_shape(x))))
 expand("ge", lambda x, y: x >= y)
 expand("le", lambda x, y: x <= y)
 expand("leaky_relu", lambda x, y: op.leakyrelu(x, cfloat(y)))

@@ -239,8 +239,16 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
   // If ends with '_', it's inplace. Remove the "_" and use the outplace version
   // instead.
-  if (name[name.size() - 1] == '_') {
-    name.erase(name.end() - 1, name.end());
+  bool is_in_place = name[name.size() - 1] == '_';
+  if (is_in_place) {
+    // These are special cases because there is no zero / fill.
+    if (name == "aten::zero_") {
+      name = "aten::zeros_like";
+    } else if (name == "aten::fill_") {
+      name = "aten::full_like";
+    } else {
+      name.erase(name.end() - 1, name.end());
+    }
     op = *dispatcher.findOp({name, ""});
   }
 
@@ -250,8 +258,16 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   torch::jit::Node *fake_target =
       lowerFromSchema(schema, stack, graph, _mapper);
 
-  // Call the
-  dispatcher.callBoxed(op, stack);
+  if (is_in_place) {
+    // The Op is in place: we don't need to run the CPU version.
+    // Just clear the stack and keep the first input.
+    at::Tensor t = stack->at(0).toTensor();
+    stack->clear();
+    stack->push_back(t);
+  } else {
+    // Call the CPU version to get the output shape
+    dispatcher.callBoxed(op, stack);
+  }
 
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
