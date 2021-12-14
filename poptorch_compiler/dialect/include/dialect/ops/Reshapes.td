@@ -45,8 +45,87 @@ def Poptorch_transpose: Poptorch_Op<"transpose", [ViewOp]> {
 }
 
 
-class Poptorch_reshape_generic<string name> : Poptorch_Op<name, [ViewOp]> {
-  let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
+def Poptorch_reshape: Poptorch_Op<"reshape", [ViewOp]> {
+    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "const std::vector<std::int64_t>&":$shape),[{
+        $_state.addOperands({value});
+
+        // At most one element can be -1, for which the shape will need to be
+        // resolved based on the number of elements.
+        const int64_t no_dim = -1;
+        int64_t inferred_dim = no_dim;
+
+        // Store the product of the shape (excluding the -1 dimension)
+        uint64_t shape_product = 1;
+
+        for(size_t dim_idx = 0; dim_idx < shape.size(); dim_idx++) {
+            if(shape[dim_idx] == -1) {
+                if(inferred_dim != no_dim) {
+                    // Match PyTorch's error message
+                    ERROR("only one dimension can be inferred");
+                }
+                inferred_dim = dim_idx;
+            } else if(shape[dim_idx] <= 0) {
+                // This should only occur as an internal error.
+                ERROR("invalid shape dimension, " << shape[dim_idx]
+                      << ", in Poptorch_reshape_generic");
+            } else {
+                shape_product *= shape[dim_idx];
+            }
+        }
+
+        // Obtain the tensor type and clone the output shape in case we modify
+        // it when resolving the "-1".
+        mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
+        auto numel_in = t1.getNumElements();
+
+        // Clone the const shape in case we need to resolve a -1 dim
+        auto shape_out = shape;
+
+        // Resolve the -1 dim if required
+        if (inferred_dim != no_dim) {
+            if(numel_in % shape_product == 0) {
+                shape_out[inferred_dim] = numel_in/shape_product;
+                shape_product = numel_in;
+            }
+        }
+
+        // At this stage, shape_product should be numel_in, or the shape is
+        // invalid (with or without a -1 dim)
+        if (shape_product != numel_in) {
+            std::ostringstream err;
+            err << "shape'[";
+
+            for(size_t dim_idx = 0; dim_idx < shape.size(); dim_idx++) {
+                err << shape[dim_idx];
+                if(dim_idx + 1 != shape.size()) {
+                    err << ", ";
+                }
+            }
+
+            err << "]' is invalid for input of size ";
+            err << numel_in;
+            throw std::runtime_error(err.str());
+        }
+
+        // Otherwise, the reshape is succesful
+        // Ensure the attribute is the resolved shape (without -1)
+        $_state.addAttribute("shape", $_builder.getI64ArrayAttr(shape_out));
+
+        mlir::Type e1 = t1.getElementType();
+        $_state.addTypes(mlir::RankedTensorType::get(shape_out, e1));
+     }]>
+    ];
+}
+
+
+// Expand is like reshape but can broadcast unity dimensions and sets -1
+// dimensions to the same as the input. New dimensions are added at the front
+// TODO T52507 Fully inplement expand
+def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
+      let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
   let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "const std::vector<std::int64_t>&":$shape),[{
@@ -59,7 +138,3 @@ class Poptorch_reshape_generic<string name> : Poptorch_Op<name, [ViewOp]> {
      }]>
     ];
 }
-
-// Reshape and expand have the exact same setup but reshape is just a reshape while exapand is a broadcast under the hood.
-def Poptorch_reshape : Poptorch_reshape_generic<"reshape"> {}
-def Poptorch_expand : Poptorch_reshape_generic<"expand"> {}

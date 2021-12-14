@@ -1382,23 +1382,32 @@ def hasMlirSupportOnPlatform():
 
 
 class IPUScope:
-    def __init__(
-            self,
-            inputs: List['torch.Tensor'],
-            parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
-            options: Optional['poptorch.Options'] = None,
-            compile_using=enums.Compiler.PopART):
+    def __init__(self,
+                 inputs: List['torch.Tensor'],
+                 parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
+                 options: Optional['poptorch.Options'] = None,
+                 compile_using=enums.Compiler.PopART):
+
+        if not isinstance(inputs, (list, tuple)):
+            raise ValueError("You can only pass a list or tuple as the " +
+                             "inputs argument to poptorch.IPUScope.")
+
+        # Check that the inputs are a valid type
+        for tensor in inputs:
+            if not isinstance(tensor, torch.Tensor):
+                raise ValueError("You can only pass torch.Tensors as inputs " +
+                                 "to poptorch.IPUScope.")
+
+            if tensor.is_sparse:
+                raise ValueError("You cannot pass sparse tensors as inputs " +
+                                 "to poptorch.IPUScope.")
+
         self._executable = None
         self._options = options or Options()
         if self._options.defaultOutputMode():
             self._options = self._options.outputMode(enums.OutputMode.All)
 
         self._compile_using = compile_using
-
-        assert isinstance(inputs,
-                          (list, tuple)), "inputs must be a list or tuple"
-        assert all(isinstance(i, torch.Tensor)
-                   for i in inputs), "All inputs must be tensors"
 
         if isinstance(parameters_and_buffers, types.GeneratorType):
             parameters_and_buffers = {

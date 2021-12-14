@@ -14,6 +14,8 @@ void reshape::lowerToPoplar(CompilerContext &context) {
   std::vector<std::size_t> new_shape =
       convertIntArray<std::size_t>(this->shape());
 
+  // NB intentionally inplace. PyTorch users are told when using reshape
+  // that "you should not depend on the copying vs. viewing behavior".
   in = in.reshape(new_shape);
   context.tensors.insert({result(), in});
 }

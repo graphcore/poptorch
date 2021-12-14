@@ -86,7 +86,7 @@ extern c10::Symbol restore_autocast;
 extern c10::Symbol autocast;
 
 // In order to allow a paramater/buffer to be updated in place, the only
-// gauranteed inplace op by PopART, use update_param_inplace.
+// guaranteed inplace op by PopART, use update_param_inplace.
 extern c10::Symbol update_param_inplace;
 
 // Casting is done before passing the input to the IPU: the op is used so that

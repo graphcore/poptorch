@@ -326,8 +326,7 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("empty.memory_format", &poptorch::emptyMemoryFormat);
   m.impl("empty.out", &poptorch::emptyOut);
   m.impl("empty_strided", &poptorch::emptyStrided);
-  m.impl("reshape",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
   m.impl("detach", &poptorch::detach);
 
   m.impl("transpose.int",
@@ -384,6 +383,12 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   // If we don't intercept this op, it will be decomposed to as_strided
   // which is harder to handler.
   m.impl("select.int",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  // Ideally, we would use the native cpu function but have an equivalent
+  // to the "if (self.is_mkldnn()) {" for IPU tensors. But we can instead
+  // overwrite and run reshape here.
+  m.impl("reshape",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 }
 
