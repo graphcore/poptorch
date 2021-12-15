@@ -89,6 +89,55 @@ def Poptorch_concat: Poptorch_Op<"concat", []> {
     ];
 }
 
+// PyTorch operation:
+/* func: topk.values(Tensor self, int k, int dim=-1,
+                    bool largest=True, bool sorted=True,
+                    Tensor(a!) values, Tensor(b!) indices) 
+                    -> (Tensor(a!) , Tensor(b!))*/
+def Poptorch_topk : Poptorch_Op<"topk", []> {
+    let arguments = (ins Poptorch_tensor:$self, 
+                         I64Attr:$K,
+                         I64Attr:$dim,
+                         BoolAttr:$largest,
+                         BoolAttr:$sorted);
+
+
+    let results = (outs Poptorch_tensor:$values, Poptorch_tensor:$indices);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, 
+                                      "std::int64_t":$K,
+                                      "std::int64_t":$dim,
+                                      "bool":$largest,
+                                      "bool":$sorted),[{
+        // Add op
+        $_state.addOperands({self});
+
+        mlir::RankedTensorType input_shape = self.getType().cast<mlir::RankedTensorType>();
+
+        llvm::SmallVector<std::int64_t, 4> out_shape {input_shape.getShape().begin(),
+                                                      input_shape.getShape().end()};
+
+        if ( dim < 0) {
+            dim = out_shape.size() + dim;
+        }
+
+        // Add attrs
+        $_state.addAttribute("K", $_builder.getI64IntegerAttr(K));
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("largest", $_builder.getBoolAttr(largest));
+        $_state.addAttribute("sorted", $_builder.getBoolAttr(sorted));
+
+        // add returns
+        out_shape[dim] = K;
+
+        auto out_type = mlir::RankedTensorType::get(out_shape, input_shape.getElementType());
+        auto out_indices = mlir::RankedTensorType::get(out_shape, $_builder.getIntegerType(32 /*width*/, true /*signed*/));
+
+        $_state.addTypes({out_type, out_indices});
+     }]>
+    ];
+}
+
 def Poptorch_dropout : Poptorch_Op<"dropout", []> {
     let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$training);
 

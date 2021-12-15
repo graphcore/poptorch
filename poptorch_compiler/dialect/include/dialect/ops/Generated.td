@@ -611,22 +611,6 @@ def Poptorch_thresholdedrelu : Poptorch_Op<"thresholdedrelu", []> {
 
 }
 
-def Poptorch_topk : Poptorch_Op<"topk", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$axis);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "std::int64_t":$axis), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("axis",$_builder.getI64IntegerAttr(axis));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_upsample : Poptorch_Op<"upsample", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, StrAttr:$mode);
   let results = (outs Poptorch_tensor:$result);

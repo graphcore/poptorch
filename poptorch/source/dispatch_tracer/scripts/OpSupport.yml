@@ -191,6 +191,15 @@
 
 
 #########
+# Misc
+#########
+
+- func: topk.values
+  PopTorchDirect: topk
+  UnusedOutputArguments: {values, indices}
+
+
+#########
 # Norms
 #########
 

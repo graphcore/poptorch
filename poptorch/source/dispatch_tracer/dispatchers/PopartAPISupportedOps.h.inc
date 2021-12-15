@@ -45,7 +45,6 @@ OP_DECL(reversesequence, reversesequence,  ARG(INT,batch_axis) ARG(INT,time_axis
 OP_DECL(roialign, roialign,  ARG(STRING,mode) ARG(INT,output_height) ARG(INT,output_width) ARG(INT,sampling_ratio) ARG(FLOAT,spatial_scale) )
 OP_DECL(slice, slice,  NONE)
 OP_DECL(thresholdedrelu, thresholdedrelu,  ARG(FLOAT,alpha) )
-OP_DECL(topk, topk,  ARG(INT,axis) )
 OP_DECL(upsample, upsample,  ARG(STRING,mode) )
 OP_DECL(acosh, acosh,  NONE)
 OP_DECL(asinh, asinh,  NONE)

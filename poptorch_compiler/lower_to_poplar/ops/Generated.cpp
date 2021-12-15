@@ -263,12 +263,6 @@ void thresholdedrelu::lowerToPoplar(CompilerContext & /*context*/) {
                   "thresholdedrelu"
                   " is currently unimplemented.");
 }
-void topk::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "topk"
-                  " is currently unimplemented.");
-}
 void upsample::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

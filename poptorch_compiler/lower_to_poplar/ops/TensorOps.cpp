@@ -5,6 +5,8 @@
 #include <popops/ElementWise.hpp>
 #include <popops/Expr.hpp>
 #include <popops/Fill.hpp>
+#include <popops/SortOrder.hpp>
+#include <popops/TopK.hpp>
 #include <popops/Zero.hpp>
 #include <poprand/RandomGen.hpp>
 
@@ -68,6 +70,47 @@ void concat::lowerToPoplar(CompilerContext &context) {
   std::vector<poplar::Tensor> tensors = context.fromSsa(this->tensors());
 
   context.tensors[this->result()] = poplar::concat(tensors, this->dim());
+}
+
+void topk::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+  const bool largest = this->largest();
+  const bool sorted = this->sorted();
+
+  // If sorted is set we should be ranking highest to lowest
+  // or lowest to highest depending on whether or not `largest` is set.
+  popops::SortOrder order = popops::SortOrder::NONE;
+  if (sorted) {
+    if (largest) {
+      order = popops::SortOrder::DESCENDING;
+    } else {
+      order = popops::SortOrder::ASCENDING;
+    }
+  }
+
+  std::uint32_t k = this->K();
+  const std::uint32_t dim = this->dim();
+  const std::uint32_t last_dim = self.rank() - 1;
+
+  self = self.dimShufflePartial({dim}, {last_dim});
+
+  // Call TopK.
+  auto pair = popops::topKWithPermutation(context.graph, context.seq, self,
+                                          {k, largest, order});
+
+  poplar::Tensor values = pair.first;
+  poplar::Tensor indices = pair.second;
+
+  values = values.dimShufflePartial({dim}, {last_dim});
+  indices = indices.dimShufflePartial({dim}, {last_dim});
+
+  std::vector<std::uint64_t> unflattened;
+
+  // Cast to signed int.
+  indices = indices.reinterpret(poplar::INT);
+
+  context.tensors.insert({this->values(), values});
+  context.tensors.insert({this->indices(), indices});
 }
 
 void dropout::lowerToPoplar(CompilerContext &context) {
