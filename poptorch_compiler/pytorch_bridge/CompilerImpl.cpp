@@ -58,6 +58,7 @@ mlir::Type PoptorchCompilerImpl::convertType(Type type) {
 
   switch (type) {
   case Type::BOOL:
+    return builder.getIntegerType(1, signed_ty != 0u);
   case Type::CHAR:
   case Type::UNSIGNED_CHAR:
     return builder.getIntegerType(8, signed_ty != 0u);

@@ -76,6 +76,9 @@ poplar::Type elementTypeFromMLIR(mlir::Type elementType) {
   }
   // We use isInteger from here onwards to capture both
   // isSignedInteger and isSignlessInteger
+  if (elementType.isInteger(1)) {
+    return poplar::BOOL;
+  }
   if (elementType.isInteger(8)) {
     return poplar::SIGNED_CHAR;
   }

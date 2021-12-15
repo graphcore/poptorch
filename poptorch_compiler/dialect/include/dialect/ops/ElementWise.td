@@ -259,3 +259,20 @@ def Poptorch_addcmul_ : Poptorch_addcX<"addcmul_"> {}
 // aten::addcdiv.out(Tensor self, Tensor tensor1, Tensor tensor2, *, Scalar value=1, Tensor(a!) out) -> (Tensor(a!))
 def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
 def Poptorch_addcdiv_ : Poptorch_addcX<"addcdiv_"> {}
+
+class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
+    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
+    let results = (outs Poptorch_tensor:$result);
+    let assemblyFormat = [{
+        `(`$in1 `,` $in2 `)` `(`type($in1)`,`type($in2)`)` `->` type($result) attr-dict
+    }];
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
+        $_state.addOperands({v1, v2});
+        mlir::RankedTensorType rtt = v1.getType().cast<mlir::RankedTensorType>();
+        $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, true)));
+     }]>
+    ];
+}
+
+def Poptorch_greater: Poptorch_binary_conditional<"greater"> {}
+def Poptorch_less: Poptorch_binary_conditional<"less"> {}

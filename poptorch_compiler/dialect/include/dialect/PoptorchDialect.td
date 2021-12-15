@@ -28,8 +28,8 @@ class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = []> :
         Op<Poptorch_Dialect, mnemonic, traits>;
 
 
-def valid_ints : SignedIntOfWidths<[8, 16, 32]>;
-def valid_uints : UnsignedIntOfWidths<[8, 16, 32]>;
+def valid_ints : SignedIntOfWidths<[1, 8, 16, 32]>;
+def valid_uints : UnsignedIntOfWidths<[1, 8, 16, 32]>;
 def valid_float : FloatOfWidths<[16, 32]>;
 
 def valid_tensor : StaticShapeTensorOf<[valid_ints, valid_uints, valid_float]>;

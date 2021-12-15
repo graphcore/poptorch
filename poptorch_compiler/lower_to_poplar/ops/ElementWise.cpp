@@ -8,23 +8,30 @@ namespace pe = popops::expr;
 
 namespace poptorch_ir {
 
-#define BINARY_OP(name)                                                        \
+#define BINARY_OP_OUTPLACE(name, popops_name)                                  \
   void name::lowerToPoplar(CompilerContext &context) {                         \
     poplar::Tensor input1 = context.fromSsa(this->in1());                      \
     poplar::Tensor input2 = context.fromSsa(this->in2());                      \
     poplar::Tensor out =                                                       \
-        popops::name(context.graph, input1, input2, context.seq);              \
+        popops::popops_name(context.graph, input1, input2, context.seq);       \
     context.tensors.insert({this->result(), out});                             \
-  }                                                                            \
+  }
+#define BINARY_OP_INPLACE(name, popops_name)                                   \
   void name##_::lowerToPoplar(CompilerContext &context) {                      \
     poplar::Tensor input1 = context.fromSsa(this->in1());                      \
     poplar::Tensor input2 = context.fromSsa(this->in2());                      \
-    popops::name##InPlace(context.graph, input1, input2, context.seq);         \
+    popops::popops_name##InPlace(context.graph, input1, input2, context.seq);  \
   }
+
+#define BINARY_OP(name)                                                        \
+  BINARY_OP_OUTPLACE(name, name)                                               \
+  BINARY_OP_INPLACE(name, name)
 
 #include "binary_ops.h.inc"
 
 #undef BINARY_OP
+#undef BINARY_OP_INPLACE
+#undef BINARY_OP_OUTPLACE
 
 void add::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());

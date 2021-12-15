@@ -329,22 +329,10 @@ void gemm::lowerToPoplar(CompilerContext & /*context*/) {
                   "gemm"
                   " is currently unimplemented.");
 }
-void greater::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "greater"
-                  " is currently unimplemented.");
-}
 void isnan::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
                   "isnan"
-                  " is currently unimplemented.");
-}
-void less::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "less"
                   " is currently unimplemented.");
 }
 void maxunpool::lowerToPoplar(CompilerContext & /*context*/) {
