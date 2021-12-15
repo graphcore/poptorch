@@ -40,7 +40,7 @@ struct LoggingContext {
 LoggingContext &context() {
   // This avoids the static initialisation order fiasco, but doesn't solve the
   // deinitialisation order. Who logs in destructors anyway?
-  static LoggingContext logging_context;
+  static thread_local LoggingContext logging_context;
   return logging_context;
 }
 

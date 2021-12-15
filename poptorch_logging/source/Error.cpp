@@ -12,7 +12,7 @@ namespace {
 using Context = std::vector<std::string>;
 
 Context &getContext() {
-  static Context log_context{};
+  static thread_local Context log_context{};
   return log_context;
 }
 
