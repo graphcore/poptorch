@@ -111,25 +111,25 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
   }
 
   torch::jit::Value *output = input;
+  auto number_of_dims = input_shape.size();
   for (size_t i = 0; i < dims.size(); ++i) {
     auto current_dim = dims.at(i);
-    ERROR_ON_MSG(static_cast<size_t>(current_dim) >= input_shape.size() ||
-                     current_dim < 0,
+    // Match the torch API of requiring dim in [-len(shape), len(shape)-1]
+    ERROR_ON_MSG(((static_cast<size_t>(current_dim) >= number_of_dims) &&
+                  (current_dim >= 0)) ||
+                     ((static_cast<size_t>(-current_dim) > number_of_dims) &&
+                      (current_dim < 0)),
                  "Dimension out of range in the roll op.");
+    current_dim = (current_dim + number_of_dims) % number_of_dims;
 
     auto current_dim_size = input_shape.at(current_dim);
     // Handle overreaching and negative shifts.
-    auto current_shift = (-shifts.at(i) + current_dim_size) % current_dim_size;
-    // Duplicate the rolling dimension and then slice based on the shift.
-    auto *split = wrapInConstant1D(graph, current_shift);
-    auto *start = wrapInConstant1D(graph, 0);
-    auto *end = wrapInConstant1D(graph, current_dim_size);
-    auto *axis = wrapInConstant1D(graph, current_dim);
-    auto *first_block = createSlice(graph, {output, start, split, axis});
-    auto *second_block = createSlice(graph, {output, split, end, axis});
+    auto split = (((-shifts.at(i)) % current_dim_size) + current_dim_size) %
+                 current_dim_size;
+    auto *chunks = createSplit(graph, {output}, 2, current_dim,
+                               {split, current_dim_size - split});
     output =
-        createConcat(graph, {second_block->output(), first_block->output()},
-                     current_dim)
+        createConcat(graph, {chunks->output(1), chunks->output(0)}, current_dim)
             ->output();
   }
 

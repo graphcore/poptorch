@@ -2,6 +2,8 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import copy
+from functools import partial
+import re
 import pytest
 import torch
 import helpers
@@ -107,12 +109,50 @@ def test_zeros_like_and_ones_like(dtype):
     zeros_and_ones_harness(Model(), dtype, True)
 
 
+def fuzzy_compare_exceptions(e_cpu, e_ipu):
+    """Compares error messages from CPU and IPU implementations
+    if they do not match a fuzzy comparison (all words in the CPU exception
+    are also in the IPU exception) an error is raised.
+    """
+    e_ipu_words = {word: i for i, word in enumerate(str(e_ipu).split())}
+    if not all([
+            e_ipu_words.get(word, -1) >= i
+            for i, word in enumerate(str(e_cpu).split())
+    ]):
+        raise ValueError("CPU and IPU error messages did not match: " +
+                         f"'{e_cpu}' not in '{e_ipu}'") from e_ipu
+    print(f"CPU and IPU error messages did match: '{e_cpu}' in '{e_ipu}'")
+
+
 def op_harness(op,
                *inputs,
                test_training=True,
                assert_fn=None,
                out_fn=None,
-               native_out=None):
+               native_out=None,
+               fuzzy_errors=False):
+    """The op harness allows to test the native torch API against poptorch.
+
+    This function wraps an operation into a model and allows training and
+    inference comparisons between py and poptorch.
+    This function returns without errors when tensors are almost equal
+    or the IPU and CPU implementation provide the same error messages.
+    """
+
+    def exception_catcher(model, *inputs, can_raise_exception=True):
+        __tracebackhide__ = True  # pylint: disable=W0612
+        op_raises_exception = False
+        try:
+            if test_training:
+                native_out, _ = model(*inputs)
+            else:
+                native_out = model(*inputs)
+        except Exception as e:  # pylint: disable=W0703
+            if not can_raise_exception:
+                raise
+            native_out = ("error", e)
+            op_raises_exception = True
+        return native_out, op_raises_exception
 
     if assert_fn is None:
 
@@ -124,6 +164,7 @@ def op_harness(op,
                 helpers.assert_allclose(expected=native_out,
                                         actual=poptorch_out)
 
+    op_raises_exception = False
     if test_training:
         # Set a fixed seed for the weights of the model
         torch.manual_seed(42)
@@ -131,37 +172,163 @@ def op_harness(op,
 
         # Run on CPU.
         if native_out is None:
-            native_out, _ = model(inputs)
+            native_out, op_raises_exception = exception_catcher(model, inputs)
 
             # native_out could be an alias of the input and so modified by
-            # the poptorch_model
-            if isinstance(native_out, tuple):
+            # the poptorch_model, except if its an error
+            if op_raises_exception:
+                pass
+            elif isinstance(native_out, tuple):
+                # pylint: disable=E1101
                 native_out = tuple([n.clone().detach() for n in native_out])
             else:
                 native_out = native_out.clone().detach()
+        else:
+            op_raises_exception = isinstance(
+                native_out, tuple) and native_out[0] == "error"
 
         # Run on IPU.
         poptorch_model = poptorch.trainingModel(model)
-        poptorch_out, _ = poptorch_model(inputs)
+        poptorch_out, ipu_raises = exception_catcher(
+            poptorch_model, inputs, can_raise_exception=op_raises_exception)
 
-        # Training test - check weights changed
-        poptorch_model.assert_weights_changed()
+        # Training test - check weights changed if no error was thrown
+        try:
+            poptorch_model.assert_weights_changed()
+            assert not op_raises_exception, (
+                "Weights changed despite errors being "
+                "thrown in IPU evaluation.")
+        except AssertionError:
+            if not op_raises_exception:
+                raise
     else:
         model = torch.nn.Module()
         model.forward = op
 
         # Run on CPU.
         if native_out is None:
-            native_out = model(*inputs)
+            native_out, op_raises_exception = exception_catcher(model, *inputs)
+        else:
+            op_raises_exception = isinstance(
+                native_out, tuple) and native_out[0] == "error"
 
         options = poptorch.Options()
         options.Jit.traceModel(False)
         poptorch_model = poptorch.inferenceModel(model, options)
         # Run on IPU.
-        poptorch_out = poptorch_model(*inputs)
+        poptorch_out, ipu_raises = exception_catcher(
+            poptorch_model, *inputs, can_raise_exception=op_raises_exception)
 
-    # Inference test - check outputs
-    assert_fn(native_out, poptorch_out)
+    # Compare outputs
+    if not ipu_raises and op_raises_exception:
+        _, cpu_error = native_out
+        raise RuntimeError(
+            "The torch and poptorch API do not match, " +
+            "poptorch returned without error while torch failed" +
+            f" with {cpu_error}") from cpu_error
+    if fuzzy_errors and op_raises_exception:
+        fuzzy_compare_exceptions(native_out[1], poptorch_out[1])
+    elif op_raises_exception:
+        _, cpu_error = native_out
+        _, ipu_error = poptorch_out
+        with pytest.raises(type(cpu_error),
+                           match="^" + re.escape(f"{cpu_error}") + "$"):
+            raise ipu_error
+    else:
+        assert_fn(native_out, poptorch_out)
+
+
+class TestOpHarness:
+    """Test the exception matching functionality of the op_harness function."""
+    exact_error_check = "Regex pattern.*does not match"
+    fuzzy_error_check = "CPU and IPU error messages did not match"
+    op_harness = op_harness
+
+    @pytest.fixture(autouse=True, params=[True, False])
+    def training(self, request, monkeypatch):
+        monkeypatch.setattr(self, "op_harness",
+                            partial(op_harness, test_training=request.param))
+
+    def test_fuzzy_error_mismatch(self):
+        x = torch.randn(2, 3)
+
+        def op(x):
+            raise ValueError("Hi")
+
+        with pytest.raises(ValueError, match=self.fuzzy_error_check):
+            self.op_harness(op,
+                            x,
+                            native_out=("error", ValueError("Hey")),
+                            fuzzy_errors=True)
+
+    def test_error_mismatch(self):
+        x = torch.randn(2, 3)
+
+        def op(x):
+            raise ValueError("Hi")
+
+        with pytest.raises(AssertionError, match=self.exact_error_check):
+            self.op_harness(op, x, native_out=("error", ValueError("Hey")))
+
+    def test_exact_match(self):
+        x = torch.randn(2, 3)
+
+        def op(x):
+            raise ValueError("Hi")
+
+        self.op_harness(op, x)
+
+    def test_fuzzy_match(self):
+        x = torch.randn(2, 3)
+
+        def op(x):
+            raise ValueError("Hi Hey")
+
+        self.op_harness(op,
+                        x,
+                        native_out=("error", ValueError("Hey")),
+                        fuzzy_errors=True)
+
+    def test_fuzzy_mismatch(self):
+        x = torch.randn(2, 3)
+
+        def op(x):
+            raise ValueError("Hi")
+
+        with pytest.raises(ValueError, match=self.fuzzy_error_check):
+            self.op_harness(op,
+                            x,
+                            native_out=("error", ValueError("Hey Hi")),
+                            fuzzy_errors=True)
+
+    def test_reject_fuzzy_match_without_fuzzy_option(self):
+        x = torch.randn(2, 3)
+
+        def op(x):
+            raise ValueError("Hi Hey")
+
+        with pytest.raises(AssertionError, match=self.exact_error_check):
+            self.op_harness(op, x, native_out=("error", ValueError("Hey")))
+
+    def test_reject_exception_if_not_native(self):
+        x = torch.randn(2, 3)
+        error = ValueError("Hi Hey")
+
+        def op(x):
+            raise error
+
+        with pytest.raises(type(error), match=f"{error}"):
+            self.op_harness(op, x, native_out=(1))
+
+    def test_no_ipu_exception_with_native_exception(self):
+        x = torch.randn(2, 3)
+        error = ValueError("Hi Hey")
+
+        def op(x):
+            return torch.roll(x, 1)
+
+        with pytest.raises(RuntimeError, match=f"{error}"):
+            self.op_harness(op, x, native_out=("error", error))
 
 
 # Note: Many of the following operations don't depend on the values of the tensors
@@ -586,7 +753,8 @@ def test_copy_(input_shapes, dtype):
                                          ((1, -1), (1, 2)), ((-3, -4), (0, 2)),
                                          ((1, 2, 3), (0, 1, 2)),
                                          ((-1, -2, -3), (0, 1, 2)), (5, None),
-                                         (-3, None)])
+                                         (-3, None), (1, -1), (1, -3), (1, -4),
+                                         (1, 3)])
 def test_roll(shifts, dims):
     torch.manual_seed(0)
     op = lambda x: x.roll(shifts, dims)
