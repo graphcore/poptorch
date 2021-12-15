@@ -544,12 +544,6 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
 
   // Fixup the JIT so it has the correct type.
   new_node->output(0)->inferTypeFrom(new_output);
-
-  // Add the tensor + track the jit node.
-  _mapper.addTensor(new_output, new_node->output(0));
-
-  // Track the MLIR node as well.
-  _mapper.addTensor(new_output, output_id);
 }
 
 std::shared_ptr<MLIRExecutable> MLIRDispatch::compile() {
