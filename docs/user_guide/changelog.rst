@@ -30,8 +30,6 @@ New features
 - Add ``removeBlocks`` function to remove block annotations from a Model / Layer.
 - Support for CPU ops using ``poptorch.CPU``.
 - Support for ``im2col``.
-- Introduce tracing v2 / dispatch tracing.
-- Introduce experimental new backend compiler.
 - Make optimizers work with LR schedulers.
 - Switched to gold linker by default.
 
