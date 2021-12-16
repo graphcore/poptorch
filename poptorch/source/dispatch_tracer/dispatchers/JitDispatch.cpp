@@ -19,12 +19,6 @@ namespace poptorch {
 
 namespace {
 
-std::string toString(const at::Tensor &t) {
-  std::stringstream ss;
-  ss << "sizes=" << t.sizes() << ", type=" << t.scalar_type();
-  return ss.str();
-}
-
 void fixFakeTargetOutput(torch::jit::Node *fake_target,
                          const c10::Stack &stack) {
   std::uint32_t index = 0;

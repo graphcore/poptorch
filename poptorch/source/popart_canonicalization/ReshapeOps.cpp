@@ -104,10 +104,45 @@ torch::jit::Node *flattenHandler(torch::jit::Graph *graph,
   return createReshape(graph, node->input(0), new_shape);
 }
 
+torch::jit::Node *asStridedHandler(torch::jit::Graph * /*graph*/,
+                                   torch::jit::Node * /*node*/) {
+  // as_strided(Tensor(a) self, int[] size, int[] stride, int?
+  // storage_offset=None) -> Tensor(a)
+
+  // as_strided is very generic and as a result complex and expensive to handle.
+  // However it is always generated as part of a decomposition so we should
+  // catch whichever op is getting decomposed rather than deal with as_strided.
+  ERROR(
+      "InternalError: aten::as_strided should have been intercepted earlier.");
+  return nullptr;
+}
+
+torch::jit::Node *viewHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  // aten::view(Tensor self, int[] size) -> Tensor
+  std::vector<std::int64_t> new_shape =
+      constantToLongVec(node->input(1)->node());
+
+  // Reshape the tensor into that shape.
+  return createReshape(graph, node->input(0), new_shape);
+}
+
+torch::jit::Node *unsqueezeHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  // aten::unsqueeze(Tensor self, int dim) -> Tensor
+  std::vector<std::int64_t> new_shape = shapeFromTensor(node->input(0));
+  std::int64_t dim = constantToLong(node->input(1)->node());
+  if (dim < 0) {
+    dim += new_shape.size() + 1;
+  }
+  new_shape.insert(new_shape.begin() + dim, 1);
+
+  // Reshape the tensor into that shape.
+  return createReshape(graph, node->input(0), new_shape);
+}
+
 torch::jit::Node *reshapeHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
-  // aten::view(Tensor self, int[] size) -> Tensor
-  // aten::unsqueeze(Tensor self, int dim) -> Tensor
   // aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
   std::vector<std::int64_t> new_shape = shapeFromTensor(node->output());
 
@@ -770,8 +805,8 @@ torch::jit::Node *autocastHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::expand, expandHandler);
   registerHandler(c10::aten::expand_as, expandAsHandler);
-  registerHandler(c10::aten::view, reshapeHandler);
-  registerHandler(c10::aten::unsqueeze, reshapeHandler);
+  registerHandler(c10::aten::view, viewHandler);
+  registerHandler(c10::aten::unsqueeze, unsqueezeHandler);
   registerHandler(c10::aten::flatten, flattenHandler);
   registerHandler(c10::aten::reshape, reshapeHandler);
   registerHandler(c10::aten::_reshape_alias, reshapeHandler);
@@ -795,7 +830,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::upsample_bicubic2d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::squeeze, reshapeHandler);
-  registerHandler(c10::aten::as_strided, reshapeHandler);
+  registerHandler(c10::aten::as_strided, asStridedHandler);
   registerHandler(c10::aten::stack, stackHandler);
   registerHandler(c10::aten::Int, intHandler);
   registerHandler(symbols::poptorch::autocast, autocastHandler);

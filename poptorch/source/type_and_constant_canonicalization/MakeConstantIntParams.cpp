@@ -30,7 +30,7 @@ void makeConstantIntParams(
     logging::LogContext ctx("processing " +
                             parameter_names[index - num_inputs]);
 
-    //_parameters in Lower to popart is traced_paramater_tensors here
+    //_parameters in Lower to popart is traced_parameter_tensors here
     auto tensor = traced_parameter_tensors[index - num_inputs];
 
     if (value->type()->kind() == c10::TypeKind::TensorType) {

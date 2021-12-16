@@ -3,6 +3,8 @@
 #define POPTORCH_DISPATCH_COMMON_HELPERS_HPP_
 
 #include <torch/csrc/jit/ir/ir.h>
+
+#include <string>
 #include <vector>
 
 namespace poptorch {
@@ -36,6 +38,8 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
 c10::intrusive_ptr<at::TensorImpl>
 getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema);
 
+// Return a string containing the tensor sizes and type.
+std::string toString(const at::Tensor &t);
 } // namespace poptorch
 
 #endif // POPTORCH_DISPATCH_COMMON_HELPERS_HPP_

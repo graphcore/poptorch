@@ -153,6 +153,9 @@ private:
   std::unordered_map<int64_t, torch::jit::Value *> _consts;
 };
 
+torch::jit::Value *wrapInConstantVec(torch::jit::Graph *graph,
+                                     const std::vector<int64_t> &data);
+
 template <typename... Elms>
 using FirstElmType = typename std::tuple_element<0, std::tuple<Elms...>>::type;
 
@@ -161,9 +164,7 @@ template <
     std::enable_if_t<std::is_integral<FirstElmType<Ints...>>::value, int> = 0>
 torch::jit::Value *wrapInConstant1D(torch::jit::Graph *graph, Ints... values) {
   std::vector<int64_t> data{std::forward<Ints>(values)...};
-  return createConstantInt(graph, data,
-                           {static_cast<std::int64_t>(data.size())})
-      ->output();
+  return wrapInConstantVec(graph, data);
 }
 
 template <typename T> struct CreateCast {};

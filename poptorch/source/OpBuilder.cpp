@@ -298,6 +298,13 @@ torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Value *wrapInConstantVec(torch::jit::Graph *graph,
+                                     const std::vector<int64_t> &data) {
+  return createConstantInt(graph, data,
+                           {static_cast<std::int64_t>(data.size())})
+      ->output();
+}
+
 torch::jit::Node *createEdgePad(torch::jit::Graph *graph, torch::jit::Value *A,
                                 const std::vector<int64_t> &pad_shape) {
   torch::jit::Node *new_node =

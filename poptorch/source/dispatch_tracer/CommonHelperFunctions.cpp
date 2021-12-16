@@ -16,8 +16,10 @@
 
 namespace poptorch {
 
-static torch::jit::Value *
-trackValue(c10::IValue &value, torch::jit::Graph &graph, ValueMapper &mapper) {
+namespace {
+
+torch::jit::Value *trackValue(c10::IValue &value, torch::jit::Graph &graph,
+                              ValueMapper &mapper) {
   if (value.isTensor()) {
     at::Tensor tensor = value.toTensor();
 
@@ -45,10 +47,9 @@ trackValue(c10::IValue &value, torch::jit::Graph &graph, ValueMapper &mapper) {
       }
     }
 
-    logging::trace("[TRACING-2] Input: Tensor ptr {}, jit ir {}",
+    logging::trace("[TRACING-2] Input: Tensor ptr {}, jit ir {} {}",
                    reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-                   val->debugNameBase());
-
+                   val->debugNameBase(), toString(tensor));
     return val;
   }
 
@@ -57,6 +58,8 @@ trackValue(c10::IValue &value, torch::jit::Graph &graph, ValueMapper &mapper) {
   ERROR_ON_MSG(val == nullptr, "Graph could not insert constant");
   return val;
 }
+
+} // namespace
 
 // Create the aten target node.
 // Note: Since 1.9.0 we could also call:
@@ -186,6 +189,12 @@ getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema) {
 
   // Assigned null in constructor.
   return {};
+}
+
+std::string toString(const at::Tensor &t) {
+  std::stringstream ss;
+  ss << "sizes=" << t.sizes() << ", type=" << t.scalar_type();
+  return ss.str();
 }
 
 } // namespace poptorch

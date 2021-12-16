@@ -350,6 +350,9 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
       at::Tensor tensor = stack->at(index).toTensor();
       node->output(index)->inferTypeFrom(tensor);
       _mapper.addTensor(tensor, node->output(index));
+      logging::trace("[TRACING-2] Output: Tensor ptr {}, jit ir %{} {}",
+                     reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+                     node->output(index)->debugNameBase(), toString(tensor));
     }
 
     // Update the 'tail' so if another node needs to process the JIT it will
@@ -544,6 +547,10 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
 
   // Fixup the JIT so it has the correct type.
   new_node->output(0)->inferTypeFrom(new_output);
+
+  logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
+                 reinterpret_cast<void *>(new_output.unsafeGetTensorImpl()),
+                 new_node->output(0)->debugNameBase(), toString(new_output));
 }
 
 std::shared_ptr<MLIRExecutable> MLIRDispatch::compile() {

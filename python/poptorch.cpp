@@ -1336,6 +1336,9 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
 
     logging::debug("Traced graph: {}", *graph);
 
+    poptorch::type_and_constant_canonicalization::makeConstantIntParams(
+        graph.get(), parameter_names, parameters);
+
     AnchorList anchors_list;
     std::vector<Optimizer> optimizers;
 

@@ -331,6 +331,9 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("transpose.int",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
+  m.impl("layer_norm",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
   m.impl("expand",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
@@ -359,6 +362,26 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
   m.impl("adaptive_avg_pool3d",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  // If we don't intercept this op, it will be decomposed to as_strided
+  // which is harder to handler.
+  m.impl("slice.Tensor",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  // If we don't intercept this op, it will be decomposed to as_strided
+  // which is harder to handler.
+  m.impl("unsqueeze",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  // If we don't intercept this op, it will be decomposed to as_strided
+  // which is harder to handler.
+  m.impl("permute",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  // If we don't intercept this op, it will be decomposed to as_strided
+  // which is harder to handler.
+  m.impl("select.int",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 }
 
