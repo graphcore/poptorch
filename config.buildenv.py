@@ -14,6 +14,7 @@ installers.add(
         "pyyaml=5.3.1",
         "pybind11=2.6.1",
         "pytest=6.2.1",
+        "setuptools=58.0.4",
         "spdlog=1.8.0",
         "wheel=0.34.2",
         "zip=3.0",
