@@ -11,6 +11,7 @@
 #include <utility>
 
 #include <model_runtime/DeviceManager.hpp>
+#include <passes/CommonPasses.hpp>
 #include <poplar/Device.hpp>
 #include <poplar/DeviceManager.hpp>
 #include <poplar/Engine.hpp>
@@ -20,7 +21,7 @@
 #include <poprithms/logging/timepartitionlogger.hpp>
 
 #include "lower_to_poplar/CompilerHelpers.hpp"
-#include "lower_to_poplar/LowerToPoplar.hpp"
+#include "passes/LowerToPoplar.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -58,20 +59,25 @@ void PoplarExecutableImpl::compile(
     poprithms::logging::ManualTimePartitionLogger &timer) {
   mlir::PassManager manager{module.getContext()};
 
-  // manager.enableStatistics();
-
-  timer.start("Poplar graph construction");
   manager.enableTiming();
+  // Disable MLIR pass verification as we have our own definition of
+  // valid IR state
+  manager.enableVerifier(false);
+
+  manager.addPass(poptorch_ir::createRemoveUnusedOperationsPass());
+  manager.addPass(poptorch_ir::createRemoveRedundantCopiesPass());
   manager.addPass(poptorch_ir::createLowerToPoplarPass(the_graph, context));
 
-  mlir::LogicalResult result = manager.run(module);
-  (void)result;
-  timer.stop();
-
-  timer.start("Compiling poplar");
-  engine = std::make_unique<poplar::Engine>(the_graph, context.programs);
-  engine->load(device->device());
-  timer.stop();
+  timer.start("Poplar graph construction");
+  if (mlir::succeeded(manager.run(module))) {
+    timer.stop();
+    timer.start("Compiling poplar");
+    engine = std::make_unique<poplar::Engine>(the_graph, context.programs);
+    engine->load(device->device());
+    timer.stop();
+  } else {
+    ERROR("One or more passes failed.");
+  }
 }
 
 } // namespace detail

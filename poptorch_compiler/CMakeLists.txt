@@ -72,10 +72,14 @@ add_subdirectory(dialect)
 # Add lower to poplar to include path.
 include_directories("${PROJECT_SOURCE_DIR}/lower_to_poplar/include/")
 
-
 # Include the PyTorch interface
 include_directories("${PROJECT_SOURCE_DIR}/pytorch_bridge/include/")
 
+# Include the generic passes
+include_directories("${PROJECT_SOURCE_DIR}/transforms/include/")
+
+# Build the mlir passes
+add_subdirectory(transforms)
 
 # Build the poplar lowering code.
 add_subdirectory(lower_to_poplar)

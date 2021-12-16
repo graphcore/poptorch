@@ -7,7 +7,8 @@
 #include "mlir/Pass/PassManager.h"
 
 #include "lower_to_poplar/CompilerHelpers.hpp"
-#include "lower_to_poplar/LowerToPoplar.hpp"
+#include "passes/LowerToPoplar.hpp"
+#include "passes/PassUtils.hpp"
 
 #include <poplar/Graph.hpp>
 #include <poplar/Program.hpp>
@@ -18,6 +19,7 @@
 #include <poprand/codelets.hpp>
 
 #include "dialect/PoptorchDialect.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch_ir {
 
@@ -25,7 +27,7 @@ namespace {
 /*
   Converts the MLIR graph into a poplar graph which can then be compiled.
  */
-class LowerToPoplar
+class LowerToPoplar final
     : public mlir::PassWrapper<LowerToPoplar,
                                mlir::OperationPass<mlir::ModuleOp>> {
 public:
@@ -40,8 +42,6 @@ public:
   }
 
   void runOnOperation() override;
-
-  void addCopyForInput(mlir::Value value);
 
   poplar::Graph &graph() { return *_graph; }
 
@@ -111,11 +111,11 @@ PoplarTypePair processType(mlir::Type mlirType) {
 }
 
 void LowerToPoplar::runOnOperation() {
-  mlir::ModuleOp the_module = this->getOperation();
+  mlir::ModuleOp module = this->getOperation();
 
-  the_module->dump();
+  poptorch::logging::info("Graph lowered to poplar:\n{}", mlirOpToStr(module));
 
-  for (mlir::FuncOp function : the_module.getOps<mlir::FuncOp>()) {
+  for (mlir::FuncOp function : module.getOps<mlir::FuncOp>()) {
     _context->seq = poplar::program::Sequence();
 
     // Walk over all functions with a poplar impl.
@@ -182,4 +182,5 @@ createLowerToPoplarPass(poplar::Graph &graph, CompilerContext &context) {
 
 } // namespace poptorch_ir
 
-static mlir::PassRegistration<poptorch_ir::LowerToPoplar> lower("", "");
+static mlir::PassRegistration<poptorch_ir::LowerToPoplar>
+    lower("lower-to-poplar", "");

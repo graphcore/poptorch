@@ -1,6 +1,5 @@
 add_library(lower_to_poplar STATIC
         PoplarExecutor.cpp
-        LowerToPoplar.cpp
         ops/Activations.cpp
         ops/ElementWise.cpp
         ops/Generated.cpp
@@ -11,7 +10,8 @@ add_library(lower_to_poplar STATIC
         ops/PoolingOps.cpp
         ops/Reductions.cpp
         ops/Reshapes.cpp
-        ops/TensorOps.cpp)
+        ops/TensorOps.cpp
+        passes/LowerToPoplar.cpp)
 
 
 target_include_directories(lower_to_poplar PUBLIC include)
@@ -23,6 +23,7 @@ find_package(popef)
 target_link_libraries(lower_to_poplar PRIVATE
         MLIRIR
         MLIRPass
+        poptorch_mlir_passes
 
         model_runtime
         popef
