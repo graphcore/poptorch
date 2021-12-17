@@ -58,10 +58,17 @@ void RemoveRedundantCopies::runOnOperation() {
       for (mlir::Operation *user : op.getUsers()) {
         first_user = user;
       }
-      if (mlir::isa<copy_>(*first_user)) { // NOLINT
+
+      // Remove only if this is a copy.
+      if (poptorch_ir::copy_ copy =
+              llvm::dyn_cast<poptorch_ir::copy_>(*first_user)) { // NOLINT
+        // Check we are copying *to* the empty tensor.
+        if (copy.self() != op.getResult(0)) {
+          continue;
+        }
         // The second operand of copy_ is the result of the operation we
         // want to replace the empty_tensor with
-        op.replaceAllUsesWith(first_user->getOperand(1).getDefiningOp());
+        copy.self().replaceAllUsesWith(copy.src());
         to_remove.push_back(&op);
         to_remove.push_back(first_user);
       }
