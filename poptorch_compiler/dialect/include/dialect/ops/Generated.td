@@ -952,20 +952,6 @@ def Poptorch_tfidfvectorizer : Poptorch_Op<"tfidfvectorizer", []> {
 
 }
 
-def Poptorch_where : Poptorch_Op<"where", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-}
-
 def Poptorch_mean : Poptorch_Op<"mean", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
   let results = (outs Poptorch_tensor:$result);

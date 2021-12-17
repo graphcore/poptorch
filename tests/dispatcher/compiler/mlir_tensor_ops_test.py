@@ -47,3 +47,21 @@ def test_cat(params):
 def test_stack(params):
     dim, dtype = params
     cat_stack_harness(torch.stack, dim, dtype)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
+def test_where():
+    zeros = torch.zeros(3, 3)
+    ones = torch.ones(3, 3)
+    cond = torch.tensor([[True, False, True], [False, True, True],
+                         [False, False, True]])
+    torch_out = torch.where(cond, zeros, ones)
+
+    with poptorch.IPUScope([zeros, ones, cond],
+                           compile_using=enums.Compiler.MLIR) as ipu:
+        ipu_out = torch.where(cond, zeros, ones)
+        ipu.outputs([ipu_out])
+
+    # pylint: disable=no-member
+    helpers.assert_allequal(actual=ipu(zeros, ones, cond), expected=torch_out)

@@ -257,3 +257,7 @@
 # adaptive_avg_pool3d(Tensor self, int[3] output_size) -> Tensor(a!)
 - func: adaptive_avg_pool3d
   PopTorchDirect: adaptive_avg_pool
+
+# _s_where(Tensor condition, Tensor self, Tensor other) -> Tensor
+- func: _s_where
+  PopTorchDirect: where

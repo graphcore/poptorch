@@ -141,4 +141,14 @@ void dropout::lowerToPoplar(CompilerContext &context) {
   }
 }
 
+void where::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor condition = context.fromSsa(this->condition());
+  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor other = context.fromSsa(this->other());
+
+  auto result =
+      popops::select(context.graph, self, other, condition, context.seq);
+  context.tensors[this->result()] = result;
+}
+
 } // namespace poptorch_ir

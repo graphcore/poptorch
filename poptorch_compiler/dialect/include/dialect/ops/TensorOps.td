@@ -151,3 +151,18 @@ def Poptorch_dropout : Poptorch_Op<"dropout", []> {
       }]>
     ];
 }
+
+def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$condition,
+                       Poptorch_tensor:$self,
+                       Poptorch_tensor:$other);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$condition,
+                                    "mlir::Value":$self,
+                                    "mlir::Value":$other), [{
+          $_state.addOperands({condition, self, other});
+          $_state.addTypes({self.getType()});
+
+  }]>];
+}

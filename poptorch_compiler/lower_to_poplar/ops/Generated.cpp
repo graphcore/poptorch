@@ -389,12 +389,6 @@ void tfidfvectorizer::lowerToPoplar(CompilerContext & /*context*/) {
                   "tfidfvectorizer"
                   " is currently unimplemented.");
 }
-void where::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "where"
-                  " is currently unimplemented.");
-}
 void mean::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
