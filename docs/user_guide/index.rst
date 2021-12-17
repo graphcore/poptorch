@@ -12,6 +12,7 @@ PyTorch for the IPU: User Guide
     batching
     supported_ops
     debugging
+    hostio_optimisation
     example
     experimental
     reference
