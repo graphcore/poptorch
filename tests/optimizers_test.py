@@ -5,6 +5,7 @@ from io import StringIO
 import json
 import os
 import tempfile
+import unittest.mock
 
 import pytest
 import torch
@@ -35,6 +36,24 @@ supported_torch_optimizers = [
 ]
 
 all_optimizers = poptorch_optimizers + supported_torch_optimizers
+
+
+def assert_is_ipu_optimizer_state(state, should_be_empty=False):
+    assert isinstance(state, dict)
+    assert "ipu_state" in state
+    assert "ipu_param" in state
+    if should_be_empty:
+        assert state["ipu_state"] is None
+        assert state["ipu_param"] is None
+    else:
+        assert isinstance(state["ipu_state"], dict) and all(
+            isinstance(k, str) and isinstance(v, torch.Tensor)
+            for k, v in state["ipu_state"].items()), state
+        assert isinstance(state["ipu_param"], dict) and all(
+            isinstance(k, str) and isinstance(v, torch.Tensor)
+            for k, v in state["ipu_param"].items()), state
+        assert len(state["ipu_param"]) > 0, "All optimizers have parameters"
+        # Not all optimizers have a state though
 
 
 class OptimizerTestModel:
@@ -1160,16 +1179,14 @@ def test_read_ipu_state(optim):
                       loss_scaling=ls)
     training_model = poptorch.trainingModel(model, optimizer=optimizer)
 
-    # Before the model is compiled, the state_dict should throw an error
-    with pytest.raises(
-            RuntimeError,
-            match="You must compile or run a training model with this "
-            "optimizer before the state can be read."):
-        optimizer.state_dict()
+    # Before the model is compiled, the state_dict should be empty
+    state = optimizer.state_dict()
+    assert_is_ipu_optimizer_state(state, should_be_empty=True)
 
     # Compiling should populate the state_dict
     training_model.compile((input, ))
     s0 = optimizer.state_dict()
+    assert_is_ipu_optimizer_state(s0, should_be_empty=False)
 
     sgd_param_keys = [
         "scaledLearningRate0___specific___model.lin.bias",
@@ -1223,6 +1240,7 @@ def test_read_ipu_state(optim):
         # Run the model, get the updated state dict and check optimiser state tensors have changed
         training_model((input, ))
         s1 = optimizer.state_dict()
+        assert_is_ipu_optimizer_state(s1, should_be_empty=False)
         assert not all([
             torch.equal(s0["ipu_state"][k], s1["ipu_state"][k])
             for k in s0["ipu_state"].keys()
@@ -1244,14 +1262,33 @@ def test_read_ipu_state_cached(caplog, capfd):
 
     training_model.compile((input, ))
     # Compilation should trigger an optimiser state IPU->host copy
-    optimizer.state_dict()
+    state = optimizer.state_dict()
+    assert_is_ipu_optimizer_state(state, should_be_empty=False)
+
     log = helpers.LogChecker(capfd)
     log.assert_matches("Writing optimiser state tensors from IPU to host.")
 
     # The second invocation should use the cached state dict, since
     # the internal optimiser state hasn't changed
-    optimizer.state_dict()
+    state = optimizer.state_dict()
+    assert_is_ipu_optimizer_state(state, should_be_empty=False)
     assert "Using cached optimiser state dict" in caplog.text
+
+
+@unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
+def test_read_ipu_state_offline():
+    input = torch.ones(3)
+    # A simple model with weights and a loss function
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
+    optimizer = poptorch.optim.SGD(model.parameters(), lr=0.0)
+
+    opts = poptorch.Options()
+    opts.useOfflineIpuTarget()
+    training_model = poptorch.trainingModel(model, opts, optimizer=optimizer)
+
+    training_model.compile((input, ))
+    state = optimizer.state_dict()
+    assert_is_ipu_optimizer_state(state, should_be_empty=True)
 
 
 @helpers.printCapfdOnExit

@@ -1159,7 +1159,9 @@ std::vector<TensorMetadata> Compiler::optimizerTensorMetadataList() const {
   for (auto *t : _impl->session->getIr().optimizerStateTensors()) {
     fn_add_tensor_data(t, true);
   }
-  for (auto *t : _impl->session->getIr().optimizerTensors()) {
+  // Note: session->getIr().optimizerTensors() is empty for cached executables,
+  // so get the optimizer tensors from the executable instead.
+  for (auto *t : _impl->session->getExecutable().getOptimizerTensors()) {
     fn_add_tensor_data(t, false);
   }
   return metadata_list;

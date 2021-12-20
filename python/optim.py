@@ -66,7 +66,7 @@ def _parseArgs(all_args: Dict[str, Any],
 
 class Optimizer:
     def __init__(self):
-        self._state_dict = {}
+        self._state_dict = {"ipu_state": None, "ipu_param": None}
 
     # These functions must be overridden so that the optimiser state can be set
     # when the model is created
@@ -85,14 +85,10 @@ class Optimizer:
 
     # Getter/setter for local state dict after the above functions been overridden by PoplarExecutor
     def get_state_dict(self):
-        if len(self._state_dict.items()) == 0:
-            raise RuntimeError(
-                "You must compile or run a training model with this optimizer"
-                " before the state can be read.")
         return self._state_dict
 
     def set_state_dict(self, state):
-        if len(state.items()) == 0:
+        if not state:
             raise RuntimeError(
                 "Cannot load optimizer state dictionary because it is empty.")
         if not ("ipu_state" in state and "ipu_param" in state):
@@ -101,8 +97,8 @@ class Optimizer:
         self._state_dict = state
 
     def has_state(self):
-        return ("ipu_state" in self._state_dict
-                and "ipu_param" in self._state_dict)
+        return (self._state_dict.get("ipu_state") is not None
+                and self._state_dict.get("ipu_param") is not None)
 
 
 class SGD(Optimizer, torch.optim.SGD):
