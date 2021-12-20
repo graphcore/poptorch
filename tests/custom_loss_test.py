@@ -100,7 +100,7 @@ def run_custom_loss_test(loss_fn,
         out, loss = poptorch_model(input, target)
 
     # Check we have trained the "model"
-    assert loss < 0.01
+    assert loss < 0.1
 
     if test_output_vs_target:
         helpers.assert_allclose(actual=out,
