@@ -575,16 +575,19 @@ input_shapes = [(1, 4, 5), (2, ), (2, 2), (2, 3, 4, 1, 3, 4)]
 dtypes = [torch.float, torch.float16, torch.int32]
 
 
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("input_shapes", input_shapes)
 @pytest.mark.parametrize("t", dtypes)
-def test_fill(input_shapes, t):
+def test_fill(capfd, input_shapes, t):
     float_test_num = 1.9375
 
     def op(x):
         value = 42 if x.dtype == torch.int32 else float_test_num
         x = x + 0  # Ensure x is not modified in place
-        return x.fill_(value), torch.full_like(x, value), torch.full(
-            input_shapes, value, dtype=x.dtype)
+        # Add zero to all results to avoid pruning the whole graph
+        return x.fill_(value) + 0, torch.full_like(x, value) + 0, torch.full(
+            input_shapes, value, dtype=x.dtype) + 0, torch.ones_like(x) + 0
 
     x = torch.ones(*input_shapes, dtype=t)
 
@@ -606,6 +609,8 @@ def test_fill(input_shapes, t):
                test_training=False,
                assert_fn=assert_fn,
                native_out=native_out)
+    testlog = helpers.LogChecker(capfd)
+    testlog.assert_no_matches("expand")
 
 
 @pytest.mark.parametrize("input_shapes", input_shapes)

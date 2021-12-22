@@ -141,7 +141,7 @@ class PrintCapfdOnExit:
         log = out + err
         with self.capfd.disabled():
             if log:
-                print(log)
+                print(log.encode("ascii", "ignore").decode())
 
 
 def printCapfdOnExit(func):

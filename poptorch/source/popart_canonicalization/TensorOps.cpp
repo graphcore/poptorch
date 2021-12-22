@@ -288,6 +288,39 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
   return result->node();
 }
 
+torch::jit::Node *fullCommon(torch::jit::Graph *graph, torch::jit::Value *v,
+                             at::ScalarType type,
+                             const std::vector<int64_t> &shape) {
+  auto *vn = v->node();
+  if (isTensorConstant(vn) && vn->output()->type()->cast<c10::TensorType>()) {
+    auto v_scalar = vn->t(c10::attr::value).item();
+    return tensorToConstant(graph, at::full(shape, v_scalar, type));
+  }
+  auto *v_cast = createCast(graph, v, type)->output();
+  auto *c_shape = intVectorToIrConstant(graph, shape);
+  return createExpand(graph, {v_cast, c_shape});
+}
+
+torch::jit::Node *fullHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  // aten::full(int[] size, Scalar fill_value) -> Tensor
+  auto *v = node->input(1);
+  auto *shape = node->input(0);
+  auto lv_shape = constantToLongVec(shape->node());
+  auto type = getNodeScalarType(shape);
+  return fullCommon(graph, v, type, lv_shape);
+}
+
+torch::jit::Node *fullLikeHandler(torch::jit::Graph *graph,
+                                  torch::jit::Node *node) {
+  // aten::full_like(Tensor self, Scalar fill_value) -> Tensor
+  auto *v = node->input(1);
+  auto *like = node->output(0);
+  auto like_shape = shapeFromTensor(like);
+  auto like_type = getNodeScalarType(like);
+  return fullCommon(graph, v, like_type, like_shape);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -301,6 +334,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::copy_, copyHandler);
   registerHandler(c10::aten::linear, linearHandler);
   registerHandler(c10::aten::gather, gatherHandler);
+  registerHandler(c10::aten::full, fullHandler);
+  registerHandler(c10::aten::full_like, fullLikeHandler);
 }
 
 } // namespace poptorch

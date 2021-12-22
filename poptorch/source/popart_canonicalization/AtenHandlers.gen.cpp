@@ -211,32 +211,6 @@ torch::jit::Node *fmodHandler(torch::jit::Graph *graph,
   return createFmod(graph, {i0, i1});
 }
 
-torch::jit::Node *fullHandler(torch::jit::Graph *graph,
-                              torch::jit::Node *node) {
-  auto *y = node->input(1);
-  auto *x = node->input(0);
-  auto t0 = constantToLongVec(x->node());
-  auto *t1 = intVectorToIrConstant(graph, t0);
-  auto *t2 = createExpand(graph, {y, t1})->output();
-  auto *t3 = node->output(0);
-  auto t5 = getNodeScalarType(t3);
-  // cast(expand(y, AsIr(clong_list(x))), scalar_type(output0))
-  return createCast(graph, t2, t5);
-}
-
-torch::jit::Node *fullLikeHandler(torch::jit::Graph *graph,
-                                  torch::jit::Node *node) {
-  auto *y = node->input(1);
-  auto *t0 = node->output(0);
-  auto t2 = getNodeScalarType(t0);
-  auto *t3 = createCast(graph, y, t2)->output();
-  auto *x = node->input(0);
-  auto t4 = shapeFromTensor(x);
-  auto *t5 = intVectorToIrConstant(graph, t4);
-  // expand(cast(y, scalar_type(output0)), AsIr(tensor_shape(x)))
-  return createExpand(graph, {t3, t5});
-}
-
 torch::jit::Node *geHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   auto *x = node->input(0);
   auto *y = node->input(1);
@@ -826,8 +800,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::expm1, expm1Handler);
   registerHandler(c10::aten::floor, floorHandler);
   registerHandler(c10::aten::fmod, fmodHandler);
-  registerHandler(c10::aten::full, fullHandler);
-  registerHandler(c10::aten::full_like, fullLikeHandler);
   registerHandler(c10::aten::ge, geHandler);
   registerHandler(c10::aten::gelu, geluHandler);
   registerHandler(c10::aten::gt, gtHandler);
