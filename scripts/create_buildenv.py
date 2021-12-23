@@ -320,8 +320,8 @@ class BuildenvManager:
                                 {full_template_name}")
 
         os.chdir(self.output_dir)
+        # CC / CXX -> Enable ccache for the current C / C++ compilers.
         self.env.run_commands(
-            """echo "export CCACHE_CPP2=yes" >> %s""" % self.activate_filename,
             """echo "export CC=\\"ccache ${CC:-gcc}\\"" >> %s""" %
             self.activate_filename,
             """echo "export CXX=\\"ccache ${CXX:-g++}\\"" >> %s""" %
@@ -373,7 +373,13 @@ class BuildenvManager:
             i.install(self.env)
 
     def _clear_activate_buildenv(self):
-        open(self.activate_filename, "w").close()
+        # Clear the content of activate_buildenv.sh
+
+        # PYTHONNOUSERSITE -> Make Conda ignore packages installed in ~/.local
+        # CCACHE_CPP2 -> Switch ccache to C++ mode (Avoid issues with C pre-processor)
+        with open(self.activate_filename, "w") as f:
+            f.write("export PYTHONNOUSERSITE=1\n")
+            f.write("export CCACHE_CPP2=yes\n")
 
     def _append_to_activate_buildenv(self, *lines):
         with open(self.activate_filename, "a") as f:
