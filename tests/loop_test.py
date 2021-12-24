@@ -121,8 +121,6 @@ def test_loop_non_list_in(trace_model):
         inference_model(x, y)
 
 
-# TODO(T33273)
-@pytest.mark.skip(reason="Popart doesn't support weights in loop oddly")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_loop_weights(trace_model):
     class Model(torch.nn.Module):
@@ -139,7 +137,7 @@ def test_loop_weights(trace_model):
                 act = self.layer2(act)
                 return act.flatten()
 
-            return poptorch.for_loop(10, body, [x])[0]
+            return poptorch.for_loop(2, body, [x])[0]
 
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
@@ -148,3 +146,51 @@ def test_loop_weights(trace_model):
     x = torch.tensor([1.])
 
     inference_model(x)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_weights_use_twice(trace_model):
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer1 = torch.nn.Linear(4, 4)
+
+        def forward(self, x):
+            def body(x):
+                act = self.layer1(x)
+                return self.layer1(act)
+
+            return poptorch.for_loop(2, body, [x])
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
+
+    x = torch.tensor(torch.ones(1, 4).to(torch.float))
+    inference_model(x)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_training(trace_model):
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer1 = torch.nn.Linear(4, 4)
+
+        def forward(self, x):
+            def body(x):
+                return self.layer1(x)
+
+            out = poptorch.for_loop(2, body, [x])[0]
+            loss = poptorch.identity_loss(out, reduction='sum')
+            return out, loss
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(Model(), options)
+
+    x = torch.tensor(torch.ones(1, 4).to(torch.float))
+    with pytest.raises(
+            poptorch.Error,
+            match=r"poptorch.for_loop\(\) is only supported in inference"):
+        training_model(x)

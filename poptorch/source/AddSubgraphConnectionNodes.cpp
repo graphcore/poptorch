@@ -122,7 +122,7 @@ void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
  * if/else and while loops. If they have tensor which comes from the subgraph
  * above we must add a specific input entry op to the graph for that op.
  */
-void annotateSubgraphs(torch::jit::Graph *graph) {
+void annotateSubgraphs(torch::jit::Graph *graph, bool training) {
   logging::LogContext ctx_func("annotateSubgraphs Processing");
   // Subgraph start to all nodes contained directly within that subgraph.
   std::stack<Subgraph> subgraph_nodes;
@@ -175,6 +175,8 @@ void annotateSubgraphs(torch::jit::Graph *graph) {
       // Record the number of outputs.
       node->i_(c10::Symbol::fromQualString("attr::num_outputs"), num_outputs);
     } else if (kind == symbols::poptorch::start_for_loop) {
+      ERROR_ON_MSG(training,
+                   "poptorch.for_loop() is only supported in inference.");
       // Start tracking the new subgraph.
       subgraph_nodes.push(Subgraph(true));
 

@@ -38,7 +38,7 @@ void canonicalizeLists(torch::jit::Graph *graph);
  */
 void warnOnUnsupportedAten(torch::jit::Graph *graph);
 
-void annotateSubgraphs(torch::jit::Graph *graph);
+void annotateSubgraphs(torch::jit::Graph *graph, bool training);
 
 void removeSurplusIdentityLosses(torch::jit::Graph *graph);
 

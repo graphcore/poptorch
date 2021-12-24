@@ -923,7 +923,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   printGraphBeforeHalfFloatResolution(*graph);
 
-  poptorch::annotateSubgraphs(graph.get());
+  poptorch::annotateSubgraphs(graph.get(), training);
 
   poptorch::resolveHalfOrFloat(graph.get());
 
