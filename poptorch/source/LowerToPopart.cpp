@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "poptorch/LowerToPopart.hpp"
 
+#include <experimental/filesystem>
 #include <pybind11/pybind11.h>
 
 #include <cstdlib>
@@ -19,9 +20,28 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+namespace fs = std::experimental::filesystem;
+
 namespace poptorch {
 
 namespace {
+
+std::string getModelProtoFilename() {
+  if (const char *proto_file = std::getenv("POPTORCH_EXPORT_PROTO_FILE")) {
+    fs::path file = fs::absolute(proto_file);
+    fs::path dir = file;
+    if (dir.has_extension()) {
+      dir.remove_filename();
+    } else {
+      file += "/model.proto";
+    }
+    fs::create_directories(dir);
+    logging::info(
+        "POPTORCH_EXPORT_PROTO_FILE set: saving model prototype to {}", file);
+    return file;
+  }
+  return "";
+}
 
 // Mapping between the SSA values of torch jit with the ssa values of popart.
 // Each Value is either a single tensor, tuple or list (Note: nested tuples are
@@ -338,7 +358,7 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
 
   logging::LogContext ctx("LowerToPopart::compile");
   // Init the session, this also involves compiling to poplar.
-  _compiler.initSession(_optimizers);
+  _compiler.initSession(_optimizers, getModelProtoFilename().c_str());
 
   _compiler.compileAndPrepareDevice();
 
@@ -358,7 +378,7 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
                                           std::int64_t offset) {
   logging::LogContext ctx("LowerToPopart::loadExecutableFromFile");
   // Init the session, this also involves compiling to poplar.
-  _compiler.initSession(_optimizers);
+  _compiler.initSession(_optimizers, getModelProtoFilename().c_str());
   _compiler.loadExecutableAndPrepareDevice(input_filename.c_str(), offset);
 
   std::vector<at::ScalarType> data_types;
@@ -376,7 +396,7 @@ void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
   ERROR_ON_MSG(!_lowered, "You need to lower() the graph first");
 
   logging::LogContext ctx("LowerToPopart::compileAndExport");
-  _compiler.initSession(_optimizers);
+  _compiler.initSession(_optimizers, getModelProtoFilename().c_str());
   _compiler.compileAndExport(export_filename.c_str());
 }
 

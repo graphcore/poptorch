@@ -390,7 +390,8 @@ public:
   void setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,
                     std::int64_t ipu_id);
 
-  void initSession(const std::vector<Optimizer> &opt);
+  void initSession(const std::vector<Optimizer> &opt,
+                   const char *export_proto_filename);
   void compileAndExport(const char *export_filename);
   void compileAndPrepareDevice();
   void loadEngineAndConnectStreams();

@@ -337,7 +337,6 @@ def test_offline_ipu():
     model = Network()
     # Force-disable the IPU model
     opts = poptorch.Options().useOfflineIpuTarget()
-    poptorch.inferenceModel(model, opts)
 
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
@@ -346,6 +345,24 @@ def test_offline_ipu():
     with pytest.raises(AssertionError,
                        match="Trying to run a model on an offline device"):
         inference_model(x, y)
+
+
+@unittest.mock.patch.dict("os.environ", {})
+def test_export_proto_file():
+    class Network(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    with tempfile.TemporaryDirectory() as tmp:
+        file = os.path.join(tmp, "my_dir", "my_model.proto")
+        os.environ["POPTORCH_EXPORT_PROTO_FILE"] = file
+        model = Network()
+        inference_model = poptorch.inferenceModel(model)
+        x = torch.ones(2)
+        y = torch.zeros(2)
+
+        inference_model(x, y)
+        assert os.path.isfile(file)
 
 
 def test_tensor_location():

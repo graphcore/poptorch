@@ -32,7 +32,7 @@ void processInputTensor(torch::jit::Graph *graph, torch::jit::Value *input) {
 
   auto *earliest_user = findEarliestUser(input);
   if (earliest_user == nullptr) {
-    logging::warn("Unused input");
+    logging::warn("Unused input {}", *input->node());
     return;
   }
 

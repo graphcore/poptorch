@@ -25,8 +25,36 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "CustomOps.hpp"
+
 namespace poptorch {
 namespace {
+
+void saveModelProtoIfNeeded(popart::Builder *builder,
+                            const char *export_proto_filename) {
+  std::string filename = export_proto_filename;
+  if (!filename.empty()) {
+    // Important: popart_compiler is compiled using C++ 14 and therefore
+    // doesn't have access to the filesystem utilities so the caller is
+    // responsible for making sure the directories exist and the
+    // filename is a valid filename.
+    std::ofstream fs(filename);
+    bool human_readable = true;
+    if (const char *proto_as_bin =
+            std::getenv("POPTORCH_EXPORT_PROTO_AS_BINARY")) {
+      human_readable = std::stoi(proto_as_bin) == 0;
+    }
+    if (human_readable) {
+      logging::info("Exporting model proto as text (Set "
+                    "POPTORCH_EXPORT_PROTO_AS_BINARY=1 to export as binary)");
+    } else {
+      logging::info("Exporting model proto as binary (Set "
+                    "POPTORCH_EXPORT_PROTO_AS_BINARY=0 to export as human "
+                    "readable text)");
+    }
+    fs << builder->getModelProto(human_readable);
+    fs.close();
+  }
+}
 
 // Helper to let us filter string arguments into const char*s. This is to catch
 // the std::string produced by some attributes before they cross the ABI
@@ -473,7 +501,8 @@ void Compiler::setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
   addOutput(id, ptr, dims, _impl.get());
 }
 
-void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
+void Compiler::initSession(const std::vector<Optimizer> &optimizers,
+                           const char *export_proto_filename) {
   logging::LogContext ctx_init_session{"Compiler::initSession"};
 
   logging::trace("Initializing session");
@@ -673,6 +702,8 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers) {
     options.accumulatorTensorLocationSettings.location.shardingDomain =
         sharding_domain;
   }
+
+  saveModelProtoIfNeeded(_impl->active_builder, export_proto_filename);
 
   // Create the popart session object to actually run the graph.
   if (!_impl->is_training) {

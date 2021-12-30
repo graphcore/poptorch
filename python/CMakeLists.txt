@@ -84,6 +84,7 @@ target_link_libraries(poptorch_core PRIVATE
   poptorch_logging
   dispatch_tracer
   poptorch_core_headers
+  stdc++fs
 )
 
 install(TARGETS poptorch_core
