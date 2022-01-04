@@ -958,7 +958,24 @@ void Compiler::copyWeightsToHost(const std::vector<void *> &host_buffers) {
   _impl->session->readWeights(_impl->weights);
 }
 
-void Compiler::run(const std::vector<Optimizer> &optimizers) {
+void Compiler::updateOptimizers(const std::vector<Optimizer> &optimizers) {
+  ERROR_ON(!_impl->session);
+  ERROR_ON(optimizers.empty());
+  ERROR_ON(!_impl->is_training);
+
+  // Each of the groups of parameters are stored in a single PopART
+  // optimizer that's why the vector of optimizers translates into
+  // a single PopART optimizer.
+  std::unique_ptr<popart::Optimizer> optimizer =
+      _impl->getPopartOptimizer(optimizers);
+
+  // Update the popart graph/poplar executable with new optimizer.
+  popart::TrainingSession &session =
+      dynamic_cast<popart::TrainingSession &>(*_impl->session);
+  session.updateOptimizerFromHost(optimizer.get());
+}
+
+void Compiler::run() {
   if (!_impl->session) {
     // Nothing to run on IPU
     ERROR_ON(!_impl->popart_incoming.empty());
@@ -966,16 +983,6 @@ void Compiler::run(const std::vector<Optimizer> &optimizers) {
     ERROR_ON(!_impl->outgoing_duplicates.empty());
     ERROR_ON(!_impl->memory_manager.empty());
     return;
-  }
-
-  if (!optimizers.empty() && _impl->is_training) {
-    std::unique_ptr<popart::Optimizer> optimizer =
-        _impl->getPopartOptimizer(optimizers);
-
-    // Update the popart graph/poplar executable with t::attache new optimizer.
-    popart::TrainingSession &session =
-        dynamic_cast<popart::TrainingSession &>(*_impl->session);
-    session.updateOptimizerFromHost(optimizer.get());
   }
 
   if (!isAttachedToDevice()) {

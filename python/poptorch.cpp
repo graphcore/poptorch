@@ -384,7 +384,7 @@ void copyParametersDict(Optimizer *out, const py::dict &in) {
 
 // Process the user provided dictionary and extract the relevant optimizer
 // information.
-std::vector<Optimizer> parseOptimizer(const py::dict &opt) {
+std::vector<Optimizer> parseOptimizers(const py::dict &opt) {
   if (opt.empty()) {
     return {};
   }
@@ -830,7 +830,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   traced_parameter_tensors = remapTensors(
       python_traced_params, model_parameters, traced_parameter_tensors);
 
-  std::vector<Optimizer> optimizers = parseOptimizer(optimizer_dict);
+  std::vector<Optimizer> optimizers = parseOptimizers(optimizer_dict);
   SessionOptions parsed_options = parseSessionOptions(options);
 
   logGraph("Lowered graph:", *graph, has_converted_any_half, input_tensors);
@@ -1003,6 +1003,7 @@ void copyWeightsToDeviceImpl(
 std::string
 getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     return executable->getPopartIR();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -1011,6 +1012,7 @@ getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
 void detachFromDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     executable->detachFromDevice();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -1019,6 +1021,7 @@ void detachFromDevice(
 void attachToDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     executable->attachToDevice();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -1027,6 +1030,7 @@ void attachToDevice(
 bool isAttachedToDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     return executable->isAttachedToDevice();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -1047,15 +1051,30 @@ void setPopartLogLevelUInt(std::uint64_t level) {
 void loadEngineAndConnectStreams(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     executable->loadEngineAndConnectStreams();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
+void updateOptimizers(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable,
+    const py::dict &optimizer_dict) {
+  try {
+    ERROR_ON_MSG(!executable, "No built executable");
+    // Create an empty optimizer for inference, this will not be applied.
+    std::vector<Optimizer> optimizers = parseOptimizers(optimizer_dict);
+
+    executable->updateOptimizers(optimizers);
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
 std::vector<pybind11::object>
 execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
-        const pybind11::tuple &inputs, py::dict *optimizer_dict) {
+        const pybind11::tuple &inputs) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     // Create a jit stack from the incoming pytorch tensors.
     torch::jit::Stack input_stack = torch::jit::toTraceableStack(inputs);
 
@@ -1066,15 +1085,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
       buildTensorList(value, &input_tensors);
     }
 
-    // Create an empty optimizer for inference, this will not be applied.
-    std::vector<Optimizer> optimizers;
-
-    if (optimizer_dict != nullptr) {
-      optimizers = parseOptimizer(*optimizer_dict);
-    }
-
-    std::vector<at::IValue> output_tensors =
-        executable->run(&input_tensors, optimizers);
+    std::vector<at::IValue> output_tensors = executable->run(&input_tensors);
 
     std::vector<pybind11::object> returnee;
 
@@ -1138,6 +1149,7 @@ py::dict readOptimizerState(
   py::dict state_tensors;
   py::dict param_tensors;
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     const auto &compiler = executable->getCompiler();
     std::vector<TensorMetadata> metadata_list =
         compiler.optimizerTensorMetadataList();
@@ -1170,22 +1182,35 @@ void writeOptimizerState(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const py::dict &optim_state) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     const auto &compiler = executable->getCompiler();
     std::vector<TensorMetadata> metadata_list =
         compiler.optimizerTensorMetadataList();
 
     std::vector<void *> host_buffers;
+    auto state = optim_state["ipu_state"];
+    auto params = optim_state["ipu_param"];
+
     for (const TensorMetadata &meta : metadata_list) {
       if (meta.num_bytes == -1) {
         // num_bytes == -1 indicates it's an optimiser state tensor (variable)
-        at::Tensor tensor =
-            optim_state["ipu_state"][py::cast(meta.id)].cast<at::Tensor>();
+        if (!state.contains(py::cast(meta.id))) {
+          logging::warn("writeOptimizerState: ignoring missing state {}",
+                        meta.id);
+          host_buffers.push_back(nullptr);
+          continue;
+        }
+        at::Tensor tensor = state[py::cast(meta.id)].cast<at::Tensor>();
         host_buffers.push_back(tensor.data_ptr());
       } else {
+        if (!params.contains(py::cast(meta.id))) {
+          logging::warn("writeOptimizerState: ignoring missing parameter {}",
+                        meta.id);
+          continue;
+        }
         // Otherwise it's a stream/constant optimiser parameter that we can copy
         // immediately
-        at::Tensor tensor =
-            optim_state["ipu_param"][py::cast(meta.id)].cast<at::Tensor>();
+        at::Tensor tensor = params[py::cast(meta.id)].cast<at::Tensor>();
         std::memcpy(meta.data, tensor.data_ptr(), meta.num_bytes);
       }
     }
@@ -1196,16 +1221,17 @@ void writeOptimizerState(
 
 std::vector<pybind11::object>
 getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
-  const auto &compiler = executable->getCompiler();
-  auto num_inputs = compiler.getNumInputs();
-  auto num_outputs = compiler.getNumOutputs();
-
-  py::list input;
-  py::list input_complete;
-  py::list output;
-  py::list output_complete;
-
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
+    const auto &compiler = executable->getCompiler();
+    auto num_inputs = compiler.getNumInputs();
+    auto num_outputs = compiler.getNumOutputs();
+
+    py::list input;
+    py::list input_complete;
+    py::list output;
+    py::list output_complete;
+
     for (size_t i = 0; i < num_inputs; ++i) {
       input.append(py::cast(compiler.getInputTimestamps(i)));
       input_complete.append(py::cast(compiler.getInputCompleteTimestamps(i)));
@@ -1215,10 +1241,10 @@ getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
       output.append(py::cast(compiler.getOutputTimestamps(i)));
       output_complete.append(py::cast(compiler.getOutputCompleteTimestamps(i)));
     }
+
+    return {input, input_complete, output, output_complete};
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
-
-  return {input, input_complete, output, output_complete};
 }
 
 void processPrecisionOptions(py::handle h) {
@@ -1278,6 +1304,7 @@ void compileWithTraceAndExport(
 uint64_t
 cycleCount(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
+    ERROR_ON_MSG(!executable, "No built executable");
     return executable->getCompiler().getCycleCount();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
@@ -1419,6 +1446,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("processTraceAndImportExecutable",
         poptorch::processTraceAndImportExecutable);
   m.def("execute", poptorch::execute);
+  m.def("updateOptimizers", poptorch::updateOptimizers);
   m.def("getTimestamps", poptorch::getTimestamps);
   m.def("readOptimizerState", poptorch::readOptimizerState);
   m.def("writeOptimizerState", poptorch::writeOptimizerState);

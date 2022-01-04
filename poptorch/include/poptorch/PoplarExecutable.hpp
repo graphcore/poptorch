@@ -40,8 +40,9 @@ public:
    * Execute the compiled graph stored in field "compiler" with the given
    * |inTensors| and return to the user the resulting tensors if any.
    */
-  std::vector<at::IValue> run(std::vector<at::Tensor> *inTensors,
-                              const std::vector<Optimizer> &optimizer);
+  std::vector<at::IValue> run(std::vector<at::Tensor> *inTensors);
+
+  void updateOptimizers(const std::vector<Optimizer> &optimizer);
 
   // Tell popart to copy weights off the IPU and write into host memory.
   void copyWeightsToHost(const std::map<std::string, void *> &buffers);

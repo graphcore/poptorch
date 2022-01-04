@@ -1336,7 +1336,8 @@ def test_read_ipu_state_on_detach(caplog, capfd, optim):
 
 
 @pytest.mark.parametrize("optim", poptorch_optimizers)
-def test_write_ipu_state(optim):
+@pytest.mark.parametrize("incomplete_state", [True, False])
+def test_write_ipu_state(optim, incomplete_state):
     torch.manual_seed(42)
     input = torch.randn(3)
     # A simple model with weights and a loss function
@@ -1344,6 +1345,10 @@ def test_write_ipu_state(optim):
 
     # SGD requires LR to be specified but the value doesn't matter
     optimizer = optim(model.parameters(), lr=0.0)
+    # Hacky way to make sure all the attributes are set to variable.
+    optimizer.variable_attrs._variable_attributes = copy.deepcopy(  # pylint: disable=protected-access
+        optimizer.variable_attrs._allowed_attributes)  # pylint: disable=protected-access
+
     training_model = poptorch.trainingModel(model, optimizer=optimizer)
 
     # Compiling should populate the state_dict
@@ -1351,13 +1356,20 @@ def test_write_ipu_state(optim):
     # The initial optimiser state
     s0 = optimizer.state_dict()
 
+    deleted_param = None
+    deleted_state = None
+    if incomplete_state:
+        # delete the first param
+        deleted_param = next(iter(s0["ipu_param"].items()))
+        del s0["ipu_param"][deleted_param[0]]
+        deleted_state = next(iter(s0["ipu_state"].items()))
+        del s0["ipu_state"][deleted_state[0]]
+
     # Just set values randomly so we can check they changed
     for k, v in s0["ipu_param"].items():
         s0["ipu_param"][k] = torch.randn_like(v)
-    if not isinstance(optimizer, torch.optim.SGD):
-        # Only non-SGD optimisers have state tensors
-        for k, v in s0["ipu_state"].items():
-            s0["ipu_state"][k] = torch.randn_like(v)
+    for k, v in s0["ipu_state"].items():
+        s0["ipu_state"][k] = torch.randn_like(v)
 
     # Load the modified state dict
     optimizer.load_state_dict(s0)
@@ -1368,10 +1380,34 @@ def test_write_ipu_state(optim):
     # Check that the values read back match the ones set
     for k, v in s0["ipu_param"].items():
         helpers.assert_allequal(actual=s1["ipu_param"][k], expected=v)
-    if not isinstance(optimizer, torch.optim.SGD):
-        # Only non-SGD optimisers have state tensors
-        for k, v in s0["ipu_state"].items():
-            helpers.assert_allequal(actual=s1["ipu_state"][k], expected=v)
+    if deleted_param:
+        # At that point we haven't used the new optimizer yet so the deleted keys haven't been restored.
+        assert deleted_param[0] not in s1["ipu_param"]
+
+    for k, v in s0["ipu_state"].items():
+        helpers.assert_allequal(actual=s1["ipu_state"][k], expected=v)
+    if deleted_state:
+        # At that point we haven't used the new optimizer yet so the deleted keys haven't been restored.
+        assert deleted_state[0] not in s1["ipu_state"]
+
+    # Use the model and check the two states have been merged.
+    training_model(input)
+
+    s1 = optimizer.state_dict()
+
+    # Check that the values read back match the ones set
+    for k, v in s0["ipu_param"].items():
+        helpers.assert_allequal(actual=s1["ipu_param"][k], expected=v)
+    if deleted_param:
+        helpers.assert_allequal(actual=s1["ipu_param"][deleted_param[0]],
+                                expected=deleted_param[1])
+
+    # Using the model will have changed the state, so we can only check the values have changed.
+    for k, v in s0["ipu_state"].items():
+        assert not torch.allclose(v, s1["ipu_state"][k])
+    if deleted_state:
+        assert not torch.allclose(deleted_state[1],
+                                  s1["ipu_state"][deleted_state[0]])
 
 
 def test_write_ipu_state_from_cpu():

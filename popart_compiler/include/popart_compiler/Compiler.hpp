@@ -434,13 +434,11 @@ public:
   // Return the type of the given tensor.
   PopartType getPopartType(poptorch::TensorId id) const;
 
-  /*
-   * Execute the compiled popart graph using poplar. An optimizer can be
-   * provided to update the optimizer currently being run by the graph. If there
-   * is nothing to update the optimizer will be set to OptimizerType::None
-   * otherwise the new optimizer will be written to device.
-   */
-  void run(const std::vector<Optimizer> &optimizer);
+  // Execute the compiled popart graph using poplar.
+  void run();
+
+  // Update the optimizers currently being run by the graph.
+  void updateOptimizers(const std::vector<Optimizer> &optimizers);
 
   std::uint64_t batchPerStep() const;
 

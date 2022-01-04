@@ -67,6 +67,11 @@ def _parseArgs(all_args: Dict[str, Any],
 class Optimizer:
     def __init__(self):
         self._state_dict = {"ipu_state": None, "ipu_param": None}
+        # If True then the state needs to be uploaded to the IPU.
+        self.ipu_state_is_dirty = False
+        # Once the optimizer has been used on the IPU its state
+        # on the host will become dirty.
+        self.host_state_is_dirty = False
 
     # These functions must be overridden so that the optimiser state can be set
     # when the model is created
@@ -95,6 +100,8 @@ class Optimizer:
             raise RuntimeError(
                 "Only IPU optimizer states can be loaded onto the IPU.")
         self._state_dict = state
+        self.ipu_state_is_dirty = True
+        self.host_state_is_dirty = False
 
     def has_state(self):
         return (self._state_dict.get("ipu_state") is not None
@@ -287,7 +294,11 @@ class SGD(Optimizer, torch.optim.SGD):
         state["accum_type"] = self.accum_type
         state["velocity_accum_type"] = self.velocity_accum_type
         state["max_grad_norm"] = self.max_grad_norm
+
+        # Mark the state as dirty only if there is one.
         state["_state_dict"] = self._state_dict
+        state["ipu_state_is_dirty"] = self.has_state()
+        state["host_state_is_dirty"] = False
         return state
 
 
@@ -393,7 +404,11 @@ class Adam(Optimizer, torch.optim.Adam):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         state["max_grad_norm"] = self.max_grad_norm
+
+        # Mark the state as dirty only if there is one.
         state["_state_dict"] = self._state_dict
+        state["ipu_state_is_dirty"] = self.has_state()
+        state["host_state_is_dirty"] = False
         return state
 
 
@@ -506,7 +521,11 @@ class AdamW(Optimizer, torch.optim.AdamW):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         state["max_grad_norm"] = self.max_grad_norm
+
+        # Mark the state as dirty only if there is one.
         state["_state_dict"] = self._state_dict
+        state["ipu_state_is_dirty"] = self.has_state()
+        state["host_state_is_dirty"] = False
         return state
 
 
@@ -620,7 +639,11 @@ class RMSprop(Optimizer, torch.optim.RMSprop):
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
         state["use_tf_variant"] = self.use_tf_variant
+
+        # Mark the state as dirty only if there is one.
         state["_state_dict"] = self._state_dict
+        state["ipu_state_is_dirty"] = self.has_state()
+        state["host_state_is_dirty"] = False
         return state
 
 
@@ -790,7 +813,11 @@ class LAMB(Optimizer, torch.optim.Optimizer):
                 self.first_order_momentum_accum_type
         state["second_order_momentum_accum_type"] = \
                 self.second_order_momentum_accum_type
+
+        # Mark the state as dirty only if there is one.
         state["_state_dict"] = self._state_dict
+        state["ipu_state_is_dirty"] = self.has_state()
+        state["host_state_is_dirty"] = False
         return state
 
 

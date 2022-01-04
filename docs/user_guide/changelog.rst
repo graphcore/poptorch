@@ -8,11 +8,16 @@ v2.5 (Poplar SDK 2.5)
 New features
 ------------
 
+- Ignore missing values when reloading an Optimizer state.
+- Support saving Optimizer states when compiling offline.
+
 API changes
 -----------
 
 Bug Fixes
 ---------
+
+- Fix thread safety issue in LogContext.
 
 v2.4 (Poplar SDK 2.4)
 =====================

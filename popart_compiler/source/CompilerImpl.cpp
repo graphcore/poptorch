@@ -344,7 +344,9 @@ void WeightsIO::registerParameter(const popart::TensorId &id,
 void WeightsIO::updateData(const std::vector<void *> &host_buffers) {
   ERROR_ON(host_buffers.size() != _weights_order.size());
   for (std::uint64_t i = 0; i < host_buffers.size(); ++i) {
-    _weights[_weights_order[i]].data = host_buffers[i];
+    if (host_buffers[i] != nullptr) {
+      _weights[_weights_order[i]].data = host_buffers[i];
+    }
   }
 }
 

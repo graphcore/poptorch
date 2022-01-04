@@ -156,10 +156,9 @@ class PoplarExecutor:
                 if anchor[2] == enums.OutputMode.EveryN:
                     anchor[3] = options.output_return_period
 
-        self._new_optimizer = optimizer
-        self._dict_new_optimizer = {}
+        self._optimizer = optimizer
+        self._ipu_optimizer_is_dirty = False
         self._dict_optimizer = {}
-        self._update_optimizer_state = False
         self._training = training
         self._dirty_host_weights = False
         self._trace = None
@@ -289,34 +288,68 @@ class PoplarExecutor:
             _impl.registerWrapperType(PoptorchParameter)
             _impl.registerWrapperType(PoptorchBuffer)
 
+    def _update_optimizer_if_needed(self):
+        if not self.isCompiled():
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
+        if self._ipu_optimizer_is_dirty:
+            poptorch_core.updateOptimizers(self._executable,
+                                           self._dict_optimizer)
+            self._ipu_optimizer_is_dirty = False
+
     def _read_optim_state_dict_if_needed(self):
-        if not isinstance(self._new_optimizer, Optimizer):
+        if not isinstance(self._optimizer, Optimizer):
             return
-        if self._update_optimizer_state:
-            assert self.isCompiled()
+        if self._optimizer.host_state_is_dirty:
+            if not self.isCompiled():
+                raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
+            assert not self._ipu_optimizer_is_dirty, (
+                "Both host "
+                "and ipu states cannot be dirty at the same time.")
             # We need to return both the internal state dict and torch's
             # state dict so that LR schedulers work
-            self._new_optimizer.set_state_dict({
+            self._optimizer.set_state_dict({
                 **poptorch_core.readOptimizerState(self._executable),
-                **torch.optim.Optimizer.state_dict(self._new_optimizer)
+                **torch.optim.Optimizer.state_dict(self._optimizer)
             })
-            self._update_optimizer_state = False
         else:
             logger.debug("Using cached optimiser state dict")
 
+    def _on_device_attach(self):
+        """Method called every time we attach to a device."""
+        # Upload the weights to the IPU
+        self.copyWeightsToDevice()
+        # Upload the optimizer parameters
+        if self._optimizer:
+            self._update_optimizer_if_needed()
+        # If the optimizer has a state: restore it.
+        if self._optimizer and isinstance(self._optimizer, Optimizer):
+            # If the optimiser has state to be written (from a checkpoint),
+            # write it immediately after compilation
+            if self._optimizer.has_state():
+                self._optimizer.ipu_state_is_dirty = True
+                self._write_optim_state_dict_if_needed()
+            else:
+                self._optimizer.host_state_is_dirty = True
+
     def _get_optim_state_dict(self):
-        assert isinstance(self._new_optimizer, Optimizer)
+        assert isinstance(self._optimizer, Optimizer)
         self._read_optim_state_dict_if_needed()
-        return self._new_optimizer.get_state_dict()
+        return self._optimizer.get_state_dict()
 
     def _write_optim_state_dict_if_needed(self):
-        assert self.isCompiled()
+        if not self.isCompiled():
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
         # If the new optimiser already has state (i.e. from a checkpoint), write it
         # to device
-        if isinstance(self._new_optimizer,
-                      Optimizer) and self._new_optimizer.has_state():
-            poptorch_core.writeOptimizerState(self._executable,
-                                              self._new_optimizer.state_dict())
+        if isinstance(self._optimizer,
+                      Optimizer) and self._optimizer.ipu_state_is_dirty:
+            assert not self._optimizer.host_state_is_dirty, (
+                "Both host "
+                "and ipu states cannot be dirty at the same time.")
+            if self._optimizer.has_state():
+                poptorch_core.writeOptimizerState(self._executable,
+                                                  self._optimizer.state_dict())
+            self._optimizer.ipu_state_is_dirty = False
 
     def load_state_dict(self,
                         state_dict: Dict[str, 'torch.Tensor'],
@@ -419,28 +452,39 @@ class PoplarExecutor:
         ``optim.AdamW``, ``optim.RMSProp``, ``optim.LAMB``.
         """
         # Optimiser state functions require a compiled executable
-        if self.isCompiled() and optimizer != self._new_optimizer:
+        if self.isCompiled() and optimizer != self._optimizer:
             # If we're setting a new optimiser, make sure the internal state of the old
             # optimiser has been read back so it's not lost, and then detach the old
             # optimiser so that its subsequent state_dict/load_state_dict calls don't
             # trigger optimiser state read/writes anymore
-            if self._new_optimizer and isinstance(self._new_optimizer,
-                                                  Optimizer):
+            if self._optimizer and isinstance(self._optimizer, Optimizer):
                 self._read_optim_state_dict_if_needed()
-                self._new_optimizer.state_dict = \
-                self._new_optimizer.get_state_dict
-            # _new_optimizer is used inside _write_optim_state_dict_if_needed
-            self._new_optimizer = optimizer
-            self._write_optim_state_dict_if_needed()
+                self._optimizer.state_dict = \
+                self._optimizer.get_state_dict
+            # We only want to update the state on the IPU if it's a brand new optimizer
+            # (Not if the params of the existing one have changed).
+            if isinstance(optimizer, Optimizer):
+                optimizer.ipu_state_is_dirty = True
+
+        # If it's a PopTorch optimizer: instrument the state_dict() method
+        # to implicitly transfer the state back to the host.
         if isinstance(optimizer, Optimizer):
             optimizer.state_dict = MethodType(
                 PoplarExecutor._get_optim_state_dict, self)
-        self._new_optimizer = optimizer
-        self._dict_new_optimizer = _optimizer_attributes.convertOptimizerToDict(
+
+        self._optimizer = optimizer
+        dict_optimizer = _optimizer_attributes.convertOptimizerToDict(
             optimizer, self._attribute_tracker, self._options,
             self.isCompiled())
-        if not self._dict_optimizer:
-            self._dict_optimizer = self._dict_new_optimizer
+
+        if dict_optimizer != self._dict_optimizer:
+            self._dict_optimizer = dict_optimizer
+            self._ipu_optimizer_is_dirty = True
+
+        # If we need and can update the optimizer now: do it.
+        if self.isAttachedToDevice():
+            self._update_optimizer_if_needed()
+            self._write_optim_state_dict_if_needed()
 
     def _compileWithDispatch(self, in_tensors):
         self._executable_inputs = in_tensors.clone()
@@ -535,17 +579,14 @@ class PoplarExecutor:
 
             self._is_attached = self.isAttachedToDevice()
 
+            # PopTorch might have attached to a device either during
+            # compileWithTrace (if connection type is set to Always) or
+            # during loadEngineAndConnectStreams (if OnDemand is used),
+            # either way this will have occurred in the C++ backend, *not* using
+            # PoplarExecutor.attachToDevice(), therefore we need to manually
+            # call the _on_device_attach() trigger here.
             if self._is_attached:
-                # Upload the weights to the IPU
-                self.copyWeightsToDevice()
-                if self._new_optimizer and isinstance(self._new_optimizer,
-                                                      Optimizer):
-                    # If the optimiser has state to be written (from a checkpoint),
-                    # write it immediately after compilation
-                    if self._new_optimizer.has_state():
-                        self._write_optim_state_dict_if_needed()
-                    else:
-                        self._update_optimizer_state = True
+                self._on_device_attach()
 
     def _preprocessGraph(self, in_tensors):
         with self._profiling.tracepoint("graphPreprocessing"):
@@ -704,7 +745,7 @@ class PoplarExecutor:
             data = _poptorch_data.PoptorchData(self._poptorch_version,
                                                in_tensors, self._options,
                                                self._training, self.model,
-                                               self._new_optimizer)
+                                               self._optimizer)
         else:
             data = _poptorch_data.PoptorchData(self._poptorch_version,
                                                in_tensors, self._options)
@@ -774,10 +815,11 @@ class PoplarExecutor:
 
         if not self._is_attached:
             self.attachToDevice()
-        # If this is an inference model: check if the same model is not being
-        # trained on a different IPU.
-        # If it is: make sure the weights are updated.
         if not self._training:
+            # If this is an inference model: check if the same model is not being
+            # trained on a different IPU.
+            # If it is: make sure the weights are updated.
+
             copyWeightsToHostIfNeeded = getattr(self._user_model,
                                                 "copyWeightsToHostIfNeeded",
                                                 None)
@@ -797,17 +839,13 @@ class PoplarExecutor:
             f"{self._executable_inputs.first_none_arg} "
             f"arguments used to compile the model and "
             f"{in_tensors.first_none} provided this time")
+
+        # Update the optimizer state on the IPU if needed.
+        self._write_optim_state_dict_if_needed()
         # Execute the poplar executable with the full size (batch * device interations)
         with self._profiling.tracepoint("modelExecution"):
-            if self._dict_new_optimizer and \
-                    self._dict_new_optimizer != self._dict_optimizer:
-                self._dict_optimizer = self._dict_new_optimizer
-                output = poptorch_core.execute(self._executable,
-                                               in_tensors.asTuple(),
-                                               self._dict_optimizer)
-            else:
-                output = poptorch_core.execute(self._executable,
-                                               in_tensors.asTuple(), {})
+            output = poptorch_core.execute(self._executable,
+                                           in_tensors.asTuple())
 
         # Any anchored tensors will be returned at the end of the list
         # Pop them out and populate the anchor memory
@@ -824,9 +862,10 @@ class PoplarExecutor:
         if self._training:
             self._dirty_host_weights = True
 
-        if self._new_optimizer and isinstance(self._new_optimizer, Optimizer):
-            # The internal optimiser state has changed so read it back
-            self._update_optimizer_state = True
+        if self._optimizer and isinstance(self._optimizer, Optimizer):
+            # The optimizer has been used on the IPU: its state on the host
+            # is now out of date.
+            self._optimizer.host_state_is_dirty = True
 
         # Provide a useful error message if the user attempts to call
         # backward() on an output tensor
@@ -1306,12 +1345,7 @@ class PoplarExecutor:
         poptorch_core.attachToDevice(self._executable)
         poptorch_core.loadEngineAndConnectStreams(self._executable)
         self._is_attached = True
-        # Upload the weights and optimizer state to the IPU
-        self.copyWeightsToDevice()
-        self._write_optim_state_dict_if_needed()
-        # PopART save / restore the optimizer state with the weight,
-        # but parameters  need to be re-uploaded
-        self._dict_optimizer = {}
+        self._on_device_attach()
 
     @classmethod
     def _RestoreInputs(cls, backup, post_trace):
@@ -1423,7 +1457,7 @@ class IPUScope:
         # Otherwise run popart.
         if self._compile_using == enums.Compiler.PopART:
             # Run via PopART.
-            output = poptorch_core.execute(self._executable, args, {})
+            output = poptorch_core.execute(self._executable, args)
         elif self._compile_using == enums.Compiler.MLIR:
             # Run via the MLIR compiled binary.
             self._executable.execute(args)

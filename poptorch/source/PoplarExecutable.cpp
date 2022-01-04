@@ -15,9 +15,13 @@
 
 namespace poptorch {
 
+void PoplarExecutable::updateOptimizers(
+    const std::vector<Optimizer> &optimizers) {
+  _compiler.updateOptimizers(optimizers);
+}
+
 std::vector<at::IValue>
-PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
-                      const std::vector<Optimizer> &optimizers) {
+PoplarExecutable::run(std::vector<at::Tensor> *inTensors) {
   std::vector<at::Tensor> tensor_views;
 
   // Set up the input tensors in the poplar graph to point to the incoming
@@ -148,7 +152,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors,
   }
 
   // Execute the compiled poplar graph.
-  _compiler.run(optimizers);
+  _compiler.run();
 
   const auto &mapping = _inplace_op_handler->getInputMapping();
   for (size_t i = 0; i < mapping.size(); i++) {
