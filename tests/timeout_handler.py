@@ -34,9 +34,9 @@ with subprocess.Popen(sys.argv[1:]) as p:
         p.wait(timeout=timeout)
     except subprocess.TimeoutExpired as e:
         print("Timeout after %d seconds" % timeout, flush=True)
-        # Timeout: send an abort signal to generate a core dump
-        p.send_signal(signal.SIGABRT)
-        print("Waiting for aborted process...")
+        # Timeout: send an segmentation fault signal to generate a core dump.
+        p.send_signal(signal.SIGSEGV)
+        print("Waiting for aborted process...", flush=True)
         # Wait for the process to exit cleanly
         p.wait()
         # Signal to ctest it was a timeout
