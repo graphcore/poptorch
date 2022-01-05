@@ -24,18 +24,24 @@ import sys
 import time
 import os
 
-# Assuming the ctest --timeout argument is set to the same value: we want this one
-# to kick in first, so remove 60 seconds from it.
+# Assuming the ctest --timeout argument is set to the same value: we want this
+# one to kick in first, so remove 60 seconds from it.
 timeout = int(os.environ.get("POPTORCH_TEST_TIMEOUT", "1000")) - 60
 # Run the command passed
-with subprocess.Popen(sys.argv[1:]) as p:
+# start_new_session is used to create a new process group so that we can send a
+# signal to the entire process group when we try to kill the test.
+with subprocess.Popen(sys.argv[1:], start_new_session=True) as p:
     try:
         print("Setting timeout to %d seconds" % timeout, flush=True)
         p.wait(timeout=timeout)
     except subprocess.TimeoutExpired as e:
         print("Timeout after %d seconds" % timeout, flush=True)
         # Timeout: send an segmentation fault signal to generate a core dump.
-        p.send_signal(signal.SIGSEGV)
+        process_group = os.getpgid(p.pid)
+        print("Sending signal to process group %d of process %d" %
+              (process_group, p.pid),
+              flush=True)
+        os.killpg(process_group, signal.SIGSEGV)
         print("Waiting for aborted process...", flush=True)
         # Wait for the process to exit cleanly
         p.wait()
