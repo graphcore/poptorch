@@ -173,7 +173,14 @@ torch::jit::Node *linearHandler(torch::jit::Graph *graph,
   auto *output = createMatmul(graph, {x, w_t->output()});
 
   if (!isNone(b)) {
+    auto *matmul = output;
     output = createAdd(graph, {output->output(), b});
+    // Fix up any set_available_memory calls to point to the matmul
+    for (const auto &use : node->output()->uses()) {
+      if (use.user->kind() == symbols::poptorch::set_available_memory) {
+        use.user->replaceInputWith(node->output(), matmul->output());
+      }
+    }
   }
   return output;
 }

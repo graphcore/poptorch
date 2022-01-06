@@ -88,3 +88,36 @@ def test_available_memory_last_op(capfd, trace_model):
 
     log = helpers.LogChecker(capfd)
     log.assert_matches(ir_before_popart_regex, per_line=False)
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_available_memory_linear(capfd, trace_model):
+    class LinModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv2d(3, 3, 3)
+            self.lin = torch.nn.Linear(3, 3)
+
+        def forward(self, x):
+            x = self.conv(x)
+            x = self.lin(x)
+            x = poptorch.set_available_memory(x, 0.3)
+            return x
+
+    x = torch.rand(2, 3, 5, 5)
+    model = LinModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model(x)
+
+    log = helpers.LogChecker(capfd)
+    it = log.createIterator()
+    # Assert that the set_available_memory node references the matmul, not the
+    # add.
+    matmul_line = it.findNext("popart::matmul").strip()
+    matmul_var = matmul_line.partition(" ")[0]
+    sam_line = it.findNext("poptorch::set_available_memory").strip()
+    assert sam_line.endswith("({})".format(matmul_var))
