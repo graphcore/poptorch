@@ -445,3 +445,9 @@ The type of running statistics computations may be controlled via ``opts.Precisi
     :linenos:
     :start-after: half_stats_begin
     :end-before: half_stats_end
+
+Gradient computation control
+----------------------------
+
+``torch.no_grad`` is supported as a context manager as well as a decorator to suppress locally the
+computation of the gradients.
