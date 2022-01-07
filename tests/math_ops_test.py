@@ -221,7 +221,7 @@ def test_clamp_(args, trace_model):
     "op",
     [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_clamp_min(op, trace_model):
+def test_clamp_min_max(op, trace_model):
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -233,6 +233,21 @@ def test_clamp_min(op, trace_model):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
     op_harness(trace_model, op_clamp, [input], assert_, test_training=True)
+
+
+def test_clamp_min_max_int():
+    torch.manual_seed(42)
+
+    t = torch.randint(-100, 100, (100, ))
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.clamp(x, min=-5, max=5)
+
+    model = Model()
+    ipu_model = poptorch.inferenceModel(model)
+
+    helpers.assert_allequal(actual=ipu_model(t), expected=model(t))
 
 
 binary_ops_float = [
