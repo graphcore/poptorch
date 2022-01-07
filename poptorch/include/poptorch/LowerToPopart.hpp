@@ -61,7 +61,6 @@ public:
 
   void lower(std::vector<at::Tensor> *in_tensors);
   std::shared_ptr<poptorch::PoplarExecutable> compile();
-  void compileAndExport(const std::string &output_filename);
   std::shared_ptr<poptorch::PoplarExecutable>
   loadExecutableFromFile(const std::string &input_filename,
                          std::int64_t offset);

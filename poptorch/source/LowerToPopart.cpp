@@ -284,7 +284,6 @@ public:
   void lower(std::vector<at::Tensor> *in_tensors);
 
   std::shared_ptr<poptorch::PoplarExecutable> compile();
-  void compileAndExport(const std::string &export_filename);
   std::shared_ptr<poptorch::PoplarExecutable>
   loadExecutableFromFile(const std::string &input_filename,
                          std::int64_t offset);
@@ -390,14 +389,6 @@ LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
       std::move(_compiler), std::move(_input_tensor_hooks),
       std::move(_output_tensor_hooks), std::move(data_types), _parameter_names,
       _inplace_op_handler);
-}
-
-void LowerToPopartImpl::compileAndExport(const std::string &export_filename) {
-  ERROR_ON_MSG(!_lowered, "You need to lower() the graph first");
-
-  logging::LogContext ctx("LowerToPopart::compileAndExport");
-  _compiler.initSession(_optimizers, getModelProtoFilename().c_str());
-  _compiler.compileAndExport(export_filename.c_str());
 }
 
 void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
@@ -1349,12 +1340,6 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
   return executable;
 }
 
-void LowerToPopart::compileAndExport(const std::string &output_filename) {
-  // We cannot currently compile then export
-  // so we need to decide now whether we want an executable
-  // or to compile and export to file.
-  _impl->compileAndExport(output_filename);
-}
 std::shared_ptr<poptorch::PoplarExecutable>
 LowerToPopart::loadExecutableFromFile(const std::string &input_filename,
                                       std::int64_t offset) {

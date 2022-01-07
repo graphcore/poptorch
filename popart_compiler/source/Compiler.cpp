@@ -727,12 +727,12 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   }
 }
 
-void Compiler::compileAndExport(const char *filename) {
+void Compiler::saveExecutableToFile(const char *filename) const {
   ERROR_ON_MSG(!_impl->session,
                "Nothing to export. This may be because the model does not run "
                "any op on the IPU.");
 
-  logging::LogContext ctx_function{"Compiler::compileAndExport"};
+  logging::LogContext ctx_function{"Compiler::saveExecutableToFile"};
   // We use std::ios_base::ate to append to the file: the Python frontend
   // will have already created the folder and written the Poptorch python
   // data in the file.
@@ -744,9 +744,8 @@ void Compiler::compileAndExport(const char *filename) {
   ERROR_ON_MSG(!stream.is_open(),
                "Failed to open " + std::string(filename) + " for writing");
   stream.seekp(0, std::ios::end);
-  logging::LogContext ctx{
-      "popart::Session::compileAndExport: Poplar compilation"};
-  _impl->session->compileAndExport(stream);
+  logging::LogContext ctx{"popart::Session::saveExecutableToStream"};
+  _impl->session->saveExecutableToStream(stream);
   stream.flush();
   stream.close();
 }

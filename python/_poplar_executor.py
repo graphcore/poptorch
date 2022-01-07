@@ -703,6 +703,52 @@ class PoplarExecutor:
                 # Upload the weights to the IPU
                 self.copyWeightsToDevice()
 
+    def save(self, filename: str, export_model: bool = True):
+        """Save the compiled model to file.
+
+        :param filename: Where to save the compiled executable.
+        :param export_model: If `True` the Torch model will be saved in
+            the file alongside the executable. :py:func:`poptorch.load` can
+            be used to restore both the original Torch model, the PopTorch
+            model and the executable.
+            If `False` then only the executable will be exported and it will
+            be the user's responsibility to call
+            :py:func:`poptorch.inferenceModel` or
+            :py:func:`poptorch.trainingModel` to re-create the PopTorch model
+            before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
+            to restore the executable.
+        """
+        if not self.isCompiled():
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
+        dst_dir = os.path.dirname(filename)
+        if dst_dir:
+            if os.path.exists(dst_dir):
+                assert os.path.isdir(dst_dir), ("Destination folder {dst_dir} "
+                                                "is not a directory")
+            else:
+                os.makedirs(dst_dir)
+        if os.path.isdir(filename):
+            dirname = filename
+            filename = os.path.join(dirname, "model.poptorch")
+            logger.warning("save(): %s is a directory, saving model to %s",
+                           dirname, filename)
+
+        if export_model:
+            data = _poptorch_data.PoptorchData(self._poptorch_version,
+                                               self._executable_inputs,
+                                               self._options, self._training,
+                                               self.model, self._optimizer)
+        else:
+            data = _poptorch_data.PoptorchData(self._poptorch_version,
+                                               self._executable_inputs,
+                                               self._options)
+        with open(filename, "wb") as f:
+            pickle.dump(data, f, protocol=4)
+            f.close()
+
+        with self._profiling.tracepoint("saveExecutableToFile"):
+            poptorch_core.saveExecutableToFile(self._executable, filename)
+
     def compileAndExport(self,
                          filename: str,
                          *args: List['torch.Tensor'],
@@ -725,50 +771,10 @@ class PoplarExecutor:
             before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
             to restore the executable.
         """
-        assert self._options.Jit.trace_model, "Only Jit tracing supported"
-        in_tensors = self._args_parser(args, kwargs, False)
-        dst_dir = os.path.dirname(filename)
-        if dst_dir:
-            if os.path.exists(dst_dir):
-                assert os.path.isdir(dst_dir), ("Destination folder {dst_dir} "
-                                                "is not a directory")
-            else:
-                os.makedirs(dst_dir)
-        if os.path.isdir(filename):
-            dirname = filename
-            filename = os.path.join(dirname, "model.poptorch")
-            logger.warning(
-                "compileAndExport: %s is a directory, saving model to %s",
-                dirname, filename)
-
-        if export_model:
-            data = _poptorch_data.PoptorchData(self._poptorch_version,
-                                               in_tensors, self._options,
-                                               self._training, self.model,
-                                               self._optimizer)
-        else:
-            data = _poptorch_data.PoptorchData(self._poptorch_version,
-                                               in_tensors, self._options)
-        with open(filename, "wb") as f:
-            pickle.dump(data, f, protocol=4)
-            f.close()
 
         with self._profiling.tracepoint("compileAndExport"):
-            if self._options.Jit.trace_model:
-                (in_tensors_trace_view,
-                 has_converted_any_half,
-                 narrow_tensor_fn) = \
-                        self._preprocessGraph(
-                            in_tensors)
-                trace_args = self._trace_model_and_get_compile_args(
-                    in_tensors, in_tensors_trace_view, has_converted_any_half,
-                    narrow_tensor_fn)
-                poptorch_core.compileWithTraceAndExport(*trace_args, filename)
-            else:
-                # TODO(T51159) Support dispatch trace + serialized executables
-                raise _impl.createPoptorchError(
-                    "Not supported: can't compileAndExport "
-                    "dispatch traced executable.")
+            self.compile(*args, **kwargs)
+            self.save(filename, export_model)
 
     def cycleCount(self):
         """ Returns number of cycles which the IPU ran.

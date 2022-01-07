@@ -21,35 +21,66 @@ class ExampleModelWithLoss(torch.nn.Module):
         return fc
 
 
-def _compileAndExport(filename,
-                      export_model=True,
-                      training=True,
-                      trace_model=True):
+def _createExampleModel(training, trace_model, offline_target=False):
     torch.manual_seed(42)
     model = ExampleModelWithLoss()
 
-    input = torch.randn(1, 10)
-    target = torch.randint(0, 10, [1])
-
     opts = poptorch.Options()
-    opts.useOfflineIpuTarget(poptorch.ipuHardwareVersion())
+    if offline_target:
+        opts.useOfflineIpuTarget(poptorch.ipuHardwareVersion())
     opts.Jit.traceModel(trace_model)
 
     if training:
         model.train()
         poptorch_model = poptorch.trainingModel(model, opts)
+    else:
+        model.eval()
+        poptorch_model = poptorch.inferenceModel(model, opts)
+    return poptorch_model
+
+
+def _compileAndExport(filename,
+                      export_model=True,
+                      training=True,
+                      trace_model=True):
+    poptorch_model = _createExampleModel(training, trace_model, True)
+
+    input = torch.randn(1, 10)
+    target = torch.randint(0, 10, [1])
+
+    if training:
         poptorch_model.compileAndExport(filename,
                                         input,
                                         target,
                                         export_model=export_model)
     else:
-        model.eval()
-        poptorch_model = poptorch.inferenceModel(model, opts)
         poptorch_model.compileAndExport(filename,
                                         input,
                                         export_model=export_model)
     poptorch_model.destroy()
     return input, target
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+# TODO(T51159) Support dispatch tracing + serialized executables
+#@pytest.mark.parametrize("trace_model", [True, False])
+def test_export_then_load_live_model(trace_model=True):
+    with tempfile.TemporaryDirectory() as tmp:
+        filename = os.path.join(tmp, "model.poptorch")
+        poptorch_model = _createExampleModel(training=False,
+                                             trace_model=trace_model)
+
+        input = torch.randn(1, 10)
+        # Running the model will trigger the executable compilation
+        poptorch_model(input)
+        # Save the executable and destroy the model
+        poptorch_model.save(filename)
+        poptorch_model.destroy()
+
+        # Reload the model from file and run it.
+        poptorch_model = poptorch.load(filename)
+        poptorch_model(input)
 
 
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),

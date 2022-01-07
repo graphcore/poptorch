@@ -1284,19 +1284,11 @@ bool pyIsGraphNondeterministic(py::handle h) {
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-void compileWithTraceAndExport(
-    py::handle h, const pybind11::dict &python_traced_params,
-    const pybind11::tuple &inputs, bool has_converted_any_half,
-    const pybind11::dict &options, bool training,
-    const py::dict &optimizer_dict, const py::function &attribute_accessor,
-    const bool added_dummy_output, const py::list &anchors,
-    const py::dict &model_parameters, const std::string &export_filename) {
+void saveExecutableToFile(
+    const std::shared_ptr<poptorch::PoplarExecutable> &executable,
+    const std::string &export_filename) {
   try {
-    auto lower = lowerToPopartFromTrace(
-        h, python_traced_params, inputs, has_converted_any_half, options,
-        training, optimizer_dict, attribute_accessor, added_dummy_output,
-        anchors, model_parameters);
-    return lower.compileAndExport(export_filename);
+    executable->getCompiler().saveExecutableToFile(export_filename.c_str());
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
@@ -1440,8 +1432,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
 
   m.def("processPrecisionOptions", poptorch::processPrecisionOptions);
   m.def("isGraphNondeterministic", poptorch::pyIsGraphNondeterministic);
+  m.def("saveExecutableToFile", poptorch::saveExecutableToFile);
   m.def("compileWithTrace", poptorch::compileWithTrace);
-  m.def("compileWithTraceAndExport", poptorch::compileWithTraceAndExport);
   m.def("cycleCount", poptorch::cycleCount);
   m.def("processTraceAndImportExecutable",
         poptorch::processTraceAndImportExecutable);

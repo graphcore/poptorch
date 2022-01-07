@@ -392,7 +392,7 @@ public:
 
   void initSession(const std::vector<Optimizer> &opt,
                    const char *export_proto_filename);
-  void compileAndExport(const char *export_filename);
+  void saveExecutableToFile(const char *export_filename) const;
   void compileAndPrepareDevice();
   void loadEngineAndConnectStreams();
   void loadExecutableAndPrepareDevice(const char *import_filename,
