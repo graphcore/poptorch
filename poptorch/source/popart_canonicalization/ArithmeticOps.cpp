@@ -193,6 +193,106 @@ torch::jit::Node *crossHandler(torch::jit::Graph *graph,
   return createGather(graph, {result_roll, indices}, axis);
 }
 
+std::pair<torch::jit::Value *, torch::jit::Value *>
+calculateVarMean(torch::jit::Graph *graph,
+                 const c10::ArrayRef<torch::jit::Value *> &inputs,
+                 const std::string &op_name) {
+  auto *x = inputs[0];
+  auto shape = shapeFromTensor(x);
+  std::vector<int64_t> dims;
+  // If true, bessel's correction is applied
+  bool unbiased = false;
+  bool keepdim = false;
+  switch (inputs.size()) {
+  case 2: {
+    // aten::var(Tensor input, bool unbiased)
+    dims.resize(shape.size());
+    // dims are unspecified so reduce over all
+    std::iota(dims.begin(), dims.end(), 0);
+    unbiased = constantToBool(inputs[1]->node());
+  } break;
+  case 4:
+    // aten::var(Tensor input, int[] dim, bool unbiased, bool keepdim)
+    dims = constantToLongVec(inputs[1]->node());
+    unbiased = constantToBool(inputs[2]->node());
+    keepdim = constantToBool(inputs[3]->node());
+    break;
+  default:
+    ERROR("Invalid number of arguments to aten::" << op_name);
+  }
+
+  // Keep the reduced dims so we can broadcast for the subtraction
+  auto *mean_keepdim = createReducemean(graph, {x}, dims, 1)->output();
+  // Also keep a copy without singleton dims so we can pass to
+  auto *mean = createSqueeze(graph, {mean_keepdim}, dims)->output();
+  auto *x_minus_mean = createSub(graph, {x, mean_keepdim})->output();
+  auto *x_minus_mean_sqr =
+      createMul(graph, {x_minus_mean, x_minus_mean})->output();
+
+  auto *var = createReducemean(graph, {x_minus_mean_sqr}, dims,
+                               static_cast<int64_t>(keepdim))
+                  ->output();
+  if (unbiased) {
+    // Apply bessel's correction by multipling the biased variance by
+    // n / (n - 1), where n is the sample size
+    std::int64_t numel_reduced = 1;
+    for (auto dim : dims) {
+      numel_reduced *= shape[dim];
+    }
+    double n = static_cast<double>(numel_reduced);
+    auto *unbiased_factor =
+        createConstantFloatLike(graph, x, {n / (n - 1)}, {});
+    var = createMul(graph, {var, unbiased_factor->output()})->output();
+  }
+  return {var, mean};
+}
+
+torch::jit::Node *varHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  // aten::var(Tensor input, bool unbiased)
+  // aten::var(Tensor input, int[] dim, bool unbiased, bool keepdim)
+  return calculateVarMean(graph, node->inputs(), "var").first->node();
+}
+
+torch::jit::Node *varMeanHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  // aten::var_mean(Tensor input, bool unbiased) -> (Tensor, Tensor)
+  // aten::var_mean(Tensor input, int[] dim, bool unbiased, bool keepdim)
+  // -> (Tensor, Tensor)
+  auto var_mean = calculateVarMean(graph, node->inputs(), "var_mean");
+
+  if (node->hasUses()) {
+    replaceOutputUse(node->output(0), var_mean.first);
+    replaceOutputUse(node->output(1), var_mean.second);
+  }
+
+  markNodeForDeletion(node);
+  return nullptr;
+}
+
+torch::jit::Node *stdHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
+  // aten::std(Tensor input, bool unbiased)
+  // aten::std(Tensor input, int[] dim, bool unbiased, bool keepdim)
+  auto *var = calculateVarMean(graph, node->inputs(), "std").first->node();
+  return createSqrt(graph, {var->output()});
+}
+
+torch::jit::Node *stdMeanHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  // aten::std_mean(Tensor input, bool unbiased) -> (Tensor, Tensor)
+  // aten::std_mean(Tensor input, int[] dim, bool unbiased, bool keepdim)
+  // -> (Tensor, Tensor)
+  auto var_mean = calculateVarMean(graph, node->inputs(), "std_mean");
+  auto *std = createSqrt(graph, {var_mean.first});
+
+  if (node->hasUses()) {
+    replaceOutputUse(node->output(0), std->output());
+    replaceOutputUse(node->output(1), var_mean.second);
+  }
+
+  markNodeForDeletion(node);
+  return nullptr;
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -209,6 +309,10 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::addcdiv, addCDivHandler);
   registerHandler(c10::aten::addcmul, addCMulHandler);
   registerHandler(c10::aten::cross, crossHandler);
+  registerHandler(c10::aten::var, varHandler);
+  registerHandler(c10::aten::var_mean, varMeanHandler);
+  registerHandler(c10::aten::std, stdHandler);
+  registerHandler(c10::aten::std_mean, stdMeanHandler);
 }
 
 } // namespace poptorch

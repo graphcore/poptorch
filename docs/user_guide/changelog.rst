@@ -10,6 +10,12 @@ New features
 
 - Ignore missing values when reloading an Optimizer state.
 - Support saving Optimizer states when compiling offline.
+- Support for the following functions:
+
+  * torch.var
+  * torch.std
+  * torch.var_mean
+  * torch.std_mean
 
 API changes
 -----------

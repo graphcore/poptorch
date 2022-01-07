@@ -160,7 +160,11 @@ Reduction ops
 * ``torch.median``
 * ``torch.prod``
 * ``torch.logsumexp``
+* ``torch.std``
+* ``torch.std_mean``
 * ``torch.sum``
+* ``torch.var``
+* ``torch.var_mean``
 
 
 Comparison ops
