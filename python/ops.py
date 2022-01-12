@@ -485,6 +485,10 @@ def BeginBlock(layer_to_call: torch.nn.Module,
 
             return super().__call__(*input, **kwargs)
 
+        def __repr__(self):
+            return super().__repr__(
+            ) + f" BeginBlock(user_id={user_id}, ipu_id={ipu_id})"
+
     if str(layer_to_call.__class__) == str(BlockModule):
         raise _impl.createPoptorchError(
             "module has already been assigned to a block.")

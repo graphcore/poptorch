@@ -883,10 +883,6 @@ void Compiler::compileAndPrepareDevice() {
     // to make sure it happens at the same time in distributed environments.
     _impl->session->prepareDevice(load_engine);
     logging::trace("Finished Poplar compilation.");
-
-    // serializeIr must be called after prepareDevice in some cases (e.g.
-    // when loading from execution cache)
-    logging::trace("Popart serialised IR:\n{}", _impl->getPopartIR());
   } catch (popart::memory_allocation_err &e) {
     logging::err("Out of memory, the graph profile is available here: {}",
                  e.getProfilePath());
