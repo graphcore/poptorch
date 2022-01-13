@@ -506,7 +506,7 @@ class PoplarExecutor:
 
         unroll(in_tensors.asTuple())
         with IPUScope(inputs,
-                      parameters=all_data(self._model),
+                      parameters_and_buffers=all_data(self._model),
                       options=self._options) as ipu:
             outputs = self._model(*in_tensors.asTuple())
             if not isinstance(outputs, (list, tuple)):
@@ -1380,11 +1380,12 @@ def hasMlirSupportOnPlatform():
 
 
 class IPUScope:
-    def __init__(self,
-                 inputs: List['torch.Tensor'],
-                 parameters: Optional[Dict[str, 'torch.Tensor']] = None,
-                 options: Optional['poptorch.Options'] = None,
-                 compile_using=enums.Compiler.PopART):
+    def __init__(
+            self,
+            inputs: List['torch.Tensor'],
+            parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
+            options: Optional['poptorch.Options'] = None,
+            compile_using=enums.Compiler.PopART):
         self._executable = None
         self._options = options or Options()
         if self._options.defaultOutputMode():
@@ -1397,15 +1398,15 @@ class IPUScope:
         assert all(isinstance(i, torch.Tensor)
                    for i in inputs), "All inputs must be tensors"
 
-        if isinstance(parameters, types.GeneratorType):
-            parameters = {
-                **dict(parameters),
+        if isinstance(parameters_and_buffers, types.GeneratorType):
+            parameters_and_buffers = {
+                **dict(parameters_and_buffers),
             }
 
-        if parameters is None:
+        if parameters_and_buffers is None:
             self._params_and_buffers = {}
         else:
-            self._params_and_buffers = parameters
+            self._params_and_buffers = parameters_and_buffers
 
         param_list = list(self._params_and_buffers.values())
 

@@ -91,7 +91,7 @@ private:
   poptorch_ir::PoptorchCompiler _compiler;
 #endif
 
-  // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
+  // We use the value mapper to map between incoming at::Tensors and JIT/MLIR
   // types.
   ValueMapper _mapper;
 

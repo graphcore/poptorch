@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "CommonHelperFunctions.hpp"
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -216,7 +217,8 @@ emptyBase(at::IntArrayRef size,
   }
   // Turn off dispatch so we can call CPU functions without catching them.
   DisableDispatchScope guard;
-  logging::trace("[TRACING-2] Intercepting empty_base");
+  logging::trace("[TRACING-2] Intercepting empty_base for tensor: {}, {}",
+                 output.data_ptr(), toString(output));
 
   context.active_dispatch->registerEmptyTensor(output);
   return output;
@@ -233,7 +235,7 @@ at::Tensor emptyMemoryFormat(
     return at::native::empty_cpu(size, dtype, layout, device, pin_memory,
                                  memory_format);
   }
-  logging::trace("[TRACING-2] Intercepting empty_base");
+  logging::trace("[TRACING-2] Intercepting memory_format");
   return poptorch::emptyBase(size, dtype, layout, device, pin_memory,
                              memory_format);
 }

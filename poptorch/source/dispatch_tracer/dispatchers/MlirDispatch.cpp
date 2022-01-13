@@ -113,8 +113,7 @@ void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
       shape.push_back(dim);
     }
 
-    logging::trace("\tAdding input: {} ",
-                   static_cast<void *>(tensor.data_ptr()));
+    logging::trace("[TRACING-2] Adding input: {} ", tensor.data_ptr());
     poptorch_ir::TensorId value = _compiler.addInput(
         tensor.data_ptr(), shape, toCompilerType(tensor), str.c_str());
     _mapper.addTensor(tensor, value);
@@ -134,8 +133,7 @@ void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
     }
 
     logging::trace(
-        "\tAdding parameter: {} with storage {}",
-        static_cast<void *>(tensor.data_ptr()),
+        "[TRACING-2] Adding parameter: {} with storage {}", tensor.data_ptr(),
         static_cast<void *>(tensor.storage().unsafeGetStorageImpl()));
 
     poptorch_ir::TensorId value = _compiler.addParameter(
@@ -159,7 +157,7 @@ void MLIRDispatch::markOutputs(
     const std::string str = "Output/" + std::to_string(i);
     poptorch_ir::TensorId id = _mapper.getMLIRForTensor(tensor);
     logging::trace(
-        "Output: {} with storage {}",
+        "[TRACING-2] Marking output: {} with storage {}",
         static_cast<void *>(tensor.unsafeGetTensorImpl()),
         static_cast<void *>(tensor.storage().unsafeGetStorageImpl()));
 
@@ -470,9 +468,9 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
       // Track all the inputs to this operation.
       mlir_ids.push_back(ssa);
 
-      logging::trace(
-          "Looking up MLIR for JIT value. Jit name {} jit ptr {} mlir {}",
-          val->debugNameBase(), reinterpret_cast<void *>(val), ssa);
+      logging::trace("[TRACING-2][JIT] Looking up MLIR for JIT value. ",
+                     "Jit name {} jit ptr {} mlir {}", val->debugNameBase(),
+                     reinterpret_cast<void *>(val), ssa);
     }
 
     const c10::Symbol kind = itr->kind();
@@ -601,7 +599,8 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
         std::vector<float> tmp(tensor.numel());
         for (auto i = 0u; i < tensor.numel(); ++i) {
           double wrapped_value = tensor.data_ptr<double>()[i];
-          logging::trace("\tWrapped value: {}", wrapped_value);
+          logging::trace("[TRACING-2] Found tensor is a wrapped value: {}",
+                         wrapped_value);
           tmp[i] = wrapped_value;
         }
         val = _compiler.tensorconstant_float(tmp);
@@ -611,7 +610,8 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
         std::vector<std::int32_t> tmp(tensor.numel());
         for (auto i = 0u; i < tensor.numel(); ++i) {
           std::int64_t wrapped_value = tensor.data_ptr<std::int64_t>()[i];
-          logging::trace("\tWrapped value: {}", wrapped_value);
+          logging::trace("[TRACING-2] Found tensor is a wrapped value: {}",
+                         wrapped_value);
           // Ensure the wrapped value fits in 32 bit
           ERROR_ON_MSG(
               wrapped_value > std::numeric_limits<std::int32_t>::max() ||
@@ -632,7 +632,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
       _mapper.addTensor(tensor, val);
 
       logging::trace(
-          "  addr: {} with storage {}",
+          "[TRACING-2] Added wrapped value tensor, addr: {} with storage {}",
           static_cast<void *>(tensor.unsafeGetTensorImpl()),
           static_cast<void *>(tensor.storage().unsafeGetStorageImpl()));
 
@@ -646,14 +646,8 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
       // tracking a huge map of tensors and their views.
       val = _mapper.getMLIRForTensor(tensor);
     } else {
-      std::stringstream stream;
-      stream << "\tCould not find tensor with values: [ ";
-      for (std::uint32_t i = 0; i < tensor.numel(); ++i) {
-        stream << tensor.data_ptr<float>()[i] << ",";
-      }
-      stream << "]" << std::endl;
-
-      ERROR(stream.str());
+      ERROR("\tCould not find tensor " << tensor.data_ptr() << ", "
+                                       << toString(tensor) << std::endl);
     }
   }
 
