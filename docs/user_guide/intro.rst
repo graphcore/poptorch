@@ -93,8 +93,11 @@ PopTorch can also run across multiple hosts. This is necessary for using more
 than 64 IPUs across IPU-PODs and may be beneficial when using a smaller number
 of IPUs such as models involving intensive pre-processing on the CPU. We
 recommend using the PopRun command-line tool and and PopDist configuration
-library, which can automatically set up PopTorch to run across multiple
-IPU-POD hosts. Please refer to the `PopRun an PopDist user guide <https://docs.graphcore.ai/projects/poprun-user-guide/>`_.
+library, which can automatically set up PopTorch to run across multiple IPU-POD
+hosts. Please refer to the `PopDist and PopRun User Guide
+<https://docs.graphcore.ai/projects/poprun-user-guide/>`__ for more information,
+including details about the installation of Horovod if you are using the MPI
+communication protocol.
 
 
 Constraints
