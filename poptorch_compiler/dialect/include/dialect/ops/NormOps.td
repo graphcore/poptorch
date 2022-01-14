@@ -22,18 +22,19 @@ def Poptorch_batch_norm : Poptorch_Op<"batch_norm", [AttrSizedOperandSegments]> 
         // These segments represent the optional tensors in the order they appear in the arguments.
         // For each segment, 1 indicates a value has been passed for that argument, otherwise 0
         // indicates a nullopt
-        std::vector<std::int32_t> segments = {0, 0, 0, 0};
+        // All operands must have a value: 1 for non optional/variadic
+        std::vector<std::int32_t> segments = {1, 0, 0, 0, 0};
         if (weight) {
           operands.push_back(weight);
           operands.push_back(bias);
-          segments[0] = 1; // weight
-          segments[1] = 1; // bias
+          segments[1] = 1; // weight
+          segments[2] = 1; // bias
         }
         if (running_mean) {
           operands.push_back(running_mean);
           operands.push_back(running_var);
-          segments[2] = 1; // running_mean
-          segments[3] = 1; // running_var
+          segments[3] = 1; // running_mean
+          segments[4] = 1; // running_var
         }
         $_state.addOperands(operands);
         $_state.addAttribute("training",$_builder.getBoolAttr(training));

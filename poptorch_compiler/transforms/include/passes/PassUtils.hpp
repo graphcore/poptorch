@@ -3,12 +3,12 @@
 #define POPTORCH_TRANSFORMS_PASS_UTILS_HPP_
 
 #include <llvm/Support/raw_ostream.h>
-#include <mlir/IR/OpDefinition.h>
 #include <string>
 
 namespace poptorch_ir {
 
-inline std::string mlirOpToStr(mlir::OpState &op) {
+// Convert an MLIR OpState or Operation to a string
+template <class T> std::string mlirOpToStr(T &op) {
   std::string str;
   llvm::raw_string_ostream ostream(str);
   ostream << op;

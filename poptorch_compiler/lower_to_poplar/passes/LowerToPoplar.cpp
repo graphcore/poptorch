@@ -3,6 +3,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -19,6 +20,7 @@
 #include <poprand/codelets.hpp>
 
 #include "dialect/PoptorchDialect.hpp"
+#include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch_ir {
@@ -46,6 +48,9 @@ public:
   poplar::Graph &graph() { return *_graph; }
 
 private:
+  // Verify operations using MLIR's verifier.
+  static void verifyOperations(const mlir::FuncOp &function);
+
   poplar::Graph *_graph;
 
   poptorch_ir::CompilerContext *_context;
@@ -116,6 +121,7 @@ void LowerToPoplar::runOnOperation() {
   poptorch::logging::info("Graph lowered to poplar:\n{}", mlirOpToStr(module));
 
   for (mlir::FuncOp function : module.getOps<mlir::FuncOp>()) {
+    verifyOperations(function);
     _context->seq = poplar::program::Sequence();
 
     // Walk over all functions with a poplar impl.
@@ -140,6 +146,39 @@ void LowerToPoplar::runOnOperation() {
           [&](PoplarImplInterface impl) { impl.lowerToPoplar(*_context); });
 
       _context->programs[program] = _context->seq;
+    }
+  }
+}
+
+void LowerToPoplar::verifyOperations(const mlir::FuncOp &function) {
+  // It would be possible to call mlir::verify on the whole graph, however
+  // this would not pinpoint the failing operation. Therefore, we verify each
+  // op at a time, by recursing into it. Note that calling mlir::verify has some
+  // extra checks ommited here.
+  auto num_regions = function->getNumRegions();
+  for (unsigned i = 0; i < num_regions; i++) {
+    auto &region = function->getRegion(i);
+
+    for (auto &block : region) {
+      for (auto &op : block) {
+        std::string op_name = op.getName().getStringRef().str();
+
+        // WeightsToDevice/Host are FuncOps, which means that they should be
+        // isolated from external variables. However, this is not the case so
+        // verification would fail. There is no interface to remove a trait
+        // so they would have to be defined as some other type such as a
+        // custom defined non-isolated function op in the tablegen. Instead,
+        // we simply skip verification. The name will be "func" when calling
+        // getName on the mlir::Operation (here) rather than the mlir::funcOp.
+        if (op_name == "func") {
+          continue;
+        }
+
+        if (mlir::failed(mlir::verify(&op))) {
+          ERROR("Verification failed for " << op_name << ":\n "
+                                           << mlirOpToStr(op));
+        }
+      }
     }
   }
 }
