@@ -487,8 +487,6 @@ class PoplarExecutor:
             self._write_optim_state_dict_if_needed()
 
     def _compileWithDispatch(self, in_tensors):
-        self._executable_inputs = in_tensors.clone()
-
         def all_data(model):
             yield from model.named_parameters()
             yield from model.named_buffers()
@@ -532,12 +530,15 @@ class PoplarExecutor:
         with self._profiling.tracepoint("modelCompilation"):
             # Compile the poplar executable based on the batchsize.
             if self._options.Jit.trace_model:
-                (in_tensors_trace_view, has_converted_any_half,
-                 narrow_tensor_fn) = self._preprocessGraph(in_tensors)
+                (in_tensors_trace_view,
+                 has_converted_any_half) = self._preprocessGraph(in_tensors)
 
                 trace_args = self._trace_model_and_get_compile_args(
-                    in_tensors, in_tensors_trace_view, has_converted_any_half,
-                    narrow_tensor_fn)
+                    in_tensors, in_tensors_trace_view, has_converted_any_half)
+            else:
+                self._executable_inputs = in_tensors.clone()
+                in_tensors_trace_view = in_tensors.clone()
+                in_tensors_trace_view.forEach(self._narrow_tensor)
 
             # Note: in single process execution or if the cache is disabled
             # should_compile will always be False.
@@ -550,7 +551,7 @@ class PoplarExecutor:
                             *trace_args)
                     else:
                         self._executable = self._compileWithDispatch(
-                            in_tensors)
+                            in_tensors_trace_view)
 
             # In distributed execution mode:
             # At that point only the first process will have a compiled executable:
@@ -560,7 +561,8 @@ class PoplarExecutor:
                     self._executable = poptorch_core.compileWithTrace(
                         *trace_args)
                 else:
-                    self._executable = self._compileWithDispatch(in_tensors)
+                    self._executable = self._compileWithDispatch(
+                        in_tensors_trace_view)
 
             # Load the engine and connect the streams in all the processes.
             #
@@ -591,40 +593,8 @@ class PoplarExecutor:
     def _preprocessGraph(self, in_tensors):
         with self._profiling.tracepoint("graphPreprocessing"):
             self._executable_inputs = in_tensors.clone()
-
-            # Input will be in form of [BatchSize* BatchPerStep, ...] so we
-            # should slice it up so we compile by the batch size alone.
-            extra_poplar_batch_dims = self._options.device_iterations * \
-                self._options.replication_factor * \
-                self._options.Training.gradient_accumulation
-
-            # There are two concepts of batch size. First is the "model" batch size then there is the
-            # concept of batching at the popart level. Here we divide by the popart batch size so the
-            # trace "sees" the model batch size but when we call execute we pass the full batch and popart
-            # will partition it up.
             in_tensors_trace_view = in_tensors.clone()
-
-            def narrowTensor(tensor):
-                if not isinstance(tensor, torch.Tensor):
-                    return tensor
-                b_size = 1 if not tensor.size() else tensor.size()[0]
-                assert b_size % extra_poplar_batch_dims == 0, (
-                    "Invalid batch dimension: In the input %s, the batch "
-                    "dimension (%d) must be a multiple of "
-                    "Options.deviceIterations(%d) * "
-                    "Options.replicationFactor(%d) * "
-                    "Options.Training.gradientAccumulation(%d) = %d "
-                    "because it is used to calculate the batch size which will "
-                    "be executed on the device in any given iteration. For a "
-                    "full explanation see the batching semantics page of the "
-                    "documentation.") % (
-                        tensor.shape, b_size, self._options.device_iterations,
-                        self._options.replication_factor,
-                        self._options.Training.gradient_accumulation,
-                        extra_poplar_batch_dims)
-                return tensor.narrow(0, 0, b_size // extra_poplar_batch_dims)
-
-            in_tensors_trace_view.forEach(narrowTensor)
+            in_tensors_trace_view.forEach(self._narrow_tensor)
 
             def remove_require_grad(tensor):
                 if not isinstance(tensor, torch.Tensor):
@@ -653,7 +623,7 @@ class PoplarExecutor:
 
             poptorch_core.processPrecisionOptions(self._options.Precision)
 
-        return in_tensors_trace_view, has_converted_any_half, narrowTensor
+        return in_tensors_trace_view, has_converted_any_half
 
     def compile(self, *args, **kwargs) -> None:
         """Takes the same arguments as the wrapped PyTorch `model.__call__`.
@@ -681,14 +651,14 @@ class PoplarExecutor:
         with self._profiling.tracepoint("loadExecutable"):
             data, exe_offset = _poptorch_data.parse(filename,
                                                     self._poptorch_version)
-            in_tensors_trace_view, has_converted_any_half, narrow_tensor_fn = \
+            in_tensors_trace_view, has_converted_any_half = \
                     self._preprocessGraph(
                         data.executable_inputs)
 
             if data.options is None or data.options.Jit.trace_model:
                 trace_args = self._trace_model_and_get_compile_args(
                     data.executable_inputs, in_tensors_trace_view,
-                    has_converted_any_half, narrow_tensor_fn)
+                    has_converted_any_half)
                 self._executable = \
                         poptorch_core.processTraceAndImportExecutable(
                             *trace_args, filename, exe_offset)
@@ -1172,8 +1142,7 @@ class PoplarExecutor:
 
     def _trace_model_and_get_compile_args(self, in_tensors,
                                           in_tensors_trace_view,
-                                          has_converted_any_half,
-                                          narrow_tensor_fn):
+                                          has_converted_any_half):
         logger.info('Compiling the model using tracing')
         # CPU tracing doens't work for half types. We need to convert all half
         # layers to float, run tracing and revert the types to their original.
@@ -1290,7 +1259,7 @@ class PoplarExecutor:
         if has_converted_any_half[0]:
             # Get the originals back.
             in_tensors_as_half = in_tensors.clone()
-            in_tensors_as_half.forEach(narrow_tensor_fn)
+            in_tensors_as_half.forEach(self._narrow_tensor)
 
             # Compile using the actual halves.
             return (self._trace._c, parameters,
@@ -1305,6 +1274,39 @@ class PoplarExecutor:
                 accessAttributes, added_dummy_output,
                 list(self._options.anchored_tensors.values()),
                 model_parameters)
+
+    def _narrow_tensor(self, tensor):
+        """There are two concepts of batch size. First is the "model" batch
+        size then there is the concept of batching at the popart level.
+        Here we divide by the popart batch size so the trace "sees" the
+        model batch size but when we call execute we pass the full batch
+        and popart will partition it up."""
+
+        # Input will be in form of [ModelBatchSize * BatchPerStep, ...] so we
+        # should slice it up so we compile by the ModelBatchSize alone.
+        extra_poplar_batch_dims = self._options.device_iterations * \
+            self._options.replication_factor * \
+            self._options.Training.gradient_accumulation
+
+        if not isinstance(tensor, torch.Tensor):
+            return tensor
+
+        b_size = 1 if not tensor.size() else tensor.size()[0]
+        assert b_size % extra_poplar_batch_dims == 0, (
+            "Invalid batch dimension: In the input %s, the batch "
+            "dimension (%d) must be a multiple of "
+            "Options.deviceIterations(%d) * "
+            "Options.replicationFactor(%d) * "
+            "Options.Training.gradientAccumulation(%d) = %d "
+            "because it is used to calculate the batch size which will "
+            "be executed on the device in any given iteration. For a "
+            "full explanation see the batching semantics page of the "
+            "documentation.") % (tensor.shape, b_size,
+                                 self._options.device_iterations,
+                                 self._options.replication_factor,
+                                 self._options.Training.gradient_accumulation,
+                                 extra_poplar_batch_dims)
+        return tensor.narrow(0, 0, b_size // extra_poplar_batch_dims)
 
     def isAttachedToDevice(self) -> bool:
         """Returns true, if the target device has been attached. False,
