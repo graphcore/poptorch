@@ -711,21 +711,23 @@ void LowerToPopartImpl::lowerBody() {
 
     } else if (kind == symbols::poptorch::set_available_memory) {
       // Get the torch jit SSA for the input/output values.
-      std::vector<poptorch::TensorId> inputs;
-      std::transform(node->inputs().begin(), node->inputs().end(),
-                     std::back_inserter(inputs), [&](torch::jit::Value *val) {
-                       // Tuples aren't supported here but it's ok because
-                       // we don't support any operations which actually take in
-                       // tuples.
-                       return _value_map.tensor(val);
-                     });
+      std::vector<std::set<poptorch::TensorId>> inputs;
+      for (auto *input : node->inputs()) {
+        inputs.emplace_back();
+        auto outputs = input->node()->outputs();
+        std::transform(
+            std::begin(outputs), std::end(outputs),
+            std::inserter(inputs.back(), std::begin(inputs.back())),
+            [&](torch::jit::Value *val) { return _value_map.tensor(val); });
+      }
 
       _compiler.setAvailableMemoryProportion(
           inputs, node->f(c10::Symbol::fromQualString(
                       "attr::availableMemoryProportion")));
 
       for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
-        _value_map.setTensor(node->output(i), inputs[i]);
+        _value_map.setTensor(node->output(i),
+                             _value_map.tensor(node->input(i)));
       }
 
     } else if (kind == c10::prim::Constant) {

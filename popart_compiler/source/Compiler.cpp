@@ -1147,11 +1147,16 @@ std::uint64_t Compiler::popartBatchDimForAnchor(poptorch::TensorId id) const {
 }
 
 void Compiler::setAvailableMemoryProportion(
-    const std::vector<poptorch::TensorId> &inputs,
+    const std::vector<std::set<poptorch::TensorId>> &inputs,
     float availableMemoryProportion) {
-  for (const poptorch::TensorId &id : inputs) {
+  for (const auto &ids : inputs) {
+    std::set<popart::TensorId> popart_ids;
+    std::transform(
+        std::begin(ids), std::end(ids),
+        std::inserter(popart_ids, std::begin(popart_ids)),
+        [this](const poptorch::TensorId &id) { return _impl->ids[id]; });
     _impl->active_builder->setAvailableMemoryProportion(
-        _impl->ids[id], availableMemoryProportion);
+        popart_ids, availableMemoryProportion);
   }
 }
 

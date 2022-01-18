@@ -3,6 +3,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -379,9 +380,13 @@ public:
   void setUpOutputOp(poptorch::TensorId id, std::int16_t *ptr,
                      const std::vector<std::int64_t> &dims);
 
-  void
-  setAvailableMemoryProportion(const std::vector<poptorch::TensorId> &inputs,
-                               float availableMemoryProportion);
+  // Each std::set of tensors represents all the outputs of a node to set
+  // the available memory proportion on. This function loops over the outer
+  // vector, so the total number of nodes it will set the proportion on
+  // will be inputs.size().
+  void setAvailableMemoryProportion(
+      const std::vector<std::set<poptorch::TensorId>> &inputs,
+      float availableMemoryProportion);
 
   void setMatMulSerialization(poptorch::TensorId matmul, const char *mode,
                               std::uint64_t factor,
