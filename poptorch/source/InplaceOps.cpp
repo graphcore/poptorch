@@ -80,6 +80,7 @@ void InplaceOpHandler::processInput(size_t input_num) {
 
     auto inputs = node->inputs();
     ERROR_ON(inputs.empty());
+
     if (inputs[0] != current_alias) {
       continue;
     }

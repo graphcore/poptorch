@@ -2,6 +2,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import torch
+import torch.nn as nn
 
 import pytest
 import poptorch
@@ -10,7 +11,7 @@ import helpers
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_add(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
                 x[0] += 1
@@ -39,7 +40,7 @@ def test_inplace_add(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_add_multi_elements(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, _x, y):
             y += 1
 
@@ -56,7 +57,7 @@ def test_inplace_add_multi_elements(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_sub(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
                 x[0] -= 1
@@ -85,7 +86,7 @@ def test_inplace_sub(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_div(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
                 x[0] /= 2
@@ -114,7 +115,7 @@ def test_inplace_div(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_mul(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
                 x[0] *= 2
@@ -143,7 +144,7 @@ def test_inplace_mul(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_masked_fill(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             x.masked_fill_(x > 0.5, 1.0)
 
@@ -161,7 +162,7 @@ def test_inplace_masked_fill(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_zero(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             # (Simply setting it to zero gets pruned by PopART)
             a = torch.sum(x)
@@ -182,7 +183,7 @@ def test_inplace_zero(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_fill(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             a = torch.sum(x)
             x.fill_(1.0)
@@ -202,7 +203,7 @@ def test_inplace_fill(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_non_input(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x):
             a = x + 1
             a += 1
@@ -230,7 +231,7 @@ def test_inplace_non_input(trace_model):
 def test_double_underscore(trace_model):
     # This tests aten::__and__ is not treated as inplace
 
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def forward(self, x, l):
             return x[x[0][0].int() & l.item()]
 
@@ -248,7 +249,7 @@ def test_double_underscore(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_half_buffer_inplace(trace_model):
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def __init__(self):
             super().__init__()
             self.register_buffer('buff', torch.ones(5, dtype=torch.float16))
@@ -280,15 +281,15 @@ def test_float_to_half_buffer_inplace_with_training():
     torch.manual_seed(42)
 
     # pylint: disable=attribute-defined-outside-init
-    class Model(torch.nn.Module):
+    class Model(nn.Module):
         def __init__(self):
             super().__init__()
 
             # need at least one parameter for a training model
-            self.param = torch.nn.Parameter(torch.ones(5, 5))
+            self.param = nn.Parameter(torch.ones(5, 5))
 
             self.register_buffer("buff", torch.ones(5))
-            self.loss = torch.nn.MSELoss()
+            self.loss = nn.MSELoss()
 
         def forward(self, x):
             # pylint: disable=no-member
@@ -309,3 +310,53 @@ def test_float_to_half_buffer_inplace_with_training():
 
     helpers.assert_allclose(actual=native_out, expected=poptorch_out)
     helpers.assert_allclose(actual=native_loss, expected=poptorch_loss)
+
+
+class DirectAssign(nn.Module):
+    def __init__(self, step):
+        super().__init__()
+        self.step = step
+
+    def forward(self, x):
+        x[0:2:self.step] = x[0:2:self.step] * 0
+        return x
+
+
+class ModifyBeforeAssign(nn.Module):
+    def __init__(self, step):
+        super().__init__()
+        self.step = step
+
+    def forward(self, x):
+        x = x * 2
+        x[0:2:self.step] = x[0:2:self.step] * 0
+        return x
+
+
+@helpers.printCapfdOnExit
+@pytest.mark.parametrize("step_size", [1, 2])
+@pytest.mark.parametrize("model", [DirectAssign, ModifyBeforeAssign])
+def test_inplace_assign_to_slice(model, step_size, capfd):
+    t = torch.rand(4, 4)
+    cpu_model = model(step_size)
+    ipu_model = poptorch.inferenceModel(cpu_model)
+
+    if step_size == 1:
+        # Clone the inputs so they're not modified by the models
+        helpers.assert_allclose(actual=ipu_model(t.clone()),
+                                expected=cpu_model(t.clone()))
+    else:
+        if model is DirectAssign:
+            with pytest.raises(
+                    poptorch.poptorch_core.Error,
+                    match="All operations in the main graph were pruned, "
+                    "nothing to compute"):
+                ipu_model.compile(t)
+        else:
+            ipu_model.compile(t)
+
+        testlog = helpers.LogChecker(capfd)
+        testlog.assert_matches(
+            r"\[warning\] In\-place modification of slices with step "
+            r"size other than 1 is not supported\. This may result in "
+            r"unexpected behaviour\.")

@@ -29,6 +29,7 @@ Bug Fixes
 
 - Fix thread safety issue in LogContext.
 - Fix torch.clamp with integer tensors
+- Fix in-place modification of slices
 
 v2.4 (Poplar SDK 2.4)
 =====================
