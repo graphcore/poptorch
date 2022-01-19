@@ -134,3 +134,41 @@ def test_scatter_add(inplace, dim):
     index = torch.randint_like(x, high=dim_size).long()
 
     op_harness(Model(dim, dim_size), x, index)
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_available_memory_scatter_add(capfd):
+    class Model(torch.nn.Module):
+        def __init__(self, dim, dim_size):
+            super().__init__()
+            self.dim = dim
+            self.dim_size = dim_size
+
+        def forward(self, src, index):
+            sz = list(src.shape)
+            sz[self.dim] = self.dim_size
+            out = torch.ones(sz)
+            sa = out.scatter_add(self.dim, index, src)
+            am = poptorch.set_available_memory(sa, 0.9)
+            return am
+
+    dim = 2
+    torch.manual_seed(42)
+    x = torch.randn(4, 8, 16)
+    dim_size = x.shape[dim] // 2
+    index = torch.randint_like(x, high=dim_size).long()
+
+    model = Model(dim, dim_size)
+    options = poptorch.Options()
+    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_model(x, index)
+
+    log = helpers.LogChecker(capfd)
+    it = log.createIterator()
+    # Assert that the set_available_memory node references the scatterreduce,
+    # not the add.
+    sa_line = it.findNext("popart::scatterreduce").strip()
+    sa_var = sa_line.partition(" ")[0]
+    sam_line = it.findNext("poptorch::set_available_memory").strip()
+    assert sam_line.endswith("({})".format(sa_var))

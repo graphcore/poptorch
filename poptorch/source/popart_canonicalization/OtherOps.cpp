@@ -193,7 +193,14 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
   auto axissize = shape.at(axis);
 
   auto *sr = createScatterreduce(graph, {src, index}, axissize, axis, 0);
-  return createAdd(graph, {output, sr->output()});
+  auto *add = createAdd(graph, {output, sr->output()});
+  // Fix up any set_available_memory calls to point to the scatterreduce
+  for (const auto &use : node->output()->uses()) {
+    if (use.user->kind() == symbols::poptorch::set_available_memory) {
+      use.user->replaceInputWith(node->output(), sr->output());
+    }
+  }
+  return add;
 }
 
 } // namespace
