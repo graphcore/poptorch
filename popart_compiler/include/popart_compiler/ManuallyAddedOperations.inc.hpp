@@ -59,6 +59,11 @@ OP_DECL(poptorch, gru, gru, AiOnnxOpset10.gru, NONE,
         BODY_ARG(EMPTY_STRING_VEC) BODY_ARG(OPTIONAL_FLOAT) BODY_ARG("forward")
         BODY_ARG(OPTIONAL_INT) BODY_ARG(1))
 
+OP_DECL(poptorch, rnn, rnn, AiOnnxOpset10.rnn,
+        ARG(STRING_VEC, activations), BODY_ARG(2) BODY_ARG(EMPTY_FLOAT_VEC)
+        BODY_ARG(EMPTY_FLOAT_VEC) BODY_ARG(activations) BODY_ARG(OPTIONAL_FLOAT)
+        BODY_ARG("forward") BODY_ARG(OPTIONAL_INT))
+
 #undef EMPTY_STRING_VEC
 #undef OPTIONAL_INT
 #undef OPTIONAL_FLOAT

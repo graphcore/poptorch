@@ -44,22 +44,6 @@ const char *convert(const std::string &s) {
   return s.c_str(); // NOLINT
 }
 
-std::vector<const char *> convert(const std::vector<std::string> &s) {
-  std::vector<const char *> result;
-  std::transform(s.begin(), s.end(), std::back_inserter(result),
-                 [](const std::string &str) {
-                   return str.c_str(); // NOLINT
-                 });
-  return result;
-}
-
-std::vector<float> convert(const std::vector<double> &v) {
-  std::vector<float> result;
-  std::transform(v.begin(), v.end(), std::back_inserter(result),
-                 [](double d) { return static_cast<float>(d); });
-  return result;
-}
-
 // We have a seperate list to help us parse the PopART IR Nodes we create as
 // part of the normal PopTorch process. This file is located in the compiler
 // build directory so if we ever decouple the compiler we would also need to

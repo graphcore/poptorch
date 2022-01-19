@@ -103,7 +103,6 @@ torch::jit::Node* createMul(torch::jit::Graph *graph,  const std::vector<torch::
 torch::jit::Node* createMultinomial(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t dtype,int64_t sample_size,float seed);
 torch::jit::Node* createLogical_or(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createPow(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
-torch::jit::Node* createRnn(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,std::vector<double> activation_alpha,std::vector<double> activation_beta,const std::vector<std::string> & activations,float clip,const std::string & direction,std::int32_t hidden_size);
 torch::jit::Node* createSin(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createSub(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);
 torch::jit::Node* createTan(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args);

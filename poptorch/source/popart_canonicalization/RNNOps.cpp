@@ -84,6 +84,7 @@ torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
                  ->output();
   }
 
+  // TODO(T54563)
   auto *seq_lens =
       createConstantInt(graph, {seq_length}, {batch_size})->output();
 
@@ -239,11 +240,109 @@ torch::jit::Node *lstmHandler(torch::jit::Graph *graph,
   markNodeForDeletion(node);
   return nullptr;
 }
+
+torch::jit::Node *rnnHandler(torch::jit::Graph *graph, torch::jit::Node *node,
+                             const std::string &nonlinearity) {
+  // rnn_{tanh/relu}.input(Tensor input, Tensor hx, Tensor[] params,
+  // bool has_biases, int num_layers, float dropout, bool train,
+  // bool bidirectional, bool batch_first) -> (Tensor, Tensor)
+  torch::jit::Value *input = node->input(0);
+  torch::jit::Value *hx = node->input(1);
+
+  torch::jit::ArrayRef<torch::jit::Value *> params =
+      node->input(2)->node()->inputs();
+  torch::jit::Value *w_ih = params[0]; // input-hidden weights
+  torch::jit::Value *w_hh = params[1]; // hidden-hidden weights
+  torch::jit::Value *b_ih = params[2]; // input-hidden bias
+  torch::jit::Value *b_hh = params[3]; // hidden-hidden bias
+
+  bool has_biases = constantToBool(node->input(3)->node());
+  ERROR_ON_MSG(!has_biases, "RNN without biases is not supported");
+
+  int num_layers = constantToInt(node->input(4)->node());
+  ERROR_ON_MSG(num_layers != 1, "Only RNN with 1 layer is supported");
+
+  float dropout = constantToFloat(node->input(5)->node());
+  ERROR_ON_MSG(dropout != 0.0f, "RNN only supports dropout = 0.0");
+
+  bool bidirectional = constantToBool(node->input(7)->node());
+  ERROR_ON_MSG(bidirectional, "Bidirectional RNN is not supported");
+
+  bool batch_first = constantToBool(node->input(8)->node());
+
+  auto input_shape = shapeFromTensor(input);
+  int64_t sequence_length;
+  int64_t batch_size;
+
+  if (batch_first) {
+    // N, L, H_in -> L, N, H_in
+    input = createTranspose(graph, {input}, {1, 0, 2})->output();
+    sequence_length = input_shape.at(1);
+    batch_size = input_shape.at(0);
+  } else {
+    sequence_length = input_shape.at(0);
+    batch_size = input_shape.at(1);
+  }
+
+  auto *b = createConcat(graph, {b_ih, b_hh}, 0)->output();
+  // Fix concat result shape so that we can use prependDimension().
+  auto hidden_size = shapeFromTensor(b_ih).front();
+  b->setType(
+      b_ih->type()->expect<c10::TensorType>()->withSizes({2 * hidden_size}));
+
+  // TODO(T54563)
+  auto *sequence_lens =
+      createConstantInt(graph, {sequence_length}, {batch_size})->output();
+
+  std::vector<torch::jit::Value *> args = {
+      // [seq_length, batch_size, input_size]
+      input,
+      // [num_directions, hidden_size, input_size]
+      prependDimension(graph, w_ih),
+      // [num_directions, hidden_size, hidden_size]
+      prependDimension(graph, w_hh),
+      // [num_directions, 2*hidden_size]
+      prependDimension(graph, b),
+      // [batch_size]
+      sequence_lens,
+      // [num_directions, batch_size, hidden_size]
+      hx,
+  };
+
+  auto *rnn = createRnn(graph, args, {nonlinearity});
+  auto *output_0 = createReshape(graph, rnn->output(0),
+                                 {sequence_length, batch_size, hidden_size})
+                       ->output();
+
+  if (batch_first) {
+    // L, N, H_out -> N, L, H_out
+    output_0 = createTranspose(graph, {output_0}, {1, 0, 2})->output();
+  }
+
+  replaceOutputUse(node->output(0), output_0);
+  replaceOutputUse(node->output(1), rnn->output(1));
+  markNodeForDeletion(node);
+
+  return nullptr;
+}
+
+torch::jit::Node *rnnTanhHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  return rnnHandler(graph, node, "Tanh");
+}
+
+torch::jit::Node *rnnReluHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  return rnnHandler(graph, node, "Relu");
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::gru, gruHandler);
   registerHandler(c10::aten::lstm, lstmHandler);
+  registerHandler(c10::aten::rnn_tanh, rnnTanhHandler);
+  registerHandler(c10::aten::rnn_relu, rnnReluHandler);
 }
 
 } // namespace poptorch

@@ -581,6 +581,16 @@ torch::jit::Node *createGru(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createRnn(torch::jit::Graph *graph,
+                            const std::vector<torch::jit::Value *> &args,
+                            const std::vector<std::string> &activations) {
+  torch::jit::Node *new_node = createAndInsertNode(
+      graph, symbols::poptorch::rnn, args, ImplicitCast::All,
+      OutputType::AsImplicitCastPromoted, 2);
+  new_node->ss_(c10::Symbol::fromQualString("attr::activations"), activations);
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */

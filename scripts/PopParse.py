@@ -196,7 +196,7 @@ tu = index.parse(session_file,
 
 parse_session_options(tu.cursor)
 
-UnsupportedOps = ["abort", "ctcloss", "gru"]
+UnsupportedOps = ["abort", "ctcloss", "gru", "rnn"]
 
 ## Implicit cast support
 # Casting on all args
