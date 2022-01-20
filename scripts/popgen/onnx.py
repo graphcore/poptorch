@@ -32,9 +32,10 @@ def find_popart_includes():
         "by running cmake")
     with open(compile_commands, "r") as f:
         cmds = json.load(f)
+    regex = r'.*-isystem (.*popart(/install)?/include) .*'
     for c in cmds:
         if "popart_compiler" in c["file"]:
-            m = re.match(".*-isystem (.*popart/include) .*", c["command"])
+            m = re.match(regex, c["command"])
             if not m:
                 continue
             return m.group(1)
@@ -206,6 +207,7 @@ def parse_signatures():
         'bool': ['cint'],
         'float': ['cfloat'],
         'int64_t': ['clong', 'dimension'],
+        'int': ['cint'],
         'unsigned int': ['cint'],
         'std::string': ['cstr'],
         'std::vector<float>': ['cfloat_list', 'empty_initializer'],
@@ -235,7 +237,7 @@ def parse_signatures():
         'popart::MultiConvStrides':
         'ignore',
         'popart::TensorId':
-        'ignore'
+        'ignore',
     }
 
     for classname in classes:

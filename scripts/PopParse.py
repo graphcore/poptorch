@@ -58,6 +58,7 @@ options_not_handled = [
     "batchSerializationSettings",
     "automaticLossScalingSettings",
     "autodiffSettings",
+    "_enableRngStateManagement",
 ]
 
 
@@ -495,8 +496,8 @@ CXX_TYPE_CONV_TABLE = {
 }
 
 CXX_NON_CONV_TYPES = [
-    "bool", "float", "int64_t", "std::string", "std::vector<int64_t>",
-    "unsigned int", "std::vector<std::string>"
+    "bool", "float", "int", "int64_t", "unsigned int", "std::string",
+    "std::vector<int64_t>", "std::vector<std::string>"
 ]
 
 
