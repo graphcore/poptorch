@@ -18,6 +18,7 @@ New features
   * torch.std_mean
 
 - Support for ``col2im`` (used by torch.nn.Fold).
+- Improve error message of ``aten::index``, ``aten::index_put_`` when indexing with boolean tensor masks
 
 API changes
 -----------
