@@ -3,6 +3,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include "../PoptorchStaticInit.hpp"
+#include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
@@ -184,7 +185,25 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
   auto *scatter = createScatter(
       graph, {info.x_partial_flat, info.indices_partial_flat, v}, 0);
   // Restore original input shape
-  return createReshape(graph, scatter->output(), shape);
+  auto *out = createReshape(graph, scatter->output(), shape);
+
+  // If we're performing an index_put on a slice - this should operate
+  // "in-place"
+  //
+  // Slices are tensor views in torch, and index_put_ should modify the tensor
+  // being sliced. To simulate in-place modification to slices, we replace all
+  // uses of the tensor being sliced with the output of this operation
+  if (x->node()->kind() == symbols::popart::slice) {
+    auto *slice_input = x->node()->input(0);
+    // Recursively follow the chain of slices until we find the original tensor
+    // actually being sliced
+    while (slice_input->node()->kind() == symbols::popart::slice) {
+      slice_input = slice_input->node()->input(0);
+    }
+    slice_input->replaceAllUsesAfterNodeWith(node, out->output());
+  }
+
+  return out;
 }
 
 } // namespace

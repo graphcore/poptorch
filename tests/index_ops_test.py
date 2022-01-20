@@ -74,7 +74,7 @@ def index_op8(t, idx, v=None):
 def index_harness(op, idxs, pass_value, v=None):
     torch.manual_seed(42)
     t = torch.randn(2, 3, 4, 5)
-    idxs_tensors = [torch.tensor(i) for i in idxs]
+    idxs_tensors = [torch.tensor([i]) for i in idxs]
     model = helpers.ModelWithWeights(op, t.shape)
     # The LR should be large enough to guarantee weights change
     optim = torch.optim.AdamW(model.parameters(), lr=0.1)
@@ -107,13 +107,6 @@ index_ops = [
     index_op6,
     index_op7,
     index_op8,
-]
-# TODO(T40635): Remove this list and use index_ops in test_index_put when
-# the index_put bug is fixed
-index_put_ops = [
-    index_op0,
-    index_op1,
-    index_op6,
 ]
 
 index_indices = ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
@@ -148,7 +141,7 @@ def test_index_on_max_indices():
 
 
 @pytest.mark.parametrize("idxs", index_indices)
-@pytest.mark.parametrize("op", index_put_ops)
+@pytest.mark.parametrize("op", index_ops)
 def test_index_put(op, idxs):
     index_harness(op, idxs, True)
 
