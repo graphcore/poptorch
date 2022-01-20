@@ -22,6 +22,8 @@ New features
 API changes
 -----------
 
+- Removed ``poptorch.AnchorMode``, ``poptorch.Options.anchorMode`` which were deprecated in favour of ``poptorch.OutputMode`` and ``poptorch.Options.outputMode`` respectively.
+
 Bug Fixes
 ---------
 

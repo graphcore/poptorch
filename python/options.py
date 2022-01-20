@@ -9,7 +9,6 @@ from ._logging import logger
 from . import _options_config
 from . import _options_impl
 from . import ops
-from ._utils import deprecated
 
 
 class Attribute():
@@ -1544,48 +1543,12 @@ class Options(_options_impl.OptionsDict):
           ``EveryN``. Defaults to 1.
         """
 
-        # TODO(T47959): remove code related to deprecated content
-        if isinstance(output_mode, enums.AnchorMode):
-            logger.warning("enums.AnchorMode has been deprecated in favour "
-                           "of enums.OutputMode. Consider changing"
-                           "enums.AnchorMode to enums.OutputMode.")
-            output_mode = enums.OutputMode(output_mode.value)
-
         if output_mode != enums.OutputMode.EveryN:
             output_return_period = 1
 
         value = [long_name, output_mode is None]
         value += [output_mode, output_return_period]
         self.anchored_tensors[short_name] = value
-
-    @deprecated("poptoch.Options", "2.4",
-                "Use outputMode instead, previous name was misleading.")
-    def anchorMode(self,
-                   anchor_mode: "poptorch.AnchorMode",
-                   anchor_return_period: Optional[int] = None
-                   ) -> "poptorch.Options":
-        """ Specify which data to return from a model.
-
-        :param poptorch.AnchorMode anchor_mode:
-            * ``All``: Return a result for each batch.
-            * ``Sum``: Return the sum of all the batches.
-            * ``Final``: Return the last batch.
-            * ``EveryN``: Return every N batches: N is passed in
-              as ``anchor_return_period``.
-            * Default: `All` for inference, `Final` for training.
-
-        For example:
-
-        >>> opts = poptorch.Options()
-        >>> opts.anchorMode(poptorch.AnchorMode.All)
-        ... # or
-        >>> opts.anchorMode(poptorch.AnchorMode.EveryN, 10)
-        """
-        assert isinstance(anchor_mode, enums.AnchorMode)
-
-        self.outputMode(enums.OutputMode(anchor_mode.value),
-                        anchor_return_period)
-        return self
 
     def outputMode(self,
                    output_mode: "poptorch.OutputMode",
@@ -1624,18 +1587,6 @@ class Options(_options_impl.OptionsDict):
         self.set(output_mode=output_mode.value,
                  output_return_period=output_return_period or 1)
         return self
-
-    @deprecated("poptoch.Options", "2.4",
-                "Use defaultOutputMode instead, previous name was misleading.")
-    def defaultAnchorMode(self) -> bool:
-        """
-        :return:
-            * True: :py:func:`~poptorch.Options.outputMode` is currently set to
-                default.
-            * False: :py:func:`~poptorch.Options.outputMode` is not set to
-                default.
-        """
-        return self.output_mode == enums.OutputMode.Default
 
     def defaultOutputMode(self) -> bool:
         """

@@ -54,23 +54,6 @@ class SharingStrategy(enum.IntEnum):
     FileSystem = 1
 
 
-# TODO(T47959): remove deprecated enum
-class AnchorMode(enum.IntEnum):
-    """
-    - ``All``: Return a result for each batch.
-    - ``Sum``: Return the sum of all the batches
-    - ``Final``: Return the last batch.
-    - ``EveryN``: Return every N batches. N is passed in as
-        `output_return_period`
-    - ``Default``: "All" for inference, "Final" for training.
-    """
-    Final = 0
-    EveryN = 1
-    All = 2
-    Sum = 3
-    Default = 4
-
-
 class OutputMode(enum.IntEnum):
     """
     - ``All``: Return a result for each batch.
