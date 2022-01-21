@@ -377,6 +377,9 @@ class PoplarExecutor:
             self.copyWeightsToDevice()
         return out
 
+    def __repr__(self):
+        return self._user_model.__repr__()
+
     def __getattr__(self, attr):
         return getattr(self._user_model, attr)
 

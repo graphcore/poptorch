@@ -19,9 +19,11 @@ New features
 - Also save the random number generator's state and the seed when saving a model.
 
 - Support for ``col2im`` (used by torch.nn.Fold).
-- Improve error message of ``aten::index``, ``aten::index_put_`` when indexing with boolean tensor masks
+- Improve error message of ``aten::index``, ``aten::index_put_`` when indexing with boolean tensor masks.
 - Support for ``torch.argsort``.
 - Support for ``torch.nn.RNN``.
+- Add support for ``__repr__`` in PoplarExecutor.
+- For models annotated with ``BeginBlock``, show the IPU blocks in ``repr(model)``.
 
 API changes
 -----------
