@@ -160,7 +160,12 @@ def Poptorch_addmm : Poptorch_Op<"addmm", []> {
         $_state.addAttribute("beta", $_builder.getF32FloatAttr(beta));
         $_state.addAttribute("alpha", $_builder.getF32FloatAttr(alpha));
 
-        $_state.addTypes(input.getType());
+        mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();
+        mlir::RankedTensorType mat1_type = mat1.getType().cast<mlir::RankedTensorType>();
+        mlir::RankedTensorType mat2_type = mat2.getType().cast<mlir::RankedTensorType>();
+        std::vector<std::int64_t> shape = mat1_type.getShape();
+        shape[1] = mat2_type.getShape()[1];
+        $_state.addTypes(mlir::RankedTensorType::get(shape, input_type.getElementType()));
      }]>
     ];
 }
