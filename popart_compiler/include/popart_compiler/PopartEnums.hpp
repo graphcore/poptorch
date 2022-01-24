@@ -39,9 +39,10 @@ enum class OptimizerType : std::uint8_t {
   _(BOOL)
 
 #define FOR_ALL_FLOATING_POINT_TYPES(_)                                        \
-  _(FLOAT)                                                                     \
+  _(FLOAT8)                                                                    \
   _(FLOAT16)                                                                   \
   _(BFLOAT16)                                                                  \
+  _(FLOAT)                                                                     \
   _(DOUBLE)                                                                    \
   _(COMPLEX64)                                                                 \
   _(COMPLEX128)
