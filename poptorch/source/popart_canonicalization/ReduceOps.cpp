@@ -158,6 +158,27 @@ torch::jit::Node *argMinMaxHandler(torch::jit::Graph *graph,
   return createArgmin(graph, {input}, dim_to_use, keep_dim);
 }
 
+torch::jit::Node *argsortHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto *x = node->input(0);
+  auto t0 = x->type()->expect<c10::TensorType>();
+  std::vector<std::int64_t> shape = shapeFromTensor(node->input(0));
+  auto dim = handleDimensionParam(node->input(1), t0);
+  auto *size = createConstantInt(graph, {shape[dim]}, {1})->output();
+  size = createCast(graph, size, c10::ScalarType::Long)->output();
+  auto *topk = createTopk(graph, {x, size}, dim);
+  auto *indices = topk->output(1);
+  auto descending = constantToBool(node->input(2)->node());
+
+  if (descending) {
+    indices = createCast(graph, indices, c10::ScalarType::Int)->output();
+    return indices->node();
+  }
+
+  std::vector<int64_t> dims{dim};
+  return createReverse(graph, {indices}, dims);
+}
+
 torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
                                            torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -335,6 +356,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::amin, aMinMaxHandler);
   registerHandler(c10::aten::argmax, argMinMaxHandler);
   registerHandler(c10::aten::argmin, argMinMaxHandler);
+  registerHandler(c10::aten::argsort, argsortHandler);
   registerHandler(c10::aten::prod, reduceHandler);
   registerHandler(c10::aten::mean, reduceHandler);
   registerHandler(c10::aten::median, reduceMedianHandler);

@@ -858,3 +858,19 @@ def test_var_std(op, params):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
     op_harness(params[0], model, [x], assert_)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+@pytest.mark.parametrize("axis", range(0, 4))
+@pytest.mark.parametrize("descending", [True, False])
+def test_argsort(trace_model, axis, descending):
+    torch.manual_seed(42)
+    input = torch.randn([3, 4, 5, 5])
+
+    def operation(x):
+        return torch.argsort(x, dim=axis, descending=descending)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    op_harness(trace_model, operation, [input], assert_)

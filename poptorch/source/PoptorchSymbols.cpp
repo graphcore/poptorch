@@ -35,6 +35,7 @@ c10::Symbol numpy_T;                     // NOLINT
 c10::Symbol col2im;                      // NOLINT
 c10::Symbol im2col;                      // NOLINT
 c10::Symbol _reshape_alias;              // NOLINT
+c10::Symbol argsort;                     // NOLINT
 
 // Removed in 1.10.
 #if TORCH_MINOR_VERSION < 10
@@ -78,6 +79,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, col2im);
   SYMBOL_INIT(aten, im2col);
   SYMBOL_INIT(aten, _reshape_alias);
+  SYMBOL_INIT(aten, argsort);
 
 #if TORCH_MINOR_VERSION < 10
   SYMBOL_INIT(aten, amax);

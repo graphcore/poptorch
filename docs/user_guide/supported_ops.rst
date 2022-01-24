@@ -183,6 +183,7 @@ Comparison ops
     ``torch.topk`` only supports ``sorted=True`` and ``largest=True`` arguments.
 
 * ``torch.topk``
+* ``torch.argsort``
 
 
 Other ops

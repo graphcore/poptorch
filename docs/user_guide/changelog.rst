@@ -19,6 +19,7 @@ New features
 
 - Support for ``col2im`` (used by torch.nn.Fold).
 - Improve error message of ``aten::index``, ``aten::index_put_`` when indexing with boolean tensor masks
+- Support for ``torch.argsort``.
 
 API changes
 -----------
