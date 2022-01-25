@@ -55,6 +55,7 @@ decl_types = {
     "I32Attr": "INT",
     "I64Attr": "LONG",
     "F32Attr": "FLOAT",
+    "F64Attr": "DOUBLE",
     "StrAttr": "STRING",
     "BoolAttr": "BOOL",
     "Poptorch_tensor": "TENSOR",
@@ -166,6 +167,8 @@ builder_call_translations = {
     "LONG": "std::int64_t",
     "OPTIONAL_LONG": "std::optional<std::int64_t>",
     "FLOAT": "float",
+    "DOUBLE": "double",
+    "OPTIONAL_DOUBLE": "std::optional<double>",
     "STRING": "const char *",
     "TENSOR": "poptorch_ir::TensorId",
     "TENSOR_VEC": "const std::vector<poptorch_ir::TensorId> &",
@@ -268,7 +271,8 @@ disptach_cxx_cases = {
     "FLOAT": "float",
     "STRING": "const char*",
     "BOOL": "bool",
-    "TYPE": "poptorch_ir::Type"
+    "TYPE": "poptorch_ir::Type",
+    "OPTIONAL_DOUBLE": "std::optional<double>"
 }
 
 # Generate the JIT dispatch table.

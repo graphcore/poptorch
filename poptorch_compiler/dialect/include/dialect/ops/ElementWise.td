@@ -276,3 +276,63 @@ class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
 
 def Poptorch_greater: Poptorch_binary_conditional<"greater"> {}
 def Poptorch_less: Poptorch_binary_conditional<"less"> {}
+
+def Poptorch_clamp: Poptorch_Op<"clamp", []> {
+  // defining input arguments 
+  let arguments = (ins Poptorch_tensor:$self,             
+                        OptionalAttr<F64Attr>:$min, 
+                        OptionalAttr<F64Attr>:$max); 
+  // defining output arguments
+  let results = (outs Poptorch_tensor:$result); 
+
+  // builders allow us to tell MIR the types 
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                    "std::optional<double>":$min,
+                                    "std::optional<double>":$max), 
+  
+  [{$_state.addOperands(self);
+  
+  if (min.has_value()){
+      $_state.addAttribute("min", $_builder.getF64FloatAttr(min.value()));}
+
+  if (max.has_value()) {
+      $_state.addAttribute("max", $_builder.getF64FloatAttr(max.value()));}
+
+  if (min.has_value() && max.has_value()){
+       $_state.addAttribute("min", $_builder.getF64FloatAttr(min.value())),
+       $_state.addAttribute("max", $_builder.getF64FloatAttr(max.value()));}
+
+  $_state.addTypes(self.getType());
+  }]>
+  ];
+}
+
+def Poptorch_clampTensor: Poptorch_Op<"clampTensor", [AttrSizedOperandSegments]> {
+  let arguments = (ins Poptorch_tensor:$self,             
+                         Optional<Poptorch_tensor>:$min,
+                         Optional<Poptorch_tensor>:$max); 
+  // defining output arguments
+  let results = (outs Poptorch_tensor:$result); 
+
+  // builders allow us to tell MIR the types 
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                    "mlir::Value":$min,
+                                    "mlir::Value":$max),
+  
+  [{std::vector<mlir::Value> operands = {self};
+  std::vector<std::int32_t> segments = {1, 0, 0};
+  if (min){
+      operands.push_back(min);
+      segments[1]=1;
+  }
+  if (max){
+      operands.push_back(max);
+      segments[2]=1;
+  }
+    $_state.addOperands(operands);
+    $_state.addAttribute("operand_segment_sizes", $_builder.getI32VectorAttr(segments));
+  
+    $_state.addTypes(self.getType());  
+    }]>
+  ];
+}

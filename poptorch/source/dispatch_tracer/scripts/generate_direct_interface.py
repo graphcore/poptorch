@@ -11,7 +11,8 @@ schemaToCpp = {
     "bool": "toBool",
     "float": "toDouble",
     # We treat all scalars as double for now.
-    "Scalar": "toDouble"
+    "Scalar": "toDouble",
+    "Scalar?": "toOptionalDouble"
 }
 
 
@@ -223,12 +224,24 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
             function_decl += "}"
 
         elif 'Tensor' in arg_type:
-            # Special tensor handling
-            function_decl += "\t// Get the pytorch tensor, find the MLIR IR"
-            function_decl += " mapped tensor for that tensor, and check if "
-            function_decl += "this tensor needs a grad (if so, so does the "
-            function_decl += "output).\n\tat::Tensor " + arg[0]
-            function_decl += "_pytorch = " + stack_at_index + ".toTensor(); \n"
+            # checking if Tensor exists or is none type
+            if 'Tensor?' in arg_type:
+                function_decl += "\t// Check if the optional tensor is none\n"
+                function_decl += "\t// type, if false then access the tensor "
+                function_decl += "passed = for operand\n\t bool " + arg[0]
+                function_decl += "_pytorch_check = " + stack_at_index
+                function_decl += ".isNone(); \n \tat::Tensor " + arg[0]
+                function_decl += "_pytorch;\n\tif (!" + arg[
+                    0] + "_pytorch_check)"
+                function_decl += "{ " + arg[0] + "_pytorch = " + stack_at_index
+                function_decl += ".toTensor();} \n"
+            else:
+                function_decl += "\t// Get the pytorch tensor, find the MLIR IR"
+                function_decl += " mapped tensor for that tensor, and check if "
+                function_decl += "this tensor needs a grad (if so, so does the "
+                function_decl += "output).\n\tat::Tensor " + arg[0]
+                function_decl += "_pytorch=" + stack_at_index + ".toTensor();\n"
+
             function_decl += "\t[[maybe_unused]] poptorch_ir::TensorId " + arg[
                 0] + " = findTensor(" + arg[0] + "_pytorch);\n"
             function_decl += "\trequires_grad |= " + arg[

@@ -751,7 +751,22 @@ inline double toDouble(c10::IValue &value) {
     return static_cast<double>(value.toInt());
   }
 
-  ERROR("Unsupported value type in `toDouble`");
+  ERROR("Unsupported value type " << value.type()->str() << " in `toDouble`");
+}
+
+inline std::optional<double> toOptionalDouble(c10::IValue &value) {
+  if (value.isNone()) {
+    return std::nullopt;
+  }
+  if (value.isDouble()) {
+    return value.toDouble();
+  }
+  // Fairly common case of `Alpha` being 1
+  if (value.isInt()) {
+    return static_cast<double>(value.toInt());
+  }
+
+  ERROR("Unsupported value type " << value.type()->str() << " in `toDouble`");
 }
 
 #include "AtenToMlirInterface.cpp.inc"

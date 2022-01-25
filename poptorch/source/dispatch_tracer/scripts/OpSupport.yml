@@ -182,6 +182,14 @@
 - func: dropout
   PopTorchDirect: dropout
 
+# - func: clamp.out(Tensor self, Scalar? min=None, Scalar? max=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: clamp.out
+  PopTorchDirect: clamp
+  UnusedOutputArguments: {out}
+
+# # - func: clamp.Tensor(Tensor self, Tensor? min=None, Tensor? max=None) -> Tensor
+- func: clamp.Tensor
+  PopTorchDirect: clampTensor
 
 ##########
 # Linalg

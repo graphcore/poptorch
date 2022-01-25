@@ -199,4 +199,49 @@ void addcdiv_::lowerToPoplar(CompilerContext &context) {
                      context.seq);
 }
 
+void clamp::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+
+  auto min_optional = this->min();
+  auto max_optional = this->max();
+
+  const float min = min_optional.hasValue()
+                        ? this->min().getValue().convertToDouble()
+                        : std::numeric_limits<float>::lowest();
+
+  const float max = max_optional.hasValue()
+                        ? this->max().getValue().convertToDouble()
+                        : std::numeric_limits<float>::max();
+
+  auto expr = pe::Clamp(pe::_1, pe::Const(min), pe::Const(max));
+  poplar::Tensor out = popops::map(context.graph, expr, {self}, context.seq);
+
+  context.tensors.insert({this->result(), out});
+}
+
+void clampTensor::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor min;
+  poplar::Tensor max;
+  std::vector<uint64_t> param_shape = {self.shape()[0]};
+  // creating numeric limit vectors
+  std::vector<float> min_lim(self.shape()[0],
+                             std::numeric_limits<float>::lowest());
+  std::vector<float> max_lim(self.shape()[0],
+                             std::numeric_limits<float>::max());
+
+  min = this->min()
+            ? context.fromSsa(this->min())
+            : createConstant(context, poplar::FLOAT, param_shape, min_lim);
+  max = this->max()
+            ? context.fromSsa(this->max())
+            : createConstant(context, poplar::FLOAT, param_shape, max_lim);
+
+  auto expr = pe::Clamp(pe::_1, pe::_2, pe::_3);
+
+  poplar::Tensor out =
+      popops::map(context.graph, expr, {self, min, max}, context.seq);
+
+  context.tensors.insert({this->result(), out});
+}
 } // namespace poptorch_ir
