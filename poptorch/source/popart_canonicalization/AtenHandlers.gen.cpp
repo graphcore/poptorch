@@ -246,6 +246,13 @@ torch::jit::Node *hardshrinkHandler(torch::jit::Graph *graph,
   return createWhere(graph, {t2, x, t3});
 }
 
+torch::jit::Node *hardsigmoidHandler(torch::jit::Graph *graph,
+                                     torch::jit::Node *node) {
+  auto *x = node->input(0);
+  // hardsigmoid(x, 1/6, 0.5)
+  return createHardsigmoid(graph, {x}, 1.0 / 6.0, 0.5);
+}
+
 torch::jit::Node *hardtanhHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -255,6 +262,22 @@ torch::jit::Node *hardtanhHandler(torch::jit::Graph *graph,
   auto t1 = constantToFloat(a->node());
   // clip(x, cfloat(b), cfloat(a))
   return createClip(graph, {x}, t0, t1);
+}
+
+torch::jit::Node *hardswishHandler(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  auto *x = node->input(0);
+  auto *t0 = createConstantFloatLike(graph, x, {0.0}, {})->output();
+  auto *t1 = createMax(graph, {x, t0})->output();
+  auto *t2 = createAbs(graph, {x})->output();
+  auto *t3 = createConstantFloatLike(graph, x, {3.0}, {})->output();
+  auto *t4 = createGreater(graph, {t2, t3})->output();
+  auto *t5 = createAdd(graph, {x, t3})->output();
+  auto *t6 = createMul(graph, {x, t5})->output();
+  auto *t7 = createConstantFloatLike(graph, x, {6.0}, {})->output();
+  auto *t8 = createDiv(graph, {t6, t7})->output();
+  // where(greater(abs(x), 3), max(x, 0), (x + 3) * x / 6.0)
+  return createWhere(graph, {t4, t1, t8});
 }
 
 torch::jit::Node *hingeEmbeddingLossHandler(torch::jit::Graph *graph,
@@ -804,7 +827,9 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::gelu, geluHandler);
   registerHandler(c10::aten::gt, gtHandler);
   registerHandler(c10::aten::hardshrink, hardshrinkHandler);
+  registerHandler(c10::aten::hardsigmoid, hardsigmoidHandler);
   registerHandler(c10::aten::hardtanh, hardtanhHandler);
+  registerHandler(c10::aten::hardswish, hardswishHandler);
   registerHandler(c10::aten::hinge_embedding_loss, hingeEmbeddingLossHandler);
   registerHandler(c10::aten::index_select, indexSelectHandler);
   registerHandler(c10::aten::isnan, isnanHandler);

@@ -28,9 +28,20 @@ def silu_inplace(x):
     return x
 
 
+def hardsigmoid_inplace(x):
+    F.hardsigmoid(x, inplace=True)
+    return x
+
+
+def hardswish_inplace(x):
+    F.hardswish(x, inplace=True)
+    return x
+
+
 activation_functions = [
-    F.relu, F.tanh, F.sigmoid, F.gelu, F.hardsigmoid, F.silu, relu_inplace,
-    tanh_inplace, sigmoid_inplace, silu_inplace
+    F.relu, F.tanh, F.sigmoid, F.gelu, F.hardsigmoid, F.silu, F.hardswish,
+    relu_inplace, tanh_inplace, sigmoid_inplace, silu_inplace,
+    hardsigmoid_inplace, hardswish_inplace
 ]
 
 

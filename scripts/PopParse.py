@@ -320,6 +320,7 @@ OutputTypeSameAsFirstInput = [
     "globalmaxpool",
     "hardmax",
     "hardsigmoid",
+    "hardswish",
     "identity",
     "identityloss",
     "l1loss",

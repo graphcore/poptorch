@@ -19,7 +19,8 @@ import helpers
 activation_functions = [
     nn.ReLU, nn.Tanh, nn.Sigmoid, nn.PReLU, nn.SELU, nn.SiLU, nn.ELU, nn.GELU,
     nn.Softmax, nn.LogSoftmax, nn.Softsign, nn.LeakyReLU, nn.Hardtanh,
-    nn.Softplus, nn.Softshrink, nn.Hardshrink, nn.CELU
+    nn.Softplus, nn.Softshrink, nn.Hardshrink, nn.CELU, nn.Hardsigmoid,
+    nn.Hardswish
 ]
 
 

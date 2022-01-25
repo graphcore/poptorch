@@ -38,9 +38,37 @@ void gelu::lowerToPoplar(CompilerContext &context) {
 // Inplace versions.
 void hardsigmoid_::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());
-  popnn::nonLinearityInPlace(context.graph,
-                             popnn::NonLinearityType::HARD_SIGMOID, input1,
-                             context.seq);
+  // PyTorch formula is:
+  // if x > 3 : return 1
+  // if x < -3: return 0
+  // return x / 6 + 0.5
+
+  auto scaled_add =
+      pe::Add(pe::Mul(pe::_1, pe::Const(1.0f / 6.0f)), pe::Const(0.5f));
+
+  auto clamped = pe::Clamp(scaled_add, pe::Const(0.0f), pe::Const(1.0f));
+  popops::mapInPlace(context.graph, clamped, {input1}, context.seq);
+}
+
+void hardswish_::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  // PyTorch formula is:
+  // if x > 3 : return x
+  // if x < -3: return 0
+  // return x * (x + 3) / 6
+
+  // poly = x * (x + 3) / 6
+  auto poly = pe::Mul(pe::Mul(pe::_1, pe::Add(pe::_1, pe::Const(3.0f))),
+                      pe::Const(1.0f / 6.0f));
+
+  auto less_than_neg3 = pe::Lt(pe::_1, pe::Const(-3.0f));
+  auto more_than_three = pe::Gt(pe::_1, pe::Const(3.0f));
+
+  // select( x < -3, 0.0, out)
+  auto clamp_lower = pe::Select(pe::Const(0.0f), poly, less_than_neg3);
+  // select( x > 3, 1.0, out)
+  auto clamp_upper = pe::Select(pe::_1, clamp_lower, more_than_three);
+  popops::mapInPlace(context.graph, clamp_upper, {input1}, context.seq);
 }
 
 void swish_::lowerToPoplar(CompilerContext &context) {
@@ -68,17 +96,34 @@ void hardsigmoid::lowerToPoplar(CompilerContext &context) {
   // if x < -3: return 0
   // return x / 6 + 0.5
 
-  // out = x / 6 + 0.5
   auto scaled_add =
-      pe::Add(pe::Mul(pe::_1, pe::Const(0.16666666666f)), pe::Const(0.5f));
+      pe::Add(pe::Mul(pe::_1, pe::Const(1.0f / 6.0f)), pe::Const(0.5f));
+
+  auto clamped = pe::Clamp(scaled_add, pe::Const(0.0f), pe::Const(1.0f));
+
+  poplar::Tensor out =
+      popops::map(context.graph, clamped, {input}, context.seq);
+  context.tensors.insert({this->result(), out});
+}
+
+void hardswish::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->in1());
+  // PyTorch formula is:
+  // if x > 3 : return x
+  // if x < -3: return 0
+  // return x * (x + 3) / 6
+
+  // poly = x * (x + 3) / 6
+  auto poly = pe::Mul(pe::Mul(pe::_1, pe::Add(pe::_1, pe::Const(3.0f))),
+                      pe::Const(1.0f / 6.0f));
 
   auto less_than_neg3 = pe::Lt(pe::_1, pe::Const(-3.0f));
   auto more_than_three = pe::Gt(pe::_1, pe::Const(3.0f));
 
   // select( x < -3, 0.0, out)
-  auto clamp_lower = pe::Select(pe::Const(0.0f), scaled_add, less_than_neg3);
+  auto clamp_lower = pe::Select(pe::Const(0.0f), poly, less_than_neg3);
   // select( x > 3, 1.0, out)
-  auto clamp_upper = pe::Select(pe::Const(1.0f), clamp_lower, more_than_three);
+  auto clamp_upper = pe::Select(pe::_1, clamp_lower, more_than_three);
 
   poplar::Tensor out =
       popops::map(context.graph, clamp_upper, {input}, context.seq);

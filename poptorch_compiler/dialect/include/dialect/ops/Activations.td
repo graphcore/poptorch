@@ -7,6 +7,7 @@ include "ops/ElementWise.td"
 
 // Outplace
 def Poptorch_hardsigmoid: Poptorch_elem_unary<"hardsigmoid"> {}
+def Poptorch_hardswish: Poptorch_elem_unary<"hardswish"> {}
 def Poptorch_swish: Poptorch_elem_unary<"swish"> {}
 def Poptorch_relu: Poptorch_elem_unary<"relu"> {}
 def Poptorch_gelu: Poptorch_elem_unary<"gelu"> {}
@@ -14,6 +15,7 @@ def Poptorch_gelu: Poptorch_elem_unary<"gelu"> {}
 
 // Inplace versions.
 def Poptorch_hardsigmoid_: Poptorch_elem_unary_in_place<"hardsigmoid_"> {}
+def Poptorch_hardswish_: Poptorch_elem_unary_in_place<"hardswish_"> {}
 def Poptorch_swish_: Poptorch_elem_unary_in_place<"swish_"> {}
 def Poptorch_relu_: Poptorch_elem_unary_in_place<"relu_"> {}
 def Poptorch_gelu_: Poptorch_elem_unary_in_place<"gelu_"> {}

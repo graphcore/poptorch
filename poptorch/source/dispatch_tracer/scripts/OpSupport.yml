@@ -32,6 +32,16 @@
   PopTorchDirectInplace: hardsigmoid_
   UnusedOutputArguments: {out}
 
+- func: hardswish.out
+  PopTorchDirect: hardswish
+  UnusedOutputArguments: {out}
+
+- func: hardswish
+  PopTorchDirect: hardswish
+
+- func: hardswish_
+  PopTorchDirectInplace: hardswish_
+
 - func: relu_
   PopTorchDirectInplace: relu_
 
