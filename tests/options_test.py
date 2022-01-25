@@ -276,6 +276,9 @@ def test_automatic_loss_scaling(capfd, optim):
     input = torch.ones(5)
     # Just a simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
+    # Weights need to be in fp16, since fp32 gradients don't influence
+    # the loss scaling factor
+    model.half()
     opts = poptorch.Options()
     opts.Training.setAutomaticLossScaling(True)
 
