@@ -293,3 +293,31 @@ def test_buffers(trace_model):
                             expected=cpu_var.half(),
                             rtol=1e-02,
                             atol=1e-02)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+@pytest.mark.parametrize("casting", [
+    poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat,
+    poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf
+])
+def test_half_casts_outplace(trace_model, casting):
+    torch.manual_seed(42)
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+    opts.Precision.halfFloatCasting(casting)
+
+    class Model(torch.nn.Module):
+        def forward(self, x1, x2):
+            return x1, x2, x1.to(torch.float16), x2.half()
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model, opts)
+
+    x1 = torch.tensor([0], dtype=torch.float32)
+    x2 = torch.tensor([0], dtype=torch.float32)
+
+    x1_ipu, x2_ipu, x1_cast, x2_cast = poptorch_model(x1, x2)
+    assert x1_ipu.dtype == torch.float32
+    assert x2_ipu.dtype == torch.float32
+    assert x1_cast.dtype == torch.float16
+    assert x2_cast.dtype == torch.float16

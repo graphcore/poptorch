@@ -1186,13 +1186,17 @@ class PoplarExecutor:
             self._user_model
         ) if self.options._module_namescope_enabled else None
 
-        # Override half so user can use it in their models.
-        def NewHalf(tensor):
+        # Override half so users can use it in their models.
+        def internal_half(tensor):
+            # Half is always outplace, if we don't clone, we might see the
+            # casted tensor in places where the original tensor should be used
+            # in the trace.
+            tensor = tensor.clone()
             return _impl.internal_cast(tensor, torch.half)
 
         # Store the old half so it can be restored.
         old_half = torch.Tensor.half
-        torch.Tensor.half = NewHalf
+        torch.Tensor.half = internal_half
 
         # Trace only a copy to avoid updating original weights during compilation.
         temp_model = copy.deepcopy(self._model.state_dict())
@@ -1244,7 +1248,8 @@ class PoplarExecutor:
             if name in half_layers:
                 layer.half()
 
-        # We need to track the parameters from the traced model as this is what the C++ graph sees.
+        # We need to track the parameters from the traced model as this is what
+        # the C++ graph sees.
         parameters = {
             **dict(self._trace.named_parameters()),
             **dict(self._trace.named_buffers())
@@ -1382,11 +1387,12 @@ def hasMlirSupportOnPlatform():
 
 
 class IPUScope:
-    def __init__(self,
-                 inputs: List['torch.Tensor'],
-                 parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
-                 options: Optional['poptorch.Options'] = None,
-                 compile_using=enums.Compiler.PopART):
+    def __init__(
+            self,
+            inputs: List['torch.Tensor'],
+            parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
+            options: Optional['poptorch.Options'] = None,
+            compile_using=enums.Compiler.PopART):
 
         if not isinstance(inputs, (list, tuple)):
             raise ValueError("You can only pass a list or tuple as the " +
