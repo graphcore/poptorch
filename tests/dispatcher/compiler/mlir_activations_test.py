@@ -93,3 +93,49 @@ def test_sigmoid(dim):
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             equal_nan=True)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.parametrize("dim", [0, 1, 2, 3])
+def test_logsoftmax_forward(dim):
+    torch.manual_seed(42)
+    input1 = torch.randn([2, 2, 4, 5])
+    with poptorch.IPUScope([input1],
+                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
+        out = F.log_softmax(input1, dim)
+        ipu.outputs([out])
+
+    cpu_result = F.log_softmax(input1, dim)
+    ipu_result = ipu(input1)
+    # pylint: disable=no-member
+    helpers.assert_allclose(expected=ipu_result,
+                            actual=cpu_result,
+                            equal_nan=True)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.parametrize("dim", [0, 1, 2, 3])
+def test_logsoftmax_backward(dim):
+    torch.manual_seed(42)
+    input1 = torch.nn.parameter.Parameter(torch.randn([2, 2, 4, 5]))
+    with poptorch.IPUScope([input1.data],
+                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
+        out = F.log_softmax(input1, dim)
+        loss = torch.sum(out)
+        loss.backward()
+        ipu.outputs([input1.grad])
+
+    input1.grad.zero_()
+    input1.grad.detach_()
+    out = F.log_softmax(input1, dim)
+    loss = torch.sum(out)
+    loss.backward()
+
+    cpu_result = input1.grad
+    ipu_result = ipu(input1)
+    # pylint: disable=no-member
+    helpers.assert_allclose(expected=ipu_result,
+                            actual=cpu_result,
+                            equal_nan=True)

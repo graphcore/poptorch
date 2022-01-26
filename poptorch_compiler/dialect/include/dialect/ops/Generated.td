@@ -199,24 +199,6 @@ def Poptorch_l1loss : Poptorch_Op<"l1loss", []> {
 
 }
 
-def Poptorch_nllloss : Poptorch_Op<"nllloss", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$reduction, I64Attr:$ignoreIndex, I64Attr:$inputIsLogProbability);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "std::int64_t":$reduction, "std::int64_t":$ignoreIndex, "std::int64_t":$inputIsLogProbability), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
-        $_state.addAttribute("ignoreIndex",$_builder.getI64IntegerAttr(ignoreIndex));
-        $_state.addAttribute("inputIsLogProbability",$_builder.getI64IntegerAttr(inputIsLogProbability));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch__ctcloss : Poptorch_Op<"_ctcloss", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$reduction, I64Attr:$blank, StrAttr:$outDataType);
   let results = (outs Poptorch_tensor:$result);
@@ -1290,22 +1272,6 @@ def Poptorch_leakyrelu : Poptorch_Op<"leakyrelu", []> {
 
         $_state.addOperands(values);
         $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
-def Poptorch_logsoftmax : Poptorch_Op<"logsoftmax", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$axis);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "std::int64_t":$axis), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("axis",$_builder.getI64IntegerAttr(axis));
 
         // Just take the first value type until this op is manually added.
 

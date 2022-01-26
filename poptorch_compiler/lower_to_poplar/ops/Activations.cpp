@@ -1,9 +1,10 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/CompilerHelpers.hpp"
-
+#include <popnn/LogSoftmax.hpp>
 #include <popnn/NonLinearity.hpp>
 #include <popops/ElementWise.hpp>
+#include <popops/Reduce.hpp>
 
 namespace pe = popops::expr;
 
@@ -152,6 +153,65 @@ void softmax::lowerToPoplar(CompilerContext &context) {
   }
 
   context.tensors.insert({this->result(), out});
+}
+
+void logsoftmax::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  const std::uint32_t axis = this->dim();
+  // If the axis is not along the last dimension.
+  if (axis + 1 != input.rank()) {
+    input = input.dimShufflePartial({axis, input.rank() - 1},
+                                    {input.rank() - 1, axis});
+  }
+  poplar::Tensor out = popnn::logSoftmax(context.graph, input, context.seq);
+  // Transpose it back into the correct form.
+  if (axis + 1 != input.rank()) {
+    out = out.dimShufflePartial({axis, out.rank() - 1}, {out.rank() - 1, axis});
+  }
+  context.tensors.insert({this->result(), out});
+}
+
+poplar::Tensor coerceTo2D(const poplar::Tensor &t) {
+  const auto in_shape = t.shape();
+  auto k = in_shape.begin();
+  std::advance(k, t.rank() - 1);
+  auto n = std::accumulate(in_shape.begin(), k, std::size_t{1},
+                           std::multiplies<std::size_t>());
+  return t.reshape({n, in_shape.back()});
+}
+
+void logsoftmax_backward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor input = context.fromSsa(this->output());
+  const std::uint32_t axis = this->dim();
+  if (axis + 1 != input.rank()) {
+    grad_output = grad_output.dimShufflePartial({axis, grad_output.rank() - 1},
+                                                {grad_output.rank() - 1, axis});
+    input = input.dimShufflePartial({axis, input.rank() - 1},
+                                    {input.rank() - 1, axis});
+  }
+  auto grad_shape = grad_output.shape();
+  grad_output = coerceTo2D(grad_output);
+  input = coerceTo2D(input);
+
+  // sum_j (g_j)
+  std::vector<size_t> red_dims(input.rank() - 1);
+  std::iota(red_dims.begin(), red_dims.end(), 1);
+  std::vector<size_t> up_ranked(input.rank(), 1);
+  up_ranked[0] = input.dim(0);
+  poplar::Tensor sum_g = popops::reduce(context.graph, grad_output, red_dims,
+                                        {popops::Operation::ADD}, context.seq)
+                             .reshape(up_ranked);
+  // softmax(x) = exp(log_softmax(x))
+  poplar::Tensor prob = popops::exp(context.graph, input, context.seq);
+  // g_i - softmax(x_i) * sum_j (g_j)
+  auto dv = popops::map(context.graph, pe::Sub(pe::_1, pe::Mul(pe::_2, pe::_3)),
+                        {grad_output, prob, sum_g}, context.seq);
+  dv = dv.reshape(grad_shape);
+  if (axis + 1 != grad_shape.size()) {
+    dv = dv.dimShufflePartial({axis, dv.rank() - 1}, {dv.rank() - 1, axis});
+  }
+  context.tensors.insert({this->result(), dv});
 }
 
 } // namespace poptorch_ir

@@ -77,7 +77,17 @@
 # _softmax.out(Tensor self, int dim, bool half_to_float, *, Tensor(a!) out) -> Tensor(a!)
 - func: _softmax.out
   PopTorchDirect: softmax
-  UnusedOutputArguments: {out}
+  UnusedOutputArguments: out
+
+# _log_softmax.out(Tensor self, int dim, bool half_to_float, *, Tensor(a!) out) -> Tensor(a!)
+- func: _log_softmax.out
+  PopTorchDirect: logsoftmax
+  UnusedOutputArguments: out
+
+# _log_softmax_backward_data.out(Tensor grad_output, Tensor output, int dim, Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: _log_softmax_backward_data.out
+  PopTorchDirect: logsoftmax_backward
+  UnusedOutputArguments: out
 
 
 ######################
@@ -247,6 +257,16 @@
 # aten::mse_loss_backward(Tensor grad_output, Tensor self, Tensor target, int reduction) -> (Tensor)
 - func: mse_loss_backward
   PopTorchDirect: mse_loss_backward
+
+# nll_loss_forward.output(Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, *, Tensor(a!) output, Tensor(b!) total_weight) -> (Tensor(a!), Tensor(b!))
+- func: nll_loss_forward.output
+  PopTorchDirect: nll_loss
+  UnusedOutputArguments: {output, total_weight}
+
+# nll_loss_backward.grad_input(Tensor grad_output, Tensor self, Tensor target, Tensor? weight, int reduction, int ignore_index, Tensor total_weight, *, Tensor(a!) grad_input) -> Tensor(a!)
+- func: nll_loss_backward.grad_input
+  PopTorchDirect: nll_loss_backward
+  UnusedOutputArguments: {grad_input}
 
 
 ###########

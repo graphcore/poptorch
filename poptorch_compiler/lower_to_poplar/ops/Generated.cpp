@@ -119,12 +119,6 @@ void l1loss::lowerToPoplar(CompilerContext & /*context*/) {
                   "l1loss"
                   " is currently unimplemented.");
 }
-void nllloss::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "nllloss"
-                  " is currently unimplemented.");
-}
 void _ctcloss::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
@@ -513,12 +507,6 @@ void leakyrelu::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
                   "leakyrelu"
-                  " is currently unimplemented.");
-}
-void logsoftmax::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "logsoftmax"
                   " is currently unimplemented.");
 }
 void lpnormalization::lowerToPoplar(CompilerContext & /*context*/) {
