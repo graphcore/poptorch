@@ -540,6 +540,19 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
           popart::toString(popart::RecomputationType::Pipeline));
     }
 
+    // TODO(T53152): AccumulateOuterFragmentSchedule::Serial is currently
+    // incompatible with gradient clipping and pipelining.
+    for (const auto &optimizer : optimizers) {
+      if (optimizer.max_grad_norm != std::numeric_limits<float>::infinity()) {
+        _impl->setOptionIfNotSet(
+            options.accumulateOuterFragmentSettings.schedule,
+            popart::AccumulateOuterFragmentSchedule::Scheduler,
+            "accumulateOuterFragmentSettings.schedule",
+            "AccumulateOuterFragmentSchedule::Scheduler");
+        break;
+      }
+    }
+
     break;
   }
   case detail::ExecutionMode::Sharded: {

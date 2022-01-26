@@ -1162,6 +1162,39 @@ def test_gradient_clipping(opt):
                             rtol=1e-5)
 
 
+# TODO(T53152): remove this test.
+def test_gradient_clipping_with_pipelining():
+    torch.manual_seed(0)
+    opts = poptorch.Options()
+    opts.Training.gradientAccumulation(3)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.w0 = poptorch.BeginBlock(torch.nn.Linear(3, 3),
+                                          "w0",
+                                          ipu_id=0)
+            self.w1 = poptorch.BeginBlock(torch.nn.Linear(3, 3),
+                                          "w1",
+                                          ipu_id=1)
+            self.loss = torch.nn.NLLLoss(reduction="mean")
+
+        def forward(self, x, y):
+            x = self.w0(x)
+            x = self.w1(x)
+            loss = self.loss(x, y)
+            return x, loss
+
+    model = Model()
+    optimizer = poptorch.optim.SGD(
+        model.parameters(),
+        lr=0.01,
+        max_grad_norm=0.001,
+    )
+    poptorch_model = poptorch.trainingModel(model, opts, optimizer=optimizer)
+    poptorch_model(torch.randn((15, 3, 3)), torch.randint(0, 1, (15, 3)))
+
+
 @pytest.mark.parametrize("optim", poptorch_optimizers)
 def test_read_ipu_state(optim):
     torch.manual_seed(42)
