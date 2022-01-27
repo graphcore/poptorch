@@ -20,6 +20,7 @@ New features
 - Support for ``col2im`` (used by torch.nn.Fold).
 - Improve error message of ``aten::index``, ``aten::index_put_`` when indexing with boolean tensor masks
 - Support for ``torch.argsort``.
+- Support for ``torch.nn.RNN``.
 
 API changes
 -----------
@@ -33,7 +34,11 @@ Bug Fixes
 - Fix ``torch.clamp`` with integer tensors
 - Fix in-place modification of slices
 - Fix ``torch.index_put_`` when operating on slices
+<<<<<<< HEAD
 - Fix ``torch.chunk`` when dim size is indivisible by the specified number of chunks
+=======
+- Fix cases where ``tensor.half()`` was in-place
+>>>>>>> Add missing supported ops to docs/changelog
 
 v2.4 (Poplar SDK 2.4)
 =====================
