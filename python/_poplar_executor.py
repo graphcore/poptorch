@@ -2,6 +2,7 @@
 import collections
 import copy
 import ctypes
+import itertools
 import json
 import os
 import pickle
@@ -1149,11 +1150,11 @@ class PoplarExecutor:
         half_layers = set()
         all_layers = list(self._model.named_modules())
 
-        # iterate in reverse to process inner layers first
+        # Iterate in reverse to process inner layers first.
         for (name, layer) in reversed(all_layers):
             any_is_half = False
-            for param in layer.parameters():
-                if param.dtype == torch.half:
+            for tensor in itertools.chain(layer.parameters(), layer.buffers()):
+                if tensor.dtype == torch.half:
                     any_is_half = True
                     break
 
@@ -1236,7 +1237,7 @@ class PoplarExecutor:
         self._options._execution_strategy.onEndTracing()
         self._RestoreInputs(in_tensors_backup, in_tensors_trace_view_tuple)
 
-        # Some of the trace layers of tuple float should be of type half.
+        # Some of the trace layers of type float should be of type half.
         # The following works because the iterator is hierarchic,
         # yielding containers before contents.
         for name, layer in self._trace.named_modules():

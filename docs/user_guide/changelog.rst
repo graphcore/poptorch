@@ -36,6 +36,7 @@ Bug Fixes
 - Fix ``torch.index_put_`` when operating on slices
 - Fix ``torch.chunk`` when dim size is indivisible by the specified number of chunks
 - Fix cases where ``tensor.half()`` was in-place
+- Fix tracing with half buffers
 
 v2.4 (Poplar SDK 2.4)
 =====================

@@ -321,3 +321,20 @@ def test_half_casts_outplace(trace_model, casting):
     assert x2_ipu.dtype == torch.float32
     assert x1_cast.dtype == torch.float16
     assert x2_cast.dtype == torch.float16
+
+
+def test_buffers_without_parameters_can_be_traced():
+    torch.manual_seed(0)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("b", torch.randn(3, 3))
+
+        def forward(self, x):
+            return torch.matmul(self.b, x)
+
+    model = Model()
+    model.half()
+    poptorch_model = poptorch.inferenceModel(model)
+    poptorch_model(torch.randn(3, 3).half())
