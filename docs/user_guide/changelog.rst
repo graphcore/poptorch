@@ -33,6 +33,7 @@ Bug Fixes
 - Fix ``torch.clamp`` with integer tensors
 - Fix in-place modification of slices
 - Fix ``torch.index_put_`` when operating on slices
+- Fix ``torch.chunk`` when dim size is indivisible by the specified number of chunks
 
 v2.4 (Poplar SDK 2.4)
 =====================

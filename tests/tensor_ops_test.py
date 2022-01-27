@@ -346,11 +346,12 @@ def test_cat(dim):
     op_harness(op, x, x, x)
 
 
-def test_chunk():
+@pytest.mark.parametrize("dim_size", [11, 12, 13])
+def test_chunk(dim_size):
     torch.manual_seed(42)
-    x = torch.randn(20, 10)
+    x = torch.randn(dim_size)
 
-    op = lambda x: torch.chunk(x, 5)
+    op = lambda x: torch.chunk(x, 6)
 
     op_harness(op, x, out_fn=lambda x: x[0])
 

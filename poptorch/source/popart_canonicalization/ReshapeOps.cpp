@@ -665,16 +665,23 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
   if (kind == c10::aten::chunk || kind == c10::aten::unsafe_chunk) {
     // Chunk takes in the *number of chunks*. Canonicalise it to *size of
     // chunks*.
-    ERROR_ON_MSG(!split_size,
-                 "Aten chunk node does not have a integer number of chunks!");
-    std::int64_t slice_size = *dims[axis] / *split_size;
-    for (int i = 0; i < *split_size; ++i) {
-      size_of_each_split.push_back(slice_size);
-    }
+    auto chunk_dim = *dims[axis];
+    auto n_chunks = *split_size;
 
-    // Add an extra slice for the remainder.
-    if (*dims[axis] % *split_size != 0) {
-      size_of_each_split.push_back(*dims[axis] % *split_size);
+    // Integer division: (dim / n_chunks) with rounding up
+    std::int64_t slice_size = (chunk_dim + n_chunks - 1) / n_chunks;
+    auto remaining_size = chunk_dim;
+    while (remaining_size >= slice_size) {
+      size_of_each_split.push_back(slice_size);
+      remaining_size -= slice_size;
+    }
+    // If we can't divide into equal chunks, then divide such that all but
+    // the last chunk are the same size, and the last chunk is smaller.
+    // If such a division is not possible, then return one fewer
+    // chunks than specified
+    if (remaining_size > 0) {
+      // Add an extra slice for the remainder.
+      size_of_each_split.push_back(remaining_size);
     }
   } else if (split_size) {
     // Split takes in the size of each chunk.
