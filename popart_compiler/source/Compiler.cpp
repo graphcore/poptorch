@@ -756,11 +756,12 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
                                 "model does not run any op on an IPU.");
 
   logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice"};
-  std::ifstream stream(import_filename, std::ifstream::binary);
-  ERROR_ON_MSG(!stream.is_open(), "Failed to open " +
-                                      std::string(import_filename) +
-                                      " for reading");
-  stream.seekg(offset);
+  auto stream =
+      std::make_shared<std::ifstream>(import_filename, std::ifstream::binary);
+  ERROR_ON_MSG(!stream->is_open(), "Failed to open " +
+                                       std::string(import_filename) +
+                                       " for reading");
+  stream->seekg(offset);
   _impl->session->loadExecutableFromStream(stream);
   // Don't automatically load the engine: we want to control when this happens
   // to make sure it happens at the same time in distributed environments.
