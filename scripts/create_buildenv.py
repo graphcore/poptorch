@@ -178,6 +178,11 @@ class BuildenvManager:
         self.buildenv_dir = os.path.join(self.output_dir, "buildenv")
         self.conda_packages = [f"python={python_version}", "conda-pack=0.5.0"]
 
+        # Support for python 3.6 was removed from pip in version 22.0
+        # https://pip.pypa.io/en/stable/news/#v22-0
+        if python_version.startswith("3.6"):
+            self.conda_packages.append("pip=21.1.3")
+
         is_aarch64 = _utils.get_arch_type() == "aarch64"
         if not is_aarch64:
             self.conda_packages.append("gdb=8.3")
