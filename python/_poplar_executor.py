@@ -159,6 +159,8 @@ class PoplarExecutor:
 
         self._optimizer = optimizer
         self._ipu_optimizer_is_dirty = False
+        self._host_rng_state_is_dirty = False
+        self._cached_rng_state = None
         self._dict_optimizer = {}
         self._training = training
         self._dirty_host_weights = False
@@ -186,11 +188,8 @@ class PoplarExecutor:
                     have been updated.
                     Return False if the weights were already up to date.
                     """
-                    if parent() and parent()._dirty_host_weights:  # pylint: disable=protected-access
-                        logger.debug("Implicit copyWeightsToHost()")
-                        parent()._dirty_host_weights = False  # pylint: disable=protected-access
-                        parent().copyWeightsToHost()
-                        return True
+                    if parent():
+                        return parent().copyWeightsToHostIfNeeded()
                     return False
 
                 def __getattribute__(self, name):
@@ -241,7 +240,7 @@ class PoplarExecutor:
             class PoptorchParameter(torch.nn.Parameter):
                 def __getattribute__(self, name):
                     if parent():
-                        parent()._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
+                        parent().copyWeightsToHostIfNeeded()
 
                     return object.__getattribute__(self, name)
 
@@ -258,7 +257,7 @@ class PoplarExecutor:
             class PoptorchBuffer(torch.Tensor):
                 def __getattribute__(self, name):
                     if parent():
-                        parent()._user_model.copyWeightsToHostIfNeeded()  # pylint: disable=protected-access
+                        parent().copyWeightsToHostIfNeeded()
 
                     return super().__getattribute__(name)
 
@@ -293,6 +292,10 @@ class PoplarExecutor:
         if not self.isCompiled():
             raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
         if self._ipu_optimizer_is_dirty:
+            # Sync the weights to host first because updateOptimizers() is
+            # going to write both the weights and the optimizer state
+            self.copyWeightsToHostIfNeeded()
+
             poptorch_core.updateOptimizers(self._executable,
                                            self._dict_optimizer)
             self._ipu_optimizer_is_dirty = False
@@ -306,6 +309,7 @@ class PoplarExecutor:
             assert not self._ipu_optimizer_is_dirty, (
                 "Both host "
                 "and ipu states cannot be dirty at the same time.")
+
             # We need to return both the internal state dict and torch's
             # state dict so that LR schedulers work
             self._optimizer.set_state_dict({
@@ -331,6 +335,9 @@ class PoplarExecutor:
                 self._write_optim_state_dict_if_needed()
             else:
                 self._optimizer.host_state_is_dirty = True
+                self._optimizer.ipu_state_is_dirty = False
+        if self._cached_rng_state is not None:
+            self._copyRngStateToDevice()
 
     def _get_optim_state_dict(self):
         assert isinstance(self._optimizer, Optimizer)
@@ -409,6 +416,17 @@ class PoplarExecutor:
             "No tensor with name " + short_name + " found."
         return self._anchor_memory[short_name]
 
+    def copyWeightsToHostIfNeeded(self) -> bool:
+        """ Return True if the weights on the host were dirty and
+        have been updated.
+        Return False if the weights were already up to date.
+        """
+        if self._dirty_host_weights:
+            logger.debug("Implicit copyWeightsToHost()")
+            self.copyWeightsToHost()
+            return True
+        return False
+
     # Copy weights from the device into the memory of the model given on wrapper creation.
     def copyWeightsToHost(self) -> None:
         """ Updates the parameters used in `model` with the weights stored on device.
@@ -417,6 +435,9 @@ class PoplarExecutor:
 
         if not self.isCompiled():
             raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
+
+        # Don't trigger another copyToHost by accessing `named_parameters`
+        self._dirty_host_weights = False
 
         weights = {
             **dict(self._model.named_parameters()),
@@ -438,6 +459,11 @@ class PoplarExecutor:
 
         # Don't trigger a copyToHost by accessing `named_parameters`
         self._dirty_host_weights = False
+
+        # Trigger a IPU sync -> host if needed for
+        # the optimizer state.
+        if self._optimizer:
+            self._optimizer.state_dict()
 
         weights = {
             **dict(self._model.named_parameters()),
@@ -656,7 +682,7 @@ class PoplarExecutor:
                     self._preprocessGraph(
                         data.executable_inputs)
 
-            if data.options is None or data.options.Jit.trace_model:
+            if data.options.Jit.trace_model:
                 trace_args = self._trace_model_and_get_compile_args(
                     data.executable_inputs, in_tensors_trace_view,
                     has_converted_any_half)
@@ -671,10 +697,12 @@ class PoplarExecutor:
             self._is_attached = self.isAttachedToDevice()
 
             if self._is_attached:
-                # Upload the weights to the IPU
-                self.copyWeightsToDevice()
+                self._on_device_attach()
 
-    def save(self, filename: str, export_model: bool = True):
+    def save(self,
+             filename: str,
+             export_model: bool = True,
+             save_rng_state: bool = True):
         """Save the compiled model to file.
 
         :param filename: Where to save the compiled executable.
@@ -688,6 +716,8 @@ class PoplarExecutor:
             :py:func:`poptorch.trainingModel` to re-create the PopTorch model
             before calling :py:meth:`~poptorch.PoplarExecutor.loadExecutable`
             to restore the executable.
+        :param save_rng_state: If `True` the random number generator's state
+            and seed will be saved in the file alongside the executable.
         """
         if not self.isCompiled():
             raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
@@ -704,21 +734,51 @@ class PoplarExecutor:
             logger.warning("save(): %s is a directory, saving model to %s",
                            dirname, filename)
 
+        data = _poptorch_data.PoptorchData(self._poptorch_version,
+                                           self._executable_inputs,
+                                           self._options)
         if export_model:
-            data = _poptorch_data.PoptorchData(self._poptorch_version,
-                                               self._executable_inputs,
-                                               self._options, self._training,
-                                               self.model, self._optimizer)
-        else:
-            data = _poptorch_data.PoptorchData(self._poptorch_version,
-                                               self._executable_inputs,
-                                               self._options)
+            data.training = self._training
+            data.model = self.model
+            data.optimizer = self._optimizer
+
+        if save_rng_state:
+            data.rng_state = self.rng_state
+
         with open(filename, "wb") as f:
             pickle.dump(data, f, protocol=4)
             f.close()
 
         with self._profiling.tracepoint("saveExecutableToFile"):
             poptorch_core.saveExecutableToFile(self._executable, filename)
+
+    @property
+    def rng_state(self) -> List[int]:
+        """Return the random number generator's seed & state of
+        the compiled model."""
+        if not self.isCompiled():
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
+        if self._host_rng_state_is_dirty:
+            self._host_rng_state_is_dirty = False
+            self._cached_rng_state = [
+                poptorch_core.getRandomSeed(self._executable)
+            ] + poptorch_core.getRngState(self._executable)
+        return self._cached_rng_state
+
+    @rng_state.setter
+    def rng_state(self, state: List[int]):
+        """Set the random number generator's seed & state for the compiled
+        model."""
+        if not self.isCompiled():
+            raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
+        self._host_rng_state_is_dirty = False
+        self._cached_rng_state = state.copy()
+        if self.isAttachedToDevice():
+            self._copyRngStateToDevice()
+
+    def _copyRngStateToDevice(self):
+        poptorch_core.setRngState(self._executable, self._cached_rng_state[0],
+                                  self._cached_rng_state[1:])
 
     def compileAndExport(self,
                          filename: str,
@@ -747,7 +807,7 @@ class PoplarExecutor:
             self.compile(*args, **kwargs)
             self.save(filename, export_model)
 
-    def cycleCount(self):
+    def cycleCount(self) -> int:
         """ Returns number of cycles which the IPU ran.
 
             You must run the model on IPU hardware before calling this method.
@@ -836,6 +896,7 @@ class PoplarExecutor:
             for key in keys:
                 self._anchor_memory[key] = tensor
 
+        self._host_rng_state_is_dirty = True
         if self._training:
             self._dirty_host_weights = True
 
@@ -1337,6 +1398,8 @@ class PoplarExecutor:
         if not self._is_attached:
             raise _impl.createPoptorchError("Device is not attached")
 
+        # Read all the states back before detaching
+        _ = self.rng_state
         if self._training:
             self.copyWeightsToHostIfNeeded()
             self._read_optim_state_dict_if_needed()

@@ -60,7 +60,7 @@ def load(filename: str,
     >>> model(my_input)
     """
     data, _ = _poptorch_data.parse(filename, __version__)
-    assert data.model and data.options, (
+    assert data.model and data.training is not None, (
         f"{filename} is a valid PopTorch file but was created"
         " with 'export_model=False' which means you need to re-create"
         " the PopTorch model using poptorch.inferenceModel or "
@@ -68,11 +68,18 @@ def load(filename: str,
         f"poptorch_model.loadExecutable(\"{filename}\").")
     if edit_opts_fn:
         edit_opts_fn(data.options)
+    if data.optimizer_state is not None:
+        assert data.optimizer is not None
+        data.optimizer.load_state_dict(data.optimizer_state)
     if data.training:
         executor = trainingModel(data.model, data.options, data.optimizer)
     else:
         executor = inferenceModel(data.model, data.options)
     executor.loadExecutable(filename)
+    if data.random_seed is not None:
+        executor.random_seed = data.random_seed
+    if data.rng_state is not None:
+        executor.rng_state = data.rng_state
     return executor
 
 

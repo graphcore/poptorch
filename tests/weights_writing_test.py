@@ -235,6 +235,90 @@ def test_torch_save():
                            pre_train_weights)
 
 
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed to test this feature")
+def test_save_everything(capfd):
+    # create a dummy model
+    model = ModelWithLoss(torch.nn.CrossEntropyLoss())
+
+    # create optimizer
+    optimizer = poptorch.optim.SGD(model.parameters(), lr=0.01)
+
+    opts = poptorch.Options().randomSeed(42)
+    training_model = poptorch.trainingModel(model,
+                                            options=opts,
+                                            optimizer=optimizer)
+    # 10 Batches of 10.
+    input = torch.randn(10, 10)
+
+    # 10 batches of 1
+    label = torch.randint(0, 10, [1])
+    label = label.expand([10])
+    first_out, first_loss = training_model(input, label)
+
+    # Clear the outputs (We only want to parse what's triggered by save()
+    helpers.LogChecker(capfd)
+
+    origin_out = []
+    loaded_out = []
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "checkpoint.pt")
+        training_model.save(path)
+
+        # Creating a checkpoint should trigger copies of the weights, optimizer state
+        # random seed and rng state.
+        log = helpers.LogChecker(capfd)
+        log.assert_matches("Reading random seed")
+        log.assert_matches("Reading RNG state")
+        log.assert_matches("Implicit copyWeightsToHost()")
+        log.assert_matches("Writing optimiser state tensors from IPU to host.")
+
+        origin_out.append(training_model(input, label))
+
+        loaded = poptorch.load(path)
+
+        log = helpers.LogChecker(capfd)
+        log.assert_matches("Writing weights from host to IPU memory")
+        log.assert_matches("Setting random seed to")
+        log.assert_matches("Setting RNG state")
+        log.assert_matches(
+            "Writing optimiser state tensors from host to IPU memory")
+
+        loaded_out.append(loaded(input, label))
+        origin_out.append(training_model(input, label))
+        # Everything is loaded: there shouldn't be any transfer
+        log = helpers.LogChecker(capfd)
+        log.assert_no_matches("Writing weights from host to IPU memory")
+        log.assert_no_matches("Implicit copyWeightsToHost()")
+        log.assert_no_matches("random seed")
+        log.assert_no_matches("RNG state")
+        log.assert_no_matches("Writing optimiser state tensors from")
+
+        loaded.detachFromDevice()
+        log = helpers.LogChecker(capfd)
+        log.assert_matches("Writing weights from IPU to host")
+        log.assert_matches("Writing optimiser state tensors from IPU to host")
+        log.assert_matches("Reading random seed")
+        log.assert_matches("Reading RNG state")
+        log.assert_matches("Detached from device")
+
+        loaded_out.append(loaded(input, label))
+        log = helpers.LogChecker(capfd)
+        log.assert_matches("Writing weights from host to IPU memory")
+        log.assert_matches(
+            "Writing optimiser state tensors from host to IPU memory")
+        log.assert_matches("Setting random seed to")
+        log.assert_matches("Setting RNG state")
+
+    for (out, loss), (load_out, load_loss) in zip(origin_out, loaded_out):
+        helpers.assert_allclose(expected=out, actual=load_out)
+        assert loss == load_loss
+        assert not torch.allclose(out, first_out, rtol=1e-02, atol=1e-02)
+        assert loss != first_loss
+
+
 def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
                                            target, original_parameters):
     # Make sure the first run doesn't already pass the test.

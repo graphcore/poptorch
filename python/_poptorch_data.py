@@ -19,10 +19,12 @@ class PoptorchData:
     def __init__(self,
                  version: str,
                  executable_inputs: List[Any],
-                 options: Optional['poptorch.Options'] = None,
+                 options: 'poptorch.Options',
                  training: Optional[bool] = None,
                  model: Optional['torch.nn.Module'] = None,
-                 optimizer: Optional['torch.optim.Optimizer'] = None):
+                 optimizer: Optional['torch.optim.Optimizer'] = None,
+                 random_seed: Optional[int] = None,
+                 rng_state: Optional[List[int]] = None):
         self.options = options
         self.training = training
         self.model = model
@@ -31,6 +33,20 @@ class PoptorchData:
         self.optimizer = optimizer
         assert executable_inputs, "The executable's inputs are missing"
         self.executable_inputs = executable_inputs
+        self.random_seed = random_seed
+        self.rng_state = rng_state
+
+    @property
+    def optimizer(self):
+        return self._optimizer
+
+    @optimizer.setter
+    def optimizer(self, opt):
+        self._optimizer = opt
+        if opt is None:
+            self.optimizer_state = None
+        else:
+            self.optimizer_state = opt.state_dict()
 
 
 def parse(filename: str, expected_version: str):

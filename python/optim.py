@@ -76,12 +76,7 @@ class Optimizer:
     # These functions must be overridden so that the optimiser state can be set
     # when the model is created
     def state_dict(self):
-        # Return both the internal state dict and torch's state dict
-        # so that LR schedulers work
-        return {
-            **self.get_state_dict(),
-            **torch.optim.Optimizer.state_dict(self)
-        }
+        return self.get_state_dict()
 
     def load_state_dict(self, state):
         # We also need to load torch's state dict so that LR schedulers work
@@ -90,7 +85,9 @@ class Optimizer:
 
     # Getter/setter for local state dict after the above functions been overridden by PoplarExecutor
     def get_state_dict(self):
-        return self._state_dict
+        # Return both the internal state dict and torch's state dict
+        # so that LR schedulers work
+        return {**self._state_dict, **torch.optim.Optimizer.state_dict(self)}
 
     def set_state_dict(self, state):
         if not state:

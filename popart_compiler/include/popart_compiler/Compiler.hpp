@@ -397,6 +397,12 @@ public:
 
   void initSession(const std::vector<Optimizer> &opt,
                    const char *export_proto_filename);
+  void setRngState(std::uint64_t seed,
+                   const std::vector<std::uint32_t> &rng_state);
+
+  std::vector<std::uint32_t> getRngState() const;
+  std::uint64_t getRandomSeed() const;
+
   void saveExecutableToFile(const char *export_filename) const;
   void compileAndPrepareDevice();
   void loadEngineAndConnectStreams();
@@ -424,9 +430,9 @@ public:
                                 std::int64_t num_outputs,
                                 const std::vector<poptorch::TensorId> &inputs);
 
-  void pushNameScope(const char *name) const;
+  void pushNameScope(const char *name);
 
-  void popNameScope() const;
+  void popNameScope();
 
   poptorch::TensorId addUntypedInputTensor();
   // Write the weights into IPU memory from the pytorch tensor buffers in the
@@ -470,11 +476,11 @@ public:
 
   std::vector<TensorMetadata> optimizerTensorMetadataList() const;
 
-  void fillHostOptimizerStateTensorData(
-      const std::vector<void *> &host_buffers) const;
+  void
+  fillHostOptimizerStateTensorData(const std::vector<void *> &host_buffers);
 
-  void writeDeviceOptimizerStateTensorData(
-      const std::vector<void *> &host_buffers) const;
+  void
+  writeDeviceOptimizerStateTensorData(const std::vector<void *> &host_buffers);
 
   std::unique_ptr<char[]> getExecutionInfo() const;
 

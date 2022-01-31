@@ -1143,6 +1143,37 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+void setRngState(std::shared_ptr<poptorch::PoplarExecutable> &executable,
+                 std::uint64_t seed,
+                 const std::vector<std::uint32_t> &rng_state) {
+  try {
+    ERROR_ON_MSG(!executable, "No built executable");
+    auto &compiler = executable->getCompiler();
+    compiler.setRngState(seed, rng_state);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
+std::uint64_t
+getRandomSeed(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  try {
+    ERROR_ON_MSG(!executable, "No built executable");
+    const auto &compiler = executable->getCompiler();
+    return compiler.getRandomSeed();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
+std::vector<std::uint32_t>
+getRngState(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  try {
+    ERROR_ON_MSG(!executable, "No built executable");
+    const auto &compiler = executable->getCompiler();
+    return compiler.getRngState();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
 py::dict readOptimizerState(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   py::dict optim_state;
@@ -1150,7 +1181,7 @@ py::dict readOptimizerState(
   py::dict param_tensors;
   try {
     ERROR_ON_MSG(!executable, "No built executable");
-    const auto &compiler = executable->getCompiler();
+    auto &compiler = executable->getCompiler();
     std::vector<TensorMetadata> metadata_list =
         compiler.optimizerTensorMetadataList();
 
@@ -1183,7 +1214,7 @@ void writeOptimizerState(
     const py::dict &optim_state) {
   try {
     ERROR_ON_MSG(!executable, "No built executable");
-    const auto &compiler = executable->getCompiler();
+    auto &compiler = executable->getCompiler();
     std::vector<TensorMetadata> metadata_list =
         compiler.optimizerTensorMetadataList();
 
@@ -1441,6 +1472,9 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("updateOptimizers", poptorch::updateOptimizers);
   m.def("getTimestamps", poptorch::getTimestamps);
   m.def("readOptimizerState", poptorch::readOptimizerState);
+  m.def("setRngState", poptorch::setRngState);
+  m.def("getRngState", poptorch::getRngState);
+  m.def("getRandomSeed", poptorch::getRandomSeed);
   m.def("writeOptimizerState", poptorch::writeOptimizerState);
   m.def("loadEngineAndConnectStreams", poptorch::loadEngineAndConnectStreams);
   m.def("copyWeightsToDevice_impl", poptorch::copyWeightsToDeviceImpl);

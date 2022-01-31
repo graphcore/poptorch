@@ -16,6 +16,7 @@ New features
   * torch.std
   * torch.var_mean
   * torch.std_mean
+- Also save the random number generator's state and the seed when saving a model.
 
 - Support for ``col2im`` (used by torch.nn.Fold).
 - Improve error message of ``aten::index``, ``aten::index_put_`` when indexing with boolean tensor masks

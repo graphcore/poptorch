@@ -339,6 +339,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_UINT64_OPTION(transitiveClosureOptimizationThreshold);
   ADD_POPART_UINT64_OPTION(automaticLossScalingSettings.updatePeriod);
 
+  ADD_POPART_BOOL_OPTION(enableLoadAndOffloadRNGState);
   ADD_POPART_BOOL_OPTION(batchSerializationSettings.concatOnVirtualGraphChange);
   ADD_POPART_BOOL_OPTION(
       batchSerializationSettings.concatOnExecutionPhaseChange);

@@ -596,6 +596,11 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   default:
     ERROR("ExecutionMode not supported");
   }
+  // By default allow the user to save / restore the RNG state (It uses slightly
+  // more memory).
+  _impl->setOptionIfNotSet(options.enableLoadAndOffloadRNGState, true,
+                           "enableLoadAndOffloadRNGState");
+
   _impl->setOptionIfNotSet(options.virtualGraphMode, graph_mode,
                            "virtualGraphMode", popart::toString(graph_mode));
 
@@ -750,6 +755,37 @@ void Compiler::saveExecutableToFile(const char *filename) const {
   stream.close();
 }
 
+void Compiler::setRngState(std::uint64_t seed,
+                           const std::vector<std::uint32_t> &rng_state) {
+  ERROR_ON_MSG(!_impl->session, "Session should be initialised first");
+  logging::debug("Setting random seed to: {}", seed);
+  if (_impl->session->getIr().getRequiresRandomSeed()) {
+    _impl->session->setRandomSeed(seed);
+  } else {
+    logging::debug("Session has no random behaviour: nothing to do.");
+  }
+  if (!rng_state.empty()) {
+    logging::debug("Setting RNG state");
+    _impl->session->setRNGState(rng_state);
+  }
+}
+
+std::vector<std::uint32_t> Compiler::getRngState() const {
+  ERROR_ON_MSG(!_impl->session, "Session should be initialised first");
+  logging::debug("Reading RNG state");
+  return _impl->session->getRNGState();
+}
+
+std::uint64_t Compiler::getRandomSeed() const {
+  ERROR_ON_MSG(!_impl->session, "Session should be initialised first");
+  logging::debug("Reading random seed");
+  if (_impl->session->getIr().getRequiresRandomSeed()) {
+    return _impl->session->getRandomSeed();
+  }
+  logging::debug("Session has no random behaviour: using 0 as seed.");
+  return 0;
+}
+
 void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
                                               std::int64_t offset) {
   ERROR_ON_MSG(!_impl->session, "Nothing to import. This may be because the "
@@ -767,6 +803,10 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
   // to make sure it happens at the same time in distributed environments.
   constexpr bool load_engine = false;
   _impl->session->prepareDevice(load_engine);
+  // Set the random seed (if one was provided)
+  if (_impl->options_set.count("random_seed") != 0u) {
+    setRngState(_impl->options.random_seed, {});
+  }
   _impl->cachePopartTypes();
 }
 
@@ -855,12 +895,6 @@ void Compiler::loadEngineAndConnectStreams() {
     _impl->session->connectHostFunction(cb_data.handle,
                                         std::move(poplar_callback));
   }
-
-  // Set the random seed (if one was provided) following compilation
-  if (_impl->options_set.count("random_seed") != 0u) {
-    logging::trace("Setting random seed to: {}", _impl->options.random_seed);
-    _impl->session->setRandomSeed(_impl->options.random_seed);
-  }
 }
 
 void Compiler::compileAndPrepareDevice() {
@@ -888,6 +922,10 @@ void Compiler::compileAndPrepareDevice() {
     logging::err("Out of memory, the graph profile is available here: {}",
                  e.getProfilePath());
     std::rethrow_exception(std::current_exception());
+  }
+  // Set the random seed (if one was provided) following compilation
+  if (_impl->options_set.count("random_seed") != 0u) {
+    setRngState(_impl->options.random_seed, {});
   }
 
   _impl->cachePopartTypes();
@@ -949,9 +987,23 @@ void Compiler::copyWeightsToHost(const std::vector<void *> &host_buffers) {
   }
 
   logging::info("Writing weights from IPU to host.");
+  // In PopTorch we use copyWeightsToHost and copyWeightsToDevice as
+  // synchronisation routines.
+  // It means we expect to have one buffer on the host, one on the device and
+  // to synchronise the two in one direction or the other.
+  //
+  // PopART works differently: it has one set of read source buffers and one
+  // set of write destination buffers and we need to keep those in sync
+  // manually by calling writeWeights()
+
+  // Transfer from the IPU to PopART read source buffers.
   _impl->session->weightsToHost();
+  // Update the Poptorch destination buffers
   _impl->weights.updateData(host_buffers);
+  // Copy from the PopART read source buffers to the Poptorch buffers.
   _impl->session->readWeights(_impl->weights);
+  // Keep the PopART write destination buffer in sync with the PopTorch buffer.
+  _impl->session->writeWeights(_impl->weights);
 }
 
 void Compiler::updateOptimizers(const std::vector<Optimizer> &optimizers) {
@@ -1207,15 +1259,29 @@ std::vector<TensorMetadata> Compiler::optimizerTensorMetadataList() const {
 }
 
 void Compiler::fillHostOptimizerStateTensorData(
-    const std::vector<void *> &host_buffers) const {
+    const std::vector<void *> &host_buffers) {
   logging::info("Writing optimiser state tensors from IPU to host.");
+  // In PopTorch we use copyWeightsToHost and copyWeightsToDevice as
+  // synchronisation routines.
+  // It means we expect to have one buffer on the host, one on the device and
+  // to synchronise the two in one direction or the other.
+  //
+  // PopART works differently: it has one set of read source buffers and one
+  // set of write destination buffers and we need to keep those in sync
+  // manually by calling writeWeights()
+
+  // Transfer from the IPU to PopART read source buffers.
   _impl->session->weightsToHost();
+  // Update the Poptorch destination buffers
   _impl->optim_state_tensors.updateData(host_buffers);
+  // Copy from the PopART read source buffers to the Poptorch buffers.
   _impl->session->readWeights(_impl->optim_state_tensors);
+  // Keep the PopART write destination buffer in sync with the PopTorch buffer.
+  _impl->session->writeWeights(_impl->optim_state_tensors);
 }
 
 void Compiler::writeDeviceOptimizerStateTensorData(
-    const std::vector<void *> &host_buffers) const {
+    const std::vector<void *> &host_buffers) {
   ERROR_ON_MSG(!_impl->session, "Session should be initialised first");
   ERROR_ON_MSG(!isAttachedToDevice(), "Must be attached to a device to "
                                       "write the optimizer state.");
@@ -1342,11 +1408,11 @@ poptorch::TensorId Compiler::endIf(const poptorch::TensorId &condition,
                                                        _impl.get());
 }
 
-void Compiler::pushNameScope(const char *name) const {
+void Compiler::pushNameScope(const char *name) {
   _impl->active_builder->pushNameScope(std::string(name));
 }
 
-void Compiler::popNameScope() const { _impl->active_builder->popNameScope(); }
+void Compiler::popNameScope() { _impl->active_builder->popNameScope(); }
 
 poptorch::TensorId Compiler::addUntypedInputTensor() {
   popart::TensorId out = _impl->active_builder->addUntypedInputTensor();
