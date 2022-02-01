@@ -24,6 +24,7 @@
 
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "poptorch_logging/Tracepoint.hpp"
 
 #include "poptorch/AliasProcessing.hpp"
 #include "poptorch/AutomaticCasting.hpp"
@@ -788,6 +789,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
     const bool added_dummy_output, const py::list &anchors,
     const py::dict &model_parameters) {
+  const char *poptorch_passes = "poptorchPasses";
+  const char *lower_to_popart = "lowerToPopart";
+  poptorch::logging::Tracepoint::begin(poptorch_passes);
   auto *module = asModule(h);
 
   auto forward = module->get_method("forward");
@@ -950,6 +954,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   AnchorList anchors_list;
   parseAnchors(&anchors_list, anchors);
 
+  poptorch::logging::Tracepoint::end(poptorch_passes);
+  poptorch::logging::Tracepoint::begin(lower_to_popart);
+
   poptorch::LowerToPopart lower(
       graph.get(), std::move(traced_parameter_tensors), std::move(parameters),
       inplace_op_handler, training, std::move(optimizers), parsed_options,
@@ -959,6 +966,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   // Clear the callbacks after compilation.
   callbacks.clear();
 
+  poptorch::logging::Tracepoint::end(lower_to_popart);
   return lower;
 }
 
@@ -968,6 +976,7 @@ void copyWeightsToHostImpl(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors) {
+  poptorch::logging::Tracepoint tp{"copyWeightsToHost"};
   // Copy the weights or warn if this is before first time compilation.
   try {
     if (!executable) {
@@ -986,6 +995,7 @@ void copyWeightsToDeviceImpl(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const pybind11::tuple &parameter_names,
     const pybind11::tuple &parameter_tensors) {
+  poptorch::logging::Tracepoint tp{"copyWeightsToDevice"};
   // Copy the weights or warn if this is before first time compilation.
   try {
     if (!executable) {
@@ -1011,6 +1021,7 @@ getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
 
 void detachFromDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     executable->detachFromDevice();
@@ -1020,6 +1031,7 @@ void detachFromDevice(
 
 void attachToDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     executable->attachToDevice();
@@ -1050,6 +1062,7 @@ void setPopartLogLevelUInt(std::uint64_t level) {
 
 void loadEngineAndConnectStreams(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     executable->loadEngineAndConnectStreams();
@@ -1060,6 +1073,7 @@ void loadEngineAndConnectStreams(
 void updateOptimizers(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const py::dict &optimizer_dict) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     // Create an empty optimizer for inference, this will not be applied.
@@ -1073,6 +1087,7 @@ void updateOptimizers(
 std::vector<pybind11::object>
 execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
         const pybind11::tuple &inputs) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     // Create a jit stack from the incoming pytorch tensors.
@@ -1146,6 +1161,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
 void setRngState(std::shared_ptr<poptorch::PoplarExecutable> &executable,
                  std::uint64_t seed,
                  const std::vector<std::uint32_t> &rng_state) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     auto &compiler = executable->getCompiler();
@@ -1156,6 +1172,7 @@ void setRngState(std::shared_ptr<poptorch::PoplarExecutable> &executable,
 
 std::uint64_t
 getRandomSeed(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     const auto &compiler = executable->getCompiler();
@@ -1166,6 +1183,7 @@ getRandomSeed(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
 
 std::vector<std::uint32_t>
 getRngState(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     const auto &compiler = executable->getCompiler();
@@ -1176,6 +1194,7 @@ getRngState(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
 
 py::dict readOptimizerState(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   py::dict optim_state;
   py::dict state_tensors;
   py::dict param_tensors;
@@ -1212,6 +1231,7 @@ py::dict readOptimizerState(
 void writeOptimizerState(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const py::dict &optim_state) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     auto &compiler = executable->getCompiler();
@@ -1252,6 +1272,7 @@ void writeOptimizerState(
 
 std::vector<pybind11::object>
 getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     ERROR_ON_MSG(!executable, "No built executable");
     const auto &compiler = executable->getCompiler();
@@ -1279,6 +1300,7 @@ getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
 }
 
 void processPrecisionOptions(py::handle h) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     auto values_dict = h.attr("_values").cast<py::dict>();
 
@@ -1318,6 +1340,7 @@ bool pyIsGraphNondeterministic(py::handle h) {
 void saveExecutableToFile(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     const std::string &export_filename) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     executable->getCompiler().saveExecutableToFile(export_filename.c_str());
   }
@@ -1341,6 +1364,7 @@ std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
     const bool added_dummy_output, const py::list &anchors,
     const py::dict &model_parameters, const std::string &import_filename,
     std::int64_t offset) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     auto lower = lowerToPopartFromTrace(
         h, python_traced_params, inputs, has_converted_any_half, options,
@@ -1359,6 +1383,7 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
                  const py::function &attribute_accessor,
                  const bool added_dummy_output, const py::list &anchors,
                  const py::dict &model_parameters) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     auto lower = lowerToPopartFromTrace(
         h, python_traced_params, inputs, has_converted_any_half, options,
@@ -1380,6 +1405,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     std::vector<at::Tensor> &inputs, const std::vector<at::Tensor> &parameters,
     const std::vector<std::string> &parameter_names,
     const pybind11::dict &options, const py::function &attribute_accessor) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     logging::debug("Compile with manual tracing");
     std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();

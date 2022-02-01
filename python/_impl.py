@@ -6,7 +6,7 @@ import copyreg
 import fcntl
 import hashlib
 import os
-from functools import partial
+from functools import partial, wraps
 from typing import Dict, Any
 import torch
 
@@ -232,3 +232,15 @@ def unwrapIfWrapped(obj):
     if isWrapped(obj):
         obj.__class__ = obj.__class__.__bases__[0]
     return obj
+
+
+def traceMethod(label):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with self._profiling.tracepoint(label):  # pylint: disable=protected-access
+                return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator

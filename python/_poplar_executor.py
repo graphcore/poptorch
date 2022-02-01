@@ -542,6 +542,7 @@ class PoplarExecutor:
             ipu.outputs(outputs)
         return ipu._executable  # pylint: disable=protected-access
 
+    @_impl.traceMethod("modelCompilation")
     def _compile(self, in_tensors):
         """On POD we want to separate compilation from device
         initialisation because we want only one process to compile the model,
@@ -557,36 +558,24 @@ class PoplarExecutor:
         The caller will then call the regular ``_compile()`` method in all the
         processes at the same time and they should all hit the cache.
         """
-        with self._profiling.tracepoint("modelCompilation"):
-            # Compile the poplar executable based on the batchsize.
-            if self._options.Jit.trace_model:
-                (in_tensors_trace_view,
-                 has_converted_any_half) = self._preprocessGraph(in_tensors)
+        # Compile the poplar executable based on the batchsize.
+        if self._options.Jit.trace_model:
+            (in_tensors_trace_view,
+             has_converted_any_half) = self._preprocessGraph(in_tensors)
 
-                trace_args = self._trace_model_and_get_compile_args(
-                    in_tensors, in_tensors_trace_view, has_converted_any_half)
-            else:
-                self._executable_inputs = in_tensors.clone()
-                in_tensors_trace_view = in_tensors.clone()
-                in_tensors_trace_view.forEach(self._narrow_tensor)
+            trace_args = self._trace_model_and_get_compile_args(
+                in_tensors, in_tensors_trace_view, has_converted_any_half)
+        else:
+            self._executable_inputs = in_tensors.clone()
+            in_tensors_trace_view = in_tensors.clone()
+            in_tensors_trace_view.forEach(self._narrow_tensor)
 
-            # Note: in single process execution or if the cache is disabled
-            # should_compile will always be False.
-            with _impl.distributedCacheLock(self._model,
-                                            self._options) as should_compile:
-                # Only the first process should compile
-                if should_compile:
-                    if self._options.Jit.trace_model:
-                        self._executable = poptorch_core.compileWithTrace(
-                            *trace_args)
-                    else:
-                        self._executable = self._compileWithDispatch(
-                            in_tensors_trace_view)
-
-            # In distributed execution mode:
-            # At that point only the first process will have a compiled executable:
-            # trigger the compilation process in all the other processes.
-            if not self.isCompiled():
+        # Note: in single process execution or if the cache is disabled
+        # should_compile will always be False.
+        with _impl.distributedCacheLock(self._model,
+                                        self._options) as should_compile:
+            # Only the first process should compile
+            if should_compile:
                 if self._options.Jit.trace_model:
                     self._executable = poptorch_core.compileWithTrace(
                         *trace_args)
@@ -594,64 +583,73 @@ class PoplarExecutor:
                     self._executable = self._compileWithDispatch(
                         in_tensors_trace_view)
 
-            # Load the engine and connect the streams in all the processes.
-            #
-            # Note: no sync point was added because we expect the above
-            # compileWithTrace call to be quick as all the processes should
-            # hit the cache.
-            #
-            # If the cache is disabled then we expect the compilation process
-            # to roughly take the same amount of time in all processes.
-            #
-            # Note: if multiple processes run on the same host, it's recommended
-            # to enable executable caching to avoid out of memory issues due
-            # to concurrent compilation processes.
-            if self._options.connection_type != enums.ConnectionType.Never:
-                poptorch_core.loadEngineAndConnectStreams(self._executable)
+        # In distributed execution mode:
+        # At that point only the first process will have a compiled executable:
+        # trigger the compilation process in all the other processes.
+        if not self.isCompiled():
+            if self._options.Jit.trace_model:
+                self._executable = poptorch_core.compileWithTrace(*trace_args)
+            else:
+                self._executable = self._compileWithDispatch(
+                    in_tensors_trace_view)
 
-            self._is_attached = self.isAttachedToDevice()
+        # Load the engine and connect the streams in all the processes.
+        #
+        # Note: no sync point was added because we expect the above
+        # compileWithTrace call to be quick as all the processes should
+        # hit the cache.
+        #
+        # If the cache is disabled then we expect the compilation process
+        # to roughly take the same amount of time in all processes.
+        #
+        # Note: if multiple processes run on the same host, it's recommended
+        # to enable executable caching to avoid out of memory issues due
+        # to concurrent compilation processes.
+        if self._options.connection_type != enums.ConnectionType.Never:
+            poptorch_core.loadEngineAndConnectStreams(self._executable)
 
-            # PopTorch might have attached to a device either during
-            # compileWithTrace (if connection type is set to Always) or
-            # during loadEngineAndConnectStreams (if OnDemand is used),
-            # either way this will have occurred in the C++ backend, *not* using
-            # PoplarExecutor.attachToDevice(), therefore we need to manually
-            # call the _on_device_attach() trigger here.
-            if self._is_attached:
-                self._on_device_attach()
+        self._is_attached = self.isAttachedToDevice()
 
+        # PopTorch might have attached to a device either during
+        # compileWithTrace (if connection type is set to Always) or
+        # during loadEngineAndConnectStreams (if OnDemand is used),
+        # either way this will have occurred in the C++ backend, *not* using
+        # PoplarExecutor.attachToDevice(), therefore we need to manually
+        # call the _on_device_attach() trigger here.
+        if self._is_attached:
+            self._on_device_attach()
+
+    @_impl.traceMethod("graphPreprocessing")
     def _preprocessGraph(self, in_tensors):
-        with self._profiling.tracepoint("graphPreprocessing"):
-            self._executable_inputs = in_tensors.clone()
-            in_tensors_trace_view = in_tensors.clone()
-            in_tensors_trace_view.forEach(self._narrow_tensor)
+        self._executable_inputs = in_tensors.clone()
+        in_tensors_trace_view = in_tensors.clone()
+        in_tensors_trace_view.forEach(self._narrow_tensor)
 
-            def remove_require_grad(tensor):
-                if not isinstance(tensor, torch.Tensor):
-                    return tensor
-
-                if tensor.requires_grad:
-                    tensor = tensor.detach()
-                    logger.warning("Input tensor has requires_grad=True set."
-                                   "This tensor will be detached.")
-
+        def remove_require_grad(tensor):
+            if not isinstance(tensor, torch.Tensor):
                 return tensor
 
-            in_tensors_trace_view.forEach(remove_require_grad)
+            if tensor.requires_grad:
+                tensor = tensor.detach()
+                logger.warning("Input tensor has requires_grad=True set."
+                               "This tensor will be detached.")
 
-            # Normal bools don't get captured in python.
-            has_converted_any_half = [False]
+            return tensor
 
-            def possiblyConvertFromHalf(tensor):
-                if isinstance(tensor,
-                              torch.Tensor) and tensor.dtype == torch.half:
-                    has_converted_any_half[0] = True
-                    return tensor.float()
-                return tensor
+        in_tensors_trace_view.forEach(remove_require_grad)
 
-            in_tensors_trace_view.forEach(possiblyConvertFromHalf)
+        # Normal bools don't get captured in python.
+        has_converted_any_half = [False]
 
-            poptorch_core.processPrecisionOptions(self._options.Precision)
+        def possiblyConvertFromHalf(tensor):
+            if isinstance(tensor, torch.Tensor) and tensor.dtype == torch.half:
+                has_converted_any_half[0] = True
+                return tensor.float()
+            return tensor
+
+        in_tensors_trace_view.forEach(possiblyConvertFromHalf)
+
+        poptorch_core.processPrecisionOptions(self._options.Precision)
 
         return in_tensors_trace_view, has_converted_any_half
 
@@ -674,33 +672,32 @@ class PoplarExecutor:
         else:
             self._compile(in_tensors)
 
+    @_impl.traceMethod("loadExecutable")
     def loadExecutable(self, filename: str) -> None:
         """Load an executable previously generated using
         :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
         """
-        with self._profiling.tracepoint("loadExecutable"):
-            data, exe_offset = _poptorch_data.parse(filename,
-                                                    self._poptorch_version)
-            in_tensors_trace_view, has_converted_any_half = \
-                    self._preprocessGraph(
-                        data.executable_inputs)
+        data, exe_offset = _poptorch_data.parse(filename,
+                                                self._poptorch_version)
+        in_tensors_trace_view, has_converted_any_half = \
+                self._preprocessGraph(
+                    data.executable_inputs)
 
-            if data.options.Jit.trace_model:
-                trace_args = self._trace_model_and_get_compile_args(
-                    data.executable_inputs, in_tensors_trace_view,
-                    has_converted_any_half)
-                self._executable = \
-                        poptorch_core.processTraceAndImportExecutable(
-                            *trace_args, filename, exe_offset)
-            else:
-                # TODO(T51159) Support dispatch tracing + serialized executables
-                raise _impl.createPoptorchError(
-                    "Not supported: can't deserialize "
-                    " dispatch traced executable.")
-            self._is_attached = self.isAttachedToDevice()
+        if data.options.Jit.trace_model:
+            trace_args = self._trace_model_and_get_compile_args(
+                data.executable_inputs, in_tensors_trace_view,
+                has_converted_any_half)
+            self._executable = \
+                    poptorch_core.processTraceAndImportExecutable(
+                        *trace_args, filename, exe_offset)
+        else:
+            # TODO(T51159) Support dispatch tracing + serialized executables
+            raise _impl.createPoptorchError("Not supported: can't deserialize "
+                                            " dispatch traced executable.")
+        self._is_attached = self.isAttachedToDevice()
 
-            if self._is_attached:
-                self._on_device_attach()
+        if self._is_attached:
+            self._on_device_attach()
 
     def save(self,
              filename: str,
@@ -783,6 +780,7 @@ class PoplarExecutor:
         poptorch_core.setRngState(self._executable, self._cached_rng_state[0],
                                   self._cached_rng_state[1:])
 
+    @_impl.traceMethod("compileAndExport")
     def compileAndExport(self,
                          filename: str,
                          *args: List['torch.Tensor'],
@@ -806,9 +804,8 @@ class PoplarExecutor:
             to restore the executable.
         """
 
-        with self._profiling.tracepoint("compileAndExport"):
-            self.compile(*args, **kwargs)
-            self.save(filename, export_model)
+        self.compile(*args, **kwargs)
+        self.save(filename, export_model)
 
     def cycleCount(self) -> int:
         """ Returns number of cycles which the IPU ran.
@@ -1205,6 +1202,7 @@ class PoplarExecutor:
                         "the name of the source tensor.")
                     raise _impl.createPoptorchError(err_msg)
 
+    @_impl.traceMethod("tracingModel")
     def _trace_model_and_get_compile_args(self, in_tensors,
                                           in_tensors_trace_view,
                                           has_converted_any_half):
