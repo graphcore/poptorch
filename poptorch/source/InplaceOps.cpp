@@ -50,6 +50,9 @@ InplaceOpHandler::InplaceOpHandler(
   // There may still be inplace ops (which do not affect an input).
   // These must also be removed.
   removeRemainingInplaceOps();
+
+  // Make sure poptorch::end_for_loop has the non-changed value as an input.
+  fixForLoopInputs();
 }
 
 void InplaceOpHandler::storeNumTensorOutputs() {
@@ -219,6 +222,20 @@ torch::jit::Node *InplaceOpHandler::outplaceOp(torch::jit::Node *node) {
   node->input(0)->replaceAllUsesAfterNodeWith(node, node->output());
 
   return new_node;
+}
+
+void InplaceOpHandler::fixForLoopInputs() {
+  torch::jit::Value *correct_loop_input = nullptr;
+  for (auto *node : _graph->nodes()) {
+    if (node->kind() == symbols::poptorch::start_for_loop) {
+      correct_loop_input = node->input();
+    } else if (node->kind() == symbols::poptorch::end_for_loop) {
+      ERROR_ON_MSG(!correct_loop_input,
+                   "Unreachable internal error: poptorch::end_for_loop "
+                   "encountered before poptorch::start_for_loop");
+      node->replaceInput(1, correct_loop_input);
+    }
+  }
 }
 
 } // namespace poptorch

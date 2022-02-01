@@ -4,6 +4,7 @@
 import torch
 import pytest
 import poptorch
+import helpers
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -194,3 +195,86 @@ def test_loop_training(trace_model):
             poptorch.Error,
             match=r"poptorch.for_loop\(\) is only supported in inference"):
         training_model(x)
+
+
+def test_loop_body_inplace_ops_1():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            # Body inputs are passed by value so 'x' remains unchanged.
+            def body(y):
+                y += 1
+                return y
+
+            return poptorch.for_loop(3, body, [x])[0]
+
+    poptorch_model = poptorch.inferenceModel(Model())
+    x = torch.ones(1, 5).to(torch.int32)
+    x_copy = torch.ones(1, 5).to(torch.int32)
+
+    out = poptorch_model(x)
+    helpers.assert_allequal(actual=x, expected=x_copy)
+    helpers.assert_allequal(actual=out, expected=x_copy * 4)
+
+
+def test_loop_body_inplace_ops_2():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            # Body inputs are passed by value so 'x' remains unchanged.
+            def body(y):
+                y += 1
+                y += 1
+                return y
+
+            return poptorch.for_loop(3, body, [x])[0]
+
+    poptorch_model = poptorch.inferenceModel(Model())
+    x = torch.ones(1, 5).to(torch.int32)
+    x_copy = torch.ones(1, 5).to(torch.int32)
+
+    out = poptorch_model(x)
+    helpers.assert_allequal(actual=x, expected=x_copy)
+    helpers.assert_allequal(actual=out, expected=x_copy * 7)
+
+
+def test_loop_body_inplace_ops_3():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            x += 1
+
+            # Body inputs are passed by value so 'x' remains unchanged.
+            def body(y):
+                y += 1
+                return y
+
+            return poptorch.for_loop(3, body, [x])[0]
+
+    poptorch_model = poptorch.inferenceModel(Model())
+    x = torch.ones(1, 5).to(torch.int32)
+    x_copy = torch.ones(1, 5).to(torch.int32)
+
+    out = poptorch_model(x)
+    helpers.assert_allequal(actual=x, expected=x_copy * 2)
+    helpers.assert_allequal(actual=out, expected=x_copy * 5)
+
+
+def test_loop_body_inplace_ops_4():
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            x += 1
+
+            # Body inputs are passed by value so 'x' remains unchanged.
+            def body(y):
+                y += 1
+                return y
+
+            z = poptorch.for_loop(3, body, [x])[0]
+            x += 1
+            return z
+
+    poptorch_model = poptorch.inferenceModel(Model())
+    x = torch.ones(1, 5).to(torch.int32)
+    x_copy = torch.ones(1, 5).to(torch.int32)
+
+    out = poptorch_model(x)
+    helpers.assert_allequal(actual=x, expected=x_copy * 3)
+    helpers.assert_allequal(actual=out, expected=x_copy * 5)

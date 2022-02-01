@@ -121,9 +121,13 @@ def for_loop(count: int,
                  " a list of tensors. (Object contained in list at index"
                  " %d is not torch.tensor)") % ind)
 
+    # Clone the inputs to make sure ir reflects the fact that
+    # body inputs are passed by value rather than by reference.
+    cloned_inputs = [t.clone() for t in inputs]
+
     # Start the for loop.
-    torch.ops.poptorch.start_for_loop(inputs)
-    outputs = body(*inputs)
+    torch.ops.poptorch.start_for_loop(cloned_inputs)
+    outputs = body(*cloned_inputs)
 
     # Break the alias of the outputs.
     example_outputs = []
@@ -135,7 +139,7 @@ def for_loop(count: int,
         outputs = [outputs]
 
     # End the for loop.
-    return torch.ops.poptorch.end_for_loop(outputs, inputs, count,
+    return torch.ops.poptorch.end_for_loop(outputs, cloned_inputs, count,
                                            example_outputs)
 
 

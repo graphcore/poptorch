@@ -653,7 +653,6 @@ void LowerToPopartImpl::lowerBody() {
     } else if (kind == symbols::poptorch::start_for_loop) {
       _compiler.startSubgraph();
     } else if (kind == symbols::poptorch::end_for_loop) {
-      // Process the if condition.
       std::vector<poptorch::TensorId> inputs =
           _value_map.tensors(node->input(0));
 

@@ -40,6 +40,7 @@ Bug Fixes
 - Fix ``torch.chunk`` when dim size is indivisible by the specified number of chunks
 - Fix cases where ``tensor.half()`` was in-place
 - Fix tracing with half buffers
+- Fix for loops with in-place ops
 
 v2.4 (Poplar SDK 2.4)
 =====================

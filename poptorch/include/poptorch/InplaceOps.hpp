@@ -57,13 +57,23 @@ private:
   // Store the number of tensors out, including those in tuples.
   void storeNumTensorOutputs();
 
-  // Process the input by changing any nodes to inplace varients and adding an
+  // Process the input by changing any nodes to inplace variants and adding an
   // addition output if required.
   void processInput(size_t input);
 
-  // Remove any inplace ops that are not connected with an input or an alias
-  // so can simply be replace with an outplace equivalents
+  // Remove any remaining inplace ops that are not connected with an input or
+  // an alias so can simply be replace with an outplace equivalents.
   void removeRemainingInplaceOps();
+
+  // Whenever loop body has inplace ops that change the input of the body,
+  // the trace we see is incorrect. It is incorrect because during loop
+  // lowering we use the inputs of poptorch::end_for_loop which comes after
+  // the inplace ops in the trace and hence has the input-changing op's output
+  // as an input. We fix this by simply overwriting the input of
+  // poptorch::end_for_loop with the input of poptorch::start_for_loop which
+  // points to the correct ssa value because it comes before the inplace ops
+  // in the trace.
+  void fixForLoopInputs();
 
   // Outplace op by swapping it with the correct variant (usually but not always
   // removing the trialing '_') and making any other changes
@@ -89,7 +99,7 @@ private:
   size_t _num_anchors;
 
   // Number of tensors: this will differ from the previous in the case of
-  // (possibly nested) tuples to include the number of tensors retuurned,
+  // (possibly nested) tuples to include the number of tensors returned,
   // including those which are elements of tuples.
   size_t _num_normal_tensor_outputs;
 

@@ -189,10 +189,7 @@ void annotateSubgraphs(torch::jit::Graph *graph, bool training) {
       node->removeInput(0);
 
     } else if (kind == symbols::poptorch::end_for_loop) {
-      // Mark the outputs of the else.
       markOutputs(graph, node->input(0)->node(), node, &subgraph_nodes.top());
-
-      // Remove the else.
       subgraph_nodes.pop();
 
       // We no longer need these inputs.
