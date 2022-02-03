@@ -16,13 +16,17 @@ import poptorch
 
 
 class ModelWithLoss(torch.nn.Module):
-    def __init__(self, loss):
+    def __init__(self, loss, use_dropout=False):
         super().__init__()
         self.linear = torch.nn.Linear(10, 10)
         self.loss = loss
+        if use_dropout:
+            self.dropout = torch.nn.Dropout()
+        else:
+            self.dropout = lambda x: x
 
     def forward(self, data, target=None):
-        out = self.linear(data)
+        out = self.dropout(self.linear(data))
 
         if target is None:
             return out
@@ -235,13 +239,64 @@ def test_torch_save():
                            pre_train_weights)
 
 
+@helpers.overridePoptorchLogLevel("DEBUG")
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed to test this feature")
+def test_seed_precompilation(capfd):
+    # create a dummy model
+    model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
+
+    # create optimizer
+    optimizer = poptorch.optim.SGD(model.parameters(), lr=0.01)
+
+    opts = poptorch.Options().randomSeed(42)
+    opts.useOfflineIpuTarget(poptorch.ipuHardwareVersion())
+    training_model = poptorch.trainingModel(model,
+                                            options=opts,
+                                            optimizer=optimizer)
+    # 10 Batches of 10.
+    input = torch.randn(10, 10)
+
+    # 10 batches of 1
+    label = torch.randint(0, 10, [1])
+    label = label.expand([10])
+    training_model.compile(input, label)
+
+    # Clear the outputs (We only want to parse what's triggered by save()
+    helpers.LogChecker(capfd)
+
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "checkpoint.pt")
+        training_model.save(path)
+
+        # Creating a checkpoint should trigger copies of the weights, optimizer state
+        # random seed and rng state but as we're using an offline target nothing
+        # should happen.
+        log = helpers.LogChecker(capfd)
+        log.assert_no_matches("Reading random seed")
+        log.assert_no_matches("Reading RNG state")
+        log.assert_no_matches("Implicit copyWeightsToHost()")
+        log.assert_no_matches(
+            "Writing optimiser state tensors from IPU to host.")
+
+        poptorch.load(path)
+
+        log = helpers.LogChecker(capfd)
+        log.assert_matches("Writing weights from host to IPU memory")
+        log.assert_matches("Setting random seed to")
+        # We haven't run on HW so we don't have a state yet
+        log.assert_no_matches("Setting RNG state")
+        log.assert_no_matches(
+            "Writing optimiser state tensors from host to IPU memory")
+
+
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test this feature")
 def test_save_everything(capfd):
     # create a dummy model
-    model = ModelWithLoss(torch.nn.CrossEntropyLoss())
+    model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
 
     # create optimizer
     optimizer = poptorch.optim.SGD(model.parameters(), lr=0.01)

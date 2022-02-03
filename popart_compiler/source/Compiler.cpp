@@ -816,10 +816,6 @@ void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
   // to make sure it happens at the same time in distributed environments.
   constexpr bool load_engine = false;
   _impl->session->prepareDevice(load_engine);
-  // Set the random seed (if one was provided)
-  if (_impl->options_set.count("random_seed") != 0u) {
-    setRngState(_impl->options.random_seed, {});
-  }
   _impl->cachePopartTypes();
 }
 
@@ -935,10 +931,6 @@ void Compiler::compileAndPrepareDevice() {
     logging::err("Out of memory, the graph profile is available here: {}",
                  e.getProfilePath());
     std::rethrow_exception(std::current_exception());
-  }
-  // Set the random seed (if one was provided) following compilation
-  if (_impl->options_set.count("random_seed") != 0u) {
-    setRngState(_impl->options.random_seed, {});
   }
 
   _impl->cachePopartTypes();

@@ -161,6 +161,9 @@ class PoplarExecutor:
         self._ipu_optimizer_is_dirty = False
         self._host_rng_state_is_dirty = False
         self._cached_rng_state = None
+        if self._options.exists("random_seed"):
+            self._cached_rng_state = [self._options.random_seed]
+
         self._dict_optimizer = {}
         self._training = training
         self._dirty_host_weights = False
