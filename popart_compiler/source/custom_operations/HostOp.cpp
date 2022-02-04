@@ -21,7 +21,7 @@
 #include <popart/tensornames.hpp>
 
 #include <popart/names.hpp>
-#include <popart/opidentifier.hpp>
+#include <popart/operators.hpp>
 
 #include <CustomOps.hpp>
 

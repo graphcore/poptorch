@@ -6,7 +6,7 @@
 
 #include <popart/op.hpp>
 #include <popart/op/identity.hpp>
-#include <popart/opidentifier.hpp>
+#include <popart/operators.hpp>
 #include <popart/opmanager.hpp>
 #include <popart/popx/opx.hpp>
 #include <popart/popx/opxmanager.hpp>

@@ -30,7 +30,7 @@
 #include <popops/ElementWise.hpp>
 
 #include <popart/names.hpp>
-#include <popart/opidentifier.hpp>
+#include <popart/operators.hpp>
 
 namespace {
 
