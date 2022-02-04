@@ -1491,6 +1491,62 @@ def test_write_ipu_state_before_override(capfd):
     log.assert_matches("Writing optimiser state tensors from IPU to host.")
 
 
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+def test_LR_scheduler(capfd):
+    input = torch.ones(2)
+    model = helpers.ModelWithWeights(lambda x: x, input.shape)
+    optimizer = poptorch.optim.Adam(model.parameters(), lr=1.0)
+    # Halve the LR after each training step
+    scheduler = ExponentialLR(optimizer, 0.5)
+    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+
+    # Compile and run the model
+    training_model((input, ))
+
+    log = helpers.LogChecker(capfd)
+    # Initial optimizer upload
+    log.assert_matches("Updating group 0 optimizer")
+
+    # Step the scheduler for the next epoch
+    # lr: 1.0 -> 0.5
+    scheduler.step()
+
+    # Set the new LR
+    training_model.setOptimizer(optimizer)
+
+    log = helpers.LogChecker(capfd)
+    log.assert_matches("Updating group 0 optimizer")
+    # Updating the optimizer's parameter shouldn't trigger a sync of the weights.
+    log.assert_no_matches("copyWeightsToHost()")
+
+    # Run the model to use the new optimizer.
+    training_model((input, ))
+
+    s0 = optimizer.state_dict()
+
+    log = helpers.LogChecker(capfd)
+    log.assert_matches("Writing optimiser state tensors from IPU to host")
+
+    # Run the model to make the IPU state dirty.
+    training_model((input, ))
+
+    log = helpers.LogChecker(capfd)
+    # No data transfer should happen.
+    log.assert_no_matches("Writing")
+
+    optimizer.load_state_dict(s0)
+
+    # Run the model to trigger the transfers.
+    training_model((input, ))
+
+    log = helpers.LogChecker(capfd).createIterator()
+    # Updating the optimizer's state should trigger a backup of the IPU weights first.
+    log.findNext("copyWeightsToHost()")
+    # Then the new state should be uploaded
+    log.findNext("Writing optimiser state tensors from host to IPU memory")
+
+
 def test_write_ipu_state_from_checkpoint():
     input = torch.ones(2)
     model = helpers.ModelWithWeights(lambda x: x, input.shape)

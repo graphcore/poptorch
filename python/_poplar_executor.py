@@ -295,10 +295,6 @@ class PoplarExecutor:
         if not self.isCompiled():
             raise _impl.createPoptorchError(NO_EXECUTABLE_ERR)
         if self._ipu_optimizer_is_dirty:
-            # Sync the weights to host first because updateOptimizers() is
-            # going to write both the weights and the optimizer state
-            self.copyWeightsToHostIfNeeded()
-
             poptorch_core.updateOptimizers(self._executable,
                                            self._dict_optimizer)
             self._ipu_optimizer_is_dirty = False
@@ -319,6 +315,8 @@ class PoplarExecutor:
                 **poptorch_core.readOptimizerState(self._executable),
                 **torch.optim.Optimizer.state_dict(self._optimizer)
             })
+            # Don't trigger a copy to IPU as we've just synced.
+            self._optimizer.ipu_state_is_dirty = False
         else:
             logger.debug("Using cached optimiser state dict")
 
@@ -358,6 +356,10 @@ class PoplarExecutor:
                 "Both host "
                 "and ipu states cannot be dirty at the same time.")
             if self._optimizer.has_state():
+                # Sync the weights to host first because writeOptimizerState() is
+                # going to write both the weights and the optimizer state
+                self.copyWeightsToHostIfNeeded()
+
                 poptorch_core.writeOptimizerState(self._executable,
                                                   self._optimizer.state_dict())
             self._optimizer.ipu_state_is_dirty = False

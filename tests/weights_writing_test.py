@@ -239,6 +239,7 @@ def test_torch_save():
                            pre_train_weights)
 
 
+@helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed to test this feature")
