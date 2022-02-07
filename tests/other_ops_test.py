@@ -138,6 +138,43 @@ def test_scatter_add(inplace, dim):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
+@pytest.mark.parametrize("expand_as", [True, False])
+def test_2d_scatter_add_with_index_expansion(capfd, expand_as):
+    class Model(torch.nn.Module):
+        def forward(self, index, src):
+            if expand_as:
+                index = index.expand_as(src)
+            else:
+                index = index.expand(src.shape)
+            return torch.zeros((5, 3)).scatter_add_(
+                dim=-2,
+                index=index,
+                src=src,
+            )
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    index = torch.randint(0, 5, (6, 1), dtype=torch.long)
+    src = torch.rand((6, 3))
+
+    out = model(index, src)
+    poptorch_out = poptorch_model(index, src)
+    helpers.assert_allclose(actual=poptorch_out, expected=out)
+
+    # Make sure the expand op is removed.
+    log = helpers.LogChecker(capfd)
+    it = log.createIterator()
+    it.findNext("Removing index expansion node:")
+    with pytest.raises(
+            AssertionError,
+            match=r".*The log above doesn't contain lines matching.*",
+    ):
+        it.findNext("aten::expand_as")
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_available_memory_scatter_add(capfd):
     class Model(torch.nn.Module):
         def __init__(self, dim, dim_size):

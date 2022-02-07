@@ -24,6 +24,7 @@ New features
 - Support for ``torch.nn.RNN``.
 - Add support for ``__repr__`` in PoplarExecutor.
 - For models annotated with ``BeginBlock``, show the IPU blocks in ``repr(model)``.
+- Improve implementation of torch.scatter_add
 
 API changes
 -----------

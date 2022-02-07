@@ -61,6 +61,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoplarExecutable.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PoptorchSymbols.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/RemoveSurplusIdentityLosses.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/ScatterAddOptimization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/AddListNumElements.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CanonicaliseConstants.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/CastUnsupportedInputs.cpp"

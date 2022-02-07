@@ -54,6 +54,13 @@ void cpuOffloadingCleanup(torch::jit::Graph *graph);
 
 // Handle the 'requires_grad=False' flag on tensors.
 void addDetachOperations(torch::jit::Graph *graph);
+
+// Popart scatterreduceop allows for non-expanded index to be passed in. It is
+// essentially a fused and more efficient version of the expand + scatterreduce.
+// This pass identifies all of the valid optimization cases and removes the
+// explicit and sub-optimal index expansion before the scatter_add ops.
+void removeScatterAddIndexExpansion(torch::jit::Graph *graph);
+
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_TRANSFORM_ATEN_TO_POPART_HPP_
