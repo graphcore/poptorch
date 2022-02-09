@@ -383,6 +383,43 @@ class BuildenvManager:
         # PYTHONNOUSERSITE -> Make Conda ignore packages installed in ~/.local
         # CCACHE_CPP2 -> Switch ccache to C++ mode (Avoid issues with C pre-processor)
         with open(self.activate_filename, "w") as f:
+            f.write("# Save the existing environment\n")
+            f.write("_print_var_names (){\n")
+            # grep: only keep lines containing 'declare -x' (Removes
+            # multi-lines content as we only care about variable names).
+            # cut -f1: remove the right hand side of the assignment.
+            # cut -f3: remove 'declare -x'
+            # tr: replace new lines with spaces.
+            f.write("   export -p | grep \"declare -x\" | "
+                    "cut -d '=' -f1 | cut -d ' ' -f3 | "
+                    "tr '\n' ' '\n")
+            f.write("}\n")
+            f.write("_saved_names=$(_print_var_names)\n")
+            f.write("_saved_vars=\"$(export -p)\"\n")
+            f.write("_saved_ps1=\"$PS1\"\n\n")
+            f.write(
+                "# Use 'deactivate_buildenv' to restore your former environment\n"
+            )
+            # Note: using 'eval' inside a function doesn't affect the parent
+            # environment, which is why we need to use an alias instead.
+            f.write(
+                "alias deactivate_buildenv='_deactivate;eval \"$_saved_vars\";"
+                "unset _deactivate _print_var_names _saved_names "
+                "_saved_vars _saved_ps1'\n")
+            f.write("_deactivate() {\n")
+            f.write(
+                "  # Unset the variables that were added by the buildenv\n")
+            f.write("  _current_vars=$(_print_var_names)\n")
+            f.write("  for v in $_current_vars; do\n")
+            f.write("    if [[ ! \" ${_saved_names[*]} \" =~ \" ${v} \" ]];"
+                    " then\n")
+            f.write("      unset \"${v}\"\n")
+            f.write("    fi\n")
+            f.write("  done\n")
+            f.write("  # Restore the shell prompt\n")
+            f.write("  PS1=\"$_saved_ps1\"\n\n")
+            f.write("}\n\n")
+
             f.write("export PYTHONNOUSERSITE=1\n")
             f.write("export CCACHE_CPP2=yes\n")
 
