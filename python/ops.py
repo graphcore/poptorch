@@ -41,7 +41,7 @@ def ctc_beam_search_decoder(probs: "torch.Tensor",
 def ipu_print_tensor(tensor: "torch.Tensor",
                      title: str = "") -> "torch.Tensor":
     """
-    Adds an op to print the content of a given IPU tensor.
+    Adds an op to print the contents of a given IPU tensor.
 
     When this is executed the tensor
     will be copied back to host and printed.
@@ -54,7 +54,7 @@ def ipu_print_tensor(tensor: "torch.Tensor",
     in the rest of the program, to make sure that the print operation isn't
     optimised away.
 
-    For example if the original code looks like this:
+    For example, if the original code looks like this:
 
     .. code-block:: python
 
@@ -62,7 +62,7 @@ def ipu_print_tensor(tensor: "torch.Tensor",
         a = c + d
         return a + b
 
-    If the result of ``ipu_print_tensor`` is not used, it will be optimised
+    If the result of ``ipu_print_tensor()`` is not used, it will be optimised
     out by the graph optimiser and tensor will not be printed.
 
     So if you want to print the value of `a`, you should do:
@@ -97,13 +97,13 @@ def ipu_print_tensor(tensor: "torch.Tensor",
 def for_loop(count: int,
              body: Callable[[List['torch.Tensor']], List['torch.Tensor']],
              inputs: List['torch.Tensor']) -> List['torch.Tensor']:
-    """ An on device for loop. This loop will execute on device for `count`
-        number of iterations.
+    """An on-device for loop. This loop will execute on device for `count`
+    number of iterations.
 
-        The body should be a python function containing the PyTorch code you
-        wish to execute in a loop. It should take as input the same number of
-        tensors as it outputs. Each iteration will have the previous output
-        passed in as input.
+    The body should be a Python function containing the PyTorch code you
+    wish to execute in a loop. It should take as input the same number of
+    tensors as it outputs. Each iteration will have the previous output
+    passed in as input.
 
     :param count: Number of iterations of the loop.
     :param body: The function to be executed.
@@ -148,7 +148,7 @@ def nop(tensor: "torch.Tensor") -> "torch.Tensor":
     eliminated by PopART patterns or inlining, so it is useful for
     debugging.
 
-    :param tensor: the tensor to pass to the no-op.
+    :param tensor: The tensor to pass to the no-op.
     :returns: The same tensor which was input.
     """
     return torch.ops.poptorch.nop(tensor)
@@ -195,10 +195,11 @@ def serializedMatMul(lhs: "torch.Tensor",
     multiplications, calculated one after the other, to reduce the memory
     requirements of the multiplication and its gradient calculation.
 
-    :param lhs: Left-hand size input matrix.
+    :param lhs: Left-hand side input matrix.
     :param rhs: Right-hand side input matrix.
     :param mode: Which dimension of the matmul
         to serialize on: for matrix A (m by n) multiplied by matrix B (n by p).
+
         * InputChannels: Split across the input channels (dimension m).
         * ReducingDim: Split across the reducing dimension (n).
         * OutputChannels: Split across the output channels (dimension p).
@@ -304,11 +305,11 @@ def set_overlap_for_output(output_tensor: "torch.Tensor",
     :py:func:`poptorch.options._TensorLocationOptions.numIOTiles` which may
     affect computation performance.
 
-    You should use this function at the end ofyour model's `forward` method
-    for each applicable output just before returning the tensor.
+    You should use this function at the end of your model's `forward` method,
+    for each applicable output, just before returning the tensor.
 
-    :param output_tensor: The output tensor for which enable overlapping host
-      IO.
+    :param output_tensor: The output tensor to enable overlapping host
+      IO for.
     :param mode: Control to what extent the host IO overlaps computation.
     :returns: the output tensor, specified for overlap.
 
@@ -352,10 +353,10 @@ class Block(torch.nn.Module):
     @staticmethod
     def useAutoId():
         """Call this method at the beginning of your ``forward()`` method to
-        enable automatic block id generation.
+        enable automatic block ID generation.
 
-        Blocks with a None ``user_id`` will be assigned an automatic id
-        which will be the index of this block in the list of id-less Blocks.
+        Blocks with a None ``user_id`` will be assigned an automatic ID
+        which will be the index of this block in the list of ID-less Blocks.
 
         >>> poptorch.Block.useAutoId()
         >>> with poptorch.Block(): # user_id = "0"
@@ -374,10 +375,10 @@ class Block(torch.nn.Module):
         """
 
         :param user_id: A user defined identifier for the block.
-            Blocks with the same id are considered as being a single block.
+            Blocks with the same ID are considered as being a single block.
             Block identifiers are also used to manually specify pipelines or
             phases.
-        :param ipu_id: The id of the IPU to run on.
+        :param ipu_id: The ID of the IPU to run on.
                        Note that the ``ipu_id`` is an index
                        in a multi-IPU device within PopTorch, and is
                        separate and distinct from the device ids used by
@@ -454,14 +455,14 @@ def BeginBlock(layer_to_call: torch.nn.Module,
     a sub-module is similar modified to be another block. In addition, if an IPU
     is specified, the module and its submodules will run on the specified IPU.
 
-    You can combines multiple blocks into a stage.
+    You can combine multiple blocks into a stage.
 
     :param layer_to_call: PyTorch module to assign to the block.
     :param user_id: A user defined identifier for the block.
-            Blocks with the same id are considered as being a single block.
+            Blocks with the same ID are considered as being a single block.
             Block identifiers are also used to manually specify pipelines or
             phases.
-    :param ipu_id: The id of the IPU to run on.
+    :param ipu_id: The ID of the IPU to run on.
                    Note that the ``ipu_id`` is an index in a multi-IPU device
                    within PopTorch, and is separate and distinct from the device
                    ids used by ``gc-info``.
@@ -529,10 +530,10 @@ def BlockFunction(user_id: Optional[str] = None, ipu_id: Optional[int] = None):
     multiple blocks into a stage.
 
     :param user_id: A user defined identifier for the block.
-        Blocks with the same id are considered as being a single block.
+        Blocks with the same ID are considered as being a single block.
         Block identifiers are also used to manually specify pipelines or
         phases.
-    :param ipu_id: The id of the IPU to run on.
+    :param ipu_id: The ID of the IPU to run on.
                    Note that the ``ipu_id`` is an index
                    in a multi-IPU device within PopTorch, and is
                    separate and distinct from the device ids used by
@@ -667,7 +668,7 @@ def custom_op(inputs: Tuple["torch.Tensor"],
 
 
 class CPU:
-    """Allow to execute a CPU op in the middle of an inference IPU graph.
+    """Allow the execution of a CPU op in the middle of an inference IPU graph.
 
     .. important:: CPU ops are only supported in inference graphs.
 
@@ -677,10 +678,10 @@ class CPU:
     >>>     def __init__(self):
     >>>         super().__init__()
     >>>         self.cpu = poptorch.CPU(self.myCpuOp, "MyCPUOp")
-
+    >>>
     >>>     def myCpuOp(self, x):
     >>>         return x * 2.0
-
+    >>>
     >>>     def forward(self, x):
     >>>         # The arguments passed to "cpu" are forwarded to "myCpuOp"
     >>>         out = self.cpu(x)
@@ -850,7 +851,7 @@ class MultiConv():
             used for all of the convolutions. Otherwise, can be a ``tuple`` or
             ``list`` containing as many ``float`` values as the number of
             convolutions.
-        :returns: self, to support method chaining
+        :returns: ``self``, to support method chaining.
         """
         name = "available memory proportion"
         value = self._validatePerConvProperty(name, value, float)
@@ -865,7 +866,7 @@ class MultiConv():
             the same value is used for all of the convolutions. Otherwise, can
             be a ``tuple`` or ``list`` containing as many ``torch.dtype``
             values as the number of convolutions.
-        :returns: self, to support method chaining
+        :returns: ``self``, to support method chaining.
         """
 
         def encode_dtype(dtype):
@@ -892,7 +893,7 @@ class MultiConv():
             used for all of the convolutions. Otherwise, can be a ``tuple`` or
             ``list`` containing as many ``bool`` values as the number of
             convolutions.
-        :returns: self, to support method chaining
+        :returns: ``self``, to support method chaining.
         """
 
         if value is None:
@@ -914,7 +915,7 @@ class MultiConv():
 
         :param value: An instance of :py:class:`MultiConvPlanType`.
 
-        :returns: self, to support method chaining
+        :returns: ``self``, to support method chaining.
         """
         if value is None:
             self._plan_type = value
@@ -928,8 +929,8 @@ class MultiConv():
     def perConvReservedTiles(self, value: int) -> "poptorch.MultiConv":
         """Tiles to reserve for each convolution.
 
-        :param value: Number of tiles
-        :returns: self, to support method chaining
+        :param value: Number of tiles.
+        :returns: ``self``, to support method chaining.
         """
         assert isinstance(value, int)
         self._per_conv_reserved_tiles = value
@@ -938,8 +939,8 @@ class MultiConv():
     def cycleBackOff(self, value: float) -> "poptorch.MultiConv":
         """Cycle back off proportion.
 
-        :param value: Number between 0 and 1
-        :returns: self, to support method chaining
+        :param value: Number between 0 and 1.
+        :returns: ``self``, to support method chaining.
         """
         assert isinstance(value, float)
         self._cycle_back_off = value
