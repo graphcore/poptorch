@@ -259,6 +259,17 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     stack->clear();
     stack->push_back(t);
   } else {
+    // Convert any halves to floats
+    for (size_t i = 0; i < stack->size(); i++) {
+      auto &value = stack->at(i);
+      if (value.isTensor()) {
+        auto tt = value.type()->cast<at::TensorType>();
+        if (tt->scalarType() == at::ScalarType::Half) {
+          at::Tensor t = value.toTensor();
+          value = t.toType(at::ScalarType::Float);
+        }
+      }
+    }
     // Call the CPU version to get the output shape
     dispatcher.callBoxed(op, stack);
   }
