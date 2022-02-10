@@ -56,6 +56,11 @@ short_tests = [
     "sharding_test.py",
 ]
 
+# The only tests that should be run in doc-only builds.
+docs_only_tests = [
+        "test_doc_urls.py"
+]
+
 long_tests = [
     "bert_small_and_medium_test.py::test_bert_medium_result",
     "fine_tuning_test.py",
@@ -145,6 +150,8 @@ with open(args.output_file, "w") as output:
                 labels.append("long")
             if test in external_data_tests:
                 labels.append("external_data")
+            if test_file in docs_only_tests:
+                labels.append("docs_only")
 
             if test_file in serial_tests:
                 test_properties['RUN_SERIAL'] = 'TRUE'
