@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 import pytest
 import poptorch
+from poptorch.experimental import IPUContext
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -14,12 +15,12 @@ def test_dropout_eval():
     torch.manual_seed(42)
 
     t1 = torch.randn(10)
-    with poptorch.IPUScope([t1],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = F.dropout(t1, p=0.5, training=False)
-        ipu.outputs([out])
 
-    t2 = ipu(t1)
+    @IPUContext
+    def ipu_dropout(t):
+        return F.dropout(t, p=0.5, training=False)
+
+    t2 = ipu_dropout(t1)
     assert (t1 == t2).all()
 
 
@@ -34,12 +35,11 @@ def test_dropout_train(p):
     n = 1000
     t1 = torch.randn(n)
 
-    with poptorch.IPUScope([t1],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = F.dropout(t1, p=p, training=True)
-        ipu.outputs([out])
+    @IPUContext
+    def ipu_dropout(t):
+        return F.dropout(t, p=p, training=True)
 
-    t2 = ipu(t1)
+    t2 = ipu_dropout(t1)
     num_zeros = n - torch.count_nonzero(t2).item()
 
     if p > 0.0:

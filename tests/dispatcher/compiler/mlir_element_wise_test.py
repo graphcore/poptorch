@@ -4,28 +4,28 @@ import torch
 import pytest
 import helpers
 import poptorch
+from poptorch.experimental import IPUContext
+
+
+def gt(t1, t2):
+    return t1 > t2
+
+
+def lt(t1, t2):
+    return t1 < t2
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
-def test_gt_lt():
+@pytest.mark.parametrize("op", [gt, lt])
+def test_gt_lt(op):
     torch.manual_seed(42)
 
     t1 = torch.randn(3, 3)
     t2 = torch.randn(3, 3)
 
-    cpu_gt = t1 > t2
-    cpu_lt = t1 < t2
-
-    with poptorch.IPUScope([t1, t2],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        ipu_gt = t1 > t2
-        ipu_lt = t1 < t2
-        ipu.outputs([ipu_gt, ipu_lt])
-
-    ipu_gt, ipu_lt = ipu(t1, t2)
+    cpu_result = op(t1, t2)
+    ipu_result = IPUContext(op)(t1, t2)
 
     # pylint: disable=no-member
-    helpers.assert_allequal(actual=ipu_gt, expected=cpu_gt)
-    # pylint: disable=no-member
-    helpers.assert_allequal(actual=ipu_lt, expected=cpu_lt)
+    helpers.assert_allequal(actual=ipu_result, expected=cpu_result)

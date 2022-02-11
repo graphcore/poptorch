@@ -4,6 +4,7 @@ import torch
 import pytest
 import helpers
 import poptorch
+from poptorch.experimental import IPUContext
 
 to_test = [
     # input_dims, out_channels, kernel_size, stride, padding, dilation
@@ -106,14 +107,8 @@ def test_conv(num_dims, size):
                                groups,
                                bias=bias)
 
-    with poptorch.IPUScope([t1],
-                           conv.named_parameters(),
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = conv(t1)
-        ipu.outputs([out])
-
-    ipu_result = ipu(t1)
-
+    ipu_result = IPUContext(conv,
+                            parameters_and_buffers=conv.named_parameters())(t1)
     cpu_result = conv(t1)
 
     assert ipu_result.size() == cpu_result.size()

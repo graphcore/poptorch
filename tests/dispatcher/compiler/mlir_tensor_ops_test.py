@@ -4,21 +4,18 @@ import torch
 import pytest
 import helpers
 import poptorch
-from poptorch import enums
+from poptorch.experimental import IPUContext
 
 
 def cat_stack_harness(op, dim, dtype):
     t1 = torch.ones(3, 2, dtype=dtype)
     t2 = torch.zeros(3, 2, dtype=dtype)
 
-    torch_out = op((t1, t2), dim)
-
-    with poptorch.IPUScope([t1, t2], compile_using=enums.Compiler.MLIR) as ipu:
-        out = op((t1, t2), dim)
-        ipu.outputs([out])
+    ipu_result = IPUContext(op)((t1, t2), dim)
+    cpu_result = op((t1, t2), dim)
 
     # pylint: disable=no-member
-    helpers.assert_allequal(actual=ipu(t1, t2), expected=torch_out)
+    helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -56,15 +53,12 @@ def test_where():
     ones = torch.ones(3, 3)
     cond = torch.tensor([[True, False, True], [False, True, True],
                          [False, False, True]])
-    torch_out = torch.where(cond, zeros, ones)
 
-    with poptorch.IPUScope([zeros, ones, cond],
-                           compile_using=enums.Compiler.MLIR) as ipu:
-        ipu_out = torch.where(cond, zeros, ones)
-        ipu.outputs([ipu_out])
+    ipu_result = IPUContext(torch.where)(cond, zeros, ones)
+    cpu_result = torch.where(cond, zeros, ones)
 
     # pylint: disable=no-member
-    helpers.assert_allequal(actual=ipu(zeros, ones, cond), expected=torch_out)
+    helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -74,37 +68,29 @@ def expand_reshape_view_harness(in_shape, new_shape, op):
 
     t = torch.randn(in_shape)
 
-    try:
+    def f(t):
         if op == "expand":
-            torch_out = t.expand(new_shape)
-        elif op == "reshape":
-            torch_out = t.reshape(new_shape)
-        elif op == "view":
-            torch_out = t.view(new_shape)
-        else:
-            raise ValueError("Invalid op")
+            return t.expand(new_shape), t
+        if op == "reshape":
+            return t.reshape(new_shape), t
+        if op == "view":
+            return t.view(new_shape), t
+        raise ValueError("Invalid op")
+
+    try:
+        cpu_result = f(t)
     except RuntimeError:
         # Let any exception come from IPUScope only
-        torch_out = None
+        cpu_result = None
 
-    with poptorch.IPUScope([t], compile_using=enums.Compiler.MLIR) as ipu:
-        if op == "expand":
-            out = t.expand(new_shape)
-        elif op == "reshape":
-            out = t.reshape(new_shape)
-        elif op == "view":
-            out = t.view(new_shape)
-        else:
-            raise ValueError("Invalid op")
-        ipu.outputs([out, t])
+    ipu_result = IPUContext(f)(t)
 
-    ipu_out = ipu(t)
     # pylint: disable=no-member
-    helpers.assert_allequal(actual=ipu_out[0], expected=torch_out)
+    helpers.assert_allequal(actual=ipu_result[0], expected=cpu_result[0])
 
     # Nb this is not guaranteed in all cases e.g. strides on CPU
     # pylint: disable=no-member
-    helpers.assert_allequal(actual=ipu_out[1], expected=t)
+    helpers.assert_allequal(actual=ipu_result[1], expected=t)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -138,12 +124,13 @@ def test_reshape_sparse():
     s = torch.sparse_coo_tensor([(0, 1), (2, 2), (2, 3)], [1.0, 2.0],
                                 (2, 3, 4))
 
-    err_msg = (r"You cannot pass sparse tensors as inputs to " +
-               r"poptorch\.IPUScope\.")
+    err_msg = (r"You cannot pass sparse tensors as inputs to IPUScope\.")
+
+    def reshape_sparse(t):
+        return t.reshape((6, 4))
+
     with pytest.raises(ValueError, match=err_msg):
-        with poptorch.IPUScope([s], compile_using=enums.Compiler.MLIR) as ipu:
-            out = s.reshape((6, 4))
-            ipu.outputs([out])
+        IPUContext(reshape_sparse)(s)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),

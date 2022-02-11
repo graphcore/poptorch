@@ -36,9 +36,11 @@ from .enums import *
 from .ops import *
 from .options import *
 from ._impl import isRunningOnIpu, createPoptorchError
-from ._poplar_executor import PoplarExecutor, IPUScope, hasMlirSupportOnPlatform
+from ._utils import accessAttributes
+from ._poplar_executor import PoplarExecutor, hasMlirSupportOnPlatform
 from . import optim
 from . import profiling
+from . import experimental
 # pylint: enable=wrong-import-position
 
 __version__ = "@VERSION@-@SNAPSHOT@"

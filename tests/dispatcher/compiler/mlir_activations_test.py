@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import pytest
 import helpers
 import poptorch
+from poptorch.experimental import IPUContext
 
 
 # It's a bit of a pain to express these in the list without a python func inbetween.
@@ -39,8 +40,8 @@ def hardswish_inplace(x):
 
 
 activation_functions = [
-    F.relu, F.tanh, F.sigmoid, F.gelu, F.hardsigmoid, F.silu, F.hardswish,
-    relu_inplace, tanh_inplace, sigmoid_inplace, silu_inplace,
+    F.relu, torch.tanh, torch.sigmoid, F.gelu, F.hardsigmoid, F.silu,
+    F.hardswish, relu_inplace, tanh_inplace, sigmoid_inplace, silu_inplace,
     hardsigmoid_inplace, hardswish_inplace
 ]
 
@@ -53,12 +54,7 @@ def test_activations(op):
 
     input = torch.randn([2, 10, 4, 2])
 
-    with poptorch.IPUScope([input],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = op(input)
-        ipu.outputs([out])
-
-    ipu_result = ipu(input)
+    ipu_result = IPUContext(op)(input)
     cpu_result = op(input)
 
     assert ipu_result.size() == cpu_result.size()
@@ -66,8 +62,8 @@ def test_activations(op):
     tol = [0.01, 1e-3] if op is F.gelu else [1e-4, 1e-7]
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result,
-                            actual=cpu_result,
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
                             atol=tol[0],
                             rtol=tol[1],
                             equal_nan=True)
@@ -76,22 +72,17 @@ def test_activations(op):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
-def test_sigmoid(dim):
+def test_softmax(dim):
     torch.manual_seed(42)
 
     input1 = torch.randn([2, 2, 4, 5])
 
-    with poptorch.IPUScope([input1],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = F.softmax(input1, dim)
-        ipu.outputs([out])
-
     cpu_result = F.softmax(input1, dim)
-    ipu_result = ipu(input1)
+    ipu_result = IPUContext(F.softmax)(input1, dim)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result,
-                            actual=cpu_result,
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
                             equal_nan=True)
 
 
@@ -101,16 +92,12 @@ def test_sigmoid(dim):
 def test_logsoftmax_forward(dim):
     torch.manual_seed(42)
     input1 = torch.randn([2, 2, 4, 5])
-    with poptorch.IPUScope([input1],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = F.log_softmax(input1, dim)
-        ipu.outputs([out])
 
     cpu_result = F.log_softmax(input1, dim)
-    ipu_result = ipu(input1)
+    ipu_result = IPUContext(F.log_softmax)(input1, dim)
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result,
-                            actual=cpu_result,
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
                             equal_nan=True)
 
 
@@ -120,22 +107,20 @@ def test_logsoftmax_forward(dim):
 def test_logsoftmax_backward(dim):
     torch.manual_seed(42)
     input1 = torch.nn.parameter.Parameter(torch.randn([2, 2, 4, 5]))
-    with poptorch.IPUScope([input1.data],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = F.log_softmax(input1, dim)
+
+    def log_softmax_backward(t):
+        out = F.log_softmax(t, dim)
         loss = torch.sum(out)
         loss.backward()
-        ipu.outputs([input1.grad])
+        return t.grad
 
+    ipu_result = IPUContext(log_softmax_backward)(input1)
     input1.grad.zero_()
     input1.grad.detach_()
-    out = F.log_softmax(input1, dim)
-    loss = torch.sum(out)
-    loss.backward()
 
-    cpu_result = input1.grad
-    ipu_result = ipu(input1)
+    cpu_result = log_softmax_backward(input1)
+
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result,
-                            actual=cpu_result,
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
                             equal_nan=True)

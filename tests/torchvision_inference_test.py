@@ -5,7 +5,7 @@ import os  # pylint: disable=unused-import
 import unittest.mock
 import torch
 import torchvision.models as models
-import poptorch
+from poptorch.experimental import IPUScope
 import helpers
 
 # Torchvision models.
@@ -79,7 +79,7 @@ def inference_harness(imagenet_model, check=True):
     }
 
     # Run on IPU.
-    with poptorch.IPUScope([image_input], parameters_named) as poptorch_model:
+    with IPUScope([image_input], parameters_named) as poptorch_model:
         out = model(image_input)
         poptorch_model.outputs([out])
 

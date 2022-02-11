@@ -4,6 +4,7 @@ import torch
 import pytest
 import helpers
 import poptorch
+from poptorch.experimental import IPUContext
 
 
 @pytest.mark.parametrize("largest", [True, False])
@@ -16,20 +17,15 @@ def test_topk(largest, K, dim):
 
     input = torch.randn([2, 3, 4, 10])
 
-    with poptorch.IPUScope([input],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        values, indices = torch.topk(input, k=K, largest=largest, dim=dim)
-        ipu.outputs([values, indices])
-
-    ipu_value, ipu_indices = ipu(input)
-    cpu_value, cpu_indices = torch.topk(input, k=K, largest=largest, dim=dim)
+    ipu_value, ipu_indices = IPUContext(torch.topk)(input, K, dim, largest)
+    cpu_value, cpu_indices = torch.topk(input, K, dim, largest)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_value,
-                            actual=cpu_value,
+    helpers.assert_allclose(expected=cpu_value,
+                            actual=ipu_value,
                             equal_nan=True)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_indices,
-                            actual=cpu_indices,
+    helpers.assert_allclose(expected=cpu_indices,
+                            actual=ipu_indices,
                             equal_nan=True)

@@ -5,7 +5,7 @@ from torch import nn
 import pytest
 import helpers
 import poptorch
-from poptorch.enums import Compiler
+from poptorch.experimental import IPUContext
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -37,13 +37,11 @@ def test_batch_norm(params):
     norm.train(training)
 
     # Run pytorch native on CPU.
-    torch_out = norm(t)
+    cpu_result = norm(t)
 
     weights = {**dict(norm.named_parameters()), **dict(norm.named_buffers())}
 
-    # Run on IPU.
-    with poptorch.IPUScope([t], weights, compile_using=Compiler.MLIR) as ipu:
-        ipu.outputs([norm(t)])
+    ipu_result = IPUContext(norm, parameters_and_buffers=weights)(t)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(actual=ipu(t), expected=torch_out)
+    helpers.assert_allclose(actual=ipu_result, expected=cpu_result)

@@ -4,7 +4,7 @@ import torch
 import pytest
 import helpers
 import poptorch
-from poptorch.enums import Compiler
+from poptorch.experimental import IPUContext
 
 to_test = [
     # Vector-Vector
@@ -33,12 +33,7 @@ def test_matmul(size):
     t1 = torch.randn(size[0])
     t2 = torch.randn(size[1])
 
-    with poptorch.IPUScope([t1, t2], compile_using=Compiler.MLIR) as ipu:
-        out = torch.matmul(t1, t2)
-        ipu.outputs([out])
-
-    ipu_result = ipu(t1, t2)
-
+    ipu_result = IPUContext(torch.matmul)(t1, t2)
     cpu_result = torch.matmul(t1, t2)
 
     if cpu_result.numel() == 1:
@@ -74,13 +69,11 @@ def test_addmm(params):
     t2 = torch.randn(3, 5)
     t3 = torch.randn(5, 7)
 
-    torch_out = torch.addmm(t1, t2, t3, beta=beta, alpha=alpha)
+    def addmm(x1, x2, x3):
+        return torch.addmm(x1, x2, x3, beta=beta, alpha=alpha)
 
-    with poptorch.IPUScope([t1, t2, t3], compile_using=Compiler.MLIR) as ipu:
-        out = torch.addmm(t1, t2, t3, beta=beta, alpha=alpha)
-        ipu.outputs([out])
-
-    poptorch_out = ipu(t1, t2, t3)
+    cpu_result = addmm(t1, t2, t3)
+    ipu_result = IPUContext(addmm)(t1, t2, t3)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=torch_out, actual=poptorch_out)
+    helpers.assert_allclose(expected=cpu_result, actual=ipu_result)

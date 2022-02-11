@@ -1,14 +1,12 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import collections
 import copy
-import ctypes
 import itertools
 import json
 import os
 import pickle
 import re
 from typing import Callable, Dict, List, Optional
-import types
 from types import MethodType
 import weakref
 import warnings
@@ -24,36 +22,11 @@ from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
 from . import _poptorch_data
+from ._utils import accessAttributes, unrollTensorList
 from ._logging import logger
-from .ops import ATTR_PREFIX
+from .experimental import IPUScope
 from .options import Options, PipelinedExecution, ShardedExecution
 from .optim import Optimizer
-
-
-# Allow access to attributes
-def accessAttributes(attribute_id_str):
-    logger.debug("Accessing attributes with: %s", attribute_id_str)
-
-    if not isinstance(attribute_id_str, (str)):
-        raise ValueError("Wrong type for attribute_id_str")
-
-    # this is to allow creating of attributes from poptorch cpp
-    if attribute_id_str.startswith('{'):
-        return json.loads(attribute_id_str)
-
-    if not attribute_id_str.startswith(ATTR_PREFIX):
-        raise ValueError("Invalid attribute_id_str")
-
-    attribute_id = int(attribute_id_str[len(ATTR_PREFIX):], 16)
-
-    # NB this is undefined behavior if attribute_id does not exist
-    attributes = ctypes.cast(attribute_id, ctypes.py_object).value
-    logger.debug(str(attributes))
-
-    if attributes is None:
-        return {}
-    return attributes
-
 
 NO_EXECUTABLE_ERR = "Model has not been compiled or has been destroyed."
 
@@ -527,17 +500,8 @@ class PoplarExecutor:
             yield from model.named_buffers()
 
         # Unpack the inputs.
-        inputs = []
+        inputs = unrollTensorList(in_tensors.asTuple())
 
-        def unroll(tensor_or_list):
-            if isinstance(tensor_or_list, (list, tuple)):
-                for t in tensor_or_list:
-                    unroll(t)
-            else:
-                assert isinstance(tensor_or_list, torch.Tensor)
-                inputs.append(tensor_or_list)
-
-        unroll(in_tensors.asTuple())
         with IPUScope(inputs,
                       parameters_and_buffers=all_data(self._model),
                       options=self._options) as ipu:
@@ -1454,126 +1418,3 @@ class PoplarExecutor:
 
 def hasMlirSupportOnPlatform():
     return poptorch_core.mlirIsSupportedOnPlatform()
-
-
-class IPUScope:
-    def __init__(
-            self,
-            inputs: List['torch.Tensor'],
-            parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
-            options: Optional['poptorch.Options'] = None,
-            compile_using=enums.Compiler.PopART):
-
-        if not isinstance(inputs, (list, tuple)):
-            raise ValueError("You can only pass a list or tuple as the " +
-                             "inputs argument to poptorch.IPUScope.")
-
-        # Check that the inputs are a valid type
-        for tensor in inputs:
-            if not isinstance(tensor, torch.Tensor):
-                raise ValueError("You can only pass torch.Tensors as inputs " +
-                                 "to poptorch.IPUScope.")
-
-            if tensor.is_sparse:
-                raise ValueError("You cannot pass sparse tensors as inputs " +
-                                 "to poptorch.IPUScope.")
-
-        self._executable = None
-        self._options = options or Options()
-        if self._options.defaultOutputMode():
-            self._options = self._options.outputMode(enums.OutputMode.All)
-
-        self._compile_using = compile_using
-
-        if isinstance(parameters_and_buffers, types.GeneratorType):
-            parameters_and_buffers = {
-                **dict(parameters_and_buffers),
-            }
-
-        if parameters_and_buffers is None:
-            self._params_and_buffers = {}
-        else:
-            self._params_and_buffers = parameters_and_buffers
-
-        param_list = list(self._params_and_buffers.values())
-
-        self._outputs = []
-        self._inputs = []
-        self._upload_weights = True
-
-        with torch.no_grad():
-            self._inputs = [t.clone() for t in inputs]
-
-        # Create the graph. Futured captured calls will be written into this graph behind the scenes.
-        poptorch_core.createGraph(
-            poptorch_core.TracingMode(self._compile_using), inputs, param_list)
-
-    # Start capturing calls.
-    def __enter__(self):
-        poptorch_core.startDispatch()
-        _impl.setIpuContext(True)
-        self._options._execution_strategy.onStartTracing()  # pylint: disable=protected-access
-        return self
-
-    # Exit the scope. Compile graph and stop capturing call
-    def __exit__(self, exc_type, value, traceback):
-        self._options._execution_strategy.onEndTracing()  # pylint: disable=protected-access
-        _impl.setIpuContext(False)
-        # Turn off the dispatcher.
-        poptorch_core.endDispatch()
-
-        # Dispatch stopped because of an exception: don't try to compile
-        # the graph.
-        if exc_type is not None:
-            return
-
-        # Compile for IPU.
-        if self._compile_using == enums.Compiler.PopART:
-            # Compile the captured graph using PopART.
-            self._executable = poptorch_core.compileWithManualTracing(
-                self._inputs, list(self._params_and_buffers.values()),
-                list(self._params_and_buffers.keys()), self._options.toDict(),
-                accessAttributes)
-        else:
-            # Compile the captured graph using MLIR.
-            self._executable = poptorch_core.compileWithMlir()
-
-    def __call__(self, *args):
-        if self._upload_weights:
-            if self._compile_using == enums.Compiler.PopART:
-                poptorch_core.copyWeightsToDevice_impl(
-                    self._executable, tuple(self._params_and_buffers.keys()),
-                    tuple(self._params_and_buffers.values()))
-            else:
-                self._executable.weightsToDevice()
-            self._upload_weights = False
-
-        # Otherwise run popart.
-        if self._compile_using == enums.Compiler.PopART:
-            # Run via PopART.
-            output = poptorch_core.execute(self._executable, args)
-        elif self._compile_using == enums.Compiler.MLIR:
-            # Run via the MLIR compiled binary.
-            self._executable.execute(args)
-            output = self._outputs
-
-        if len(output) == 1:
-            return output[0]
-
-        return output
-
-    def outputs(self, tensors):
-        # We don't want to catch anything in here.
-        poptorch_core.endDispatch()
-
-        with torch.no_grad():
-            for tensor in tensors:
-                if tensor.dtype == torch.torch.long:
-                    self._outputs.append(tensor.int())
-                else:
-                    self._outputs.append(tensor.clone())
-
-        poptorch_core.markOutputs(tensors, self._outputs)
-
-        # Turn dispatch back on.
-        poptorch_core.startDispatch()

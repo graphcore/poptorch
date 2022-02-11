@@ -4,7 +4,7 @@ import torch
 import pytest
 import helpers
 import poptorch
-from poptorch.enums import Compiler
+from poptorch.experimental import IPUContext
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -13,33 +13,30 @@ def test_simple_adder():
     t1 = torch.randn([20])
     t2 = torch.randn([20])
 
-    def foo(t1, t2):
+    def add(t1, t2):
         return t1 + t2
 
-    with poptorch.IPUScope([t1, t2], compile_using=Compiler.MLIR) as ipu:
-        out = foo(t1, t2)
-        ipu.outputs([out])
+    add_ipu = IPUContext(add)
 
-    ipu_result = ipu(t1, t2)
-    cpu_result = foo(t1, t2)
+    cpu_result = add(t1, t2)
+    ipu_result = add_ipu(t1, t2)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result, actual=cpu_result)
+    helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
 def test_zero_inplace():
-    t1 = torch.randn([20])
+    t = torch.randn([20])
 
-    with poptorch.IPUScope([t1], compile_using=Compiler.MLIR) as ipu:
-        t1.zero_()
-        ipu.outputs([t1])
-
-    ipu_result = ipu(t1)
+    @IPUContext
+    def ipu_zero_(t):
+        t.zero_()
+        return t
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result, actual=torch.zeros(20))
+    helpers.assert_allclose(expected=ipu_zero_(t), actual=torch.zeros(20))
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -47,18 +44,15 @@ def test_zero_inplace():
 def test_simple_inplace():
     t1 = torch.randn([20])
 
-    def foo(t1):
-        t1 *= 10.0
+    def mul_inplace(t):
+        t *= 10.0
+        return t
 
-    with poptorch.IPUScope([t1], compile_using=Compiler.MLIR) as ipu:
-        foo(t1)
-        ipu.outputs([t1])
-
-    ipu_result = ipu(t1)
-    foo(t1)
+    ipu_result = IPUContext(mul_inplace)(t1)
+    mul_inplace(t1)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result, actual=t1)
+    helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -66,18 +60,15 @@ def test_simple_inplace():
 def test_simple_inplace_add():
     t1 = torch.randn([20])
 
-    def foo(t1):
-        t1 += 10.0
+    def add_inplace(t):
+        t += 10.0
+        return t
 
-    with poptorch.IPUScope([t1], compile_using=Compiler.MLIR) as ipu:
-        foo(t1)
-        ipu.outputs([t1])
-
-    ipu_result = ipu(t1)
-    foo(t1)
+    ipu_result = IPUContext(add_inplace)(t1)
+    add_inplace(t1)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result, actual=t1)
+    helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -85,18 +76,18 @@ def test_simple_inplace_add():
 def test_add_with_alpha():
     t1 = torch.randn([20])
 
-    def foo(t1):
-        t1.add_(10.0, alpha=0.5)
+    def add_with_alpha(t):
+        t.add_(10.0, alpha=0.5)
+        return t
 
-    with poptorch.IPUScope([t1], compile_using=Compiler.MLIR) as ipu:
-        foo(t1)
-        ipu.outputs([t1])
+    ipu_result = IPUContext(add_with_alpha)(t1)
+    add_with_alpha(t1)
 
-    ipu_result = ipu(t1)
-    foo(t1)
+    print(ipu_result)
+    print(t1)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result, actual=t1)
+    helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -104,18 +95,15 @@ def test_add_with_alpha():
 def test_sub_with_alpha():
     t1 = torch.randn([20])
 
-    def foo(t1):
-        t1.sub_(10.0, alpha=0.5)
+    def sub_with_alpha(t):
+        t.sub_(10.0, alpha=0.5)
+        return t
 
-    with poptorch.IPUScope([t1], compile_using=Compiler.MLIR) as ipu:
-        foo(t1)
-        ipu.outputs([t1])
-
-    ipu_result = ipu(t1)
-    foo(t1)
+    ipu_result = IPUContext(sub_with_alpha)(t1)
+    sub_with_alpha(t1)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result, actual=t1)
+    helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
 # TODO(T49190): More than just float and long
@@ -126,22 +114,18 @@ def test_wrapped_values(python_type):
     dtype = torch.float if python_type is float else torch.int
     t1 = torch.ones([20], dtype=dtype)
 
-    def foo(t1):
-        t1 += python_type(5)
-        t1 *= python_type(2)
+    def f(t):
+        t += python_type(5)
+        t *= python_type(2)
         # Use floor division so that both types work
         i = python_type(6) // python_type(3)
-        return t1 * i
+        return t * i
 
-    with poptorch.IPUScope([t1], compile_using=Compiler.MLIR) as ipu:
-        out = foo(t1)
-        ipu.outputs([out])
-
-    ipu_result = ipu(t1)
-    cpu_result = foo(t1)
+    ipu_result = IPUContext(f)(t1)
+    cpu_result = f(t1)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result, actual=cpu_result)
+    helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
 
 
 @pytest.mark.parametrize("fail_fn",
@@ -152,7 +136,4 @@ def test_wrapped_values_integer_outside_32bit_range(fail_fn):
     t = torch.ones(1, dtype=torch.int)
 
     with pytest.raises(RuntimeError, match="outside the representable range"):
-        with poptorch.IPUScope([t], compile_using=Compiler.MLIR) as ipu:
-            out = fail_fn(t)
-            ipu.outputs([out])
-        ipu(t)
+        IPUContext(fail_fn)(t)

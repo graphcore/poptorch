@@ -2,7 +2,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import torch
 import torch.nn as nn
-import poptorch
+from poptorch.experimental import IPUScope
 import helpers
 
 
@@ -55,7 +55,7 @@ def test_mnist():
         yield from model.named_parameters()
         yield from model.named_buffers()
 
-    with poptorch.IPUScope([input], all_data(model)) as ipu:
+    with IPUScope([input], all_data(model)) as ipu:
         out = model(input)
         ipu.outputs([out])
 

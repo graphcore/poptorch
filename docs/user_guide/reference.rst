@@ -61,9 +61,6 @@ PopTorch Ops
 .. autoclass:: poptorch.CPU
    :special-members: __init__
 
-.. autoclass:: poptorch.IPUScope
-   :members:
-
 .. autoclass:: poptorch.NameScope
    :members:
 

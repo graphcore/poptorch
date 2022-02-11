@@ -6,6 +6,7 @@ import torch
 import pytest
 import helpers
 import poptorch
+from poptorch.experimental import IPUContext
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -16,29 +17,21 @@ def test_grad():
     t1 = torch.tensor([3.5])
     t2 = torch.ones([10])
 
-    with poptorch.IPUScope([t1, t2],
-                           model.named_parameters(),
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = model(t1)
-        loss = torch.nn.functional.mse_loss(out, t2)
+    def grad(x1, x2, lin):
+        out = lin(x1)
+        loss = torch.nn.functional.mse_loss(out, x2)
         out.retain_grad()
         loss.backward()
-
-        ipu.outputs([loss, model[0].weight.grad, model[0].bias.grad, out.grad])
-
-    ipu_outs = ipu(t1, t2)
+        return loss, lin[0].weight.grad, lin[0].bias.grad, out.grad
 
     cpu_model = copy.deepcopy(model)
-    out = cpu_model(t1)
-    loss = torch.nn.functional.mse_loss(out, t2)
+    cpu_result = grad(t1, t2, cpu_model)
 
-    out.retain_grad()
-    loss.backward()
+    ipu_result = IPUContext(grad,
+                            parameters_and_buffers=model.named_parameters())(
+                                t1, t2, model)
 
-    cpu_outs = (loss, cpu_model[0].weight.grad, cpu_model[0].bias.grad,
-                out.grad)
-
-    for ipu_out, cpu_out in zip(ipu_outs, cpu_outs):
+    for ipu_out, cpu_out in zip(ipu_result, cpu_result):
         helpers.assert_allclose(expected=ipu_out, actual=cpu_out)
 
 
@@ -48,47 +41,32 @@ def test_SGD():
     torch.manual_seed(42)
 
     model = torch.nn.Sequential(torch.nn.Linear(1, 10))
+    cpu_model = copy.deepcopy(model)
     t1 = torch.tensor([3.5])
     t2 = torch.ones([10])
 
-    opt = torch.optim.SGD(model.parameters(), lr=0.01)
+    ipu_opt = torch.optim.SGD(model.parameters(), lr=0.01)
+    cpu_opt = torch.optim.SGD(cpu_model.parameters(), lr=0.01)
 
-    cpu_model = copy.deepcopy(model)
+    def sgd(x1, x2, m, o):
+        o.zero_grad()
+        out = m(x1)
 
-    with poptorch.IPUScope([t1, t2],
-                           model.named_parameters(),
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        opt.zero_grad()
-        out = model(t1)
-
-        loss = torch.nn.functional.mse_loss(out, t2)
+        loss = torch.nn.functional.mse_loss(out, x2)
         loss.backward()
 
-        opt.step()
-        ipu.outputs([
-            model[0].weight.grad, model[0].bias.grad, model[0].weight,
-            model[0].bias
-        ])
+        o.step()
+        return m[0].weight.grad, m[0].bias.grad, m[0].weight, m[0].bias
 
-    opt = torch.optim.SGD(cpu_model.parameters(), lr=0.01)
+    ipu_sgd = IPUContext(sgd, parameters_and_buffers=model.named_parameters())
 
-    for _ in range(0, 5):
+    for _ in range(5):
         # Run on IPU.
-        ipu_outs = ipu(t1, t2)
+        ipu_result = ipu_sgd(t1, t2, model, ipu_opt)
 
-        opt.zero_grad()
+        cpu_result = sgd(t1, t2, cpu_model, cpu_opt)
 
-        out = cpu_model(t1)
-
-        loss = torch.nn.functional.mse_loss(out, t2)
-
-        loss.backward()
-        opt.step()
-
-        cpu_outs = (cpu_model[0].weight.grad, cpu_model[0].bias.grad,
-                    cpu_model[0].weight, cpu_model[0].bias)
-
-        for ipu_out, cpu_out in zip(ipu_outs, cpu_outs):
+        for ipu_out, cpu_out in zip(ipu_result, cpu_result):
             helpers.assert_allclose(expected=ipu_out, actual=cpu_out)
 
 
@@ -97,47 +75,34 @@ def test_SGD():
 def test_Adam():
     torch.manual_seed(42)
     model = torch.nn.Sequential(torch.nn.Linear(1, 10))
+    cpu_model = copy.deepcopy(model)
+
     t1 = torch.tensor([3.5])
     t2 = torch.ones([10])
 
-    opt = torch.optim.Adam(model.parameters(), lr=0.01)
+    ipu_opt = torch.optim.Adam(model.parameters(), lr=0.01)
+    cpu_opt = torch.optim.Adam(cpu_model.parameters(), lr=0.01)
 
-    cpu_model = copy.deepcopy(model)
+    def adam(x1, x2, m, o):
+        o.zero_grad()
+        out = m(x1)
 
-    with poptorch.IPUScope([t1, t2],
-                           model.named_parameters(),
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        opt.zero_grad()
-        out = model(t1)
-
-        loss = torch.nn.functional.mse_loss(out, t2)
+        loss = torch.nn.functional.mse_loss(out, x2)
         loss.backward()
 
-        opt.step()
-        ipu.outputs([
-            model[0].weight.grad, model[0].bias.grad, model[0].weight,
-            model[0].bias
-        ])
+        o.step()
+        return m[0].weight.grad, m[0].bias.grad, m[0].weight, m[0].bias
 
-    opt = torch.optim.Adam(cpu_model.parameters(), lr=0.01)
+    ipu_adam = IPUContext(adam,
+                          parameters_and_buffers=model.named_parameters())
 
     for i in range(0, 5):
         # Run on IPU.
-        ipu_outs = ipu(t1, t2)
+        ipu_result = ipu_adam(t1, t2, model, ipu_opt)
 
-        opt.zero_grad()
+        cpu_result = adam(t1, t2, cpu_model, cpu_opt)
 
-        out = cpu_model(t1)
-
-        loss = torch.nn.functional.mse_loss(out, t2)
-
-        loss.backward()
-        opt.step()
-
-        cpu_outs = (cpu_model[0].weight.grad, cpu_model[0].bias.grad,
-                    cpu_model[0].weight, cpu_model[0].bias)
-
-        for ipu_out, cpu_out in zip(ipu_outs, cpu_outs):
+        for ipu_out, cpu_out in zip(ipu_result, cpu_result):
             if i == 0:
                 # Until we can detect changes to and update in flight some "constants",
                 # Adam will diverge quite quickly. First step should be 1:1.

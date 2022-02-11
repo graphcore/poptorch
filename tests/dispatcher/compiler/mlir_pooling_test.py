@@ -5,7 +5,7 @@ from torch import nn
 import pytest
 import helpers
 import poptorch
-from poptorch.enums import Compiler
+from poptorch.experimental import IPUContext
 
 spatial_dim_map = {
     nn.MaxPool1d: 1,
@@ -57,17 +57,19 @@ def test_pool(op, params):
     shape.extend([10 for _ in range(spatial_dims)])
     t = torch.randn(shape)
 
-    pool = op(kernel_size, stride, padding, ceil_mode=ceil_mode, **extra_args)
+    def pool(x):
+        return op(kernel_size,
+                  stride,
+                  padding,
+                  ceil_mode=ceil_mode,
+                  **extra_args)(x)
 
     # Run pytorch native on CPU.
-    torch_out = pool(t)
-
-    # Run on IPU.
-    with poptorch.IPUScope([t], compile_using=Compiler.MLIR) as ipu:
-        ipu.outputs([pool(t)])
+    cpu_result = pool(t)
+    ipu_result = IPUContext(pool)(t)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(actual=ipu(t), expected=torch_out)
+    helpers.assert_allclose(actual=ipu_result, expected=cpu_result)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -89,13 +91,9 @@ def test_adaptive_avg_pool(op):
     t = torch.randn(shape)
     output_size = [i + 2 for i in range(spatial_dims)]
 
-    pool = op(output_size)
     # Run pytorch native on CPU.
-    torch_out = pool(t)
-
-    # Run on IPU.
-    with poptorch.IPUScope([t], compile_using=Compiler.MLIR) as ipu:
-        ipu.outputs([pool(t)])
+    cpu_result = op(output_size)(t)
+    ipu_result = IPUContext(op(output_size))(t)
 
     # pylint: disable=no-member
-    helpers.assert_allclose(actual=ipu(t), expected=torch_out)
+    helpers.assert_allclose(actual=ipu_result, expected=cpu_result)

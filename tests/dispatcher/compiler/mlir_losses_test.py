@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import pytest
 import helpers
 import poptorch
+from poptorch.experimental import IPUContext
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
@@ -15,22 +16,18 @@ def test_nll_loss_forward(reduction, ignore_index):
     torch.manual_seed(42)
     input1 = torch.randn([4, 10])
     input2 = torch.Tensor([1, 2, 3, 4]).long()
-    with poptorch.IPUScope([input1, input2],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        out = F.nll_loss(input1,
-                         input2,
-                         reduction=reduction,
-                         ignore_index=ignore_index)
-        ipu.outputs([out])
 
-    cpu_result = F.nll_loss(input1,
-                            input2,
-                            reduction=reduction,
-                            ignore_index=ignore_index)
-    ipu_result = ipu(input1, input2)
+    def nll_loss(t1, t2):
+        return F.nll_loss(t1,
+                          t2,
+                          reduction=reduction,
+                          ignore_index=ignore_index)
+
+    cpu_result = nll_loss(input1, input2)
+    ipu_result = IPUContext(nll_loss)(input1, input2)
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result,
-                            actual=cpu_result,
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
                             equal_nan=True)
 
 
@@ -42,30 +39,24 @@ def test_nll_loss_backward(reduction, ignore_index):
     torch.manual_seed(42)
     input1 = torch.nn.parameter.Parameter(torch.randn([4, 10]))
     input2 = torch.Tensor([1, 2, 3, 4]).long()
-    with poptorch.IPUScope([input1.data, input2],
-                           compile_using=poptorch.enums.Compiler.MLIR) as ipu:
-        loss = F.nll_loss(input1,
-                          input2,
+
+    def nll_loss_backward(t1, t2):
+        loss = F.nll_loss(t1,
+                          t2,
                           reduction=reduction,
                           ignore_index=ignore_index)
         if reduction == "none":
             loss = loss.sum()
         loss.backward()
-        ipu.outputs([input1.grad])
+        return t1.grad
+
+    ipu_result = IPUContext(nll_loss_backward)(input1, input2)
 
     input1.grad.zero_()
     input1.grad.detach_()
-    loss = F.nll_loss(input1,
-                      input2,
-                      reduction=reduction,
-                      ignore_index=ignore_index)
-    if reduction == "none":
-        loss = loss.sum()
-    loss.backward()
-    cpu_result = input1.grad
+    cpu_result = nll_loss_backward(input1, input2)
 
-    ipu_result = ipu(input1, input2)
     # pylint: disable=no-member
-    helpers.assert_allclose(expected=ipu_result,
-                            actual=cpu_result,
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
                             equal_nan=True)
