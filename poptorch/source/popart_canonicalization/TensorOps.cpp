@@ -32,10 +32,15 @@ torch::jit::Node *numToTensorHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *flipHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
+  // aten::flip(Tensor self, int[] dims) -> Tensor
   auto *input = node->input(0);
+  auto input_shape = shapeFromTensor(input);
   auto dims = constantToLongVec(node->input(1)->node());
-  std::vector<torch::jit::Value *> args;
-  args.push_back(input);
+  for (auto &dim : dims) {
+    if (dim < 0) {
+      dim += input_shape.size();
+    }
+  }
   return createReverse(graph, {input}, dims);
 }
 

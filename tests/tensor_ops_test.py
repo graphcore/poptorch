@@ -768,7 +768,7 @@ def test_roll(shifts, dims):
     op_harness(op, x)
 
 
-@pytest.mark.parametrize("dims", [(0, 1)])
+@pytest.mark.parametrize("dims", [0, 1, -1])
 def test_flip(dims):
     torch.manual_seed(0)
     op = lambda x: x.flip(dims)
