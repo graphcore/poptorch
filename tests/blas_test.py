@@ -3,12 +3,11 @@
 
 import pytest
 import torch
-import torch.optim as optim
 import poptorch
 import helpers
 
 
-def blas_op(op, input1, input2, out, trace_model):
+def blas_op(op, input1, input2, out, trace_model, atol=1e-04, rtol=1e-04):
     class Model(torch.nn.Module):
         def __init__(self, op):
             super(Model, self).__init__()
@@ -32,14 +31,14 @@ def blas_op(op, input1, input2, out, trace_model):
 
     helpers.assert_allclose(expected=native_out,
                             actual=poptorch_out,
-                            atol=1e-05,
-                            rtol=1e-05,
+                            atol=atol,
+                            rtol=rtol,
                             equal_nan=True)
     if out is not None:
         helpers.assert_allclose(expected=native_out,
                                 actual=out,
-                                atol=1e-05,
-                                rtol=1e-05,
+                                atol=atol,
+                                rtol=rtol,
                                 equal_nan=True)
 
 
@@ -53,6 +52,39 @@ def test_matmul(optional_out, trace_model):
     out = torch.randn([10, 45]) if optional_out else None
 
     blas_op(torch.matmul, input1, input2, out, trace_model)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+@pytest.mark.parametrize("mode",
+                         (poptorch.MatMulSerializationMode.InputChannels,
+                          poptorch.MatMulSerializationMode.ReducingDim,
+                          poptorch.MatMulSerializationMode.OutputChannels,
+                          poptorch.MatMulSerializationMode.Disabled))
+@pytest.mark.parametrize("factor", (2, 5, 10))
+@pytest.mark.parametrize("keep_precision", [True, False])
+def test_serializedMatMul(trace_model, mode, factor, keep_precision):
+    torch.manual_seed(42)
+
+    input1 = torch.rand(1, 10, 200)
+    input2 = torch.rand(200, 45)
+
+    def serialise_matmal_op(input, other, out):
+        assert out is None
+        return poptorch.serializedMatMul(input, other, mode, factor,
+                                         keep_precision)
+
+    if keep_precision:
+        input1 = input1.half()
+        input2 = input2.half()
+        blas_op(serialise_matmal_op,
+                input1,
+                input2,
+                None,
+                trace_model,
+                rtol=0.01,
+                atol=0.05)
+    else:
+        blas_op(serialise_matmal_op, input1, input2, None, trace_model)
 
 
 @pytest.mark.parametrize("optional_out", [True, False])
@@ -86,7 +118,7 @@ def test_matmul_training(bias):
     model = Net()
     opts = poptorch.Options()
 
-    optimizer = optim.SGD(model.parameters(), lr=0.01)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     torch.manual_seed(42)
     poptorch_model = poptorch.trainingModel(model, opts, optimizer)
     x = torch.randn(N, M, K)

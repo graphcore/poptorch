@@ -84,7 +84,7 @@ torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
 
     for (const torch::jit::Use &use : node->output()->uses()) {
       if (use.user->kind() == symbols::poptorch::set_matmul_serialization) {
-        use.user->replaceInput(0, mul->output());
+        use.user->replaceInput(0, result->output());
       }
     }
   } else {
