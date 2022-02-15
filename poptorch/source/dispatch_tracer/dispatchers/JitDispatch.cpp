@@ -97,7 +97,7 @@ at::Tensor &JITDispatch::copyInplace(at::Tensor &self,
                                      const at::Tensor &other) {
   if (other.unsafeGetTensorImpl()->is_wrapped_number()) {
     torch::jit::Value *val = graph.insertConstant(other);
-    _mapper.addTensor(other, val);
+    _mapper.addTensor(other, val, true);
   }
 
   ValueMapper::TrackedTensor *dest = _mapper.rawTensorRecord(self);
@@ -124,7 +124,7 @@ at::Tensor JITDispatch::toCopyInplace(
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
   torch::jit::Node *n =
       graph.createUninitialized(c10::TensorType::create(tensor));
-  _mapper.addTensor(tensor, n->output(0));
+  _mapper.addTensor(tensor, n->output(0), true);
 }
 
 at::Tensor JITDispatch::convolution(

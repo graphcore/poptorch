@@ -37,3 +37,19 @@ def test_simple_conv():
                             atol=1e-05,
                             rtol=1e-05,
                             equal_nan=True)
+
+
+def test_tensor_constant():
+    def f(x):
+        return x + torch.tensor([1.0, 2.0, 3.0])
+
+    input = torch.rand(3)
+    with IPUScope([input]) as ipu:
+        y = f(input)
+        ipu.outputs([y])
+
+    cpu = f(input)
+    ipu = ipu(input)
+
+    # pylint: disable=no-member
+    helpers.assert_allequal(expected=cpu, actual=ipu)

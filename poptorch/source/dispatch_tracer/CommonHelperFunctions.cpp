@@ -39,11 +39,17 @@ torch::jit::Value *trackValue(c10::IValue &value, torch::jit::Graph &graph,
       if (tensor.unsafeGetTensorImpl()->is_wrapped_number()) {
         val = graph.insertConstant(value);
       } else {
-        // Otherwise add it as an uninitialized node. We probably shouldn't be
-        // reaching this path.
-        torch::jit::Node *n =
-            graph.createUninitialized(c10::TensorType::create(tensor));
-        val = n->output(0);
+        // This is probably an external tensor that we didn't catch. Assume
+        // it's a constant.
+        auto *constant = tensorToConstant(&graph, tensor.clone());
+        val = constant->output();
+      }
+    } else {
+      // If this is a constant tensor, add it to the graph now
+      auto is_const = *mapper.tensorIsConst(tensor);
+      if (is_const) {
+        auto *constant = tensorToConstant(&graph, tensor.clone());
+        val = constant->output();
       }
     }
 

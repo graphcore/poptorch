@@ -22,10 +22,10 @@ public:
   // Each tensor we are tracking has a short record containing a pointer to the
   // tensor and its corresponding values in the two IRs.
   struct TrackedTensor {
-    explicit TrackedTensor(const at::Tensor &tensor)
+    explicit TrackedTensor(const at::Tensor &tensor, bool _is_const)
         : tensor_impl(tensor.unsafeGetTensorImpl()),
           tracker(tensor.getIntrusivePtr()), jit(nullptr),
-          mlir(poptorch_ir::tensor_error_id) {}
+          mlir(poptorch_ir::tensor_error_id), is_const(_is_const) {}
 
     // The PyTorch tensor impl. Most of the time it is "the tensor" on the
     // PyTorch side. However the autograd can create non-view aliases so
@@ -48,6 +48,9 @@ public:
 
     // The value in our mlir backend.
     poptorch_ir::TensorId mlir;
+
+    // Is this tensor definitely constant?
+    bool is_const;
 
     // Autograd can create tensors which mirror the original tensor storage.
     bool isSame(const at::Tensor &other) {
@@ -77,9 +80,13 @@ public:
 
   poptorch_ir::TensorId getMLIRForJit(torch::jit::Value *val);
 
-  void addTensor(const at::Tensor &t, torch::jit::Value *val);
+  c10::optional<bool> tensorIsConst(const at::Tensor &t);
 
-  void addTensor(const at::Tensor &t, poptorch_ir::TensorId id);
+  void addTensor(const at::Tensor &t, torch::jit::Value *val,
+                 bool is_const = false);
+
+  void addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
+                 bool is_const = false);
 
   // Returns true if this is a direct alias and adds it to the approved alias
   // map.
