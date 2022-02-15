@@ -841,6 +841,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::log1p, log1pHandler);
   registerHandler(c10::aten::log2, log2Handler);
   registerHandler(c10::aten::log_sigmoid, logSigmoidHandler);
+  registerHandler(c10::aten::log_sigmoid_forward, logSigmoidHandler);
   registerHandler(c10::aten::logical_and, logicalAndHandler);
   registerHandler(c10::aten::logical_not, logicalNotHandler);
   registerHandler(c10::aten::logical_or, logicalOrHandler);
