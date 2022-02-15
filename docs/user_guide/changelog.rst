@@ -25,6 +25,7 @@ New features
 - Add support for ``__repr__`` in PoplarExecutor.
 - For models annotated with ``BeginBlock``, show the IPU blocks in ``repr(model)``.
 - Improve implementation of torch.scatter_add
+- Support for ``torch.nn.utils.weight_norm``
 
 API changes
 -----------

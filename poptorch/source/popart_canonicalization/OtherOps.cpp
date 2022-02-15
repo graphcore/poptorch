@@ -203,6 +203,57 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
   return add;
 }
 
+torch::jit::Node *weightNormHandler(torch::jit::Graph *graph,
+                                    torch::jit::Node *node) {
+  // aten::_weight_norm(Tensor v, Tensor g, int dim) -> Tensor
+  auto *v = node->input(0);
+  auto *g = node->input(1);
+  auto shape = shapeFromTensor(v);
+  auto dim = constantToLong(node->input(2)->node());
+  // Correct negative indices
+  // PyTorch handles dim -1 in a special way - it computes the
+  // norm over all dimensions. We handle that case separately
+  if (dim < -1) {
+    dim += shape.size();
+  }
+  std::vector<std::int64_t> axes(shape.size());
+  std::iota(axes.begin(), axes.end(), 0);
+
+  // If we have the special case dim -1: We don't erase any
+  // axes so that the norm is computed over all dimensions)
+  if (dim != -1) {
+    axes.erase(axes.begin() + dim);
+  }
+
+  std::vector<torch::jit::Value *> axes_constants;
+  axes_constants.reserve(axes.size());
+  for (auto d : axes) {
+    axes_constants.push_back(wrapInConstant1D(graph, d));
+  }
+  // tensorNormHandler expects ListConstruct for axes_constants
+  torch::jit::Value *axes_list =
+      createAndInsertNode(graph, c10::prim::ListConstruct, axes_constants)
+          ->output();
+  // Order 2 norm
+  auto *p = wrapInConstant1D(graph, 2);
+  // Keep the normalised dims to enable broadcasting
+  auto *keepdim = wrapInConstant1D(graph, 1);
+
+  // tensorNormHandler
+  auto norm_handler = getHandler(c10::aten::norm);
+  // PyTorch defines the weight calculation as
+  //   w = g * v / norm(v)
+  // This can be rewritten as
+  //   w = v * g / norm(v)
+  // Which is slightly more efficient, since it doesn't require
+  // expanding g to be broadcastable with v
+  auto *norm_v =
+      createHandlerOperation(graph, norm_handler, {v, p, axes_list, keepdim});
+  auto *scaled_v = createDiv(graph, {g, norm_v->output()});
+
+  return createMul(graph, {v, scaled_v->output()});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -211,6 +262,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::cartesian_prod, cartesianProdHandler);
   registerHandler(c10::aten::tensordot, tensordotHandler);
   registerHandler(c10::aten::scatter_add, scatterAddHandler);
+  registerHandler(c10::aten::_weight_norm, weightNormHandler);
 }
 
 } // namespace poptorch

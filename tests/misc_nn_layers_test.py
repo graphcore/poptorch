@@ -487,3 +487,73 @@ def test_fold_with_padding(stride_x, stride_y):
 
     op = torch.nn.Fold(**unfold_args)
     op_harness(op, [unfolded])
+
+
+@pytest.mark.parametrize("trace_model, dim", [
+    (True, 0),
+    (False, 1),
+    (True, None),
+])
+def test_weight_norm(trace_model, dim):
+    torch.manual_seed(42)
+
+    x = torch.randn(10)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            lin = torch.nn.Linear(10, 5)
+            # Wrap the linear layer with a weight_norm - This should
+            # decompose "weight" into "weight_v" and "weight_g"
+            self.lin = torch.nn.utils.weight_norm(lin, "weight", dim)
+
+        def forward(self, x):
+            x = self.lin(x)
+            return x, poptorch.identity_loss(x**2, reduction="sum")
+
+    model = Model()
+    weight_v_before = model.lin.weight_v.detach().clone()
+    weight_g_before = model.lin.weight_g.detach().clone()
+
+    native_out, _ = model(x)
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options)
+
+    poptorch_out, _ = poptorch_model(x)
+
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    tensor_names = poptorch_model.getTensorNames()
+    decomposed_tensors = ["weight_v", "weight_g"]
+
+    # Check that both decomposed tensors exist in the graph
+    assert all(f"model.lin.{t}" in tensor_names for t in decomposed_tensors)
+    # Check that they also exist in the backward graph
+    assert all(f"UpdatedVar___model.lin.{t}" in tensor_names
+               for t in decomposed_tensors)
+
+    # Ensure that the original weight tensor does NOT exist -
+    # autograd should be performed with respect to the decomposed tensors
+    # only
+    assert not "model.lin.weight" in tensor_names
+    assert not "UpdatedVar___model.lin.weight" in tensor_names
+
+    n = 3
+    # Run a few more times to ensure that the decomposed weights are being
+    # updated each time
+    for i in range(n):
+        weight_v_after = poptorch_model.lin.weight_v.detach().clone()
+        weight_g_after = poptorch_model.lin.weight_g.detach().clone()
+
+        # Ensure the decomposed weights changed since the previous iteration
+        assert not torch.allclose(weight_v_before, weight_v_after)
+        assert not torch.allclose(weight_g_before, weight_g_after)
+
+        # Prepare for the next iteration
+        if i != n - 1:
+            weight_v_before = weight_v_after
+            weight_g_before = weight_g_after
+
+            poptorch_model(x)

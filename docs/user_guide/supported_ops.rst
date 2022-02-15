@@ -298,6 +298,8 @@ Currently only ``affine=True`` is supported as a parameter. That is to say, only
 * ``torch.nn.InstanceNorm2d``
 * ``torch.nn.InstanceNorm3d``
 
+* ``torch.nn.utils.weight_norm``
+
 Recurrent layers
 ----------------
 
