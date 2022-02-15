@@ -2,6 +2,7 @@
 #include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -25,7 +26,7 @@ torch::jit::Node *numToTensorHandler(torch::jit::Graph *graph,
   ERROR_ON(node->input(0)->node()->kind() !=
            symbols::poptorch::tensor_constant);
   UNUSED(graph);
-  node->output()->replaceAllUsesWith(node->input(0));
+  replaceAllUsesWith(node->output(), node->input(0));
   markNodeForDeletion(node);
   return nullptr;
 }
@@ -200,7 +201,7 @@ torch::jit::Node *copyHandler(torch::jit::Graph *graph,
     // Replace uses of slice input after inplace op with result of
     // the dynamic update (i.e. the modified tensor)
     out = dynamic_update->output();
-    slice_input->replaceAllUsesAfterNodeWith(node, out);
+    replaceAllUsesAfterNodeWith(node, slice_input, out);
 
     if (src_type == dest_type) {
       return dynamic_update;

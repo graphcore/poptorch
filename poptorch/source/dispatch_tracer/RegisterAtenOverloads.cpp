@@ -4,8 +4,10 @@
 #include <string>
 #include <unordered_map>
 
+#include "../popart_canonicalization/PopartCanonicalizationUtils.hpp"
 #include "CommonHelperFunctions.hpp"
 #include "poptorch/DispatchTracer.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -89,6 +91,14 @@ void endDispatch() {
   context.raii_dispatch_context.reset();
 }
 
+// Returns true if the dispatcher is active.
+bool isDispatcherActive() {
+  // We can't use context.dispatch_on here, because isDispatcherActive() gets
+  // used by the handlers, and we disable the dispatcher using
+  // DisableDispatchScope when calling handlers.
+  return static_cast<bool>(context.active_dispatch);
+}
+
 // Take the inputs to the graph and turn them into our IR graph
 // inputs/parameters.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
@@ -161,6 +171,17 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 
   // torch::jit does not copy attributes on the return node, so copy them here
   copied_graph->return_node()->copyAttributes(*jit->graph.return_node());
+
+  // Build a list of nodes marked for deletion.
+  std::unordered_set<torch::jit::Node *> to_delete;
+  for (torch::jit::Node *node : copied_graph->nodes()) {
+    if (isMarkedForDeletion(node)) {
+      to_delete.insert(node);
+    }
+  }
+
+  // Remove the dead nodes.
+  searchAndPossiblyDestroy(to_delete);
 
   return copied_graph;
 }

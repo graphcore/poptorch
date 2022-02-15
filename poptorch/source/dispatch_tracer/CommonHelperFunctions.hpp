@@ -40,6 +40,11 @@ getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema);
 
 // Return a string containing the tensor sizes and type.
 std::string toString(const at::Tensor &t);
+
+// If this value was replaced with another by the most recently run handler,
+// return the replacement. If not, return nullptr.
+torch::jit::Value *wasReplaced(torch::jit::Value *target);
+
 } // namespace poptorch
 
 #endif // POPTORCH_DISPATCH_COMMON_HELPERS_HPP_

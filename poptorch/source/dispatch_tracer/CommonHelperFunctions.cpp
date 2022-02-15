@@ -3,9 +3,11 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <map>
 #include <unordered_set>
 
 #include "../popart_canonicalization/PopartCanonicalizationUtils.hpp"
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
@@ -107,10 +109,13 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
   return aten_target;
 }
 
+static std::map<torch::jit::Value *, torch::jit::Value *> replacements;
+
 torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
                                torch::jit::Node *aten_target,
                                torch::jit::Graph &graph,
                                bool is_allowed_to_fail) {
+  replacements.clear();
   // Run the normal canonicalisation process on the aten target.
   torch::jit::Symbol symbol = torch::jit::Symbol::fromQualString(schema.name());
 
@@ -140,6 +145,31 @@ torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
     new_node = aten_target;
   }
   return new_node;
+}
+
+void replaceAllUsesWith(torch::jit::Value *target,
+                        torch::jit::Value *replacement) {
+  if (isDispatcherActive()) {
+    replacements[target] = replacement;
+  }
+  target->replaceAllUsesWith(replacement);
+}
+
+void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
+                                 torch::jit::Value *target,
+                                 torch::jit::Value *replacement) {
+  if (isDispatcherActive()) {
+    replacements[target] = replacement;
+  }
+  target->replaceAllUsesAfterNodeWith(node, replacement);
+}
+
+torch::jit::Value *wasReplaced(torch::jit::Value *target) {
+  auto it = replacements.find(target);
+  if (it == std::end(replacements)) {
+    return nullptr;
+  }
+  return it->second;
 }
 
 // From the given torch schema return the correct mlir values.

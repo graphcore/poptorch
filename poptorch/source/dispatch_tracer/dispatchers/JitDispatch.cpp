@@ -208,6 +208,11 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       at::Tensor tensor = value.toTensor();
 
       torch::jit::Value *val = new_node->output(output_index);
+      // Check whether the handler replaced this value.
+      auto *replacement = wasReplaced(val);
+      if (replacement != nullptr) {
+        val = replacement;
+      }
       val->inferTypeFrom(tensor);
       _mapper.addTensor(tensor, val);
 

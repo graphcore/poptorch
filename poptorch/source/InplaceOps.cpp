@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/InplaceOpsPyTorch.hpp_nolint"
 
@@ -218,8 +219,8 @@ torch::jit::Node *InplaceOpHandler::outplaceOp(torch::jit::Node *node) {
   torch::jit::addAdditionalInputsIfRequired(_graph, node, new_node);
 
   new_node->output()->setType(node->output()->type());
-  node->output()->replaceAllUsesWith(new_node->output());
-  node->input(0)->replaceAllUsesAfterNodeWith(node, node->output());
+  replaceAllUsesWith(node->output(), new_node->output());
+  replaceAllUsesAfterNodeWith(node, node->input(0), node->output());
 
   return new_node;
 }

@@ -11,6 +11,7 @@
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -135,7 +136,7 @@ void resolveCastConstants(torch::jit::Graph *graph, torch::jit::Node *node) {
     // Replace node to avoid a cast
     torch::jit::WithInsertPoint insert_point(node);
     auto *replacement_node = tensorToConstant(graph, tensor);
-    cast_node->output()->replaceAllUsesWith(replacement_node->output());
+    replaceAllUsesWith(cast_node->output(), replacement_node->output());
 
     markNodeForDeletion(cast_node);
     markNodeForDeletion(constant_to_be_cast);

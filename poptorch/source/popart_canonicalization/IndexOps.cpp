@@ -6,6 +6,7 @@
 #include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -200,7 +201,7 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
     while (slice_input->node()->kind() == symbols::popart::slice) {
       slice_input = slice_input->node()->input(0);
     }
-    slice_input->replaceAllUsesAfterNodeWith(node, out->output());
+    replaceAllUsesAfterNodeWith(node, slice_input, out->output());
   }
 
   return out;

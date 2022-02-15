@@ -79,6 +79,20 @@ void startDispatch();
 // Stop capturing calls.
 void endDispatch();
 
+// Return true if the dispatcher is active
+bool isDispatcherActive();
+
+// Replace all uses of target with replacement. Keeps track of the replacement
+// so it can be correctly handled if the dispatcher is active.
+void replaceAllUsesWith(torch::jit::Value *target,
+                        torch::jit::Value *replacement);
+
+// Replace all uses of target after node with replacement. Keeps track of the
+// replacement so it can be correctly handled if the dispatcher is active.
+void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
+                                 torch::jit::Value *target,
+                                 torch::jit::Value *replacement);
+
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_

@@ -3,6 +3,7 @@
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "../PoptorchSymbols.hpp"
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -606,9 +607,9 @@ torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
   decoder->addOutput();
   decoder->addOutput();
 
-  unpack->output(0)->replaceAllUsesWith(decoder->output(0));
-  unpack->output(1)->replaceAllUsesWith(decoder->output(1));
-  unpack->output(2)->replaceAllUsesWith(decoder->output(2));
+  replaceAllUsesWith(unpack->output(0), decoder->output(0));
+  replaceAllUsesWith(unpack->output(1), decoder->output(1));
+  replaceAllUsesWith(unpack->output(2), decoder->output(2));
 
   markNodeForDeletion(node);
   markNodeForDeletion(unpack);

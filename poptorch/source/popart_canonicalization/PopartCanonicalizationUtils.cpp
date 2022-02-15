@@ -7,6 +7,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -295,7 +296,7 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
         // This occurs because we have to trace with Float so we can switch
         // to Half here
         new_val->setType(old_type->withScalarType(at::ScalarType::Half));
-        old_val->replaceAllUsesWith(new_val);
+        replaceAllUsesWith(old_val, new_val);
         return;
       }
       if (old_type->scalarType() == at::ScalarType::Float &&
@@ -303,12 +304,12 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
         // At this stage, we do not know whether it is a float16 or float32
         new_val->setType(old_type->withScalarType(HALF_OR_FLOAT));
 
-        old_val->replaceAllUsesWith(new_val);
+        replaceAllUsesWith(old_val, new_val);
         return;
       }
 
       new_val->setType(new_type);
-      old_val->replaceAllUsesWith(new_val);
+      replaceAllUsesWith(old_val, new_val);
       return;
     }
   }
@@ -316,7 +317,7 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
   new_val->setType(old_val->type());
 
   // Replace the old value with the new one.
-  old_val->replaceAllUsesWith(new_val);
+  replaceAllUsesWith(old_val, new_val);
 }
 
 void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
