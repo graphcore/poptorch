@@ -387,7 +387,8 @@ def test_cat_chunk_slice_multiple_slices():
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2, -1, -2])
-def test_gather_3dim(dim):
+@pytest.mark.parametrize("larger_index", [True, False])
+def test_gather_3dim(dim, larger_index):
     torch.manual_seed(42)
     shape = (9, 11, 6)
     input = torch.randn(shape)
@@ -397,13 +398,18 @@ def test_gather_3dim(dim):
     op_harness(op, input, indices)
 
     small_shape = (7, 9, 5)
+    if larger_index:
+        larger_dims = list(small_shape)
+        larger_dims[dim] = shape[dim] + 1
+        small_shape = tuple(larger_dims)
     indices = torch.randint(0, 6, small_shape)
     op = lambda x, y: torch.gather(x, dim, y)
     op_harness(op, input, indices)
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
-def test_gather_4dim(dim):
+@pytest.mark.parametrize("larger_index", [True, False])
+def test_gather_4dim(dim, larger_index):
     torch.manual_seed(42)
     shape = (5, 8, 6, 7)
     input = torch.randn(shape)
@@ -413,13 +419,18 @@ def test_gather_4dim(dim):
     op_harness(op, input, indices)
 
     small_shape = (4, 5, 2, 6)
+    if larger_index:
+        larger_dims = list(small_shape)
+        larger_dims[dim] = shape[dim] + 1
+        small_shape = tuple(larger_dims)
     indices = torch.randint(0, 5, small_shape)
     op = lambda x, y: torch.gather(x, dim, y)
     op_harness(op, input, indices)
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
-def test_gather_5dim(dim):
+@pytest.mark.parametrize("larger_index", [True, False])
+def test_gather_5dim(dim, larger_index):
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)
@@ -429,6 +440,10 @@ def test_gather_5dim(dim):
     op_harness(op, input, indices)
 
     small_shape = (2, 2, 2, 2, 2)
+    if larger_index:
+        larger_dims = list(small_shape)
+        larger_dims[dim] = shape[dim] + 1
+        small_shape = tuple(larger_dims)
     indices = torch.randint(0, 3, small_shape)
     op = lambda x, y: torch.gather(x, dim, y)
     op_harness(op, input, indices)

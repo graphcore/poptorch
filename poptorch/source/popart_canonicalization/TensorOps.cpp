@@ -265,7 +265,9 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
   auto stride = input_shape[axis];
 
   for (unsigned s = 0; s < input_shape.size(); ++s) {
-    ERROR_ON(input_shape[s] < index_shape[s]);
+    if (s != axis) {
+      ERROR_ON(input_shape[s] < index_shape[s]);
+    }
   }
   // Move gather axis to the innermost dim
   std::vector<int64_t> permutation;
