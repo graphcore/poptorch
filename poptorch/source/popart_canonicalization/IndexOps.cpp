@@ -138,6 +138,46 @@ torch::jit::Node *indexHandler(torch::jit::Graph *graph,
                       0);
 }
 
+bool isMaskedFill(torch::jit::Graph *graph, torch::jit::Value *x,
+                  std::vector<torch::jit::Value *> &indices,
+                  torch::jit::Value *v) {
+  // Masked fill only takes one index tensor which is broadcastable
+  // with the input
+  if (indices.size() != 1) {
+    return false;
+  }
+
+  auto v_numel = *v->type()->expect<c10::TensorType>()->numel();
+  // Masked fill only takes a single fill value
+  if (v_numel != 1) {
+    return false;
+  }
+
+  auto index = indices[0]->type()->expect<c10::TensorType>();
+  ERROR_ON(!index->scalarType().has_value());
+  auto dtype = index->scalarType().value();
+
+  // Masks must be of type bool or byte
+  if (dtype != c10::ScalarType::Bool && dtype != c10::ScalarType::Byte) {
+    return false;
+  }
+
+  auto mask_shape = shapeFromTensor(indices[0]);
+  auto x_shape = shapeFromTensor(x);
+
+  // popart::where expects a bool tensor mask so cast if necessary
+  if (dtype == c10::ScalarType::Byte) {
+    indices[0] = createCast(graph, indices[0], c10::ScalarType::Bool)->output();
+  }
+
+  // Pad indices to enable broadcasting
+  if (mask_shape.size() < x_shape.size()) {
+    mask_shape.resize(x_shape.size(), 1);
+    indices[0] = createReshape(graph, indices[0], mask_shape)->output();
+  }
+  return true;
+}
+
 torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   // aten::index_put(Tensor self, Tensor?[] indices, Tensor value, bool
@@ -146,6 +186,10 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
   std::vector<torch::jit::Value *> indices =
       handleTensorList(node->input(1)->node());
   torch::jit::Value *v = node->input(2);
+
+  if (isMaskedFill(graph, x, indices, v)) {
+    return createWhere(graph, {indices[0], v, x});
+  }
 
   auto fn_gen_none = [graph]() {
     torch::jit::Value *none = graph->create(c10::prim::Constant)->output();

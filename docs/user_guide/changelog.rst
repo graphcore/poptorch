@@ -44,6 +44,7 @@ Bug Fixes
 - Fix tracing with half buffers
 - Fix for loops with in-place ops
 - Fix ``torch.flip`` with negative indices
+- Fix masked fill when using tensor indexing syntax
 
 v2.4 (Poplar SDK 2.4)
 =====================
