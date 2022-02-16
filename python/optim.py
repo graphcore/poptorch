@@ -413,7 +413,7 @@ class AdamW(Optimizer, torch.optim.AdamW):
     """ Adam optimizer with true weight decay.
 
     This optimizer matches PyTorch's implementation
-    (`torch.optim.AdamW <https://pytorch.org/docs/1.10.0/optim.htmltorch.optim.AdamW>`_)
+    (`torch.optim.AdamW <https://pytorch.org/docs/1.10.0/optim.html#torch.optim.AdamW>`_)
     with optional loss scaling.
 
     AMSGrad is currently not supported."""
