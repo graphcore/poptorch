@@ -106,6 +106,8 @@ at::Tensor &JITDispatch::copyInplace(at::Tensor &self,
   ERROR_ON(src == nullptr);
 
   dest->jit = src->jit;
+  dest->is_const = src->is_const;
+
   return self;
 }
 
