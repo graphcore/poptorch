@@ -761,11 +761,7 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
     }
 
     // Avoid promoting to an unsupported type
-    if (*cast_to == at::ScalarType::Double) {
-      cast_to = at::ScalarType::Float;
-    } else if (*cast_to == at::ScalarType::Long) {
-      cast_to = at::ScalarType::Int;
-    }
+    cast_to = coerceToSupportedType(*cast_to);
   }
 
   if (!cast_to.has_value() || cast_to == *tensor_type->scalarType()) {

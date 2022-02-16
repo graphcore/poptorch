@@ -17,15 +17,11 @@ void processInputTensor(torch::jit::Graph *graph, torch::jit::Value *input) {
   auto tensor_type = input->type()->expect<c10::TensorType>();
   auto current_type = tensor_type->scalarType().value();
 
-  at::ScalarType new_type;
+  at::ScalarType new_type = coerceToSupportedType(current_type);
 
-  if (current_type == at::ScalarType::Double) {
-    new_type = at::ScalarType::Float;
-  } else if (current_type == at::ScalarType::Long) {
-    new_type = at::ScalarType::Int;
-  } else if (current_type == at::ScalarType::BFloat16) {
+  if (current_type == at::ScalarType::BFloat16) {
     new_type = at::ScalarType::Half;
-  } else {
+  } else if (new_type == current_type) {
     // No need for a host side cast
     return;
   }

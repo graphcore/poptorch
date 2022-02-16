@@ -365,11 +365,12 @@ torch::jit::Node *fullCommon(torch::jit::Graph *graph, torch::jit::Value *v,
                              at::ScalarType type,
                              const std::vector<int64_t> &shape) {
   auto *vn = v->node();
+  auto stype = coerceToSupportedType(type);
   if (isTensorConstant(vn) && vn->output()->type()->cast<c10::TensorType>()) {
-    auto v_scalar = vn->t(c10::attr::value).item();
-    return tensorToConstant(graph, at::full(shape, v_scalar, type));
+    auto v_scalar = vn->t(c10::attr::value).to(stype).item();
+    return tensorToConstant(graph, at::full(shape, v_scalar, stype));
   }
-  auto *v_cast = createCast(graph, v, type)->output();
+  auto *v_cast = createCast(graph, v, stype)->output();
   auto *c_shape = intVectorToIrConstant(graph, shape);
   return createExpand(graph, {v_cast, c_shape});
 }

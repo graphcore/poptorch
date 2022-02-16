@@ -215,7 +215,15 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       if (replacement != nullptr) {
         val = replacement;
       }
-      val->inferTypeFrom(tensor);
+      auto st = tensor.scalar_type();
+      auto st_coerced = coerceToSupportedType(st);
+      if (st != st_coerced) {
+        logging::warn("[TRACING-2][JIT] Type coerced from {} to {}", st,
+                      st_coerced);
+        val->inferTypeFrom(tensor.to(st_coerced));
+      } else {
+        val->inferTypeFrom(tensor);
+      }
       _mapper.addTensor(tensor, val);
 
       logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
@@ -269,12 +277,17 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     // Convert any halves to floats
     for (size_t i = 0; i < stack->size(); i++) {
       auto &value = stack->at(i);
-      if (value.isTensor()) {
-        auto tt = value.type()->cast<at::TensorType>();
-        if (tt->scalarType() == at::ScalarType::Half) {
-          at::Tensor t = value.toTensor();
-          value = t.toType(at::ScalarType::Float);
-        }
+      if (!value.isTensor()) {
+        continue;
+      }
+      auto tensor = value.toTensor();
+      if (!tensor.defined()) {
+        continue;
+      }
+      auto tt = value.type()->cast<at::TensorType>();
+      if (tt->scalarType() == at::ScalarType::Half) {
+        at::Tensor t = value.toTensor();
+        value = t.toType(at::ScalarType::Float);
       }
     }
     // Call the CPU version to get the output shape

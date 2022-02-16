@@ -131,6 +131,18 @@ at::ScalarType onnxStrToScalarType(const char *type_str) {
   ERROR("No at::scalar_type for " << type_str);
 }
 
+at::ScalarType coerceToSupportedType(at::ScalarType type) {
+  switch (type) {
+  case at::ScalarType::Double:
+    return at::ScalarType::Float;
+  case at::ScalarType::Long:
+    return at::ScalarType::Int;
+  default:
+    break;
+  }
+  return type;
+}
+
 namespace {
 // Adds a null pointers for every unused tensor in an unused tuple
 void addNullPtrsForUnusedTuple(const c10::TupleType *tuple_type,

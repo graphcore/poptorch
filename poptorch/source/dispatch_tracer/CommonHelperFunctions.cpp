@@ -20,6 +20,19 @@ namespace poptorch {
 
 namespace {
 
+torch::jit::Value *makeConstant(torch::jit::Graph &graph, at::Tensor &tensor) {
+  at::Tensor ct;
+  auto st = tensor.scalar_type();
+  auto st_coerced = coerceToSupportedType(st);
+  if (st != st_coerced) {
+    ct = tensor.to(st_coerced);
+  } else {
+    ct = tensor.clone();
+  }
+  auto *constant = tensorToConstant(&graph, ct);
+  return constant->output();
+}
+
 torch::jit::Value *trackValue(c10::IValue &value, torch::jit::Graph &graph,
                               ValueMapper &mapper) {
   if (value.isTensor()) {
@@ -43,15 +56,13 @@ torch::jit::Value *trackValue(c10::IValue &value, torch::jit::Graph &graph,
       } else {
         // This is probably an external tensor that we didn't catch. Assume
         // it's a constant.
-        auto *constant = tensorToConstant(&graph, tensor.clone());
-        val = constant->output();
+        val = makeConstant(graph, tensor);
       }
     } else {
       // If this is a constant tensor, add it to the graph now
       auto is_const = *mapper.tensorIsConst(tensor);
       if (is_const) {
-        auto *constant = tensorToConstant(&graph, tensor.clone());
-        val = constant->output();
+        val = makeConstant(graph, tensor);
       }
     }
 
