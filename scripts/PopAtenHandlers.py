@@ -107,6 +107,7 @@ forward("replication_pad3d", "replication_pad1d")
 # ternary operators
 convert("masked_fill", 3, "where", [1, 2, 0])
 convert("where", 3)
+forward("_s_where", "where")
 
 expand("constant_pad_nd", lambda x, l, c: op.constantPad(
     x, clong_list(l), cfloat(c)))

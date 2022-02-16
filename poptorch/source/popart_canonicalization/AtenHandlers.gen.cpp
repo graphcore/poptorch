@@ -888,6 +888,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::topk, topkHandler);
   registerHandler(c10::aten::uniform_, uniformHandler);
   registerHandler(c10::aten::where, whereHandler);
+  registerHandler(c10::aten::_s_where, whereHandler);
 }
 
 } // namespace poptorch
