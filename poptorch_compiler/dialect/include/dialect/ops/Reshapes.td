@@ -138,3 +138,28 @@ def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
      }]>
     ];
 }
+
+
+// squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
+def Poptorch_squeeze_dim: Poptorch_Op<"squeeze_dim", [ViewOp]> {
+    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
+        $_state.addOperands({value});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+        mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
+        mlir::Type e1 = t1.getElementType();
+        auto shape = t1.getShape();
+        if (dim < 0) {
+            dim += shape.size();
+        }
+        std::vector<int64_t> new_shape = shape;
+        if (shape[dim] == 1) {
+            new_shape.erase(new_shape.begin() + dim);
+        }
+        $_state.addTypes(mlir::RankedTensorType::get(new_shape, e1));
+     }]>
+    ];
+}

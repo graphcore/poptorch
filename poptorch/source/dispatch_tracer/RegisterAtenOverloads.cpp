@@ -387,22 +387,27 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
   // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handler.
+  // which is harder to handle.
   m.impl("slice.Tensor",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
   // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handler.
+  // which is harder to handle.
+  m.impl("squeeze.dim",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  // If we don't intercept this op, it will be decomposed to as_strided
+  // which is harder to handle.
   m.impl("unsqueeze",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
   // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handler.
+  // which is harder to handle.
   m.impl("permute",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
   // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handler.
+  // which is harder to handle.
   m.impl("select.int",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 

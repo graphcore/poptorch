@@ -136,6 +136,9 @@
 - func: _cat
   PopTorchDirect: concat
 
+# squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
+- func: squeeze.dim
+  PopTorchDirect: squeeze_dim
 ################
 # Element wise
 ################
