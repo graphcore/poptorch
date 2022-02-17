@@ -416,6 +416,9 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   // overwrite and run reshape here.
   m.impl("reshape",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("constant_pad_nd",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 }
 
 /*
