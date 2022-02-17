@@ -103,8 +103,8 @@ void JITDispatch::markOutputs(
   logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", graph);
 }
 
-at::Tensor &JITDispatch::copyInplace(at::Tensor &self,
-                                     const at::Tensor &other) {
+const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
+                                           const at::Tensor &other) {
   if (other.unsafeGetTensorImpl()->is_wrapped_number()) {
     torch::jit::Value *val = graph.insertConstant(other);
     _mapper.addTensor(other, val, true);

@@ -1,5 +1,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+import sys
+
 # PyTorch Schema types to C++ convertor.
 schemaToCpp = {
     "int[]": "toIntVector",
@@ -8,6 +10,10 @@ schemaToCpp = {
     "int[3]": "toIntVector",
     "int": "toInt",
     "int?": "toOptionalInt",
+    "bool[]": "toBoolVector",
+    "bool[1]": "toBoolVector",
+    "bool[2]": "toBoolVector",
+    "bool[3]": "toBoolVector",
     "bool": "toBool",
     "float": "toDouble",
     # We treat all scalars as double for now.
@@ -26,8 +32,13 @@ def canonicalise_tensor(tensor):
     # If a tensor is not inplace or a view there is nothing to refer to in the context of arguments and returns.
     # See the usage of these rules in native_functions.yml and in https://github.com/pytorch/pytorch/tree/master/aten/src/ATen/native for a full expansion of the precise rules (of which the above is an approximation).
 
+    if not tensor.startswith("Tensor"):
+        raise ValueError(f"Type f{tensor} not implemented.")
+
     # We have a normal non-aliasing tensor.
     if '(' not in tensor:
+        if tensor != "Tensor":
+            raise ValueError(f"Type f{tensor} not implemented.")
         return ['', False, False]
 
     is_inplace = '!' in tensor
@@ -37,6 +48,7 @@ def canonicalise_tensor(tensor):
 
     # The id of the tensor. This is the identifier given to map an input onto an output.
     tensor_id = tensor[len('Tensor('):-1]
+    assert tensor[-1] == ")"
 
     # Remove the `!` if this is inplace.
     if is_inplace:
@@ -47,58 +59,52 @@ def canonicalise_tensor(tensor):
 
 
 def add_outplace_op(function, parameters, outputs, named_tensors, scope=""):
-    # If it is mutliple outputs
-    is_multiple_outputs = len(outputs) > 1
-
-    # Return either a vector or single tensor.
-    if is_multiple_outputs:
-        return_type = "\tstd::vector<poptorch_ir::TensorId> mlir_output ="
-    else:
-        return_type = "\tpoptorch_ir::TensorId mlir_output ="
+    return_type = "poptorch_ir::ODSTensorResults mlir_output =\n" + scope
+    return_type += "\t  "
 
     # Generate the call to the compiler function.
     function_decl = "{}\t{} _compiler.".format(scope, return_type)
-    function_decl += function + "(" + parameters + ");\n"
+    function_decl += function + "(" + parameters + ");\n\n"
 
     # Clear the stack and add the outputs.
     function_decl += scope + "\t// Pop pytorch inputs from stack\n"
-    function_decl += scope + "\tstack.clear();\n"
+    function_decl += scope + "\tstack.clear();\n\n"
 
     # Add each of the outputs
     function_decl += scope + "\t// Push the new outputs onto the stack\n"
-
-    index = 0
+    function_decl += scope + "\tstd::vector<poptorch_ir::OptionalTensorId> "
+    function_decl += "t_ids;\n"
+    function_decl += scope + "\tpoptorch_ir::TensorId t_id;\n"
 
     # Handle each of the outputs.
-    for output in outputs:
+    for index, output in enumerate(outputs):
         # Capture all metadata related to each of the output tensors.
         output_info = canonicalise_tensor(output)
         tensor_id = output_info[0]
         is_inplace = output_info[1]
         is_view = output_info[2]
 
-        # We either are expecting one tensor or a vector of tensors.
-        if not is_multiple_outputs:
-            output_id = "mlir_output"
-        else:
-            output_id = "mlir_output[" + str(index) + "]"
-            index += 1
+        # We will get a list of tensor IDs, which could be zero for optional
+        # one ore more. For now, we will not support variadic.
+        function_decl += scope
+        function_decl += "\tt_ids = mlir_output.at(" + str(index) + ");\n"
+
+        function_decl += scope + "\tt_id = getSingleOptionalTensorId(t_ids);\n"
 
         # For each output tensor return it to pytorch in a different way depending on what the schema tells us.
         if is_inplace:
             # Inplace operations should be inplaced versions of a certain input.
-            function_decl += "\tstack.push_back(outputIsInplaceOf("
-            function_decl += output_id + ", " + named_tensors[tensor_id]
-            function_decl += "_pytorch));\n"
+            function_decl += "\tstack.push_back(outputIsInplaceOf(t_id, "
+            function_decl += named_tensors[tensor_id] + "_pytorch));\n"
         elif is_view:
             # Views should be a view of a given input.
-            function_decl += "\tstack.push_back(outputIsViewOf(" + output_id
-            function_decl += ", " + named_tensors[tensor_id]
+            function_decl += "\tstack.push_back(outputIsViewOf(t_id, "
+            function_decl += named_tensors[tensor_id]
             function_decl += "_pytorch, requires_grad));\n"
         else:
             # Otherwise we are returning a new tensor.
-            function_decl += "\tstack.push_back(makeEmptyOutputTensor("
-            function_decl += output_id + ", requires_grad));\n"
+            function_decl += "\tstack.push_back(makeEmptyOutputTensor(t_id, "
+            function_decl += "requires_grad));\n"
 
     return function_decl
 
@@ -203,7 +209,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
 
             # Create the list converted into poptorch compiler tensors.
             function_decl += "\t[[maybe_unused]] std::vector<"
-            function_decl += "poptorch_ir::TensorId> " + arg[0] + ";\n"
+            function_decl += "poptorch_ir::OptionalTensorId> " + arg[0] + ";\n"
 
             # Placeholder value to store each IValue in the list
             loop_placeholder = arg[0] + "_pytorch"
@@ -251,6 +257,12 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
             if len(arg) > 2 and arg[3]:
                 inplace_ins.append(arg[0])
         else:
+            if arg_type not in schemaToCpp:
+                print(f"There is no c++ schema for {arg_type} in {__file__}.")
+                print("You need to add one to schemaToCpp for compilation " +
+                      "to succeed.")
+                sys.exit(1)
+
             function_decl += "\tauto " + arg[0] + " = " + schemaToCpp[
                 arg_type] + "(" + stack_at_index + ");\n"
 

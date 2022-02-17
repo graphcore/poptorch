@@ -45,7 +45,8 @@ public:
                 c10::optional<bool> pin = c10::nullopt,
                 c10::optional<c10::MemoryFormat> fmt = c10::nullopt) final;
 
-  at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src) final;
+  const at::Tensor &copyInplace(const at::Tensor &self,
+                                const at::Tensor &src) final;
 
   at::Tensor convolution(const at::Tensor &input, const at::Tensor &weight,
                          const c10::optional<at::Tensor> &bias,
@@ -61,17 +62,17 @@ public:
   std::vector<poptorch_ir::TensorId> mlirFromStack(c10::Stack &stack);
 
   // Return a new tensor which shares some storage information with `tensor`.
-  at::Tensor outputIsViewOf(poptorch_ir::TensorId output_id,
+  at::Tensor outputIsViewOf(poptorch_ir::OptionalTensorId output_id,
                             const at::Tensor &original_input,
                             bool requires_grad);
 
   // Some times pytorch specifies the output of an operation as an argument
   // without that operation being inplace, i.e matmul. In these cases we copy
   // and let the compiler eliminate it.
-  at::Tensor outputIsInplaceOf(poptorch_ir::TensorId output_id,
+  at::Tensor outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
                                const at::Tensor &original_input);
 
-  at::Tensor makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
+  at::Tensor makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
                                    bool requires_grad);
 
   // If an MLIR implementation is unavailable we will create the MLIR by first
@@ -83,6 +84,13 @@ public:
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
 #include "AtenToMlirInterface.hpp.inc"
+
+protected:
+  // Returns the only tensor ID in the vector, if it exists, or
+  // poptorch::OptionalTensorId others. Errors if the vector is longer than
+  // length one.
+  static poptorch_ir::TensorId getSingleOptionalTensorId(
+      const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec);
 
 private:
 // We don't build this on Centos TODO(T49566)

@@ -38,7 +38,8 @@ public:
            c10::optional<bool> pin = c10::nullopt,
            c10::optional<c10::MemoryFormat> fmt = c10::nullopt);
 
-  at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &other);
+  const at::Tensor &copyInplace(const at::Tensor &self,
+                                const at::Tensor &other);
 
   at::Tensor
   convolution(const at::Tensor &input, const at::Tensor &weight,

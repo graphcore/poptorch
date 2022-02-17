@@ -1,5 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "CompilerImpl.hpp"
+#include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 
 /*
@@ -25,7 +26,7 @@ convert(const std::vector<poptorch_ir::TensorId> &inputs,
 
 mlir::Value convert(poptorch_ir::TensorId input,
                     std::vector<mlir::Value> &values) {
-  if (input == poptorch_ir::tensor_error_id) {
+  if (input == poptorch_ir::tensor_error_id || input == poptorch_ir::none_id) {
     return {};
   }
 

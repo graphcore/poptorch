@@ -39,7 +39,10 @@ public:
                 c10::optional<bool> pin = c10::nullopt,
                 c10::optional<c10::MemoryFormat> fmt = c10::nullopt) = 0;
 
-  virtual at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src) = 0;
+  // Sets up a an inplace copy in the graph from src to self. Returns self
+  // unaltered as a convenience.
+  virtual const at::Tensor &copyInplace(const at::Tensor &self,
+                                        const at::Tensor &src) = 0;
 
   virtual at::Tensor
   convolution(const at::Tensor &input, const at::Tensor &weight,

@@ -161,7 +161,7 @@ void MLIRDispatch::markOutputs(
         static_cast<void *>(tensor.unsafeGetTensorImpl()),
         static_cast<void *>(tensor.storage().unsafeGetStorageImpl()));
 
-    if (id != poptorch_ir::tensor_error_id) {
+    if (id != poptorch_ir::tensor_error_id && id != poptorch_ir::none_id) {
       _compiler.addOutput(id, storage, str.c_str());
     }
   }
@@ -187,7 +187,8 @@ MLIRDispatch::mlirFromStack(c10::Stack &stack) {
   return ids;
 }
 
-at::Tensor &MLIRDispatch::copyInplace(at::Tensor &self, const at::Tensor &src) {
+const at::Tensor &MLIRDispatch::copyInplace(const at::Tensor &self,
+                                            const at::Tensor &src) {
   // We have to look the tensors up first as they might be a special case.
   _compiler.copy_(findTensor(self), findTensor(src));
 
@@ -259,22 +260,34 @@ at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
   at::Tensor out =
       at::native::empty_cpu(self.sizes(), dtype, layout, device, pin, fmt);
 
+  // Zero tensor as it's possible that the tensor is accessable by the user
+  // after tracing.
+  at::zero_(out);
+
   // Make an empty IR node.
+  // (empty_tensor returns an ODSTensorResults instance, which is a vector of a
+  // vector of a tensor)
   poptorch_ir::TensorId out_id =
-      _compiler.empty_tensor(self.sizes().vec(), toCompilerType(*dtype));
+      _compiler.empty_tensor(self.sizes().vec(), toCompilerType(*dtype))
+          .at(0)
+          .at(0);
 
   // Track it in our mapper.
   _mapper.addTensor(out, out_id);
 
-  // Create a normal copy.
+  // Create a normal copy in the graph (this does not alter the at::tensor)
   return copyInplace(out, self);
 }
 
 void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
   // Don't bother intercepting on JIT as we automatically promote unknown nodes
   // to empty tensors.
+  // (empty_tensor returns an ODSTensorResults instance, which is a vector of a
+  // vector of the tensor)
   poptorch_ir::TensorId id =
-      _compiler.empty_tensor(tensor.sizes().vec(), toCompilerType(tensor));
+      _compiler.empty_tensor(tensor.sizes().vec(), toCompilerType(tensor))
+          .at(0)
+          .at(0);
   _mapper.addTensor(tensor, id);
 }
 
@@ -315,7 +328,7 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
         // Legality of the JIT doesn't hugely matter, especially for inputs.
         // Each node will at most only look at the output of a previous node,
         // not the input. So we don't think too much here and just skip nodes
-        // which we aren't trakcing.
+        // which we aren't tracking.
         torch::jit::Value *val = _mapper.getValueForTensor(t);
         if (val == nullptr) {
           continue;
@@ -328,8 +341,12 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
     /*
      * The core MLIR part.
      */
-    // Call the handler which empties the stack, calls the MLIR, and repopulates
-    // the stack.
+    // Call the handler which empties the stack, calls the MLIR implementation
+    // (i.e. builders defined in tablegen), and repopulates the stack.
+
+    // The handler will be found in the compiler dispatch table.
+    // See CompilerDispatchTable.cpp generaed generated AtenToMlirDispatch.inc,
+    // AtenToMlirInterface.hpp.inc and AtenToMlirInterface.hpp.inc
     mlir_handle->second(*stack);
 
     /*
@@ -338,6 +355,7 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
      */
     // The stack contains all the outputs.
     const std::size_t num_outputs = stack->size();
+    logging::trace("[TRACING-2] Num outputs: {}", num_outputs);
 
     // Add a JIT node to keep the jit graph clean.
     torch::jit::Node *node = _graph.create(symbol, inputs, stack->size());
@@ -346,6 +364,13 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
     // Map the JIT nodes onto the correct outputs.
     for (std::size_t index = 0; index < num_outputs; ++index) {
       at::Tensor tensor = stack->at(index).toTensor();
+
+      if (!tensor.defined()) {
+        logging::trace("[TRACING-2] Output: skipping undefined tensor,{}",
+                       reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()));
+        continue;
+      }
+
       node->output(index)->inferTypeFrom(tensor);
       _mapper.addTensor(tensor, node->output(index));
       logging::trace("[TRACING-2] Output: Tensor ptr {}, jit ir %{} {}",
@@ -457,7 +482,7 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
       poptorch_ir::TensorId ssa = _mapper.getMLIRForJit(val);
 
       // Otherwise check if it is an intermediate produced by this expression.
-      if (ssa == poptorch_ir::tensor_error_id) {
+      if (ssa == poptorch_ir::tensor_error_id || ssa == poptorch_ir::none_id) {
         // Error if we can't find it here.
         auto ssa_itr = just_added_nodes.find(val);
         ERROR_ON_MSG(ssa_itr == just_added_nodes.end(),
@@ -490,7 +515,7 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
         axes[i] = i;
       }
 
-      output_id = _compiler.reducemean(mlir_ids[0], axes, false);
+      output_id = _compiler.reducemean(mlir_ids[0], axes, false).at(0).at(0);
     } else {
       const c10::FunctionSchema &notfound_schema = itr->schema();
       ERROR("Could not find any handler for node." + notfound_schema.name());
@@ -603,7 +628,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
                          wrapped_value);
           tmp[i] = wrapped_value;
         }
-        val = _compiler.tensorconstant_float(tmp);
+        val = _compiler.tensorconstant_float(tmp).at(0).at(0);
         break;
       }
       case c10::ScalarType::Long: {
@@ -622,7 +647,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
                      "outside the representable range.");
           tmp[i] = wrapped_value;
         }
-        val = _compiler.tensorconstant_int(tmp);
+        val = _compiler.tensorconstant_int(tmp).at(0).at(0);
         break;
       }
       default:
@@ -656,6 +681,9 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
 
 at::Tensor MLIRDispatch::outputIsInplaceOf(poptorch_ir::TensorId output_id,
                                            const at::Tensor &original_input) {
+  ERROR_ON(output_id == poptorch_ir::none_id ||
+           output_id == poptorch_ir::tensor_error_id);
+
   poptorch_ir::TensorId actual_output = findTensor(original_input);
   _compiler.copy_(actual_output, output_id);
   return original_input;
@@ -663,11 +691,18 @@ at::Tensor MLIRDispatch::outputIsInplaceOf(poptorch_ir::TensorId output_id,
 
 at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
                                                bool requires_grad) {
+  // If it's a none or error, return an undefined tensor. Some functions may
+  // return undefined tensor for certain inputs.
+  if (output_id == poptorch_ir::none_id ||
+      output_id == poptorch_ir::tensor_error_id) {
+    return at::Tensor();
+  }
+
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
   poptorch_ir::Type compiler_type = _compiler.getType(output_id);
   auto dtype = compilerTypeToScalarType(compiler_type);
   // Create new tensor
-  at::Tensor new_output = at::native::empty_cpu(shape, dtype);
+  at::Tensor new_output = at::native::zeros(shape, dtype);
   new_output.set_requires_grad(requires_grad);
   _mapper.addTensor(new_output, output_id);
 
@@ -679,11 +714,14 @@ at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
 at::Tensor MLIRDispatch::outputIsViewOf(poptorch_ir::TensorId output_id,
                                         const at::Tensor &original_input,
                                         bool requires_grad) {
+  ERROR_ON(output_id == poptorch_ir::none_id ||
+           output_id == poptorch_ir::tensor_error_id);
+
   std::vector<std::int64_t> shape = _compiler.getSize(output_id);
 
   // Create new tensor
   at::Tensor new_output =
-      at::native::empty_cpu(shape, original_input.scalar_type());
+      at::native::zeros(shape, original_input.scalar_type());
 
   const std::int64_t old_numel = new_output.numel();
 
@@ -705,6 +743,17 @@ at::Tensor MLIRDispatch::outputIsViewOf(poptorch_ir::TensorId output_id,
   _mapper.addTensor(new_output, output_id);
 
   return new_output;
+}
+
+poptorch_ir::OptionalTensorId MLIRDispatch::getSingleOptionalTensorId(
+    const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec) {
+  ERROR_ON(tensor_vec.size() > 1);
+
+  if (tensor_vec.empty()) {
+    return poptorch_ir::none_id;
+  }
+
+  return tensor_vec[0];
 }
 
 // A small collection of helpers to help convert PyTorch ATEN into MLIR.
@@ -731,6 +780,19 @@ inline std::vector<std::int64_t> toIntVector(c10::IValue &value) {
   return value.toIntVector();
 }
 inline std::int64_t toInt(c10::IValue &value) { return value.toInt(); }
+
+// Use an int vector to avoid the unusual std::vector<bool>: there is also no
+// "toBoolVector method."
+// (PyTorch uses std::array<bool, N> in at least one place for this.)
+inline std::vector<int64_t> toBoolVector(c10::IValue &value) {
+  auto bool_list = value.toBoolList();
+
+  std::vector<int64_t> vec;
+  std::for_each(bool_list.begin(), bool_list.end(),
+                [&vec](bool b) { vec.emplace_back(b); });
+
+  return vec;
+}
 
 inline bool toBool(c10::IValue &value) { return value.toBool(); }
 

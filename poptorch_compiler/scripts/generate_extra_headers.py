@@ -1,5 +1,6 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import argparse
+import sys
 
 import json
 
@@ -47,27 +48,174 @@ ops = {}
 # class my_op : public ::mlir::Op<my_op, ... whole bunch of traits... ,  PoplarImplInterface::Trait> {
 json_in = json.load(parse_args.input_file)
 
-decl_types = {
+attr_types = {
     "F32ArrayAttr": "FLOAT_VEC",
     "StrArrayAttr": "STRING_VEC",
     "I32ArrayAttr": "INT_VEC",
     "I64ArrayAttr": "LONG_VEC",
+    "BoolArrayAttr": "BOOL_VEC",
     "I32Attr": "INT",
     "I64Attr": "LONG",
     "F32Attr": "FLOAT",
     "F64Attr": "DOUBLE",
     "StrAttr": "STRING",
     "BoolAttr": "BOOL",
-    "Poptorch_tensor": "TENSOR",
     "TypeAttr": "TYPE"
+}
+
+tensor_types = {
+    "Poptorch_tensor": "TENSOR",
 }
 
 # Is a bit easier to work with if we convert the JSON into the old macro format even if we don't end up saving that to disk.
 poptorch_ops = {}
 
+
+class ValueType:
+    def __init__(self, name, type_str, default_value=None):
+        self._name = name
+        self._type_str = type_str
+        self._default_value = default_value
+
+    @property
+    def default_value(self):
+        return self._default_value
+
+    @property
+    def name(self):
+        return self._name
+
+    def macro_type(self):
+        """ Returns the type used in C++ macros i.e. where ARG(Type, Name) is
+        used"""
+        try:
+            return attr_types[self._type_str]
+        except KeyError:
+            return tensor_types[self._type_str]
+
+
+class OptionalValueType(ValueType):
+    def __init__(self, name, type_str):
+        super().__init__(name, type_str)
+
+    def macro_type(self):
+        return "OPTIONAL_" + super().macro_type()
+
+
+class VariadicValueType(ValueType):
+    def __init__(self, name, type_str):
+        super().__init__(name, type_str)
+
+    def macro_type(self):
+        if self._type_str not in tensor_types:
+            raise ValueError("Only tensor types can be variadic")
+        return super().macro_type() + "_VEC"
+
+
+def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
+    assert 'Poptorch_Op' in json_in[op_key]["!superclasses"]
+
+    arg_types = []
+
+    for arg in json_in[op_key][sub_key]["args"]:
+        arg_name = arg[1]
+        arg_type_str = arg[0]["def"]
+
+        # Basic attribute/tensor types can be handled simply
+        if arg_type_str in attr_types or arg_type_str in tensor_types:
+            arg_types.append(ValueType(arg_name, arg_type_str))
+            continue
+
+        # Otherwise the type should be anonymous type whose traits can be
+        # looked up, or "Poptorch_tensorlist" which is an instance of
+        # Variadic<Poptorch_tensor>
+        if ("anonymous" not in arg_type_str
+                and arg_type_str != "Poptorch_tensorlist"):
+            raise ValueError(f"{arg_type_str} unknown and not anonymous.")
+
+        resolved_type_details = json_in[arg_type_str]
+        resolved_type_superclasses = resolved_type_details['!superclasses']
+
+        # Many types have Constraint or Attr/TypeContraint
+        if 'Constraint' in resolved_type_superclasses:
+            resolved_type_superclasses.remove('Constraint')
+        if 'AttrConstraint' in resolved_type_superclasses:
+            resolved_type_superclasses.remove('AttrConstraint')
+        if 'TypeConstraint' in resolved_type_superclasses:
+            resolved_type_superclasses.remove('TypeConstraint')
+
+        # Sometimes DefaultValuedAttr/OptionalAttr come alone and
+        # sometimes with Attr
+        is_attr = ("Attr" in resolved_type_superclasses
+                   or "DefaultValuedAttr" in resolved_type_superclasses
+                   or "OptionalAttr" in resolved_type_superclasses)
+
+        if is_attr:
+            if not allow_attributes:
+                raise ValueError(f"Attributes not permitted for {sub_key}")
+
+            if "Attr" in resolved_type_superclasses:
+                resolved_type_superclasses.remove("Attr")
+
+            type_str = resolved_type_details["baseAttr"]["def"]
+            if type_str not in attr_types:
+                print(f"Unhandled type {type_str} in {__file__}")
+
+            if len(resolved_type_superclasses) != 1:
+                print(f"{arg_name} has an unexpected number of superclasses.")
+                sys.exit(1)
+
+            single_attribute = resolved_type_superclasses[0]
+            if single_attribute == "OptionalAttr":
+                arg_types.append(OptionalValueType(arg_name, type_str))
+            elif single_attribute == "DefaultValuedAttr":
+                arg_types.append(
+                    ValueType(arg_name, type_str,
+                              resolved_type_details["defaultValue"]))
+            else:
+                print(
+                    f"Attribute {single_attribute} not handled in {__file__}")
+                sys.exit(1)
+
+            continue
+
+        # Handle tensors
+        if len(resolved_type_superclasses) != 1:
+            print(f"{arg_name} has an unexpected number of superclasses.")
+            sys.exit(1)
+
+        # Only attribute sshould have a default value
+        assert "default_value" not in resolved_type_details
+
+        type_str = resolved_type_details["baseType"]["def"]
+        if type_str not in tensor_types:
+            print(f"Unhandled type {type_str} in {__file__}")
+            sys.exit(1)
+
+        single_attribute = resolved_type_superclasses[0]
+
+        if single_attribute == "Optional":
+            arg_types.append(OptionalValueType(arg_name, type_str))
+        elif single_attribute == "Variadic":
+            arg_types.append(VariadicValueType(arg_name, type_str))
+        else:
+            print(f"Attribute {single_attribute} not handled in {__file__}")
+            sys.exit(1)
+
+    return arg_types
+
+
+# Convert all the arguments from json to ValueType
+def args_from_json(json_in, op_key):
+    return vals_from_json(json_in, op_key, "arguments")
+
+
+def returns_from_json(json_in, op_key):
+    return vals_from_json(json_in, op_key, "results", False)
+
+
 for key in json_in.keys():
     if key.startswith("Poptorch_"):
-
         if "Poptorch_Op" not in json_in[key]["!superclasses"]:
             continue
 
@@ -78,91 +226,17 @@ for key in json_in.keys():
         op_name = json_in[key]["!name"].replace("Poptorch_", "")
         poptorch_ops[op_name] = {}
 
-        args = ""
-        body_args = ""
-        poptorch_ops[op_name]["args"] = []
-
-        poptorch_ops[op_name]["args_with_default_vals"] = {}
-
         # Convert the args into our little decl type system.
-        for arg in json_in[key]["arguments"]["args"]:
-            arg_name = arg[1]
-            arg_type = arg[0]["def"]
-
-            if arg_type not in decl_types:
-                type_info = json_in[arg_type]
-
-                # Variadic tensor.
-                is_variadic_tensor = "Variadic" in type_info[
-                    "!superclasses"] and type_info["baseType"][
-                        "def"] == "Poptorch_tensor"
-                if is_variadic_tensor:
-                    arg_type = "TENSOR_VEC"
-
-                # An attribute with a default value.
-                is_default_valued = "DefaultValuedAttr" in type_info[
-                    "!superclasses"] and type_info["baseAttr"][
-                        "def"] in decl_types
-                if is_default_valued:
-                    arg_type = decl_types[type_info["baseAttr"]["def"]]
-
-                    poptorch_ops[op_name]["args_with_default_vals"][
-                        arg_name] = type_info["defaultValue"]
-
-                # An optional operand.
-                is_optional = "Optional" in type_info[
-                    "!superclasses"] and type_info["baseType"][
-                        "def"] in decl_types
-
-                is_optional_attr = "OptionalAttr" in type_info[
-                    "!superclasses"] and type_info["baseAttr"][
-                        "def"] in decl_types
-
-                if is_optional:
-                    arg_type = decl_types[type_info["baseType"]["def"]]
-
-                if is_optional_attr:
-                    arg_type = "OPTIONAL_" + decl_types[type_info["baseAttr"]
-                                                        ["def"]]
-
-            else:
-                arg_type = decl_types[arg_type]
-
-            poptorch_ops[op_name]["args"].append((arg_name, arg_type))
-
-            args += "ARG(" + arg_name + ", " + arg_type + ") COMMA "
-            body_args += "BODY_ARG(" + arg_name + ") COMMA "
-
-        # Remove the last comma
-        args = args[:-len("COMMA ")]
-        body_args = body_args[:-len("COMMA ")]
-
-        if args == "":
-            args = "NONE"
-            body_args = "NONE"
-
-        decl = "OP_DECL"
-
-        poptorch_ops[op_name]["num_returns"] = len(
-            json_in[key]["results"]["args"])
-
-        # Mark no return ops.
-        if len(json_in[key]["results"]["args"]) == 0:
-            decl += "_NO_RETURN"
-            poptorch_ops[op_name]["no_return"] = True
-
-        decl += "( " + op_name + ", " + args + ", " + body_args + ")"
-
-        # Print the generated decl.
-        #print(decl, file=parse_args.decl_output_file)
+        poptorch_ops[op_name]["args"] = args_from_json(json_in, key)
+        poptorch_ops[op_name]["returns"] = returns_from_json(json_in, key)
 
 # Create the builder Cpp/Hpp file.
-
 builder_call_translations = {
     "FLOAT_VEC": "const std::vector<float> &",
     "STRING_VEC": "const std::vector<const char *> &",
     "INT_VEC": "const std::vector<std::int32_t> &",
     "LONG_VEC": "const std::vector<std::int64_t> &",
+    "BOOL_VEC": "const std::vector<std::int64_t> &",  # Avoid packing issue
     "INT": "std::int32_t",
     "LONG": "std::int64_t",
     "OPTIONAL_LONG": "std::optional<std::int64_t>",
@@ -171,6 +245,7 @@ builder_call_translations = {
     "OPTIONAL_DOUBLE": "std::optional<double>",
     "STRING": "const char *",
     "TENSOR": "poptorch_ir::TensorId",
+    "OPTIONAL_TENSOR": "poptorch_ir::OptionalTensorId",
     "TENSOR_VEC": "const std::vector<poptorch_ir::TensorId> &",
     "BOOL": "bool",
     "TYPE": "poptorch_ir::Type"
@@ -185,86 +260,84 @@ builder_call_translations = {
 #define BODY_ARG(Name) convert(Name, _impl->value_map)
 
 for op_name in poptorch_ops:
+    #print(op_name)
+
     # Create a function with the same name as the compiler function to call.
-    num_returns = poptorch_ops[op_name]["num_returns"]
+    # Allow for each return to be optional, normal or variadic.
+    # This is a vector of vecor of TensorIds.
+    function_def = "poptorch_ir::ODSTensorResults "
 
-    return_stmt = "" if num_returns == 0 else "return"
-
-    if num_returns == 0:
-        function_def = "void "
-    elif num_returns == 1:
-        function_def = "poptorch_ir::TensorId "
-    else:
-        function_def = "std::vector<poptorch_ir::TensorId> "
+    # if num_returns == 0:
+    #     function_def = "void "
+    # elif num_returns == 1:
+    #     function_def = "poptorch_ir::TensorId "
+    # else:
+    #     function_def = "std::vector<poptorch_ir::TensorId> "
 
     function_def += "__OP_NAME_PLACEHOLDER__("
 
     # One space to give the comma removal thing something to remove when there are no args.
-    func_args = " "
+    func_args = []
     parameters = ""
 
     # Turn the args into function signitures.
-    for args in poptorch_ops[op_name]["args"]:
-        name = args[0]
-        arg_type = args[1]
-
-        func_args += builder_call_translations[arg_type] + " " + name + " ,"
+    for arg in poptorch_ops[op_name]["args"]:
+        func_args.append(builder_call_translations[arg.macro_type()] + " " +
+                         arg.name)
 
         # If the argument is an MLIR type we want to convert it first.
         # pylint: disable=literal-comparison
-        if arg_type is "TYPE":
-            parameters += ", _impl->convertType(" + name + ")"
+        if arg.macro_type() is "TYPE":
+            parameters += ", _impl->convertType(" + arg.name + ")"
         else:
-            parameters += ", convert(" + name + ", _impl->value_map)"
+            parameters += ", convert(" + arg.name + ", _impl->value_map)"
 
-    # Remove the last commas.
-    func_args = func_args[:-1]
+    func_args_str = ", ".join(func_args)
 
     cppFunction = function_def.replace("__OP_NAME_PLACEHOLDER__",
                                        "PoptorchCompiler::" + op_name)
     headerFunction = function_def.replace("__OP_NAME_PLACEHOLDER__", op_name)
 
-    cppFunction += func_args + ") {\n"
+    cppFunction += func_args_str + ") {\n\n"
 
     # Create the IR op.
+
     cppFunction += "auto tmp = _impl->builder.create<poptorch_ir::"
     cppFunction += op_name + ">(_impl->default_loc"
-    cppFunction += parameters + ");\n"
+    cppFunction += parameters + ");\n\n"
 
     # Add the IR op to the graph.
-    cppFunction += "_impl->main_graph.front().push_back(tmp);\n"
+    cppFunction += "_impl->main_graph.front().push_back(tmp);\n\n"
 
-    # Map the output[s] into the IR map.
-    if num_returns == 1:
-        cppFunction += "_impl->value_map.push_back(tmp);"
-        cppFunction += "return _impl->value_map.size() - 1;"
-    elif num_returns > 1:
-        # Create a temp vector for the new tensor IDs to return to the user
-        cppFunction += "std::vector<poptorch_ir::TensorId> ids;\n"
-        cppFunction += "ids.reserve(tmp.getNumResults());\n"
+    # Allow for each return to be optional, normal or variadic.
+    cppFunction += "poptorch_ir::ODSTensorResults results;\n"
 
-        cppFunction += "for(mlir::Value value : tmp.getResults()) {\n"
-        cppFunction += "    _impl->value_map.push_back(value);\n"
-        cppFunction += "   ids.push_back(_impl->value_map.size() - 1);\n"
-        cppFunction += "}\n"
+    for arg_num, arg in enumerate(poptorch_ops[op_name]["returns"]):
+        cppFunction += "results.emplace_back();\n"
+        cppFunction += "// Each result may be optional or variadic.\n"
+        cppFunction += "for(mlir::Value value : tmp.getODSResults("
+        cppFunction += str(arg_num) + ")) {\n"
+        cppFunction += "  _impl->value_map.push_back(value);\n"
+        cppFunction += "  results.back()."
+        cppFunction += "push_back(_impl->value_map.size() - 1);\n"
+        cppFunction += "}\n\n"
 
-        cppFunction += "return ids;"
+    cppFunction += "return results;\n"
 
     # Add the function end scope.
-    cppFunction += "}"
+    cppFunction += "}\n\n"
 
-    # Print the header file
-    print(headerFunction + func_args + ");",
+    # Save the header file and implementation
+    print(headerFunction + func_args_str + ");",
           file=parse_args.interface_header_file)
-
-    # Print the impl
     print(cppFunction, file=parse_args.interface_cpp_file)
 
-disptach_cxx_cases = {
+dispatch_cxx_cases = {
     "FLOAT_VEC": "const std::vector<float>&",
     "STRING_VEC": "const std::vector<const char*>&",
     "INT_VEC": "const std::vector<std::int32_t> &",
     "LONG_VEC": "const std::vector<std::int64_t> &",
+    "BOOL_VEC": "const std::vector<std::int64_t> &",
     "INT": "std::int32_t",
     "LONG": "std::int64_t",
     "OPTIONAL_LONG": "std::optional<std::int64_t>",
@@ -278,18 +351,8 @@ disptach_cxx_cases = {
 # Generate the JIT dispatch table.
 for op_name in poptorch_ops:
     # Create a function with the same name as the compiler function to call.
-    num_returns = poptorch_ops[op_name]["num_returns"]
-
-    return_stmt = "" if num_returns == 0 else "return"
-    if num_returns == 0:
-        function_def = "[[maybe_unused]] void "
-    elif num_returns == 1:
-        function_def = "[[maybe_unused]] poptorch_ir::TensorId "
-    else:
-        function_def = "[[maybe_unused]] std::vector<poptorch_ir::TensorId> "
-
-    function_def += "JIT_" + op_name + "("
-    function_def += "poptorch_ir::PoptorchCompiler &compiler,"
+    function_def = "[[maybe_unused]] poptorch_ir::ODSTensorResults JIT_"
+    function_def += op_name + "(poptorch_ir::PoptorchCompiler &compiler,"
     function_def += "const std::vector<poptorch_ir::TensorId> &ids,"
 
     # Unpack all the arguments.
@@ -299,29 +362,43 @@ for op_name in poptorch_ops:
     if len(poptorch_ops[op_name]["args"]) > 0:
         unpack_args += "std::uint32_t index = 0; (void) index;\n"
 
-    for args in poptorch_ops[op_name]["args"]:
-        name = args[0]
-        arg_type = args[1]
+    for arg in poptorch_ops[op_name]["args"]:
+        name = arg.name
+        arg_type = arg.macro_type()
+        val = arg.default_value
 
-        # Get the default value of this argument if it exists.
-        val = None
-        if name in poptorch_ops[op_name]["args_with_default_vals"]:
-            val = poptorch_ops[op_name]["args_with_default_vals"][name]
+        normal_tensor = False
+        tensor_vec = False
 
-        if arg_type in disptach_cxx_cases:
-
+        if arg_type in dispatch_cxx_cases:
             if val:
-                function_def += disptach_cxx_cases[
+                function_def += dispatch_cxx_cases[
                     arg_type] + " " + name + "=" + val + ","
             else:
-                function_def += disptach_cxx_cases[arg_type] + " " + name + " ,"
+                function_def += dispatch_cxx_cases[arg_type] + " " + name + " ,"
 
             parameters += name + " ,"
+        elif arg_type == "OPTIONAL_TENSOR":
+            unpack_args += "poptorch_ir::TensorId " + name + "= ids[index++];"
+            unpack_args += "// optionality not supported\n"
+            parameters += name + " ,"
+            normal_tensor = True
         elif arg_type == "TENSOR":
             unpack_args += "poptorch_ir::TensorId " + name + "= ids[index++];\n"
             parameters += name + " ,"
+            normal_tensor = True
         elif arg_type == "TENSOR_VEC":
             parameters += "ids ,"
+            tensor_vec = True
+        else:
+            print(f"Nothing for {arg_type}")
+            sys.exit(1)
+
+        # As variadic means passing the whole list of ids while a "normal"
+        # tensor involves passing each, one at a time, they cannot be mixed.
+        if normal_tensor and tensor_vec:
+            raise ValueError(f"Op {op_name} mixes normal and variadic tensor ",
+                             "inputs")
 
     # Remove the last comma.
     parameters = parameters[:-1]
@@ -329,6 +406,6 @@ for op_name in poptorch_ops:
 
     function_def += ") {\n"
 
-    print(function_def + unpack_args + return_stmt + " compiler." + op_name +
-          "(" + parameters + ");\n }\n",
+    print(function_def + unpack_args + "return compiler." + op_name + "(" +
+          parameters + ");\n }\n",
           file=parse_args.jit_dispatch_table_output_file)

@@ -3,6 +3,8 @@
 
 #include <vector>
 
+#include "poptorch_logging/Error.hpp"
+
 #include "../../PoptorchSymbols.hpp"
 #include "MlirDispatch.hpp"
 
@@ -58,7 +60,7 @@ const char *convert(const std::string &s) {
  * The first dispatch table. This is the one which maps from an aten operation
  * onto the above table.
  */
-void MLIRDispatch::generateDispatchTable() {
+void MLIRDispatch::generateDispatchTable() { // NOLINT
   // The generated mapping of PyTorch/Aten -> MLIR functions.
   // Each of functions when passed the PyTorch function arguments will extract
   // and translate all tensors/scalars into an MLIR representation from the
@@ -97,12 +99,16 @@ void MLIRDispatch::generateDispatchTable() {
   , convert(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
 
 // Create a function decl with the given call and arguments.
+// This will only work for a single output.
 #define OP_DECL(symbolName, function, Args)                                    \
   {symbols::popart::symbolName,                                                \
    [&](torch::jit::Node *node,                                                 \
        const std::vector<poptorch_ir::TensorId> &ids) {                        \
      (void)(node);                                                             \
-     return JIT_##function(this->_compiler, ids Args);                         \
+     auto output = JIT_##function(this->_compiler, ids Args);                  \
+     ERROR_ON(output.size() != 1);                                             \
+     ERROR_ON(output[0].size() != 1);                                          \
+     return output[0][0];                                                      \
    }},
 
 #include "PopartAPISupportedOps.h.inc"
