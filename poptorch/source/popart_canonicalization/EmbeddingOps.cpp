@@ -56,9 +56,12 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
   ERROR_ON_MSG(scale_grad_by_freq || sparse,
                "Unsupported aten::embedding_bag operation");
 
-  ERROR_ON_MSG(!isNone(padding_idx),
-               "Unsupported aten::embedding_bag operation: padding_idx "
-               "parameter is unsupported.");
+  if (!isNone(padding_idx)) {
+    auto padding_idx_val = constantToInt(node->input(8)->node());
+    ERROR_ON_MSG(padding_idx_val >= 0,
+                 "Unsupported aten::embedding_bag operation: padding_idx "
+                 "parameter is unsupported.");
+  }
 
   // aten::embedding_bag has 4 outputs but only the first one is used so we
   // delete them here to match our output
@@ -140,6 +143,7 @@ torch::jit::Node *onehotHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::embedding, embeddingHandler);
   registerHandler(c10::aten::embedding_bag, embeddingBagHandler);
+  registerHandler(c10::aten::_embedding_bag, embeddingBagHandler);
   registerHandler(c10::aten::one_hot, onehotHandler);
 }
 
