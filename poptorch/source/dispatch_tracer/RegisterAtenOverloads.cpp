@@ -386,6 +386,10 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("adaptive_avg_pool3d",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
+  // Needed due to "CompositeImplicitAutograd"
+  m.impl("native_group_norm",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
   // If we don't intercept this op, it will be decomposed to as_strided
   // which is harder to handle.
   m.impl("slice.Tensor",

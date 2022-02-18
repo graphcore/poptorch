@@ -1,11 +1,13 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include <poplar/Graph.hpp>
 #include <popnn/BatchNorm.hpp>
+#include <popnn/GroupNorm.hpp>
 #include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Expr.hpp>
 
 #include "lower_to_poplar/CompilerHelpers.hpp"
+#include "poptorch_logging/Error.hpp"
 
 namespace pe = popops::expr;
 
@@ -111,6 +113,64 @@ void batch_norm::lowerToPoplar(CompilerContext &context) {
     context.tensors[this->result()] =
         batchNormalise(context, input, weight, bias, running_mean, inv_sd);
   }
+}
+
+void group_norm::lowerToPoplar(CompilerContext &context) {
+  float epsilon = this->epsilon().convertToFloat();
+  uint64_t num_groups = this->group();
+
+  // Hard wire to stable for now
+  const bool stable_algo = true;
+
+  // Get the inputs
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor weight;
+  poplar::Tensor bias;
+
+  // Check that the redundant N, C and HxW match input dimensions
+  auto input_shape = input.shape();
+  ERROR_ON(input_shape.at(0) != this->N());
+  ERROR_ON(input_shape.at(1) != this->C());
+  auto hx_w =
+      std::accumulate(input_shape.begin() + 2, input_shape.end(),
+                      static_cast<size_t>(1), std::multiplies<size_t>());
+  ERROR_ON(hx_w != this->HxW());
+
+  const std::vector<float> ones(num_groups, 1.0f);
+  const std::vector<float> zeros(num_groups, 0.0f);
+  const std::vector<uint64_t> param_shape = {num_groups};
+  if (this->weight() && this->bias()) {
+    weight = context.fromSsa(this->weight());
+    bias = context.fromSsa(this->bias());
+  } else {
+    weight = createConstant(context, poplar::FLOAT, param_shape, ones);
+    bias = createConstant(context, poplar::FLOAT, param_shape, zeros);
+  }
+
+  // Calculate the mean and the inverse standard deviation
+  poplar::Tensor mean;
+  poplar::Tensor inv_std_dev;
+
+  // Hardwire to correct and slightly slower.
+  const bool fast_math_group_norm = false;
+
+  poplar::OptionFlags flags{{"groupNormStridedChannelGrouping",
+                             fast_math_group_norm ? "true" : "false"}};
+
+  std::tie(mean, inv_std_dev) = popnn::gn::groupNormStatistics(
+      context.graph, input, epsilon, context.seq,
+      static_cast<unsigned int>(num_groups), false, stable_algo, poplar::FLOAT,
+      {}, flags);
+
+  // Calculate the normalization
+  auto result =
+      popnn::gn::groupNormalise(context.graph, input, weight, bias, mean,
+                                inv_std_dev, context.seq, {}, flags);
+
+  // Return the result
+  context.tensors[this->result()] = result.first;
+  context.tensors[this->mean()] = mean;
+  context.tensors[this->rstd()] = inv_std_dev;
 }
 
 } // namespace poptorch_ir

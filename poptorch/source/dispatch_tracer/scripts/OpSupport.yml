@@ -295,6 +295,12 @@
 - func: native_batch_norm
   PopTorchDirect: batch_norm
 
+# native_group_norm(Tensor input, Tensor? weight, Tensor? bias, int N, int C,
+#                   int HxW, int group, float eps) -> (Tensor, Tensor, Tensor)
+- func: native_group_norm
+  PopTorchDirect: group_norm
+
+
 #
 # Losses
 #

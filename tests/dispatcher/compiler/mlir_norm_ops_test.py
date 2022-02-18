@@ -45,3 +45,25 @@ def test_batch_norm(params):
 
     # pylint: disable=no-member
     helpers.assert_allclose(actual=ipu_result, expected=cpu_result)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
+def test_group_norm():
+    torch.manual_seed(42)
+    num_groups = 4
+    C = 12
+
+    input_shape = [3, C, 5]
+    norm = nn.GroupNorm(num_groups, C)
+
+    t = torch.rand(input_shape)
+    # Run pytorch native on CPU.
+    torch_out = norm(t)
+
+    weights = {**dict(norm.named_parameters()), **dict(norm.named_buffers())}
+    # Run on IPU.
+    ipu_result = IPUContext(norm, parameters_and_buffers=weights)(t)
+
+    # pylint: disable=no-member
+    helpers.assert_allclose(actual=ipu_result, expected=torch_out)
