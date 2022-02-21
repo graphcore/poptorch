@@ -35,7 +35,9 @@ torch::jit::Node *flipHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   // aten::flip(Tensor self, int[] dims) -> Tensor
   auto *input = node->input(0);
-  auto input_shape = shapeFromTensor(input);
+  // Use output shape because input shape might not exist
+  // if the input is the result of another operation
+  auto input_shape = shapeFromTensor(node->output());
   auto dims = constantToLongVec(node->input(1)->node());
   for (auto &dim : dims) {
     if (dim < 0) {
