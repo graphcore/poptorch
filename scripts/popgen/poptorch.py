@@ -22,5 +22,6 @@ signatures = {
     'reflectionPad': ['Args', ['clong_list']],
     'setAvailableMemory': ['Args', ['cfloat']],
     'setMatMulSerialization': ['Args', ['cstr'], ['clong'], ['cint']],
-    'endForLoop': ['Args', ['clong']]
+    'startForLoop': ['Args'],
+    'endForLoop': ['Args', ['clong']],
 }

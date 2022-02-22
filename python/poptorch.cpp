@@ -1412,16 +1412,22 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     logging::debug("Compile with manual tracing");
     std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
 
-    logging::debug("Traced graph: {}", *graph);
+    logging::debug("Traced graph:\n{}", *graph);
+
+    auto inplace_op_handler =
+        std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
 
     poptorch::type_and_constant_canonicalization::makeConstantIntParams(
         graph.get(), parameter_names, parameters);
 
+    // TODO(T51159): Add support for dispatch tracing + training.
+    // Currently we just pass training = false to annotateSubgraphs.
+    poptorch::annotateSubgraphs(graph.get(), false);
+
+    logging::debug("Graph right before popart:\n{}", *graph);
+
     AnchorList anchors_list;
     std::vector<Optimizer> optimizers;
-
-    auto inplace_op_handler =
-        std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
 
     poptorch::LowerToPopart lower(
         graph.get(), parameters, parameter_names, inplace_op_handler, false,

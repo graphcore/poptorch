@@ -11,6 +11,7 @@
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
+#include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 #include "../CommonHelperFunctions.hpp"
@@ -23,23 +24,26 @@ void fixFakeTargetOutput(torch::jit::Node *fake_target,
                          const c10::Stack &stack) {
   std::uint32_t index = 0;
   for (c10::IValue value : stack) {
+    // Add any missing outputs. They frequently return scalars which we just
+    // ignore here as our canonicalisation only returns tensors.
+    while (index >= fake_target->outputs().size()) {
+      fake_target->addOutput();
+    }
+
     if (value.isTensor()) {
-      torch::jit::Value *val = nullptr;
-
-      // Add any missing outputs. They frequently return scalars which we just
-      // ignore here as our canonicalisation only returns tensors.
-      while (index >= fake_target->outputs().size()) {
-        fake_target->addOutput();
-      }
       at::Tensor tensor = value.toTensor();
-
       // Sometimes "Tensors" are actually "Not tensors" but still stored as a
       // tensor and will assert in the infer type.
       if (tensor.sizes().size() == 1 && tensor.sizes()[0] == 0) {
         continue;
       }
-      val = fake_target->output(index);
+
+      torch::jit::Value *val = fake_target->output(index);
       val->inferTypeFrom(tensor);
+    } else if (value.isTensorList()) {
+      auto list_type = value.type()->expect<c10::ListType>();
+      torch::jit::Value *val = fake_target->output(index);
+      val->setType(list_type);
     }
     index++;
   }
@@ -71,11 +75,15 @@ void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
 void JITDispatch::markOutputs(
     const std::vector<at::Tensor> &outputs,
     const std::vector<at::Tensor> &persistent_data_storage) {
-  (void)persistent_data_storage;
+  // 'persistent_data_storage' is only needed by the MLIR dispatcher.
+  UNUSED(persistent_data_storage);
 
   int64_t output_num = 0;
   for (const at::Tensor &tensor : outputs) {
     torch::jit::Value *val = _mapper.getValueForTensor(tensor);
+    ERROR_ON_MSG(
+        val == nullptr,
+        "Internal: graph output tensor not present in the value mapper");
 
     logging::trace(
         "[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} {}",
@@ -91,6 +99,8 @@ void JITDispatch::markOutputs(
 
     output_num++;
   }
+
+  logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", graph);
 }
 
 at::Tensor &JITDispatch::copyInplace(at::Tensor &self,
@@ -205,16 +215,17 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       break;
     }
 
-    // Start tracking the tensor.
+    // Start tracking the tensors, i.e. add them to the value mapper.
+    torch::jit::Value *val = new_node->output(output_index);
+    // Check whether the handler replaced this value.
+    auto *replacement = wasReplaced(val);
+    if (replacement != nullptr) {
+      val = replacement;
+    }
+
     if (value.isTensor()) {
       at::Tensor tensor = value.toTensor();
 
-      torch::jit::Value *val = new_node->output(output_index);
-      // Check whether the handler replaced this value.
-      auto *replacement = wasReplaced(val);
-      if (replacement != nullptr) {
-        val = replacement;
-      }
       auto st = tensor.scalar_type();
       auto st_coerced = coerceToSupportedType(st);
       if (st != st_coerced) {
@@ -229,9 +240,24 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
                      reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
                      val->debugNameBase(), toString(tensor));
+    } else if (value.isTensorList()) {
+      val->setType(value.type()->expect<c10::ListType>());
+      auto tensor_list = value.toTensorVector();
+      // Always insert list unpack if output value is a list.
+      auto *unpack = graph.createListUnpack(val, tensor_list.size());
+      graph.insertNode(unpack);
 
-      output_index++;
+      for (size_t i = 0; i < tensor_list.size(); ++i) {
+        at::Tensor tensor = tensor_list.at(i);
+        val = unpack->output(i);
+        _mapper.addTensor(tensor, val);
+        logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
+                       reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+                       val->debugNameBase(), toString(tensor));
+      }
     }
+
+    output_index++;
   }
 }
 
@@ -242,14 +268,15 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   c10::OperatorHandle op = initial_op;
 
   // Run through the schema to find out if one of the operators is supposed to
-  // be inplace.
+  // be inplace, this could be the 'out' argument of a non-inplace op.
   c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
       getInplaceArgument(*stack, initial_op.schema());
-
+  bool is_truly_inplace = isTrulyInplace(*stack, initial_op.schema());
   // If ends with '_', it's inplace. Remove the "_" and use the outplace version
   // instead.
-  bool is_in_place = name[name.size() - 1] == '_';
-  if (is_in_place) {
+  bool name_indicates_is_inplace = name[name.size() - 1] == '_';
+
+  if (name_indicates_is_inplace) {
     // These are special cases because there is no zero / fill.
     if (name == "aten::zero_") {
       name = "aten::zeros_like";
@@ -267,7 +294,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   torch::jit::Node *fake_target =
       lowerFromSchema(schema, stack, graph, _mapper);
 
-  if (is_in_place) {
+  if (name_indicates_is_inplace || is_truly_inplace) {
     // The Op is in place: we don't need to run the CPU version.
     // Just clear the stack and keep the first input.
     at::Tensor t = stack->at(0).toTensor();

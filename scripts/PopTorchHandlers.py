@@ -31,6 +31,7 @@ expand(
 expand(
     "set_matmul_serialization", lambda x, s, a, b: op.setMatMulSerialization(
         x, cstr(s), clong(a), cint(b)))
+expand("start_for_loop", op.startForLoop)
 expand(
     "end_for_loop", lambda output, inputs, trip_count: op.endForLoop(
         output, inputs, clong(trip_count)))

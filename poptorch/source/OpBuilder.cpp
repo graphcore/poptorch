@@ -400,6 +400,14 @@ torch::jit::Node *createEndIf(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createStartForLoop(torch::jit::Graph *graph,
+                                     torch::jit::Value *inputs) {
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::start_for_loop, inputs,
+                          ImplicitCast::None, OutputType::Unknown, 0);
+  return new_node;
+}
+
 torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
                                    torch::jit::Value *outputs,
                                    torch::jit::Value *inputs,
@@ -407,7 +415,6 @@ torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::end_for_loop, {outputs, inputs});
   new_node->i_(c10::Symbol::fromQualString("attr::trip_count"), trip_count);
-
   const std::size_t num_outputs = outputs->node()->inputs().size();
   new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"), num_outputs);
   return new_node;

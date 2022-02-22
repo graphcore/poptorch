@@ -33,11 +33,12 @@ torch::jit::Value *makeConstant(torch::jit::Graph &graph, at::Tensor &tensor) {
   return constant->output();
 }
 
-torch::jit::Value *trackValue(c10::IValue &value, torch::jit::Graph &graph,
-                              ValueMapper &mapper) {
+torch::jit::Value *insertValueIntoGraph(c10::IValue &value,
+                                        torch::jit::Graph &graph,
+                                        ValueMapper &mapper) {
   if (value.isTensor()) {
+    // Handle tensors.
     at::Tensor tensor = value.toTensor();
-
     // Undefined tensors are optional tensors.
     if (!tensor.defined()) {
       // Create a null IR value.
@@ -46,7 +47,6 @@ torch::jit::Value *trackValue(c10::IValue &value, torch::jit::Graph &graph,
     }
 
     torch::jit::Value *val = mapper.getValueForTensor(tensor);
-
     // If we couldn't find the tensor in the tensors we are currently tracking.
     if (val == nullptr) {
       // If it is actually just a tensor wrapper around a python scalar we just
@@ -69,12 +69,24 @@ torch::jit::Value *trackValue(c10::IValue &value, torch::jit::Graph &graph,
     logging::trace("[TRACING-2] Input: Tensor ptr {}, jit ir {} {}",
                    reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
                    val->debugNameBase(), toString(tensor));
+
     return val;
   }
 
-  torch::jit::Value *val = graph.insertConstant(value);
+  if (value.isTensorList()) {
+    // Handle tensor lists.
+    std::vector<torch::jit::Value *> list_values;
+    for (c10::IValue list_value : value.toTensorVector()) {
+      list_values.push_back(insertValueIntoGraph(list_value, graph, mapper));
+    }
+    auto *list = graph.createList(c10::TensorType::get(), list_values);
+    graph.insertNode(list);
+    return list->output();
+  }
 
-  ERROR_ON_MSG(val == nullptr, "Graph could not insert constant");
+  // Assume value is a constant.
+  torch::jit::Value *val = graph.insertConstant(value);
+  ERROR_ON_MSG(val == nullptr, "Internal: graph could not insert a constant");
   return val;
 }
 
@@ -188,29 +200,14 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
                                   c10::Stack *stack, torch::jit::Graph &graph,
                                   ValueMapper &mapper) {
   std::vector<torch::jit::Value *> inputs;
-
   for (c10::IValue value : *stack) {
-    torch::jit::Value *jit_value;
-
-    if (value.isTensorList()) {
-      std::vector<torch::jit::Value *> values;
-      for (c10::IValue list_val : value.toTensorVector()) {
-        values.push_back(trackValue(list_val, graph, mapper));
-      }
-
-      jit_value = graph.createList(c10::TensorType::get(), values)->output();
-    } else {
-      jit_value = trackValue(value, graph, mapper);
-    }
-
-    inputs.push_back(jit_value);
+    inputs.push_back(insertValueIntoGraph(value, graph, mapper));
   }
-
   return createAtenTarget(graph, schema, inputs, stack, mapper);
 }
 
 c10::intrusive_ptr<at::TensorImpl>
-getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema) {
+getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema) {
   logging::trace("[TRACING-2][JIT] Looking for inplace argument in schema {}",
                  schema);
 
@@ -229,6 +226,10 @@ getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema) {
       if (argument.alias_info() && argument.alias_info()->isWrite()) {
         // We just return the first inplace argument but more than one can
         // technically be inplace.
+        logging::trace(
+            "[TRACING-2][JIT] Found inplace argument, tensor ptr {}, tensor {}",
+            reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+            toString(tensor));
         return tensor.getIntrusivePtr();
       }
     }
@@ -236,6 +237,40 @@ getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema) {
 
   // Assigned null in constructor.
   return {};
+}
+
+bool isTrulyInplace(const c10::Stack &stack,
+                    const c10::FunctionSchema &schema) {
+  const auto &arguments = schema.arguments();
+  for (size_t i = 0; i < arguments.size(); ++i) {
+    const auto &argument = arguments.at(i);
+    const c10::IValue value = stack.at(i);
+
+    // We are only interested in finding inplace tensors.
+    if (!argument.alias_info() || !argument.alias_info()->isWrite() ||
+        !value.isTensor()) {
+      continue;
+    }
+    const at::Tensor &tensor = value.toTensor();
+    // Undefined tensors are optional tensors.
+    if (!tensor.defined()) {
+      continue;
+    }
+
+    // We've found an inplace tensor. Check the stack whether it actually
+    // references one of the input arguments and it isn't just
+    // the 'out' argument.
+    for (size_t j = 0; j < stack.size(); ++j) {
+      if (i == j) {
+        continue;
+      }
+      if (value.isSameIdentity(stack.at(j))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 std::string toString(const at::Tensor &t) {

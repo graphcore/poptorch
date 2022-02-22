@@ -18,6 +18,10 @@ from . import poptorch_core
 # divergent IPU/CPU codepaths within one model.
 _is_ipu_context = False
 
+# A flag to tell if the dispatch mechanism (or jit tracing) is used to obtain
+# a graph.
+_dispatch_tracing = False
+
 
 class NameScopeHook:
     """ Create a name scope for each operator present in the module.
@@ -79,6 +83,19 @@ def isRunningOnIpu() -> bool:
 def setIpuContext(val: bool):
     global _is_ipu_context
     _is_ipu_context = val
+
+
+def isDispatchTracing() -> bool:
+    """ This function returns `True` when executing within the IPUScope.
+    The flag is set when entering the scope and turned off when exiting.
+    """
+    global _dispatch_tracing
+    return _dispatch_tracing
+
+
+def setDispatchTracing(val: bool):
+    global _dispatch_tracing
+    _dispatch_tracing = val
 
 
 def internal_cast(tensor, dtype):

@@ -34,9 +34,16 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
                                   ValueMapper &mapper);
 
 // From the schema deduce which argument if any is inplace. Only return the
-// first one which is inplace.
+// first one which is inplace. This might include an argument of an op that
+// is not truly inplace, e.g. it returns the 'out' argument in the schema
+// op(Tensor self, Tensor(a!) out) -> (Tensor(a!)) even when 'self' and 'out'
+// are not the same tensor.
 c10::intrusive_ptr<at::TensorImpl>
-getInplaceArgument(c10::Stack &stack, const c10::FunctionSchema &schema);
+getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema);
+
+// Unlike 'getInplaceArgument', returns true if and only if the
+// op is truly inplace.
+bool isTrulyInplace(const c10::Stack &stack, const c10::FunctionSchema &schema);
 
 // Return a string containing the tensor sizes and type.
 std::string toString(const at::Tensor &t);

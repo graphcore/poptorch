@@ -129,11 +129,19 @@ def for_loop(count: int,
     torch.ops.poptorch.start_for_loop(cloned_inputs)
     outputs = body(*cloned_inputs)
 
+    # We don't need to trace the creation of example outputs or the ir needs
+    # to be cleaned up later.
+    if _impl.isDispatchTracing():
+        poptorch_core.endDispatch()
+
     # Break the alias of the outputs.
     example_outputs = []
     for output in outputs:
         grad = output.requires_grad
         example_outputs.append(torch.zeros_like(output, requires_grad=grad))
+
+    if _impl.isDispatchTracing():
+        poptorch_core.startDispatch()
 
     if not isinstance(outputs, list) and not isinstance(outputs, tuple):
         outputs = [outputs]

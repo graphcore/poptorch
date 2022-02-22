@@ -123,6 +123,9 @@ torch::jit::Node *createEndIf(torch::jit::Graph *graph,
                               torch::jit::Value *condition,
                               torch::jit::Value *if_false_out);
 
+torch::jit::Node *createStartForLoop(torch::jit::Graph *graph,
+                                     torch::jit::Value *inputs);
+
 torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
                                    torch::jit::Value *outputs,
                                    torch::jit::Value *inputs,

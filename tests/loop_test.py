@@ -167,7 +167,7 @@ def test_loop_weights_use_twice(trace_model):
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(Model(), options)
 
-    x = torch.tensor(torch.ones(1, 4).to(torch.float))
+    x = torch.ones(1, 4).to(torch.float)
     inference_model(x)
 
 
@@ -190,14 +190,15 @@ def test_loop_training(trace_model):
     options.Jit.traceModel(trace_model)
     training_model = poptorch.trainingModel(Model(), options)
 
-    x = torch.tensor(torch.ones(1, 4).to(torch.float))
+    x = torch.ones(1, 4).to(torch.float)
     with pytest.raises(
             poptorch.Error,
             match=r"poptorch.for_loop\(\) is only supported in inference"):
         training_model(x)
 
 
-def test_loop_body_inplace_ops_1():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_body_inplace_ops_1(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             # Body inputs are passed by value so 'x' remains unchanged.
@@ -207,7 +208,9 @@ def test_loop_body_inplace_ops_1():
 
             return poptorch.for_loop(3, body, [x])[0]
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.ones(1, 5).to(torch.int32)
     x_copy = torch.ones(1, 5).to(torch.int32)
 
@@ -216,7 +219,8 @@ def test_loop_body_inplace_ops_1():
     helpers.assert_allequal(actual=out, expected=x_copy * 4)
 
 
-def test_loop_body_inplace_ops_2():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_body_inplace_ops_2(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             # Body inputs are passed by value so 'x' remains unchanged.
@@ -227,7 +231,9 @@ def test_loop_body_inplace_ops_2():
 
             return poptorch.for_loop(3, body, [x])[0]
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.ones(1, 5).to(torch.int32)
     x_copy = torch.ones(1, 5).to(torch.int32)
 
@@ -236,7 +242,8 @@ def test_loop_body_inplace_ops_2():
     helpers.assert_allequal(actual=out, expected=x_copy * 7)
 
 
-def test_loop_body_inplace_ops_3():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_body_inplace_ops_3(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x += 1
@@ -248,7 +255,9 @@ def test_loop_body_inplace_ops_3():
 
             return poptorch.for_loop(3, body, [x])[0]
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.ones(1, 5).to(torch.int32)
     x_copy = torch.ones(1, 5).to(torch.int32)
 
@@ -257,7 +266,8 @@ def test_loop_body_inplace_ops_3():
     helpers.assert_allequal(actual=out, expected=x_copy * 5)
 
 
-def test_loop_body_inplace_ops_4():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_body_inplace_ops_4(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):
             x += 1
@@ -271,7 +281,9 @@ def test_loop_body_inplace_ops_4():
             x += 1
             return z
 
-    poptorch_model = poptorch.inferenceModel(Model())
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
     x = torch.ones(1, 5).to(torch.int32)
     x_copy = torch.ones(1, 5).to(torch.int32)
 

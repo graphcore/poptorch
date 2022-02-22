@@ -64,6 +64,7 @@ class IPUScope:
     # Start capturing calls.
     def __enter__(self):
         poptorch_core.startDispatch()
+        _impl.setDispatchTracing(True)
         _impl.setIpuContext(True)
         self._options._execution_strategy.onStartTracing()  # pylint: disable=protected-access
         return self
@@ -72,6 +73,7 @@ class IPUScope:
     def __exit__(self, exc_type, value, traceback):
         self._options._execution_strategy.onEndTracing()  # pylint: disable=protected-access
         _impl.setIpuContext(False)
+        _impl.setDispatchTracing(False)
         # Turn off the dispatcher.
         poptorch_core.endDispatch()
 
