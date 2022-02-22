@@ -5,13 +5,14 @@ Experimental features
 Distributed execution without PopRun
 ====================================
 
-PopTorch supports distributed execution on IPU-POD using the IPU over Fabric
+PopTorch supports distributed execution on a Pod using the IPU over Fabric
 (IPUoF).
 
-If you run using your own distributed processing tool instead of PopRun, the only change to your code needed is to set the id of the current process and
-the total number of processes the execution is distributed across using
+If you run a program using your own distributed processing tool instead of PopRun, the only change you need to make to your code is to set the ID of the current process and
+the total number of processes the execution is distributed across, using
 :py:meth:`~poptorch.options._DistributedOptions.configureProcessId`.
-Please also be aware that :py:meth:`~poptorch.Options.replicationFactor` should
+
+Note that :py:meth:`~poptorch.Options.replicationFactor` should
 be used to set the number of local replicas (per host) not the total (global)
 number of replicas.
 
@@ -23,7 +24,7 @@ number of replicas.
   :linenos:
 
 .. note:: The ``DataLoader`` will automatically select a different subset of the
-  dataset based on the process id.
+  dataset based on the process ID.
 
 .. warning:: All the processes must use the same seed if ``shuffle=True`` is used
   for the ``DataLoader``.
@@ -31,7 +32,8 @@ number of replicas.
 torch.nn.CTCLoss
 ================
 
-Support was added for the CTCLoss operator with a number of limitations:
-#. ``zero_infinity`` parameter must be set ``False``
-#. ``reduction`` parameter must be set to either ``sum`` or ``mean``
-#. ``targets`` tensor must be 2D, corresponding to stacked, padded layout
+The CTCLoss operator is supported, with some limitations:
+
+#. The ``zero_infinity`` parameter must be set to ``False``
+#. The ``reduction`` parameter must be set to either ``sum`` or ``mean``
+#. The ``targets`` tensor must be 2D, corresponding to stacked, padded layout
