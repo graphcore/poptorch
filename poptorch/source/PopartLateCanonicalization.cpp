@@ -177,6 +177,38 @@ private:
   bool _in_multi_conv = false;
 };
 
+// Reorders set_matmul_serialization and reshape if required
+FunctionTy reorderMatmulSeralisationIfRequired(torch::jit::Node *node) {
+  return [node]() {
+    ERROR_ON(node->kind() != symbols::poptorch::set_matmul_serialization);
+
+    auto *reshape_node = node->input()->node();
+
+    // If the input is a matmul, no reordering is necessary
+    if (reshape_node->kind() == symbols::popart::matmul) {
+      return;
+    }
+
+    ERROR_ON(reshape_node->kind() != symbols::popart::reshape_static_shape);
+    ERROR_ON(reshape_node->input()->node()->kind() != symbols::popart::matmul);
+
+    // Change matmul -> reshape -> set_matmul_seralization
+    // to matmul -> set_matmul_seralization -> reshape
+    node->moveBefore(reshape_node);
+
+    node->replaceInput(0, reshape_node->input());
+    // matmul -> reshape
+    //  \-> set_matmul_seralization -> ...
+
+    node->output()->replaceAllUsesWith(reshape_node->output());
+    // matmul -> reshape  -> ...
+    //  \-> set_matmul_seralization
+
+    reshape_node->replaceInput(0, node->output());
+    // matmul -> set_matmul_seralization -> reshape -> ...
+  };
+}
+
 void canonicalizeLate(torch::jit::Graph *graph) {
   logging::LogContext ctx_func("canonicalizeLate");
   /*
@@ -214,6 +246,8 @@ void canonicalizeLate(torch::jit::Graph *graph) {
       std::string key = constantToString(node->input(1)->node());
       node->s_(c10::Symbol::attr("attribute"), attribute);
       node->s_(c10::Symbol::attr("key"), key);
+    } else if (kind == symbols::poptorch::set_matmul_serialization) {
+      callbacks.emplace_back(reorderMatmulSeralisationIfRequired(node));
     }
   }
 

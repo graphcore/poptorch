@@ -66,7 +66,14 @@ def test_serializedMatMul(trace_model, mode, factor, keep_precision):
     torch.manual_seed(42)
 
     input1 = torch.rand(1, 10, 200)
-    input2 = torch.rand(200, 45)
+
+    input2_dim = 45
+
+    if mode == poptorch.MatMulSerializationMode.OutputChannels:
+        # Ensure the value is a multiple of factor
+        input2_dim = input2_dim // factor * factor
+
+    input2 = torch.rand(200, input2_dim)
 
     def serialise_matmal_op(input, other, out):
         assert out is None

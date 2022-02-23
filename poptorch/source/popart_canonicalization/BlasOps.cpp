@@ -82,11 +82,6 @@ torch::jit::Node *matmulHandler(torch::jit::Graph *graph,
     logging::trace("Replacing matmul {} with {} {} {}", *node, *merge_mat, *mul,
                    *result);
 
-    for (const torch::jit::Use &use : node->output()->uses()) {
-      if (use.user->kind() == symbols::poptorch::set_matmul_serialization) {
-        use.user->replaceInput(0, result->output());
-      }
-    }
   } else {
     // The "normal" matmul will follow the original path
     result = createMatmul(graph, {matrix_a, matrix_b});
