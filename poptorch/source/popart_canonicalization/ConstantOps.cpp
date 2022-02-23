@@ -1,4 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <algorithm>
+#include <random>
+
 #include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
@@ -69,6 +72,25 @@ torch::jit::Node *arangeHandler(torch::jit::Graph *graph,
                            {static_cast<std::int64_t>(vals.size())});
 }
 
+torch::jit::Node *randpermHandler(torch::jit::Graph *graph,
+                                  torch::jit::Node *node) {
+  // aten::randperm(Scalar n, ScalarType dtype, Layout, Device, bool pin_memory)
+  auto *n = node->input(0)->node();
+  n->t_(c10::attr::value, n->t(c10::attr::value).to(at::ScalarType::Long));
+  n->output()->inferTypeFrom(n->t(c10::attr::value));
+  auto *size_of_permutation = n->output();
+
+  auto shape = {constantToLong(n)};
+  auto dtype = c10::ScalarType::Float;
+
+  torch::jit::Value *uniform =
+      createRandomUniform(graph, nullptr, shape, 1.0, 0.0, dtype)->output();
+
+  auto *topk = createTopk(graph, {uniform, size_of_permutation}, 0);
+
+  return createCast(graph, topk->output(1), c10::ScalarType::Int);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -79,6 +101,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::new_zeros, onesZerosHandler);
   registerHandler(c10::aten::zeros, onesZerosHandler);
   registerHandler(c10::aten::zeros_like, onesZerosHandler);
+  registerHandler(c10::aten::randperm, randpermHandler);
 }
 
 } // namespace poptorch

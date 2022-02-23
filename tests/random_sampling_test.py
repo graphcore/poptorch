@@ -240,6 +240,18 @@ def test_distributions_bernoulli(trace_model):
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 @pytest.mark.parametrize("trace_model", [True, False])
+def test_randperm(trace_model):
+    def rng_op(x):
+        return torch.randperm(x.item()) + 0
+
+    input = torch.tensor([100], dtype=torch.int)
+    stat_funs = [torch.numel]
+    rng_harness(trace_model, rng_op, input, stat_funs, torch.int32)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_random_seed_repeatability(trace_model):
     class Model(torch.nn.Module):
         def forward(self, x):

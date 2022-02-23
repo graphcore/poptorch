@@ -26,6 +26,7 @@ New features
 - For models annotated with ``BeginBlock``, show the IPU blocks in ``repr(model)``.
 - Improve implementation of torch.scatter_add
 - Support for ``torch.nn.utils.weight_norm``
+- Support for ``torch.randperm``
 
 API changes
 -----------

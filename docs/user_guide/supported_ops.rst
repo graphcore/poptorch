@@ -184,6 +184,7 @@ Comparison ops
 
 * ``torch.topk``
 * ``torch.argsort``
+* ``torch.randperm``
 
 
 Other ops
