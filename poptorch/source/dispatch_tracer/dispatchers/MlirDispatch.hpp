@@ -72,6 +72,14 @@ public:
   at::Tensor outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
                                const at::Tensor &original_input);
 
+  // Handle the special case of squeeze_dim_, which is inplace in PyTorch but
+  // changes the shape of the target tensor.
+  // NOLINTNEXTLINE
+  at::Tensor outputInplaceReshape_squeeze_dim_(poptorch_ir::TensorId output_id,
+                                               const at::Tensor &original_input,
+                                               poptorch_ir::TensorId self,
+                                               int dim);
+
   at::Tensor makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
                                    bool requires_grad);
 

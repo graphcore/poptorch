@@ -396,6 +396,8 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   // which is harder to handle.
   m.impl("squeeze.dim",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("squeeze_.dim",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
   // If we don't intercept this op, it will be decomposed to as_strided
   // which is harder to handle.

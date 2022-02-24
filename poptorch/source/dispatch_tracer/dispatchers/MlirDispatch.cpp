@@ -689,6 +689,15 @@ at::Tensor MLIRDispatch::outputIsInplaceOf(poptorch_ir::TensorId output_id,
   return original_input;
 }
 
+at::Tensor MLIRDispatch::outputInplaceReshape_squeeze_dim_(
+    poptorch_ir::TensorId output_id, const at::Tensor &original_input,
+    poptorch_ir::TensorId self, int dim) {
+  (void)self;
+  original_input.squeeze_(dim);
+  _mapper.addTensor(original_input, output_id);
+  return original_input;
+}
+
 at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
                                                bool requires_grad) {
   // If it's a none or error, return an undefined tensor. Some functions may

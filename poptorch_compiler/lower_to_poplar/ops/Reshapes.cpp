@@ -32,6 +32,18 @@ void squeeze_dim::lowerToPoplar(CompilerContext &context) {
   context.tensors.insert({result(), in});
 }
 
+void squeeze_dim_::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+
+  std::int64_t dim = this->dim();
+
+  if (dim < 0) {
+    dim += in.rank();
+  }
+  in = in.squeeze({static_cast<size_t>(dim)});
+  context.tensors.insert({result(), in});
+}
+
 void expand::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->input());
 

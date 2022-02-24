@@ -139,6 +139,10 @@
 # squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
 - func: squeeze.dim
   PopTorchDirect: squeeze_dim
+
+# squeeze_.dim(Tensor(a!) self, int dim) -> Tensor(a!)
+- func: squeeze_.dim
+  PopTorchDirectInplaceReshape: squeeze_dim_
 ################
 # Element wise
 ################

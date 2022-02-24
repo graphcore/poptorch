@@ -2,6 +2,7 @@
 #include "JitDispatch.hpp"
 
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 #include "../../PoptorchSymbols.hpp"
@@ -276,9 +277,17 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
   }
 }
 
+namespace {
+// The in-place versions of these functions break the rule that in place ops
+// don't change the shape of the tensor they operate on.
+const std::unordered_set<std::string> in_place_reshapes{
+    "aten::squeeze", "aten::unsqueeze", "aten::transpose"};
+} // namespace
+
 void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
                            c10::Stack *stack) {
-  std::string name = initial_op.schema().operator_name().name;
+  std::string name = initial_op.schema().name();
+  std::string overload = initial_op.schema().overload_name();
   c10::Dispatcher &dispatcher = c10::Dispatcher::singleton();
   c10::OperatorHandle op = initial_op;
 
@@ -300,7 +309,12 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     } else {
       name.erase(name.end() - 1, name.end());
     }
-    op = *dispatcher.findOp({name, ""});
+    auto opt_op = dispatcher.findOp({name, overload});
+    if (opt_op) {
+      op = *opt_op;
+    } else {
+      op = *dispatcher.findOp({name, ""});
+    }
   }
 
   const c10::FunctionSchema &schema = op.schema();
@@ -309,7 +323,8 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   torch::jit::Node *fake_target =
       lowerFromSchema(schema, stack, graph, _mapper);
 
-  if (name_indicates_is_inplace || is_truly_inplace) {
+  if ((name_indicates_is_inplace || is_truly_inplace) &&
+      in_place_reshapes.count(name) == 0) {
     // The Op is in place: we don't need to run the CPU version.
     // Just clear the stack and keep the first input.
     at::Tensor t = stack->at(0).toTensor();

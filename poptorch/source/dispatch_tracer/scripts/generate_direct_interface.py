@@ -58,7 +58,12 @@ def canonicalise_tensor(tensor):
     return [tensor_id, is_inplace, is_view]
 
 
-def add_outplace_op(function, parameters, outputs, named_tensors, scope=""):
+def add_outplace_op(function,
+                    parameters,
+                    outputs,
+                    named_tensors,
+                    scope="",
+                    inplace_reshape=False):
     return_type = "poptorch_ir::ODSTensorResults mlir_output =\n" + scope
     return_type += "\t  "
 
@@ -92,7 +97,12 @@ def add_outplace_op(function, parameters, outputs, named_tensors, scope=""):
         function_decl += scope + "\tt_id = getSingleOptionalTensorId(t_ids);\n"
 
         # For each output tensor return it to pytorch in a different way depending on what the schema tells us.
-        if is_inplace:
+        if inplace_reshape:
+            # Inplace operations should be inplaced versions of a certain input.
+            function_decl += "\tstack.push_back(outputInplaceReshape_"
+            function_decl += function + "(t_id, " + named_tensors[tensor_id]
+            function_decl += "_pytorch, " + parameters + "));\n"
+        elif is_inplace:
             # Inplace operations should be inplaced versions of a certain input.
             function_decl += "\tstack.push_back(outputIsInplaceOf(t_id, "
             function_decl += named_tensors[tensor_id] + "_pytorch));\n"
@@ -290,6 +300,15 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
         # Otherwise we are dealing with a vanilla function.
         function_decl += add_outplace_op(op_target["PopTorchDirect"],
                                          parameters, outputs, named_tensors)
+    elif "PopTorchDirectInplaceReshape" in op_target:
+        # These functions are inplace from PyTorch's point of view, but reshape
+        # the target tensor, so need to be handled outplace in MLIR.
+        function_decl += add_outplace_op(
+            op_target["PopTorchDirectInplaceReshape"],
+            parameters,
+            outputs,
+            named_tensors,
+            inplace_reshape=True)
     else:
         function_decl += add_inplace_op(op_target["PopTorchDirectInplace"],
                                         parameters,
