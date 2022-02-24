@@ -214,7 +214,7 @@ at::Tensor MLIRDispatch::convolution(
     const at::Tensor &input, const at::Tensor &weight,
     const c10::optional<at::Tensor> &bias, const at::IntArrayRef strides,
     const at::IntArrayRef padding, const at::IntArrayRef dilation,
-    const bool /*transposed*/, const at::IntArrayRef output_padding,
+    const bool transposed, const at::IntArrayRef output_padding,
     const int64_t groups) {
   // Create the stack which is just a vector of IValues, I.e all of the above
   // arguments.
@@ -222,7 +222,7 @@ at::Tensor MLIRDispatch::convolution(
 
   // An optional bias is actually an undefined tensor, not 100% why they have
   // two layers of indirection (optional AND undefined).
-  packStack(stack, input, weight, *bias, strides, padding, dilation,
+  packStack(stack, input, weight, *bias, strides, padding, dilation, transposed,
             output_padding, groups);
 
   // Unpack the above and create the MLIR convolution node.

@@ -1697,25 +1697,6 @@ def Poptorch_random_uniform : Poptorch_Op<"random_uniform", []> {
 
 }
 
-def Poptorch_random_normal : Poptorch_Op<"random_normal", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$shape, F32Attr:$mean, F32Attr:$scale, StrAttr:$dtype);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "const std::vector<std::int64_t>&":$shape, "float":$mean, "float":$scale, "const char*":$dtype), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("shape",$_builder.getI64ArrayAttr(shape));
-        $_state.addAttribute("mean",$_builder.getF32FloatAttr(mean));
-        $_state.addAttribute("scale",$_builder.getF32FloatAttr(scale));
-        $_state.addAttribute("dtype",$_builder.getStringAttr(dtype));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_ones : Poptorch_Op<"ones", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$shape, StrAttr:$dtype);
   let results = (outs Poptorch_tensor:$result);

@@ -188,7 +188,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
     for arg in canonicalised_args:
         # We just skip some arguments
         if arg[0] in args_to_ignore:
-            #   arg_index += 1
+            arg_index += 1
             continue
 
         stack_at_index = "stack.at(" + str(arg_index) + ")"

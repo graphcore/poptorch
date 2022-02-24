@@ -660,12 +660,6 @@ void random_uniform::lowerToPoplar(CompilerContext & /*context*/) {
                   "random_uniform"
                   " is currently unimplemented.");
 }
-void random_normal::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "random_normal"
-                  " is currently unimplemented.");
-}
 void ones::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

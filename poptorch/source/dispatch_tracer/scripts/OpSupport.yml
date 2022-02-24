@@ -66,7 +66,7 @@
   PopTorchDirect: gelu
   UnusedOutputArguments: {out}
 
-# aten::sigmoid_(Tensor(a!) self) -> Tensor(a!) 
+# aten::sigmoid_(Tensor(a!) self) -> Tensor(a!)
 - func: sigmoid_
   PopTorchDirectInplace: sigmoid_
 
@@ -230,6 +230,48 @@
 # addmm.out(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
 - func: addmm.out
   PopTorchDirect: addmm
+  UnusedOutputArguments: {out}
+
+
+#############
+# Random number generation
+#############
+
+
+# `torch.randn`, `torch.randn_like` dispatch to this
+# normal_(Tensor(a!) self, float mean=0, float std=1, *, Generator? generator=None) -> Tensor(a!)
+- func: normal_
+  PopTorchDirect: normal_
+  IgnoreArgs: {'generator'}
+
+# normal.Tensor_Tensor(Tensor mean, Tensor std, *, Generator? generator=None) -> Tensor
+- func: normal.Tensor_Tensor
+  PopTorchDirect: normal_Tensor_Tensor
+  IgnoreArgs: {'generator'}
+# normal.Tensor_Tensor_out(Tensor mean, Tensor std, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+- func: normal.Tensor_Tensor_out
+  PopTorchDirect: normal_Tensor_Tensor
+  IgnoreArgs: {'generator'}
+  UnusedOutputArguments: {out}
+
+# normal.Tensor_float(Tensor mean, float std=1, *, Generator? generator=None) -> Tensor
+- func: normal.Tensor_float
+  PopTorchDirect: normal_Tensor_float
+  IgnoreArgs: {'generator'}
+# normal.Tensor_float_out(Tensor mean, float std=1, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+- func: normal.Tensor_float_out
+  PopTorchDirect: normal_Tensor_float
+  IgnoreArgs: {'generator'}
+  UnusedOutputArguments: {out}
+
+# normal.float_Tensor(float mean, Tensor std, *, Generator? generator=None) -> Tensor
+- func: normal.float_Tensor
+  PopTorchDirect: normal_float_Tensor
+  IgnoreArgs: {'generator'}
+# normal.float_Tensor_out(float mean, Tensor std, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+- func: normal.float_Tensor_out
+  PopTorchDirect: normal_float_Tensor
+  IgnoreArgs: {'generator'}
   UnusedOutputArguments: {out}
 
 
