@@ -280,6 +280,17 @@
   PopTorchDirect: uniform_
   IgnoreArgs: {'generator'}
 
+# `torch.randint`, `torch.randint_like` dispatch to this
+# random_(Tensor(a!) self, *, Generator? generator=None) -> Tensor(a!)
+- func: random_
+  PopTorchDirect: random_
+  IgnoreArgs: {'generator'}
+
+# random_.from(Tensor(a!) self, int from, int? to, *, Generator? generator=None) -> Tensor(a!)
+- func: random_.from
+  PopTorchDirect: random__from
+  IgnoreArgs: {'generator'}
+
 
 #########
 # Misc

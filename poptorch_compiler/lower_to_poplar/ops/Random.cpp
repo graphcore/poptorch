@@ -2,9 +2,59 @@
 
 #include "lower_to_poplar/CompilerHelpers.hpp"
 
+#include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Fill.hpp>
 #include <poprand/RandomGen.hpp>
+
+#include "poptorch_logging/Error.hpp"
+
+namespace {
+
+// Source: https://pytorch.org/docs/stable/generated/torch.Tensor.random_.html
+//
+// `torch.random_`'s value limits are defined for ints as the limits of the
+// underlying `dtype`, and for floats as 2^mantissa (IEEE754), depending on the
+// float size. The minimum defaults to 0.
+//
+// However, `torch.random_` is implemented in terms of `poprand::uniform`, which
+// only accepts a `dtype` of `FLOAT`/`HALF`/`INT`. We also need to convert
+// `random_` ranges [from, to) to `poprand::uniform` ranges [from, to].
+int32_t getMaxValueForRandom(const poplar::Type &type) {
+  if (type == poplar::FLOAT) {
+    return 1 << 24;
+  }
+  if (type == poplar::HALF) {
+    return 1 << 11;
+  }
+  if (type == poplar::INT) {
+    return std::numeric_limits<int32_t>::max() - 1;
+  }
+  if (type == poplar::SHORT) {
+    return std::numeric_limits<int16_t>::max() - 1;
+  }
+  if (type == poplar::UNSIGNED_SHORT) {
+    return std::numeric_limits<uint16_t>::max() - 1;
+  }
+  if (type == poplar::SIGNED_CHAR || type == poplar::CHAR) {
+    return std::numeric_limits<int8_t>::max() - 1;
+  }
+  if (type == poplar::UNSIGNED_CHAR) {
+    return std::numeric_limits<uint8_t>::max() - 1;
+  }
+  if (type == poplar::BOOL) {
+    return 1;
+  }
+  if (type == poplar::UNSIGNED_INT || type == poplar::LONGLONG ||
+      type == poplar::UNSIGNED_LONGLONG) {
+    ERROR("dtype used for random_ or randint has a too-big largest "
+          "representable value (maximum is that of int32).");
+  }
+
+  ERROR("Unknown dtype used for random_ or randint.");
+}
+
+} // namespace
 
 namespace poptorch_ir {
 
@@ -72,6 +122,61 @@ void uniform_::lowerToPoplar(CompilerContext &context) {
                        poplar::FLOAT, from, to, context.seq);
 
   context.tensors.insert({this->result(), res});
+}
+
+void random_::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor self = context.fromSsa(this->self());
+
+  const int32_t from = 0;
+  const int32_t to = getMaxValueForRandom(self.elementType());
+
+  const poplar::Tensor as_ints =
+      poprand::uniform(context.graph, &context.getRandomSeed(), 0, self,
+                       poplar::INT, from, to, context.seq);
+
+  const poplar::Tensor res =
+      popops::cast(context.graph, as_ints, self.elementType(), context.seq);
+
+  context.tensors.insert({this->result(), res});
+}
+
+void random__from::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor self = context.fromSsa(this->self());
+
+  const int64_t from = this->from();
+  const int64_t to =
+      this->to() ? *this->to() -
+                       1 // `random_` is [l, h); `poprand::uniform` is [l, h].
+                 : getMaxValueForRandom(self.elementType());
+
+  if (self.elementType() == poplar::FLOAT ||
+      self.elementType() == poplar::HALF) {
+    // Deal with halves & floats directly since they should be allowed to
+    // generate values outside of int32 range.
+    //
+    // Since we're rounding down, the highest number in the range would be
+    // extremely unlikely, so add almost 1 -- though not quite enough to make
+    // the next number a possibility.
+    const poplar::Tensor res =
+        poprand::uniform(context.graph, &context.getRandomSeed(), 0, self,
+                         self.elementType(), from, to + 0.99, context.seq);
+    popops::floorInPlace(context.graph, res, context.seq);
+
+    context.tensors.insert({this->result(), res});
+  } else {
+    // For everything else, generate the biggest ints we can and cast down
+    // if-needed.
+    //
+    // NOTE: This will defer to the poplar behaviour of failing if passed a
+    //       `from`/`to` outside int32 range.
+    const poplar::Tensor as_ints =
+        poprand::uniform(context.graph, &context.getRandomSeed(), 0, self,
+                         poplar::INT, from, to, context.seq);
+    const poplar::Tensor res =
+        popops::cast(context.graph, as_ints, self.elementType(), context.seq);
+
+    context.tensors.insert({this->result(), res});
+  }
 }
 
 } // namespace poptorch_ir

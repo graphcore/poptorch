@@ -81,3 +81,34 @@ def Poptorch_uniform_ : Poptorch_Op<"uniform_", [SameOperandsAndResultShape]> {
         $_state.addTypes({self.getType()});
   }]>];
 }
+
+def Poptorch_random_ : Poptorch_Op<"random_", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+        $_state.addOperands({self});
+        $_state.addTypes({self.getType()});
+  }]>];
+}
+
+def Poptorch_random__from : Poptorch_Op<"random__from", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       I64Attr:$from,
+                       OptionalAttr<I64Attr>:$to);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                    "int64_t":$from,
+                                    "std::optional<int64_t>":$to), [{
+        $_state.addOperands({self});
+
+        $_state.addAttribute("from", $_builder.getI64IntegerAttr(from));
+        if (to)
+          $_state.addAttribute("to", $_builder.getI64IntegerAttr(*to));
+
+        $_state.addTypes({self.getType()});
+  }]>];
+}

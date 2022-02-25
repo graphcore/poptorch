@@ -252,3 +252,73 @@ def test_uniform_(shape):
         return torch.empty(shape).uniform_()
 
     rng_harness(rand, [torch.min, torch.max, torch.mean, torch.var])
+
+
+# torch.random_
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.parametrize("dtype",
+                         [torch.int, torch.float, torch.half, torch.bool])
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_random_(shape, dtype):
+    def rand():
+        return torch.empty(shape, dtype=dtype).random_()
+
+    rng_harness(rand, [mean, std])
+
+
+# torch.random_(dtype=int8)
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_random_int8(shape):
+    # This is mainly to test boundaries of generated values.
+    def rand():
+        return torch.empty(shape, dtype=torch.int8).random_()
+
+    rng_harness(rand, [torch.min, torch.max, mean, std])
+
+
+# torch.random_(int, int)
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.parametrize("dtype", [torch.int, torch.float, torch.half])
+@pytest.mark.parametrize("limits", [(0, 1), (0, 2), (0, 3), (0, 5), (5, 500)])
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_random_limits(shape, dtype, limits):
+    def rand():
+        return torch.empty(shape, dtype=dtype).random_(limits[0], limits[1])
+
+    rng_harness(rand, [torch.min, torch.max, mean, std])
+
+
+# torch.randint
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.parametrize("dtype", [torch.int, torch.float, torch.half])
+@pytest.mark.parametrize("limits", [(0, 2), (0, 5), (5, 500)])
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_randint(shape, dtype, limits):
+    def rand():
+        return torch.randint(limits[0], limits[1], shape, dtype=dtype)
+
+    rng_harness(rand, [torch.min, torch.max, mean, std])
+
+
+# torch.randint_like
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.parametrize("dtype", [torch.int, torch.float])
+@pytest.mark.parametrize("limits", [(2, 5)])
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_randint_like(shape, dtype, limits):
+    torch.manual_seed(42)
+    inp = torch.empty(shape, dtype=dtype)
+
+    cpu_res = torch.randint_like(inp, low=limits[0], high=limits[1])
+
+    ipu_res = IPUContext(torch.randint_like)(inp,
+                                             low=limits[0],
+                                             high=limits[1])
+
+    check_stats(cpu_res, ipu_res, [torch.min, torch.max, mean, std])
