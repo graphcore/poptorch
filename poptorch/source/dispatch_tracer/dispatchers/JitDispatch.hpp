@@ -50,10 +50,10 @@ public:
                     at::IntArrayRef output_padding, int64_t groups);
 
 
-  // fake_target will be updated to the new target post canonicalisation
+  // node will be updated to the new target post canonicalisation
   void canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                               c10::Stack &stack,
-                              torch::jit::Node **fake_target);
+                              torch::jit::Node **node);
 
   // clang-format on
 private:

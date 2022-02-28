@@ -310,6 +310,7 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   // First we check if we have a direct mapping onto MLIR.
   auto mlir_handle = _direct_dispatch_lookup.find(schema_key);
   if (mlir_handle != _direct_dispatch_lookup.end()) {
+    logging::trace("[TRACING-2] Handling {} via MLIR", schema_key);
     /*
      * Convert the stack arguments into JIT. Only for JIT graph
      * correction/building so we can maintain a JIT graph as well as the MLIR
@@ -382,15 +383,16 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
     // start from here.
     _last_processed_node = node;
   } else {
+    logging::trace("[TRACING-2] Handling {} via JIT fallback", schema_key);
     // Otherwise we convert the node into PyTorch JIT first and work with that
     // instead of direct mapping.
-    canonicaliseAndLowerViaJit(schema, *stack);
+    canonicaliseAndLowerViaJit(op, stack);
   }
 }
 
 // Convert to JIT and through that lower to MLIR.
-void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
-                                              c10::Stack &stack) {
+void MLIRDispatch::canonicaliseAndLowerViaJit(
+    const c10::OperatorHandle &initial_op, c10::Stack *stack) {
   // We can convert any Pytorch schema we see into JIT via the PyTorch JIT API.
   // In the case where we have not mapped an operation on to MLIR or have not
   // directly supported that operation 1:1 in MLIR we can convert that operation
@@ -434,23 +436,45 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
   // We can iterate down from that till the end of the graph so we capture all
   // nodes which canonicalisation has added.
 
-  // Create a fake IR node for us to target using the schema.
-  torch::jit::Node *fake_target =
-      lowerFromSchema(schema, &stack, _graph, _mapper);
+  c10::Dispatcher &dispatcher = c10::Dispatcher::singleton();
 
-  // Try canonicalise it.
+  const c10::FunctionSchema &initial_schema = initial_op.schema();
+  // Run through the schema to find out if one of the operators is supposed to
+  // be inplace, this could be the 'out' argument of a non-inplace op.
+  c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
+      getInplaceArgument(*stack, initial_schema);
+  bool is_truly_inplace = isTrulyInplace(*stack, initial_schema);
+
+  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
+  const c10::FunctionSchema &schema = op.schema();
+
+  // Create a fake IR node for us to target using the schema.
+  torch::jit::Node *node = lowerFromSchema(schema, stack, _graph, _mapper);
+
+  if (shouldRunOnCpu(is_truly_inplace, schema.name())) {
+    convertAnyHalvesToFloat(stack);
+    // Call the CPU version to get the output shape
+    dispatcher.callBoxed(op, stack);
+  } else {
+    // The Op is in place: we don't need to run the CPU version.
+    // Just clear the stack and keep the first input.
+    at::Tensor t = stack->at(0).toTensor();
+    stack->clear();
+    stack->push_back(t);
+  }
+
+  // Fix the fake tensor so it can still work with our canonicalisation
+  // functions which check the output.
+  fixNodeOutput(node, *stack);
+
+  // Try to canonicalise it.
   torch::jit::Node *new_node =
-      canonicalise(schema, fake_target, _graph, true /*is allowed to fail*/);
+      canonicalise(schema, node, _graph, true /*is allowed to fail*/);
 
   // The running output_id. Each operation will decompose into 1 or more onnx
   // operations, we track the last added one via this so we know which one is
   // the "last".
   poptorch_ir::TensorId output_id = poptorch_ir::tensor_error_id;
-
-  // Run through the schema to find out if one of the operators is supposed to
-  // be inplace.
-  c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
-      getInplaceArgument(stack, schema);
 
   // We use the last processed node as the start point for the jit. This is the
   // last node which has been added to the graph, so we can tell what nodes have
@@ -502,7 +526,6 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
 
     // Look up the normal PopART jit node.
     auto jit_handler = _jit_handlers.find(kind);
-
     if (jit_handler != _jit_handlers.end()) {
       // Call the normal PopART handler.
       output_id = jit_handler->second(*itr, mlir_ids);
@@ -527,53 +550,49 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(const c10::FunctionSchema &schema,
   // We always want to be looking at "fresh" nodes.
   _last_processed_node = new_node;
 
-  std::vector<std::int64_t> shape = _compiler.getSize(output_id);
-  bool requires_grad = false;
-
-  // If any input needs a grad our output needs a gradient.
-  for (c10::IValue value : stack) {
-    if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
-      if (tensor.requires_grad()) {
-        requires_grad = true;
-      }
-    }
-  }
-
   // The output to return
-  at::Tensor new_output;
+  at::Tensor output;
+  auto output_val = stack->at(0);
+  ERROR_ON_MSG(!output_val.isTensor(), "Output value is not a tensor.");
+  output = output_val.toTensor();
 
   // If we are inplace copy the result into that tensor.
   if (inplace_tensor) {
-    new_output = outputIsInplaceOf(output_id, at::Tensor{inplace_tensor});
+    outputIsInplaceOf(output_id, at::Tensor{inplace_tensor});
   } else {
-    poptorch_ir::Type compiler_type = _compiler.getType(output_id);
-    auto dtype = compilerTypeToScalarType(compiler_type);
-
-    // Otherwise create a tensor to return to the user.
-    new_output = at::native::empty_cpu(shape, dtype);
-    new_output.set_requires_grad(requires_grad);
-
     // Add the tensor + track the jit node.
-    _mapper.addTensor(new_output, new_node->output(0));
-
+    _mapper.addTensor(output, new_node->output(0));
     // Track the MLIR node as well.
-    _mapper.addTensor(new_output, output_id);
+    _mapper.addTensor(output, output_id);
   }
 
-  // Clear the stack of inputs and add the output (as per the PyTorch calling
-  // convention)
-  stack.clear();
+  // In some cases, cpu shape doesn't match the mlir shape exactly
+  // (e.g. scalar vectors). If that's the case, mlir has precedence.
+  auto mlir_shape = _compiler.getSize(output_id);
+  auto cpu_shape = output.sizes();
+  bool shapes_match = mlir_shape.size() == cpu_shape.size();
 
-  // JIT only supports one output.
-  stack.push_back(new_output);
+  for (size_t i = 0; i < mlir_shape.size(); ++i) {
+    if (!shapes_match) {
+      break;
+    }
+    if (mlir_shape.at(i) != cpu_shape.at(i)) {
+      shapes_match = false;
+    }
+  }
+
+  if (!shapes_match) {
+    output = output.reshape(mlir_shape);
+    stack->clear();
+    stack->push_back(output);
+  }
 
   // Fixup the JIT so it has the correct type.
-  new_node->output(0)->inferTypeFrom(new_output);
+  new_node->output(0)->inferTypeFrom(output);
 
   logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
-                 reinterpret_cast<void *>(new_output.unsafeGetTensorImpl()),
-                 new_node->output(0)->debugNameBase(), toString(new_output));
+                 reinterpret_cast<void *>(output.unsafeGetTensorImpl()),
+                 new_node->output(0)->debugNameBase(), toString(output));
 }
 
 std::shared_ptr<MLIRExecutable> MLIRDispatch::compile() {
