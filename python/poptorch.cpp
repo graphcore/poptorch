@@ -56,12 +56,6 @@ void beginIpuBlock(int64_t stage_id, int64_t phase_id, int64_t ipu_id) {
   UNUSED(ipu_id);
 }
 
-void whileLoopBegin(const at::Tensor &condition,           // NOLINT
-                    const c10::List<at::Tensor> &inputs) { // NOLINT
-  UNUSED(condition);
-  UNUSED(inputs);
-}
-
 at::Tensor castOp(at::Tensor tensor, std::string &&type) {
   UNUSED(type);
 
@@ -187,20 +181,6 @@ void clearAttribute(const std::string &attribute, const std::string &key) {
   UNUSED(key);
 }
 
-// We track the outputs of the if in this brach as it is easier to add them
-// immediately before.
-void elseBranch(c10::List<at::Tensor> if_out) { // NOLINT
-  UNUSED(if_out);
-}
-
-c10::List<at::Tensor> endIf(at::Tensor condition,               // NOLINT
-                            c10::List<at::Tensor> example_outs, // NOLINT
-                            c10::List<at::Tensor> else_out) {   // NOLINT
-  UNUSED(condition);
-  UNUSED(else_out);
-  return example_outs;
-}
-
 void startForLoop(c10::List<at::Tensor> inputs) { // NOLINT
   UNUSED(inputs);
 }
@@ -250,11 +230,6 @@ static auto registry =
         .op("poptorch::custom_operation", &customOperation)
         .op("poptorch::ctc_beam_search_decoder", &ctcBeamSearchDecoder)
         .op("poptorch::identity_loss", &identityLoss)
-        .op("poptorch::while_loop_begin", &whileLoopBegin)
-        .op("poptorch::end_loop_begin", &nullOp)
-        .op("poptorch::start_if_true", &nullOp)
-        .op("poptorch::start_if_false", &elseBranch)
-        .op("poptorch::end_if", &endIf)
         .op("poptorch::start_for_loop", &startForLoop)
         .op("poptorch::end_for_loop", &endForLoop)
         .op("poptorch::optimizer_group", &optimizerGroup)

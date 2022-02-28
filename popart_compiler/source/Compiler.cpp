@@ -1331,20 +1331,6 @@ void Compiler::startSubgraph() {
   _impl->active_builder->addOutputTensor({keep_going});
 }
 
-void Compiler::startIfBlock() {
-  popart::Builder *subgraph = &_impl->active_builder->createSubgraphBuilder();
-  _impl->active_builder = subgraph;
-  _impl->if_true_stack.push(_impl->active_builder);
-}
-
-void Compiler::startElseBlock() {
-  // Else must by definition be added after a if block.
-  _impl->active_builder = _impl->active_builder->getParent();
-  popart::Builder *subgraph = &_impl->active_builder->createSubgraphBuilder();
-  _impl->active_builder = subgraph;
-  _impl->if_false_stack.push(_impl->active_builder);
-}
-
 void Compiler::setAttribute(const char *attribute, const char *key,
                             const char *value) {
   _impl->setAttribute(std::string(attribute), std::string(key),
@@ -1386,29 +1372,6 @@ Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
   std::vector<popart::TensorId> output =
       ai_onnx.loop(transformed_ins, num_outputs, *body);
 
-  return HandleOutput<std::vector<popart::TensorId>>{}(output, false,
-                                                       _impl.get());
-}
-
-poptorch::TensorId Compiler::endIf(const poptorch::TensorId &condition,
-                                   std::size_t num_outputs) {
-  // Pop back to the parent.
-  _impl->active_builder = _impl->active_builder->getParent();
-
-  // Pop the true branch off the stack.
-  popart::Builder *true_branch = _impl->if_true_stack.top();
-  _impl->if_true_stack.pop();
-
-  // Pop the false branch off the stack.
-  popart::Builder *false_branch = _impl->if_false_stack.top();
-  _impl->if_false_stack.pop();
-
-  popart::TensorId cond_as_popart =
-      _impl->convertPoptorchToPopartTensor(condition);
-
-  auto ai_onnx = _impl->active_builder->aiOnnxOpset10();
-  std::vector<popart::TensorId> output = ai_onnx.logical_if(
-      {cond_as_popart}, num_outputs, *false_branch, *true_branch);
   return HandleOutput<std::vector<popart::TensorId>>{}(output, false,
                                                        _impl.get());
 }

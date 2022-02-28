@@ -118,11 +118,6 @@ torch::jit::Node *createAddNotInPlace(torch::jit::Graph *graph,
                                       torch::jit::Value *A,
                                       torch::jit::Value *B);
 
-// Clean up the if to remove the genuinely dead zeros.
-torch::jit::Node *createEndIf(torch::jit::Graph *graph,
-                              torch::jit::Value *condition,
-                              torch::jit::Value *if_false_out);
-
 torch::jit::Node *createStartForLoop(torch::jit::Graph *graph,
                                      torch::jit::Value *inputs);
 
@@ -130,10 +125,6 @@ torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
                                    torch::jit::Value *outputs,
                                    torch::jit::Value *inputs,
                                    std::int64_t trip_count);
-
-// Add an input from the parent graph.
-torch::jit::Node *createAddInputTensorFromParentGraph(torch::jit::Graph *graph,
-                                                      torch::jit::Value *input);
 
 torch::jit::Node *createAddUntypedInputTensor(torch::jit::Graph *graph,
                                               torch::jit::Value *input);

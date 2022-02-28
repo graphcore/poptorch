@@ -409,12 +409,6 @@ public:
   void loadExecutableAndPrepareDevice(const char *import_filename,
                                       std::int64_t offset);
 
-  void startIfBlock();
-
-  void startElseBlock();
-
-  void startSubgraph();
-
   poptorch::TensorId
   addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
                  const CallbackMetadata &callback,
@@ -423,8 +417,7 @@ public:
                  std::vector<poptorch::PopartType> output_types,
                  std::vector<std::vector<std::size_t>> output_shapes);
 
-  poptorch::TensorId endIf(const poptorch::TensorId &condition,
-                           std::size_t num_outputs);
+  void startSubgraph();
 
   poptorch::TensorId endForLoop(std::int32_t trip_count,
                                 std::int64_t num_outputs,

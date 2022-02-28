@@ -618,38 +618,6 @@ void LowerToPopartImpl::lowerBody() {
       }
     } else if (kind == symbols::poptorch::end_ipu_block) {
       _compiler.clearActiveIpu();
-    } else if (kind == symbols::poptorch::start_if_true) {
-      // Starting the if block means changing the internal builder state to work
-      // with a new subgraph.
-      _compiler.startIfBlock();
-    } else if (kind == symbols::poptorch::start_if_false) {
-      // Starting the else block means changing the internal builder state to
-      // work with a new subgraph.
-      _compiler.startElseBlock();
-    } else if (kind == symbols::poptorch::end_if) {
-      // Process the if condition.
-      poptorch::TensorId condition = _value_map.tensor(node->input(0));
-
-      // Popart needs to know the number of outputs even though it's in the
-      // graph.
-      const std::size_t num_outputs =
-          node->i(c10::Symbol::fromQualString("attr::num_outputs"));
-
-      // Call the callback. This will pop the subgraphs from the stack.
-      poptorch::TensorId first_output_tensor =
-          _compiler.endIf(condition, num_outputs);
-
-      // The callback only returns the ID of the first tensor, but we know
-      // the generated tensors have contiguous IDs, so we can infer the other
-      // IDs.
-      std::vector<poptorch::TensorId> outs;
-      outs.resize(num_outputs);
-      for (std::uint64_t i = 0; i < num_outputs; ++i) {
-        outs[i] = first_output_tensor + i;
-      }
-
-      _value_map.setTuple(node->output(), outs);
-
     } else if (kind == symbols::poptorch::start_for_loop) {
       _compiler.startSubgraph();
     } else if (kind == symbols::poptorch::end_for_loop) {

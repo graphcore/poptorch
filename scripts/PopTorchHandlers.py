@@ -41,8 +41,6 @@ expand("nop", op.nop)
 # These are graph annotations: they don't take any arguments and don't return
 # anything: we just want to pass them through to the lowering stage.
 expand("end_ipu_block", op.passThrough)
-expand("end_loop_begin", op.passThrough)
-expand("start_if_true", op.passThrough)
 expand("begin_multi_conv", op.passThrough)
 expand("pop_name_scope", op.passThrough)
 expand("begin_autocast", op.passThrough)

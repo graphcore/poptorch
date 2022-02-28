@@ -356,15 +356,6 @@ createCustomOperation(torch::jit::Graph *graph,
   return new_node;
 }
 
-torch::jit::Node *
-createAddInputTensorFromParentGraph(torch::jit::Graph *graph,
-                                    torch::jit::Value *input) {
-  torch::jit::Node *new_node = createAndInsertNode(
-      graph, symbols::poptorch::addInputTensorFromParentGraph, {input},
-      ImplicitCast::None, OutputType::Unknown, 0);
-  return new_node;
-}
-
 torch::jit::Node *createAddUntypedInputTensor(torch::jit::Graph *graph,
                                               torch::jit::Value *input) {
   torch::jit::Node *new_node = createAndInsertNode(
@@ -390,14 +381,6 @@ torch::jit::Value *WrappedIntConstantReuser::getConst(int64_t val) {
   }
 
   return _consts[val];
-}
-
-torch::jit::Node *createEndIf(torch::jit::Graph *graph,
-                              torch::jit::Value *condition,
-                              torch::jit::Value *if_false_out) {
-  torch::jit::Node *new_node = createAndInsertNode(
-      graph, symbols::poptorch::end_if, {condition, if_false_out});
-  return new_node;
 }
 
 torch::jit::Node *createStartForLoop(torch::jit::Graph *graph,

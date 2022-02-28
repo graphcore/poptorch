@@ -26,8 +26,6 @@ OP_DECL(poptorch, custom_operation, custom_operation, _impl->customOperation,
         ARG(STRING, name) ARG(STRING, domain) ARG(INT, version) ARG(INT, num_outputs) POPART_ATTRIB_VEC_ARG(attributes),
         BODY_ARG(name) BODY_ARG(domain) BODY_ARG(version) BODY_ARG(num_outputs) BODY_ARG(attributes))
 
-OP_DECL_NO_RETURN(poptorch, addInputTensorFromParentGraph, addInputTensorFromParentGraph,
-                        _impl->addInputTensorFromParentGraph, NONE, NONE)
 OP_DECL_NO_RETURN(poptorch, addOutputTensor, addOutputTensor,  _impl->addOutputTensor, NONE, NONE)
 
 OP_DECL(poptorch, random_uniform, random_uniform, _impl->randomUniform,

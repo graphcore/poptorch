@@ -134,7 +134,6 @@ c10::Symbol nop;
 c10::Symbol begin_ipu_block;
 c10::Symbol internal_cast;
 c10::Symbol end_ipu_block;
-c10::Symbol end_loop_begin;
 c10::Symbol identity_loss;
 c10::Symbol set_available_memory;
 c10::Symbol set_matmul_serialization;
@@ -153,9 +152,6 @@ c10::Symbol update_param_inplace;
 
 c10::Symbol host_side_cast;
 
-c10::Symbol end_if;
-c10::Symbol start_if_true;
-c10::Symbol start_if_false;
 c10::Symbol start_for_loop;
 c10::Symbol end_for_loop;
 c10::Symbol push_name_scope;
@@ -182,7 +178,6 @@ static void initializePoptorchSymbols() {
   SYMBOL_INIT(poptorch, begin_ipu_block);
   SYMBOL_INIT(poptorch, internal_cast);
   SYMBOL_INIT(poptorch, end_ipu_block);
-  SYMBOL_INIT(poptorch, end_loop_begin);
   SYMBOL_INIT(poptorch, identity_loss);
   SYMBOL_INIT(poptorch, set_available_memory);
   SYMBOL_INIT(poptorch, set_matmul_serialization);
@@ -200,9 +195,6 @@ static void initializePoptorchSymbols() {
 
   SYMBOL_INIT(poptorch, update_param_inplace);
 
-  SYMBOL_INIT(poptorch, end_if);
-  SYMBOL_INIT(poptorch, start_if_true);
-  SYMBOL_INIT(poptorch, start_if_false);
   SYMBOL_INIT(poptorch, start_for_loop);
   SYMBOL_INIT(poptorch, end_for_loop);
   SYMBOL_INIT(poptorch, push_name_scope);

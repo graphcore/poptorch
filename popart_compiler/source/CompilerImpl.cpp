@@ -453,11 +453,6 @@ void CompilerImpl::addOutputTensor(
   active_builder->addOutputTensor(tensors.at(0));
 }
 
-void CompilerImpl::addInputTensorFromParentGraph(
-    const std::vector<popart::TensorId> &tensors) {
-  active_builder->addInputTensorFromParentGraph(tensors.at(0));
-}
-
 popart::TensorId
 CompilerImpl::reshape(const std::vector<popart::TensorId> &tensors,
                       const std::vector<int64_t> &shape) {

@@ -72,7 +72,6 @@ extern c10::Symbol nop;
 extern c10::Symbol begin_ipu_block;
 extern c10::Symbol internal_cast;
 extern c10::Symbol end_ipu_block;
-extern c10::Symbol end_loop_begin;
 extern c10::Symbol identity_loss;
 extern c10::Symbol set_available_memory;
 extern c10::Symbol set_matmul_serialization;
@@ -96,9 +95,6 @@ extern c10::Symbol update_param_inplace;
 // types to later ops have the correct type.
 extern c10::Symbol host_side_cast;
 
-extern c10::Symbol end_if;
-extern c10::Symbol start_if_true;
-extern c10::Symbol start_if_false;
 extern c10::Symbol start_for_loop;
 extern c10::Symbol end_for_loop;
 extern c10::Symbol push_name_scope;

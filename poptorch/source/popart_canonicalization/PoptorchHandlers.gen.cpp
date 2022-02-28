@@ -70,12 +70,6 @@ torch::jit::Node *endIpuBlockHandler(torch::jit::Graph * /*graph*/,
   return nullptr;
 }
 
-torch::jit::Node *endLoopBeginHandler(torch::jit::Graph * /*graph*/,
-                                      torch::jit::Node * /*node*/) {
-  // <pass through>
-  return nullptr;
-}
-
 torch::jit::Node *identityLossHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -167,12 +161,6 @@ torch::jit::Node *startForLoopHandler(torch::jit::Graph *graph,
   return createStartForLoop(graph, inputs);
 }
 
-torch::jit::Node *startIfTrueHandler(torch::jit::Graph * /*graph*/,
-                                     torch::jit::Node * /*node*/) {
-  // <pass through>
-  return nullptr;
-}
-
 torch::jit::Node *suppressAutocastHandler(torch::jit::Graph * /*graph*/,
                                           torch::jit::Node * /*node*/) {
   // <pass through>
@@ -197,7 +185,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::end_cpu_op, endCpuOpHandler);
   registerHandler(symbols::poptorch::end_for_loop, endForLoopHandler);
   registerHandler(symbols::poptorch::end_ipu_block, endIpuBlockHandler);
-  registerHandler(symbols::poptorch::end_loop_begin, endLoopBeginHandler);
   registerHandler(symbols::poptorch::identity_loss, identityLossHandler);
   registerHandler(symbols::poptorch::internal_cast, internalCastHandler);
   registerHandler(symbols::poptorch::ipu_print_tensor, ipuPrintTensorHandler);
@@ -212,7 +199,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::set_matmul_serialization,
                   setMatmulSerializationHandler);
   registerHandler(symbols::poptorch::start_for_loop, startForLoopHandler);
-  registerHandler(symbols::poptorch::start_if_true, startIfTrueHandler);
   registerHandler(symbols::poptorch::suppress_autocast,
                   suppressAutocastHandler);
   registerHandler(symbols::poptorch::update_param_inplace,

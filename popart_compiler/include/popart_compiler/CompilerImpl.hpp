@@ -160,9 +160,6 @@ public:
   // of the op_builder top level graph.
   popart::Builder *active_builder;
 
-  std::stack<popart::Builder *> if_true_stack;
-  std::stack<popart::Builder *> if_false_stack;
-
   std::map<popart::TensorId, popart::AnchorReturnType> anchors;
 
   std::vector<popart::TensorId> ids;
@@ -258,9 +255,6 @@ public:
 
   void addOutputTensor(const std::vector<popart::TensorId> &tensors);
 
-  void
-  addInputTensorFromParentGraph(const std::vector<popart::TensorId> &tensors);
-
   popart::TensorId
   addUntypedInputTensor(const std::vector<popart::TensorId> &tensors);
 
@@ -280,16 +274,6 @@ public:
                          HostSideConstant constant);
 
   popart::TensorId addNotInPlace(const std::vector<popart::TensorId> &in);
-
-  // Convert a poptorch tensor id to a popart tensor.
-  inline popart::TensorId
-  convertPoptorchToPopartTensor(poptorch::TensorId tensors) {
-    return ids.at(tensors);
-  }
-
-  // Convert a list of poptorch tensors to a list of popart tensors.
-  std::vector<popart::TensorId> convertPoptorchToPopartTensors(
-      const std::vector<poptorch::TensorId> &tensors);
 
   popart::TensorId randomNormal(const std::vector<popart::TensorId> &tensors,
                                 const std::vector<int64_t> &shape, float mean,
@@ -338,7 +322,8 @@ public:
                          const std::string &value_as_string) {
     if (options_set.count(name) && option != static_cast<T>(value)) {
       logging::warn("{} forced by the user from default to {}, "
-          "ignoring value {}", name, option, value_as_string);
+                    "ignoring value {}",
+                    name, option, value_as_string);
     } else {
       logging::debug("{} set to value {}", name, value_as_string);
       option = value;
