@@ -65,10 +65,37 @@ torch::jit::Node *pairwiseDistanceHandler(torch::jit::Graph *graph,
 
   return out;
 }
+
+torch::jit::Node *cosineSimilarityHandler(torch::jit::Graph *graph,
+                                          torch::jit::Node *node) {
+  // aten::cosine_similarity(const Tensor& x1, const Tensor& x2, int64_t dim,
+  //                         double eps)
+
+  // inputs
+  auto *x1 = node->input(0);
+  auto *x2 = node->input(1);
+  auto dim = constantToLong(node->input(2)->node());
+  auto *eps = node->input(3);
+
+  // dividend
+  auto *mul12 = createMul(graph, {x1, x2})->output();
+  auto *dot12 = createReducesum(graph, {mul12}, {dim}, 0)->output();
+
+  // divisor
+  auto *mag1_sq = createReducesumsquare(graph, {x1}, {dim}, 0)->output();
+  auto *mag2_sq = createReducesumsquare(graph, {x2}, {dim}, 0)->output();
+  auto *mag12_sq = createMul(graph, {mag1_sq, mag2_sq})->output();
+  auto *mag12 = createSqrt(graph, {mag12_sq})->output();
+  auto *mag12_nonzero = createMax(graph, {mag12, eps})->output();
+
+  return createDiv(graph, {dot12, mag12_nonzero});
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::pairwise_distance, pairwiseDistanceHandler);
+  registerHandler(c10::aten::cosine_similarity, cosineSimilarityHandler);
 }
 
 } // namespace poptorch

@@ -27,6 +27,7 @@ New features
 - Improve implementation of torch.scatter_add
 - Support for ``torch.nn.utils.weight_norm``
 - Support for ``torch.randperm``
+- Support for ``torch.nn.functional.cosine_similarity`` and ``torch.nn.CosineSimilarity``
 
 API changes
 -----------
