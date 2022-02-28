@@ -446,3 +446,67 @@ def test_get_cycles_no_hw(trace_model):
         r"Cycle count logging is only supported on actual IPU hardware.")
     with pytest.raises(poptorch.Error, match=error_msg):
         inference_model(torch.Tensor([3.0]), torch.Tensor([4.0]))
+
+
+@pytest.mark.parametrize("rewrap_executor", [True, False])
+def test_rewrap_model(rewrap_executor):
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = torch.nn.Linear(1, 1)
+            self.loss = torch.nn.L1Loss()
+
+        def forward(self, x):
+            y = self.fc(x)
+            loss = self.loss(y, x + 1)
+
+            return loss
+
+    model = Model()
+
+    opts = poptorch.Options()
+
+    # Normal running
+    torch.nn.init.ones_(model.fc.weight)
+    torch.nn.init.zeros_(model.fc.bias)
+
+    opts.deviceIterations(10)
+    poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    poptorch_model(torch.ones([10]))
+
+    bias_after_1000 = float(model.fc.bias)
+
+    # Try rewrapping model half way
+    torch.nn.init.ones_(model.fc.weight)
+    torch.nn.init.zeros_(model.fc.bias)
+
+    with pytest.raises(AssertionError):
+        torch.testing.assert_allclose(actual=model.fc.bias,
+                                      expected=bias_after_1000)
+
+    model.destroy()
+
+    opts = poptorch.Options()
+    opts.deviceIterations(5)
+    poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    poptorch_model(torch.ones([5]))
+
+    err_msg = (r"Model has already been wrapped in 'poptorch.trainingModel'." +
+               r" Call model.destroy\(\) on the model to unwrap before " +
+               "wrapping again.")
+    with pytest.raises(RuntimeError, match=err_msg):
+        poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    # re-wrap for test
+    if rewrap_executor:
+        poptorch_model.destroy()
+        poptorch_model = poptorch.trainingModel(poptorch_model, options=opts)
+    else:
+        model.destroy()
+        poptorch_model = poptorch.trainingModel(model, options=opts)
+
+    poptorch_model(torch.ones([5]))
+    torch.testing.assert_allclose(actual=float(model.fc.bias),
+                                  expected=bias_after_1000)

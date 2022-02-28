@@ -30,6 +30,7 @@ import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 from poptorch.poptorch_core import Error, RecoverableError, UnrecoverableError
 from . import _dataloader
+from . import _impl
 from . import _poptorch_data
 from .autocasting import autocast
 from .enums import *
@@ -73,6 +74,15 @@ def load(filename: str,
     if data.optimizer_state is not None:
         assert data.optimizer is not None
         data.optimizer.load_state_dict(data.optimizer_state)
+
+    # It may look wrapped but not be in _impl._wrapper_types because it has been
+    # loaded in a new session. Unwrap manually if so.
+    wrapped_model_cls_str = (
+        "poptorch._poplar_executor." +
+        "PoplarExecutor.__init__.<locals>.PoptorchModel'>")
+    if wrapped_model_cls_str in str(data.model.__class__):
+        data.model.__class__ = data.model.__class__.__bases__[0]
+
     if data.training:
         executor = trainingModel(data.model, data.options, data.optimizer)
     else:
@@ -522,13 +532,19 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     """ Create a PopTorch training model, from a PyTorch model, to run on IPU
     hardware in training mode.
 
-    .. note:: PopTorch makes a shallow copy of the model. Changes to the
-        parameters in the returned training model affect the original model
-        and vice versa. However, primitive variable types are not synced: for
-        example calling ``model.train()`` on the original model, which
-        changes the ``training`` bool of the model instance, will not alter the
-        model returned by this function. You may need to call ``model.train()``
-        on your model before you call this function for correct behaviour.
+    .. note:: PopTorch makes a shallow copy of the model and wraps the original
+            model to fasciliate weight syncronisation. Changes to the parameters
+            in the returned training model affect the original model and vice
+            versa. However, primitive variable types are not synced: for
+            example calling ``model.train()`` on the original model, which
+            changes the ``training`` bool of the model instance, will not alter
+            the model returned by this function. You may need to call
+            ``model.train()`` on your model before you call this function for
+            correct behaviour.
+
+    .. note: To restore a model use :py:meth:`~poptorch.PoplarExecutor.destroy`.
+        You will need to do this first if you need to call this function again
+        on the same instance.
 
     :param model: The PyTorch model to wrap.
     :param options: The IPU specific options
@@ -547,8 +563,15 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
     :returns: The :py:class:`poptorch.PoplarExecutor` wrapper to use in place
         of ``model``.
     """
+
     if isinstance(model, PoplarExecutor):
         model = model._user_model  # pylint: disable=protected-access
+
+    # Handle the model already being wrapped
+    if _impl.isWrapped(model):
+        raise RuntimeError("Model has already been wrapped in " +
+                           "'poptorch.trainingModel'. Call model.destroy() " +
+                           "on the model to unwrap before wrapping again.")
 
     # Create a copy of the original model in case it needs to be wrapped
     maybe_wrapped_model = copy.copy(model)

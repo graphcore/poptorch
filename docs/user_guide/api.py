@@ -141,6 +141,9 @@ with tempfile.TemporaryDirectory() as d:
     # Saving the optimizer state
     torch.save({'optimizer_state_dict': optimizer.state_dict()}, PATH)
 
+    # Destroy original model to prevent an error when wrapping the model again
+    poptorch_model.destroy()
+
     new_optimizer = poptorch.optim.Adam(model.parameters())
     # Loading the optimizer state back
     checkpoint = torch.load(PATH)

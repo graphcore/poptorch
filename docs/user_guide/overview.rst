@@ -113,10 +113,12 @@ You should not create this class directly. It is a wrapper around the model
 that was passed into :py:func:`~poptorch.inferenceModel` or :py:func:`~poptorch.trainingModel`.
 It has a few methods which you can use to interface with the IPU.
 
-The :py:class:`~poptorch.PoplarExecutor` will implicitly keep in sync the parameters
-of the  source PyTorch model and the PopTorch model(s). However, you need to explicitly copy the weights
-if the model is trained on the CPU and inference is run on
-the IPU.
+The :py:class:`~poptorch.PoplarExecutor` will implicitly keep in sync the
+parameters of the source PyTorch model and the PopTorch model(s). However, you
+need to explicitly copy the weights before you run a model on the IPU if you
+train the model on the CPU after you have already wrapped it for the IPU. You
+also need to explicitly copy the weights if you alter an already wrapped model
+parameter by some other means.
 
 See :py:class:`~poptorch.PoplarExecutor` for a complete description of the IPU interface
 functionality.

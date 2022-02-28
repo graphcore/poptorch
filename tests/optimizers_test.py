@@ -1473,6 +1473,9 @@ def test_write_ipu_state_before_override(capfd):
     training_model((input, ))
     s1 = optimizer.state_dict()
 
+    # destroy model so it can be rewrapped
+    training_model.destroy()
+
     # Create a new optimiser and load the state dict
     new_optimizer = poptorch.optim.Adam(model.parameters())
     new_optimizer.load_state_dict(s1)

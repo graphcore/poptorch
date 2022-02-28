@@ -67,6 +67,9 @@ class PoplarExecutor:
         else:
             options = Options()
 
+        # NB model is the one which gets called, which may have its own wrapping
+        # such as to have a loss. user_model is the one which is transformed.
+
         self._user_model = user_model or model
 
         options.Precision.autocast_policy.apply(self._user_model, options)
@@ -167,6 +170,12 @@ class PoplarExecutor:
                     if parent():
                         return parent().copyWeightsToHostIfNeeded()
                     return False
+
+                def destroy(self):
+                    """Destroy the model: release the IPUs and the executable.
+                    """
+                    if parent():
+                        parent().destroy()
 
                 def __getattribute__(self, name):
                     if name == "_host_weights_version":
@@ -1067,6 +1076,18 @@ class PoplarExecutor:
             self.copyWeightsToHostIfNeeded()
         del self._executable
         self._executable = None
+
+        if not self._training:
+            return
+
+        # Unwrap parmateres and buffers
+        self.load_state_dict(self.state_dict())
+
+        # unwrap the model
+        if not _impl.isWrapped(self._user_model):
+            raise _impl.createPoptorchError("model was never wrapped")
+
+        _impl.unwrapIfWrapped(self._user_model)
 
     def _trace_with_warning_filter(self, in_tensors_trace_view_tuple):
         # Conditionally suppress the following jit warnings when the model

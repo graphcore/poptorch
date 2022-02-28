@@ -62,11 +62,11 @@ def setIpuDevice(opts):
 poptorch_model = poptorch.load(filename, edit_opts_fn=setIpuDevice)
 poptorch_model(input, target)  # Run on IPU 1
 # load_setIpu_end
-poptorch_model.destroy()
 
 # precomp_no_python_start
 poptorch_model.compileAndExport(filename, input, target, export_model=False)
 # precomp_no_python_end
+
 poptorch_model.destroy()
 
 # load_exe_start

@@ -37,6 +37,8 @@ opts.anchorTensor('grad_bias', 'Gradient___model.fc2.bias')
 opts.anchorTensor('update_weight', 'UpdatedVar___model.fc2.weight')
 # tensor_anchor_end
 
+poptorch_model.destroy()
+
 # tensor_retrieve_start
 poptorch_model = poptorch.trainingModel(model, opts)
 poptorch_model(input, label)
@@ -44,6 +46,8 @@ poptorch_model(input, label)
 grad = poptorch_model.getAnchoredTensor('grad_bias')
 update = poptorch_model.getAnchoredTensor('update_weight')
 # tensor_retrieve_end
+
+poptorch_model.destroy()
 
 # optim_state_dict_start
 optim = poptorch.optim.SGD(model.parameters(), lr=0.01)

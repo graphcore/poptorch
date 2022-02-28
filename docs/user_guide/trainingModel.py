@@ -70,8 +70,8 @@ def validate(model):
 
 # explicit_copy_start
 model = Model()
-
 model.eval()
+
 poptorch_inf = poptorch.inferenceModel(model)
 
 # Switch for "poptorch.trainingModel": poptorch_inf will remain in "eval" mode
