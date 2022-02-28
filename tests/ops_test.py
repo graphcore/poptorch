@@ -117,6 +117,7 @@ def test_available_memory_linear(capfd, trace_model):
     it = log.createIterator()
     # Assert that the set_available_memory node references the matmul, not the
     # add.
+    it.findNext("Graph right before popart:")
     matmul_line = it.findNext("popart::matmul").strip()
     matmul_var = matmul_line.partition(" ")[0]
     sam_line = it.findNext("poptorch::set_available_memory").strip()

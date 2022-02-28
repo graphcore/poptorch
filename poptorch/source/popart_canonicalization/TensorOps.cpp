@@ -4,6 +4,7 @@
 
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -252,6 +253,7 @@ torch::jit::Node *linearHandler(torch::jit::Graph *graph,
         use.user->replaceInputWith(node->output(), matmul->output());
       }
     }
+    setAvailableMemoryAddPossibleInputOp(matmul);
   }
   return output;
 }

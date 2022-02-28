@@ -175,7 +175,8 @@ def test_2d_scatter_add_with_index_expansion(capfd, expand_as):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
-def test_available_memory_scatter_add(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_available_memory_scatter_add(capfd, trace_model):
     class Model(torch.nn.Module):
         def __init__(self, dim, dim_size):
             super().__init__()
@@ -198,11 +199,13 @@ def test_available_memory_scatter_add(capfd):
 
     model = Model(dim, dim_size)
     options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_model(x, index)
 
     log = helpers.LogChecker(capfd)
     it = log.createIterator()
+    it.findNext("Graph right before popart:")
     # Assert that the set_available_memory node references the scatterreduce,
     # not the add.
     sa_line = it.findNext("popart::scatterreduce").strip()

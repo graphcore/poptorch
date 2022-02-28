@@ -66,6 +66,15 @@ void addDetachOperations(torch::jit::Graph *graph);
 // explicit and sub-optimal index expansion before the scatter_add ops.
 void removeScatterAddIndexExpansion(torch::jit::Graph *graph);
 
+// Adds the op as the possible true input op to set_available_memory. Some ops
+// are composed of multiple ops, and their return values might not be an op that
+// accepts set_available_memory.
+void setAvailableMemoryAddPossibleInputOp(torch::jit::Node *node);
+
+// Ensure that the input to the given set_available_memory op is the one that
+// supports set_available_memory.
+void setAvailableMemoryFixupInput(torch::jit::Node *node);
+void setAvailableMemoryOnGraphFinalized();
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_TRANSFORM_ATEN_TO_POPART_HPP_

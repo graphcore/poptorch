@@ -3,7 +3,7 @@
 import os
 
 from popgen.api import expand, convert, generate
-from popgen.helpers import cfloat, cint, clong, cstr, tensor_list
+from popgen.helpers import cint, clong, cstr, tensor_list
 from popgen.values import OriginalNode
 from popgen.operatorfactory import op
 from utils import _utils
@@ -26,8 +26,6 @@ expand("call_cpu_op", lambda x, s: op.callCpuOp(tensor_list(x), cstr(s),
 expand("identity_loss", lambda x, r: op.identityloss(x, cint(r)))
 expand("optimizer_group", lambda x, l: op.optimizerGroup(
     clong(x), tensor_list(l)))
-expand(
-    "set_available_memory", lambda x, y: op.setAvailableMemory(x, cfloat(y)))
 expand(
     "set_matmul_serialization", lambda x, s, a, b: op.setMatMulSerialization(
         x, cstr(s), clong(a), cint(b)))

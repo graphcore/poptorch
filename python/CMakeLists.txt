@@ -55,6 +55,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/AutomaticCasting.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CanonicalizeLists.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/CPUOffloadingCleanUp.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/FixupSetAvailableMemory.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/InplaceOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartCanonicalization.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/PopartLateCanonicalization.cpp"

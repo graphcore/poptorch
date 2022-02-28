@@ -5,6 +5,7 @@
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 
@@ -200,6 +201,7 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
       use.user->replaceInputWith(node->output(), sr->output());
     }
   }
+  setAvailableMemoryAddPossibleInputOp(sr);
   return add;
 }
 
@@ -254,6 +256,16 @@ torch::jit::Node *weightNormHandler(torch::jit::Graph *graph,
   return createMul(graph, {v, scaled_v->output()});
 }
 
+torch::jit::Node *setAvailableMemoryHandler(torch::jit::Graph *graph,
+                                            torch::jit::Node *node) {
+  // poptorch::set_available_memory(Tensor, float) -> Tensor
+  auto *x = node->input(0);
+  auto *y = node->input(1);
+  auto t0 = constantToFloat(y->node());
+  auto *new_node = createSetAvailableMemory(graph, x, t0);
+  setAvailableMemoryFixupInput(new_node);
+  return new_node;
+}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -263,6 +275,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::tensordot, tensordotHandler);
   registerHandler(c10::aten::scatter_add, scatterAddHandler);
   registerHandler(c10::aten::_weight_norm, weightNormHandler);
+  registerHandler(symbols::poptorch::set_available_memory,
+                  setAvailableMemoryHandler);
 }
 
 } // namespace poptorch

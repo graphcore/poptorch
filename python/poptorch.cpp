@@ -943,6 +943,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   // Clear the callbacks after compilation.
   callbacks.clear();
 
+  poptorch::setAvailableMemoryOnGraphFinalized();
+
   poptorch::logging::Tracepoint::end(lower_to_popart);
   return lower;
 }

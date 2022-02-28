@@ -132,15 +132,6 @@ torch::jit::Node *restoreAutocastHandler(torch::jit::Graph * /*graph*/,
   return nullptr;
 }
 
-torch::jit::Node *setAvailableMemoryHandler(torch::jit::Graph *graph,
-                                            torch::jit::Node *node) {
-  auto *x = node->input(0);
-  auto *y = node->input(1);
-  auto t0 = constantToFloat(y->node());
-  // setAvailableMemory(x, cfloat(y))
-  return createSetAvailableMemory(graph, x, t0);
-}
-
 torch::jit::Node *setMatmulSerializationHandler(torch::jit::Graph *graph,
                                                 torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -194,8 +185,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(symbols::poptorch::recomputation_checkpoint,
                   recomputationCheckpointHandler);
   registerHandler(symbols::poptorch::restore_autocast, restoreAutocastHandler);
-  registerHandler(symbols::poptorch::set_available_memory,
-                  setAvailableMemoryHandler);
   registerHandler(symbols::poptorch::set_matmul_serialization,
                   setMatmulSerializationHandler);
   registerHandler(symbols::poptorch::start_for_loop, startForLoopHandler);
