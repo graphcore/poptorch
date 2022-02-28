@@ -11,27 +11,8 @@ namespace poptorch {
 
 class ValueMapper;
 
-// Create a node based on the Schema which deduces the return and input types
-// from the inputs/stack and the name from the schema. As far as our
-// canonicalisation is concerned this *is* the "aten" node it purports to be
-// however it may not match it exacty, and is not created by the normal JIT
-// process.
-torch::jit::Node *
-createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
-                 const std::vector<torch::jit::Value *> &inputs,
-                 c10::Stack *stack, ValueMapper &mapper);
-
-// Run our canonicaliser passes over the graph.
-torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
-                               torch::jit::Node *aten_target,
-                               torch::jit::Graph &graph,
-                               bool is_allowed_to_fail);
-
-// Using the schema definition as a guide look up all the correct
-// torch::jit::Values in the stack.
-torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
-                                  c10::Stack *stack, torch::jit::Graph &graph,
-                                  ValueMapper &mapper);
+c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &initial_op,
+                                        c10::Dispatcher &dispatcher);
 
 // From the schema deduce which argument if any is inplace. Only return the
 // first one which is inplace. This might include an argument of an op that
@@ -45,12 +26,31 @@ getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema);
 // op is truly inplace.
 bool isTrulyInplace(const c10::Stack &stack, const c10::FunctionSchema &schema);
 
-// Return a string containing the tensor sizes and type.
-std::string toString(const at::Tensor &t);
+// Using the schema definition as a guide look up all the correct
+// torch::jit::Values in the stack and create a jit node with the correct
+// symbol. Input values from the stack are also inserted into the graph.
+torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
+                                  c10::Stack *stack, torch::jit::Graph &graph,
+                                  ValueMapper &mapper);
+
+bool shouldRunOnCpu(bool is_inplace, const std::string &op_name);
+
+void convertAnyHalvesToFloat(c10::Stack *stack);
+
+void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack);
+
+// Run our canonicaliser passes for the aten_target over the graph.
+torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
+                               torch::jit::Node *aten_target,
+                               torch::jit::Graph &graph,
+                               bool is_allowed_to_fail);
 
 // If this value was replaced with another by the most recently run handler,
 // return the replacement. If not, return nullptr.
 torch::jit::Value *wasReplaced(torch::jit::Value *target);
+
+// Return a string containing the tensor sizes and type.
+std::string toString(const at::Tensor &t);
 
 } // namespace poptorch
 

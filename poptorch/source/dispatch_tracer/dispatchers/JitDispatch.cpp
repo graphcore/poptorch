@@ -19,39 +19,6 @@
 
 namespace poptorch {
 
-namespace {
-
-void fixFakeTargetOutput(torch::jit::Node *fake_target,
-                         const c10::Stack &stack) {
-  std::uint32_t index = 0;
-  for (c10::IValue value : stack) {
-    // Add any missing outputs. They frequently return scalars which we just
-    // ignore here as our canonicalisation only returns tensors.
-    while (index >= fake_target->outputs().size()) {
-      fake_target->addOutput();
-    }
-
-    if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
-      // Sometimes "Tensors" are actually "Not tensors" but still stored as a
-      // tensor and will assert in the infer type.
-      if (tensor.sizes().size() == 1 && tensor.sizes()[0] == 0) {
-        continue;
-      }
-
-      torch::jit::Value *val = fake_target->output(index);
-      val->inferTypeFrom(tensor);
-    } else if (value.isTensorList()) {
-      auto list_type = value.type()->expect<c10::ListType>();
-      torch::jit::Value *val = fake_target->output(index);
-      val->setType(list_type);
-    }
-    index++;
-  }
-}
-
-} // namespace
-
 void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
                               const std::vector<at::Tensor> &parameters) {
   // We build up the torch IR graph as well.
@@ -181,8 +148,7 @@ at::Tensor JITDispatch::convolution(
   stack.push_back(groups);
 
   // Add it to the graph as a normal output.
-  torch::jit::Node *fake_target =
-      lowerFromSchema(schema, &stack, graph, _mapper);
+  torch::jit::Node *node = lowerFromSchema(schema, &stack, graph, _mapper);
 
   // Get the handler for the convolution.
   auto op_typed = op.typed<decltype(at::convolution)>();
@@ -198,13 +164,13 @@ at::Tensor JITDispatch::convolution(
 
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
-  fixFakeTargetOutput(fake_target, stack);
+  fixNodeOutput(node, stack);
 
   logging::trace("[TRACING-2][JIT] Node tensor output size: ={}",
                  output.sizes());
 
   // Run our normal canonicalisation passes on it.
-  canonicaliseAndFixOutput(schema, stack, &fake_target);
+  canonicaliseAndFixOutput(schema, stack, &node);
 
   return output;
 }
@@ -215,11 +181,9 @@ at::Tensor JITDispatch::detach(const at::Tensor &self) { return self; }
 // Convert the operation into our normal IR style operation.
 void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                                            c10::Stack &stack,
-                                           torch::jit::Node **fake_target) {
-  torch::jit::Node *new_node = canonicalise(schema, *fake_target, graph, false);
-
-  // Point fake_target at the new node
-  *fake_target = new_node;
+                                           torch::jit::Node **node) {
+  torch::jit::Node *new_node = canonicalise(schema, *node, graph, false);
+  *node = new_node;
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation {}", *new_node);
 
@@ -277,91 +241,46 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
   }
 }
 
-namespace {
-// The in-place versions of these functions break the rule that in place ops
-// don't change the shape of the tensor they operate on.
-const std::unordered_set<std::string> in_place_reshapes{
-    "aten::squeeze", "aten::unsqueeze", "aten::transpose"};
-} // namespace
-
 void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
                            c10::Stack *stack) {
-  std::string name = initial_op.schema().name();
-  std::string overload = initial_op.schema().overload_name();
   c10::Dispatcher &dispatcher = c10::Dispatcher::singleton();
-  c10::OperatorHandle op = initial_op;
 
+  const c10::FunctionSchema &initial_schema = initial_op.schema();
   // Run through the schema to find out if one of the operators is supposed to
   // be inplace, this could be the 'out' argument of a non-inplace op.
   c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
-      getInplaceArgument(*stack, initial_op.schema());
-  bool is_truly_inplace = isTrulyInplace(*stack, initial_op.schema());
-  // If ends with '_', it's inplace. Remove the "_" and use the outplace version
-  // instead.
-  bool name_indicates_is_inplace = name[name.size() - 1] == '_';
+      getInplaceArgument(*stack, initial_schema);
+  bool is_truly_inplace = isTrulyInplace(*stack, initial_schema);
 
-  if (name_indicates_is_inplace) {
-    // These are special cases because there is no zero / fill.
-    if (name == "aten::zero_") {
-      name = "aten::zeros_like";
-    } else if (name == "aten::fill_") {
-      name = "aten::full_like";
-    } else {
-      name.erase(name.end() - 1, name.end());
-    }
-    auto opt_op = dispatcher.findOp({name, overload});
-    if (opt_op) {
-      op = *opt_op;
-    } else {
-      op = *dispatcher.findOp({name, ""});
-    }
-  }
-
+  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
   const c10::FunctionSchema &schema = op.schema();
 
   // Create a fake IR node for us to target using the schema.
-  torch::jit::Node *fake_target =
-      lowerFromSchema(schema, stack, graph, _mapper);
+  torch::jit::Node *node = lowerFromSchema(schema, stack, graph, _mapper);
 
-  if ((name_indicates_is_inplace || is_truly_inplace) &&
-      in_place_reshapes.count(name) == 0) {
+  if (shouldRunOnCpu(is_truly_inplace, schema.name())) {
+    convertAnyHalvesToFloat(stack);
+    // Call the CPU version to get the output shape
+    dispatcher.callBoxed(op, stack);
+  } else {
     // The Op is in place: we don't need to run the CPU version.
     // Just clear the stack and keep the first input.
     at::Tensor t = stack->at(0).toTensor();
     stack->clear();
     stack->push_back(t);
-  } else {
-    // Convert any halves to floats
-    for (size_t i = 0; i < stack->size(); i++) {
-      auto &value = stack->at(i);
-      if (!value.isTensor()) {
-        continue;
-      }
-      auto tensor = value.toTensor();
-      if (!tensor.defined()) {
-        continue;
-      }
-      auto tt = value.type()->cast<at::TensorType>();
-      if (tt->scalarType() == at::ScalarType::Half) {
-        at::Tensor t = value.toTensor();
-        value = t.toType(at::ScalarType::Float);
-      }
-    }
-    // Call the CPU version to get the output shape
-    dispatcher.callBoxed(op, stack);
   }
 
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
-  fixFakeTargetOutput(fake_target, *stack);
-  logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *fake_target);
+  fixNodeOutput(node, *stack);
+  logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *node);
 
   // Run our normal canonicalisation passes on it.
-  // The original fake_target node will be deleted but replaced with a new node.
-  canonicaliseAndFixOutput(schema, *stack, &fake_target);
+  // The original node will be deleted but replaced with a new node.
+  canonicaliseAndFixOutput(schema, *stack, &node);
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation and fix output {}",
-                 *fake_target);
+                 *node);
 
   std::size_t i = 0;
   for (c10::IValue value : *stack) {

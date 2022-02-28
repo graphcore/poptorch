@@ -118,30 +118,6 @@ torch::jit::Node *asStridedHandler(torch::jit::Graph * /*graph*/,
   return nullptr;
 }
 
-torch::jit::Node *viewHandler(torch::jit::Graph *graph,
-                              torch::jit::Node *node) {
-  // aten::view(Tensor self, int[] size) -> Tensor
-  std::vector<std::int64_t> new_shape =
-      constantToLongVec(node->input(1)->node());
-
-  // Reshape the tensor into that shape.
-  return createReshape(graph, node->input(0), new_shape);
-}
-
-torch::jit::Node *unsqueezeHandler(torch::jit::Graph *graph,
-                                   torch::jit::Node *node) {
-  // aten::unsqueeze(Tensor self, int dim) -> Tensor
-  std::vector<std::int64_t> new_shape = shapeFromTensor(node->input(0));
-  std::int64_t dim = constantToLong(node->input(1)->node());
-  if (dim < 0) {
-    dim += new_shape.size() + 1;
-  }
-  new_shape.insert(new_shape.begin() + dim, 1);
-
-  // Reshape the tensor into that shape.
-  return createReshape(graph, node->input(0), new_shape);
-}
-
 torch::jit::Node *reshapeHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   // aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
@@ -929,8 +905,8 @@ torch::jit::Node *autocastHandler(torch::jit::Graph *graph,
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::expand, expandHandler);
   registerHandler(c10::aten::expand_as, expandAsHandler);
-  registerHandler(c10::aten::view, viewHandler);
-  registerHandler(c10::aten::unsqueeze, unsqueezeHandler);
+  registerHandler(c10::aten::view, reshapeHandler);
+  registerHandler(c10::aten::unsqueeze, reshapeHandler);
   registerHandler(c10::aten::flatten, flattenHandler);
   registerHandler(c10::aten::reshape, reshapeHandler);
   registerHandler(c10::aten::_reshape_alias, reshapeHandler);
