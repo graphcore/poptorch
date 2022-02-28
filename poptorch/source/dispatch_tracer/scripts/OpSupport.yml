@@ -274,6 +274,12 @@
   IgnoreArgs: {'generator'}
   UnusedOutputArguments: {out}
 
+# `torch.rand`, `torch.rand_like` dispatch to this
+# uniform_(Tensor(a!) self, float from=0, float to=1, *, Generator? generator=None) -> Tensor(a!)
+- func: uniform_
+  PopTorchDirect: uniform_
+  IgnoreArgs: {'generator'}
+
 
 #########
 # Misc

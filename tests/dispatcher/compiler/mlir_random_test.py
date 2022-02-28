@@ -214,3 +214,41 @@ def test_normal_(shape):
         return torch.empty(shape).normal_(5, 10)
 
     rng_harness(rand, [torch.mean, torch.std])
+
+
+# torch.rand
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_rand(shape):
+    def rand():
+        return torch.rand(shape)
+
+    rng_harness(rand, [torch.min, torch.max, torch.mean, torch.var])
+
+
+# torch.rand_like
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_rand_like(shape):
+    torch.manual_seed(42)
+    inp = torch.empty(shape)
+
+    cpu_res = torch.rand_like(inp)
+
+    ipu_res = IPUContext(torch.rand_like)(inp)
+
+    check_stats(cpu_res, ipu_res,
+                [torch.min, torch.max, torch.mean, torch.var])
+
+
+# torch.uniform_
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_uniform_(shape):
+    def rand():
+        return torch.empty(shape).uniform_()
+
+    rng_harness(rand, [torch.min, torch.max, torch.mean, torch.var])

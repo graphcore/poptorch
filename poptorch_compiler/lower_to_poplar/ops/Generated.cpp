@@ -654,12 +654,6 @@ void unsqueeze::lowerToPoplar(CompilerContext & /*context*/) {
                   "unsqueeze"
                   " is currently unimplemented.");
 }
-void random_uniform::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "random_uniform"
-                  " is currently unimplemented.");
-}
 void ones::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

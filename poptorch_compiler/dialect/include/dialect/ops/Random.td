@@ -64,3 +64,20 @@ def Poptorch_normal_float_Tensor : Poptorch_Op<"normal_float_Tensor",
         $_state.addTypes({stdvs.getType()});
   }]>];
 }
+
+def Poptorch_uniform_ : Poptorch_Op<"uniform_", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       F32Attr:$from,
+                       F32Attr:$to);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                    "float":$from,
+                                    "float":$to), [{
+        $_state.addOperands({self});
+        $_state.addAttribute("from", $_builder.getF32FloatAttr(from));
+        $_state.addAttribute("to", $_builder.getF32FloatAttr(to));
+        $_state.addTypes({self.getType()});
+  }]>];
+}

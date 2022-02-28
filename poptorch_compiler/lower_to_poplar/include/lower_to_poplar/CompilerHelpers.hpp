@@ -6,6 +6,7 @@
 #include <mlir/IR/Value.h>
 
 #include <array>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -43,6 +44,22 @@ struct CompilerContext {
   std::vector<poplar::Tensor> fromSsa(mlir::ValueRange value_range);
 
   std::int64_t graph_const_count = 0;
+
+  // Get a seed to use for RNG functions.
+  //
+  // If no seed is used (ie. if left `nullptr` in functions that use it), can
+  // get strange results from `poprand` functions.
+  //
+  // NOTE: This is a temporary workaround while TODO(T51096) remains unresolved,
+  //       to handle loading, saving & restoring of the seed.
+  poplar::Tensor &getRandomSeed();
+
+private:
+  // Persistent seed to use for RNG functions.
+  //
+  // NOTE: This is a temporary workaround while TODO(T51096) remains unresolved,
+  //       to handle loading, saving & restoring of the seed.
+  std::optional<poplar::Tensor> _randomSeed;
 };
 
 template <typename T>

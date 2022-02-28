@@ -19,6 +19,9 @@
 #include <popops/codelets.hpp>
 #include <poprand/codelets.hpp>
 
+#include <popops/Fill.hpp>
+#include <poprand/RandomGen.hpp>
+
 #include "dialect/PoptorchDialect.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -212,6 +215,18 @@ CompilerContext::fromSsa(mlir::ValueRange value_range) {
   }
 
   return poplar_tensors;
+}
+
+poplar::Tensor &CompilerContext::getRandomSeed() {
+  // NOTE: This mechanism is a temporary workaround while TODO(T51096) remains
+  //       unresolved, to handle loading, saving & restoring of the seed.
+  if (!_randomSeed) {
+    _randomSeed = graph.addVariable(poplar::UNSIGNED_INT, {2},
+                                    poplar::VariableMappingMethod::LINEAR);
+    popops::fill(graph, *_randomSeed, seq, 42);
+  }
+
+  return *_randomSeed;
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>

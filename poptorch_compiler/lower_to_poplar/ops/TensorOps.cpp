@@ -129,12 +129,9 @@ void dropout::lowerToPoplar(CompilerContext &context) {
     // NB: Seeds not implemented yet.
     // Need to implement setting seed, seedModifier, and reference tensor
     // TODO(T51096)
-    poplar::Tensor seed = context.graph.addVariable(
-        poplar::UNSIGNED_INT, {2}, poplar::VariableMappingMethod::LINEAR);
-    popops::fill(context.graph, seed, context.seq, 42);
     poplar::Tensor result =
-        poprand::dropout(context.graph, &seed, 0, tensor, tensor, 1. - p,
-                         1. / (1. - p), context.seq);
+        poprand::dropout(context.graph, &context.getRandomSeed(), 0, tensor,
+                         tensor, 1. - p, 1. / (1. - p), context.seq);
     context.tensors[this->result()] = result;
   } else {
     context.tensors[this->result()] = tensor;
