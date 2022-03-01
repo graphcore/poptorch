@@ -74,11 +74,18 @@ void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
 
 void JITDispatch::markOutputs(
     const std::vector<at::Tensor> &outputs,
-    const std::vector<at::Tensor> &persistent_data_storage) {
+    const std::vector<at::Tensor> &persistent_data_storage, bool output_tuple) {
   // 'persistent_data_storage' is only needed by the MLIR dispatcher.
   UNUSED(persistent_data_storage);
 
   int64_t output_num = 0;
+  torch::jit::Node *construct_node = nullptr;
+  std::vector<c10::TypePtr> construct_element_types;
+  if (output_tuple) {
+    construct_node = graph.create(c10::prim::TupleConstruct);
+    graph.insertNode(construct_node);
+    graph.registerOutput(construct_node->output());
+  }
   for (const at::Tensor &tensor : outputs) {
     torch::jit::Value *val = _mapper.getValueForTensor(tensor);
     ERROR_ON_MSG(
@@ -90,7 +97,12 @@ void JITDispatch::markOutputs(
         reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
         val->debugNameBase(), toString(tensor));
 
-    graph.registerOutput(val);
+    if (construct_node != nullptr) {
+      construct_element_types.push_back(val->type());
+      construct_node->addInput(val);
+    } else {
+      graph.registerOutput(val);
+    }
 
     // For now, disable overlapping host IO on every output
     auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
@@ -99,7 +111,10 @@ void JITDispatch::markOutputs(
 
     output_num++;
   }
-
+  if (construct_node != nullptr) {
+    construct_node->output()->setType(
+        c10::TupleType::create(construct_element_types));
+  }
   logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", graph);
 }
 

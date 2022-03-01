@@ -128,7 +128,8 @@ class IPUScope:
                 else:
                     self._outputs.append(tensor.clone())
 
-        poptorch_core.markOutputs(tensors, self._outputs)
+        poptorch_core.markOutputs(tensors, self._outputs,
+                                  isinstance(tensors, tuple))
 
         # Turn dispatch back on.
         poptorch_core.startDispatch()

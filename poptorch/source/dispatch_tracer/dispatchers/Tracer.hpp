@@ -19,7 +19,8 @@ public:
 
   virtual void
   markOutputs(const std::vector<at::Tensor> &ids,
-              const std::vector<at::Tensor> &persistent_data_storage) = 0;
+              const std::vector<at::Tensor> &persistent_data_storage,
+              bool output_tuple) = 0;
 
   // The "catch-all" fallback kernel.
   virtual void fallback(const c10::OperatorHandle &op, c10::Stack *stack) = 0;

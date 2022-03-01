@@ -188,11 +188,12 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 
 // Record these tensors as being the outputs of the graph.
 void markOutputs(const std::vector<at::Tensor> &outputs,
-                 const std::vector<at::Tensor> &data_storage) {
+                 const std::vector<at::Tensor> &data_storage,
+                 bool output_tuple) {
   // We will also catch pytorch calls called via C++ so we need to disable our
   // dispatch catcher while it is running.
   DisableDispatchScope guard;
-  context.active_dispatch->markOutputs(outputs, data_storage);
+  context.active_dispatch->markOutputs(outputs, data_storage, output_tuple);
 }
 
 // Appears in 1.10.

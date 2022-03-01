@@ -27,9 +27,9 @@ public:
   void createGraph(const std::vector<at::Tensor> &inputs,
                    const std::vector<at::Tensor> &parameters) final;
 
-  void
-  markOutputs(const std::vector<at::Tensor> &ids,
-              const std::vector<at::Tensor> &persistent_data_storage) final;
+  void markOutputs(const std::vector<at::Tensor> &ids,
+                   const std::vector<at::Tensor> &persistent_data_storage,
+                   bool output_tuple) final;
 
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) final;
 

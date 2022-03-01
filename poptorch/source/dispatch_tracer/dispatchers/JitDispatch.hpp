@@ -20,7 +20,8 @@ public:
                    const std::vector<at::Tensor> &parameters);
 
   void markOutputs(const std::vector<at::Tensor> &outputs,
-                   const std::vector<at::Tensor> &persistent_data_storage);
+                   const std::vector<at::Tensor> &persistent_data_storage,
+                   bool output_tuple);
 
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack);
 
