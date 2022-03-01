@@ -85,18 +85,18 @@ void batch_norm::lowerToPoplar(CompilerContext &context) {
         context.graph, inv_sd, epsilon, context.seq, running_var.elementType());
 
     // Calculate the running mean
-    context.tensors[this->mean()] = popops::map(
-        context.graph,
-        pe::Add(pe::Mul(pe::Sub(pe::Const(1), pe::Const(momentum)), pe::_2),
-                pe::Mul(pe::Const(momentum), pe::_1)),
-        {running_mean, batch_mean}, context.seq);
+    context.tensors[this->mean()] =
+        popops::map(context.graph,
+                    pe::Add(pe::Mul(pe::Const(1.f - momentum), pe::_2),
+                            pe::Mul(pe::Const(momentum), pe::_1)),
+                    {running_mean, batch_mean}, context.seq);
 
     // Calculate the running variance using the unbiased results
-    context.tensors[this->var()] = popops::map(
-        context.graph,
-        pe::Add(pe::Mul(pe::Sub(pe::Const(1), pe::Const(momentum)), pe::_2),
-                pe::Mul(pe::Const(momentum), pe::_1)),
-        {running_var, batch_var}, context.seq);
+    context.tensors[this->var()] =
+        popops::map(context.graph,
+                    pe::Add(pe::Mul(pe::Const(1.f - momentum), pe::_2),
+                            pe::Mul(pe::Const(momentum), pe::_1)),
+                    {running_var, batch_var}, context.seq);
   } else {
     // convert variance to inverse standard deviation
     auto inv_sd = popops::varianceToInvStdDev(
