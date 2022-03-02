@@ -89,6 +89,8 @@ To set the random state, use ``poptorch.Options.randomSeed``
 * ``torch.rand``
 * ``torch.uniform``
 * ``torch.distributions.Uniform``
+* ``torch.exponential``
+* ``torch.distributions.Exponential``
 
 Math operations
 ---------------

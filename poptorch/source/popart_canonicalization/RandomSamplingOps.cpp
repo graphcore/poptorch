@@ -85,11 +85,29 @@ torch::jit::Node *bernoulliHandler(torch::jit::Graph *graph,
   return createCast(graph, lt, dtype);
 }
 
+torch::jit::Node *exponentialHandler(torch::jit::Graph *graph,
+                                     torch::jit::Node *node) {
+  // aten::exponential_(Tensor self, double lambda)
+  torch::jit::Value *lambda = node->input(1);
+
+  std::vector<int64_t> shape = shapeFromTensor(node->output());
+  c10::ScalarType dtype = getNodeScalarType(node->input(0));
+
+  torch::jit::Value *x =
+      createRandomUniform(graph, nullptr, shape, 1.0, 0.0, dtype)->output();
+
+  auto *log_x = createLog(graph, {x})->output();
+  auto *neg_log_x = createNeg(graph, {log_x})->output();
+  auto *exponential = createDiv(graph, {neg_log_x, lambda})->output();
+  return createCast(graph, exponential, dtype);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::normal, normalHandler);
   registerHandler(c10::aten::bernoulli, bernoulliHandler);
+  registerHandler(c10::aten::exponential_, exponentialHandler);
 }
 
 } // namespace poptorch

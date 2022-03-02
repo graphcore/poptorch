@@ -23,7 +23,8 @@ namespace {
 const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
   // static to make sure values are initialised
   static std::unordered_set<torch::jit::NodeKind> only_implace = {
-      c10::aten::copy_, c10::aten::normal_, c10::aten::uniform_};
+      c10::aten::copy_, c10::aten::normal_, c10::aten::uniform_,
+      c10::aten::exponential_};
   return only_implace;
 }
 } // namespace

@@ -29,6 +29,7 @@ New features
 - Support for ``torch.randperm``
 - Support for ``torch.nn.functional.cosine_similarity`` and ``torch.nn.CosineSimilarity``
 - Support for ``torch.all``, ``torch.any``, ``torch.Tensor.all`` and ``torch.Tensor.any``
+- Support for ``torch.Tensor.exponential_`` and ``torch.distributions.Exponential``
 
 API changes
 -----------

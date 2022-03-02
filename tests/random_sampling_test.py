@@ -237,6 +237,34 @@ def test_distributions_bernoulli(trace_model):
     rng_harness(trace_model, rng_op, input, stat_funs)
 
 
+# torch.exponential_
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+@pytest.mark.parametrize("lambd", [0.5, 1.0])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_exponential_(trace_model, lambd):
+    def rng_op(x):
+        return x.exponential_(lambd=lambd)
+
+    input = torch.empty(3, 5, 100)
+    stat_funs = [torch.mean]
+    rng_harness(trace_model, rng_op, input, stat_funs)
+
+
+# torch.distributions.Exponential
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_distributions_exponential(trace_model):
+    def rng_op(x):
+        bd = torch.distributions.Exponential(0.5)
+        return bd.sample(x.size())
+
+    input = torch.empty(10, 10, 1000)
+    stat_funs = [torch.mean]
+    rng_harness(trace_model, rng_op, input, stat_funs)
+
+
 @pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
                     reason="Hardware IPU needed")
 @pytest.mark.parametrize("trace_model", [True, False])

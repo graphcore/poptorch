@@ -16,6 +16,7 @@ c10::Symbol selu_;                       // NOLINT
 c10::Symbol isinf;                       // NOLINT
 c10::Symbol uniform_;                    // NOLINT
 c10::Symbol normal_;                     // NOLINT
+c10::Symbol exponential_;                // NOLINT
 c10::Symbol where_;                      // NOLINT
 c10::Symbol poisson_nll_loss;            // NOLINT
 c10::Symbol multilabel_soft_margin_loss; // NOLINT
@@ -60,6 +61,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, isinf);
   SYMBOL_INIT(aten, uniform_);
   SYMBOL_INIT(aten, normal_);
+  SYMBOL_INIT(aten, exponential_);
   SYMBOL_INIT(aten, where_);
   SYMBOL_INIT(aten, poisson_nll_loss);
   SYMBOL_INIT(aten, multilabel_soft_margin_loss);
