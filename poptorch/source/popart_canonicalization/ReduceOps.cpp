@@ -15,11 +15,14 @@ namespace {
 
 torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
-  // Reductions have two overloads. The first is:
+  // Reductions have three overloads. The first is:
   // aten::mean(Tensor self, int[] dim, int keepdim, Tensor? out)) -> tensor
 
   // The second is:
   // aten::mean(Tensor self, int? dtype)) -> tensor
+
+  // The third is for boolean reductions
+  // aten::all(Tensor self) -> tensor
 
   torch::jit::Symbol kind = node->kind();
   torch::jit::Value *input = node->input(0);
@@ -34,8 +37,9 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   std::vector<std::int64_t> axes{};
   std::int64_t keepdim = 0;
 
-  // Case 2 or case 1 with no dimension specified.
-  bool flatten = node->inputs().size() == 2;
+  // Case 2/3 or case 1 with no dimension specified.
+  size_t case_2_3 = (kind == c10::aten::any || kind == c10::aten::all) ? 1 : 2;
+  bool flatten = node->inputs().size() == case_2_3;
   if (!flatten) {
     // Case 1.
     // Sometimes the dimensions are just one int.
@@ -74,6 +78,16 @@ torch::jit::Node *reduceHandler(torch::jit::Graph *graph,
   }
   if (kind == c10::aten::logsumexp) {
     return createReducelogsumexp(graph, {input}, axes, keepdim);
+  }
+  if (kind == c10::aten::all) {
+    auto *t0 = createAbs(graph, {input})->output();
+    auto *t1 = createReducemin(graph, {t0}, axes, keepdim)->output();
+    return createCast(graph, t1, at::ScalarType::Bool);
+  }
+  if (kind == c10::aten::any) {
+    auto *t0 = createAbs(graph, {input})->output();
+    auto *t1 = createReducemax(graph, {t0}, axes, keepdim)->output();
+    return createCast(graph, t1, at::ScalarType::Bool);
   }
   ERROR("Popart Canonicalisation: UNREACHABLE reached in reductions.");
 }
@@ -366,5 +380,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::frobenius_norm, frobeniusnormHandler);
   registerHandler(c10::aten::min, minHandler);
   registerHandler(c10::aten::max, maxHandler);
+  registerHandler(c10::aten::any, reduceHandler);
+  registerHandler(c10::aten::all, reduceHandler);
 }
 } // namespace poptorch

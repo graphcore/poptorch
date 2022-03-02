@@ -154,6 +154,8 @@ Pointwise ops
 Reduction ops
 '''''''''''''
 
+* ``torch.all``
+* ``torch.any``
 * ``torch.argmax``
 * ``torch.argmin``
 * ``torch.mean``
