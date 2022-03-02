@@ -531,6 +531,8 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(
     }
 
     const c10::Symbol kind = itr->kind();
+    logging::trace("[TRACING-2][JIT] Looking for a handler for {}",
+                   kind.toQualString());
 
     // Look up the normal PopART jit node.
     auto jit_handler = _jit_handlers.find(kind);
@@ -548,8 +550,14 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(
 
       output_id = _compiler.reducemean(mlir_ids[0], axes, false).at(0).at(0);
     } else {
-      const c10::FunctionSchema &notfound_schema = itr->schema();
-      ERROR("Could not find any handler for node." + notfound_schema.name());
+      try {
+        const c10::FunctionSchema &notfound_schema = itr->schema();
+        ERROR("Could not find any handler for node." + notfound_schema.name());
+      } catch (std::exception &ex) {
+        ERROR("Could not find a handler for a node which does not have a "
+              << "schema. The following is the error from PyTorch JIT:"
+              << ex.what());
+      }
     }
 
     just_added_nodes.insert({itr->output(0), output_id});
