@@ -201,30 +201,31 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
 
   // Note: there is also this overload which is not supported at the moment
   // aten::select(Tensor[] list, int idx) -> Tensor
+  auto *input = node->input(0);
   std::int64_t dim = constantToLong(node->input(1)->node());
+  auto dims = shapeFromTensor(input);
+  if (dim < 0) {
+    dim += dims.size();
+  }
 
   auto *index_node = node->input(2)->node();
 
   torch::jit::Node *slice_node;
   if (!isTensorConstant(index_node)) {
     // Handle dynamic index
-    slice_node = createDynamicslice(
-        graph, {node->input(0), index_node->output()}, {dim}, {1}, 1);
+    slice_node =
+        createDynamicslice(graph, {input, index_node->output()}, {dim}, {1}, 1);
   } else {
     // Handle static index
     std::int64_t index = constantToLong(index_node);
 
     if (index < 0) {
-      c10::TensorTypePtr as_tensor =
-          node->input(0)->type()->cast<c10::TensorType>();
-      c10::VaryingShape dims = as_tensor->sizes();
-      index += *dims[dim];
+      index += dims[dim];
     }
 
-    slice_node =
-        createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
-                            wrapInConstant1D(graph, index + 1),
-                            wrapInConstant1D(graph, dim)});
+    slice_node = createSlice(graph, {input, wrapInConstant1D(graph, index),
+                                     wrapInConstant1D(graph, index + 1),
+                                     wrapInConstant1D(graph, dim)});
   }
 
   // Reshape to remove the singleton dimenson left in by slice

@@ -307,21 +307,15 @@ torch::jit::Node *subsampleSlice(torch::jit::Graph *graph,
   return slice;
 }
 
-torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
-                               torch::jit::Node *node) {
-  // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor
-  auto *input = node->input(0);
-  auto dim = constantToLong(node->input(1)->node());
-  auto *start_node = node->input(2)->node();
-  auto *end_node = node->input(3)->node();
-  auto *step_node = node->input(4)->node();
-
-  ERROR_ON_MSG(!isTensorConstant(step_node), "Slicing step must be a constant");
-
-  auto step = constantToLong(step_node);
-  ERROR_ON_MSG(step < 1, "Slicing step must be at least 1");
-
+namespace {
+torch::jit::Node *sliceCommon(torch::jit::Graph *graph, torch::jit::Node *node,
+                              torch::jit::Value *input, int64_t dim,
+                              torch::jit::Node *start_node,
+                              torch::jit::Node *end_node, int64_t step) {
   auto dims = shapeFromTensor(input);
+  if (dim < 0) {
+    dim += dims.size();
+  }
 
   // If any of the inputs are not constants, dynamicSlice is required
   if (!isTensorConstant(start_node) || !isTensorConstant(end_node)) {
@@ -355,10 +349,28 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
     end = dims[dim];
   }
 
-  auto *slice = createSlice(
-      graph, {node->input(0), wrapInConstant1D(graph, start),
-              wrapInConstant1D(graph, end), wrapInConstant1D(graph, dim)});
+  auto *slice = createSlice(graph, {input, wrapInConstant1D(graph, start),
+                                    wrapInConstant1D(graph, end),
+                                    wrapInConstant1D(graph, dim)});
   return subsampleSlice(graph, slice, dims.size(), dim, step);
+}
+} // namespace
+
+torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  // aten::slice(Tensor self, int dim, int start, int end, int step) -> Tensor
+  auto *input = node->input(0);
+  auto dim = constantToLong(node->input(1)->node());
+  auto *start_node = node->input(2)->node();
+  auto *end_node = node->input(3)->node();
+  auto *step_node = node->input(4)->node();
+
+  ERROR_ON_MSG(!isTensorConstant(step_node), "Slicing step must be a constant");
+
+  auto step = constantToLong(step_node);
+  ERROR_ON_MSG(step < 1, "Slicing step must be at least 1");
+
+  return sliceCommon(graph, node, input, dim, start_node, end_node, step);
 }
 
 torch::jit::Node *unbindHandler(torch::jit::Graph *graph,
@@ -384,11 +396,23 @@ torch::jit::Node *unbindHandler(torch::jit::Graph *graph,
   return createAndInsertNode(graph, at::prim::ListConstruct, tensors);
 }
 
+torch::jit::Node *narrowHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  // narrow(Tensor(a) self, int dim, int start, int length) -> Tensor(a)
+  auto *input = node->input(0);
+  int dim = constantToInt(node->input(1)->node());
+  auto *start_node = node->input(2)->node();
+  auto *end_node = node->input(3)->node();
+
+  return sliceCommon(graph, node, input, dim, start_node, end_node, 1);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::slice, sliceHandler);
   registerHandler(c10::aten::unbind, unbindHandler);
+  registerHandler(c10::aten::narrow, narrowHandler);
 }
 
 } // namespace poptorch

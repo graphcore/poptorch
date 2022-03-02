@@ -380,3 +380,37 @@ def test_dynamic_length_slice(trace_model):
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
         poptorch_model(inp, l)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_select_negative_dim(trace_model):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x.select(-1, 1)
+
+    model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    input_tensor = torch.rand((2, 4))
+    helpers.assert_allequal(actual=poptorch_model(input_tensor),
+                            expected=model(input_tensor))
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_slice_negative_dim(trace_model):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            # This lowers to aten::select with a negative dim, which is what
+            # we want to test in the JIT dispatcher
+            return x.narrow(-1, 0, 2)
+
+    model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    input_tensor = torch.rand((2, 4))
+    helpers.assert_allequal(actual=poptorch_model(input_tensor),
+                            expected=model(input_tensor))
