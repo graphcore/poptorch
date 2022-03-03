@@ -140,6 +140,34 @@ void random_::lowerToPoplar(CompilerContext &context) {
   context.tensors.insert({this->result(), res});
 }
 
+void bernoulli__float::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor input = context.fromSsa(this->input());
+  const float prob = this->prob().convertToFloat();
+
+  const poplar::Tensor res =
+      poprand::bernoulli(context.graph, &context.getRandomSeed(), 0, input,
+                         poplar::FLOAT, prob, context.seq);
+
+  context.tensors.insert({this->result(), res});
+}
+
+void bernoulli__tensor::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor input = context.fromSsa(this->input());
+  const poplar::Tensor probs = context.fromSsa(this->probs());
+
+  const poplar::Tensor uniform =
+      poprand::uniform(context.graph, &context.getRandomSeed(), 0, input,
+                       poplar::FLOAT, 0, 1, context.seq);
+
+  const poplar::Tensor as_bools =
+      popops::lt(context.graph, uniform, probs, context.seq);
+
+  const poplar::Tensor res =
+      popops::cast(context.graph, as_bools, poplar::FLOAT, context.seq);
+
+  context.tensors.insert({this->result(), res});
+}
+
 void random__from::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor self = context.fromSsa(this->self());
 
@@ -177,6 +205,22 @@ void random__from::lowerToPoplar(CompilerContext &context) {
 
     context.tensors.insert({this->result(), res});
   }
+}
+
+void bernoulli_out::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor self = context.fromSsa(this->self());
+
+  const poplar::Tensor uniform =
+      poprand::uniform(context.graph, &context.getRandomSeed(), 0, self,
+                       poplar::FLOAT, 0, 1, context.seq);
+
+  const poplar::Tensor as_bools =
+      popops::lt(context.graph, uniform, self, context.seq);
+
+  const poplar::Tensor res =
+      popops::cast(context.graph, as_bools, poplar::FLOAT, context.seq);
+
+  context.tensors.insert({this->result(), res});
 }
 
 } // namespace poptorch_ir

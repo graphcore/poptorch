@@ -112,3 +112,53 @@ def Poptorch_random__from : Poptorch_Op<"random__from", [SameOperandsAndResultSh
         $_state.addTypes({self.getType()});
   }]>];
 }
+
+def Poptorch_bernoulli__float : Poptorch_Op<"bernoulli__float", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$input,
+                       F32Attr:$prob);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+                                    "float":$prob), [{
+        $_state.addOperands({input});
+        $_state.addAttribute("prob", $_builder.getF32FloatAttr(prob));
+
+        mlir::RankedTensorType input_tensor = input.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 4> input_shape {input_tensor.getShape().begin(), input_tensor.getShape().end()};
+
+        $_state.addTypes(mlir::RankedTensorType::get(input_shape, $_builder.getF32Type()));
+  }]>];
+}
+
+def Poptorch_bernoulli__tensor : Poptorch_Op<"bernoulli__tensor", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$input,
+                       Poptorch_tensor:$probs);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+                                    "mlir::Value":$probs), [{
+        $_state.addOperands({input, probs});
+
+        mlir::RankedTensorType input_tensor = input.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 4> input_shape {input_tensor.getShape().begin(), input_tensor.getShape().end()};
+
+        $_state.addTypes(mlir::RankedTensorType::get(input_shape, $_builder.getF32Type()));
+  }]>];
+}
+
+def Poptorch_bernoulli_out : Poptorch_Op<"bernoulli_out", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+        $_state.addOperands({self});
+
+        mlir::RankedTensorType self_tensor = self.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 4> self_shape {self_tensor.getShape().begin(), self_tensor.getShape().end()};
+
+        $_state.addTypes(mlir::RankedTensorType::get(self_shape, $_builder.getF32Type()));
+  }]>];
+}
