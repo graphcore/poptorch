@@ -68,6 +68,11 @@ bool isFloatingPointConstant(torch::jit::Node *node);
 
 bool isTensorConstant(torch::jit::Node *node);
 
+// Does the given value (tensor) represent a single, scalar value?
+//
+// Useful in cases of broadcasting.
+bool isConstantScalar(torch::jit::Value *input);
+
 // Force a constant to be a float: this is appropriate if required for popart
 // (onnx); e.g. Gemm alpha and beta are always floats
 float constantToFloat(torch::jit::Node *node);
