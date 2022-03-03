@@ -6,10 +6,12 @@ import pytest
 import torch
 
 import poptorch
-from poptorch.enums import Compiler
-from poptorch.experimental import IPUContext, IPUScope
+from poptorch.experimental import IPUContext
 
 import helpers
+
+# Set PyTorch's RNG seed to this manually.
+rng_seed = 42
 
 tensor_shapes = [
     # Hopefully large-enough tensor to get reasonable statistics.
@@ -17,34 +19,51 @@ tensor_shapes = [
 ]
 
 
-# Compare two sets of results statistically, using the given functions
-def check_stats(expect_base, actual_base, test_fns):
-    for tf in test_fns:
-        # pylint: disable=no-member
-        helpers.assert_allclose(expected=tf(expect_base),
-                                actual=tf(actual_base),
-                                atol=1e-2,
-                                rtol=0.1)
+# This is purely used for its __call__ to allow a more intuitive use of
+# `rng_harness` like: rng_harness(my_fn, arg1, arg2=a2)(mean, std, torch.min),
+# instead of having to mix up the function, its list of args and the list of
+# stat functions in one list.
+class StatChecker:
+    def __init__(self, expect, actual):
+        self.expect = expect
+        self.actual = actual
+
+    # Compare two sets of results statistically, using the given functions
+    def __call__(self, *args):
+        for tf in args:
+            # pylint: disable=no-member
+            helpers.assert_allclose(expected=tf(self.expect),
+                                    actual=tf(self.actual),
+                                    atol=1e-2,
+                                    rtol=0.1)
 
 
-# Helper, that takes a PyTorchy-function to run on the CPU & IPU, and some
-# statistical test functions to check the results for similarity.
-def rng_harness(fn, test_fns):
-    torch.manual_seed(42)
+# Helper, that takes a PyTorchy-function to run on the CPU & IPU.
+#
+# *args & **kwargs are forwarded straight to the given function.
+#
+# Returns a `StatChecker` class containing the results, that can be called with
+# a list of statistical test functions to check the results for similarity.
+def rng_harness(fn, *args, **kwargs):
+    # Sometimes things need to be generated before calling into `rng_harness`,
+    # and so the seed has already been set. In these cases, setting it again
+    # can cause strange results.
+    if torch.initial_seed() != rng_seed:
+        torch.manual_seed(rng_seed)
 
     # Get the result from the CPU
-    cpu_res = fn()
+    cpu_res = fn(*args, **kwargs)
     print(f"From CPU: {cpu_res}")
 
-    ipu_res = IPUContext(fn)()
+    ipu_res = IPUContext(fn)(*args, **kwargs)
     print(f"From IPU: {ipu_res}")
 
-    # Compare the CPU & IPU results statistically
-    check_stats(cpu_res, ipu_res, test_fns)
+    # Return results in container, to later compare the results statistically
+    return StatChecker(expect=cpu_res, actual=ipu_res)
 
 
-# Helpers that are pluggable into `check_stats`, that can get the mean & std of
-# a tensor of ints as well as floats.
+# Helpers that are pluggable into `StatChecker`, that can get statistical
+# values of a tensor of ints as well as floats.
 def mean(inp):
     if inp.type() in [torch.float, torch.double]:
         return torch.mean(inp)
@@ -57,15 +76,18 @@ def std(inp):
     return inp.double().std()
 
 
+def var(inp):
+    if inp.type() in [torch.float, torch.double]:
+        return torch.var(inp)
+    return inp.double().var()
+
+
 # torch.randn
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_randn(shape):
-    def rand():
-        return torch.randn(shape)
-
-    rng_harness(rand, [torch.mean, torch.std])
+    rng_harness(torch.randn, shape)(mean, std)
 
 
 # torch.randn_like
@@ -73,14 +95,10 @@ def test_randn(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_randn_like(shape):
-    torch.manual_seed(42)
+    torch.manual_seed(rng_seed)
     inp = torch.empty(shape)
 
-    cpu_res = torch.randn_like(inp)
-
-    ipu_res = IPUContext(torch.randn_like)(inp)
-
-    check_stats(cpu_res, ipu_res, [torch.mean, torch.std])
+    rng_harness(torch.randn_like, inp)(mean, std)
 
 
 # torch.normal(float, float)
@@ -88,10 +106,7 @@ def test_randn_like(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_float(shape):
-    def rand():
-        return torch.normal(5, 10, size=shape)
-
-    rng_harness(rand, [torch.mean, torch.std])
+    rng_harness(torch.normal, 5, 10, size=shape)(mean, std)
 
 
 # torch.normal(Tensor, Tensor)
@@ -99,15 +114,11 @@ def test_normal_float(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_tensor_tensor(shape):
-    torch.manual_seed(42)
+    torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
     stdvs = torch.rand(shape) * 3
 
-    cpu_res = torch.normal(means, stdvs)
-
-    ipu_res = IPUContext(torch.normal)(means, stdvs)
-
-    check_stats(cpu_res, ipu_res, [torch.mean, torch.std])
+    rng_harness(torch.normal, means, stdvs)(mean, std)
 
 
 # torch.normal(Tensor, float)
@@ -115,15 +126,11 @@ def test_normal_tensor_tensor(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_tensor_float(shape):
-    torch.manual_seed(42)
+    torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
     stdv = 3
 
-    cpu_res = torch.normal(means, stdv)
-
-    ipu_res = IPUContext(torch.normal)(means, stdv)
-
-    check_stats(cpu_res, ipu_res, [torch.mean, torch.std])
+    rng_harness(torch.normal, means, stdv)(mean, std)
 
 
 # torch.normal(float, Tensor)
@@ -131,15 +138,11 @@ def test_normal_tensor_float(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_float_tensor(shape):
-    torch.manual_seed(42)
-    mean = 10
+    torch.manual_seed(rng_seed)
+    desired_mean = 10
     stdvs = torch.rand(shape) * 3
 
-    cpu_res = torch.normal(mean, stdvs)
-
-    ipu_res = IPUContext(torch.normal)(mean, stdvs)
-
-    check_stats(cpu_res, ipu_res, [torch.mean, torch.std])
+    rng_harness(torch.normal, desired_mean, stdvs)(mean, std)
 
 
 # torch.normal(Tensor, Tensor, out=Tensor)
@@ -147,20 +150,16 @@ def test_normal_float_tensor(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_tensor_tensor_out(shape):
-    torch.manual_seed(42)
+    torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
     stdvs = torch.rand(shape) * 3
 
-    cpu_res = torch.empty(shape)
-    torch.normal(means, stdvs, out=cpu_res)
-
-    with IPUScope([means, stdvs], compile_using=Compiler.MLIR) as ipu:
+    def fn(means, stdvs):
         res = torch.empty(shape)
         torch.normal(means, stdvs, out=res)
-        ipu.outputs([res])
-    ipu_res = ipu(means, stdvs)
+        return res
 
-    check_stats(cpu_res, ipu_res, [torch.mean, torch.std])
+    rng_harness(fn, means, stdvs)(mean, std)
 
 
 # torch.normal(Tensor, float, out=Tensor)
@@ -168,20 +167,16 @@ def test_normal_tensor_tensor_out(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_tensor_float_out(shape):
-    torch.manual_seed(42)
+    torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
     stdv = 3
 
-    cpu_res = torch.empty(shape)
-    torch.normal(means, stdv, out=cpu_res)
-
-    with IPUScope([means], compile_using=Compiler.MLIR) as ipu:
+    def fn(means):
         res = torch.empty(shape)
         torch.normal(means, stdv, out=res)
-        ipu.outputs([res])
-    ipu_res = ipu(means)
+        return res
 
-    check_stats(cpu_res, ipu_res, [torch.mean, torch.std])
+    rng_harness(fn, means)(mean, std)
 
 
 # torch.normal(float, Tensor, out=Tensor)
@@ -189,20 +184,16 @@ def test_normal_tensor_float_out(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_float_tensor_out(shape):
-    torch.manual_seed(42)
-    mean = 10
+    torch.manual_seed(rng_seed)
+    desired_mean = 10
     stdvs = torch.rand(shape) * 3
 
-    cpu_res = torch.empty(shape)
-    torch.normal(mean, stdvs, out=cpu_res)
-
-    with IPUScope([stdvs], compile_using=Compiler.MLIR) as ipu:
+    def fn(stdvs):
         res = torch.empty(shape)
-        torch.normal(mean, stdvs, out=res)
-        ipu.outputs([res])
-    ipu_res = ipu(stdvs)
+        torch.normal(desired_mean, stdvs, out=res)
+        return res
 
-    check_stats(cpu_res, ipu_res, [torch.mean, torch.std])
+    rng_harness(fn, stdvs)(mean, std)
 
 
 # torch.normal_
@@ -210,10 +201,10 @@ def test_normal_float_tensor_out(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_normal_(shape):
-    def rand():
+    def fn():
         return torch.empty(shape).normal_(5, 10)
 
-    rng_harness(rand, [torch.mean, torch.std])
+    rng_harness(fn)(torch.mean, torch.std)
 
 
 # torch.rand
@@ -221,10 +212,7 @@ def test_normal_(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_rand(shape):
-    def rand():
-        return torch.rand(shape)
-
-    rng_harness(rand, [torch.min, torch.max, torch.mean, torch.var])
+    rng_harness(torch.rand, shape)(torch.min, torch.max, mean, var)
 
 
 # torch.rand_like
@@ -232,15 +220,10 @@ def test_rand(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_rand_like(shape):
-    torch.manual_seed(42)
+    torch.manual_seed(rng_seed)
     inp = torch.empty(shape)
 
-    cpu_res = torch.rand_like(inp)
-
-    ipu_res = IPUContext(torch.rand_like)(inp)
-
-    check_stats(cpu_res, ipu_res,
-                [torch.min, torch.max, torch.mean, torch.var])
+    rng_harness(torch.rand_like, inp)(torch.min, torch.max, mean, var)
 
 
 # torch.uniform_
@@ -248,10 +231,10 @@ def test_rand_like(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_uniform_(shape):
-    def rand():
+    def fn():
         return torch.empty(shape).uniform_()
 
-    rng_harness(rand, [torch.min, torch.max, torch.mean, torch.var])
+    rng_harness(fn)(torch.min, torch.max, mean, var)
 
 
 # torch.random_
@@ -261,10 +244,10 @@ def test_uniform_(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_random_(shape, dtype):
-    def rand():
+    def fn():
         return torch.empty(shape, dtype=dtype).random_()
 
-    rng_harness(rand, [mean, std])
+    rng_harness(fn)(mean, std)
 
 
 # torch.random_(dtype=int8)
@@ -273,10 +256,10 @@ def test_random_(shape, dtype):
                     reason="Your platform doesn't have MLIR support.")
 def test_random_int8(shape):
     # This is mainly to test boundaries of generated values.
-    def rand():
+    def fn():
         return torch.empty(shape, dtype=torch.int8).random_()
 
-    rng_harness(rand, [torch.min, torch.max, mean, std])
+    rng_harness(fn)(torch.min, torch.max, mean, std)
 
 
 # torch.random_(int, int)
@@ -286,10 +269,10 @@ def test_random_int8(shape):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_random_limits(shape, dtype, limits):
-    def rand():
+    def fn():
         return torch.empty(shape, dtype=dtype).random_(limits[0], limits[1])
 
-    rng_harness(rand, [torch.min, torch.max, mean, std])
+    rng_harness(fn)(torch.min, torch.max, mean, std)
 
 
 # torch.randint
@@ -299,10 +282,8 @@ def test_random_limits(shape, dtype, limits):
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="Your platform doesn't have MLIR support.")
 def test_randint(shape, dtype, limits):
-    def rand():
-        return torch.randint(limits[0], limits[1], shape, dtype=dtype)
-
-    rng_harness(rand, [torch.min, torch.max, mean, std])
+    rng_harness(torch.randint, limits[0], limits[1], shape, dtype=dtype)\
+               (torch.min, torch.max, mean, std)
 
 
 # torch.randint_like
@@ -315,10 +296,55 @@ def test_randint_like(shape, dtype, limits):
     torch.manual_seed(42)
     inp = torch.empty(shape, dtype=dtype)
 
-    cpu_res = torch.randint_like(inp, low=limits[0], high=limits[1])
+    rng_harness(torch.randint_like, inp, low=limits[0], high=limits[1])\
+               (torch.min, torch.max, mean, std)
 
-    ipu_res = IPUContext(torch.randint_like)(inp,
-                                             low=limits[0],
-                                             high=limits[1])
 
-    check_stats(cpu_res, ipu_res, [torch.min, torch.max, mean, std])
+# torch.bernoulli_(float)
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.parametrize("prob", [0.0, 0.5, 1.0])
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_bernoulli_(shape, prob):
+    def fn():
+        return torch.empty(shape).bernoulli_(prob)
+
+    rng_harness(fn)(mean)
+
+
+# torch.bernoulli(Tensor, float)
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.parametrize("prob", [0.0, 0.5, 1.0])
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_bernoulli_float(shape, prob):
+    inp = torch.empty(shape)
+
+    rng_harness(torch.bernoulli, inp, prob)(torch.mean)
+
+
+# torch.bernoulli(Tensor, Tensor)
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_bernoulli_tensor(shape):
+    torch.manual_seed(rng_seed)
+    t = torch.rand(shape)
+
+    rng_harness(torch.bernoulli, t)(mean)
+
+
+# torch.bernoulli(Tensor, Tensor, out=Tensor)
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_bernoulli_tensor_out(shape):
+    torch.manual_seed(rng_seed)
+    t = torch.rand(shape)
+
+    def fn(seed):
+        res = torch.empty(shape)
+        torch.bernoulli(seed, out=res)
+        return res
+
+    rng_harness(fn, t)(mean)

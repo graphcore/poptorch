@@ -295,6 +295,22 @@
   PopTorchDirect: random__from
   IgnoreArgs: {'generator'}
 
+# bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
+- func: bernoulli_.float
+  PopTorchDirect: bernoulli__float
+  IgnoreArgs: {'generator'}
+
+# bernoulli_.Tensor(Tensor(a!) self, Tensor p, *, Generator? generator=None) -> Tensor(a!)
+- func: bernoulli_.Tensor
+  PopTorchDirect: bernoulli__tensor
+  IgnoreArgs: {'generator'}
+
+# bernoulli.out(Tensor self, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+- func: bernoulli.out
+  PopTorchDirect: bernoulli_out
+  IgnoreArgs: {'generator'}
+  UnusedOutputArguments: {out}
+
 
 #########
 # Misc
