@@ -3,6 +3,9 @@
 
 #include <vector>
 
+// This is a wrapper for boost::stacktrace without exposing Boost.
+#include <gccs/StackTrace.hpp>
+
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
@@ -24,6 +27,15 @@ std::string singleLineContext() {
     sep = " -> ";
   }
   return ss.str();
+}
+
+std::string getStackTrace() {
+  std::stringstream out;
+  // 3 to get out of gccs + getStackTrace + Error constructor
+  constexpr size_t num_frames_to_skip = 3;
+  constexpr size_t max_depth = 20;
+  out << "\nStacktrace:\n" << gccs::getStackTrace(num_frames_to_skip, max_depth);
+  return out.str();
 }
 
 } // namespace
@@ -53,6 +65,7 @@ bool LogContextImpl::trace_enabled = []() {
 
 struct ErrorImpl {
   std::string file;
+  std::string message;
   uint64_t line;
 };
 
@@ -64,11 +77,14 @@ Error::Error(Error &&e)
     : std::runtime_error(e.what()), _impl(std::move(e._impl)) {}
 
 Error::Error(const char *s, const char *file, uint64_t line)
-    : std::runtime_error(std::string(s)),
+    : std::runtime_error(std::string(s) + getStackTrace()),
       _impl(std::make_unique<detail::ErrorImpl>()) {
   _impl->file = logging::shortPoptorchFilename(file);
   _impl->line = line;
+  _impl->message = s;
 }
+
+const char *Error::message() const { return _impl->message.c_str(); }
 
 const char *Error::file() const { return _impl->file.c_str(); }
 

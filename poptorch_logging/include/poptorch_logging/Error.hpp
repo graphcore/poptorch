@@ -44,7 +44,11 @@ const char *shortPoptorchFilename(const char *filename);
 #define ERROR_ON(condition) ERROR_ON_MSG(condition, #condition)
 
 /**
- * Exception class for poptorch
+ * Exception class for poptorch.
+ *
+ * The what() method returns both the error message and the
+ * stacktrace.
+ * To have the error without the stacktrace use message().
  */
 class Error : public std::runtime_error {
 public:
@@ -52,6 +56,7 @@ public:
   Error(Error &&e);
   const char *file() const;
   uint64_t line() const;
+  // The error message without the stacktrace
   const char *message() const;
   ~Error() override;
 

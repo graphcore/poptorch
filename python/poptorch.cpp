@@ -1418,6 +1418,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
 
 } // namespace poptorch
 
+namespace {
 class Error : public py::object {
 public:
   Error() = default;
@@ -1464,6 +1465,8 @@ public:
     PyObject_SetAttrString(m_ptr, "recovery_action", x.ptr());
   }
 };
+
+} // namespace
 
 PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   py::class_<poptorch::PoplarExecutable,

@@ -1725,16 +1725,25 @@ ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
       _impl->type = "std::exception";
     }
   }
-  const std::string &what = e.what();
+  std::string what;
+  // Poptorch errors will include a stack trace in what() which we don't want
+  // here, so keep only the message.
+  if (const auto *poptorch_error =
+          dynamic_cast<const poptorch::logging::Error *>(&e)) {
+    what = poptorch_error->message();
+    logging::trace("Full error: {}", poptorch_error->what());
+  } else {
+    what = e.what();
+  }
   if (std::count(what.begin(), what.end(), '\n') > 80) {
     std::ofstream log;
     log.open(ERROR_LOG);
-    log << e.what();
+    log << what;
     log << extra_info;
     log.close();
     _impl->message = "See " ERROR_LOG " for details";
   } else {
-    _impl->message = e.what() + extra_info;
+    _impl->message = what + extra_info;
   }
   _impl->what = _impl->message;
 }

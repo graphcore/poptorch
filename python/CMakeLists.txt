@@ -73,12 +73,20 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/WarnOnUnsupportedAten.cpp"
   )
 
-pybind11_add_module(poptorch_core SHARED SYSTEM
+# Same as pybind11_add_module but without stripping the symbols and setting the visibility to hidden.
+# Source: https://pybind11.readthedocs.io/en/stable/compiling.html#advanced-interface-library-targets
+#
+# If the symbols are stripped then error messages will only contain symbol
+# addresses instead of human readable names.
+add_library(poptorch_core MODULE
   ${POPTORCH_CORE_SOURCES}
   )
-
+pybind11_extension(poptorch_core)
+# skip pybind11_strip(target)
 
 target_link_libraries(poptorch_core PRIVATE
+  pybind11::module
+  pybind11::lto
   popart_compiler
   torch
   ${TORCH_PYTHON_LIBRARY}
