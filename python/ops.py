@@ -41,7 +41,7 @@ def ctc_beam_search_decoder(probs: "torch.Tensor",
 def ipu_print_tensor(tensor: "torch.Tensor",
                      title: str = "") -> "torch.Tensor":
     """
-    Adds an op to print the contents of a given IPU tensor.
+    Adds an op to print the contents of the IPU tensor.
 
     When this is executed the tensor
     will be copied back to host and printed.
@@ -62,8 +62,8 @@ def ipu_print_tensor(tensor: "torch.Tensor",
         a = c + d
         return a + b
 
-    If the result of ``ipu_print_tensor()`` is not used, it will be optimised
-    out by the graph optimiser and tensor will not be printed.
+    If the result of ``ipu_print_tensor()`` is not used, the function will be optimised
+    out by the graph optimiser and the tensor will not be printed.
 
     So if you want to print the value of `a`, you should do:
 
@@ -74,7 +74,11 @@ def ipu_print_tensor(tensor: "torch.Tensor",
         x = poptorch.ipu_print_tensor(a)
         return x + b
 
-    Optionally, you may add a second string parameter to be used as a title.
+    Optionally, you can add a second string argument to be used as a title, as
+    shown in the following example.
+    The value of `a` will be printed after the title "summation". The
+    value of the gradient of `a` will be printed after the title "summation_gradient"
+    if the operation is called in the backward pass.
 
     .. code-block:: python
 
@@ -85,11 +89,12 @@ def ipu_print_tensor(tensor: "torch.Tensor",
 
 
     .. warning::
-       In order for the print operation to not be optimised out by the graph
+       To prevent the print operation being optimised out by the graph
        optimiser, you must use the output of the print.
 
-    :param ipu_print_tensor: The tensor to print.
-    :returns: The input unchanged.
+    :param tensor: The tensor to print.
+    :param title: An optional title to print before the tensor value.
+    :returns: The input tensor unchanged.
     """
     return torch.ops.poptorch.ipu_print_tensor(tensor, title)
 
