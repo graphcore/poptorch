@@ -9,6 +9,7 @@
 #include "poptorch/Utils.hpp"
 
 #include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 #include "../PoptorchSymbols.hpp"
 
@@ -57,16 +58,43 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
 torch::jit::Node *arangeHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // aten::arange(Scalar end, ScalarType dtype, Layout, Device, bool pin_memory)
+  // aten::arange(Scalar start, Scalar end, ScalarType dtype=None, Layout,
+  //              Device, bool pin_memory)
   // aten::arange(Scalar start, Scalar end, Scalar step, ScalarType dtype,
   // Layout, Device, bool pin_memory)
 
-  ERROR_ON_MSG(node->inputs().size() != 5, "Unsupported arrange op");
+  std::size_t start;
+  std::size_t end;
+  std::size_t step;
 
-  std::vector<std::int64_t> vals;
-  std::size_t end = constantToLong(node->input(0)->node());
-  for (std::size_t start = 0; start < end; ++start) {
-    vals.push_back(start);
+  switch (node->inputs().size()) {
+  case 2:
+    start = 0;
+    end = constantToLong(node->input(0)->node());
+    step = 1;
+    break;
+  case 3:
+    start = constantToLong(node->input(0)->node());
+    end = constantToLong(node->input(1)->node());
+    step = 1;
+    break;
+  case 4:
+    start = constantToLong(node->input(0)->node());
+    end = constantToLong(node->input(1)->node());
+    step = constantToLong(node->input(2)->node());
+    break;
+  default:
+    ERROR("Unsupported arange op");
+    break;
   }
+
+  std::vector<std::int64_t> vals((end - start) / step);
+  size_t v = start;
+  std::generate(std::begin(vals), std::end(vals), [&v, step] {
+    auto cv = v;
+    v += step;
+    return cv;
+  });
 
   return createConstantInt(graph, vals,
                            {static_cast<std::int64_t>(vals.size())});
