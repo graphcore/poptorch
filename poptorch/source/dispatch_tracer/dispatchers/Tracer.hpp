@@ -2,7 +2,10 @@
 #ifndef POPTORCH_DISPATCH_TRACER_H_
 #define POPTORCH_DISPATCH_TRACER_H_
 
-#include <torch/csrc/jit/ir/ir.h>
+#include <ATen/Tensor.h>
+#include <ATen/core/boxing/KernelFunction.h>
+#include <c10/util/Optional.h>
+
 #include <unordered_map>
 #include <vector>
 

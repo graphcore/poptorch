@@ -2,10 +2,20 @@
 #ifndef INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_
 #define INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_
 
-#include <torch/csrc/jit/ir/ir.h>
-
 #include <memory>
 #include <vector>
+
+namespace at {
+class Tensor;
+}
+
+namespace torch {
+namespace jit {
+struct Graph;
+struct Node;
+struct Value;
+} // namespace jit
+} // namespace torch
 
 namespace poptorch_ir {
 class PoptorchExecutorWrapper;

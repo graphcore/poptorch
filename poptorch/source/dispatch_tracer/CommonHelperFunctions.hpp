@@ -2,11 +2,21 @@
 #ifndef POPTORCH_DISPATCH_COMMON_HELPERS_HPP_
 #define POPTORCH_DISPATCH_COMMON_HELPERS_HPP_
 
-#include <torch/csrc/jit/ir/ir.h>
+#include <ATen/core/boxing/KernelFunction.h>
+#include <ATen/core/dispatch/Dispatcher.h>
+#include <ATen/core/function_schema.h>
 
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+namespace torch {
+namespace jit {
+struct Graph;
+struct Node;
+struct Value;
+} // namespace jit
+} // namespace torch
 
 namespace poptorch {
 
