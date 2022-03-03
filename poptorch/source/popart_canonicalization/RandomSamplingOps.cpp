@@ -10,18 +10,6 @@
 namespace poptorch {
 namespace {
 
-bool isConstantScalar(torch::jit::Value *input) {
-  if (input->node()->kind() != symbols::poptorch::tensor_constant) {
-    return false;
-  }
-
-  std::vector<int64_t> shape = shapeFromTensor(input);
-  int64_t numel = std::accumulate(shape.begin(), shape.end(), 1,
-                                  std::multiplies<int64_t>());
-
-  return numel == 1;
-}
-
 torch::jit::Node *normalHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
   // Overloads for aten::normal

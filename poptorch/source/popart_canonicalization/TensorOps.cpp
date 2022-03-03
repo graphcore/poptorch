@@ -363,6 +363,25 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
   return output->node();
 }
 
+torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto *input = node->input(0);
+  const auto input_type = input->type()->expect<c10::TensorType>();
+  const auto dim = handleDimensionParam(node->input(1), input_type);
+  auto *index = node->input(2);
+  auto *src = node->input(3);
+
+  // `scatter` can be passed a single value for `src` as a tensor constant, so
+  // broadcast it up.
+  if (isConstantScalar(src)) {
+    auto *shape = intVectorToIrConstant(graph, shapeFromTensor(index));
+    src = createExpand(graph, {src, shape})->output();
+  }
+
+  // scatter(input, index, src, dimension(dim, TensorType(input)))
+  return createScatter(graph, {input, index, src}, dim);
+}
+
 torch::jit::Node *fullCommon(torch::jit::Graph *graph, torch::jit::Value *v,
                              at::ScalarType type,
                              const std::vector<int64_t> &shape) {
@@ -410,6 +429,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::copy_, copyHandler);
   registerHandler(c10::aten::linear, linearHandler);
   registerHandler(c10::aten::gather, gatherHandler);
+  registerHandler(c10::aten::scatter, scatterHandler);
   registerHandler(c10::aten::full, fullHandler);
   registerHandler(c10::aten::full_like, fullLikeHandler);
 }

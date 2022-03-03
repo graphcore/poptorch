@@ -166,6 +166,18 @@ bool isTensorConstant(torch::jit::Node *node) {
           node->kind() == symbols::poptorch::host_side_tensor_constant);
 }
 
+bool isConstantScalar(torch::jit::Value *input) {
+  if (!isTensorConstant(input->node())) {
+    return false;
+  }
+
+  const std::vector<int64_t> shape = shapeFromTensor(input);
+  const int64_t numel = std::accumulate(shape.begin(), shape.end(), 1,
+                                        std::multiplies<int64_t>());
+
+  return numel == 1;
+}
+
 float constantToFloat(torch::jit::Node *node) {
   ERROR_ON_MSG(!isTensorConstant(node), "Cannot force a non-constant '"
                                             << node->kind().toQualString()

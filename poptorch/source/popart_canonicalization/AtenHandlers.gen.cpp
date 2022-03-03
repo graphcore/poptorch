@@ -597,18 +597,6 @@ torch::jit::Node *rsubHandler(torch::jit::Graph *graph,
   return createSub(graph, {y, x});
 }
 
-torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
-                                 torch::jit::Node *node) {
-  auto *input = node->input(0);
-  auto *index = node->input(2);
-  auto *src = node->input(3);
-  auto *dim = node->input(1);
-  auto t0 = input->type()->expect<c10::TensorType>();
-  auto t1 = handleDimensionParam(dim, t0);
-  // scatter(input, index, src, dimension(dim, TensorType(input)))
-  return createScatter(graph, {input, index, src}, t1);
-}
-
 torch::jit::Node *seluHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -868,7 +856,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::round, roundHandler);
   registerHandler(c10::aten::rsqrt, rsqrtHandler);
   registerHandler(c10::aten::rsub, rsubHandler);
-  registerHandler(c10::aten::scatter, scatterHandler);
   registerHandler(c10::aten::selu, seluHandler);
   registerHandler(c10::aten::sigmoid, sigmoidHandler);
   registerHandler(c10::aten::sign, signHandler);
