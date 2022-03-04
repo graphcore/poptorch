@@ -138,18 +138,11 @@ torch::jit::Node *indexHandler(torch::jit::Graph *graph,
                       0);
 }
 
-bool isMaskedFill(torch::jit::Graph *graph, torch::jit::Value *x,
-                  std::vector<torch::jit::Value *> &indices,
-                  torch::jit::Value *v) {
+bool isMaskedAssign(torch::jit::Graph *graph, torch::jit::Value *x,
+                    std::vector<torch::jit::Value *> &indices) {
   // Masked fill only takes one index tensor which is broadcastable
   // with the input
   if (indices.size() != 1) {
-    return false;
-  }
-
-  auto v_numel = *v->type()->expect<c10::TensorType>()->numel();
-  // Masked fill only takes a single fill value
-  if (v_numel != 1) {
     return false;
   }
 
@@ -187,7 +180,7 @@ torch::jit::Node *indexPutHandler(torch::jit::Graph *graph,
       handleTensorList(node->input(1)->node());
   torch::jit::Value *v = node->input(2);
 
-  if (isMaskedFill(graph, x, indices, v)) {
+  if (isMaskedAssign(graph, x, indices)) {
     return createWhere(graph, {indices[0], v, x});
   }
 
