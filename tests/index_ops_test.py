@@ -178,6 +178,23 @@ def test_index_put_masked_fill(mask_size, dtype):
     index_harness(index_op0, mask, True, v=v, is_mask=True)
 
 
+@pytest.mark.parametrize("mask_size, dtype", [
+    (1, torch.bool),
+    (2, torch.uint8),
+    (3, torch.bool),
+    (4, torch.uint8),
+])
+def test_index_put_masked_assign(mask_size, dtype):
+    torch.manual_seed(42)
+    mask_shape = [2, 3, 4, 5][:mask_size]
+    mask = (torch.rand(mask_shape) > 0.5).type(dtype)
+    v = torch.zeros([2, 3, 4, 5][mask_size:], dtype=torch.float32)
+    if len(v.size()) == 0:
+        # To avoid a size 0 tensor
+        v = v.unsqueeze(0)
+    index_harness(index_op0, mask, True, v=v, is_mask=True)
+
+
 @pytest.mark.parametrize("dim", range(-3, 3))
 def test_index_select(dim):
     op = lambda src, index: src.index_select(dim, index)
