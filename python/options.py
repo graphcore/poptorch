@@ -861,25 +861,64 @@ class Phase:
 
 class PipelinedExecution(_IExecutionStrategy):
     def __init__(self, *args):
-        """Pipeline the execution of the passed :py:class:`Stages<poptorch.Stage>` or if no stage is passed
-        consider each unique :py:class:`Block<poptorch.Block>` name
-        encountered during tracing as a different stage.
+        """Pipeline the execution of the graph partitions.
+        These partitions can be:
+        :py:class:`Stages<poptorch.Stage>`, :py:class:`Stages<poptorch.Block>`
+        or :py:class:`Stages<poptorch.BeginBlock>`.
+        If none of these are passed, :py:class:`poptorch.AutoStage` strategy
+        can be passed instead to decide how the stages ids are created.
+        By default, `poptorch.AutoStage.SameAsIpu` is used: The stage id
+        will be set to the selected IPU number.
+        This implies that each unique :py:class:`Block<poptorch.Block>` or
+        :py:class:`Block<poptorch.BeginBlock>` in the graph must have
+        their `ipu_id` explicitly set when using `AutoStage`.
 
+        Example 1: Blocks `user_id` are known, IPUs are inferred.
         >>> with poptorch.Block("A"):
-        ...     layer()
+        ...     layer1()
         >>> with poptorch.Block("B"):
-        ...     layer()
+        ...     layer2()
         >>> with poptorch.Block("C"):
-        ...     layer()
+        ...     layer3()
+        >>> with poptorch.Block("D"):
+        ...     layer4()
         >>> opts = poptorch.Options()
-        >>> # Create a 3 stages pipeline
-        >>> opts.setExecutionStrategy(poptorch.PipelinedExecution("A","B","C"))
-        >>> # Create a 2 stages pipeline
+        >>> # Create a 4 stages pipeline based on `user_id`, 4 IPUs will be used.
+        >>> opts.setExecutionStrategy(poptorch.PipelinedExecution("A","B",
+        ...                                                       "C","D"))
+
+        Stages can also be set explicitly:
+        >>> # Create a 2 stages pipeline with the blocks `user_id`, 2 IPUs will be used.
         >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
         ...    poptorch.Stage("A","B"),
-        ...    "C"))
-        >>> # Automatically create a 3 stages pipeline based on the block names
+        ...    poptorch.Stage("C","D")))
+
+        Example 2: Blocks `ipu_id` are known, use default AutoStage.
+        poptorch.Block.useAutoId()
+        >>> with poptorch.Block(ipu_id=0):
+        ...     layer1()
+        >>> with poptorch.Block(ipu_id=1):
+        ...     layer2()
+        >>> with poptorch.Block(ipu_id=2):
+        ...     layer3()
+        >>> with poptorch.Block(ipu_id=3):
+        ...     layer4()
+        >>> # Automatically create a 4 stages pipeline matching the Blocks `ipu_id`.
         >>> opts.setExecutionStrategy(poptorch.PipelinedExecution())
+        >>> # Note: poptorch.PipelinedExecution()
+        >>> # is the default execution strategy when blocks are defined.
+
+        Example 3:  Non-consecutive stages placed on the same IPU.
+        >>> with poptorch.Block(ipu_id=0):
+        ...     layer1()
+        >>> with poptorch.Block(ipu_id=1):
+        ...     layer2()
+        >>> with poptorch.Block(ipu_id=0):
+        ...     layer3()
+        >>> # Automatically create a 3 stages pipeline forcing the stages
+        >>> # ids to be incremental.
+        >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
+        ...                           poptorch.AutoStage.AutoIncrement))
 
         :param args: Either a :py:class:`poptorch.AutoStage` strategy or an
             explicit list of stages or block ids.
@@ -936,14 +975,14 @@ class PipelinedExecution(_IExecutionStrategy):
 
 class ShardedExecution(PipelinedExecution):
     """Will shard the execution of the passed Stages or if no stage is passed
-    will consider each unique Block name encountered during tracing as a
+    will consider each unique Block ipu_id encountered during tracing as a
     different stage.
 
-    >>> with poptorch.Block("A"):
+    >>> with poptorch.Block(ipu_id=0):
     ...     layer()
-    >>> with poptorch.Block("B"):
+    >>> with poptorch.Block(ipu_id=1):
     ...     layer()
-    >>> with poptorch.Block("C"):
+    >>> with poptorch.Block(ipu_id=2):
     ...     layer()
     >>> opts = poptorch.Options()
     >>> # Automatically create 3 shards based on the block names

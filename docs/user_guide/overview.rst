@@ -245,6 +245,19 @@ IPUs.
 Annotations
 -----------
 
+In PopTorch, you can divide a model into blocks. Blocks are associated to stages and
+stages can be grouped into phases. This chapter will describe how to define them
+and how to use them to set up different execution modes.
+
+:numref:`figStages`
+
+.. _figStages:
+.. figure:: stages_summary.png
+   :width: 581
+
+   Poptorch model partition summary
+
+
 Model partitioning using blocks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
