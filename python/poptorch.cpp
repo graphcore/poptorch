@@ -1417,6 +1417,12 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
       }
     }
 
+    // Make sure all constants are correctly categorised as either
+    // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
+    // that we have a full graph.
+    poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
+        graph.get());
+
     auto inplace_op_handler =
         std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
 

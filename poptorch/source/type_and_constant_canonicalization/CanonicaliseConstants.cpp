@@ -42,9 +42,11 @@ bool popartOnlyNode(const torch::jit::NodeKind &kind) {
 }
 
 // Check whether the node is (eventually) used host side, IPU or both
-UseOfNode getUseOfNode(torch::jit::Node *n) {
-  // Check the kind of the node itself (for when not called on a constant)
-  if (popartOnlyNode(n->kind())) {
+UseOfNode getUseOfNode(torch::jit::Node *n,
+                       bool check_node_kind_itself = true) {
+  // Check the kind of the node itself (for when not called on a prim constant).
+  // This could be disabled explicitly by the caller.
+  if (check_node_kind_itself && popartOnlyNode(n->kind())) {
     return UseOfNode::PopARTOnly;
   }
 
@@ -95,15 +97,27 @@ UseOfNode getUseOfNode(torch::jit::Node *n) {
 void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
                                const at::Tensor &t) {
   ERROR_ON(n->kind() != c10::prim::Constant);
-
+  bool is_dispatcher_active = isDispatcherActive();
   torch::jit::WithInsertPoint insert_point(n);
-  auto *new_node = tensorToConstant(graph, t, getUseOfNode(n));
 
-  // Due to tracing ambiguity, a float tensor here could be either float or half
-  auto new_type = new_node->output()->type()->expect<c10::TensorType>();
-  if (new_type->scalarType() == at::ScalarType::Float &&
-      !isDispatcherActive()) {
-    new_node->output()->setType(new_type->withScalarType(HALF_OR_FLOAT));
+  poptorch::UseOfNode use_of_node;
+  if (is_dispatcher_active) {
+    // At the time of the intercept we don't have a full view of how a constant
+    // will be used so mark it as popart only and resolve at the
+    // end of dispatch.
+    use_of_node = poptorch::UseOfNode::PopARTOnly;
+  } else {
+    use_of_node = getUseOfNode(n);
+  }
+  auto *new_node = tensorToConstant(graph, t, use_of_node);
+
+  if (!is_dispatcher_active) {
+    // Due to tracing ambiguity, a float tensor here could be either
+    // float or half
+    auto new_type = new_node->output()->type()->expect<c10::TensorType>();
+    if (new_type->scalarType() == at::ScalarType::Float) {
+      new_node->output()->setType(new_type->withScalarType(HALF_OR_FLOAT));
+    }
   }
 
   for (size_t use_idx = 0; use_idx < n->output()->uses().size(); use_idx++) {
@@ -538,6 +552,64 @@ void removeStateChangingNodesFromHostSideBranch(
     }
   }
 }
+
+void canonicaliseIfConstant(torch::jit::Graph *graph, torch::jit::Node *node,
+                            std::unordered_set<torch::jit::Node *> *to_delete) {
+  logging::LogContext ctx("processing " + nodeToString(node));
+
+  if (node->kind() == c10::aten::size) {
+    // This will be made a constant in the size handler
+    node->output()->setType(
+        c10::TensorType::create(c10::ScalarType::Int, c10::nullopt, 1, false));
+  }
+
+  // If it's not a constant or if it doesn't have a value (i.e is None) or if
+  // it's a Device
+  if (node->kind() != c10::prim::Constant ||
+      !node->hasAttribute(c10::attr::value) ||
+      node->output()->type()->isSubtypeOf(c10::DeviceObjType::get())) {
+    return;
+  }
+
+  if (node->output()->type()->isSubtypeOf(c10::NumberType::get()) ||
+      node->output()->type()->isSubtypeOf(c10::BoolType::get())) {
+    logging::LogContext ctx2("handling as number constant");
+    handleNumberConstant(graph, node);
+  } else if (node->output()->type()->isSubtypeOf(c10::TensorType::get())) {
+    logging::LogContext ctx2("handling as tensor constant");
+    handleTensorConstant(graph, node);
+  } else if (node->output()->type()->isSubtypeOf(c10::StringType::get())) {
+    logging::LogContext ctx2("handling as string constant");
+    handleStringConstant(graph, node);
+  } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofBools())) {
+    // Only known case is the result of an evaluated constexpr
+    logging::LogContext ctx2("handling as bool list constant");
+    handleListOrTuple(graph, node, to_delete);
+  } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofFloats())) {
+    // Only known case is the result of an evaluated constexpr
+    logging::LogContext ctx2("handling as float list constant");
+    handleListOrTuple(graph, node, to_delete);
+  } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofInts())) {
+    // Only known case is the result of an evaluated constexpr
+    logging::LogContext ctx2("handling as int list constant");
+    handleListOrTuple(graph, node, to_delete);
+  } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofTensors())) {
+    // Only known case is the result of an evaluated constexpr
+    logging::LogContext ctx2("handling a tensor list constant");
+    handleListOrTuple(graph, node, to_delete);
+  } else if (node->output()->type()->isSubtypeOf(c10::ListType::create(
+                 c10::OptionalType::create(c10::TensorType::get())))) {
+    logging::LogContext ctx2("handling an optional tensor list constant");
+    handleListOrTuple(graph, node, to_delete);
+  } else if (node->output()->type()->cast<c10::TupleType>()) {
+    handleListOrTuple(graph, node, to_delete);
+  } else {
+    ERROR("Unsupported type " << node->output()->type()->str());
+  }
+
+  to_delete->insert(node);
+}
+
 } // namespace
 
 void canonicaliseConstants(torch::jit::Graph *graph) {
@@ -546,62 +618,9 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
   std::unordered_set<torch::jit::Node *> to_delete;
   for (auto it = nodes.begin(); it != nodes.end(); it++) {
     auto *node = *it;
-
-    logging::LogContext ctx("processing " + nodeToString(node));
-
-    if (node->kind() == c10::aten::size) {
-      // This will be made a constant in the size handler
-      node->output()->setType(c10::TensorType::create(c10::ScalarType::Int,
-                                                      c10::nullopt, 1, false));
-    }
-
-    // If it's not a constant or if it doesn't have a value (i.e is None) or if
-    // it's a Device
-    if (node->kind() != c10::prim::Constant ||
-        !node->hasAttribute(c10::attr::value) ||
-        node->output()->type()->isSubtypeOf(c10::DeviceObjType::get())) {
-      continue;
-    }
-
-    if (node->output()->type()->isSubtypeOf(c10::NumberType::get()) ||
-        node->output()->type()->isSubtypeOf(c10::BoolType::get())) {
-      logging::LogContext ctx2("handling as number constant");
-      handleNumberConstant(graph, node);
-    } else if (node->output()->type()->isSubtypeOf(c10::TensorType::get())) {
-      logging::LogContext ctx2("handling as tensor constant");
-      handleTensorConstant(graph, node);
-    } else if (node->output()->type()->isSubtypeOf(c10::StringType::get())) {
-      logging::LogContext ctx2("handling as string constant");
-      handleStringConstant(graph, node);
-    } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofBools())) {
-      // Only known case is the result of an evaluated constexpr
-      logging::LogContext ctx2("handling as bool list constant");
-      handleListOrTuple(graph, node, &to_delete);
-    } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofFloats())) {
-      // Only known case is the result of an evaluated constexpr
-      logging::LogContext ctx2("handling as float list constant");
-      handleListOrTuple(graph, node, &to_delete);
-    } else if (node->output()->type()->isSubtypeOf(c10::ListType::ofInts())) {
-      // Only known case is the result of an evaluated constexpr
-      logging::LogContext ctx2("handling as int list constant");
-      handleListOrTuple(graph, node, &to_delete);
-    } else if (node->output()->type()->isSubtypeOf(
-                   c10::ListType::ofTensors())) {
-      // Only known case is the result of an evaluated constexpr
-      logging::LogContext ctx2("handling a tensor list constant");
-      handleListOrTuple(graph, node, &to_delete);
-    } else if (node->output()->type()->isSubtypeOf(c10::ListType::create(
-                   c10::OptionalType::create(c10::TensorType::get())))) {
-      logging::LogContext ctx2("handling an optional tensor list constant");
-      handleListOrTuple(graph, node, &to_delete);
-    } else if (node->output()->type()->cast<c10::TupleType>()) {
-      handleListOrTuple(graph, node, &to_delete);
-    } else {
-      ERROR("Unsupported type " << node->output()->type()->str());
-    }
-
-    to_delete.insert(*it);
+    canonicaliseIfConstant(graph, node, &to_delete);
   }
+
   searchAndPossiblyDestroy(to_delete);
   to_delete.clear();
 
@@ -609,6 +628,55 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
   searchAndPossiblyDestroy(to_delete);
 
   to_delete.clear();
+  removeStateChangingNodesFromHostSideBranch(graph, &to_delete);
+  searchAndPossiblyDestroy(to_delete);
+}
+
+void canonicaliseConstantsDispatch(torch::jit::Graph *graph,
+                                   torch::jit::Node *node) {
+  logging::LogContext ctx_func("CanonicaliseConstantsDispatch");
+  std::unordered_set<torch::jit::Node *> to_delete;
+  for (auto *input : node->inputs()) {
+    auto *input_producer = input->node();
+    canonicaliseIfConstant(graph, input_producer, &to_delete);
+  }
+
+  searchAndPossiblyDestroy(to_delete);
+}
+
+void categoriseConstantsDispatch(torch::jit::Graph *graph) {
+  logging::LogContext ctx_func("CategoriseConstantsDispatch");
+
+  std::unordered_set<torch::jit::Node *> to_delete;
+  for (auto *node : graph->nodes()) {
+    if (node->kind() != symbols::poptorch::tensor_constant) {
+      continue;
+    }
+
+    // Don't check the kind of the node itself as we are not calling on a
+    // prim::Constant.
+    switch (getUseOfNode(node, /*check_node_kind_itself=*/false)) {
+    case UseOfNode::PopARTOnly:
+      break;
+    case UseOfNode::HostSideOnly:
+      node->replaceWithNewSymbol(symbols::poptorch::host_side_tensor_constant);
+      to_delete.insert(node);
+      break;
+    case UseOfNode::HostSideAndPopART:
+      node->replaceWithNewSymbol(
+          symbols::poptorch::host_and_ipu_side_tensor_constant);
+      to_delete.insert(node);
+      break;
+    }
+  }
+
+  searchAndPossiblyDestroy(to_delete);
+  to_delete.clear();
+
+  rectifyHostAndIPUSideConstants(graph, &to_delete);
+  searchAndPossiblyDestroy(to_delete);
+  to_delete.clear();
+
   removeStateChangingNodesFromHostSideBranch(graph, &to_delete);
   searchAndPossiblyDestroy(to_delete);
 }

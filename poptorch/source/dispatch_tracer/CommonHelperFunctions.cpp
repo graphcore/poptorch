@@ -33,9 +33,9 @@ torch::jit::Value *makeConstant(torch::jit::Graph &graph, at::Tensor &tensor) {
   return constant->output();
 }
 
-torch::jit::Value *insertValueIntoGraph(c10::IValue &value,
-                                        torch::jit::Graph &graph,
-                                        ValueMapper &mapper) {
+torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
+                                                  torch::jit::Graph &graph,
+                                                  ValueMapper &mapper) {
   if (value.isTensor()) {
     // Handle tensors.
     at::Tensor tensor = value.toTensor();
@@ -47,26 +47,21 @@ torch::jit::Value *insertValueIntoGraph(c10::IValue &value,
     }
 
     torch::jit::Value *val = mapper.getValueForTensor(tensor);
-    // If we couldn't find the tensor in the tensors we are currently tracking.
     if (val == nullptr) {
-      // If it is actually just a tensor wrapper around a python scalar we just
-      // add it as a constant.
-      if (tensor.unsafeGetTensorImpl()->is_wrapped_number()) {
-        val = graph.insertConstant(value);
-      } else {
-        // This is probably an external tensor that we didn't catch. Assume
-        // it's a constant.
-        val = makeConstant(graph, tensor);
-      }
+      // This is probably an external tensor that we didn't catch. Assume
+      // it's a constant.
+      val = makeConstant(graph, tensor);
     } else {
+      auto *record = mapper.rawTensorRecord(tensor);
       // If this is a constant tensor, add it to the graph now
-      auto is_const = *mapper.tensorIsConst(tensor);
-      if (is_const) {
+      // and fix the mapping.
+      if (record->is_const) {
         val = makeConstant(graph, tensor);
+        record->jit = val;
       }
     }
 
-    logging::trace("[TRACING-2] Input: Tensor ptr {}, jit ir {} {}",
+    logging::trace("[TRACING-2] Tensor input: tensor ptr {}, jit ir {} {}",
                    reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
                    val->debugNameBase(), toString(tensor));
 
@@ -77,16 +72,19 @@ torch::jit::Value *insertValueIntoGraph(c10::IValue &value,
     // Handle tensor lists.
     std::vector<torch::jit::Value *> list_values;
     for (c10::IValue list_value : value.toTensorVector()) {
-      list_values.push_back(insertValueIntoGraph(list_value, graph, mapper));
+      list_values.push_back(
+          insertValueIntoGraphAndTrackIt(list_value, graph, mapper));
     }
     auto *list = graph.createList(c10::TensorType::get(), list_values);
     graph.insertNode(list);
     return list->output();
   }
 
-  // Assume value is a constant.
+  // Assume value is a true constant and not a tensor so we don't have to
+  // track it in the value mapper. It will get canonicalised later.
   torch::jit::Value *val = graph.insertConstant(value);
   ERROR_ON_MSG(val == nullptr, "Internal: graph could not insert a constant");
+  logging::trace("[TRACING-2] Constant input: jit ir {}", val->debugNameBase());
   return val;
 }
 
@@ -114,7 +112,7 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
       if (val.isTensor()) {
         at::Tensor as_tensor = val.toTensor();
         // But actually we are a previously seen tensor which has been demoted
-        // to constant.
+        // to a constant.
         torch::jit::Value *new_val = mapper.getValueForTensor(as_tensor);
 
         if ((new_val != nullptr) && new_val != in) {
@@ -125,7 +123,9 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
     }
   }
 
-  poptorch::type_and_constant_canonicalization::canonicaliseConstants(&graph);
+  poptorch::type_and_constant_canonicalization::canonicaliseConstantsDispatch(
+      &graph, aten_target);
+
   return aten_target;
 }
 
@@ -244,7 +244,7 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
         }
       }
     }
-    inputs.push_back(insertValueIntoGraph(value, graph, mapper));
+    inputs.push_back(insertValueIntoGraphAndTrackIt(value, graph, mapper));
   }
   return createAtenTarget(graph, schema, inputs, stack, mapper);
 }

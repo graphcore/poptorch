@@ -235,7 +235,7 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       break;
     }
 
-    // Start tracking the tensors, i.e. add them to the value mapper.
+    // Start tracking the output tensors, i.e. add them to the value mapper.
     torch::jit::Value *val = new_node->output(output_index);
     // Check whether the handler replaced this value.
     auto *replacement = wasReplaced(val);

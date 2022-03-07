@@ -47,9 +47,23 @@ void castUnsupportedInputs(torch::jit::Graph *graph);
 void checkAndChangeOutputTypes(torch::jit::Graph *graph);
 
 // Changes all constants used in implicit casting operations into tensor
-// constants (poptorch::tensor_constant) of the correct type. Note the other
-// constants remain unchanged.
+// constants (poptorch::tensor_constant) of the correct type.
 void canonicaliseConstants(torch::jit::Graph *graph);
+
+// Dispatcher-specific passes are below.
+
+// Changes all constants to poptorch::tensor_constant but only checks the
+// inputs of the node. This pass does not resolve any of the constants to
+// either poptorch::host_side_tensor_constant nor
+// poptorch::host_and_ipu_side_tensor_constant as we don't see the full graph
+// at the point of dispatch intercept.
+void canonicaliseConstantsDispatch(torch::jit::Graph *graph,
+                                   torch::jit::Node *node);
+
+// Categorise all poptorch::tensor_constant into either
+// poptorch::tensor_constant or poptorch::host_side_tensor_constant. This pass
+// is called after dispatch once the full graph is available.
+void categoriseConstantsDispatch(torch::jit::Graph *graph);
 
 } // namespace type_and_constant_canonicalization
 } // namespace poptorch

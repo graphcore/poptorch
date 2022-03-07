@@ -1,6 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "ValueMapper.hpp"
-#include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
@@ -51,6 +51,8 @@ bool ValueMapper::isDirectAlias(const at::Tensor &t) {
 // Add a tensor to the IR.
 void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
                             bool is_const) {
+  logging::trace("Adding {} to value mapper, MLIR id: {}",
+                 static_cast<void *>(t.unsafeGetTensorImpl()), id);
   // If the tensor is already being tracked then we will update the MLIR
   // value being tracked. Otherwise we insert and add the MLIR value.
   auto itr =
@@ -66,6 +68,9 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
 
 void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
                             bool is_const) {
+  logging::trace("Adding {} to value mapper, JIT id: {}",
+                 static_cast<void *>(t.unsafeGetTensorImpl()),
+                 val->debugName());
   // If the tensor is already being tracked then we will update the JIT
   // value being tracked. Otherwise we insert and add the jit value.
   auto itr =

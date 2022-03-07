@@ -2,20 +2,13 @@
 #ifndef POPTORCH_DISPATCH_VALUE_MAPPER_HPP_
 #define POPTORCH_DISPATCH_VALUE_MAPPER_HPP_
 
-#include <ATen/Tensor.h>
-#include <c10/util/Optional.h>
+#include <torch/csrc/jit/ir/ir.h>
 
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
-
-namespace torch {
-namespace jit {
-struct Value;
-} // namespace jit
-} // namespace torch
 
 namespace poptorch {
 
