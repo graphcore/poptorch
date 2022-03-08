@@ -61,7 +61,7 @@ the two tensors we have anchored previously.
 
 For a more practical understanding around observing tensors, Graphcore's tutorials
 repository contains a tutorial you can follow about observing tensors, using anchoring and generating a gradient histogram:
-`PopTorch tutorial: Observing tensors <https://github.com/graphcore/tutorials/tree/sdk-release-2.4/tutorials/pytorch/tut4_observing_tensors>`_.
+`PopTorch tutorial: Observing tensors <https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut4_observing_tensors>`_.
 
 Inspecting optimiser state
 ==========================
