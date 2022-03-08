@@ -14,7 +14,18 @@ URL_PATTERN = re.compile(r"\bhttps?:[^\s>]+")
 #
 # Make sure to add a TODO(TXXXX) comment to remove the exception once the link
 # is fixed.
-EXCEPTIONS = []
+EXCEPTIONS = [
+    #TODO(T57889): remove exceptions after 2.5 release
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/pytorch",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/simple_applications/pytorch",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/popart/custom_operators",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut1_basics",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut2_efficient_data_loading",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut4_observing_tensors",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut3_mixed_precision",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/pytorch/custom_op"
+]
 
 
 def get_all_links_from_file(rst_file_name):

@@ -160,4 +160,4 @@ passing in the updated optimizer.
 Going further
 =============
 
-For a more detailed tutorial on getting started with PopTorch, you can find the `Pytorch basics tutorial <https://github.com/graphcore/tutorials/tree/sdk-release-2.4/tutorials/pytorch/tut1_basics>`_ which walks through training an MNIST model on the IPU.
+For a more detailed tutorial on getting started with PopTorch, you can find the `Pytorch basics tutorial <https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut1_basics>`_ which walks through training an MNIST model on the IPU.
