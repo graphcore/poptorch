@@ -126,14 +126,3 @@ def test_wrapped_values(python_type):
 
     # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
-
-
-@pytest.mark.parametrize("fail_fn",
-                         [lambda t: t + (2**31), lambda t: t + (-2**31 - 1)])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
-def test_wrapped_values_integer_outside_32bit_range(fail_fn):
-    t = torch.ones(1, dtype=torch.int)
-
-    with pytest.raises(RuntimeError, match="outside the representable range"):
-        IPUContext(fail_fn)(t)
