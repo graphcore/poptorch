@@ -691,14 +691,18 @@ public:
     // not strictly necessary, we check that op is castable to a UpsampleOp *.
     verifyOp<UpsampleOp>(op, poptorch_custom_ops::upsample_bilinear2d);
 
-    std::stringstream compile_output;
-    std::stringstream codelets{
+    // We only want to register the codelets once, so check if the first
+    // codelet in the file has already been added
+    if (!graph().hasCodelet("BilinearMultipleVertex<float>")) {
+      std::stringstream compile_output;
+      std::stringstream codelets{
 #include "UpsampleBilinear2dCodelets.inc"
-    };
+      };
 
-    graph().addCodelets(
-        codelets, "-DNDEBUG -O3", compile_output,
-        poplar::CodeletFileType::CppSource); // add codelets to the graph
+      graph().addCodelets(
+          codelets, "-DNDEBUG -O3", compile_output,
+          poplar::CodeletFileType::CppSource); // add codelets to the graph
+    }
   }
 
   void grow(poplar::program::Sequence &prog) const final {
