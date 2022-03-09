@@ -164,7 +164,7 @@ def Poptorch_squeeze_dim: Poptorch_Op<"squeeze_dim", [ViewOp]> {
     ];
 }
 
-//  squeeze_.dim(Tensor(a!) self, int dim) -> Tensor(a!)
+// squeeze_.dim(Tensor(a!) self, int dim) -> Tensor(a!)
 def Poptorch_squeeze_dim_: Poptorch_Op<"squeeze_dim_", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
     let results = (outs Poptorch_tensor:$result);
@@ -184,6 +184,46 @@ def Poptorch_squeeze_dim_: Poptorch_Op<"squeeze_dim_", [ViewOp]> {
             new_shape.erase(new_shape.begin() + dim);
         }
         $_state.addTypes(mlir::RankedTensorType::get(new_shape, e1));
+     }]>
+    ];
+}
+
+// select.int(Tensor(a) self, int dim, int index) -> Tensor(a)
+def Poptorch_select : Poptorch_Op<"select", [ViewOp]> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64Attr:$dim,
+                         I64Attr:$idx);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::int64_t":$dim,
+                                      "std::int64_t":$idx),[{
+
+        // Operands
+        $_state.addOperands({self});
+
+        // Attributes
+        mlir::RankedTensorType input_tensor = self.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 4> out_shape {input_tensor.getShape().begin(),
+                                                      input_tensor.getShape().end()};
+
+        if (dim < 0) {
+            dim += out_shape.size();
+        }
+        if (idx < 0) {
+            idx += out_shape[dim];
+        }
+
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("idx", $_builder.getI64IntegerAttr(idx));
+
+        // Returns
+        out_shape.erase(out_shape.begin() + dim);
+
+        auto out_type = mlir::RankedTensorType::get(out_shape, input_tensor.getElementType());
+
+        $_state.addTypes({out_type});
      }]>
     ];
 }

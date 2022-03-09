@@ -107,4 +107,14 @@ void transpose::lowerToPoplar(CompilerContext &context) {
   context.tensors.insert({result(), view});
 }
 
+void select::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor self = context.fromSsa(this->self());
+  const int64_t dim = this->dim();
+  const int64_t idx = this->idx();
+
+  const poplar::Tensor res = self.slice(idx, idx + 1, dim);
+
+  context.tensors.insert({this->result(), res});
+}
+
 } // namespace poptorch_ir

@@ -63,7 +63,8 @@ def add_outplace_op(function,
                     outputs,
                     named_tensors,
                     scope="",
-                    inplace_reshape=False):
+                    inplace_reshape=False,
+                    is_subview=False):
     return_type = "poptorch_ir::ODSTensorResults mlir_output =\n" + scope
     return_type += "\t  "
 
@@ -99,22 +100,28 @@ def add_outplace_op(function,
         # For each output tensor return it to pytorch in a different way depending on what the schema tells us.
         if inplace_reshape:
             # Inplace operations should be inplaced versions of a certain input.
-            function_decl += "\tstack.push_back(outputInplaceReshape_"
+            function_decl += scope + "\tstack.push_back(outputInplaceReshape_"
             function_decl += function + "(t_id, " + named_tensors[tensor_id]
             function_decl += "_pytorch, " + parameters + "));\n"
+        elif is_subview:
+            # Subviews should be a view of a given input, with additional info
+            # passed to know how to select it.
+            function_decl += scope + "\tstack.push_back(outputIsSubviewOf_"
+            function_decl += function + "(t_id, " + named_tensors[tensor_id]
+            function_decl += "_pytorch, requires_grad, " + parameters + "));\n"
         elif is_inplace:
             # Inplace operations should be inplaced versions of a certain input.
-            function_decl += "\tstack.push_back(outputIsInplaceOf(t_id, "
-            function_decl += named_tensors[tensor_id] + "_pytorch));\n"
+            function_decl += scope + "\tstack.push_back(outputIsInplaceOf(t_id"
+            function_decl += ", " + named_tensors[tensor_id] + "_pytorch));\n"
         elif is_view:
             # Views should be a view of a given input.
-            function_decl += "\tstack.push_back(outputIsViewOf(t_id, "
+            function_decl += scope + "\tstack.push_back(outputIsViewOf(t_id, "
             function_decl += named_tensors[tensor_id]
             function_decl += "_pytorch, requires_grad));\n"
         else:
             # Otherwise we are returning a new tensor.
-            function_decl += "\tstack.push_back(makeEmptyOutputTensor(t_id, "
-            function_decl += "requires_grad));\n"
+            function_decl += scope + "\tstack.push_back(makeEmptyOutputTensor("
+            function_decl += "t_id, requires_grad));\n"
 
     return function_decl
 
@@ -309,10 +316,19 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
             outputs,
             named_tensors,
             inplace_reshape=True)
-    else:
+    elif "PopTorchDirectSubview" in op_target:
+        function_decl += add_outplace_op(op_target["PopTorchDirectSubview"],
+                                         parameters,
+                                         outputs,
+                                         named_tensors,
+                                         is_subview=True)
+    elif "PopTorchDirectInplace" in op_target:
         function_decl += add_inplace_op(op_target["PopTorchDirectInplace"],
                                         parameters,
                                         inplace_ins[0] + "_pytorch")
+    else:
+        raise KeyError("Couldn't find a valid PopTorch direct mapping " +
+                       "(eg. PopTorchDirect, or PopTorchDirectInplace)")
 
     function_decl += "}\n"
     return function_decl

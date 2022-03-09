@@ -717,6 +717,30 @@ at::Tensor MLIRDispatch::outputInplaceReshape_squeeze_dim_(
   return original_input;
 }
 
+at::Tensor MLIRDispatch::outputIsSubviewOf_select(
+    poptorch_ir::TensorId output_id, const at::Tensor &original_input,
+    bool requires_grad, poptorch_ir::TensorId self, int64_t dim,
+    int64_t index) {
+  (void)self;
+  std::vector<std::int64_t> shape = _compiler.getSize(output_id);
+
+  // Create new tensor.
+  at::Tensor new_output =
+      at::native::empty_cpu(shape, original_input.scalar_type());
+
+  // We need to take the same storage and storage metadata (strides, offsets) as
+  // the original.
+  new_output = new_output.set_(original_input);
+
+  // Perform the selection.
+  new_output = new_output.select(dim, index);
+
+  new_output.set_requires_grad(requires_grad);
+  _mapper.addTensor(new_output, output_id);
+
+  return new_output;
+}
+
 at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
                                                bool requires_grad) {
   // If it's a none or error, return an undefined tensor. Some functions may

@@ -80,6 +80,16 @@ public:
                                                poptorch_ir::TensorId self,
                                                int dim);
 
+  // Special case: When the output is a selection of the input, it's technically
+  // a view but a smaller one than the input, so we need more info than
+  // `outputIsViewOf` to know what to cut out.
+  // NOLINTNEXTLINE
+  at::Tensor outputIsSubviewOf_select(poptorch_ir::TensorId output_id,
+                                      const at::Tensor &original_input,
+                                      bool requires_grad,
+                                      poptorch_ir::TensorId self, int64_t dim,
+                                      int64_t index);
+
   at::Tensor makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
                                    bool requires_grad);
 

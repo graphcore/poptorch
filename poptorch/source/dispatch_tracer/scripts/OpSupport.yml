@@ -131,7 +131,7 @@
 # view.
 - func: view
   PopTorchDirect: reshape
-  
+
 # _cat(Tensor[] tensors, int dim=0) -> Tensor(a!)
 - func: _cat
   PopTorchDirect: concat
@@ -143,6 +143,12 @@
 # squeeze_.dim(Tensor(a!) self, int dim) -> Tensor(a!)
 - func: squeeze_.dim
   PopTorchDirectInplaceReshape: squeeze_dim_
+
+# select.int(Tensor(a) self, int dim, int index) -> Tensor(a)
+- func: select.int
+  PopTorchDirectSubview: select
+
+
 ################
 # Element wise
 ################
