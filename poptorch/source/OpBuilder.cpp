@@ -4,6 +4,7 @@
 
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -102,7 +103,8 @@ void setNodeOutputsTypes(torch::jit::Node *node,
         resolved_output_type = onnxStrToScalarType(onnx_dtype.c_str());
       }
 
-      if (resolved_output_type == at::ScalarType::Float) {
+      if (resolved_output_type == at::ScalarType::Float &&
+          !isDispatcherActive()) {
         // Due to tracing not supporting Float16, the original type could be
         // either half or float 16.
         resolved_output_type = HALF_OR_FLOAT;
