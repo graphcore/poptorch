@@ -1409,6 +1409,14 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
 
     logging::debug("Traced graph:\n{}", *graph);
 
+    if (graph->outputs().empty()) {
+      logging::trace("No outputs, so all nodes cleared");
+      for (auto it = graph->nodes().rbegin(); it != graph->nodes().rend();
+           it++) {
+        it.destroyCurrent();
+      }
+    }
+
     auto inplace_op_handler =
         std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
 

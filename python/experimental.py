@@ -142,15 +142,16 @@ class IPUScope:
             else:
                 yield x
 
-        flattened = list(flatten(tensors))
-        with torch.no_grad():
-            for tensor in flattened:
-                if tensor.dtype == torch.long:
-                    self._outputs.append(tensor.int())
-                else:
-                    self._outputs.append(tensor.clone())
+        if tensors != [None]:
+            flattened = list(flatten(tensors))
+            with torch.no_grad():
+                for tensor in flattened:
+                    if tensor.dtype == torch.long:
+                        self._outputs.append(tensor.int())
+                    else:
+                        self._outputs.append(tensor.clone())
 
-        poptorch_core.markOutputs(flattened, self._outputs, structure(tensors))
+            poptorch_core.markOutputs(flattened, self._outputs, structure(tensors))
 
         # Turn dispatch back on.
         poptorch_core.startDispatch()
