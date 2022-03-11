@@ -5,14 +5,15 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace poptorch {
 
 class ValueMapper;
 
-c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &initial_op,
-                                        c10::Dispatcher &dispatcher);
+bool getOutplaceOpHandle(c10::OperatorHandle &initial_op,
+                         c10::Dispatcher &dispatcher);
 
 // From the schema deduce which argument if any is inplace. Only return the
 // first one which is inplace. This might include an argument of an op that
@@ -35,9 +36,27 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
 
 bool shouldRunOnCpu(bool is_inplace, const std::string &op_name);
 
-void convertAnyHalvesToFloat(c10::Stack *stack);
+class HalfFloatConverter {
+public:
+  explicit HalfFloatConverter(c10::Stack *stack,
+                              const c10::FunctionSchema &schema,
+                              ValueMapper &mapper);
 
-void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack);
+  void pre();
+  void post();
+
+private:
+  c10::Stack *_stack;
+  const c10::FunctionSchema &_schema;
+  ValueMapper &_mapper;
+  std::unordered_map<c10::intrusive_ptr<at::TensorImpl>,
+                     c10::intrusive_ptr<at::TensorImpl>>
+      _half_map;
+  bool _has_half_input;
+};
+
+void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack,
+                   ValueMapper &mapper);
 
 // Run our canonicaliser passes for the aten_target over the graph.
 torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
@@ -51,6 +70,8 @@ torch::jit::Value *wasReplaced(torch::jit::Value *target);
 
 // Return a string containing the tensor sizes and type.
 std::string toString(const at::Tensor &t);
+
+bool isHalfTensor(const at::Tensor &t);
 
 } // namespace poptorch
 

@@ -53,7 +53,8 @@ public:
   // node will be updated to the new target post canonicalisation
   void canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                               c10::Stack &stack,
-                              torch::jit::Node **node);
+                              torch::jit::Node **node,
+                              ValueMapper &mapper);
 
   // clang-format on
 private:

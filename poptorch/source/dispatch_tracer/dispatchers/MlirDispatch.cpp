@@ -445,16 +445,19 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(
       getInplaceArgument(*stack, initial_schema);
   bool is_truly_inplace = isTrulyInplace(*stack, initial_schema);
 
-  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
+  c10::OperatorHandle op = initial_op;
+  bool op_changed = getOutplaceOpHandle(op, dispatcher);
   const c10::FunctionSchema &schema = op.schema();
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, _graph, _mapper);
 
-  if (shouldRunOnCpu(is_truly_inplace, schema.name())) {
-    convertAnyHalvesToFloat(stack);
+  if (shouldRunOnCpu(op_changed || is_truly_inplace, schema.name())) {
+    HalfFloatConverter hf_conv(stack, schema, _mapper);
+    hf_conv.pre();
     // Call the CPU version to get the output shape
     dispatcher.callBoxed(op, stack);
+    hf_conv.post();
   } else {
     // The Op is in place: we don't need to run the CPU version.
     // Just clear the stack and keep the first input.
@@ -465,7 +468,7 @@ void MLIRDispatch::canonicaliseAndLowerViaJit(
 
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
-  fixNodeOutput(node, *stack);
+  fixNodeOutput(node, *stack, _mapper);
 
   // Try to canonicalise it.
   torch::jit::Node *new_node =

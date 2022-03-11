@@ -100,6 +100,9 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
 
   dest->jit = src->jit;
   dest->is_const = src->is_const;
+  if (_mapper.isHalfTensor(other)) {
+    _mapper.markHalfTensor(self);
+  }
 
   return self;
 }
@@ -153,24 +156,36 @@ at::Tensor JITDispatch::convolution(
   // Get the handler for the convolution.
   auto op_typed = op.typed<decltype(at::convolution)>();
 
+  bool input_half = isHalfTensor(input);
+  bool weight_half = isHalfTensor(weight);
+  bool bias_half = false;
+  if (bias) {
+    bias_half = isHalfTensor(*bias);
+  }
   // Rerun on CPU to see the sizes.
   at::Tensor output = op_typed.redispatch(
-      c10::DispatchKeySet({c10::DispatchKey::AutogradOther}), input, weight,
-      bias, stride, padding, dilation, transposed, output_padding, groups);
+      c10::DispatchKeySet({c10::DispatchKey::AutogradOther}),
+      input_half ? input.to(at::ScalarType::Float) : input,
+      weight_half ? weight.to(at::ScalarType::Float) : weight,
+      bias_half ? (*bias).to(at::ScalarType::Float) : bias, stride, padding,
+      dilation, transposed, output_padding, groups);
 
+  if (input_half) {
+    _mapper.markHalfTensor(output);
+  }
   // Add the output into the stack.
   stack.clear();
   stack.push_back(output);
 
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
-  fixNodeOutput(node, stack);
+  fixNodeOutput(node, stack, _mapper);
 
   logging::trace("[TRACING-2][JIT] Node tensor output size: ={}",
                  output.sizes());
 
   // Run our normal canonicalisation passes on it.
-  canonicaliseAndFixOutput(schema, stack, &node);
+  canonicaliseAndFixOutput(schema, stack, &node, _mapper);
 
   return output;
 }
@@ -181,7 +196,8 @@ at::Tensor JITDispatch::detach(const at::Tensor &self) { return self; }
 // Convert the operation into our normal IR style operation.
 void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                                            c10::Stack &stack,
-                                           torch::jit::Node **node) {
+                                           torch::jit::Node **node,
+                                           ValueMapper &mapper) {
   torch::jit::Node *new_node = canonicalise(schema, *node, graph, false);
   *node = new_node;
 
@@ -206,14 +222,18 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
     if (value.isTensor()) {
       at::Tensor tensor = value.toTensor();
 
-      auto st = tensor.scalar_type();
-      auto st_coerced = coerceToSupportedType(st);
-      if (st != st_coerced) {
-        logging::warn("[TRACING-2][JIT] Type coerced from {} to {}", st,
-                      st_coerced);
-        val->inferTypeFrom(tensor.to(st_coerced));
+      if (mapper.isHalfTensor(tensor)) {
+        val->inferTypeFrom(tensor.to(at::ScalarType::Half));
       } else {
-        val->inferTypeFrom(tensor);
+        auto st = tensor.scalar_type();
+        auto st_coerced = coerceToSupportedType(st);
+        if (st != st_coerced) {
+          logging::warn("[TRACING-2][JIT] Type coerced from {} to {}", st,
+                        st_coerced);
+          val->inferTypeFrom(tensor.to(st_coerced));
+        } else {
+          val->inferTypeFrom(tensor);
+        }
       }
       _mapper.addTensor(tensor, val);
 
@@ -252,16 +272,19 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
       getInplaceArgument(*stack, initial_schema);
   bool is_truly_inplace = isTrulyInplace(*stack, initial_schema);
 
-  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
+  c10::OperatorHandle op = initial_op;
+  bool op_changed = getOutplaceOpHandle(op, dispatcher);
   const c10::FunctionSchema &schema = op.schema();
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, graph, _mapper);
 
-  if (shouldRunOnCpu(is_truly_inplace, schema.name())) {
-    convertAnyHalvesToFloat(stack);
+  if (shouldRunOnCpu(is_truly_inplace || op_changed, schema.name())) {
+    HalfFloatConverter hf_conv(stack, schema, _mapper);
+    hf_conv.pre();
     // Call the CPU version to get the output shape
     dispatcher.callBoxed(op, stack);
+    hf_conv.post();
   } else {
     // The Op is in place: we don't need to run the CPU version.
     // Just clear the stack and keep the first input.
@@ -269,15 +292,14 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     stack->clear();
     stack->push_back(t);
   }
-
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
-  fixNodeOutput(node, *stack);
+  fixNodeOutput(node, *stack, _mapper);
   logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *node);
 
   // Run our normal canonicalisation passes on it.
   // The original node will be deleted but replaced with a new node.
-  canonicaliseAndFixOutput(schema, *stack, &node);
+  canonicaliseAndFixOutput(schema, *stack, &node, _mapper);
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation and fix output {}",
                  *node);
@@ -310,6 +332,10 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
         !record,
         "[TRACING-2][JIT] Inplace op is not tracking inplace argument");
     record->jit = value;
+    record->is_const = false;
+    if (_mapper.isHalfTensor(output)) {
+      _mapper.markHalfTensor(inplace);
+    }
   }
 
   logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",

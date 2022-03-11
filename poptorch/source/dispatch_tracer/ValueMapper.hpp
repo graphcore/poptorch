@@ -4,6 +4,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
@@ -72,6 +73,11 @@ public:
   // given value.
   std::unordered_map<torch::jit::Value *, TrackedTensor *> values_map;
 
+  // List of tensors which are actually half-valued from our point of view,
+  // but which are floats in PyTorch land because the CPU can't handle half
+  // typed values.
+  std::unordered_set<at::TensorImpl *> half_tensors;
+
   TrackedTensor *rawTensorRecord(const at::Tensor &t);
 
   torch::jit::Value *getValueForTensor(const at::Tensor &t);
@@ -87,6 +93,9 @@ public:
 
   void addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
                  bool is_const = false);
+
+  void markHalfTensor(const at::Tensor &t);
+  bool isHalfTensor(const at::Tensor &t);
 
   // Returns true if this is a direct alias and adds it to the approved alias
   // map.

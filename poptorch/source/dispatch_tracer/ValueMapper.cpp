@@ -131,4 +131,13 @@ c10::optional<bool> ValueMapper::tensorIsConst(const at::Tensor &t) {
 
   return itr->second.is_const;
 }
+
+void ValueMapper::markHalfTensor(const at::Tensor &t) {
+  half_tensors.insert(t.unsafeGetTensorImpl());
+}
+
+bool ValueMapper::isHalfTensor(const at::Tensor &t) {
+  return half_tensors.find(t.unsafeGetTensorImpl()) != std::end(half_tensors);
+}
+
 } // namespace poptorch
