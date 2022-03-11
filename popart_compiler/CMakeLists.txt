@@ -9,6 +9,7 @@ add_library(popart_compiler SHARED
   "source/Utils.cpp"
   "source/SessionOptions.cpp"
   "source/custom_operations/Embedding.cpp"
+  "source/custom_operations/FastGatherLastDim.cpp"
   "source/custom_operations/HostOp.cpp"
   "source/custom_operations/TorchSoftplus.cpp"
   "source/custom_operations/UpsampleBilinear2d.cpp"

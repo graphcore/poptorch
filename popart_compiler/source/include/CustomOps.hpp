@@ -45,5 +45,11 @@ const popart::OperatorIdentifier embedding = {"poptorch.custom_ops",
 const popart::OperatorIdentifier embedding_grad = {"poptorch.custom_ops",
                                                    "EmbeddingGrad", domain};
 
+const popart::OperatorIdentifier fast_gather_last_dim = {
+    "poptorch.custom_ops", "FastGatherLastDim", 1};
+
+const popart::OperatorIdentifier fast_gather_last_dim_grad = {
+    "poptorch.custom_ops", "FastGatherLastDimGrad", 1};
+
 } // namespace poptorch_custom_ops
 }
