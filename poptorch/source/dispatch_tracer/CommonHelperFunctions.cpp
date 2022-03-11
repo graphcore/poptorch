@@ -51,6 +51,7 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       // This is probably an external tensor that we didn't catch. Assume
       // it's a constant.
       val = makeConstant(graph, tensor);
+      mapper.addTensor(tensor, val);
     } else {
       auto *record = mapper.rawTensorRecord(tensor);
       // If this isn't an input or node-output tensor, add it to the graph now
@@ -58,6 +59,7 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       if (record->is_empty) {
         val = makeConstant(graph, tensor);
         record->jit = val;
+        mapper.addTensor(tensor, val);
       }
     }
 
