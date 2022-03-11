@@ -386,6 +386,49 @@ def test_cat_chunk_slice_multiple_slices():
     op_harness(op, x, mems, test_training=False)
 
 
+def fast_gather_last_dim(data, idx):
+    assert poptorch.ipuHardwareIsAvailable(), \
+           "Hardware IPU needed to compile this FastGatherLastDim custom op"
+    out = None
+    if poptorch.isRunningOnIpu():
+        target = torch.zeros(idx.shape).type_as(data)
+        target.requires_grad_()
+        o = poptorch.custom_op([data, idx],
+                               "FastGatherLastDim",
+                               "poptorch.custom_ops",
+                               1,
+                               example_outputs=[target],
+                               attributes={})
+        out = o[0]
+    else:
+        out = torch.gather(data, -1, idx)
+    return out
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed to test this feature")
+def test_fastgather_3dim():
+    torch.manual_seed(42)
+    shape = (9, 11, 6)
+    input = torch.randn(shape)
+    indices = torch.randint(0, 6, shape)
+    op_harness(fast_gather_last_dim, input, indices)
+
+    # Gather index last dim smaller than input last dim
+    indices = torch.randint(0, 6, (9, 11, 3))
+    op_harness(fast_gather_last_dim, input, indices)
+
+    # Gather index different shape should fail
+    indices = torch.randint(0, 6, (9, 1, 6))
+    with pytest.raises(poptorch.poptorch_core.Error):
+        op_harness(fast_gather_last_dim, input, indices)
+
+    # Gather index different rank should fail
+    indices = torch.randint(0, 6, (11, 6))
+    with pytest.raises(poptorch.poptorch_core.Error):
+        op_harness(fast_gather_last_dim, input, indices)
+
+
 @pytest.mark.parametrize("dim", [0, 1, 2, -1, -2])
 @pytest.mark.parametrize("larger_index", [True, False])
 def test_gather_3dim(dim, larger_index):
