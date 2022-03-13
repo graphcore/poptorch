@@ -132,7 +132,7 @@ def _get_view_hash():
             ],
             stderr=subprocess.STDOUT).decode("utf-8").strip().rstrip()
         return hash
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
@@ -146,7 +146,7 @@ def _get_poptorch_hash():
             ],
             stderr=subprocess.STDOUT).decode("utf-8").strip().rstrip()
         return hash
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
