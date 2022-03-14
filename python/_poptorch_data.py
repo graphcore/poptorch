@@ -49,23 +49,22 @@ class PoptorchData:
             self.optimizer_state = opt.state_dict()
 
 
-def parse(filename: str, expected_version: str):
+def parse(serialized_data: bytes, expected_version: str):
     """Extract the :py:class:`~poptorch.PoptorchData` and the offset at
        which the PopART executable is stored from a given file.
     """
-    with open(filename, "rb") as f:
-        data = pickle.load(f)
-        assert data.version == expected_version, (
-            "PopTorch version mismatch: "
-            f"{filename} was created with version: {data.version}"
-            f" and this is version {expected_version}")
-        assert data.executable_inputs, (f"Invalid file {filename}:"
-                                        " executable inputs are missing")
-        if data.options:
-            data.options._unfreeze()  # pylint: disable=protected-access
-            # Remove usefOfflineIpuTarget related flags if used
-            data.options.deleteIfExists("ipu_version")
-            if data.options.connection_type == enums.ConnectionType.Never.value:
-                data.options.connectionType(enums.ConnectionType.Always)
+    data = pickle.loads(serialized_data)
+    assert data.version == expected_version, (
+        "PopTorch version mismatch: "
+        f"File was created with version: {data.version}"
+        f" and this is version {expected_version}")
+    assert data.executable_inputs, ("Executable inputs are missing")
 
-        return data, f.tell()
+    if data.options:
+        data.options._unfreeze()  # pylint: disable=protected-access
+        # Remove usefOfflineIpuTarget related flags if used
+        data.options.deleteIfExists("ipu_version")
+        if data.options.connection_type == enums.ConnectionType.Never.value:
+            data.options.connectionType(enums.ConnectionType.Always)
+
+    return data

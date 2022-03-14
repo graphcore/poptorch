@@ -406,8 +406,14 @@ public:
   void saveExecutableToFile(const char *export_filename) const;
   void compileAndPrepareDevice();
   void loadEngineAndConnectStreams();
-  void loadExecutableAndPrepareDevice(const char *import_filename,
-                                      std::int64_t offset);
+  void loadExecutableAndPrepareDevice(const char *import_filename);
+
+  static void
+  appendPoptorchMetadataToFile(const char *serialized_poptorch_metadata,
+                               size_t metadata_length,
+                               const char *export_filename);
+  static std::vector<char>
+  importPoptorchMetadataFromFile(const char *import_filename);
 
   poptorch::TensorId
   addCPUCallback(const std::vector<poptorch::TensorId> &inputs,
@@ -528,7 +534,8 @@ private:
   // Store the cycle account of last run, if the relevant option is enabled,
   // otherwise no_cycles
   int64_t _cycle_count;
-  static const int64_t no_cycles = -1;
+  static constexpr int64_t no_cycles = -1;
+  static constexpr const char *poptorch_opaque_name = "poptorch";
 };
 
 } // namespace poptorch

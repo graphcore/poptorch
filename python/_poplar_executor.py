@@ -655,8 +655,16 @@ class PoplarExecutor:
         """Load an executable previously generated using
         :py:meth:`~poptorch.PoplarExecutor.compileAndExport`
         """
-        data, exe_offset = _poptorch_data.parse(filename,
-                                                self._poptorch_version)
+        serialized_data = poptorch_core.importPoptorchMetadataFromFile(
+            filename)
+
+        try:
+            data = _poptorch_data.parse(serialized_data,
+                                        self._poptorch_version)
+        except AssertionError as e:
+            raise _impl.createPoptorchError("Invalid file %s: %s" %
+                                            (filename, e))
+
         in_tensors_trace_view, has_converted_any_half = \
                 self._preprocessGraph(
                     data.executable_inputs)
@@ -667,7 +675,7 @@ class PoplarExecutor:
                 has_converted_any_half)
             self._executable = \
                     poptorch_core.processTraceAndImportExecutable(
-                        *trace_args, filename, exe_offset)
+                        *trace_args, filename)
         else:
             # TODO(T51159) Support dispatch tracing + serialized executables
             raise _impl.createPoptorchError("Not supported: can't deserialize "
@@ -723,12 +731,12 @@ class PoplarExecutor:
         if save_rng_state:
             data.rng_state = self.rng_state
 
-        with open(filename, "wb") as f:
-            pickle.dump(data, f, protocol=4)
-            f.close()
+        serialized_data = pickle.dumps(data, protocol=4)
 
         with self._profiling.tracepoint("saveExecutableToFile"):
             poptorch_core.saveExecutableToFile(self._executable, filename)
+            poptorch_core.appendPoptorchMetadataToFile(serialized_data,
+                                                       filename)
 
     @property
     def rng_state(self) -> List[int]:

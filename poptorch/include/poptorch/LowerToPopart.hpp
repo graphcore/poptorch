@@ -62,8 +62,7 @@ public:
   void lower(std::vector<at::Tensor> *in_tensors);
   std::shared_ptr<poptorch::PoplarExecutable> compile();
   std::shared_ptr<poptorch::PoplarExecutable>
-  loadExecutableFromFile(const std::string &input_filename,
-                         std::int64_t offset);
+  loadExecutableFromFile(const std::string &input_filename);
 
 private:
   std::unique_ptr<detail::LowerToPopartImpl> _impl;

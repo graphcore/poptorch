@@ -28,7 +28,7 @@ if "RDMAV_FORK_SAFE" not in os.environ:
 # pylint: disable=wrong-import-position
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
-from poptorch.poptorch_core import Error, RecoverableError, UnrecoverableError
+from poptorch.poptorch_core import importPoptorchMetadataFromFile, Error, RecoverableError, UnrecoverableError
 from . import _dataloader
 from . import _impl
 from . import _poptorch_data
@@ -62,7 +62,14 @@ def load(filename: str,
     >>> model = poptorch.load("my_model.poptorch")
     >>> model(my_input)
     """
-    data, _ = _poptorch_data.parse(filename, __version__)
+
+    serialized_data = importPoptorchMetadataFromFile(filename)
+
+    try:
+        data = _poptorch_data.parse(serialized_data, __version__)
+    except AssertionError as e:
+        raise AssertionError("Invalid file %s: %s" % (filename, e))
+
     assert data.model and data.training is not None, (
         f"{filename} is a valid PopTorch file but was created"
         " with 'export_model=False' which means you need to re-create"

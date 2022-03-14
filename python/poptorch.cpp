@@ -1324,6 +1324,17 @@ void saveExecutableToFile(
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
+void appendPoptorchMetadataToFile(const std::string &serialized_poptorch_data,
+                                  const std::string &export_filename) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
+  try {
+    Compiler::appendPoptorchMetadataToFile(serialized_poptorch_data.c_str(),
+                                           serialized_poptorch_data.size(),
+                                           export_filename.c_str());
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
 uint64_t
 cycleCount(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   try {
@@ -1339,15 +1350,24 @@ std::shared_ptr<poptorch::PoplarExecutable> processTraceAndImportExecutable(
     const pybind11::dict &options, bool training,
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
     const bool added_dummy_output, const py::list &anchors,
-    const py::dict &model_parameters, const std::string &import_filename,
-    std::int64_t offset) {
+    const py::dict &model_parameters, const std::string &import_filename) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     auto lower = lowerToPopartFromTrace(
         h, python_traced_params, inputs, has_converted_any_half, options,
         training, optimizer_dict, attribute_accessor, added_dummy_output,
         anchors, model_parameters);
-    return lower.loadExecutableFromFile(import_filename, offset);
+    return lower.loadExecutableFromFile(import_filename);
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
+
+py::bytes importPoptorchMetadataFromFile(const std::string &import_filename) {
+  poptorch::logging::Tracepoint tp{__FUNCTION__};
+  try {
+    std::vector<char> metadata_buffer =
+        Compiler::importPoptorchMetadataFromFile(import_filename.c_str());
+    return py::bytes(metadata_buffer.data(), metadata_buffer.size());
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
@@ -1476,10 +1496,13 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("processPrecisionOptions", poptorch::processPrecisionOptions);
   m.def("isGraphNondeterministic", poptorch::pyIsGraphNondeterministic);
   m.def("saveExecutableToFile", poptorch::saveExecutableToFile);
+  m.def("appendPoptorchMetadataToFile", poptorch::appendPoptorchMetadataToFile);
   m.def("compileWithTrace", poptorch::compileWithTrace);
   m.def("cycleCount", poptorch::cycleCount);
   m.def("processTraceAndImportExecutable",
         poptorch::processTraceAndImportExecutable);
+  m.def("importPoptorchMetadataFromFile",
+        poptorch::importPoptorchMetadataFromFile);
   m.def("execute", poptorch::execute);
   m.def("updateOptimizers", poptorch::updateOptimizers);
   m.def("getTimestamps", poptorch::getTimestamps);

@@ -285,8 +285,7 @@ public:
 
   std::shared_ptr<poptorch::PoplarExecutable> compile();
   std::shared_ptr<poptorch::PoplarExecutable>
-  loadExecutableFromFile(const std::string &input_filename,
-                         std::int64_t offset);
+  loadExecutableFromFile(const std::string &input_filename);
 
 private:
   torch::jit::Graph &_graph;
@@ -373,12 +372,11 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopartImpl::compile() {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename,
-                                          std::int64_t offset) {
+LowerToPopartImpl::loadExecutableFromFile(const std::string &input_filename) {
   logging::LogContext ctx("LowerToPopart::loadExecutableFromFile");
   // Init the session, this also involves compiling to poplar.
   _compiler.initSession(_optimizers, getModelProtoFilename().c_str());
-  _compiler.loadExecutableAndPrepareDevice(input_filename.c_str(), offset);
+  _compiler.loadExecutableAndPrepareDevice(input_filename.c_str());
 
   std::vector<at::ScalarType> data_types;
   for (auto id : _output_tensor_hooks) {
@@ -1310,12 +1308,14 @@ std::shared_ptr<poptorch::PoplarExecutable> LowerToPopart::compile() {
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
-LowerToPopart::loadExecutableFromFile(const std::string &input_filename,
-                                      std::int64_t offset) {
-  return _impl->loadExecutableFromFile(input_filename, offset);
+LowerToPopart::loadExecutableFromFile(const std::string &input_filename) {
+  return _impl->loadExecutableFromFile(input_filename);
 }
+
 LowerToPopart::~LowerToPopart() = default;
+
 LowerToPopart::LowerToPopart(LowerToPopart &&lower) {
   _impl = std::move(lower._impl);
 }
+
 } // namespace poptorch

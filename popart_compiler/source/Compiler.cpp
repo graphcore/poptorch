@@ -11,6 +11,8 @@
 #include <popart/graphtransformer.hpp>
 #include <popart/ndarraywrapper.hpp>
 #include <popart/optimizer.hpp>
+#include <popef/Reader.hpp>
+#include <popef/Writer.hpp>
 #include <poplar/exceptions.hpp>
 #include <poputil/exceptions.hpp>
 
@@ -745,23 +747,16 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   }
 }
 
-void Compiler::saveExecutableToFile(const char *filename) const {
+void Compiler::saveExecutableToFile(const char *export_filename) const {
   ERROR_ON_MSG(!_impl->session,
                "Nothing to export. This may be because the model does not run "
                "any op on the IPU.");
 
   logging::LogContext ctx_function{"Compiler::saveExecutableToFile"};
-  // We use std::ios_base::ate to append to the file: the Python frontend
-  // will have already created the folder and written the Poptorch python
-  // data in the file.
-  //
-  // Note: PopArt needs to be able to move backward through the stream so
-  // we cannot use std::ios_base::app
-  std::fstream stream(filename, std::ios_base::in | std::ios_base::out |
-                                    std::ios_base::ate | std::ofstream::binary);
-  ERROR_ON_MSG(!stream.is_open(),
-               "Failed to open " + std::string(filename) + " for writing");
-  stream.seekp(0, std::ios::end);
+
+  const std::string path(export_filename);
+  std::ofstream stream(path, std::ofstream::binary);
+  ERROR_ON_MSG(!stream.is_open(), "Failed to open " << path << " for writing");
   logging::LogContext ctx{"popart::Session::saveExecutableToStream"};
   _impl->session->saveExecutableToStream(stream);
   stream.flush();
@@ -799,18 +794,15 @@ std::uint64_t Compiler::getRandomSeed() const {
   return 0;
 }
 
-void Compiler::loadExecutableAndPrepareDevice(const char *import_filename,
-                                              std::int64_t offset) {
+void Compiler::loadExecutableAndPrepareDevice(const char *import_filename) {
   ERROR_ON_MSG(!_impl->session, "Nothing to import. This may be because the "
                                 "model does not run any op on an IPU.");
 
   logging::LogContext ctx{"Compiler::loadExecutableAndPrepareDevice"};
-  auto stream =
-      std::make_shared<std::ifstream>(import_filename, std::ifstream::binary);
-  ERROR_ON_MSG(!stream->is_open(), "Failed to open " +
-                                       std::string(import_filename) +
-                                       " for reading");
-  stream->seekg(offset);
+
+  const std::string path(import_filename);
+  auto stream = std::make_shared<std::ifstream>(path, std::ifstream::binary);
+  ERROR_ON_MSG(!stream->is_open(), "Failed to open " << path << " for reading");
   _impl->session->loadExecutableFromStream(stream);
   // Don't automatically load the engine: we want to control when this happens
   // to make sure it happens at the same time in distributed environments.
@@ -904,6 +896,43 @@ void Compiler::loadEngineAndConnectStreams() {
     _impl->session->connectHostFunction(cb_data.handle,
                                         std::move(poplar_callback));
   }
+}
+
+void Compiler::appendPoptorchMetadataToFile(
+    const char *serialized_poptorch_metadata, const size_t metadata_length,
+    const char *export_filename) {
+  popef::Reader reader;
+  reader.parseFile(export_filename);
+  ERROR_ON_MSG(reader.executables().size() != 1,
+               "Popef file does not contain exactly one Executable blob.");
+  const std::string &executable_name = reader.executables().at(0).name;
+
+  popef::FileWriter writer(export_filename, popef::FileWriter::Mode::APPEND);
+  auto poptorch_blob =
+      writer.createOpaqueBlob(poptorch_opaque_name, executable_name);
+  poptorch_blob->stream.write(serialized_poptorch_metadata, metadata_length);
+  poptorch_blob->close();
+  writer.close();
+}
+
+std::vector<char>
+Compiler::importPoptorchMetadataFromFile(const char *import_filename) {
+  popef::Reader reader;
+  reader.parseFile(import_filename);
+
+  std::vector<popef::OpaqueReader> opaques = reader.opaqueBlobs();
+  auto poptorch_blob_it = std::find_if(
+      opaques.begin(), opaques.end(), [](const popef::OpaqueReader &opaque) {
+        return opaque.name == poptorch_opaque_name;
+      });
+  ERROR_ON_MSG(poptorch_blob_it == opaques.end(),
+               "Popef file does not contain Poptorch metadata.");
+
+  const size_t buffer_size = poptorch_blob_it->getAvailableReadSize();
+  std::vector<char> metadata_buffer(buffer_size);
+  poptorch_blob_it->data.read(metadata_buffer.data(), buffer_size);
+
+  return metadata_buffer;
 }
 
 void Compiler::compileAndPrepareDevice() {
