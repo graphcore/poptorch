@@ -36,6 +36,29 @@ def test_select(dim_idx):
     assert torch.equal(IPUContext(fn)(t, d, i), fn(t, d, i))
 
 
+# Test that the result returned from `select.int` is a view, not a copy of the
+# input tensor.
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_select_is_view():
+    num_elems = 1
+    for d in shape:
+        num_elems *= d
+
+    t_cpu = torch.linspace(1, num_elems, num_elems).view(shape)
+    t_ipu = torch.empty(shape).copy_(t_cpu)
+
+    def fn(t, d, i):
+        res = t.select(d, i)
+        t.add_(8.0)
+        return res
+
+    d = min(1, len(shape) - 1)
+    i = min(1, shape[d] - 1)
+
+    assert torch.equal(IPUContext(fn)(t_ipu, d, i), fn(t_cpu, d, i))
+
+
 # torch.unbind
 @pytest.mark.parametrize("dim", range(-len(shape), len(shape)))
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),

@@ -720,30 +720,6 @@ at::Tensor MLIRDispatch::outputInplaceReshape_squeeze_dim_(
   return original_input;
 }
 
-at::Tensor MLIRDispatch::outputIsSubviewOf_select(
-    poptorch_ir::TensorId output_id, const at::Tensor &original_input,
-    bool requires_grad, poptorch_ir::TensorId self, int64_t dim,
-    int64_t index) {
-  (void)self;
-  std::vector<std::int64_t> shape = _compiler.getSize(output_id);
-
-  // Create new tensor.
-  at::Tensor new_output =
-      at::native::empty_cpu(shape, original_input.scalar_type());
-
-  // We need to take the same storage and storage metadata (strides, offsets) as
-  // the original.
-  new_output = new_output.set_(original_input);
-
-  // Perform the selection.
-  new_output = new_output.select(dim, index);
-
-  new_output.set_requires_grad(requires_grad);
-  _mapper.addTensor(new_output, output_id);
-
-  return new_output;
-}
-
 at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
                                                bool requires_grad) {
   // If it's a none or error, return an undefined tensor. Some functions may
@@ -758,42 +734,6 @@ at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
   auto dtype = compilerTypeToScalarType(compiler_type);
   // Create new tensor
   at::Tensor new_output = at::native::zeros(shape, dtype);
-  new_output.set_requires_grad(requires_grad);
-  _mapper.addTensor(new_output, output_id);
-
-  return new_output;
-}
-
-// If it is a view we need to give it the same storage location as PyTorch
-// checks this, at least in debug builds.
-at::Tensor MLIRDispatch::outputIsViewOf(poptorch_ir::TensorId output_id,
-                                        const at::Tensor &original_input,
-                                        bool requires_grad) {
-  ERROR_ON(output_id == poptorch_ir::none_id ||
-           output_id == poptorch_ir::tensor_error_id);
-
-  std::vector<std::int64_t> shape = _compiler.getSize(output_id);
-
-  // Create new tensor
-  at::Tensor new_output =
-      at::native::zeros(shape, original_input.scalar_type());
-
-  const std::int64_t old_numel = new_output.numel();
-
-  // We need to take the same storage and storage metadata (strides,
-  // offsets) as the original.
-  new_output = new_output.set_(original_input);
-
-  if (old_numel == new_output.numel()) {
-    new_output = new_output.reshape(shape);
-  } else {
-    // Reshape into the original shape.
-    new_output = new_output.reshape(original_input.sizes());
-
-    // Perform the operation as planned.
-    new_output = new_output.expand(shape);
-  }
-
   new_output.set_requires_grad(requires_grad);
   _mapper.addTensor(new_output, output_id);
 

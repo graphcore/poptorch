@@ -142,3 +142,52 @@ def test_expand():
     # TODO T52507 Fully inplement expand
     with pytest.raises(RuntimeError):
         expand_reshape_view_harness((2, 1, 4), (2, 4, -1), "expand")
+
+
+# Simple harness to test that the given `fn` returns a view of its input tensor,
+# not just a copy.
+#
+# This is tested by modifying the source tensor after the view has been made,
+# and checking that this change is reflected in the view.
+#
+# :param in_shape: shape of tensor to give to test function.
+# :param fn: function of signature `fn(input_tensor, ...) -> output_tensor`.
+def is_view_harness(in_shape, fn, *args, **kwargs):
+    num_elems = 1
+    for d in in_shape:
+        num_elems *= d
+
+    t_cpu = torch.linspace(1, num_elems, num_elems).view(in_shape)
+    t_ipu = torch.empty(in_shape).copy_(t_cpu)
+
+    def is_view_fn(t, *args, **kwargs):
+        res = fn(t, *args, **kwargs)
+        t.add_(8.0)
+        return res
+
+    ipu_res = IPUContext(is_view_fn)(t_ipu, *args, **kwargs)
+    cpu_res = is_view_fn(t_cpu, *args, **kwargs)
+    # pylint: disable=no-member
+    helpers.assert_allequal(actual=ipu_res, expected=cpu_res)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_view_is_view():
+    shape = (3, 4, 5)
+    view_shape = shape[::-1]
+
+    fn = lambda t, s: t.view(s)
+
+    is_view_harness(shape, fn, view_shape)
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_expand_is_view():
+    shape = (3, 1, 5)
+    expanded_shape = (3, 4, 5)
+
+    fn = lambda t, s: t.expand(s)
+
+    is_view_harness(shape, fn, expanded_shape)
