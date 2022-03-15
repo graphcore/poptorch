@@ -5,7 +5,9 @@
 #include <ATen/Tensor.h>
 #include <ATen/core/boxing/KernelFunction.h>
 #include <c10/util/Optional.h>
+#include <torch/csrc/jit/ir/ir.h>
 
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -23,7 +25,7 @@ public:
   virtual void
   markOutputs(const std::vector<at::Tensor> &ids,
               const std::vector<at::Tensor> &persistent_data_storage,
-              bool output_tuple) = 0;
+              const std::string &output_structure) = 0;
 
   // The "catch-all" fallback kernel.
   virtual void fallback(const c10::OperatorHandle &op, c10::Stack *stack) = 0;

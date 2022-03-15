@@ -121,15 +121,36 @@ class IPUScope:
         # We don't want to catch anything in here.
         poptorch_core.endDispatch()
 
+        def structure(x, toplevel=True):
+            if isinstance(x, tuple):
+                prefix = "("
+                postfix = ")"
+            elif isinstance(x, list):
+                if toplevel:
+                    prefix = postfix = ""
+                else:
+                    prefix = "["
+                    postfix = "]"
+            else:
+                return "x"
+            return prefix + "".join(structure(e, False) for e in x) + postfix
+
+        def flatten(x):
+            if isinstance(x, (tuple, list)):
+                for e in x:
+                    yield from flatten(e)
+            else:
+                yield x
+
+        flattened = list(flatten(tensors))
         with torch.no_grad():
-            for tensor in tensors:
-                if tensor.dtype == torch.torch.long:
+            for tensor in flattened:
+                if tensor.dtype == torch.long:
                     self._outputs.append(tensor.int())
                 else:
                     self._outputs.append(tensor.clone())
 
-        poptorch_core.markOutputs(tensors, self._outputs,
-                                  isinstance(tensors, tuple))
+        poptorch_core.markOutputs(flattened, self._outputs, structure(tensors))
 
         # Turn dispatch back on.
         poptorch_core.startDispatch()

@@ -40,49 +40,73 @@ void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
   }
 }
 
+namespace {
+struct ConstructElement {
+  torch::jit::Node *node;
+  std::vector<c10::TypePtr> element_types;
+
+  explicit ConstructElement(torch::jit::Node *_node) : node(_node) {}
+};
+} // namespace
+
 void JITDispatch::markOutputs(
     const std::vector<at::Tensor> &outputs,
-    const std::vector<at::Tensor> &persistent_data_storage, bool output_tuple) {
+    const std::vector<at::Tensor> &persistent_data_storage,
+    const std::string &output_structure) {
   // 'persistent_data_storage' is only needed by the MLIR dispatcher.
   UNUSED(persistent_data_storage);
 
   int64_t output_num = 0;
-  torch::jit::Node *construct_node = nullptr;
-  std::vector<c10::TypePtr> construct_element_types;
-  if (output_tuple) {
-    construct_node = graph.create(c10::prim::TupleConstruct);
-    graph.insertNode(construct_node);
-    graph.registerOutput(construct_node->output());
-  }
-  for (const at::Tensor &tensor : outputs) {
-    torch::jit::Value *val = _mapper.getValueForTensor(tensor);
-    ERROR_ON_MSG(
-        val == nullptr,
-        "Internal: graph output tensor not present in the value mapper");
+  auto output_it = std::begin(outputs);
+  std::vector<ConstructElement> construct_elem_stack;
 
-    logging::trace(
-        "[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} {}",
-        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-        val->debugNameBase(), toString(tensor));
-
-    if (construct_node != nullptr) {
-      construct_element_types.push_back(val->type());
-      construct_node->addInput(val);
-    } else {
-      graph.registerOutput(val);
+  for (size_t i = 0; i < output_structure.size(); i++) {
+    char s = output_structure[i];
+    if (s == '(' || s == '[') {
+      auto *construct_node = graph.create(s == '(' ? c10::prim::TupleConstruct
+                                                   : c10::prim::ListConstruct);
+      construct_elem_stack.emplace_back(construct_node);
+      continue;
     }
+    torch::jit::Value *val = nullptr;
+    if (s == ')' || s == ']') {
+      auto &construct_elem = construct_elem_stack.back();
+      auto *node = construct_elem.node;
+      node->output()->setType(
+          c10::TupleType::create(construct_elem.element_types));
+      construct_elem_stack.pop_back();
+      graph.insertNode(node);
+      val = node->output();
+    } else {
+      const auto &tensor = *output_it;
+      ++output_it;
+      val = _mapper.getValueForTensor(tensor);
+      ERROR_ON_MSG(
+          val == nullptr,
+          "Internal: graph output tensor not present in the value mapper");
 
-    // For now, disable overlapping host IO on every output
-    auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
-    const std::string value_str = "no_overlap";
-    graph.return_node()->s_(overlap_symbol, value_str);
+      logging::trace(
+          "[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} {}",
+          reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+          val->debugNameBase(), toString(tensor));
+    }
+    if (construct_elem_stack.empty()) {
+      graph.registerOutput(val);
+    } else {
+      auto &next_up_stack = construct_elem_stack.back();
+      next_up_stack.node->addInput(val);
+      next_up_stack.element_types.push_back(val->type());
+    }
+    if (s == 'x') {
+      // For now, disable overlapping host IO on every output
+      auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
+      const std::string value_str = "no_overlap";
+      graph.return_node()->s_(overlap_symbol, value_str);
 
-    output_num++;
+      output_num++;
+    }
   }
-  if (construct_node != nullptr) {
-    construct_node->output()->setType(
-        c10::TupleType::create(construct_element_types));
-  }
+  ERROR_ON_MSG(output_it != std::end(outputs), "Didn't consume all outputs");
   logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", graph);
 }
 

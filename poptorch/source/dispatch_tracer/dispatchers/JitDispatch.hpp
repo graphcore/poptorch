@@ -3,6 +3,8 @@
 #define POPTORCH_DISPATCH_JIT_DISPATCH_HPP_
 
 #include <torch/csrc/jit/ir/ir.h>
+
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -21,7 +23,7 @@ public:
 
   void markOutputs(const std::vector<at::Tensor> &outputs,
                    const std::vector<at::Tensor> &persistent_data_storage,
-                   bool output_tuple);
+                   const std::string &output_structure);
 
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack);
 

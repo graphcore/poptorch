@@ -3,6 +3,7 @@
 #define INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace at {
@@ -74,7 +75,7 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
 // return location.
 void markOutputs(const std::vector<at::Tensor> &outputs,
                  const std::vector<at::Tensor> &data_storage,
-                 bool output_tuple);
+                 const std::string &output_structure);
 
 // Get the captured JIT graph. In reality is just returning the
 // torch::jit::Graph it's already been compiling during the dispatch process.

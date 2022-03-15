@@ -144,8 +144,9 @@ void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
 
 void MLIRDispatch::markOutputs(
     const std::vector<at::Tensor> &ids,
-    const std::vector<at::Tensor> &persistent_data_storage, bool output_tuple) {
-  UNUSED(output_tuple);
+    const std::vector<at::Tensor> &persistent_data_storage,
+    const std::string &output_structure) {
+  UNUSED(output_structure);
   ERROR_ON_MSG(
       ids.size() != persistent_data_storage.size(),
       "[INTERNAL] Outputs and output storages do not have same length");

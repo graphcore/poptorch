@@ -29,7 +29,7 @@ public:
 
   void markOutputs(const std::vector<at::Tensor> &ids,
                    const std::vector<at::Tensor> &persistent_data_storage,
-                   bool output_tuple) final;
+                   const std::string &output_structure) final;
 
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) final;
 
