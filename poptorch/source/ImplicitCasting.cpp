@@ -79,7 +79,12 @@ c10::ScalarType promoteTypes(c10::ScalarType t1, c10::ScalarType t2) {
     ERROR_ON(halfFloatCastingBehavior() != HalfFloatCasting::HalfUpcastToFloat);
   }
 
-  return c10::promoteTypes(t1, t2);
+  auto type = c10::promoteTypes(t1, t2);
+
+  // Ensure we don't promote to a type the IPU doesn't support
+  type = coerceToSupportedType(type);
+
+  return type;
 }
 
 c10::ScalarType highestTypeOf(const std::vector<c10::ScalarType> &types) {
