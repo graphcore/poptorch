@@ -343,11 +343,19 @@
 - func: native_batch_norm
   PopTorchDirect: batch_norm
 
+# aten::native_batch_norm_backward(Tensor grad_out, Tensor input,
+#                                  Tensor? weight, Tensor? running_mean,
+#                                  Tensor? running_var, Tensor? save_mean,
+#                                  Tensor? save_invstd, bool train, float eps,
+#                                  bool[3] output_mask) -> (Tensor, Tensor, Tensor)
+- func: native_batch_norm_backward
+  PopTorchDirect: batch_norm_backward
+  IgnoreArgs: {'output_mask'}
+
 # native_group_norm(Tensor input, Tensor? weight, Tensor? bias, int N, int C,
 #                   int HxW, int group, float eps) -> (Tensor, Tensor, Tensor)
 - func: native_group_norm
   PopTorchDirect: group_norm
-
 
 #
 # Losses

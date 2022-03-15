@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+import copy
 import torch
 from torch import nn
 import pytest
@@ -10,41 +11,67 @@ from poptorch.experimental import IPUContext
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
-@pytest.mark.parametrize(
-    "params",
-    [
-        # Norm, affine, running_stats, training
-        (nn.BatchNorm1d, False, False, False),
-        (nn.BatchNorm2d, True, False, True),
-        (nn.BatchNorm3d, False, True, True),
-    ])
-def test_batch_norm(params):
+@pytest.mark.parametrize("batch_norm, affine, track_running_stats, training", [
+    (nn.BatchNorm1d, True, False, False),
+    (nn.BatchNorm2d, True, False, True),
+    (nn.BatchNorm3d, True, True, True),
+    (nn.BatchNorm1d, False, False, False),
+    (nn.BatchNorm2d, False, False, True),
+    (nn.BatchNorm3d, False, True, True),
+])
+def test_batch_norm(batch_norm, affine, track_running_stats, training):
     torch.manual_seed(42)
     C = 4
     input_shape = [3, C, 5]
-    batch_norm, affine, running_stats, training = params
     if batch_norm in (nn.BatchNorm2d, nn.BatchNorm3d):
         input_shape.append(6)
     if batch_norm is nn.BatchNorm3d:
         input_shape.append(7)
     t = torch.randn(input_shape)
 
-    norm = batch_norm(C, affine=affine, track_running_stats=running_stats)
+    ipu_norm = batch_norm(C,
+                          affine=affine,
+                          track_running_stats=track_running_stats)
+    ipu_norm.train(training)
+    cpu_norm = copy.deepcopy(ipu_norm)
 
-    # pylint: disable=W0212
-    norm._buffers["running_mean"] = torch.randn([C])
-    norm._buffers["running_var"] = torch.clamp(torch.randn([C]) + 1.0, min=0.1)
-    norm.train(training)
+    weights = {
+        **dict(ipu_norm.named_parameters()),
+        **dict(ipu_norm.named_buffers())
+    }
 
-    # Run pytorch native on CPU.
-    cpu_result = norm(t)
+    t2 = torch.ones_like(t)
 
-    weights = {**dict(norm.named_parameters()), **dict(norm.named_buffers())}
+    if affine:
 
-    ipu_result = IPUContext(norm, parameters_and_buffers=weights)(t)
+        def cpu_step(norm, x1, x2):
+            out = norm(x1)
+            loss = torch.nn.functional.mse_loss(out, x2)
+            loss.backward()
+            return out, norm.weight.grad, norm.bias.grad
+    else:
+        cpu_step = lambda norm, x1, _: norm(x1)
 
-    # pylint: disable=no-member
-    helpers.assert_allclose(actual=ipu_result, expected=cpu_result)
+    ipu_result = IPUContext(cpu_step, parameters_and_buffers=weights)(ipu_norm,
+                                                                      t, t2)
+    cpu_result = cpu_step(cpu_norm, t, t2)
+
+    # Test outputs and gradients
+    for cpu, ipu in zip(cpu_result, ipu_result):
+        # pylint: disable=no-member
+        helpers.assert_allclose(actual=ipu, expected=cpu)
+
+    # Test running statistics
+    if track_running_stats:
+        # pylint: disable=no-member
+        helpers.assert_allclose(actual=ipu_norm.running_mean,
+                                expected=cpu_norm.running_mean,
+                                atol=1e-4,
+                                rtol=1e-4)
+        helpers.assert_allclose(actual=ipu_norm.running_var,
+                                expected=cpu_norm.running_var,
+                                atol=1e-4,
+                                rtol=1e-4)
 
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),

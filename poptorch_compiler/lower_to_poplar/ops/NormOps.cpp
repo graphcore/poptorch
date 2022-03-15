@@ -33,6 +33,26 @@ batchNormalise(CompilerContext &context, const poplar::Tensor &input,
                                    context.seq);
 }
 
+std::tuple<poplar::Tensor, poplar::Tensor, poplar::Tensor> batchNormaliseGrad(
+    CompilerContext &context, const poplar::Tensor &input,
+    const poplar::Tensor &weight, const poplar::Tensor &save_mean,
+    const poplar::Tensor &inv_sd, const poplar::Tensor &grad_out) {
+
+  poplar::Tensor input_whitened = popnn::bn::batchNormWhiten(
+      context.graph, input, save_mean, inv_sd, context.seq);
+
+  // Compute the delta for the operand
+  poplar::Tensor grad_input =
+      popnn::bn::batchNormGradients(context.graph, input_whitened, grad_out,
+                                    inv_sd, weight, context.seq, poplar::FLOAT);
+
+  const auto [grad_weight, grad_bias] = // NOLINT
+      popnn::bn::batchNormParamGradients(context.graph, input_whitened,
+                                         grad_out, context.seq, poplar::FLOAT);
+
+  return std::make_tuple(grad_input, grad_weight, grad_bias);
+}
+
 void batch_norm::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input = context.fromSsa(this->input());
   poplar::Tensor weight;
@@ -54,7 +74,8 @@ void batch_norm::lowerToPoplar(CompilerContext &context) {
     weight = createConstant(context, poplar::FLOAT, param_shape, ones);
     bias = createConstant(context, poplar::FLOAT, param_shape, zeros);
   }
-  if (this->running_mean() && this->running_var()) {
+  const bool track_running_stats = this->running_mean() && this->running_var();
+  if (track_running_stats) {
     running_mean = context.fromSsa(this->running_mean());
     running_var = context.fromSsa(this->running_var());
   } else {
@@ -63,56 +84,73 @@ void batch_norm::lowerToPoplar(CompilerContext &context) {
   }
 
   if (training) {
-    poplar::Tensor batch_mean;
-    poplar::Tensor inv_sd;
-    std::tie(batch_mean, inv_sd) = popnn::bn::batchNormStatistics(
-        context.graph, input, epsilon, context.seq, false,
-        true /* stable_algo */, poplar::FLOAT);
+    const auto [batch_mean, inv_sd] = popnn::bn::batchNormStatistics( // NOLINT
+        context.graph, input, epsilon, context.seq,
+        /*unbiasedVarEstimate=*/false, /*stableAlgo=*/true, poplar::FLOAT);
 
-    // batch normalise
     context.tensors[this->result()] =
         batchNormalise(context, input, weight, bias, batch_mean, inv_sd);
 
-    // Ensure batch mean is the same type as mean so that running mean can
-    // be calculated
-    if (batch_mean.elementType() != running_mean.elementType()) {
-      batch_mean = popops::cast(context.graph, batch_mean,
-                                running_mean.elementType(), context.seq);
+    // Save the computed mean and invstd for the backward op to reuse
+    context.tensors[this->save_mean()] = batch_mean;
+    context.tensors[this->save_invstd()] = inv_sd;
+
+    if (track_running_stats) {
+      // Calculate the running mean
+      context.tensors[this->running_mean()] =
+          popops::map(context.graph,
+                      pe::Add(pe::Mul(pe::Const(1.f - momentum), pe::_1),
+                              pe::Mul(pe::Const(momentum), pe::_2)),
+                      {running_mean, batch_mean}, context.seq);
+
+      auto batch_var =
+          popops::invStdDevToVariance(context.graph, inv_sd, epsilon,
+                                      context.seq, running_var.elementType());
+
+      // Calculate the running variance
+      context.tensors[this->running_var()] =
+          popops::map(context.graph,
+                      pe::Add(pe::Mul(pe::Const(1.f - momentum), pe::_1),
+                              pe::Mul(pe::Const(momentum), pe::_2)),
+                      {running_var, batch_var}, context.seq);
     }
-
-    // Then convert the inv_sd to the variance
-    auto batch_var = popops::invStdDevToVariance(
-        context.graph, inv_sd, epsilon, context.seq, running_var.elementType());
-
-    // Calculate the running mean
-    context.tensors[this->mean()] =
-        popops::map(context.graph,
-                    pe::Add(pe::Mul(pe::Const(1.f - momentum), pe::_2),
-                            pe::Mul(pe::Const(momentum), pe::_1)),
-                    {running_mean, batch_mean}, context.seq);
-
-    // Calculate the running variance using the unbiased results
-    context.tensors[this->var()] =
-        popops::map(context.graph,
-                    pe::Add(pe::Mul(pe::Const(1.f - momentum), pe::_2),
-                            pe::Mul(pe::Const(momentum), pe::_1)),
-                    {running_var, batch_var}, context.seq);
   } else {
-    // convert variance to inverse standard deviation
     auto inv_sd = popops::varianceToInvStdDev(
         context.graph, running_var, epsilon, context.seq, input.elementType());
 
-    // mean might have a different type so cast is required before
-    // batchNormalise calculation
-    if (running_mean.elementType() != input.elementType()) {
-      running_mean = popops::cast(context.graph, running_mean,
-                                  input.elementType(), context.seq);
-    }
-
-    // batchnorm
     context.tensors[this->result()] =
         batchNormalise(context, input, weight, bias, running_mean, inv_sd);
   }
+}
+
+void batch_norm_backward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor grad_out = context.fromSsa(this->grad_out());
+  poplar::Tensor input = context.fromSsa(this->input());
+  poplar::Tensor weight = context.fromSsa(this->weight());
+  bool training = this->training();
+  float epsilon = this->epsilon().convertToFloat();
+
+  poplar::Tensor mean;
+  poplar::Tensor inv_std;
+  if (training) {
+    // These tensors only exist in training mode, and are cached versions
+    // of the batch mean and batch var tensors which are carried over from
+    // the forward pass to avoid recomputing them for the backward pass
+    mean = context.fromSsa(this->save_mean());
+    inv_std = context.fromSsa(this->save_invstd());
+  } else {
+    mean = context.fromSsa(this->running_mean());
+    poplar::Tensor running_var = context.fromSsa(this->running_var());
+    inv_std = popops::varianceToInvStdDev(context.graph, running_var, epsilon,
+                                          context.seq, input.elementType());
+  }
+
+  const auto [grad_input, grad_weight, grad_bias] = // NOLINT
+      batchNormaliseGrad(context, input, weight, mean, inv_std, grad_out);
+
+  context.tensors[this->grad_input()] = grad_input;
+  context.tensors[this->grad_weight()] = grad_weight;
+  context.tensors[this->grad_bias()] = grad_bias;
 }
 
 void group_norm::lowerToPoplar(CompilerContext &context) {
