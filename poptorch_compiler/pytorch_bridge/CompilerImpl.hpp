@@ -87,6 +87,11 @@ public:
   poptorch_ir::PoplarExecutable executable;
 
   poprithms::logging::ManualTimePartitionLogger timing_manager;
+  // When a new op is added to the graph using appendToMainGraph() we check and
+  // store whether or not there is an actual handler for this op. (Some ops will
+  // have been added with only shape inference and no implementation, in which
+  // case we won't be able to lower them later on).
+  bool all_ops_can_be_lowered{true};
 
   // clang-format off
   // TODO(T49565): In LLVM 13 MLIR provides a really nice timing wrapper

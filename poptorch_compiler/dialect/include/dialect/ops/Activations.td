@@ -61,3 +61,13 @@ def Poptorch_logsoftmax_backward : Poptorch_Op<"logsoftmax_backward", [SameOpera
         $_state.addTypes(grad_output.getType());
   }]>];
 }
+
+def Poptorch_softplus : Poptorch_NotImplementedOp<"softplus", []> {
+  let arguments = (ins Poptorch_tensor:$input);
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$input), [{
+        $_state.addOperands({input});
+        $_state.addTypes(input.getType());
+  }]>];
+
+}

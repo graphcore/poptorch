@@ -12,7 +12,8 @@
 
 namespace mlir {
 class RankedTensorType;
-}
+class Operation;
+} // namespace mlir
 
 namespace poptorch_ir {
 
@@ -52,6 +53,10 @@ public:
 
   bool isView(TensorId id) const;
 
+  // Return true if all the ops in the graph can be lowered to
+  // Poplar.
+  bool allOpsCanBeLoweredToPoplar() const;
+
 // Each tablegen entry will automatically generate a C++ method and impl which
 // can be used by PyTorch. This means Compiler will have a function to add any
 // op using non-pytorch, non-mlir types. Tensors are poptorch_ir::TensorId.
@@ -60,6 +65,10 @@ public:
 #include "dialect/AutogenCompiler.hpp.inc"
 
 private:
+  // All the ops added by a handler to the graph should be added using this
+  // method to allow the compiler to keep track of whether or not all the ops
+  // can be lowered to Poplar.
+  void appendToMainGraph(mlir::Operation *op);
   mlir::RankedTensorType getRankedTensorType(TensorId id) const;
 
   std::unique_ptr<detail::PoptorchCompilerImpl> _impl;

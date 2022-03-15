@@ -26,8 +26,7 @@ public:
 };
 
 template <typename ConcreteType>
-class DontGenerateBridgeCxx
-    : public TraitBase<ConcreteType, DontGenerateBridgeCxx> {};
+class NotImplementedOp : public TraitBase<ConcreteType, NotImplementedOp> {};
 
 } // namespace OpTrait
 } // namespace mlir

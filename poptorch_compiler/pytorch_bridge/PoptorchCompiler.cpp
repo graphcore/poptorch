@@ -2,6 +2,7 @@
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 
 #include <llvm/ADT/SmallVector.h>
+#include <mlir/IR/Operation.h>
 
 #include <iostream>
 #include <utility>
@@ -147,6 +148,16 @@ void PoptorchCompiler::addReturn() {
         _impl->builder.create<poptorch_ir::end_graph>(_impl->default_loc);
     _impl->read_weights_graph.front().push_back(ret);
   }
+}
+
+void PoptorchCompiler::appendToMainGraph(mlir::Operation *op) {
+  _impl->all_ops_can_be_lowered &=
+      !op->hasTrait<mlir::OpTrait::NotImplementedOp>();
+  _impl->main_graph.front().push_back(op);
+}
+
+bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
+  return _impl->all_ops_can_be_lowered;
 }
 
 } // namespace poptorch_ir

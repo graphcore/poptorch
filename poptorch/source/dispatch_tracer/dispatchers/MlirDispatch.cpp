@@ -346,9 +346,13 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
     // (i.e. builders defined in tablegen), and repopulates the stack.
 
     // The handler will be found in the compiler dispatch table.
-    // See CompilerDispatchTable.cpp generaed generated AtenToMlirDispatch.inc,
+    // See CompilerDispatchTable.cpp AtenToMlirDispatch.inc,
     // AtenToMlirInterface.hpp.inc and AtenToMlirInterface.hpp.inc
+    ERROR_ON(
+        !_compiler.allOpsCanBeLoweredToPoplar()); // This shouldn't be possible
     mlir_handle->second(*stack);
+    ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
+                 schema_key << " cannot currently be lowered to Poplar");
 
     /*
      * All logic from here down is to ensure the JIT graph is still correct and

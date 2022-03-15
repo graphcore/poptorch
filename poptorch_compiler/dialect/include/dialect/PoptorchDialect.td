@@ -19,10 +19,18 @@ def Poptorch_Dialect : Dialect {
 }
 
 def ViewOp : NativeOpTrait<"ViewOp">;
+// Ops with this trait implement shape inference but can't be lowered to
+// Poplar (yet).
+def NotImplementedOp : NativeOpTrait<"NotImplementedOp">;
 
+// All operations coming through the dispatcher's fallback should inherit
+// from either Poptorch_Op if they can be lowered to Poplar or
+// Poptorch_NotImplementedOp if they cannot.
 class Poptorch_Op<string mnemonic, list<OpTrait> traits = []> :
         Op<Poptorch_Dialect, mnemonic, traits # [DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>]>;
 
+class Poptorch_NotImplementedOp<string mnemonic, list<OpTrait> traits = []> :
+        Op<Poptorch_Dialect, mnemonic, traits # [NotImplementedOp]>;
 
 class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = []> :
         Op<Poptorch_Dialect, mnemonic, traits>;

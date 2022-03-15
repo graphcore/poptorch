@@ -50,6 +50,11 @@
   PopTorchDirect: tanh
   UnusedOutputArguments: {out}
 
+# func: softplus.out(Tensor self, Scalar beta=1, Scalar threshold=20, *, Tensor(a!) out) -> Tensor(a!)
+- func: softplus.out
+  PopTorchDirect: softplus
+  IgnoreArgs: {'beta', 'threshold'}
+  UnusedOutputArguments: {out}
 
 # sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: sigmoid.out

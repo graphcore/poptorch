@@ -1585,21 +1585,6 @@ def Poptorch_size : Poptorch_Op<"size", []> {
 
 }
 
-def Poptorch_softplus : Poptorch_Op<"softplus", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_softsign : Poptorch_Op<"softsign", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
   let results = (outs Poptorch_tensor:$result);

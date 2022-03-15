@@ -618,12 +618,6 @@ void size::lowerToPoplar(CompilerContext & /*context*/) {
                   "size"
                   " is currently unimplemented.");
 }
-void softplus::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "softplus"
-                  " is currently unimplemented.");
-}
 void softsign::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

@@ -113,7 +113,10 @@ class VariadicValueType(ValueType):
 
 
 def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
-    assert 'Poptorch_Op' in json_in[op_key]["!superclasses"]
+    assert any([
+        x in json_in[op_key]["!superclasses"]
+        for x in ['Poptorch_Op', 'Poptorch_NotImplementedOp']
+    ])
 
     arg_types = []
 
@@ -216,7 +219,8 @@ def returns_from_json(json_in, op_key):
 
 for key in json_in.keys():
     if key.startswith("Poptorch_"):
-        if "Poptorch_Op" not in json_in[key]["!superclasses"]:
+        if all(x not in json_in[key]["!superclasses"]
+               for x in ["Poptorch_Op", "Poptorch_NotImplementedOp"]):
             continue
 
         # Skip the stream copies. They have their own API.
@@ -307,7 +311,7 @@ for op_name in poptorch_ops:
     cppFunction += parameters + ");\n\n"
 
     # Add the IR op to the graph.
-    cppFunction += "_impl->main_graph.front().push_back(tmp);\n\n"
+    cppFunction += "appendToMainGraph(tmp);\n\n"
 
     # Allow for each return to be optional, normal or variadic.
     cppFunction += "poptorch_ir::ODSTensorResults results;\n"
