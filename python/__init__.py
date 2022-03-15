@@ -2,7 +2,7 @@
 import atexit
 import copy
 import os
-from typing import Any, Callable, Dict, Iterator, Optional, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Union, Iterable
 import pickle
 
 import torch
@@ -95,21 +95,18 @@ def load(filename: str,
     return executor
 
 
-class _SubDataset:
-    """For distributed execution split the dataset into serial blocks of tensors
-
-    All the tensors used by process 0, followed by all the tensors
+class _SubDatasetSampler:
+    """For distributed execution split the dataset into serial blocks of indices
+    All the indices  used by process 0, followed by all the indices
     used by process 1, and so on.
 
     [p0, p0, p0, ..., p1, p1, p1, ..., p2,p2, p2]
-
-    If shuffling is used, then the indices in the parent (entire) dataset are
-    randomised and ``swap_range`` will be called every time a new iterator
-    is created in order to make sure all the tensors get used.
     """
 
-    def __init__(self, dataset, opts, step, drop_last):
-        num_elts = len(dataset)
+    def __init__(self, sampler: 'torch.utils.data.Sampler',
+                 opts: 'poptorch.Options', step: int, shuffle: bool,
+                 drop_last: bool):
+        num_elts = len(sampler)
         # Note: all the processes must have the same number of batches
         # or it will hang.
         if drop_last:
@@ -117,7 +114,6 @@ class _SubDataset:
                                (step * opts.Distributed.numProcesses))
             self._offset = opts.Distributed.processId * per_proc
             self._length = min(per_proc, num_elts - self._offset)
-            self._leftovers = num_elts % per_proc
         else:
             # If the user explicitly requested to not drop the left over elements
             # then evenly distribute them across all the processes and let the user
@@ -127,55 +123,32 @@ class _SubDataset:
                         for proc in range(opts.Distributed.numProcesses)]
             self._offset = sum(per_proc[:opts.Distributed.processId])
             self._length = per_proc[opts.Distributed.processId]
-            self._leftovers = 0
 
-        self._base_offset = self._offset
-        self._dataset = dataset
+        self._sampler = sampler
         self._seed = opts.random_seed if opts.exists('random_seed') else None
         self._shuffling_generator_state = None
-        self._shuffled_global_indices = None
+        self.shuffle = shuffle
 
-    def shuffle_global_indices(self):
-        """Shuffles the indices across the entire dataset."""
-        generator = torch.Generator()
-        if self._shuffling_generator_state is None:
-            assert self._seed is not None, (
-                "Seed must be set when shuffling so that all "
-                "instances end up with the same shuffled global indices.")
-            generator.manual_seed(self._seed)
-        else:
-            generator.set_state(self._shuffling_generator_state)
-        self._shuffled_global_indices = torch.randperm(len(self._dataset),
-                                                       generator=generator)
-        self._shuffling_generator_state = generator.get_state()
-
-    def swap_range(self):
-        """If there are leftovers in the randomly sampled dataset make sure
-        they get included in the next iteration.
-
-        For example if we've got: T = N * B + L
-        T = total number of tensors
-        N = number of full batches in T
-        B = batch size
-        L = Number of left over tensors
-
-        First the dataset will return the tensors in [0, T-L]
-        after ``swap_range`` was called the dataset will return tensors in
-        [L, T]
-        """
-        if self._base_offset == self._offset:
-            self._offset += self._leftovers
-        else:
-            self._offset = self._base_offset
+    def __iter__(self):
+        if self.shuffle:
+            generator = torch.Generator()
+            if self._shuffling_generator_state is None:
+                assert self._seed is not None, (
+                    "Seed must be set when shuffling so that all "
+                    "instances end up with the same shuffled global indices.")
+                generator.manual_seed(self._seed)
+            else:
+                generator.set_state(self._shuffling_generator_state)
+            shuffled_global_indices = torch.randperm(len(self._sampler),
+                                                     generator=generator)
+            self._shuffling_generator_state = generator.get_state()
+            return (shuffled_global_indices[i]
+                    for i in range(self._offset, self._offset + self._length))
+        #  If not shuffled no need for generator
+        return (i for i in range(self._offset, self._offset + self._length))
 
     def __len__(self):
         return self._length
-
-    def __getitem__(self, index):
-        global_index = index + self._offset
-        if self._shuffled_global_indices is not None:
-            global_index = self._shuffled_global_indices[global_index]
-        return self._dataset[global_index]
 
 
 class DataLoader(torch.utils.data.DataLoader):
@@ -188,19 +161,21 @@ class DataLoader(torch.utils.data.DataLoader):
     across all hosts.
     """
 
-    def __init__(self,
-                 options: 'poptorch.Options',
-                 dataset: 'torch.utils.data.Dataset',
-                 batch_size: int = 1,
-                 shuffle: bool = False,
-                 num_workers: int = 0,
-                 drop_last: bool = True,
-                 persistent_workers: Optional[bool] = None,
-                 auto_distributed_partitioning: bool = True,
-                 mode: 'poptorch.DataLoaderMode' = DataLoaderMode.Sync,
-                 async_options: Optional[Dict[str, Any]] = None,
-                 rebatched_worker_size: Optional[int] = None,
-                 **kwargs):
+    def __init__(
+            self,
+            options: 'poptorch.Options',
+            dataset: 'torch.utils.data.Dataset',
+            batch_size: int = 1,
+            shuffle: bool = False,
+            sampler: Union['torch.utils.data.Sampler', Iterable, None] = None,
+            num_workers: int = 0,
+            drop_last: bool = True,
+            persistent_workers: Optional[bool] = None,
+            auto_distributed_partitioning: bool = True,
+            mode: 'poptorch.DataLoaderMode' = DataLoaderMode.Sync,
+            async_options: Optional[Dict[str, Any]] = None,
+            rebatched_worker_size: Optional[int] = None,
+            **kwargs):
         """
         :param options: Options that will be used to compile
             and run the model.
@@ -209,6 +184,7 @@ class DataLoader(torch.utils.data.DataLoader):
             of being the size that runs through an operation in the model at
             any given time.
         :param shuffle: Whether or not the dataset should be shuffled.
+        :param sampler: Defines the strategy to draw samples from the dataset.
         :param num_workers: Number of worker processes to use to read the
             data.
         :param drop_last: If True and the number of elements in the
@@ -294,15 +270,18 @@ class DataLoader(torch.utils.data.DataLoader):
                         "batch_size=None not allowed when using "
                         "auto_distributed_partitioning.")
 
-                    dataset = _SubDataset(dataset, options,
-                                          self._combined_batch_size, drop_last)
                     if shuffle:
-                        # In a distributed environment we handle the shuffling
-                        # ourselves (take a look at _SubDataset and __iter__)
-                        # so no need for parent class to shuffle within each of
-                        # the subsets again.
-                        self._shuffle_map_style_data_in_distributed_env = True
-                        shuffle = False
+                        sampler = torch.utils.data.RandomSampler(dataset)
+                    else:
+                        sampler = torch.utils.data.SequentialSampler(dataset)
+                    # In a distributed environment we handle the distributed
+                    # sampling ourslves  (take a look at _SubDatasetSampler)
+                    # so no need for parent class to shuffle within each of
+                    # the subsets again.
+                    sampler = _SubDatasetSampler(sampler, options,
+                                                 self._combined_batch_size,
+                                                 shuffle, drop_last)
+                    shuffle = False
         if not self._is_iterable:
             dataset = profiling.Channel("dataset").instrument(
                 dataset, "__getitem__")
@@ -325,6 +304,7 @@ class DataLoader(torch.utils.data.DataLoader):
         super().__init__(dataset,
                          batch_size=dataset_batch_size,
                          shuffle=shuffle,
+                         sampler=sampler,
                          num_workers=num_workers,
                          drop_last=drop_last,
                          persistent_workers=persistent_workers,
@@ -344,7 +324,10 @@ class DataLoader(torch.utils.data.DataLoader):
         # If we're rebatching in the AsynchronousDataAccessor we need to
         # adjust the dataset's length.
         if self._accessor is not None and self._accessor.rebatched_size:
-            num_elts = len(self.dataset)
+            if self._is_iterable:
+                num_elts = len(self.dataset)
+            else:
+                num_elts = len(self.sampler)
             dataset_len = num_elts // self._accessor.rebatched_size
             if not self.rebatched_drop_last and \
                     num_elts % self._accessor.rebatched_size:
@@ -383,9 +366,6 @@ class DataLoader(torch.utils.data.DataLoader):
         self.terminate()
 
     def __iter__(self) -> "torch.utils.data.dataloader._BaseDataLoaderIter":
-        if self._shuffle_map_style_data_in_distributed_env:
-            self.dataset.shuffle_global_indices()
-            self.dataset.swap_range()
         if self._accessor is not None:
             return self._accessor.__iter__()
 
