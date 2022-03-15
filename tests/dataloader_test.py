@@ -420,6 +420,7 @@ def test_global_shuffle_each_epoch(num_processes):
             IncrementDataset((), 100),
             batch_size=16,
             shuffle=True,
+            num_workers=1,
         )
         for _ in range(5):
             each_epoch_data = []
