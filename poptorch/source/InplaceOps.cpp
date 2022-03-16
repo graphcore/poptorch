@@ -53,8 +53,12 @@ InplaceOpHandler::InplaceOpHandler(
   // These must also be removed.
   removeRemainingInplaceOps();
 
-  // Make sure poptorch::end_for_loop has the non-changed value as an input.
-  fixForLoopInputs();
+  // TODO(T57408): Remove the if statement after the pass is adapted for
+  // the dispatcher (most of the pass, including this call, won't be needed).
+  if (!isDispatcherActive()) {
+    // Make sure poptorch::end_for_loop has the non-changed value as an input.
+    fixForLoopInputs();
+  }
 }
 
 void InplaceOpHandler::storeNumTensorOutputs() {

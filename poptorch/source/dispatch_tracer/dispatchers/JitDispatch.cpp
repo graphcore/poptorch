@@ -325,6 +325,9 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   // The original node will be deleted but replaced with a new node.
   canonicaliseAndFixOutput(schema, *stack, &node, _mapper);
 
+  // Annotate for loops as subgraphs.
+  annotateSubgraphsDispatch(&graph, node);
+
   logging::trace("[TRACING-2][JIT] Post canonicalisation and fix output {}",
                  *node);
 

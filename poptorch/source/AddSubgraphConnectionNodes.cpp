@@ -103,13 +103,18 @@ void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
   }
 }
 
+// State during the dispatcher intercept calls.
+std::stack<torch::jit::Node *> start_for_loop_nodes;
+
 } // namespace
+
 /*
  * Certain ops are essentially subgraphs within the main graph. For instance
- * for loops. If they have tensor which comes from the subgraph
+ * for loops. If they have a tensor which comes from the subgraph
  * above we must add a specific input entry op to the graph for that op.
  */
-void annotateSubgraphs(torch::jit::Graph *graph, bool training) {
+void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node,
+                       bool training) {
   logging::LogContext ctx_func("annotateSubgraphs Processing");
   // Subgraph start to all nodes contained directly within that subgraph.
   std::stack<Subgraph> subgraph_nodes;
@@ -119,7 +124,9 @@ void annotateSubgraphs(torch::jit::Graph *graph, bool training) {
 
   // Look for any subgraphs. Subgraphs are currently:
   // * for loops.
-  for (torch::jit::Node *node : graph->nodes()) {
+  for (auto iter = start_node->iterator(); iter != graph->nodes().end();
+       ++iter) {
+    torch::jit::Node *node = *iter;
     logging::LogContext ctx("Processing " + nodeToString(node));
     const torch::jit::Symbol kind = node->kind();
 
@@ -157,11 +164,9 @@ void annotateSubgraphs(torch::jit::Graph *graph, bool training) {
       graph->setInsertPoint(node);
       markInputsAsComingFromParent(graph, node, &subgraph_nodes.top());
 
-      if (!isUsedInTerminator(node)) {
-        for (const std::pair<torch::jit::Value *const, torch::jit::Value *>
-                 &pair : subgraph_nodes.top().input_map) {
-          node->replaceInputWith(pair.second, pair.first);
-        }
+      for (const std::pair<torch::jit::Value *const, torch::jit::Value *>
+               &pair : subgraph_nodes.top().input_map) {
+        node->replaceInputWith(pair.second, pair.first);
       }
     }
   }
@@ -170,6 +175,29 @@ void annotateSubgraphs(torch::jit::Graph *graph, bool training) {
     if (node->output()->uses().empty()) {
       node->destroy();
     }
+  }
+}
+
+// Same pass as annotateSubgraphs above but working as a state machine, using
+// start_for_loop_nodes as state between the calls.
+void annotateSubgraphsDispatch(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  logging::LogContext ctx_func("annotateSubgraphsDispatch");
+
+  const torch::jit::Symbol kind = node->kind();
+
+  if (kind == symbols::poptorch::start_for_loop) {
+    start_for_loop_nodes.push(node);
+  } else if (kind == symbols::poptorch::end_for_loop) {
+    ERROR_ON_MSG(start_for_loop_nodes.empty(),
+                 "Internal: end_for_loop encountered before end_for_loop");
+    if (start_for_loop_nodes.size() == 1) {
+      auto *start_node = start_for_loop_nodes.top();
+      // TODO(T51159): Add support for dispatch tracing + training.
+      // Currently we just pass training = false to annotateSubgraphs.
+      annotateSubgraphs(graph, start_node, /*training=*/false);
+    }
+    start_for_loop_nodes.pop();
   }
 }
 

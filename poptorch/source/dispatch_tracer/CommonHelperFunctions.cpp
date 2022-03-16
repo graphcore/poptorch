@@ -75,9 +75,16 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       list_values.push_back(
           insertValueIntoGraphAndTrackIt(list_value, graph, mapper));
     }
-    auto *list = graph.createList(c10::TensorType::get(), list_values);
-    graph.insertNode(list);
-    return list->output();
+
+    // We assume all lists with the same jit values are the same list in python.
+    torch::jit::Value *val = mapper.getValueForTensorList(list_values);
+    if (val == nullptr) {
+      auto *list = graph.createList(c10::TensorType::get(), list_values);
+      graph.insertNode(list);
+      val = list->output();
+      mapper.addTensorList(list_values, val);
+    }
+    return val;
   }
 
   // Assume value is a true constant and not a tensor so we don't have to

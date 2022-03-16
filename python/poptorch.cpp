@@ -904,7 +904,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   printGraphBeforeHalfFloatResolution(*graph);
 
-  poptorch::annotateSubgraphs(graph.get(), training);
+  poptorch::annotateSubgraphs(graph.get(), graph->nodes().front(), training);
 
   poptorch::resolveHalfOrFloat(graph.get());
 
@@ -1405,6 +1405,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   try {
     logging::debug("Compile with manual tracing");
+
     std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
 
     logging::debug("Traced graph:\n{}", *graph);
@@ -1428,10 +1429,6 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
 
     poptorch::type_and_constant_canonicalization::makeConstantIntParams(
         graph.get(), parameter_names, parameters);
-
-    // TODO(T51159): Add support for dispatch tracing + training.
-    // Currently we just pass training = false to annotateSubgraphs.
-    poptorch::annotateSubgraphs(graph.get(), false);
 
     logging::debug("Graph right before popart:\n{}", *graph);
 

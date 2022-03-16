@@ -145,4 +145,19 @@ bool ValueMapper::isHalfTensor(const at::Tensor &t) {
   return half_tensors.find(t.unsafeGetTensorImpl()) != std::end(half_tensors);
 }
 
+void ValueMapper::addTensorList(const TensorList &list,
+                                torch::jit::Value *val) {
+  logging::trace("Adding tensor list to value mapper, JIT id: {}",
+                 val->debugName());
+  tensor_lists.insert({list, val});
+}
+
+torch::jit::Value *ValueMapper::getValueForTensorList(const TensorList &list) {
+  auto itr = tensor_lists.find(list);
+  if (itr != tensor_lists.end()) {
+    return itr->second;
+  }
+  return nullptr;
+}
+
 } // namespace poptorch

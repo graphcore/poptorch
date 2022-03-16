@@ -4,6 +4,7 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -20,6 +21,27 @@ namespace poptorch {
  * JIT/MLIR graphs respectively.
  */
 class ValueMapper {
+private:
+  using TensorList = std::vector<torch::jit::Value *>;
+
+  // Hash combine for mapping a vector of jit values (inputs of a
+  // prim::ListConstruct) to the output jit value. This allows us to use an
+  // unordered_map from TensorList to the output values and thus track the
+  // incoming tensor lists. Performance and collisions are not very critical
+  // in this scenario as we don't expect models with unreasonably
+  // large number of lists.
+  struct TensorListHash {
+    size_t operator()(const TensorList &list) const {
+      std::hash<const torch::jit::Value *> hash_func;
+      size_t hash = 11;
+      for (const auto *value : list) {
+        size_t hash_next = hash_func(value);
+        hash = hash * 31 + hash_next;
+      }
+      return hash;
+    }
+  };
+
 public:
   // Each tensor we are tracking has a short record containing a pointer to the
   // tensor and its corresponding values in the two IRs.
@@ -79,6 +101,10 @@ public:
   // typed values.
   std::unordered_set<at::TensorImpl *> half_tensors;
 
+  // Map each prim::ListConstruct to a corresponding jit output value.
+  std::unordered_map<TensorList, torch::jit::Value *, TensorListHash>
+      tensor_lists;
+
   TrackedTensor *rawTensorRecord(const at::Tensor &t);
 
   torch::jit::Value *getValueForTensor(const at::Tensor &t);
@@ -96,7 +122,12 @@ public:
                  bool is_const = false);
 
   void markHalfTensor(const at::Tensor &t);
+
   bool isHalfTensor(const at::Tensor &t);
+
+  void addTensorList(const TensorList &list, torch::jit::Value *val);
+
+  torch::jit::Value *getValueForTensorList(const TensorList &list);
 
   // Returns true if this is a direct alias and adds it to the approved alias
   // map.
