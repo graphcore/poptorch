@@ -355,6 +355,7 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_BOOL_OPTION(enableOutlining);
   ADD_POPART_BOOL_OPTION(enableOutliningCopyCostPruning);
   ADD_POPART_BOOL_OPTION(rearrangeAnchorsOnHost);
+  ADD_POPART_BOOL_OPTION(rearrangeStreamsOnHost);
   ADD_POPART_BOOL_OPTION(enablePrefetchDatastreams);
   ADD_POPART_BOOL_OPTION(enableNonStableSoftmax);
   ADD_POPART_BOOL_OPTION(enableReplicatedGraphs);

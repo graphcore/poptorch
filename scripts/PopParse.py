@@ -43,7 +43,6 @@ options_not_handled = [
     "autodiffSettings",
     "scheduleNonWeightUpdateGradientConsumersEarly",
     "matmulOptions",
-    "rearrangeStreamsOnHost",
     # Handled by PopTorch but not detected by this parser:
     "activationTensorLocationSettings",
     "automaticLossScalingSettings",
