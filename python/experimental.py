@@ -57,9 +57,22 @@ class IPUScope:
         with torch.no_grad():
             self._inputs = [t.clone() for t in inputs]
 
-        # Create the graph. Futured captured calls will be written into this graph behind the scenes.
+        # Create the graph. Futured captured calls will be written into this
+        # graph behind the scenes.
         poptorch_core.createGraph(
             poptorch_core.TracingMode(self._compile_using), inputs, param_list)
+
+        # JITDispatch::createGraph() doesn't add non-floating point parameters
+        # and buffers as graph inputs as they are not supported in PopART.
+        # Instead, they are added as constant nodes. We can safely delete them
+        # here.
+        if self._compile_using == enums.Compiler.PopART:
+            to_delete = []
+            for k, v in self._params_and_buffers.items():
+                if not torch.is_floating_point(v):
+                    to_delete.append(k)
+            for k in to_delete:
+                del self._params_and_buffers[k]
 
     # Start capturing calls.
     def __enter__(self):
@@ -151,7 +164,8 @@ class IPUScope:
                     else:
                         self._outputs.append(tensor.clone())
 
-            poptorch_core.markOutputs(flattened, self._outputs, structure(tensors))
+            poptorch_core.markOutputs(flattened, self._outputs,
+                                      structure(tensors))
 
         # Turn dispatch back on.
         poptorch_core.startDispatch()
@@ -200,12 +214,12 @@ class _IPUContext:
 #
 # You can also pass in parameters and poptorch options:
 #
-# 1.     ipu_func = IPUContext(func, parameters_and_buffers=..., options=...)(inputs)
+# 1. ipu_func = IPUContext(func, parameters_and_buffers=..., options=...)(inputs)
 #
-# 2.     @IPUContext(parameters_and_buffers=..., options=...)
-#        def ipu_func(inputs):
-#            ...
-#            return outputs
+# 2. @IPUContext(parameters_and_buffers=..., options=...)
+#    def ipu_func(inputs):
+#        ...
+#        return outputs
 #
 # Note that the function being wrapped MUST take the graph inputs as inputs to the
 # function, and MUST return the outputs of the graph. Any non-tensor inputs will

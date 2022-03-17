@@ -21,22 +21,32 @@ namespace poptorch {
 
 void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
                               const std::vector<at::Tensor> &parameters) {
-  // We build up the torch IR graph as well.
-  auto add = [&](at::Tensor &tensor) {
+  auto add_input = [&](at::Tensor &tensor) {
     torch::jit::Value *value = graph.addInput(tensor.name());
     value->inferTypeFrom(tensor);
-
     _mapper.addTensor(tensor, value);
   };
 
   // Add any inputs.
   for (at::Tensor tensor : inputs) {
-    add(tensor);
+    add_input(tensor);
   }
 
   // Add the parameters.
   for (at::Tensor tensor : parameters) {
-    add(tensor);
+    at::ScalarType type = tensor.scalar_type();
+    // PopART doesn't allow non-floating point variables so add them as
+    // constants instead. These will be deleted from parameters and buffers
+    // in python before passed to lowering.
+    if (!at::isFloatingType(type)) {
+      if (type == at::ScalarType::Long) {
+        tensor = tensor.to(at::ScalarType::Int);
+      }
+      auto *new_node = tensorToConstant(&graph, tensor);
+      _mapper.addTensor(tensor, new_node->output());
+    } else {
+      add_input(tensor);
+    }
   }
 }
 

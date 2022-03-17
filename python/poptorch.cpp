@@ -1427,9 +1427,6 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     auto inplace_op_handler =
         std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
 
-    poptorch::type_and_constant_canonicalization::makeConstantIntParams(
-        graph.get(), parameter_names, parameters);
-
     // We need to keep the dispatcher alive until after the passes because
     // some of them call isDispatcherActive().
     destroyDispatcher();
