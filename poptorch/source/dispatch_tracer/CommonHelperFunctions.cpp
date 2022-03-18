@@ -53,9 +53,9 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       val = makeConstant(graph, tensor);
     } else {
       auto *record = mapper.rawTensorRecord(tensor);
-      // If this is a constant tensor, add it to the graph now
-      // and fix the mapping.
-      if (record->is_const) {
+      // If this isn't an input or node-output tensor, add it to the graph now
+      // as a constant and fix the mapping.
+      if (record->is_empty) {
         val = makeConstant(graph, tensor);
         record->jit = val;
       }
@@ -243,14 +243,14 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
     auto value = (*stack)[arg];
     const auto &argument = schema.arguments()[arg];
     bool is_write = argument.alias_info() && argument.alias_info()->isWrite();
-    // If we're writing to this tensor, it's no longer constant
+    // If we're writing to this tensor, it's no longer empty
     if (is_write && value.isTensor()) {
       at::Tensor tensor = value.toTensor();
       // Undefined tensors are optional tensors.
       if (tensor.defined()) {
         auto *record = mapper.rawTensorRecord(tensor);
         if (record != nullptr) {
-          record->is_const = false;
+          record->is_empty = false;
         }
       }
     }

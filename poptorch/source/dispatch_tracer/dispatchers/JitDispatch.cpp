@@ -124,7 +124,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
                                            const at::Tensor &other) {
   if (other.unsafeGetTensorImpl()->is_wrapped_number()) {
     torch::jit::Value *val = graph.insertConstant(other);
-    _mapper.addTensor(other, val, true);
+    _mapper.addTensor(other, val);
   }
 
   ValueMapper::TrackedTensor *dest = _mapper.rawTensorRecord(self);
@@ -145,7 +145,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   }
 
   dest->jit = copy;
-  dest->is_const = src->is_const;
+  dest->is_empty = src->is_empty;
 
   if (_mapper.isHalfTensor(other)) {
     _mapper.markHalfTensor(self);
@@ -320,7 +320,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
         !record,
         "[TRACING-2][JIT] Inplace op is not tracking inplace argument");
     record->jit = value;
-    record->is_const = false;
+    record->is_empty = false;
     if (_mapper.isHalfTensor(output)) {
       _mapper.markHalfTensor(inplace);
     }
