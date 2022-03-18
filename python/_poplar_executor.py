@@ -515,8 +515,6 @@ class PoplarExecutor:
                       parameters_and_buffers=all_data(self._model),
                       options=self._options) as ipu:
             outputs = self._model(*in_tensors.asTuple())
-            if not isinstance(outputs, (list, tuple)):
-                outputs = [outputs]
             ipu.outputs(outputs)
         return ipu._executable  # pylint: disable=protected-access
 

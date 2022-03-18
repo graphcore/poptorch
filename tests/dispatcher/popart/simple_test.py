@@ -16,7 +16,7 @@ def test_simple_test():
     with IPUScope([input]) as ipu:
         x = input + 5
         x = x * 3
-        ipu.outputs([x])
+        ipu.outputs(x)
 
     # pylint: disable=no-member
     helpers.assert_allequal(actual=ipu(input),
@@ -32,7 +32,7 @@ def test_simple_conv():
 
     with IPUScope([input], conv.named_parameters()) as ipu:
         x = conv(input)
-        ipu.outputs([x])
+        ipu.outputs(x)
 
     cpu = conv(input)
     ipu = ipu(input)
@@ -54,7 +54,7 @@ def test_tensor_constant():
     input = torch.rand(3)
     with IPUScope([input]) as ipu:
         y = f(input)
-        ipu.outputs([y])
+        ipu.outputs(y)
 
     cpu = f(input)
     ipu = ipu(input)

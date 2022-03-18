@@ -83,7 +83,7 @@ def inference_harness(imagenet_model, check=True):
     # Run on IPU.
     with IPUScope([image_input], parameters_named) as poptorch_model:
         out = model(image_input)
-        poptorch_model.outputs([out])
+        poptorch_model.outputs(out)
 
     poptorch_out = poptorch_model(image_input)
 

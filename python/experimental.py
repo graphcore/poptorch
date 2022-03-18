@@ -134,19 +134,16 @@ class IPUScope:
         # We don't want to catch anything in here.
         poptorch_core.endDispatch()
 
-        def structure(x, toplevel=True):
+        def structure(x):
             if isinstance(x, tuple):
                 prefix = "("
                 postfix = ")"
             elif isinstance(x, list):
-                if toplevel:
-                    prefix = postfix = ""
-                else:
-                    prefix = "["
-                    postfix = "]"
+                prefix = "["
+                postfix = "]"
             else:
                 return "x"
-            return prefix + "".join(structure(e, False) for e in x) + postfix
+            return prefix + "".join(structure(e) for e in x) + postfix
 
         def flatten(x):
             if isinstance(x, (tuple, list)):
@@ -192,11 +189,7 @@ class _IPUContext:
                           options=self.options,
                           compile_using=self.compiler) as ipu:
                 result = self.func(*args, **kwargs)
-                tensor_outputs = unrollTensorList(result)
-                if len(tensor_outputs) == 0:
-                    raise TypeError("A function marked with IPUContext must "
-                                    "return one or more tensors.")
-                ipu.outputs(tensor_outputs)
+                ipu.outputs(result)
             self.ipu = ipu
         return self.ipu(*tensor_args)
 
