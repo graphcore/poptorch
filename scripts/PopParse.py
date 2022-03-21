@@ -34,8 +34,13 @@ jsonOutput = onnx.parse()
 logging_level = logging.DEBUG if args.debug else logging.INFO
 logging.basicConfig(level=logging_level)
 
+# List of options which cannot be resolved with clang, e.g. referring to values
+# in external sources
+options_not_resolved = ["defaultPrefetchBufferingDepth"]
+
 # List of SessionOptions attributes PopTorch decided to not support
 options_not_handled = [
+    "bufferingDepthMap",
     "developerSettings",
     "prefetchBufferingDepthMap",
     "matmulOptions",
@@ -45,6 +50,7 @@ options_not_handled = [
     "matmulOptions",
     # Handled by PopTorch but not detected by this parser:
     "activationTensorLocationSettings",
+    "replicatedCollectivesSettings",
     "automaticLossScalingSettings",
     "weightTensorLocationSettings",
     "optimizerStateTensorLocationSettings",
@@ -119,6 +125,10 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
     for c in opts.get_children():
         if c.kind != clang.cindex.CursorKind.FIELD_DECL:
             continue
+
+        if c.spelling in options_not_resolved:
+            continue
+
         children = list(c.get_children())
 
         # deal with CursorKind.UNEXPOSED_REF
@@ -194,7 +204,7 @@ tu = index.parse(session_file,
 
 parse_session_options(tu.cursor)
 
-UnsupportedOps = ["abort", "ctcloss", "gru", "rnn"]
+UnsupportedOps = ["abort", "ctcloss", "gru", "rnn", "tensorremap"]
 
 ## Implicit cast support
 # Casting on all args

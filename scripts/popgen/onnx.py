@@ -10,7 +10,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 logger = logging.getLogger('OnnxParser')
 
 popart_include_dir = None
-popart_files = ["builder.hpp", "builder.h.gen"]
+popart_files = ["builder.hpp", "builder.gen.hpp"]
 
 nodeBlacklist = {
     "DomainOpSet", "Builder", "getOpsetVersion", "AiOnnxOpset11",
