@@ -78,12 +78,6 @@ public:
   at::Tensor makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
                                    bool requires_grad);
 
-  // If an MLIR implementation is unavailable we will create the MLIR by first
-  // lowering to JIT, canonicalising it, and lowering each of the composite
-  // nodes one at a time.
-  void canonicaliseAndLowerViaJit(const c10::OperatorHandle &initial_op,
-                                  c10::Stack *stack);
-
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
 #include "AtenToMlirInterface.hpp.inc"

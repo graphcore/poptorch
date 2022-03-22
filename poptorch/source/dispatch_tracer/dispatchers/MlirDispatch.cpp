@@ -310,305 +310,84 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 
   // First we check if we have a direct mapping onto MLIR.
   auto mlir_handle = _direct_dispatch_lookup.find(schema_key);
-  if (mlir_handle != _direct_dispatch_lookup.end()) {
-    logging::trace("[TRACING-2] Handling {} via MLIR", schema_key);
-    /*
-     * Convert the stack arguments into JIT. Only for JIT graph
-     * correction/building so we can maintain a JIT graph as well as the MLIR
-     * graph.
-     */
-    // The handler will clear the stack so we collect up all the JIT inputs.
-    std::vector<torch::jit::Value *> inputs;
-    for (c10::IValue value : (*stack)) {
-      if (value.isTensor()) {
-        at::Tensor t = value.toTensor();
+  ERROR_ON_MSG(mlir_handle == _direct_dispatch_lookup.end(),
+               "No shape inference handler for " << schema_key);
+  logging::trace("[TRACING-2] Handling {} via MLIR", schema_key);
+  /*
+   * Convert the stack arguments into JIT. Only for JIT graph
+   * correction/building so we can maintain a JIT graph as well as the MLIR
+   * graph.
+   */
+  // The handler will clear the stack so we collect up all the JIT inputs.
+  std::vector<torch::jit::Value *> inputs;
+  for (c10::IValue value : (*stack)) {
+    if (value.isTensor()) {
+      at::Tensor t = value.toTensor();
 
-        // Skip optionals.
-        if (!t.defined()) {
-          continue;
-        }
-        // Legality of the JIT doesn't hugely matter, especially for inputs.
-        // Each node will at most only look at the output of a previous node,
-        // not the input. So we don't think too much here and just skip nodes
-        // which we aren't tracking.
-        torch::jit::Value *val = _mapper.getValueForTensor(t);
-        if (val == nullptr) {
-          continue;
-        }
-        // Add it to the list.
-        inputs.push_back(val);
-      }
-    }
-
-    /*
-     * The core MLIR part.
-     */
-    // Call the handler which empties the stack, calls the MLIR implementation
-    // (i.e. builders defined in tablegen), and repopulates the stack.
-
-    // The handler will be found in the compiler dispatch table.
-    // See CompilerDispatchTable.cpp AtenToMlirDispatch.inc,
-    // AtenToMlirInterface.hpp.inc and AtenToMlirInterface.hpp.inc
-    ERROR_ON(
-        !_compiler.allOpsCanBeLoweredToPoplar()); // This shouldn't be possible
-    mlir_handle->second(*stack);
-    ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
-                 schema_key << " cannot currently be lowered to Poplar");
-
-    /*
-     * All logic from here down is to ensure the JIT graph is still correct and
-     * legal.
-     */
-    // The stack contains all the outputs.
-    const std::size_t num_outputs = stack->size();
-    logging::trace("[TRACING-2] Num outputs: {}", num_outputs);
-
-    // Add a JIT node to keep the jit graph clean.
-    torch::jit::Node *node = _graph.create(symbol, inputs, stack->size());
-    _graph.appendNode(node);
-
-    // Map the JIT nodes onto the correct outputs.
-    for (std::size_t index = 0; index < num_outputs; ++index) {
-      at::Tensor tensor = stack->at(index).toTensor();
-
-      if (!tensor.defined()) {
-        logging::trace("[TRACING-2] Output: skipping undefined tensor,{}",
-                       reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()));
+      // Skip optionals.
+      if (!t.defined()) {
         continue;
       }
-
-      node->output(index)->inferTypeFrom(tensor);
-      _mapper.addTensor(tensor, node->output(index));
-      logging::trace("[TRACING-2] Output: Tensor ptr {}, jit ir %{} {}",
-                     reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-                     node->output(index)->debugNameBase(), toString(tensor));
-    }
-
-    // Update the 'tail' so if another node needs to process the JIT it will
-    // start from here.
-    _last_processed_node = node;
-  } else {
-    logging::trace("[TRACING-2] Handling {} via JIT fallback", schema_key);
-    // Otherwise we convert the node into PyTorch JIT first and work with that
-    // instead of direct mapping.
-    canonicaliseAndLowerViaJit(op, stack);
-  }
-}
-
-// Convert to JIT and through that lower to MLIR.
-void MLIRDispatch::canonicaliseAndLowerViaJit(
-    const c10::OperatorHandle &initial_op, c10::Stack *stack) {
-  // We can convert any Pytorch schema we see into JIT via the PyTorch JIT API.
-  // In the case where we have not mapped an operation on to MLIR or have not
-  // directly supported that operation 1:1 in MLIR we can convert that operation
-  // to JIT and run through our existing canonicalisation code. That converts
-  // from the 1000s of PyTorch ops into the PopART/Onnx op set which we can then
-  // lower.
-
-  // A jit node will look like:
-  /*
-   * graph(...):
-   *    aten::node(...)
-   */
-
-  // We canonicalise that which will turn it into the PopART/Onnx equivalent.
-  /*
-   * graph(...):
-   *    popart::node(...)
-   */
-  // We can then just directly add that node as MLIR.
-
-  // OR! The canonicalisation will decompose it into multiple supported popart
-  // ops which implements the operation.
-  /*
-   * graph(...):
-   *    popart::SubNode1(...)
-   *    popart::SubNode2(...)
-   *    popart::SubNode3(...)
-   */
-  // We then iterate over each of those nodes and add them one by one into MLIR.
-
-  // As we move through the model we build up the MLIR graph AND the JIT graph.
-  // To know where to start from we track the last added node.
-  /*
-   * graph(...):
-   *    popart::MatMul(...)
-   *    popart::Add(...)        <- _last_processed_node
-   *    popart::SubNode1(...)   <- Node we've just added/canonicalised.
-   *    popart::SubNode2(...)
-   *    popart::SubNode3(...)
-   */
-  // We can iterate down from that till the end of the graph so we capture all
-  // nodes which canonicalisation has added.
-
-  c10::Dispatcher &dispatcher = c10::Dispatcher::singleton();
-
-  const c10::FunctionSchema &initial_schema = initial_op.schema();
-  // Run through the schema to find out if one of the operators is supposed to
-  // be inplace, this could be the 'out' argument of a non-inplace op.
-  c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
-      getInplaceArgument(*stack, initial_schema);
-  bool is_truly_inplace = isTrulyInplace(*stack, initial_schema);
-
-  c10::OperatorHandle op = initial_op;
-  bool op_changed = getOutplaceOpHandle(op, dispatcher);
-  const c10::FunctionSchema &schema = op.schema();
-
-  // Create a fake IR node for us to target using the schema.
-  torch::jit::Node *node = lowerFromSchema(schema, stack, _graph, _mapper);
-
-  if (shouldRunOnCpu(op_changed || is_truly_inplace, schema.name())) {
-    HalfFloatConverter hf_conv(stack, schema, _mapper);
-    hf_conv.pre();
-    // Call the CPU version to get the output shape
-    dispatcher.callBoxed(op, stack);
-    hf_conv.post();
-  } else {
-    // The Op is in place: we don't need to run the CPU version.
-    // Just clear the stack and keep the first input.
-    at::Tensor t = stack->at(0).toTensor();
-    stack->clear();
-    stack->push_back(t);
-  }
-
-  // Fix the fake tensor so it can still work with our canonicalisation
-  // functions which check the output.
-  fixNodeOutput(node, *stack, _mapper);
-
-  // Try to canonicalise it.
-  torch::jit::Node *new_node =
-      canonicalise(schema, node, _graph, true /*is allowed to fail*/);
-
-  // The running output_id. Each operation will decompose into 1 or more onnx
-  // operations, we track the last added one via this so we know which one is
-  // the "last".
-  poptorch_ir::TensorId output_id = poptorch_ir::tensor_error_id;
-
-  // We use the last processed node as the start point for the jit. This is the
-  // last node which has been added to the graph, so we can tell what nodes have
-  // just been added.
-  if (_last_processed_node == nullptr) {
-    // We start one behind the first node as when we traverse we are looking a
-    // the *next* node as normally we will be starting from the last node,
-    // however here the first node is the node we are evaluating.
-    _last_processed_node = *(--_graph.nodes().begin());
-  }
-
-  torch::jit::Node *start_node = _last_processed_node;
-
-  // When we add a jit node we track the compiler output of that node and map it
-  // onto the corresponding JIT value. This is so one expression can refer to
-  // its constituent parts. E.G an expression broken into an add and a mul:
-  // %3 = mul(%0, %1)
-  // %4 = add(%2, %3)
-  // This here would track the %3 and %4. We don't need to track them globally
-  // because any other expression can't refer to them, only the final node can.
-  std::unordered_map<torch::jit::Value *, poptorch_ir::TensorId>
-      just_added_nodes;
-
-  for (auto itr = ++start_node->iterator(); itr != _graph.nodes().end();
-       ++itr) {
-    std::vector<poptorch_ir::TensorId> mlir_ids;
-    for (torch::jit::Value *val : itr->inputs()) {
-      // See if the value is being tracked globally.
-      poptorch_ir::TensorId ssa = _mapper.getMLIRForJit(val);
-
-      // Otherwise check if it is an intermediate produced by this expression.
-      if (ssa == poptorch_ir::tensor_error_id || ssa == poptorch_ir::none_id) {
-        // Error if we can't find it here.
-        auto ssa_itr = just_added_nodes.find(val);
-        ERROR_ON_MSG(ssa_itr == just_added_nodes.end(),
-                     "JIT node could not be mapped onto MLIR.");
-        ssa = ssa_itr->second;
+      // Legality of the JIT doesn't hugely matter, especially for inputs.
+      // Each node will at most only look at the output of a previous node,
+      // not the input. So we don't think too much here and just skip nodes
+      // which we aren't tracking.
+      torch::jit::Value *val = _mapper.getValueForTensor(t);
+      if (val == nullptr) {
+        continue;
       }
-
-      // Track all the inputs to this operation.
-      mlir_ids.push_back(ssa);
-
-      logging::trace("[TRACING-2][JIT] Looking up MLIR for JIT value. ",
-                     "Jit name {} jit ptr {} mlir {}", val->debugNameBase(),
-                     reinterpret_cast<void *>(val), ssa);
-    }
-
-    const c10::Symbol kind = itr->kind();
-    logging::trace("[TRACING-2][JIT] Looking for a handler for {}",
-                   kind.toQualString());
-
-    // Look up the normal PopART jit node.
-    auto jit_handler = _jit_handlers.find(kind);
-    if (jit_handler != _jit_handlers.end()) {
-      // Call the normal PopART handler.
-      output_id = jit_handler->second(*itr, mlir_ids);
-    } else if (kind == symbols::popart::identityloss) {
-      // We treat identity loss as a special case so we can directly handle the
-      // reductions.
-      std::vector<std::int64_t> axes = _compiler.getSize(mlir_ids[0]);
-
-      for (std::size_t i = 0; i < axes.size(); ++i) {
-        axes[i] = i;
-      }
-
-      output_id = _compiler.reducemean(mlir_ids[0], axes, false).at(0).at(0);
-    } else {
-      try {
-        const c10::FunctionSchema &notfound_schema = itr->schema();
-        ERROR("Could not find any handler for node." + notfound_schema.name());
-      } catch (std::exception &ex) {
-        ERROR("Could not find a handler for a node which does not have a "
-              << "schema. The following is the error from PyTorch JIT:"
-              << ex.what());
-      }
-    }
-
-    just_added_nodes.insert({itr->output(0), output_id});
-  }
-
-  // We always want to be looking at "fresh" nodes.
-  _last_processed_node = new_node;
-
-  // The output to return
-  at::Tensor output;
-  auto output_val = stack->at(0);
-  ERROR_ON_MSG(!output_val.isTensor(), "Output value is not a tensor.");
-  output = output_val.toTensor();
-
-  // If we are inplace copy the result into that tensor.
-  if (inplace_tensor) {
-    outputIsInplaceOf(output_id, at::Tensor{inplace_tensor});
-  } else {
-    // Add the tensor + track the jit node.
-    _mapper.addTensor(output, new_node->output(0));
-    // Track the MLIR node as well.
-    _mapper.addTensor(output, output_id);
-  }
-
-  // In some cases, cpu shape doesn't match the mlir shape exactly
-  // (e.g. scalar vectors). If that's the case, mlir has precedence.
-  auto mlir_shape = _compiler.getSize(output_id);
-  auto cpu_shape = output.sizes();
-  bool shapes_match = mlir_shape.size() == cpu_shape.size();
-
-  for (size_t i = 0; i < mlir_shape.size(); ++i) {
-    if (!shapes_match) {
-      break;
-    }
-    if (mlir_shape.at(i) != cpu_shape.at(i)) {
-      shapes_match = false;
+      // Add it to the list.
+      inputs.push_back(val);
     }
   }
 
-  if (!shapes_match) {
-    output = output.reshape(mlir_shape);
-    stack->clear();
-    stack->push_back(output);
+  /*
+   * The core MLIR part.
+   */
+  // Call the handler which empties the stack, calls the MLIR implementation
+  // (i.e. builders defined in tablegen), and repopulates the stack.
+
+  // The handler will be found in the compiler dispatch table.
+  // See CompilerDispatchTable.cpp AtenToMlirDispatch.inc,
+  // AtenToMlirInterface.hpp.inc and AtenToMlirInterface.hpp.inc
+  ERROR_ON(
+      !_compiler.allOpsCanBeLoweredToPoplar()); // This shouldn't be possible
+  mlir_handle->second(*stack);
+  ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
+               schema_key << " cannot currently be lowered to Poplar");
+
+  /*
+   * All logic from here down is to ensure the JIT graph is still correct and
+   * legal.
+   */
+  // The stack contains all the outputs.
+  const std::size_t num_outputs = stack->size();
+  logging::trace("[TRACING-2] Num outputs: {}", num_outputs);
+
+  // Add a JIT node to keep the jit graph clean.
+  torch::jit::Node *node = _graph.create(symbol, inputs, stack->size());
+  _graph.appendNode(node);
+
+  // Map the JIT nodes onto the correct outputs.
+  for (std::size_t index = 0; index < num_outputs; ++index) {
+    at::Tensor tensor = stack->at(index).toTensor();
+
+    if (!tensor.defined()) {
+      logging::trace("[TRACING-2] Output: skipping undefined tensor,{}",
+                     reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()));
+      continue;
+    }
+
+    node->output(index)->inferTypeFrom(tensor);
+    _mapper.addTensor(tensor, node->output(index));
+    logging::trace("[TRACING-2] Output: Tensor ptr {}, jit ir %{} {}",
+                   reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+                   node->output(index)->debugNameBase(), toString(tensor));
   }
 
-  // Fixup the JIT so it has the correct type.
-  new_node->output(0)->inferTypeFrom(output);
-
-  logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
-                 reinterpret_cast<void *>(output.unsafeGetTensorImpl()),
-                 new_node->output(0)->debugNameBase(), toString(output));
+  // Update the 'tail' so if another node needs to process the JIT it will
+  // start from here.
+  _last_processed_node = node;
 }
 
 std::shared_ptr<MLIRExecutable> MLIRDispatch::compile() {
