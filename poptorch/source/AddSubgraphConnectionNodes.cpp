@@ -77,7 +77,7 @@ bool markInputsAsComingFromParent(torch::jit::Graph *graph,
 
 void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
                  torch::jit::Node *insertion_point, Subgraph *subgraph) {
-  graph->setInsertPoint(outputs);
+  torch::jit::WithInsertPoint insert_point(outputs);
 
   // Sometimes the return might not be processed in this node.
   bool not_used_in_subgraph =
@@ -136,7 +136,7 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node,
       // Start tracking the new subgraph.
       subgraph_nodes.push(Subgraph());
 
-      graph->setInsertPoint(node->next());
+      torch::jit::WithInsertPoint insert_point(node->next());
       markInputsAsComingFromParent(graph, node->input()->node(),
                                    &subgraph_nodes.top(), false);
 
@@ -161,7 +161,7 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node,
 
       // Add this node to the active subgraph.
       subgraph_nodes.top().nodes.insert(node);
-      graph->setInsertPoint(node);
+      torch::jit::WithInsertPoint insert_point(node);
       markInputsAsComingFromParent(graph, node, &subgraph_nodes.top());
 
       for (const std::pair<torch::jit::Value *const, torch::jit::Value *>
@@ -191,12 +191,26 @@ void annotateSubgraphsDispatch(torch::jit::Graph *graph,
   } else if (kind == symbols::poptorch::end_for_loop) {
     ERROR_ON_MSG(start_for_loop_nodes.empty(),
                  "Internal: end_for_loop encountered before end_for_loop");
+
+    auto *start_node = start_for_loop_nodes.top();
+    // Whenever loop body has inplace ops that change the input of the body,
+    // the graph we see is incorrect. It is incorrect because during loop
+    // lowering we use the inputs of poptorch::end_for_loop which comes after
+    // the inplace ops in the graph and hence has the input-changing op's output
+    // as an input. We fix this by simply overwriting the input of
+    // poptorch::end_for_loop with the input of poptorch::start_for_loop which
+    // points to the correct ssa value because it comes before the inplace ops
+    // in the graph.
+    if (node->input(1) != start_node->input()) {
+      node->replaceInput(1, start_node->input());
+    }
+
     if (start_for_loop_nodes.size() == 1) {
-      auto *start_node = start_for_loop_nodes.top();
       // TODO(T51159): Add support for dispatch tracing + training.
       // Currently we just pass training = false to annotateSubgraphs.
       annotateSubgraphs(graph, start_node, /*training=*/false);
     }
+
     start_for_loop_nodes.pop();
   }
 }

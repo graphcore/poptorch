@@ -122,8 +122,17 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   ERROR_ON(dest == nullptr);
   ERROR_ON(src == nullptr);
 
-  dest->jit = src->jit;
+  logging::trace("[TRACING-2][JIT] copyInplace: src tensor {}, dest tensor {}",
+                 static_cast<void *>(other.unsafeGetTensorImpl()),
+                 static_cast<void *>(self.unsafeGetTensorImpl()));
+
+  auto *copy_node = createIdentity(&graph, {src->jit});
+  auto *copy = copy_node->output();
+  copy->inferTypeFrom(self);
+
+  dest->jit = copy;
   dest->is_const = src->is_const;
+
   if (_mapper.isHalfTensor(other)) {
     _mapper.markHalfTensor(self);
   }

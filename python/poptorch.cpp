@@ -1430,6 +1430,10 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     poptorch::type_and_constant_canonicalization::makeConstantIntParams(
         graph.get(), parameter_names, parameters);
 
+    // We need to keep the dispatcher alive until after the passes because
+    // some of them call isDispatcherActive().
+    destroyDispatcher();
+
     logging::debug("Graph right before popart:\n{}", *graph);
 
     AnchorList anchors_list;
@@ -1441,7 +1445,6 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
         callbacks, std::move(anchors_list));
 
     lower.lower(&inputs);
-
     return lower.compile();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION

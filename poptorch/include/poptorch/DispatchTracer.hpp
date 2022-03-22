@@ -91,8 +91,11 @@ void startDispatch();
 // Stop capturing calls.
 void endDispatch();
 
-// Return true if the dispatcher is active
+// Return true if the dispatcher is active.
 bool isDispatcherActive();
+
+// Destroy the active dispatcher object.
+void destroyDispatcher();
 
 // Replace all uses of target with replacement. Keeps track of the replacement
 // so it can be correctly handled if the dispatcher is active.

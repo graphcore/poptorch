@@ -99,6 +99,13 @@ bool isDispatcherActive() {
   return static_cast<bool>(context.active_dispatch);
 }
 
+void destroyDispatcher() {
+  if (context.isDispatchOn()) {
+    endDispatch();
+  }
+  context.active_dispatch.reset();
+}
+
 // Take the inputs to the graph and turn them into our IR graph
 // inputs/parameters.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
@@ -159,7 +166,9 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 std::shared_ptr<MLIRExecutable> compileMLIR() {
   auto *mlir = dynamic_cast<MLIRDispatch *>(context.active_dispatch.get());
   ERROR_ON(mlir == nullptr);
-  return mlir->compile();
+  auto executable = mlir->compile();
+  destroyDispatcher();
+  return executable;
 }
 
 #endif
