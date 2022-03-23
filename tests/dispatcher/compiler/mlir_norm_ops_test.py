@@ -11,14 +11,16 @@ from poptorch.experimental import IPUContext
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
-@pytest.mark.parametrize("batch_norm, affine, track_running_stats, training", [
-    (nn.BatchNorm1d, True, False, False),
-    (nn.BatchNorm2d, True, False, True),
-    (nn.BatchNorm3d, True, True, True),
-    (nn.BatchNorm1d, False, False, False),
-    (nn.BatchNorm2d, False, False, True),
-    (nn.BatchNorm3d, False, True, True),
-])
+@pytest.mark.parametrize(
+    "batch_norm, affine, track_running_stats, training",
+    [
+        #(nn.BatchNorm1d, True, False, False), # FIXME(T59038): requires mse_loss support
+        #(nn.BatchNorm2d, True, False, True), # FIXME(T59038): requires mse_loss support
+        #(nn.BatchNorm3d, True, True, True), # FIXME(T59038): requires mse_loss support
+        (nn.BatchNorm1d, False, False, False),
+        (nn.BatchNorm2d, False, False, True),
+        (nn.BatchNorm3d, False, True, True),
+    ])
 def test_batch_norm(batch_norm, affine, track_running_stats, training):
     torch.manual_seed(42)
     C = 4

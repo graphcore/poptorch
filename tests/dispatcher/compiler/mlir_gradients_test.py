@@ -11,6 +11,7 @@ from poptorch.experimental import IPUContext
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.skip(reason="T59038 requires mse_loss support")
 def test_grad():
     model = torch.nn.Sequential(torch.nn.Linear(1, 10))
 
@@ -37,6 +38,7 @@ def test_grad():
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.skip(reason="T59038 requires mse_loss support")
 def test_SGD():
     torch.manual_seed(42)
 
@@ -72,6 +74,7 @@ def test_SGD():
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.skip(reason="T59038 requires mse_loss support")
 def test_Adam():
     torch.manual_seed(42)
     model = torch.nn.Sequential(torch.nn.Linear(1, 10))

@@ -229,6 +229,16 @@
   IgnoreArgs: {'dtype'}
   UnusedOutputArguments: {out}
 
+# gt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+- func: gt.Tensor_out
+  PopTorchDirect: gt
+  UnusedOutputArguments: {out}
+
+# lt.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+- func: lt.Tensor_out
+  PopTorchDirect: lt
+  UnusedOutputArguments: {out}
+
 ##########
 # Linalg
 ##########
@@ -241,13 +251,26 @@
   PopTorchDirect: conv
   IgnoreArgs: {'transposed'}
 
+# bmm(Tensor self, Tensor mat2) -> (Tensor)
+# Batch matrix-matrix multiplication
+- func: bmm
+  PopTorchDirect: matmul
 
-# aten::mm(Tensor self, Tensor mat2) -> (Tensor)
+# mm(Tensor self, Tensor mat2) -> (Tensor)
 # Matrix-matrix multiplication
 - func: mm
   PopTorchDirect: matmul
 
-# aten::mm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> (Tensor(a!))
+# mv(Tensor self, Tensor vec) -> Tensor
+# Matrix-vector multiplication
+- func: mv
+  PopTorchDirect: matmul
+
+# dot(Tensor self, Tensor tensor) -> Tensor
+- func: dot
+  PopTorchDirect: matmul
+
+# mm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> (Tensor(a!))
 - func: mm.out
   PopTorchDirect: matmul
   UnusedOutputArguments: {out}
@@ -370,6 +393,10 @@
 #
 # Losses
 #
+
+# mse_loss(Tensor self, Tensor target, int reduction=Mean) -> Tensor
+- func: mse_loss
+  PopTorchDirect: mse_loss
 
 # aten::mse_loss_backward(Tensor grad_output, Tensor self, Tensor target, int reduction) -> (Tensor)
 - func: mse_loss_backward
