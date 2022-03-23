@@ -1,5 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+# IMPORTANT: Keep requirements in sync with ./requirements.txt.
+
 _llvm_version = "12.0.1"
 
 installers.add(

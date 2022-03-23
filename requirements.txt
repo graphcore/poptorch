@@ -1,3 +1,5 @@
+# IMPORTANT: Keep requirements in sync with ./config.buildenv.py
+
 --find-links https://download.pytorch.org/whl/torch_stable.html
 pytest==6.2.1
 transformers==4.12.2
@@ -12,3 +14,5 @@ torch==1.10.0; sys_platform == "darwin" or platform_machine == "aarch64"
 torchvision==0.11.1; sys_platform == "darwin" or platform_machine == "aarch64"
 tqdm==4.46.1
 expecttest==0.1.3
+# Use old version for wheel.pep425tags support (new versions removed it).
+wheel<0.35
