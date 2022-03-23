@@ -18,7 +18,9 @@ schemaToCpp = {
     "float": "toDouble",
     # We treat all scalars as double for now.
     "Scalar": "toDouble",
-    "Scalar?": "toOptionalDouble"
+    "Scalar?": "toOptionalDouble",
+    "ScalarType": "toCompilerType",
+    "ScalarType?": "toOptionalCompilerType"
 }
 
 

@@ -824,6 +824,18 @@ inline double toDouble(c10::IValue &value) {
   ERROR("Unsupported value type " << value.type()->str() << " in `toDouble`");
 }
 
+inline poptorch_ir::Type toCompilerType(c10::IValue &value) {
+  return toCompilerType(value.toScalarType());
+}
+
+inline std::optional<poptorch_ir::Type>
+toOptionalCompilerType(c10::IValue &value) {
+  if (value.isNone()) {
+    return std::nullopt;
+  }
+  return toCompilerType(value.toScalarType());
+}
+
 inline std::optional<double> toOptionalDouble(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;

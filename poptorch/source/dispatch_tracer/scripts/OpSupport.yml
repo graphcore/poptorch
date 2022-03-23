@@ -153,6 +153,9 @@
 - func: select.int
   PopTorchDirect: select
 
+# unsqueeze(Tensor(a) self, int dim) -> Tensor(a)
+- func: unsqueeze
+  PopTorchDirect: unsqueeze
 
 ################
 # Element wise
@@ -210,14 +213,21 @@
 - func: dropout
   PopTorchDirect: dropout
 
-# - func: clamp.out(Tensor self, Scalar? min=None, Scalar? max=None, *, Tensor(a!) out) -> Tensor(a!)
+# clamp.out(Tensor self, Scalar? min=None, Scalar? max=None, *, Tensor(a!) out) -> Tensor(a!)
 - func: clamp.out
   PopTorchDirect: clamp
   UnusedOutputArguments: {out}
 
-# # - func: clamp.Tensor(Tensor self, Tensor? min=None, Tensor? max=None) -> Tensor
+# clamp.Tensor(Tensor self, Tensor? min=None, Tensor? max=None) -> Tensor
 - func: clamp.Tensor
   PopTorchDirect: clampTensor
+
+
+# sum.IntList_out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
+- func: sum.IntList_out
+  PopTorchDirect: reducesum
+  IgnoreArgs: {'dtype'}
+  UnusedOutputArguments: {out}
 
 ##########
 # Linalg

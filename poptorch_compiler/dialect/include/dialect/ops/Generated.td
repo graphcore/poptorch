@@ -1647,22 +1647,6 @@ def Poptorch_tile : Poptorch_Op<"tile", []> {
 
 }
 
-def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$axes);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "const std::vector<std::int64_t>&":$axes), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("axes",$_builder.getI64ArrayAttr(axes));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_ones : Poptorch_Op<"ones", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$shape, StrAttr:$dtype);
   let results = (outs Poptorch_tensor:$result);

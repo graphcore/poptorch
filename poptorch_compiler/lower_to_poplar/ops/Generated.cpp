@@ -642,12 +642,6 @@ void tile::lowerToPoplar(CompilerContext & /*context*/) {
                   "tile"
                   " is currently unimplemented.");
 }
-void unsqueeze::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "unsqueeze"
-                  " is currently unimplemented.");
-}
 void ones::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

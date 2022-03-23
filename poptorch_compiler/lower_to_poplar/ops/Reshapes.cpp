@@ -44,6 +44,24 @@ void squeeze_dim_::lowerToPoplar(CompilerContext &context) {
   context.tensors.insert({result(), in});
 }
 
+void unsqueeze::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+
+  std::int64_t dim = this->dim();
+
+  if (dim < 0) {
+    // "Negative dim will correspond to unsqueeze() applied at
+    // dim = dim + input.dim() + 1."
+    // Source:
+    // https://pytorch.org/docs/stable/generated/torch.unsqueeze.html
+    dim += in.rank() + 1;
+  }
+  auto shape = in.shape();
+  shape.insert(shape.begin() + dim, 1);
+  in = in.reshape(shape);
+  context.tensors.insert({result(), in});
+}
+
 void expand::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->input());
 

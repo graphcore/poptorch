@@ -31,7 +31,7 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
                 return;
             }
 
-            shape.erase(std::remove(shape.begin(), shape.end(), 0));
+            shape.erase(std::remove(shape.begin(), shape.end(), 0), shape.end());
         }
 
         $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));

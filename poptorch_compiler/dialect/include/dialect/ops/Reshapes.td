@@ -227,3 +227,28 @@ def Poptorch_select : Poptorch_Op<"select", [ViewOp]> {
      }]>
     ];
 }
+
+// unsqueeze(Tensor(a) self, int dim) -> Tensor(a)
+def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
+    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
+        $_state.addOperands({value});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+        mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
+        mlir::Type e1 = t1.getElementType();
+        std::vector<int64_t> shape = t1.getShape();
+        // "Negative dim will correspond to unsqueeze() applied at
+        // dim = dim + input.dim() + 1."
+        // Source:
+        // https://pytorch.org/docs/stable/generated/torch.unsqueeze.html
+        if (dim < 0) {
+            dim += shape.size() + 1;
+        }
+        shape.insert(shape.begin() + dim, 1);
+        $_state.addTypes(mlir::RankedTensorType::get(shape, e1));
+  }]>];
+
+}
+
