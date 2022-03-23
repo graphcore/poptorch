@@ -91,7 +91,10 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
   // track it in the value mapper. It will get canonicalised later.
   torch::jit::Value *val = graph.insertConstant(value);
   ERROR_ON_MSG(val == nullptr, "Internal: graph could not insert a constant");
-  logging::trace("[TRACING-2] Constant input: jit ir {}", val->debugNameBase());
+
+  logging::trace("[TRACING-2] Constant input: jit ir {}, ivalue tag kind: {}",
+                 val->debugNameBase(), value.tagKind());
+
   return val;
 }
 

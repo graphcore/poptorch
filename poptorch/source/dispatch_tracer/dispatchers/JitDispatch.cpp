@@ -284,6 +284,8 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                      reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
                      val->debugNameBase(), toString(tensor));
     } else if (value.isTensorList()) {
+      logging::trace("[TRACING-2][JIT] Output tensor list: jit ir %{}",
+                     val->debugName());
       val->setType(value.type()->expect<c10::ListType>());
       auto tensor_list = value.toTensorVector();
       // Always insert list unpack if output value is a list.
@@ -294,7 +296,8 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
         at::Tensor tensor = tensor_list.at(i);
         val = unpack->output(i);
         _mapper.addTensor(tensor, val);
-        logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
+        logging::trace("[TRACING-2][JIT] Output tensor list element: Tensor "
+                       "ptr {}, jit ir %{} {}",
                        reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
                        val->debugNameBase(), toString(tensor));
       }

@@ -265,10 +265,8 @@ torch::jit::Node *varMeanHandler(torch::jit::Graph *graph,
   // -> (Tensor, Tensor)
   auto var_mean = calculateVarMean(graph, node->inputs(), "var_mean");
 
-  if (node->hasUses()) {
-    replaceOutputUse(node->output(0), var_mean.first);
-    replaceOutputUse(node->output(1), var_mean.second);
-  }
+  replaceOutputUse(node->output(0), var_mean.first);
+  replaceOutputUse(node->output(1), var_mean.second);
 
   markNodeForDeletion(node);
   return nullptr;
@@ -289,10 +287,8 @@ torch::jit::Node *stdMeanHandler(torch::jit::Graph *graph,
   auto var_mean = calculateVarMean(graph, node->inputs(), "std_mean");
   auto *std = createSqrt(graph, {var_mean.first});
 
-  if (node->hasUses()) {
-    replaceOutputUse(node->output(0), std->output());
-    replaceOutputUse(node->output(1), var_mean.second);
-  }
+  replaceOutputUse(node->output(0), std->output());
+  replaceOutputUse(node->output(1), var_mean.second);
 
   markNodeForDeletion(node);
   return nullptr;
