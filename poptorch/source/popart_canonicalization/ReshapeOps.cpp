@@ -196,7 +196,7 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
     std::int64_t index = constantToLong(index_node);
 
     if (index < 0) {
-      index += dims[dim];
+      index += dims.at(dim);
     }
 
     slice_node = createSlice(graph, {input, wrapInConstant1D(graph, index),

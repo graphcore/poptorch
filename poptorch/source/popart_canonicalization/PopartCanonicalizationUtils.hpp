@@ -102,6 +102,10 @@ bool constantToBool(torch::jit::Node *node);
 // Extracts a string from a constant containing a string
 std::string constantToString(torch::jit::Node *node);
 
+// Extract a `at::ScalarType` from a constant containing a number that
+// represents one.
+at::ScalarType constantToScalarType(torch::jit::Node *node);
+
 // Forces a ListConstuct into a vector of the given type
 template <typename T, typename ExtractFunc>
 std::vector<T> constantListToVec(torch::jit::Node *node,

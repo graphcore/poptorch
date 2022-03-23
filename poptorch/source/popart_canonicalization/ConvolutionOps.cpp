@@ -122,6 +122,22 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
     dim += r;
   }
 
+  // By default, the output's `dtype` should match the input's.
+  at::ScalarType requested_output_dtype = getNodeScalarType(data);
+
+  if (node->inputs().size() == 4) {
+    // We've been called with the form `torch.cumsum(..., out=output)`, so the
+    // output tensor's `dtype` gets used as per the `torch.cumsum` spec.
+    requested_output_dtype = getNodeScalarType(node->input(3));
+  } else if (!isNone(node->input(2))) {
+    // We've been called with an explicit `dtype`, so use that.
+    requested_output_dtype = constantToScalarType(node->input(2)->node());
+  }
+
+  // We have to cast the input tensor to the output `dtype` *before* doing the
+  // sum, to conform with the API of `torch.cumsum`.
+  data = createCast(graph, data, requested_output_dtype)->output();
+
   // The 1-D conv kernel span is the size in the dim we are reducing along
   int64_t span = data_shape[static_cast<size_t>(dim)];
 
@@ -165,6 +181,13 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
   x = createTranspose(graph, {x}, {1, 2, 0, 3})->output();
   torch::jit::Value *y =
       createConv(graph, {x, k}, {}, 1, {}, {span - 1, 0, 0, 0}, {})->output();
+
+  // Unfortunately we have to cast again here, because `createConv` always
+  // returns a float-typed tensor. We can't *only* cast here either, because
+  // cast -> sum != sum -> cast when going from float to int, and the spec of
+  // `torch.cumsum` says to cast first. If we don't cast at all, info about our
+  // size doesn't get transmitted to later ops relying on us (eg. `select`).
+  y = createCast(graph, y, requested_output_dtype)->output();
 
   // Work back to the correct expected output shape
   y = createTranspose(graph, {y}, {2, 0, 1, 3})->output();

@@ -267,6 +267,16 @@ std::string constantToString(torch::jit::Node *node) {
   return s;
 }
 
+at::ScalarType constantToScalarType(torch::jit::Node *node) {
+  const auto as_num = constantToInt(node);
+  ERROR_ON_MSG(as_num < 0 || as_num > at::NumScalarTypes,
+               "Node has a value (" << as_num
+                                    << ") which is not "
+                                       "representable as a torch dtype");
+
+  return static_cast<at::ScalarType>(as_num);
+}
+
 std::int32_t convertReduceToPopart(std::int32_t pytorchReduce) {
   // Popart:
   // Sum = 0, Mean =1, NoReduction = 2
