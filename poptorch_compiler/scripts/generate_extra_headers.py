@@ -32,12 +32,6 @@ parser.add_argument('--interface-cpp-file',
                     type=argparse.FileType('w'),
                     help='The cpp file which implements the interface calls')
 
-# The dispatch for PyTorch JIT -> MLIR.
-parser.add_argument('--jit-dispatch-table-output-file',
-                    required=True,
-                    type=argparse.FileType('w'),
-                    help='File to output the jit dispatch table into')
-
 parse_args = parser.parse_args()
 
 active_op = None
@@ -335,81 +329,3 @@ for op_name in poptorch_ops:
     print(headerFunction + func_args_str + ");",
           file=parse_args.interface_header_file)
     print(cppFunction, file=parse_args.interface_cpp_file)
-
-dispatch_cxx_cases = {
-    "FLOAT_VEC": "const std::vector<float>&",
-    "STRING_VEC": "const std::vector<const char*>&",
-    "INT_VEC": "const std::vector<std::int32_t> &",
-    "LONG_VEC": "const std::vector<std::int64_t> &",
-    "BOOL_VEC": "const std::vector<std::int64_t> &",
-    "INT": "std::int32_t",
-    "LONG": "std::int64_t",
-    "OPTIONAL_LONG": "std::optional<std::int64_t>",
-    "FLOAT": "float",
-    "STRING": "const char*",
-    "BOOL": "bool",
-    "TYPE": "poptorch_ir::Type",
-    "OPTIONAL_DOUBLE": "std::optional<double>"
-}
-
-# Generate the JIT dispatch table.
-for op_name in poptorch_ops:
-    # Create a function with the same name as the compiler function to call.
-    function_def = "[[maybe_unused]] poptorch_ir::ODSTensorResults JIT_"
-    function_def += op_name + "(poptorch_ir::PoptorchCompiler &compiler,"
-    function_def += "const std::vector<poptorch_ir::TensorId> &ids,"
-
-    # Unpack all the arguments.
-    unpack_args = "(void)ids;\n"
-    parameters = " "
-
-    if len(poptorch_ops[op_name]["args"]) > 0:
-        unpack_args += "std::uint32_t index = 0; (void) index;\n"
-
-    for arg in poptorch_ops[op_name]["args"]:
-        name = arg.name
-        arg_type = arg.macro_type()
-        val = arg.default_value
-
-        normal_tensor = False
-        tensor_vec = False
-
-        if arg_type in dispatch_cxx_cases:
-            if val:
-                function_def += dispatch_cxx_cases[
-                    arg_type] + " " + name + "=" + val + ","
-            else:
-                function_def += dispatch_cxx_cases[arg_type] + " " + name + " ,"
-
-            parameters += name + " ,"
-        elif arg_type == "OPTIONAL_TENSOR":
-            unpack_args += "poptorch_ir::TensorId " + name + "= ids[index++];"
-            unpack_args += "// optionality not supported\n"
-            parameters += name + " ,"
-            normal_tensor = True
-        elif arg_type == "TENSOR":
-            unpack_args += "poptorch_ir::TensorId " + name + "= ids[index++];\n"
-            parameters += name + " ,"
-            normal_tensor = True
-        elif arg_type == "TENSOR_VEC":
-            parameters += "ids ,"
-            tensor_vec = True
-        else:
-            print(f"Nothing for {arg_type}")
-            sys.exit(1)
-
-        # As variadic means passing the whole list of ids while a "normal"
-        # tensor involves passing each, one at a time, they cannot be mixed.
-        if normal_tensor and tensor_vec:
-            raise ValueError(f"Op {op_name} mixes normal and variadic tensor ",
-                             "inputs")
-
-    # Remove the last comma.
-    parameters = parameters[:-1]
-    function_def = function_def[:-1]
-
-    function_def += ") {\n"
-
-    print(function_def + unpack_args + "return compiler." + op_name + "(" +
-          parameters + ");\n }\n",
-          file=parse_args.jit_dispatch_table_output_file)

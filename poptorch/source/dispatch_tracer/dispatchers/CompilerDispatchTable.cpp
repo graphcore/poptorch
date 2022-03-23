@@ -34,28 +34,6 @@
 
 namespace poptorch {
 
-namespace {
-
-// We don't build this on Centos 7.3 TODO(T49566)
-#if POPTORCH_BUILD_MLIR_COMPILER
-
-template <typename T> T convert(T t) { return t; }
-
-// String, return const char*. To avoid any ABI boundry issues with std string.
-const char *convert(const std::string &s) {
-  return s.c_str(); // NOLINT
-}
-
-// We have a seperate list to help us parse the PopART IR Nodes we create as
-// part of the normal PopTorch process. This file is located in the compiler
-// build directory so if we ever decouple the compiler we would also need to
-// move this into a public header.
-#include "JitToMlirDispatch.hpp.inc"
-
-#endif
-
-} // namespace
-
 /*
  * The first dispatch table. This is the one which maps from an aten operation
  * onto the above table.
@@ -77,55 +55,6 @@ void MLIRDispatch::generateDispatchTable() { // NOLINT
    * like PopART/JIT IR nodes we create. This is so we can still support the
    * normal handler path.
    */
-
-// We don't build this on Centos 7.3 TODO(T49566)
-#if POPTORCH_BUILD_MLIR_COMPILER
-  this->_jit_handlers = {
-#define INT_VEC is
-#define FLOAT_VEC fs
-#define FLOAT f
-#define INT i
-#define BOOL i
-#define STRING s
-#define STRING_VEC ss
-
-// Useful NOP macro
-#define NONE
-
-// The arguments are processed by extracting the given type using the above
-// accessors, the name is converted into "attr::NAME" which is what pytorch
-// expects for attribute accessing.
-#define ARG(Type, Name)                                                        \
-  , convert(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
-
-// Create a function decl with the given call and arguments.
-// This will only work for a single output.
-#define OP_DECL(symbolName, function, Args)                                    \
-  {symbols::popart::symbolName,                                                \
-   [&](torch::jit::Node *node,                                                 \
-       const std::vector<poptorch_ir::TensorId> &ids) {                        \
-     (void)(node);                                                             \
-     auto output = JIT_##function(this->_compiler, ids Args);                  \
-     ERROR_ON(output.size() != 1);                                             \
-     ERROR_ON(output[0].size() != 1);                                          \
-     return output[0][0];                                                      \
-   }},
-
-#include "PopartAPISupportedOps.h.inc"
-  };
-
-#undef OP_DECL
-#undef OP_DECL_NO_RETURN
-#undef ARG
-#undef NONE
-#undef BOOL
-#undef STRING
-#undef STRING_VEC
-#undef INT
-#undef FLOAT
-#undef FLOAT_VEC
-#undef INT_VEC
-#endif
 }
 
 } // namespace poptorch

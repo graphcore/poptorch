@@ -117,12 +117,6 @@ private:
   // operation.
   using StackFunctionType = std::function<void(c10::Stack &)>;
   std::unordered_map<std::string, StackFunctionType> _direct_dispatch_lookup;
-
-  // Then we have a set of handlers which map from JIT nodes to MLIR nodes. For
-  // use in tandem with our existing canonicalisation infrastructure.
-  using JitFunctionType = std::function<ReturnTy(
-      torch::jit::Node *, const std::vector<poptorch_ir::TensorId> &)>;
-  std::unordered_map<c10::Symbol, JitFunctionType> _jit_handlers;
 };
 
 } // namespace poptorch
