@@ -95,6 +95,13 @@ class CppLinters(ILinterFamily):
                                   CppLint()])
 
 
+class TdLinters(ILinterFamily):
+    def __init__(self):
+        super().__init__(["td"],
+                         excluded_extensions=["inc.hpp"],
+                         linters=[ClangFormat()])
+
+
 class PyLinters(ILinterFamily):
     def __init__(self):
         super().__init__(["py"], linters=[Pylint(), Yapf()])
@@ -760,8 +767,7 @@ class Linters:
     """Interface class used to lint files"""
 
     def __init__(self):
-        self._cpp_linters = CppLinters()
-        self._py_linters = PyLinters()
+        self._linters = [TdLinters(), CppLinters(), PyLinters()]
 
     def lint_git(self, strategy, autofix):
         files = []
@@ -828,9 +834,9 @@ class Linters:
             time.sleep(1)
 
     def _gen_lint_commands(self, filename, autofix):
-        cmd = self._cpp_linters.gen_lint_commands(
-            filename, autofix) + self._py_linters.gen_lint_commands(
-                filename, autofix)
+        cmd = []
+        for linter in self._linters:
+            cmd += linter.gen_lint_commands(filename, autofix)
         return [[c] if isinstance(c, Command) else c for c in cmd]
 
 

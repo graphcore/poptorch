@@ -2,13 +2,13 @@
     "linters": {
         "code_linters":{
           "type": "script-and-regex",
-          "include": "(\\.(cpp|hpp|py|inc)$)",
+          "include": "(\\.(cpp|hpp|py|inc|td)$)",
           "script-and-regex.script": "python3 scripts/apply_linters.py ",
           "script-and-regex.regex": "/^(?P<file>[^\n:]+):((?P<line>[0-9]+):)?((?P<char>[0-9]+):)?(?P<error>error:)?(?P<message>.+)$/m"
         },
         "copyright":{
           "type": "script-and-regex",
-          "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp|py|inc)$)",
+          "include": "(\\.(c|cpp|C|cc|c\\+\\+|cxx|h|hpp|py|inc|td)$)",
           "script-and-regex.script": "sh -c 'grep -qi -m1 -e \"copyright.*graphcore\" $0 || echo \"$0: Graphcore copyright notice missing\"'",
           "script-and-regex.regex": "/^(?P<file>[^ :]*): (?P<message>.*)$/m"
         },
