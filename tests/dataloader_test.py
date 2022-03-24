@@ -408,7 +408,8 @@ def test_shuffle_subdataset2():
 
 
 @pytest.mark.parametrize("num_processes", [2, 3, 4, 5])
-def test_global_shuffle_each_epoch(num_processes):
+@pytest.mark.parametrize("num_workers", [0, 1, 3])
+def test_global_shuffle_each_epoch(num_processes, num_workers):
     each_process_data = []
     for process_id in range(num_processes):
         each_process_data.append(list())
@@ -420,6 +421,7 @@ def test_global_shuffle_each_epoch(num_processes):
             IncrementDataset((), 100),
             batch_size=16,
             shuffle=True,
+            num_workers=num_workers,
         )
         for _ in range(5):
             each_epoch_data = []

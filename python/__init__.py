@@ -152,8 +152,13 @@ class _SubDataset:
             generator.manual_seed(self._seed)
         else:
             generator.set_state(self._shuffling_generator_state)
-        self._shuffled_global_indices = torch.randperm(len(self._dataset),
-                                                       generator=generator)
+        shuffled = torch.randperm(len(self._dataset), generator=generator)
+        # Use shared memory so that the workers' indices
+        # also get shuffled.
+        if self._shuffled_global_indices is None:
+            self._shuffled_global_indices = shuffled.share_memory_()
+        else:
+            self._shuffled_global_indices.copy_(shuffled)
         self._shuffling_generator_state = generator.get_state()
 
     def swap_range(self):
