@@ -7,15 +7,16 @@ include "mlir/IR/OpBase.td"
 include "PoptorchInterfaces.td"
 
 def Poptorch_Dialect : Dialect {
-  let name = "poptorch";
+    let name = "poptorch";
 
-  let summary = "PopTorch MLIR target";
+    let summary = "PopTorch MLIR target";
 
-  let description =
-      [{This dialect sits inbetween canonicalised torch::jit IR and Poplar /
-        poplibs.}];
+    let description = [{
+        This dialect sits inbetween canonicalised torch::jit IR and Poplar/poplibs.
+    }];
 
-  let cppNamespace = "::poptorch_ir";
+
+    let cppNamespace = "::poptorch_ir";
 }
 
 def ViewOp : NativeOpTrait<"ViewOp">;
@@ -26,15 +27,15 @@ def NotImplementedOp : NativeOpTrait<"NotImplementedOp">;
 // All operations coming through the dispatcher's fallback should inherit
 // from either Poptorch_Op if they can be lowered to Poplar or
 // Poptorch_NotImplementedOp if they cannot.
-class Poptorch_Op<string mnemonic, list<OpTrait> traits = []>
-    : Op<Poptorch_Dialect, mnemonic,
-         traits #[DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>]>;
+class Poptorch_Op<string mnemonic, list<OpTrait> traits = []> :
+        Op<Poptorch_Dialect, mnemonic, traits # [DeclareOpInterfaceMethods<Poptorch_PoplarImplInterface>]>;
 
-class Poptorch_NotImplementedOp<string mnemonic, list<OpTrait> traits = []>
-    : Op<Poptorch_Dialect, mnemonic, traits #[NotImplementedOp]>;
+class Poptorch_NotImplementedOp<string mnemonic, list<OpTrait> traits = []> :
+        Op<Poptorch_Dialect, mnemonic, traits # [NotImplementedOp]>;
 
-class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = []>
-    : Op<Poptorch_Dialect, mnemonic, traits>;
+class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = []> :
+        Op<Poptorch_Dialect, mnemonic, traits>;
+
 
 def valid_ints : SignedIntOfWidths<[1, 8, 16, 32]>;
 def valid_uints : UnsignedIntOfWidths<[1, 8, 16, 32]>;

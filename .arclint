@@ -2,9 +2,9 @@
     "linters": {
         "code_linters":{
           "type": "script-and-regex",
-          "include": "(\\.(cpp|hpp|py|inc|td)$)",
+          "include": "(\\.(cpp|hpp|py|inc)$)",
           "script-and-regex.script": "python3 scripts/apply_linters.py ",
-          "script-and-regex.regex": "/^(?P<file>[^\n:]+):((?P<line>[0-9]+):)?((?P<char>[0-9]+):)?(?P<error>error:)?(?P<message>.+)$/m"
+          "script-and-regex.regex": "/^(?P<file>[^ \n:]+):((?P<line>[0-9]+):)?((?P<char>[0-9]+):)?(?P<error>error:)?(?P<message>.+)$/m"
         },
         "copyright":{
           "type": "script-and-regex",

@@ -95,13 +95,6 @@ class CppLinters(ILinterFamily):
                                   CppLint()])
 
 
-class TdLinters(ILinterFamily):
-    def __init__(self):
-        super().__init__(["td"],
-                         excluded_extensions=["inc.hpp"],
-                         linters=[ClangFormat()])
-
-
 class PyLinters(ILinterFamily):
     def __init__(self):
         super().__init__(["py"], linters=[Pylint(), Yapf()])
@@ -336,11 +329,16 @@ class DiffCreator:
             m = re.match(r"@@ -(\d+),.*@@", line)
             if m:
                 print(f"{self.filename}:{int(m.group(1))+3}:error:"
-                      f"formatting error[{self.linter}]")
+                      f"[{self.linter}] to fix run "
+                      "./scripts/apply_linters.py --autofix")
             delta += line
-        if delta and self.autofix:
-            with open(self.filename, "w") as f:
-                f.write(output)
+        if delta:
+            if self.autofix:
+                with open(self.filename, "w") as f:
+                    f.write(output)
+            else:
+                print(f"{self.linter} found the following issues in "
+                      f"{self.filename}\n{delta}")
             errcode = 1
         return delta, errcode
 
@@ -757,7 +755,8 @@ class Executor:
         if self.cmd:
             self._next_step()
         elif self.returncode:
-            print(f"{self.filename}:error: contains linting errors")
+            print(f"{self.filename}:error: contains linting errors: "
+                  "run ./scripts/apply_linters.py --autofix")
 
     def execution_complete(self):
         return not self.cmd
@@ -767,7 +766,7 @@ class Linters:
     """Interface class used to lint files"""
 
     def __init__(self):
-        self._linters = [TdLinters(), CppLinters(), PyLinters()]
+        self._linters = [CppLinters(), PyLinters()]
 
     def lint_git(self, strategy, autofix):
         files = []
