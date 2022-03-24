@@ -170,14 +170,19 @@ def _get_snapshot():
 def _get_package_os_type():
     distrib = None
     version = None
-    for line in open("/etc/os-release", "r"):
-        if line.startswith("ID="):
-            distrib = line.split("=")[1].rstrip()
-            distrib = distrib.replace('"', "")
-        elif line.startswith("VERSION_ID="):
-            version = line.split("=")[1]
-            version = version.replace(".", "_")
-            version = version.replace('"', "").rstrip()
+    try:
+        for line in open("/etc/os-release", "r"):
+            if line.startswith("ID="):
+                distrib = line.split("=")[1].rstrip()
+                distrib = distrib.replace('"', "")
+            elif line.startswith("VERSION_ID="):
+                version = line.split("=")[1]
+                version = version.replace(".", "_")
+                version = version.replace('"', "").rstrip()
+    except FileNotFoundError as exc:
+        logger.warning(f"Setting distro/version to \"unknown\" because: {exc}")
+        distrib = "unknown"
+        version = "unknown"
     assert distrib and version
     return f"{distrib}_{version}"
 
