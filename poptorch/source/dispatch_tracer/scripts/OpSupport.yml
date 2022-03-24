@@ -417,6 +417,21 @@
   PopTorchDirect: nll_loss_backward
   UnusedOutputArguments: {grad_input}
 
+# binary_cross_entropy.out(Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean) -> Tensor(a!)
+- func: binary_cross_entropy
+  PopTorchDirect: binary_cross_entropy
+
+# binary_cross_entropy_backward.grad_input(Tensor grad_output, Tensor self, Tensor target, Tensor? weight=None, int reduction=Mean, *, Tensor(a!) grad_input) -> Tensor(a!)
+- func: binary_cross_entropy_backward
+  PopTorchDirect: binary_cross_entropy_backward
+
+# binary_cross_entropy_with_logits(Tensor self, Tensor target, Tensor? weight=None, Tensor? pos_weight=None, int reduction=Mean) -> Tensor
+- func: binary_cross_entropy_with_logits
+  PopTorchDirect: binary_cross_entropy_with_logits
+
+# binary_cross_entropy_with_logits_backward(Tensor grad_output, Tensor self, Tensor target, Tensor? weight=None, Tensor? pos_weight=None, int reduction=Mean) -> Tensor
+- func: binary_cross_entropy_with_logits_backward
+  PopTorchDirect: binary_cross_entropy_with_logits_backward
 
 ###########
 # Pooling

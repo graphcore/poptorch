@@ -1,6 +1,8 @@
 
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "lower_to_poplar/CompilerHelpers.hpp"
+#include <popnn/NonLinearity.hpp>
+#include <popnn/NonLinearityDef.hpp>
 #include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Encoding.hpp>
@@ -117,6 +119,139 @@ void nll_loss_backward::lowerToPoplar(CompilerContext &context) {
                        total_elements, context.seq);
   } else if (reduction == 0) { // none reduction
     grad_output = grad_output.reshape({grad.shape()[0], 1});
+  }
+  popops::mapInPlace(context.graph, popops::expr::BinaryOpType::MULTIPLY, grad,
+                     grad_output, context.seq);
+  context.tensors.insert({result(), grad});
+}
+
+poplar::Tensor bce(CompilerContext &context, poplar::Tensor &pred,
+                   poplar::Tensor &target) {
+  target = popops::cast(context.graph, target, pred.elementType(), context.seq);
+  // Create an epsilon value
+  double eps_f = 1.0e-7;
+  // if using fp16, increase the eps to avoid underfloat
+  if (pred.elementType() == poplar::HALF) {
+    eps_f = 6.104e-05;
+  }
+  poplar::Tensor eps = createConstant(context, pred.elementType(), {},
+                                      std::vector<double>{eps_f});
+  poplar::Tensor one = context.graph.addConstant(pred.elementType(), {1}, 1.0);
+  context.graph.setTileMapping(one, 0);
+  // log_prob
+  poplar::Tensor log_prob =
+      popops::map(context.graph, pe::Log(pe::Max(pe::_1, pe::_2)), {pred, eps},
+                  context.seq);
+  // log(1-prob)
+  poplar::Tensor inverse_log_prob = popops::map(
+      context.graph, pe::Log(pe::Max(pe::Sub(pe::_3, pe::_1), pe::_2)),
+      {pred, eps, one}, context.seq);
+  poplar::Tensor out =
+      popops::map(context.graph,
+                  pe::Add(pe::Mul(pe::_3, pe::_1),
+                          pe::Mul(pe::Sub(pe::_4, pe::_3), pe::_2)),
+                  {log_prob, inverse_log_prob, target, one}, context.seq);
+  return out;
+}
+
+void binary_cross_entropy::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->self());
+  poplar::Tensor target = context.fromSsa(this->target());
+  const int reduction = this->reduction();
+  poplar::Tensor out = bce(context, input, target);
+
+  if (reduction != 0) { // other than none
+    out = popops::reduce(context.graph, out, {0}, {popops::Operation::ADD},
+                         context.seq);
+    if (reduction == 1) { // mean reduce
+      auto total_elements =
+          createConstant(context, input.elementType(), {},
+                         std::vector<uint64_t>{target.shape()[0]});
+      popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, out,
+                         total_elements, context.seq);
+    }
+  }
+  popops::mapInPlace(context.graph, popops::expr::UnaryOpType::NEGATE, out,
+                     context.seq);
+
+  context.tensors.insert({result(), out});
+}
+
+void binary_cross_entropy_backward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->self());
+  poplar::Tensor target = context.fromSsa(this->target());
+  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  const int reduction = this->reduction();
+  poplar::Tensor one = createConstant(context, input.elementType(), {1},
+                                      std::vector<float>{1.0});
+
+  poplar::Tensor first_term =
+      popops::map(context.graph, popops::expr::BinaryOpType::DIVIDE, target,
+                  input, context.seq);
+
+  poplar::Tensor second_term =
+      popops::map(context.graph,
+                  pe::Divide(pe::Sub(pe::_1, pe::_3), pe::Sub(pe::_3, pe::_2)),
+                  {target, input, one}, context.seq);
+
+  poplar::Tensor grad =
+      popops::map(context.graph, pe::Neg(pe::Add(pe::_1, pe::_2)),
+                  {first_term, second_term}, context.seq);
+  if (reduction == 1) { // mean reduce
+    auto total_elements =
+        createConstant(context, input.elementType(), {},
+                       std::vector<uint64_t>{target.shape()[0]});
+    popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, grad,
+                       total_elements, context.seq);
+  }
+
+  popops::mapInPlace(context.graph, popops::expr::BinaryOpType::MULTIPLY, grad,
+                     grad_output, context.seq);
+  context.tensors.insert({result(), grad});
+}
+
+void binary_cross_entropy_with_logits::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->self());
+  poplar::Tensor target = context.fromSsa(this->target());
+  const int reduction = this->reduction();
+  input = popops::sigmoid(context.graph, input, context.seq);
+  poplar::Tensor out = bce(context, input, target);
+
+  if (reduction != 0) { // other than none
+    out = popops::reduce(context.graph, out, {0}, {popops::Operation::ADD},
+                         context.seq);
+    if (reduction == 1) { // mean reduce
+      auto total_elements =
+          createConstant(context, input.elementType(), {},
+                         std::vector<uint64_t>{target.shape()[0]});
+      popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, out,
+                         total_elements, context.seq);
+    }
+  }
+  popops::mapInPlace(context.graph, popops::expr::UnaryOpType::NEGATE, out,
+                     context.seq);
+
+  context.tensors.insert({result(), out});
+}
+
+void binary_cross_entropy_with_logits_backward::lowerToPoplar(
+    CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->self());
+  poplar::Tensor target = context.fromSsa(this->target());
+  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  const int reduction = this->reduction();
+  poplar::Tensor prob = popnn::nonLinearity(
+      context.graph, popnn::NonLinearityType::SIGMOID, input, context.seq);
+
+  poplar::Tensor grad =
+      popops::map(context.graph, popops::expr::BinaryOpType::SUBTRACT, prob,
+                  target, context.seq);
+  if (reduction == 1) { // mean reduce
+    auto total_elements =
+        createConstant(context, input.elementType(), {},
+                       std::vector<uint64_t>{target.shape()[0]});
+    popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, grad,
+                       total_elements, context.seq);
   }
   popops::mapInPlace(context.graph, popops::expr::BinaryOpType::MULTIPLY, grad,
                      grad_output, context.seq);

@@ -96,4 +96,10 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
 
   m.impl("constant_pad_nd",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("binary_cross_entropy_with_logits",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("binary_cross_entropy_with_logits_backward",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 }

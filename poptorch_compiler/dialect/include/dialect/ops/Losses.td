@@ -60,7 +60,7 @@ def Poptorch_nll_loss : Poptorch_Op<"nll_loss", []> {
         $_state.addAttribute("ignore_index",$_builder.getI64IntegerAttr(ignore_index));
         mlir::RankedTensorType input_type = self.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> shape;
-        if (reduction == 0){
+        if (reduction == 0){  // if none reduction applied the output shape is the same as input, otherwise torch.Size([])
             shape = input_type.getShape();
             shape.erase(shape.begin());
         } else {
@@ -99,3 +99,93 @@ def Poptorch_nll_loss_backward : Poptorch_Op<"nll_loss_backward", []> {
 
 }
 
+def Poptorch_binary_cross_entropy : Poptorch_Op<"binary_cross_entropy", []> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         Poptorch_tensor:$target,
+                         Optional<Poptorch_tensor>:$weight,
+                         I64Attr:$reduction);
+  
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "mlir::Value":$target,
+                                      "mlir::Value":$weight,
+                                      "std::int64_t":$reduction),[{
+        $_state.addOperands({self, target});
+        $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
+        mlir::RankedTensorType input_type = self.getType().cast<mlir::RankedTensorType>();
+        std::vector<std::int64_t> shape;
+        if (reduction == 0){
+            shape = input_type.getShape();
+        }
+
+        $_state.addTypes({mlir::RankedTensorType::get(shape, input_type.getElementType())});
+    }]>
+    ];
+}
+
+def Poptorch_binary_cross_entropy_backward : Poptorch_Op<"binary_cross_entropy_backward", []> {
+    let arguments = (ins Poptorch_tensor:$grad_output,
+                         Poptorch_tensor:$self,
+                         Poptorch_tensor:$target,
+                         Optional<Poptorch_tensor>:$weight,
+                         I64Attr:$reduction);
+  
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$grad_output,
+                                      "mlir::Value":$self,
+                                      "mlir::Value":$target,
+                                      "mlir::Value":$weight,
+                                      "std::int64_t":$reduction),[{
+        $_state.addOperands({grad_output, self, target});
+        $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
+        $_state.addTypes(self.getType());
+    }]>
+    ];
+}
+
+def Poptorch_binary_cross_entropy_with_logits : Poptorch_Op<"binary_cross_entropy_with_logits", [SameVariadicOperandSize]> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         Poptorch_tensor:$target,
+                         Optional<Poptorch_tensor>:$weight,
+                         Optional<Poptorch_tensor>:$pos_weight,
+                         I64Attr:$reduction);
+  
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "mlir::Value":$target,
+                                      "mlir::Value":$weight,
+                                      "mlir::Value":$pos_weight,
+                                      "std::int64_t":$reduction),[{
+        $_state.addOperands({self, target});
+        $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
+        mlir::RankedTensorType input_type = self.getType().cast<mlir::RankedTensorType>();
+        std::vector<std::int64_t> shape;
+        if (reduction == 0){  // if none reduction applied the output shape is the same as input, otherwise torch.Size([])
+            shape = input_type.getShape();
+        }
+        $_state.addTypes({mlir::RankedTensorType::get(shape, input_type.getElementType())});
+    }]>
+    ];
+}
+
+def Poptorch_binary_cross_entropy_with_logits_backward : Poptorch_Op<"binary_cross_entropy_with_logits_backward", [SameVariadicOperandSize]> {
+    let arguments = (ins Poptorch_tensor:$grad_output,
+                         Poptorch_tensor:$self,
+                         Poptorch_tensor:$target,
+                         Optional<Poptorch_tensor>:$weight,
+                         Optional<Poptorch_tensor>:$pos_weight,
+                         I64Attr:$reduction);
+  
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$grad_output,
+                                      "mlir::Value":$self,
+                                      "mlir::Value":$target,
+                                      "mlir::Value":$weight,
+                                      "mlir::Value":$pos_weight,
+                                      "std::int64_t":$reduction),[{
+        $_state.addOperands({grad_output, self, target});
+        $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
+        $_state.addTypes(self.getType());
+    }]>
+    ];
+}
