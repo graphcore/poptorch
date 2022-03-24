@@ -42,8 +42,13 @@
 - func: hardswish_
   PopTorchDirectInplace: hardswish_
 
+# relu_(Tensor(a!) self) -> Tensor(a!)
 - func: relu_
   PopTorchDirectInplace: relu_
+
+# relu(Tensor self) -> Tensor
+- func: relu
+  PopTorchDirect: relu
 
 # tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: tanh.out
