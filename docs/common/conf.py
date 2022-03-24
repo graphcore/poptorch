@@ -52,7 +52,7 @@ nitpick_ignore = [
     ('py:class', 'torch.optim.Optimizer'),
     ('py:class', 'torch.optim.optimizer.Optimizer'),
     ('py:class', 'torch.utils.data.Dataset'),
-    ('py:class', 'torch.utils.data.Sampler'),
+    ('py:class', 'torch.utils.data.sampler.Sampler'),
     # Enums already described in functions that use them
     ('py:class', 'poptorch.OutputMode'),
     ('py:class', 'poptorch.ConnectionType'),
