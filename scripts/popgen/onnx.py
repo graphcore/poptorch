@@ -32,7 +32,7 @@ def find_popart_includes():
         "by running cmake")
     with open(compile_commands, "r") as f:
         cmds = json.load(f)
-    regex = r'.*-isystem (.*popart(/install)?/include) .*'
+    regex = r'.*-isystem (.*popart.*?(/install)?/include) ?.*'
     for c in cmds:
         if "popart_compiler" in c["file"]:
             m = re.match(regex, c["command"])
