@@ -37,6 +37,8 @@ c10::Symbol col2im;                      // NOLINT
 c10::Symbol im2col;                      // NOLINT
 c10::Symbol _reshape_alias;              // NOLINT
 c10::Symbol argsort;                     // NOLINT
+c10::Symbol minimum;                     // NOLINT
+c10::Symbol maximum;                     // NOLINT
 
 // Removed in 1.10.
 #if TORCH_MINOR_VERSION < 10
@@ -82,6 +84,8 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, im2col);
   SYMBOL_INIT(aten, _reshape_alias);
   SYMBOL_INIT(aten, argsort);
+  SYMBOL_INIT(aten, minimum);
+  SYMBOL_INIT(aten, maximum);
 
 #if TORCH_MINOR_VERSION < 10
   SYMBOL_INIT(aten, amax);

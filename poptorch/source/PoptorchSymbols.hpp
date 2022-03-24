@@ -35,6 +35,8 @@ extern c10::Symbol col2im;                      // NOLINT
 extern c10::Symbol im2col;                      // NOLINT
 extern c10::Symbol _reshape_alias;              // NOLINT
 extern c10::Symbol argsort;                     // NOLINT
+extern c10::Symbol minimum;                     // NOLINT
+extern c10::Symbol maximum;                     // NOLINT
 
 // Removed in 1.10.
 #if TORCH_MINOR_VERSION < 10

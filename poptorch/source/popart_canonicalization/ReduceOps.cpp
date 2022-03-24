@@ -379,7 +379,9 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::norm, tensorNormHandler);
   registerHandler(c10::aten::frobenius_norm, frobeniusnormHandler);
   registerHandler(c10::aten::min, minHandler);
+  registerHandler(c10::aten::minimum, minHandler);
   registerHandler(c10::aten::max, maxHandler);
+  registerHandler(c10::aten::maximum, maxHandler);
   registerHandler(c10::aten::any, reduceHandler);
   registerHandler(c10::aten::all, reduceHandler);
 }

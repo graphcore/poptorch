@@ -61,6 +61,24 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("std_mean",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
+  m.impl("trunc",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("min",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("minimum",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("max",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("maximum",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("argsort",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
   // If we don't intercept this op, it will be decomposed to as_strided
   // which is harder to handle.
   m.impl("slice.Tensor",
