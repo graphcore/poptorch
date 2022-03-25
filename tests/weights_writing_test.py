@@ -803,7 +803,8 @@ def test_copy_after_compile():
     poptorch_model(input, target)
 
 
-def test_torch_save_unwrapped():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_torch_save_unwrapped(trace_model):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -827,7 +828,7 @@ def test_torch_save_unwrapped():
 
     # An inference model sharing its user model with a training model will be instrumented though.
     options = poptorch.Options()
-    options.Jit.traceModel(False)
+    options.Jit.traceModel(trace_model)
     poptorch.inferenceModel(model, options)
 
     with tempfile.TemporaryDirectory() as tmp:

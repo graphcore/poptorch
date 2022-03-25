@@ -13,20 +13,21 @@ MANY_TYPES = (torch.float32, torch.float64, torch.int32, torch.int64)
 DEMOTED_ON_IPU = (torch.float64, torch.int64)
 
 
-def get_simple_adder(return_type):
+def get_simple_adder(return_type, trace_model):
     class SimpleAdder(nn.Module):
         def forward(self, x, y):
             return (x + y).type(return_type)
 
     options = poptorch.Options()
-    options.Jit.traceModel(False)
+    options.Jit.traceModel(trace_model)
     return poptorch.inferenceModel(SimpleAdder(), options)
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
 @pytest.mark.parametrize("output_type", MANY_TYPES)
-def test_many_input_output_types(input_type, output_type):
-    model = get_simple_adder(output_type)
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_input_output_types(input_type, output_type, trace_model):
+    model = get_simple_adder(output_type, trace_model)
     t1 = torch.tensor([1.0, 25, -1.0, 83], dtype=input_type)
     t2 = torch.tensor([2.0, 35, 1.0, 32.4], dtype=input_type)
 
@@ -44,9 +45,11 @@ def test_many_input_output_types(input_type, output_type):
 @pytest.mark.parametrize("input_1_type", MANY_TYPES)
 @pytest.mark.parametrize("input_2_type", MANY_TYPES)
 @pytest.mark.parametrize("output_type", MANY_TYPES)
-def test_many_implicit_cast(input_1_type, input_2_type, output_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_implicit_cast(input_1_type, input_2_type, output_type,
+                            trace_model):
 
-    model = get_simple_adder(output_type)
+    model = get_simple_adder(output_type, trace_model)
     t1 = torch.tensor([1.0, 25., -1.0, 83.], dtype=input_1_type)
     t2 = torch.tensor([2.0, 35., 1.0, 32.4], dtype=input_2_type)
 
@@ -55,19 +58,20 @@ def test_many_implicit_cast(input_1_type, input_2_type, output_type):
                                atol=0.5)
 
 
-def get_simple_add_two():
+def get_simple_add_two(trace_model):
     class GetSimpleAddTwo(nn.Module):
         def forward(self, x):
             return x + 2
 
     options = poptorch.Options()
-    options.Jit.traceModel(False)
+    options.Jit.traceModel(trace_model)
     return poptorch.inferenceModel(GetSimpleAddTwo(), options)
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
-def test_add_two_many_types(input_type):
-    model = get_simple_add_two()
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_add_two_many_types(input_type, trace_model):
+    model = get_simple_add_two(trace_model)
 
     t = torch.tensor([1.0, 25., -1.0, 83.], dtype=input_type)
     np.testing.assert_allclose(model(t).numpy(),
@@ -75,25 +79,27 @@ def test_add_two_many_types(input_type):
                                atol=0.5)
 
 
-def get_simple_incrementer(constant_type, return_type):
+def get_simple_incrementer(constant_type, return_type, trace_model):
     class SimpleIncrementer(nn.Module):
         def forward(self, x):
             return (x + torch.tensor(1, dtype=constant_type)).type(return_type)
 
     options = poptorch.Options()
-    options.Jit.traceModel(False)
+    options.Jit.traceModel(trace_model)
     return poptorch.inferenceModel(SimpleIncrementer(), options)
 
 
 @pytest.mark.parametrize("input_type", MANY_TYPES)
 @pytest.mark.parametrize("constant_type", MANY_TYPES)
 @pytest.mark.parametrize("output_type", MANY_TYPES)
-def test_many_constant_implicit_cast(input_type, constant_type, output_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_many_constant_implicit_cast(input_type, constant_type, output_type,
+                                     trace_model):
     #Will not trace
     if constant_type == torch.float16:
         return
 
-    model = get_simple_incrementer(constant_type, output_type)
+    model = get_simple_incrementer(constant_type, output_type, trace_model)
     t = torch.tensor([1.0, 25., -1.0, 83.], dtype=input_type)
 
     np.testing.assert_allclose(model(t).numpy(),
