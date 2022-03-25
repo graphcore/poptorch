@@ -136,9 +136,13 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
                  static_cast<void *>(other.unsafeGetTensorImpl()),
                  static_cast<void *>(self.unsafeGetTensorImpl()));
 
-  auto *copy_node = createIdentity(&graph, {src->jit});
-  auto *copy = copy_node->output();
-  copy->inferTypeFrom(self);
+  torch::jit::Value *copy;
+  if (self.scalar_type() == other.scalar_type()) {
+    copy = createIdentity(&graph, {src->jit})->output();
+    copy->inferTypeFrom(self);
+  } else {
+    copy = createCast(&graph, src->jit, self.scalar_type())->output();
+  }
 
   dest->jit = copy;
   dest->is_const = src->is_const;
