@@ -962,5 +962,7 @@ def test_requires_grad_true(capfd, trace_model):
 
     poptorch_model(torch.tensor([0.0], requires_grad=True))
     log = helpers.LogChecker(capfd)
-    log.assert_contains("Input tensor has requires_grad=True set." +
-                        "This tensor will be detached.")
+    log.assert_contains(
+        "Input tensor has requires_grad=True set. " +
+        "This tensor will be detached because backward pass via " +
+        "inputs is not supported.")

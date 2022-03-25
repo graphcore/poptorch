@@ -539,14 +539,12 @@ class PoplarExecutor:
         # Compile the poplar executable based on the batchsize.
         if self._options.Jit.trace_model:
             (in_tensors_trace_view,
-             has_converted_any_half) = self._preprocessGraph(in_tensors)
+             has_converted_any_half) = self._preprocessGraphTracing(in_tensors)
 
             trace_args = self._trace_model_and_get_compile_args(
                 in_tensors, in_tensors_trace_view, has_converted_any_half)
         else:
-            self._executable_inputs = in_tensors.clone()
-            in_tensors_trace_view = in_tensors.clone()
-            in_tensors_trace_view.forEach(self._narrow_tensor)
+            in_tensors_trace_view = self._preprocessGraphDispatcher(in_tensors)
 
         # Note: in single process execution or if the cache is disabled
         # should_compile will always be False.
@@ -598,24 +596,8 @@ class PoplarExecutor:
             self._on_device_attach()
 
     @_impl.traceMethod("graphPreprocessing")
-    def _preprocessGraph(self, in_tensors):
-        self._executable_inputs = in_tensors.clone()
-        in_tensors_trace_view = in_tensors.clone()
-        in_tensors_trace_view.forEach(self._narrow_tensor)
-
-        def remove_require_grad(tensor):
-            if not isinstance(tensor, torch.Tensor):
-                return tensor
-
-            if tensor.requires_grad:
-                tensor = tensor.detach()
-                logger.warning("Input tensor has requires_grad=True set."
-                               "This tensor will be detached.")
-
-            return tensor
-
-        in_tensors_trace_view.forEach(remove_require_grad)
-
+    def _preprocessGraphTracing(self, in_tensors):
+        in_tensors_trace_view = self._preprocessGraphCommon(in_tensors)
         # Normal bools don't get captured in python.
         has_converted_any_half = [False]
 
@@ -626,10 +608,31 @@ class PoplarExecutor:
             return tensor
 
         in_tensors_trace_view.forEach(possiblyConvertFromHalf)
-
         poptorch_core.processPrecisionOptions(self._options.Precision)
-
         return in_tensors_trace_view, has_converted_any_half
+
+    @_impl.traceMethod("graphPreprocessing")
+    def _preprocessGraphDispatcher(self, in_tensors):
+        return self._preprocessGraphCommon(in_tensors)
+
+    def _preprocessGraphCommon(self, in_tensors):
+        self._executable_inputs = in_tensors.clone()
+        in_tensors_trace_view = in_tensors.clone()
+
+        def remove_requires_grad(tensor):
+            if not isinstance(tensor, torch.Tensor):
+                return tensor
+            if tensor.requires_grad:
+                tensor = tensor.detach()
+                logger.warning(
+                    "Input tensor has requires_grad=True set. "
+                    "This tensor will be detached because backward pass via "
+                    "inputs is not supported.")
+            return tensor
+
+        in_tensors_trace_view.forEach(self._narrow_tensor)
+        in_tensors_trace_view.forEach(remove_requires_grad)
+        return in_tensors_trace_view
 
     def compile(self, *args, **kwargs) -> None:
         """Takes the same arguments as the wrapped PyTorch `model.__call__`.
@@ -666,7 +669,7 @@ class PoplarExecutor:
                                             (filename, e))
 
         in_tensors_trace_view, has_converted_any_half = \
-                self._preprocessGraph(
+                self._preprocessGraphTracing(
                     data.executable_inputs)
 
         if data.options.Jit.trace_model:
