@@ -237,6 +237,17 @@ def test_uniform_(shape):
     rng_harness(fn)(torch.min, torch.max, mean, var)
 
 
+# torch.exponential_
+@pytest.mark.parametrize("shape", tensor_shapes)
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="Your platform doesn't have MLIR support.")
+def test_exponential_(shape):
+    def fn():
+        return torch.empty(shape).exponential_()
+
+    rng_harness(fn)(mean, std, var)
+
+
 # torch.random_
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype",

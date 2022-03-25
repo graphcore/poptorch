@@ -113,6 +113,20 @@ def Poptorch_random__from : Poptorch_Op<"random__from", [SameOperandsAndResultSh
   }]>];
 }
 
+def Poptorch_exponential_ : Poptorch_Op<"exponential_", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       F32Attr:$lambd);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                    "float":$lamb), [{
+        $_state.addOperands({self});
+        $_state.addAttribute("lambd", $_builder.getF32FloatAttr(lamb));
+        $_state.addTypes({self.getType()});
+  }]>];
+}
+
 def Poptorch_bernoulli__float : Poptorch_Op<"bernoulli__float", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$input,
                        F32Attr:$prob);

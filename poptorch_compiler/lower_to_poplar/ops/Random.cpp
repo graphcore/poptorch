@@ -140,6 +140,20 @@ void random_::lowerToPoplar(CompilerContext &context) {
   context.tensors.insert({this->result(), res});
 }
 
+void exponential_::lowerToPoplar(CompilerContext &context) {
+  const poplar::Tensor self = context.fromSsa(this->self());
+  const float lambd = this->lambd().convertToFloat();
+
+  auto res = poprand::uniform(context.graph, &context.getRandomSeed(), 0, self,
+                              poplar::FLOAT, 0.0, 1.0, context.seq);
+
+  popops::logInPlace(context.graph, res, context.seq);
+  popops::negInPlace(context.graph, res, context.seq);
+  popops::divInPlace(context.graph, res, lambd, context.seq);
+
+  context.tensors.insert({this->result(), res});
+}
+
 void bernoulli__float::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor input = context.fromSsa(this->input());
   const float prob = this->prob().convertToFloat();
