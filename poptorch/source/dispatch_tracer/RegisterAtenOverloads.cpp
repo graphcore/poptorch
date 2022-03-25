@@ -11,9 +11,9 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "dispatchers/IDispatch.hpp"
 #include "dispatchers/JitDispatch.hpp"
 #include "dispatchers/MlirDispatch.hpp"
-#include "dispatchers/Tracer.hpp"
 
 namespace poptorch {
 
@@ -35,7 +35,7 @@ struct GlobalTracerContext {
   inline bool isDispatchOn() { return raii_dispatch_context && dispatch_on; }
 
   // The active dispatcher. Created once upon dispatch start.
-  std::unique_ptr<DispatcherBase> active_dispatch;
+  std::unique_ptr<IDispatch> active_dispatch;
 
   // Activates the interceptor which catches the pytorch calls.
   std::unique_ptr<c10::impl::IncludeDispatchKeyGuard> raii_dispatch_context;
@@ -111,11 +111,20 @@ void destroyDispatcher() {
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
                  const std::vector<at::Tensor> &parameters) {
   if (mode == TracingMode::POPART) {
+// We don't build this on Centos TODO(T49566)
+#if POPTORCH_BUILD_MLIR_COMPILER
     context.active_dispatch = std::make_unique<JITDispatch>();
+#else
+    ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
+          "use the dispatcher");
+#endif
   } else if (mode == TracingMode::MLIR) {
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
     context.active_dispatch = std::make_unique<MLIRDispatch>();
+#else
+    ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
+          "use the dispatcher");
 #endif
   } else {
     ERROR("Unsupported target");

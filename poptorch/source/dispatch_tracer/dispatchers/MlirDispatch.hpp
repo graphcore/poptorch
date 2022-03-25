@@ -16,11 +16,11 @@
 #endif
 
 #include "../ValueMapper.hpp"
-#include "Tracer.hpp"
+#include "IDispatch.hpp"
 
 namespace poptorch {
 
-class MLIRDispatch : public DispatcherBase {
+class MLIRDispatch : public IDispatch {
 public:
   MLIRDispatch();
 
@@ -99,12 +99,6 @@ private:
   // We use the value mapper to map between incoming at::Tensors and JIT/MLIR
   // types.
   ValueMapper _mapper;
-
-  // The JIT graph we are building up.
-  torch::jit::Graph _graph;
-
-  // The node we last processed in the graph.
-  torch::jit::Node *_last_processed_node;
 
   // We genenerate the lookup tables at object creation. This is the mechanism
   // by which that we use to target the right MLIR operation for a given aten

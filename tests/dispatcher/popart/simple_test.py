@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+import pytest
 import torch
 import torch.nn as nn
 from poptorch.experimental import IPUScope
+import poptorch
 import helpers
 
 
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_simple_test():
     input = torch.ones([10])
 
@@ -19,6 +23,8 @@ def test_simple_test():
                             expected=torch.empty(10).fill_(18.0))
 
 
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_simple_conv():
     input = torch.ones([1, 5, 25, 25])
 
@@ -39,6 +45,8 @@ def test_simple_conv():
                             equal_nan=True)
 
 
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def test_tensor_constant():
     def f(x):
         return x + torch.tensor([1.0, 2.0, 3.0])

@@ -9,11 +9,11 @@
 #include <vector>
 
 #include "../ValueMapper.hpp"
-#include "Tracer.hpp"
+#include "IDispatch.hpp"
 
 namespace poptorch {
 
-class JITDispatch final : public DispatcherBase {
+class JITDispatch final : public IDispatch {
 public:
   // The JIT graph we are building up.
   torch::jit::Graph graph;

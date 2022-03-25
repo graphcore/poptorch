@@ -91,21 +91,9 @@ void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
   // Start timing how long it takes us to build the graph.
   _compiler.startTraceTiming();
 
-  _last_processed_node = nullptr;
-
-  // We build up the torch IR graph as well.
-  const auto add_to_jit = [&](const at::Tensor &tensor) {
-    torch::jit::Value *value = _graph.addInput(tensor.name());
-    value->inferTypeFrom(tensor);
-
-    _mapper.addTensor(tensor, value);
-  };
-
   int i = 0;
   // Add any inputs.
   for (const at::Tensor &tensor : inputs) {
-    add_to_jit(tensor);
-
     const std::string str = "Input/" + std::to_string(i++);
     std::vector<std::int64_t> shape;
     shape.reserve(tensor.dim());
@@ -122,8 +110,6 @@ void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
   i = 0;
   // Add the parameters.
   for (const at::Tensor &tensor : parameters) {
-    add_to_jit(tensor);
-
     const std::string str = "Parameter/" + std::to_string(i++);
 
     std::vector<std::int64_t> shape;
@@ -177,8 +163,7 @@ MLIRDispatch::mlirFromStack(c10::Stack &stack) {
 
   // For each IValue (which may or may not be a tensor).
   for (c10::IValue value : stack) {
-    // Look up the MLIR value if it is a tensor. Other stuff will be in the JIT
-    // IR. (This is only used for JIT.)
+    // Look up the MLIR value if it is a tensor.
     if (value.isTensor()) {
       at::Tensor tensor = value.toTensor();
       ids.push_back(findTensor(tensor));
@@ -230,21 +215,7 @@ at::Tensor MLIRDispatch::convolution(
   // Unpack the above and create the MLIR convolution node.
   this->convolution(stack);
 
-  // Add a JIT node to keep the jit graph clean-ish, we don't bother adding the
-  // inputs.
-  torch::jit::Node *node = _graph.create(c10::aten::convolution, {}, 1);
-  _graph.appendNode(node);
-
-  // Map the input tensor onto the JIT.
-  at::Tensor new_output = stack.at(0).toTensor();
-  node->output(0)->inferTypeFrom(new_output);
-  _mapper.addTensor(new_output, node->output(0));
-
-  // Update the 'tail' so if another node needs to process the JIT it will
-  // start from here.
-  _last_processed_node = node;
-
-  return new_output;
+  return stack.at(0).toTensor();
 }
 
 // _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
@@ -281,10 +252,6 @@ at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
 }
 
 void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
-  // Don't bother intercepting on JIT as we automatically promote unknown nodes
-  // to empty tensors.
-  // (empty_tensor returns an ODSTensorResults instance, which is a vector of a
-  // vector of the tensor)
   poptorch_ir::TensorId id =
       _compiler.empty_tensor(tensor.sizes().vec(), toCompilerType(tensor))
           .at(0)
@@ -297,7 +264,6 @@ at::Tensor MLIRDispatch::detach(const at::Tensor &self) { return self; }
 
 void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
-  torch::jit::Symbol symbol = torch::jit::Symbol::fromQualString(schema.name());
 
   // Unfortunately we can't overload based only on the schema symbol as it does
   // not contain the overload info.
@@ -313,33 +279,6 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   ERROR_ON_MSG(mlir_handle == _direct_dispatch_lookup.end(),
                "No shape inference handler for " << schema_key);
   logging::trace("[TRACING-2] Handling {} via MLIR", schema_key);
-  /*
-   * Convert the stack arguments into JIT. Only for JIT graph
-   * correction/building so we can maintain a JIT graph as well as the MLIR
-   * graph.
-   */
-  // The handler will clear the stack so we collect up all the JIT inputs.
-  std::vector<torch::jit::Value *> inputs;
-  for (c10::IValue value : (*stack)) {
-    if (value.isTensor()) {
-      at::Tensor t = value.toTensor();
-
-      // Skip optionals.
-      if (!t.defined()) {
-        continue;
-      }
-      // Legality of the JIT doesn't hugely matter, especially for inputs.
-      // Each node will at most only look at the output of a previous node,
-      // not the input. So we don't think too much here and just skip nodes
-      // which we aren't tracking.
-      torch::jit::Value *val = _mapper.getValueForTensor(t);
-      if (val == nullptr) {
-        continue;
-      }
-      // Add it to the list.
-      inputs.push_back(val);
-    }
-  }
 
   /*
    * The core MLIR part.
@@ -355,39 +294,6 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   mlir_handle->second(*stack);
   ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
                schema_key << " cannot currently be lowered to Poplar");
-
-  /*
-   * All logic from here down is to ensure the JIT graph is still correct and
-   * legal.
-   */
-  // The stack contains all the outputs.
-  const std::size_t num_outputs = stack->size();
-  logging::trace("[TRACING-2] Num outputs: {}", num_outputs);
-
-  // Add a JIT node to keep the jit graph clean.
-  torch::jit::Node *node = _graph.create(symbol, inputs, stack->size());
-  _graph.appendNode(node);
-
-  // Map the JIT nodes onto the correct outputs.
-  for (std::size_t index = 0; index < num_outputs; ++index) {
-    at::Tensor tensor = stack->at(index).toTensor();
-
-    if (!tensor.defined()) {
-      logging::trace("[TRACING-2] Output: skipping undefined tensor,{}",
-                     reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()));
-      continue;
-    }
-
-    node->output(index)->inferTypeFrom(tensor);
-    _mapper.addTensor(tensor, node->output(index));
-    logging::trace("[TRACING-2] Output: Tensor ptr {}, jit ir %{} {}",
-                   reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-                   node->output(index)->debugNameBase(), toString(tensor));
-  }
-
-  // Update the 'tail' so if another node needs to process the JIT it will
-  // start from here.
-  _last_processed_node = node;
 }
 
 std::shared_ptr<MLIRExecutable> MLIRDispatch::compile() {

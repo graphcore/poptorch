@@ -1,5 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "ValueMapper.hpp"
+#include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
@@ -41,7 +42,9 @@ bool ValueMapper::isDirectAlias(const at::Tensor &t) {
     }
 
     addTensor(t, record->mlir, record->is_const);
-    addTensor(t, record->jit, record->is_const);
+    if (record->jit != nullptr) {
+      addTensor(t, record->jit, record->is_const);
+    }
     return true;
   }
 
@@ -68,6 +71,7 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
 
 void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
                             bool is_const) {
+  ERROR_ON_MSG(val == nullptr, "torch::jit::Value* cannot be null");
   logging::trace("Adding {} to value mapper, JIT id: {}",
                  static_cast<void *>(t.unsafeGetTensorImpl()),
                  val->debugName());

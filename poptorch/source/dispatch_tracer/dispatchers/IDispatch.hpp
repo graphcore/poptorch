@@ -1,6 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#ifndef POPTORCH_DISPATCH_TRACER_H_
-#define POPTORCH_DISPATCH_TRACER_H_
+#ifndef POPTORCH_IDISPATCH_H_
+#define POPTORCH_IDISPATCH_H_
 
 #include <ATen/Tensor.h>
 #include <ATen/core/boxing/KernelFunction.h>
@@ -15,9 +15,9 @@
 
 namespace poptorch {
 
-class DispatcherBase {
+class IDispatch {
 public:
-  virtual ~DispatcherBase() {}
+  virtual ~IDispatch() {}
 
   virtual void createGraph(const std::vector<at::Tensor> &inputs,
                            const std::vector<at::Tensor> &parameters) = 0;
@@ -60,4 +60,4 @@ public:
 
 } // namespace poptorch
 
-#endif // POPTORCH_DISPATCH_TRACER_H_
+#endif // POPTORCH_IDISPATCH_H_

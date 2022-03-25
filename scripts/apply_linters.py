@@ -776,13 +776,17 @@ class Linters:
                 self.files = files
 
             def __call__(self, output, returncode):
-                self.files += output.splitlines()
+                # If we keep the last element of each line we will have the files we need to lint.
+                # ['M', 'poptorch/source/dispatch_tracer/RegisterAtenOverloads.cpp']
+                # ['R092', 'poptorch/source/dispatch_tracer/dispatchers/Tracer.hpp', 'poptorch/source/dispatch_tracer/dispatchers/IDispatch.hpp']
+                # ['A', 'poptorch/source/dispatch_tracer/dispatchers/JitDispatch.hpp']
+                for line in output.splitlines():
+                    self.files.append(line.split()[-1])
                 return output, returncode
 
         assert isinstance(strategy, GitStrategy)
         git_cmd = ""
         filter_cmd = "| grep \"^[AMRT]\" "
-        filter_cmd += "| cut -f 2"
         if strategy == GitStrategy.Master:
             git_cmd = "git diff --name-status -r origin/master "
         elif strategy == GitStrategy.Head:
