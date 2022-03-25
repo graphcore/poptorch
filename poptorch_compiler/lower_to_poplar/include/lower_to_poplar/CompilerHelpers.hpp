@@ -88,8 +88,8 @@ std::vector<T> convertIntArray(const mlir::ArrayAttr &array) {
 template <typename T>
 poplar::Tensor createConstant(CompilerContext &context, poplar::Type type,
                               const std::vector<uint64_t> &shape,
-                              const std::vector<T> &data) {
-  poplar::Tensor constant = context.graph.addConstant<T>(type, shape, data);
+                              const T &value) {
+  poplar::Tensor constant = context.graph.addConstant<T>(type, shape, value);
   context.graph.setTileMapping(constant, context.graph_const_count++);
   return constant;
 }

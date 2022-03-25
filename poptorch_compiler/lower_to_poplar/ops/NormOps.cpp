@@ -63,24 +63,21 @@ void batch_norm::lowerToPoplar(CompilerContext &context) {
   float momentum = this->momentum().convertToFloat();
   float epsilon = this->epsilon().convertToFloat();
 
-  std::uint64_t c = input.shape()[1];
-  std::vector<float> ones(c, 1.0f);
-  std::vector<float> zeros(c, 0.0f);
-  std::vector<uint64_t> param_shape = {c};
+  std::vector<uint64_t> param_shape = {input.shape()[1]};
   if (this->weight() && this->bias()) {
     weight = context.fromSsa(this->weight());
     bias = context.fromSsa(this->bias());
   } else {
-    weight = createConstant(context, poplar::FLOAT, param_shape, ones);
-    bias = createConstant(context, poplar::FLOAT, param_shape, zeros);
+    weight = createConstant(context, poplar::FLOAT, param_shape, 1.0f);
+    bias = createConstant(context, poplar::FLOAT, param_shape, 0.0f);
   }
   const bool track_running_stats = this->running_mean() && this->running_var();
   if (track_running_stats) {
     running_mean = context.fromSsa(this->running_mean());
     running_var = context.fromSsa(this->running_var());
   } else {
-    running_mean = createConstant(context, poplar::FLOAT, param_shape, zeros);
-    running_var = createConstant(context, poplar::FLOAT, param_shape, ones);
+    running_mean = createConstant(context, poplar::FLOAT, param_shape, 0.0f);
+    running_var = createConstant(context, poplar::FLOAT, param_shape, 1.0f);
   }
 
   if (training) {
@@ -174,15 +171,13 @@ void group_norm::lowerToPoplar(CompilerContext &context) {
                       static_cast<size_t>(1), std::multiplies<size_t>());
   ERROR_ON(hx_w != this->HxW());
 
-  const std::vector<float> ones(num_groups, 1.0f);
-  const std::vector<float> zeros(num_groups, 0.0f);
   const std::vector<uint64_t> param_shape = {num_groups};
   if (this->weight() && this->bias()) {
     weight = context.fromSsa(this->weight());
     bias = context.fromSsa(this->bias());
   } else {
-    weight = createConstant(context, poplar::FLOAT, param_shape, ones);
-    bias = createConstant(context, poplar::FLOAT, param_shape, zeros);
+    weight = createConstant(context, poplar::FLOAT, param_shape, 1.0f);
+    bias = createConstant(context, poplar::FLOAT, param_shape, 0.0f);
   }
 
   // Calculate the mean and the inverse standard deviation

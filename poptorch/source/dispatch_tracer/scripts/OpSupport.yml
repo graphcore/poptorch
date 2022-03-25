@@ -244,6 +244,11 @@
   PopTorchDirect: lt
   UnusedOutputArguments: {out}
 
+# sqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: sqrt.out
+  PopTorchDirect: sqrt
+  UnusedOutputArguments: {out}
+
 ##########
 # Linalg
 ##########

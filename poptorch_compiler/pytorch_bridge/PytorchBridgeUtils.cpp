@@ -1,5 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
+#include "poptorch_logging/Error.hpp"
 
 namespace poptorch_ir {
 
@@ -36,6 +37,20 @@ Type mlirTypeToCompilerType(mlir::Type type) {
   }
 
   return Type::UNDEFINED;
+}
+
+TorchReduction getTorchReduction(int reduction) {
+  switch (reduction) {
+  case 0:
+    return TorchReduction::NONE;
+  case 1:
+    return TorchReduction::MEAN;
+  case 2:
+    return TorchReduction::SUM;
+  default:
+    ERROR("Unknown PyTorch reduction " << reduction);
+    return TorchReduction::UNKNOWN;
+  }
 }
 
 } // namespace poptorch_ir

@@ -9,6 +9,10 @@ namespace poptorch_ir {
 
 Type mlirTypeToCompilerType(mlir::Type type);
 
+enum class TorchReduction { UNKNOWN = -1, NONE = 0, MEAN = 1, SUM = 2 };
+
+TorchReduction getTorchReduction(int reduction);
+
 } // namespace poptorch_ir
 
 #endif
