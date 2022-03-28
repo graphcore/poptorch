@@ -14,8 +14,11 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "dispatchers/IDispatch.hpp"
+
+#if POPTORCH_BUILD_MLIR_COMPILER
 #include "dispatchers/JitDispatch.hpp"
 #include "dispatchers/MlirDispatch.hpp"
+#endif
 
 namespace poptorch {
 
@@ -226,6 +229,7 @@ std::shared_ptr<MLIRExecutable> compileMLIR() {
 #endif
 
 std::shared_ptr<torch::jit::Graph> getTracedGraph() {
+#if POPTORCH_BUILD_MLIR_COMPILER
   auto *jit = dynamic_cast<JITDispatch *>(context.active_dispatch.get());
   ERROR_ON_MSG(jit == nullptr, "[User Unreachable] Tracer context is null.");
   auto copied_graph = jit->graph.copy();
@@ -245,6 +249,9 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
   searchAndPossiblyDestroy(to_delete);
 
   return copied_graph;
+#else
+  ERROR("PopTorch must be compiled with -DPOPTORCH_BUILD_MLIR_COMPILER=ON");
+#endif
 }
 
 // Record these tensors as being the outputs of the graph.

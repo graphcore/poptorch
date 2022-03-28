@@ -58,6 +58,10 @@ void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
       add_input(tensor);
     }
   }
+
+  // No need to create a MLIR graph, we're going to only use the dispatcher
+  // for shape inference, so just initialise the compiler.
+  _mlir_dispatch.initCompiler();
 }
 
 namespace {
@@ -308,28 +312,29 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   // be inplace, this could be the 'out' argument of a non-inplace op.
   c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
       getInplaceArgument(*stack, initial_schema);
-  bool is_truly_inplace = isTrulyInplace(*stack, initial_schema);
 
-  c10::OperatorHandle op = initial_op;
-  bool op_changed = getOutplaceOpHandle(op, dispatcher);
+  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
   const c10::FunctionSchema &schema = op.schema();
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, graph, _mapper);
 
-  if (shouldRunOnCpu(is_truly_inplace || op_changed, schema.name())) {
-    HalfFloatConverter hf_conv(stack, schema, _mapper);
-    hf_conv.pre();
-    // Call the CPU version to get the output shape
-    dispatcher.callBoxed(op, stack);
-    hf_conv.post();
-  } else {
-    // The Op is in place: we don't need to run the CPU version.
-    // Just clear the stack and keep the first input.
-    at::Tensor t = stack->at(0).toTensor();
-    stack->clear();
-    stack->push_back(t);
+  // The MLIR dispatcher is going to use the shape and type of the inputs to
+  // infer the shape and type of the outputs so we need to create dummy MLIR
+  // tensors for each input.
+  for (c10::IValue value : *stack) {
+    if (value.isTensor()) {
+      at::Tensor tensor = value.toTensor();
+      // Sometimes Undefined is used to mark an optional tensor as not set.
+      if (tensor.scalar_type() == at::ScalarType::Undefined) {
+        ERROR_ON_MSG(tensor.numel() != 0,
+                     "[Internal error] Non-empty tensor of type 'Undefined'");
+        continue;
+      }
+      _mlir_dispatch.registerEmptyTensor(tensor);
+    }
   }
+  _mlir_dispatch.handleOp(op, stack);
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
   fixNodeOutput(node, *stack, _mapper);

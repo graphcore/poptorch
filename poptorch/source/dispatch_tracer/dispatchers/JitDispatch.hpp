@@ -10,6 +10,7 @@
 
 #include "../ValueMapper.hpp"
 #include "IDispatch.hpp"
+#include "MlirDispatch.hpp"
 
 namespace poptorch {
 
@@ -56,6 +57,8 @@ private:
   // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
   // types.
   ValueMapper _mapper;
+  // We use the MLIR dispatch for shape inference.
+  MLIRDispatch _mlir_dispatch;
 };
 
 } // namespace poptorch

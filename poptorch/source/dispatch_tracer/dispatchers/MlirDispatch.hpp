@@ -24,6 +24,7 @@ class MLIRDispatch : public IDispatch {
 public:
   MLIRDispatch();
 
+  void initCompiler();
   void createGraph(const std::vector<at::Tensor> &inputs,
                    const std::vector<at::Tensor> &parameters) final;
 
@@ -34,6 +35,7 @@ public:
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) final;
+  std::string handleOp(const c10::OperatorHandle &op, c10::Stack *stack);
 
   at::Tensor detach(const at::Tensor &self) final;
 

@@ -73,7 +73,7 @@ static poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type) {
   case at::ScalarType::Long: // We will convert this.
     return poptorch_ir::Type::INT;
   default:
-    ERROR("Unsupported tensor input type from pytorch.");
+    ERROR("Unsupported tensor input type from pytorch: " << elem_type);
   }
 }
 
@@ -83,10 +83,13 @@ static poptorch_ir::Type toCompilerType(const at::Tensor &tensor) {
   return toCompilerType(elem_type);
 }
 
-void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
-                               const std::vector<at::Tensor> &parameters) {
+void MLIRDispatch::initCompiler() {
   // Init our MLIR compiler.
   _compiler.init();
+}
+void MLIRDispatch::createGraph(const std::vector<at::Tensor> &inputs,
+                               const std::vector<at::Tensor> &parameters) {
+  initCompiler();
 
   // Start timing how long it takes us to build the graph.
   _compiler.startTraceTiming();
@@ -253,7 +256,8 @@ void MLIRDispatch::setCurrentCodeLocation(
   }
 }
 
-void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
+std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
+                                   c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
 
   // Unfortunately we can't overload based only on the schema symbol as it does
@@ -280,9 +284,14 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   // The handler will be found in the compiler dispatch table.
   // See CompilerDispatchTable.cpp AtenToMlirDispatch.inc,
   // AtenToMlirInterface.hpp.inc and AtenToMlirInterface.hpp.inc
+  mlir_handle->second(*stack);
+  return schema_key;
+}
+
+void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   ERROR_ON(
       !_compiler.allOpsCanBeLoweredToPoplar()); // This shouldn't be possible
-  mlir_handle->second(*stack);
+  const std::string schema_key = handleOp(op, stack);
   ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
                schema_key << " cannot currently be lowered to Poplar");
 }

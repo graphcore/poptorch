@@ -144,7 +144,8 @@ torch::jit::Value *makeConstant(torch::jit::Graph &graph,
   return constant->output();
 }
 
-bool getOutplaceOpHandle(c10::OperatorHandle &op, c10::Dispatcher &dispatcher) {
+c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
+                                        c10::Dispatcher &dispatcher) {
   const auto &schema = op.schema();
   std::string name = schema.name();
   const std::string &overload = schema.overload_name();
@@ -161,13 +162,11 @@ bool getOutplaceOpHandle(c10::OperatorHandle &op, c10::Dispatcher &dispatcher) {
     }
     auto opt_op = dispatcher.findOp({name, overload});
     if (opt_op) {
-      op = *opt_op;
-    } else {
-      op = *dispatcher.findOp({name, ""});
+      return *opt_op;
     }
-    return true;
+    return *dispatcher.findOp({name, ""});
   }
-  return false;
+  return op;
 }
 
 c10::intrusive_ptr<at::TensorImpl>
@@ -203,40 +202,6 @@ getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema) {
   return {};
 }
 
-bool isTrulyInplace(const c10::Stack &stack,
-                    const c10::FunctionSchema &schema) {
-  const auto &arguments = schema.arguments();
-  for (size_t i = 0; i < arguments.size(); ++i) {
-    const auto &argument = arguments.at(i);
-    const c10::IValue value = stack.at(i);
-
-    // We are only interested in finding inplace tensors.
-    if (!argument.alias_info() || !argument.alias_info()->isWrite() ||
-        !value.isTensor()) {
-      continue;
-    }
-    const at::Tensor &tensor = value.toTensor();
-    // Undefined tensors are optional tensors.
-    if (!tensor.defined()) {
-      continue;
-    }
-
-    // We've found an inplace tensor. Check the stack whether it actually
-    // references one of the input arguments and it isn't just
-    // the 'out' argument.
-    for (size_t j = 0; j < stack.size(); ++j) {
-      if (i == j) {
-        continue;
-      }
-      if (value.isSameIdentity(stack.at(j))) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
                                   c10::Stack *stack, torch::jit::Graph &graph,
                                   ValueMapper &mapper) {
@@ -260,103 +225,6 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
     inputs.push_back(insertValueIntoGraphAndTrackIt(value, graph, mapper));
   }
   return createAtenTarget(graph, schema, inputs, stack, mapper);
-}
-
-namespace {
-// The in-place versions of these functions break the rule that in place ops
-// don't change the shape of the tensor they operate on.
-const std::unordered_set<std::string> in_place_reshapes{
-    "aten::squeeze", "aten::unsqueeze", "aten::transpose"};
-} // namespace
-
-bool shouldRunOnCpu(bool is_inplace, const std::string &op_name) {
-  return !is_inplace || in_place_reshapes.count(op_name) != 0;
-}
-
-HalfFloatConverter::HalfFloatConverter(c10::Stack *stack,
-                                       const c10::FunctionSchema &schema,
-                                       ValueMapper &mapper)
-    : _stack(stack), _schema(schema), _mapper(mapper) {}
-
-void HalfFloatConverter::pre() {
-  // Convert any halves to floats. Keep track of what we replaced in case
-  // the op reshapes any of them.
-  _has_half_input = false;
-  // The first pass looks for half-typed inputs, casts them to float, and places
-  // them into the _half_map lookup table so the original half-typed tensors
-  // can be appropriately reshaped after the op if necessary.
-  // The second pass only runs if any half-typed input tensors were found in
-  // the first pass. It tracks all of the float-typed output tensors as half
-  // typed tensors (we make the assumption that if we supplied any half-typed
-  // input tensors, any outputs will also be half-typed).
-  for (size_t pass = 0; pass < 2; pass++) {
-    if (pass == 1 && !_has_half_input) {
-      break;
-    }
-    for (size_t i = 0; i < _stack->size(); i++) {
-      auto &value = _stack->at(i);
-      if (!value.isTensor()) {
-        continue;
-      }
-      auto t = value.toTensor();
-      if (!t.defined()) {
-        continue;
-      }
-      auto tt = value.type()->cast<at::TensorType>();
-      switch (pass) {
-      case 0: {
-        if (tt->scalarType() == at::ScalarType::Half) {
-          at::Tensor t_cast = t.toType(at::ScalarType::Float);
-          value = t_cast;
-          _half_map[t_cast.getIntrusivePtr()] = t.getIntrusivePtr();
-          _has_half_input = true;
-        } else if (_mapper.isHalfTensor(t)) {
-          _has_half_input = true;
-        }
-        break;
-      }
-      case 1: {
-        const c10::Argument &argument = _schema.arguments()[i];
-        if (tt->scalarType() == at::ScalarType::Float &&
-            argument.alias_info() && argument.alias_info()->isWrite()) {
-          _mapper.markHalfTensor(t);
-        }
-        break;
-      }
-      }
-    }
-  }
-}
-
-void HalfFloatConverter::post() {
-  if (!_has_half_input) {
-    return;
-  }
-  // First do any necessary reshapes on half-typed input tensors
-  for (const auto &pair : _half_map) {
-    at::Tensor float_tensor{pair.first};
-    at::Tensor half_tensor{pair.second};
-    if (half_tensor.sizes() != float_tensor.sizes()) {
-      half_tensor.resize_as_(float_tensor);
-    }
-  }
-  // Walk the stack noting any output tensors that should be considered
-  // half-typed
-  for (size_t i = 0; i < _stack->size(); i++) {
-    auto &value = _stack->at(i);
-    if (!value.isTensor()) {
-      continue;
-    }
-    auto t = value.toTensor();
-    if (!t.defined()) {
-      continue;
-    }
-    auto tt = value.type()->cast<at::TensorType>();
-    if (tt->scalarType() != at::ScalarType::Float) {
-      continue;
-    }
-    _mapper.markHalfTensor(t);
-  }
 }
 
 void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack,
