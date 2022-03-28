@@ -43,9 +43,9 @@ public:
            c10::optional<c10::MemoryFormat> fmt = c10::nullopt);
 
   const at::Tensor &copyInplace(const at::Tensor &self,
-                                const at::Tensor &other);
+                                const at::Tensor &src);
 
-  // node will be updated to the new target post canonicalisation
+  // Node will be updated to the new target post canonicalisation.
   void canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                               c10::Stack &stack,
                               torch::jit::Node **node,

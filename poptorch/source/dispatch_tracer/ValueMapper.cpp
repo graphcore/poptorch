@@ -72,7 +72,7 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
 void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
                             bool is_empty) {
   ERROR_ON_MSG(val == nullptr, "torch::jit::Value* cannot be null");
-  logging::trace("Adding {} to value mapper, JIT id: {}",
+  logging::trace("Adding {} to value mapper, JIT ir: {}",
                  static_cast<void *>(t.unsafeGetTensorImpl()),
                  val->debugName());
   // If the tensor is already being tracked then we will update the JIT
@@ -151,7 +151,7 @@ bool ValueMapper::isHalfTensor(const at::Tensor &t) {
 
 void ValueMapper::addTensorList(const TensorList &list,
                                 torch::jit::Value *val) {
-  logging::trace("Adding tensor list to value mapper, JIT id: {}",
+  logging::trace("Adding tensor list to value mapper, JIT ir: {}",
                  val->debugName());
   tensor_lists.insert({list, val});
 }

@@ -2,6 +2,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <memory>
+#include <vector>
 
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -224,6 +225,34 @@ implicitCastInputs(torch::jit::ArrayRef<torch::jit::Value *> *inputs,
     input_num++;
   }
   return new_inputs;
+}
+
+void removeDeadImplicitCasts(torch::jit::Graph *graph) {
+  // We are removing dead code casts that result from the following cases:
+  //   - Torch is dispatching a cast of a tensor in which case it should be used
+  //     elsewhere and its uses won't be empty -> just delete the cast.
+  //   - Torch is dispatching a cast of a wrapped number (a tensor_constant on
+  //     our side) -> delete the cast and the constant.
+  std::vector<torch::jit::Node *> to_delete;
+
+  for (auto *node : graph->nodes()) {
+    if (node->kind() != symbols::popart::cast || node->hasUses()) {
+      continue;
+    }
+
+    to_delete.push_back(node);
+    if (node->input()->uses().size() == 1) {
+      // 'node' is the only use so it's safe to delete. This must be a
+      // tensor_constant representing a wrapped number.
+      auto *constant = node->input()->node();
+      ERROR_ON(constant->kind() != symbols::poptorch::tensor_constant);
+      to_delete.push_back(constant);
+    }
+  }
+
+  for (auto *node : to_delete) {
+    node->destroy();
+  }
 }
 
 } // namespace poptorch

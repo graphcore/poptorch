@@ -20,19 +20,6 @@ namespace poptorch {
 
 namespace {
 
-torch::jit::Value *makeConstant(torch::jit::Graph &graph, at::Tensor &tensor) {
-  at::Tensor ct;
-  auto st = tensor.scalar_type();
-  auto st_coerced = coerceToSupportedType(st);
-  if (st != st_coerced) {
-    ct = tensor.to(st_coerced);
-  } else {
-    ct = tensor.clone();
-  }
-  auto *constant = tensorToConstant(&graph, ct);
-  return constant->output();
-}
-
 torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
                                                   torch::jit::Graph &graph,
                                                   ValueMapper &mapper) {
@@ -142,6 +129,20 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
 }
 
 } // namespace
+
+torch::jit::Value *makeConstant(torch::jit::Graph &graph,
+                                const at::Tensor &tensor) {
+  at::Tensor ct;
+  auto st = tensor.scalar_type();
+  auto st_coerced = coerceToSupportedType(st);
+  if (st != st_coerced) {
+    ct = tensor.to(st_coerced);
+  } else {
+    ct = tensor.clone();
+  }
+  auto *constant = tensorToConstant(&graph, ct);
+  return constant->output();
+}
 
 bool getOutplaceOpHandle(c10::OperatorHandle &op, c10::Dispatcher &dispatcher) {
   const auto &schema = op.schema();

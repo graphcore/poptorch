@@ -1429,6 +1429,9 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
     auto inplace_op_handler =
         std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
 
+    // TODO(T55228): remove after we use our own dispatch key.
+    removeDeadImplicitCasts(graph.get());
+
     // We need to keep the dispatcher alive until after the passes because
     // some of them call isDispatcherActive().
     destroyDispatcher();

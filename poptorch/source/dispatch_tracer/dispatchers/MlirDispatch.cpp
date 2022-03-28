@@ -211,7 +211,7 @@ at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
   at::Tensor out =
       at::native::empty_cpu(self.sizes(), dtype, layout, device, pin, fmt);
 
-  // Zero tensor as it's possible that the tensor is accessable by the user
+  // Zero tensor as it's possible that the tensor is accessible by the user
   // after tracing.
   at::zero_(out);
 

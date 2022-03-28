@@ -23,7 +23,17 @@ void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
                               const std::vector<at::Tensor> &parameters) {
   auto add_input = [&](at::Tensor &tensor) {
     torch::jit::Value *value = graph.addInput(tensor.name());
-    value->inferTypeFrom(tensor);
+
+    auto scalar_type = tensor.scalar_type();
+    auto scalar_type_coerced = coerceToSupportedType(scalar_type);
+    if (scalar_type != scalar_type_coerced) {
+      logging::warn("[TRACING-2][JIT] Input %{} type coerced from {} to {}",
+                    value->debugName(), scalar_type, scalar_type_coerced);
+      value->inferTypeFrom(tensor.to(scalar_type_coerced));
+    } else {
+      value->inferTypeFrom(tensor);
+    }
+
     _mapper.addTensor(tensor, value);
   };
 
@@ -137,34 +147,42 @@ void JITDispatch::markOutputs(
   logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", graph);
 }
 
+// copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
-                                           const at::Tensor &other) {
-  if (other.unsafeGetTensorImpl()->is_wrapped_number()) {
-    torch::jit::Value *val = graph.insertConstant(other);
-    _mapper.addTensor(other, val);
+                                           const at::Tensor &src) {
+  if (src.unsafeGetTensorImpl()->is_wrapped_number()) {
+    torch::jit::Value *val = makeConstant(graph, src);
+    _mapper.addTensor(src, val, true);
   }
 
-  ValueMapper::TrackedTensor *dest = _mapper.rawTensorRecord(self);
-  ValueMapper::TrackedTensor *src = _mapper.rawTensorRecord(other);
-  ERROR_ON(dest == nullptr);
-  ERROR_ON(src == nullptr);
+  ValueMapper::TrackedTensor *self_tracked = _mapper.rawTensorRecord(self);
+  ValueMapper::TrackedTensor *src_tracked = _mapper.rawTensorRecord(src);
+  ERROR_ON(self_tracked == nullptr);
+  ERROR_ON(src_tracked == nullptr);
 
-  logging::trace("[TRACING-2][JIT] copyInplace: src tensor {}, dest tensor {}",
-                 static_cast<void *>(other.unsafeGetTensorImpl()),
-                 static_cast<void *>(self.unsafeGetTensorImpl()));
+  logging::trace(
+      "[TRACING-2][JIT] copyInplace: src tensor {} (jit ir %{}), self tensor "
+      "{} (jit ir %{})",
+      static_cast<void *>(src.unsafeGetTensorImpl()),
+      src_tracked->jit->debugName(),
+      static_cast<void *>(self.unsafeGetTensorImpl()),
+      self_tracked->jit->debugName());
 
   torch::jit::Value *copy;
-  if (self.scalar_type() == other.scalar_type()) {
-    copy = createIdentity(&graph, {src->jit})->output();
+  if (self.scalar_type() == src.scalar_type()) {
+    copy = createIdentity(&graph, {src_tracked->jit})->output();
     copy->inferTypeFrom(self);
   } else {
-    copy = createCast(&graph, src->jit, self.scalar_type())->output();
+    copy = createCast(&graph, src_tracked->jit, self.scalar_type())->output();
   }
 
-  dest->jit = copy;
-  dest->is_empty = src->is_empty;
+  self_tracked->jit = copy;
+  self_tracked->is_empty = src_tracked->is_empty;
 
-  if (_mapper.isHalfTensor(other)) {
+  logging::trace("[TRACING-2][JIT] copyInplace: self tensor new jit ir %{}",
+                 self_tracked->jit->debugName());
+
+  if (_mapper.isHalfTensor(src)) {
     _mapper.markHalfTensor(self);
   }
 
@@ -174,13 +192,26 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
 // _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
 // device=None, bool? pin_memory=None, bool non_blocking=False, MemoryFormat?
 // memory_format=None) -> Tensor
-// Apears in 1.10.
-at::Tensor JITDispatch::toCopyInplace(
-    const at::Tensor &self, c10::optional<at::ScalarType> /*dtype*/,
-    c10::optional<at::Layout> /*layout*/, c10::optional<at::Device> /*device*/,
-    c10::optional<bool> /*pin*/, c10::optional<c10::MemoryFormat> /*fmt*/) {
-  // TODO(T45469): Renable.
-  return self;
+at::Tensor JITDispatch::toCopyInplace(const at::Tensor &self,
+                                      c10::optional<at::ScalarType> dtype,
+                                      c10::optional<at::Layout> layout,
+                                      c10::optional<at::Device> device,
+                                      c10::optional<bool> pin,
+                                      c10::optional<c10::MemoryFormat> fmt) {
+  at::Tensor out =
+      at::native::empty_cpu(self.sizes(), dtype, layout, device, pin, fmt);
+  // Zero tensor as it's possible that the tensor is accessible by the user
+  // after tracing.
+  at::zero_(out);
+
+  torch::jit::Node *n = graph.createUninitialized(c10::TensorType::create(out));
+  _mapper.addTensor(out, n->output(0), true);
+
+  logging::trace("[TRACING-2][JIT] toCopyInplace: out tensor {} self tensor {}",
+                 static_cast<void *>(out.unsafeGetTensorImpl()),
+                 static_cast<void *>(self.unsafeGetTensorImpl()));
+
+  return copyInplace(out, self);
 }
 
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
