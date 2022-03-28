@@ -49,13 +49,6 @@ public:
   // unaltered as a convenience.
   virtual const at::Tensor &copyInplace(const at::Tensor &self,
                                         const at::Tensor &src) = 0;
-
-  virtual at::Tensor
-  convolution(const at::Tensor &input, const at::Tensor &weight,
-              const c10::optional<at::Tensor> &bias, at::IntArrayRef stride,
-              at::IntArrayRef padding, at::IntArrayRef dilation,
-              bool transposed, at::IntArrayRef output_padding,
-              int64_t groups) = 0;
 };
 
 } // namespace poptorch

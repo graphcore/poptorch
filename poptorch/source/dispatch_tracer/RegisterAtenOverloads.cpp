@@ -133,25 +133,6 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
   context.active_dispatch->createGraph(inputs, parameters);
 }
 
-// Special entry point for convolution.
-at::Tensor
-convolutionKernel(const at::Tensor &input, const at::Tensor &weight,
-                  const c10::optional<at::Tensor> &bias,
-                  const at::IntArrayRef stride, const at::IntArrayRef padding,
-                  const at::IntArrayRef dilation, const bool transposed,
-                  const at::IntArrayRef output_padding, const int64_t groups) {
-  // We will also catch pytorch calls called via C++ so we need to disable our
-  // dispatch catcher while it is running.
-  DisableDispatchScope guard;
-  logging::trace("[TRACING-2] Intercepting aten::convolution");
-
-  at::Tensor out = context.active_dispatch->convolution(
-      input, weight, bias, stride, padding, dilation, transposed,
-      output_padding, groups);
-
-  return out;
-}
-
 void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   if (!context.isDispatchOn()) {
     // Redirect back to CPU if we are not in our own dispatch context.
@@ -390,23 +371,10 @@ TORCH_LIBRARY_IMPL(aten, BackendSelect, m) {
   FLAGS_caffe2_log_level = log_level;
 }
 
-/*
- Convolution and convolution backwards kernels are special cases.
-
- MLIRNpcomp had the same issue.
- https://github.com/llvm/mlir-npcomp/blob/ec611c1e6f44eb5b49c658fd98740000935a1058/frontends/pytorch/csrc/builder/acap_dispatch.cpp#L563
-
-  The code that handles convolution is one gigantic switch statement so it seems
-  to be a bit of a special case in the dispatcher. This is the top level of the
-  switch.
-*/
 TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse2, m) {
   m.impl("detach", &poptorch::detach);
-
-  m.impl("convolution", &poptorch::convolutionKernel);
-
-  // Once we have our own device target we can target this kernel.
-  // m.impl("convolution_overrideable", &poptorch::convolutionKernel);
+  m.impl("convolution",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 }
 
 TORCH_LIBRARY_IMPL(poptorch, PrivateUse2, m) {

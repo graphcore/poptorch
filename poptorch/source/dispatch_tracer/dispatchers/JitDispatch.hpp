@@ -44,14 +44,6 @@ public:
   const at::Tensor &copyInplace(const at::Tensor &self,
                                 const at::Tensor &other);
 
-  at::Tensor
-  convolution(const at::Tensor &input, const at::Tensor &weight,
-                    const c10::optional<at::Tensor> &bias,
-                    at::IntArrayRef stride, at::IntArrayRef padding,
-                    at::IntArrayRef dilation, bool transposed,
-                    at::IntArrayRef output_padding, int64_t groups);
-
-
   // node will be updated to the new target post canonicalisation
   void canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                               c10::Stack &stack,
