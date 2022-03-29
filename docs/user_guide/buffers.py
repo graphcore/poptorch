@@ -21,7 +21,7 @@ print(poptorch_model())  # tensor([6.])
 print(poptorch_model())  # tensor([6.])
 # counter_model_wrong_end
 
-torch.testing.assert_allclose(model.i, torch.tensor([5.], dtype=torch.float))
+torch.testing.assert_close(model.i, torch.tensor([5.], dtype=torch.float))
 
 
 # pragma pylint: disable=function-redefined,no-member
@@ -46,4 +46,4 @@ print(poptorch_model())  # tensor([2.])
 # Because the model is running in inference mode, we will need to manually
 # call copyWeightsToHost
 poptorch_model.copyWeightsToHost()
-torch.testing.assert_allclose(model.i, torch.tensor([2.], dtype=torch.float))
+torch.testing.assert_close(model.i, torch.tensor([2.], dtype=torch.float))

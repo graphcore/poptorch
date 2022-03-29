@@ -68,7 +68,10 @@ for _ in range(100):
 
 print(f"Bias after training: {model_with_loss.model.bias}")
 
-torch.testing.assert_allclose(model_with_loss.model.bias, 1.0)
+torch.testing.assert_close(model_with_loss.model.bias,
+                           torch.tensor(1.0, dtype=torch.float),
+                           rtol=1e-4,
+                           atol=1e-5)
 poptorch_model.destroy()
 
 model = ExampleModelWithCustomLoss()

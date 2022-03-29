@@ -45,7 +45,7 @@ native_out = model(input)
 
 # Models should be very close to native output although some operations are
 # numerically different and floating point differences can accumulate.
-torch.testing.assert_allclose(native_out, poptorch_out, rtol=1e-04, atol=1e-04)
+torch.testing.assert_close(native_out, poptorch_out, rtol=1e-04, atol=1e-04)
 # training_model_end
 Model = ExampleModelWithLoss
 

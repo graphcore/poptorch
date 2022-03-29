@@ -482,8 +482,7 @@ def test_rewrap_model(rewrap_executor):
     torch.nn.init.zeros_(model.fc.bias)
 
     with pytest.raises(AssertionError):
-        torch.testing.assert_allclose(actual=model.fc.bias,
-                                      expected=bias_after_1000)
+        helpers.assert_allclose(actual=model.fc.bias, expected=bias_after_1000)
 
     model.destroy()
 
@@ -508,5 +507,5 @@ def test_rewrap_model(rewrap_executor):
         poptorch_model = poptorch.trainingModel(model, options=opts)
 
     poptorch_model(torch.ones([5]))
-    torch.testing.assert_allclose(actual=float(model.fc.bias),
-                                  expected=bias_after_1000)
+    helpers.assert_allclose(actual=float(model.fc.bias),
+                            expected=bias_after_1000)
