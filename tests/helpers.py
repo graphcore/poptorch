@@ -7,17 +7,19 @@ import poptorch
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 
-def assert_allclose(*, actual=None, expected=None, **kwargs):
+def assert_allclose(*, actual=None, expected=None, check_dtype=False,
+                    **kwargs):
     """Assertion function that enforces passing the 'actual' and 'expected'
-    arguments to torch.testing.assert_allclose in the correct order by forcing
+    arguments to torch.testing.assert_close in the correct order by forcing
     the use of keyword arguments. This improves error reporting in case of
     assertion failures.
 
-    :param actual: torch.Tensor, array-like of torch.Tensor objects or
-           scalar value that is tested.
-    :param expected: torch.Tensor, array-like of torch.Tensor objects or
-           scalar value that is used as a reference.
-    :param kwargs: kwargs passed to torch.testing.assert_allclose.
+    :param actual: torch.Tensor, scalar value, or array-like of either
+            torch.Tensor objects or scalar values that is tested.
+    :param expected: torch.Tensor, scalar value, or array-like of either
+            torch.Tensor objects or scalar values that is tested.
+    :param check_dtype: whether to check the types of the tensor
+    :param kwargs: kwargs passed to torch.testing.assert_close.
     """
     assert actual is not None and expected is not None, (
         "'actual' and 'expected' keyword arguments must be present")
@@ -35,20 +37,37 @@ def assert_allclose(*, actual=None, expected=None, **kwargs):
             assert_allclose(actual=a, expected=e, **kwargs)
         return
 
-    torch.testing.assert_allclose(actual, expected, **kwargs)
+    if not isinstance(actual, torch.Tensor):
+        actual = torch.tensor(actual)
+    if not isinstance(expected, torch.Tensor):
+        expected = torch.tensor(expected)
+
+    torch.testing.assert_close(actual,
+                               expected,
+                               check_dtype=check_dtype,
+                               **kwargs)
 
 
-def assert_allequal(*, actual=None, expected=None, msg=''):
+def assert_allequal(*,
+                    actual=None,
+                    expected=None,
+                    msg='',
+                    check_dtype=False,
+                    **kwargs):
     """Assertion function that enforces passing the 'actual' and 'expected'
-    arguments to torch.testing.assert_allclose in the correct order by forcing
+    arguments to torch.testing.assert_close in the correct order by forcing
     the use of keyword arguments. This improves error reporting in case of
     assertion failures. Additionally, rtol=0 and atol=0 are passed to
-    torch.testing.assert_allclose as this results in identity comparison for
+    torch.testing.assert_close as this results in identity comparison for
     integer and boolean tensors.
 
-    :param actual: torch.Tensor or scalar value that is tested.
-    :param expected: torch.Tensor or scalar value that is used as a reference.
-    :param msg: message passed to torch.testing.assert_allclose.
+    :param actual: torch.Tensor, scalar value, or array-like of either
+            torch.Tensor objects or scalar values that is tested.
+    :param expected: torch.Tensor, scalar value, or array-like of either
+            torch.Tensor objects or scalar values that is tested.
+    :param msg: message passed to torch.testing.assert_close.
+    :param check_dtype: whether to check the types of the tensor
+    :param kwargs: kwargs passed to torch.testing.assert_close.
     """
     assert actual is not None and expected is not None, (
         "'actual' and 'expected' keyword arguments must be present")
@@ -58,7 +77,13 @@ def assert_allequal(*, actual=None, expected=None, msg=''):
             "Shape of 'actual' (%s) should be the same as shape of"
             " 'expected' (%s)") % (actual.shape, expected.shape)
 
-    torch.testing.assert_allclose(actual, expected, rtol=0, atol=0, msg=msg)
+    torch.testing.assert_close(actual,
+                               expected,
+                               rtol=0,
+                               atol=0,
+                               msg=msg,
+                               check_dtype=check_dtype,
+                               **kwargs)
 
 
 def disableSmallModel():

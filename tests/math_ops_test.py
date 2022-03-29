@@ -132,7 +132,9 @@ def test_binary_pow(inplace, exponent, trace_model):
     input = torch.randn([1, 2, 10, 200])
 
     def assert_(native_out, poptorch_out):
-        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+        helpers.assert_allclose(actual=poptorch_out,
+                                expected=native_out,
+                                equal_nan=True)
 
     def op(x):
         if inplace:
