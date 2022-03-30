@@ -153,8 +153,8 @@ class IPUScope:
             else:
                 yield x
 
-        if tensors != [None]:
-            flattened = list(flatten(tensors))
+        flattened = list(flatten(tensors))
+        if flattened != [None]:
             with torch.no_grad():
                 for tensor in flattened:
                     if tensor.dtype == torch.long:

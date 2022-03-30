@@ -388,8 +388,7 @@ def test_none_input_fail(trace_model):
         poptorch_model(x, None)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_no_inputs(trace_model):
+def test_no_inputs():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -402,7 +401,7 @@ def test_no_inputs(trace_model):
 
     model = Model()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(model, options)
 
     # It appears that forward is called enough time as to make the value 7 as
