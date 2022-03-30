@@ -14,6 +14,8 @@ API changes
 Bug Fixes
 ---------
 
+- Fix remaining in-place operations on slices
+
 v2.5 (Poplar SDK 2.5)
 =====================
 

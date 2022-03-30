@@ -312,41 +312,62 @@ def test_float_to_half_buffer_inplace_with_training():
     helpers.assert_allclose(actual=native_loss, expected=poptorch_loss)
 
 
-class DirectAssign(nn.Module):
-    def __init__(self, step):
-        super().__init__()
-        self.step = step
-
-    def forward(self, x):
-        x[0:2:self.step] = x[0:2:self.step] * 0
-        return x
+def direct_assign(x, step):
+    x[0:2:step.item()] = x[0:2:step.item()] * 0
+    return x
 
 
-class ModifyBeforeAssign(nn.Module):
-    def __init__(self, step):
-        super().__init__()
-        self.step = step
+def direct_assign_inplace(x, step):
+    x[0:2:step.item()] *= 0
+    return x
 
-    def forward(self, x):
-        x = x * 2
-        x[0:2:self.step] = x[0:2:self.step] * 0
-        return x
+
+def direct_fill(x, step):
+    x[0:2:step.item()] = 0
+    return x
+
+
+# Slicing entire dimensions lowers to slice(slice(x))
+def chained_slice(x, step):
+    x[:, :2:step.item()].mul_(0)
+    return x
+
+
+def modify_before_assign(x, step):
+    x = x * 2
+    x[0:2:step.item()] = x[0:2:step.item()] * 0
+    return x
 
 
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("step_size", [1, 2])
-@pytest.mark.parametrize("model", [DirectAssign, ModifyBeforeAssign])
-def test_inplace_assign_to_slice(model, step_size, capfd):
+@pytest.mark.parametrize("op", [
+    direct_assign, direct_assign_inplace, direct_fill, chained_slice,
+    modify_before_assign
+])
+def test_inplace_modify_slice(op, step_size, capfd):
     t = torch.rand(4, 4)
-    cpu_model = model(step_size)
+    step = torch.tensor(step_size)
+
+    class Model(torch.nn.Module):
+        pass
+
+    Model.forward = lambda _, x: op(x, step)
+
+    cpu_model = Model()
     ipu_model = poptorch.inferenceModel(cpu_model)
 
     if step_size == 1:
-        # Clone the inputs so they're not modified by the models
-        helpers.assert_allclose(actual=ipu_model(t.clone()),
-                                expected=cpu_model(t.clone()))
+        ipu_input = t.clone()
+        cpu_input = t.clone()
+        # Ensure outputs match
+        helpers.assert_allclose(actual=ipu_model(ipu_input),
+                                expected=cpu_model(cpu_input))
+        # Ensure that any inplace modification of graph inputs is
+        # correctly reflected
+        helpers.assert_allclose(actual=ipu_input, expected=cpu_input)
     else:
-        if model is DirectAssign:
+        if op is direct_fill:
             with pytest.raises(
                     poptorch.poptorch_core.Error,
                     match="All operations in the main graph were pruned, "

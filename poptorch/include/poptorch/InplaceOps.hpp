@@ -8,10 +8,15 @@
 #include <unordered_set>
 #include <vector>
 
+namespace c10 {
+struct Symbol;
+} // namespace c10
+
 namespace torch {
 namespace jit {
 struct Graph;
 struct Node;
+using NodeKind = c10::Symbol;
 struct Value;
 } // namespace jit
 } // namespace torch
@@ -76,7 +81,7 @@ private:
   void fixForLoopInputs();
 
   // Outplace op by swapping it with the correct variant (usually but not always
-  // removing the trialing '_') and making any other changes
+  // removing the trailing '_') and making any other changes
   torch::jit::Node *outplaceOp(torch::jit::Node *node);
 
   torch::jit::Graph *_graph;
@@ -107,6 +112,10 @@ private:
   // of buffers modified in place, which is not supported with replicas
   bool _replicas_needing_broadcast;
 };
+
+// Get the NodeKind corresponding to the outplace version of the given
+// inplace op NodeKind
+torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind);
 
 } // namespace poptorch
 

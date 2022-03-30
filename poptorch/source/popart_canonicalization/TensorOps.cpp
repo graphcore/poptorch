@@ -161,70 +161,13 @@ torch::jit::Node *copyHandler(torch::jit::Graph *graph,
   // aten::copy_(Tensor self, Tensor src, bool non_blocking) -> Tensor
   auto *dest = node->input(0);
   auto *src = node->input(1);
-  auto *out = src;
   at::ScalarType dest_type = getNodeScalarType(dest);
   at::ScalarType src_type = getNodeScalarType(src);
 
-  // In-place copying to slices is a special case. When we modify a
-  // slice in-place, torch produces a graph like the following:
-  //
-  //   %x = input, shape = [4, 4]
-  //   %1 = slice(%x), shape = [2, 2]
-  //   %2 = add(%1, %1)
-  //   %3 = slice(%x), shape = [2, 2]
-  //   %4 = copy_(%3, %2), shape = [2, 2]
-  //   return %x, shape = [4, 4]
-  //
-  // The original input %x is returned because the slice %3 is a
-  // view on %x, and thus any modifications to %3 are reflected
-  // in %x. To simulate in-place modification to slices, we return
-  // a dynamic update instead, so that we can perform the slice
-  // modification out-of-place, and return the "modified" tensor
-  //
-  //   %x = input, shape = [4, 4]
-  //   %1 = slice(%x), shape = [2, 2]
-  //   %2 = add(%1, %1)
-  //   %3 = dynamic_update(%x, $2)
-  //   return %3
-  //
-  if (dest->node()->kind() == symbols::popart::slice) {
-    auto *slice = dest->node();
-    auto *slice_input = slice->input(0);
-    auto *slice_offset = slice->input(1);
-
-    // Record the indices that we sliced: We need these for DynamicUpdate
-    int32_t slice_start = constantToInt(slice_offset->node());
-    int32_t slice_end = constantToInt(slice->input(2)->node());
-    int32_t slice_dim = constantToInt(slice->input(3)->node());
-
-    auto *dynamic_update = createDynamicupdate(
-        graph, {slice_input, slice_offset, src}, {slice_dim},
-        {slice_end - slice_start}, /* noOverlap = */ 1);
-
-    // Replace uses of slice input after inplace op with result of
-    // the dynamic update (i.e. the modified tensor)
-    out = dynamic_update->output();
-    replaceAllUsesAfterNodeWith(node, slice_input, out);
-
-    if (src_type == dest_type) {
-      return dynamic_update;
-    }
-  }
-  // Dynamic update does not support step size. Slicing with step size is
-  // implemented using subsample(slice(x))
-  if (dest->node()->kind() == symbols::popart::subsample) {
-    auto *subsample = dest->node();
-    if (subsample->input(0)->node()->kind() == symbols::popart::slice) {
-      logging::warn(
-          "In-place modification of slices with step size other than 1 is "
-          "not supported. This may result in unexpected behaviour.");
-    }
-  }
-
   if (src_type == dest_type) {
-    return createIdentity(graph, {out});
+    return createIdentity(graph, {src});
   }
-  return createCast(graph, out, dest_type);
+  return createCast(graph, src, dest_type);
 }
 
 torch::jit::Node *justReturnFalse(torch::jit::Graph *graph,

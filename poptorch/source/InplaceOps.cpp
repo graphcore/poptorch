@@ -19,13 +19,25 @@
 namespace poptorch {
 
 namespace {
+namespace aten = c10::aten;
 // Ops which only have an in-place version
 const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
   // static to make sure values are initialised
-  static std::unordered_set<torch::jit::NodeKind> only_implace = {
-      c10::aten::copy_, c10::aten::normal_, c10::aten::uniform_,
-      c10::aten::exponential_};
-  return only_implace;
+  static std::unordered_set<torch::jit::NodeKind> only_inplace = {
+      aten::copy_, aten::normal_, aten::uniform_, aten::exponential_};
+  return only_inplace;
+}
+
+// Known view operations
+const std::unordered_set<torch::jit::NodeKind> &viewOps() {
+  // static to make sure values are initialised
+  static std::unordered_set<torch::jit::NodeKind> view_ops = {
+      aten::chunk,    aten::detach,     aten::narrow,   aten::permute,
+      aten::reshape,  aten::select,     aten::slice,    aten::split,
+      aten::squeeze,  aten::transpose,  aten::unbind,   aten::unsqueeze,
+      aten::view,     aten::as_strided, aten::diagonal, aten::movedim,
+      aten::swapaxes, aten::swapdims,   aten::view_as};
+  return view_ops;
 }
 } // namespace
 
@@ -90,7 +102,15 @@ void InplaceOpHandler::processInput(size_t input_num) {
     auto inputs = node->inputs();
     ERROR_ON(inputs.empty());
 
-    if (inputs[0] != current_alias) {
+    // There are two cases in which an inplace op should modify graph inputs:
+    // 1. When the inplace op operates on the input directly
+    // 2. When the inplace op operates on a chain of view operations that
+    //    can be followed back to the input (e.g. inplace on an input slice)
+    torch::jit::Value *input = inputs[0];
+    while (viewOps().count(input->node()->kind()) != 0) {
+      input = input->node()->input(0);
+    }
+    if (input != current_alias) {
       continue;
     }
 
@@ -112,6 +132,11 @@ void InplaceOpHandler::processInput(size_t input_num) {
 
     // Keep it in place if there is only an inplace version
     if (onlyInplaceOps().count(node->kind()) != 0) {
+      current_alias = node->output();
+      continue;
+    }
+
+    if (viewOps().count(node->input(0)->node()->kind()) != 0) {
       current_alias = node->output();
       continue;
     }
@@ -193,6 +218,14 @@ void InplaceOpHandler::removeRemainingInplaceOps() {
       continue;
     }
 
+    // If the input is a view operation, it's unsafe to
+    // outplace at this stage because aliasing information
+    // is lost. This special case will be handled during
+    // PopART canonicalisation
+    if (viewOps().count(node->input(0)->node()->kind()) != 0) {
+      continue;
+    }
+
     outplaceOp(node);
     to_delete.push_back(node);
   }
@@ -202,16 +235,26 @@ void InplaceOpHandler::removeRemainingInplaceOps() {
   }
 }
 
-torch::jit::Node *InplaceOpHandler::outplaceOp(torch::jit::Node *node) {
+torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind) {
+  if (onlyInplaceOps().count(kind) != 0) {
+    return kind;
+  }
+
   torch::jit::NodeKind new_kind;
-  if (torch::jit::inPlaceToOutOfPlace.count(node->kind()) != 0) {
-    new_kind = torch::jit::inPlaceToOutOfPlace.at(node->kind());
+  if (torch::jit::inPlaceToOutOfPlace.count(kind) != 0) {
+    new_kind = torch::jit::inPlaceToOutOfPlace.at(kind);
   } else {
     // Remove trailing '_' from the kind string
-    std::string kind_str(node->kind().toQualString());
+    std::string kind_str(kind.toQualString());
     std::string modified_kind_str = kind_str.substr(0, kind_str.length() - 1);
     new_kind = c10::Symbol::fromQualString(modified_kind_str);
   }
+
+  return new_kind;
+}
+
+torch::jit::Node *InplaceOpHandler::outplaceOp(torch::jit::Node *node) {
+  torch::jit::NodeKind new_kind = outplaceKind(node->kind());
 
   torch::jit::WithInsertPoint insert_point(node);
   auto *new_node = _graph->create(new_kind);

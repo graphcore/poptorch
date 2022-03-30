@@ -8,14 +8,91 @@
 
 #include "PoptorchSymbols.hpp"
 #include "popart_canonicalization/PopartCanonicalizationUtils.hpp"
+#include "poptorch/DispatchTracer.hpp"
+#include "poptorch/InplaceOps.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+namespace torch {
+namespace jit {
+bool isInplaceOp(const Node *node);
+} // namespace jit
+} // namespace torch
+
 namespace poptorch {
 namespace {
+
+// In-place modification of slices is a special case. When we
+// modify a slice in-place, torch produces a graph like the
+// following:
+//
+//   %x = input, shape = [4, 4]
+//   %1 = slice(%x), shape = [2, 2]
+//   %2 = add(%1, %1)
+//   %3 = slice(%x), shape = [2, 2]
+//   %4 = copy_(%3, %2), shape = [2, 2]
+//   return %x, shape = [4, 4]
+//
+// The original input %x is returned because the slice %3 is a
+// view on %x, and thus any modifications to %3 are reflected
+// in %x. To simulate in-place modification to slices, we return
+// a dynamic update instead, so that we can perform the slice
+// modification out-of-place, and return the "modified" tensor
+// with the correct shape
+//
+//   %x = input, shape = [4, 4]
+//   %1 = slice(%x), shape = [2, 2]
+//   %2 = add(%1, %1)
+//   %3 = dynamic_update(%x, $2) shape = [4, 4]
+//   return %3, shape = [4, 4]
+//
+torch::jit::Node *handleSliceModification(torch::jit::Graph *graph,
+                                          torch::jit::Node *node,
+                                          torch::jit::Value *modified_slice) {
+  torch::jit::Value *input = node->input(0);
+  torch::jit::Node *new_node = modified_slice->node();
+  // Follow the chain of slices that are being operated on by the inplace op
+  while (input->node()->kind() == symbols::popart::slice) {
+    auto *slice = input->node();
+    auto *slice_input = slice->input(0);
+    auto *slice_offset = slice->input(1);
+
+    // Record the indices that we sliced: We need these for DynamicUpdate
+    int32_t slice_start = constantToInt(slice_offset->node());
+    int32_t slice_end = constantToInt(slice->input(2)->node());
+    int32_t slice_dim = constantToInt(slice->input(3)->node());
+
+    auto *dynamic_update = createDynamicupdate(
+        graph, {slice_input, slice_offset, modified_slice}, {slice_dim},
+        {slice_end - slice_start}, /* noOverlap = */ 1);
+
+    // Replace uses of slice input after inplace op with result of
+    // the dynamic update (i.e. the modified tensor)
+    auto *modified_input = dynamic_update->output();
+    replaceAllUsesAfterNodeWith(node, slice_input, modified_input);
+    new_node = dynamic_update;
+
+    // Repeat this process for the entire chain of slices - the
+    // reconstructed modified input is used to reconstruct the next
+    // modified slice input
+    input = slice_input;
+    modified_slice = modified_input;
+  }
+  // Dynamic update does not support step size. Slicing with step size is
+  // implemented using subsample(slice(x))
+  if (input->node()->kind() == symbols::popart::subsample) {
+    auto *subsample = input->node();
+    if (subsample->input(0)->node()->kind() == symbols::popart::slice) {
+      logging::warn(
+          "In-place modification of slices with step size other than 1 is "
+          "not supported. This may result in unexpected behaviour.");
+    }
+  }
+  return new_node;
+}
 
 class CanonicalizeImpl {
 public:
@@ -34,8 +111,23 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     torch::jit::Node *new_node = nullptr;
     torch::jit::Symbol kind = node->kind();
 
+    bool is_inplace_op = torch::jit::isInplaceOp(node);
+
+    // If the op is inplace at the canonicalisation stage (i.e. it
+    // wasn't outplaced by the InplaceOpHandler), that means it's
+    // operating on a view and is unsafe to replace. We can handle
+    // the slice modification here so it's safe to outplace remaining
+    // inplace ops
+    if (is_inplace_op) {
+      kind = outplaceKind(kind);
+    }
+
     if (SymbolHandler handler = getHandler(kind)) {
       new_node = handler(graph, node);
+
+      if (is_inplace_op) {
+        new_node = handleSliceModification(graph, node, new_node->output());
+      }
     }
 
     // If we have a new node add it and replace the old use.
