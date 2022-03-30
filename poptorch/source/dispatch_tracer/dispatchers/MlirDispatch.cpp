@@ -241,6 +241,18 @@ void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
 // aten::detach(Tensor(a) self) -> (Tensor(a))
 at::Tensor MLIRDispatch::detach(const at::Tensor &self) { return self; }
 
+void MLIRDispatch::setCurrentCodeLocation(
+    const torch::jit::SourceRange &source_location) {
+  auto file_line_col = source_location.file_line_col();
+  if (file_line_col) {
+    std::uint64_t line;
+    std::uint64_t col;
+    std::string filename;
+    std::tie(filename, line, col) = *file_line_col;
+    _compiler.setCurrentPythonCodeLocation(filename.c_str(), line, col);
+  }
+}
+
 void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
 

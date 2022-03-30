@@ -19,7 +19,15 @@ at::ScalarType scalarTypeFromInput(const torch::jit::Node *node, size_t num) {
                                                     << " as it does not exist");
   return *node->input(num)->type()->expect<c10::TensorType>()->scalarType();
 }
+
+torch::jit::SourceRange current_source_location = {};
+
 } // namespace
+
+void setCurrentPythonCodeLocation(
+    const torch::jit::SourceRange &source_location) {
+  current_source_location = source_location;
+}
 
 torch::jit::Node *
 createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
@@ -48,6 +56,7 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
     }
   }
 
+  new_node->setSourceRange(current_source_location);
   setNodeOutputsTypes(new_node, implicit_cast, output_type);
   graph->insertNode(new_node);
   return new_node;

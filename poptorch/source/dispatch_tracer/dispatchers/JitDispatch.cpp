@@ -175,6 +175,11 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
 // aten::detach(Tensor(a) self) -> (Tensor(a))
 at::Tensor JITDispatch::detach(const at::Tensor &self) { return self; }
 
+void JITDispatch::setCurrentCodeLocation(
+    const torch::jit::SourceRange &source_location) {
+  setCurrentPythonCodeLocation(source_location);
+}
+
 // Convert the operation into our normal IR style operation.
 void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                                            c10::Stack &stack,

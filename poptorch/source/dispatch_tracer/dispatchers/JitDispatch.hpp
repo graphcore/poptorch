@@ -25,6 +25,7 @@ public:
                    const std::vector<at::Tensor> &persistent_data_storage,
                    const std::string &output_structure);
 
+  void setCurrentCodeLocation(const torch::jit::SourceRange &source_location);
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack);
 
   at::Tensor detach(const at::Tensor &self);

@@ -60,7 +60,8 @@ class IPUScope:
         # Create the graph. Futured captured calls will be written into this
         # graph behind the scenes.
         poptorch_core.createGraph(
-            poptorch_core.TracingMode(self._compile_using), inputs, param_list)
+            poptorch_core.TracingMode(self._compile_using), inputs, param_list,
+            self._options._source_location_excludes)
 
         # JITDispatch::createGraph() doesn't add non-floating point parameters
         # and buffers as graph inputs as they are not supported in PopART.

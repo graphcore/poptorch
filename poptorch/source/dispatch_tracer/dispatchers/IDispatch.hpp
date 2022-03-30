@@ -27,6 +27,8 @@ public:
               const std::vector<at::Tensor> &persistent_data_storage,
               const std::string &output_structure) = 0;
 
+  virtual void
+  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) = 0;
   // The "catch-all" fallback kernel.
   virtual void fallback(const c10::OperatorHandle &op, c10::Stack *stack) = 0;
 

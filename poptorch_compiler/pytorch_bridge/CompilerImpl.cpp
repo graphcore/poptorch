@@ -6,14 +6,16 @@ namespace poptorch_ir {
 namespace detail {
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
-    : builder(&context), default_loc(mlir::UnknownLoc::get(&context)),
-      the_module(mlir::ModuleOp::create(default_loc)), executable(the_module) {
+    : builder(mlir::UnknownLoc::get(&context), &context),
+      the_module(mlir::ModuleOp::create(builder.getLoc())),
+      executable(the_module) {
+
   // Load the dialect.
   context.loadDialect<poptorch_ir::PoptorchDialect>();
 
   // We represent our graph as a simple function.
   auto func_type = builder.getFunctionType({}, llvm::None);
-  main_graph = mlir::FuncOp::create(default_loc, "MainGraph", func_type);
+  main_graph = builder.create<mlir::FuncOp>("MainGraph", func_type);
   the_module.push_back(main_graph);
 
   // Add an entry block.
@@ -21,13 +23,12 @@ PoptorchCompilerImpl::PoptorchCompilerImpl()
 
   // Same for write weights.
   write_weights_graph =
-      mlir::FuncOp::create(default_loc, "WeightsToDevice", func_type);
+      builder.create<mlir::FuncOp>("WeightsToDevice", func_type);
   main_graph.front().push_back(write_weights_graph);
   write_weights_graph.addEntryBlock();
 
   // Same for read weights.
-  read_weights_graph =
-      mlir::FuncOp::create(default_loc, "WeightsToHost", func_type);
+  read_weights_graph = builder.create<mlir::FuncOp>("WeightsToHost", func_type);
   main_graph.front().push_back(read_weights_graph);
   read_weights_graph.addEntryBlock();
 }

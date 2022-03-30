@@ -34,6 +34,9 @@ public:
 
   void init();
 
+  void setCurrentPythonCodeLocation(const char *filename, std::uint64_t line,
+                                    std::uint64_t col);
+
   TensorId addInput(void *ptr, const std::vector<std::int64_t> &shape, Type,
                     const char *);
   TensorId addParameter(void *ptr, const std::vector<std::int64_t> &shape, Type,

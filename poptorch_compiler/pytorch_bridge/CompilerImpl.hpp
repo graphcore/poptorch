@@ -7,7 +7,7 @@
 
 #include <llvm/ADT/StringSwitch.h>
 #include <mlir/IR/Attributes.h>
-#include <mlir/IR/Builders.h>
+#include <mlir/IR/ImplicitLocOpBuilder.h>
 #include <mlir/IR/TypeSupport.h>
 #include <mlir/IR/Types.h>
 
@@ -54,11 +54,7 @@ public:
   mlir::MLIRContext context;
 
   // Builder to create ops.
-  mlir::OpBuilder builder;
-
-  // We don't have any code info so we just use unknown code location. Just a
-  // helper so we don't have to recreate it every time.
-  mlir::Location default_loc;
+  mlir::ImplicitLocOpBuilder builder;
 
   // The main module which our functions are attached to.
   mlir::ModuleOp the_module;

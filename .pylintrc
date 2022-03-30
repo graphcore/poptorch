@@ -9,7 +9,8 @@ extension-pkg-whitelist=numpy,torch
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-#init-hook=
+# This adds <root_dir>/tests to the path (Needed for tests in subfolders to find helpers.py)
+init-hook="from pylint.config import find_pylintrc; import os, sys; sys.path.append(os.path.join(os.path.dirname(os.path.realpath(find_pylintrc())), 'tests'))"
 
 # Profiled execution.
 profile=no

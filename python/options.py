@@ -1220,6 +1220,11 @@ class Options(_options_impl.OptionsDict):
         self._distributed = _DistributedOptions()
         self._tensor_locations = _TensorLocationOptions()
         self._execution_strategy = PipelinedExecution()
+        # Don't pass it to super().__init__() -> we don't want it to be passed to the backend with the other
+        # options. (It is passed to createGraph() instead).
+        self._source_location_excludes = [
+            "install/poptorch", "site-packages/torch", "site-packages/poptorch"
+        ]
 
         self.relaxOptimizerAttributesChecks(False)
         self.showCompilationProgressBar(True)
@@ -1240,6 +1245,34 @@ class Options(_options_impl.OptionsDict):
             logger.info("POPTORCH_CACHE_DIR is set: setting cache path to %s",
                         path)
             self.enableExecutableCaching(path)
+
+    def sourceLocationExcludes(self,
+                               excludes: List[str]) -> "poptorch.Options":
+        """ When printing the IR all the frames containing one of the excluded
+            strings will be ignored.
+
+            This is helpful to get the IR to trace back to user code rather
+            than some function inside a framework.
+
+            :param excludes: Replace the current list of exclusions with this
+                             one.
+        """
+
+        self._source_location_excludes = excludes
+        return self
+
+    def appendToLocationExcludes(self, *excludes: str) -> "poptorch.Options":
+        """ When printing the IR all the frames containing one of the excluded
+            strings will be ignored.
+
+            This is helpful to get the IR to trace back to user code rather
+            than some function inside a framework.
+
+            :param excludes: Append these exclusions to the existing
+                             list of exclusions.
+        """
+        self._source_location_excludes += excludes
+        return self
 
     def showCompilationProgressBar(self,
                                    show: bool = True) -> "poptorch.Options":

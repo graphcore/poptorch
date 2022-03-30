@@ -34,6 +34,12 @@ template <class T> class optional;
 } // namespace c10
 
 namespace poptorch {
+
+// Set the current source code location (i.e all the nodes created
+// will appear as having been instantiated from that location).
+void setCurrentPythonCodeLocation(
+    const torch::jit::SourceRange &source_location);
+
 torch::jit::Node *createAndInsertNode(
     torch::jit::Graph *graph, torch::jit::NodeKind kind,
     torch::jit::ArrayRef<torch::jit::Value *> inputs = {},

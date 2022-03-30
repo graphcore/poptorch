@@ -3,6 +3,7 @@
 #define POPTORCH_TRANSFORMS_PASS_UTILS_HPP_
 
 #include <llvm/Support/raw_ostream.h>
+#include <mlir/IR/OperationSupport.h>
 #include <string>
 
 namespace poptorch_ir {
@@ -11,7 +12,12 @@ namespace poptorch_ir {
 template <class T> std::string mlirOpToStr(T &op) {
   std::string str;
   llvm::raw_string_ostream ostream(str);
-  ostream << op;
+  mlir::OpPrintingFlags flags{};
+  // enableDebugInfo = add location() at the end of each line.
+  // pretty = true -> Print the actual filename:line:col rather than loc0, loc1,
+  // etc which are IDs in the mlir::SourceManager.
+  flags.enableDebugInfo(true);
+  op.print(ostream, flags);
   return str;
 }
 

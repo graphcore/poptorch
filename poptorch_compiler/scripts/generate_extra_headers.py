@@ -276,7 +276,7 @@ for op_name in poptorch_ops:
 
     # One space to give the comma removal thing something to remove when there are no args.
     func_args = []
-    parameters = ""
+    parameters = []
 
     # Turn the args into function signitures.
     for arg in poptorch_ops[op_name]["args"]:
@@ -286,9 +286,9 @@ for op_name in poptorch_ops:
         # If the argument is an MLIR type we want to convert it first.
         # pylint: disable=literal-comparison
         if arg.macro_type() is "TYPE":
-            parameters += ", _impl->convertType(" + arg.name + ")"
+            parameters.append("_impl->convertType(" + arg.name + ")")
         else:
-            parameters += ", convert(" + arg.name + ", _impl->value_map)"
+            parameters.append("convert(" + arg.name + ", _impl->value_map)")
 
     func_args_str = ", ".join(func_args)
 
@@ -301,8 +301,7 @@ for op_name in poptorch_ops:
     # Create the IR op.
 
     cppFunction += "auto tmp = _impl->builder.create<poptorch_ir::"
-    cppFunction += op_name + ">(_impl->default_loc"
-    cppFunction += parameters + ");\n\n"
+    cppFunction += op_name + ">(" + ", ".join(parameters) + ");\n\n"
 
     # Add the IR op to the graph.
     cppFunction += "appendToMainGraph(tmp);\n\n"

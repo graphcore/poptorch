@@ -1,5 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
+#include <torch/csrc/jit/runtime/interpreter.h>
 
 #include <string>
 #include <unordered_map>
@@ -18,6 +20,7 @@
 namespace poptorch {
 
 namespace {
+
 // This is just a useful helper since sometimes we need to pass both keys in.
 c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::PrivateUse2,
                                      c10::DispatchKey::AutogradPrivateUse2};
@@ -40,13 +43,64 @@ struct GlobalTracerContext {
   // Activates the interceptor which catches the pytorch calls.
   std::unique_ptr<c10::impl::IncludeDispatchKeyGuard> raii_dispatch_context;
 
+  // When setting the location source ignore all the frames containing one of
+  // these strings.
+  std::vector<std::string> source_location_excludes;
+
   // A simple guard to stop us from redispatching when we are already in a
   // dispatch context.
   bool dispatch_on;
+
+  // Return the passed filename if it doesn't match any of the registered
+  // exclusions, else an empty c10::optional.
+  c10::optional<std::string> filenameIfNotExcluded(const std::string &filename);
 };
+
+c10::optional<std::string>
+GlobalTracerContext::filenameIfNotExcluded(const std::string &filename) {
+  for (auto &exception : source_location_excludes) {
+    if (filename.find(exception) != std::string::npos) {
+      return {};
+    }
+  }
+  return filename;
+}
 
 GlobalTracerContext context;
 
+// adapted from torch/csrc/jit/python/python_tracer.cpp because the header file
+// had too many dependepencies
+torch::jit::SourceRange getPythonInterpreterSourceRange() {
+  auto cs = torch::jit::tracer::pythonCallstack();
+  c10::optional<std::string> source_filename;
+  size_t source_line = 0;
+  std::stringstream stack_trace;
+  for (const auto &entry : cs) {
+    const auto &range = entry.range;
+    if (range.source()) {
+      const auto &src = range.source();
+      if (src && src->filename()) {
+        auto line =
+            src->starting_line_no() + src->lineno_for_offset(range.start());
+        stack_trace << *(src->filename()) << "(" << line
+                    << "): " << entry.filename << "\n";
+        if (!source_filename) {
+          source_filename = context.filenameIfNotExcluded(*src->filename());
+          source_line = line;
+        }
+      }
+    }
+  }
+
+  auto stack_trace_text = stack_trace.str();
+  auto source = std::make_shared<torch::jit::Source>(
+      stack_trace_text, source_filename, source_line);
+  if (!source_filename) {
+    source_filename = "<unknown>";
+  }
+  logging::trace("Setting op source to: {}:{}", *source_filename, source_line);
+  return torch::jit::SourceRange(source, 0, stack_trace_text.size());
+}
 /*
  * Small helper to stop us from intercepting CPU calls called by us.
  */
@@ -71,6 +125,8 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
   // dispatch catcher while it is running.
   DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting aten::copy_");
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   context.active_dispatch->copyInplace(self, src);
 
   return self;
@@ -109,7 +165,9 @@ void destroyDispatcher() {
 // Take the inputs to the graph and turn them into our IR graph
 // inputs/parameters.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
-                 const std::vector<at::Tensor> &parameters) {
+                 const std::vector<at::Tensor> &parameters,
+                 const std::vector<std::string> &source_location_excludes) {
+  context.source_location_excludes = source_location_excludes;
   if (mode == TracingMode::POPART) {
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
@@ -130,6 +188,8 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
     ERROR("Unsupported target");
   }
 
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   context.active_dispatch->createGraph(inputs, parameters);
 }
 
@@ -147,6 +207,8 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
   logging::trace("[TRACING-2] Intercepting {} ", schema);
 
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   context.active_dispatch->fallback(op, stack);
 }
 
@@ -192,6 +254,8 @@ void markOutputs(const std::vector<at::Tensor> &outputs,
   // We will also catch pytorch calls called via C++ so we need to disable our
   // dispatch catcher while it is running.
   DisableDispatchScope guard;
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   context.active_dispatch->markOutputs(outputs, data_storage, output_structure);
 }
 
@@ -215,6 +279,8 @@ at::Tensor toCopy(const at::Tensor &self,
   DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting aten::_to_copy");
 
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   at::Tensor out = context.active_dispatch->toCopyInplace(self, dtype, layout,
                                                           device, pin, fmt);
   return out;
@@ -241,6 +307,8 @@ emptyBase(at::IntArrayRef size,
   logging::trace("[TRACING-2] Intercepting empty_base for tensor: {}, {}",
                  output.data_ptr(), toString(output));
 
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   context.active_dispatch->registerEmptyTensor(output);
   return output;
 }
@@ -270,6 +338,8 @@ at::Tensor &emptyOut(at::IntArrayRef size, c10::optional<at::MemoryFormat> fmt,
   DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting empty.out");
 
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   context.active_dispatch->registerEmptyTensor(out);
   return out;
 }
@@ -293,6 +363,8 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
   DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting empty_strided");
 
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   context.active_dispatch->registerEmptyTensor(output);
 
   return output;
@@ -307,6 +379,8 @@ at::Tensor detach(const at::Tensor &self) {
   DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting aten::detach");
 
+  context.active_dispatch->setCurrentCodeLocation(
+      getPythonInterpreterSourceRange());
   at::Tensor out = context.active_dispatch->detach(self);
   return out;
 }

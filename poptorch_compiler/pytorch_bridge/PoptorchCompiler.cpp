@@ -29,14 +29,23 @@ TensorId PoptorchCompiler::addInput(void * /*unused*/,
   mlir::Value val = _impl->addArgument(_impl->main_graph, tensor);
 
   poptorch_ir::copy_from_host copy =
-      _impl->builder.create<poptorch_ir::copy_from_host>(_impl->default_loc,
-                                                         val, name);
+      _impl->builder.create<poptorch_ir::copy_from_host>(val, name);
   _impl->main_graph.front().push_back(copy);
 
   _impl->value_map.push_back(val);
   _impl->input_callbacks.push_back(name);
 
   return _impl->value_map.size() - 1;
+}
+
+void PoptorchCompiler::setCurrentPythonCodeLocation(const char *filename,
+                                                    std::uint64_t line,
+                                                    std::uint64_t col) {
+  // If the compiler isn't initialised yet: just ignore the call.
+  if (_impl) {
+    _impl->builder.setLoc(_impl->builder.getFileLineColLoc(
+        _impl->builder.getIdentifier(filename), line, col));
+  }
 }
 
 TensorId PoptorchCompiler::addParameter(void *ptr,
@@ -51,13 +60,13 @@ TensorId PoptorchCompiler::addParameter(void *ptr,
   // Write weights to the graph.
   poptorch_ir::copy_from_host copy_from =
       _impl->builder.create<poptorch_ir::copy_from_host>(
-          _impl->default_loc, val, "Write-" + std::string(name));
+          val, "Write-" + std::string(name));
   _impl->write_weights_graph.front().push_back(copy_from);
 
   // Read weights from the graph.
   poptorch_ir::copy_to_host copy_to =
       _impl->builder.create<poptorch_ir::copy_to_host>(
-          _impl->default_loc, val, "Read-" + std::string(name));
+          val, "Read-" + std::string(name));
   _impl->read_weights_graph.front().push_back(copy_to);
 
   // Add the main graph reference. Both copies are implicitly updating the main
@@ -77,8 +86,7 @@ TensorId PoptorchCompiler::addBuffer(void *ptr,
 void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {
   mlir::Value val = _impl->value_map[id];
   poptorch_ir::copy_to_host copy =
-      _impl->builder.create<poptorch_ir::copy_to_host>(_impl->default_loc, val,
-                                                       name);
+      _impl->builder.create<poptorch_ir::copy_to_host>(val, name);
   _impl->main_graph.front().push_back(copy);
   _impl->output_callbacks.push_back({name, ptr});
 }
@@ -135,17 +143,17 @@ void PoptorchCompiler::addReturn() {
   // Add returns to each of the graphs.
   {
     poptorch_ir::end_graph ret =
-        _impl->builder.create<poptorch_ir::end_graph>(_impl->default_loc);
+        _impl->builder.create<poptorch_ir::end_graph>();
     _impl->main_graph.front().push_back(ret);
   }
   {
     poptorch_ir::end_graph ret =
-        _impl->builder.create<poptorch_ir::end_graph>(_impl->default_loc);
+        _impl->builder.create<poptorch_ir::end_graph>();
     _impl->write_weights_graph.front().push_back(ret);
   }
   {
     poptorch_ir::end_graph ret =
-        _impl->builder.create<poptorch_ir::end_graph>(_impl->default_loc);
+        _impl->builder.create<poptorch_ir::end_graph>();
     _impl->read_weights_graph.front().push_back(ret);
   }
 }

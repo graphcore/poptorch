@@ -67,7 +67,8 @@ private:
 
 // Create a new graph.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
-                 const std::vector<at::Tensor> &parameters);
+                 const std::vector<at::Tensor> &parameters,
+                 const std::vector<std::string> &source_location_excludes);
 
 // Mark the outputs of the graph. |outputs| are the outputs as seen in the
 // graph, i.e, the tensors as seen/used by the user. `data_storage` are clones
