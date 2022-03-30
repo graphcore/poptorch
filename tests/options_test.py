@@ -111,6 +111,7 @@ def test_set_popart_options(capfd):
     # Create our model.
     model = Network()
     opts = poptorch.Options()
+
     opts._Popart.set("hardwareInstrumentations", set([0, 1]))
     opts._Popart.set("dotChecks", ["FINAL", "ALL"])
     opts._Popart.set("engineOptions", {
@@ -138,6 +139,7 @@ def test_set_popart_options(capfd):
     opts._Popart.set("accumulateOuterFragmentSettings.schedule", 1)
     opts._Popart.set("accumulateOuterFragmentSettings.excludedVirtualGraphs",
                      ["0", "1"])
+    opts._Popart.set("enableExplicitIR", True)
 
     inference_model = poptorch.inferenceModel(model, opts)
     x = torch.ones(2)
@@ -150,6 +152,7 @@ def test_set_popart_options(capfd):
         inference_model.compile(x, y)
 
     log = helpers.LogChecker(capfd)
+
     log.assert_contains("poptorch.Options added 0 to hardwareInstrumentations")
     log.assert_contains("poptorch.Options added 1 to hardwareInstrumentations")
     log.assert_contains("poptorch.Options added FINAL to dotChecks")
@@ -199,6 +202,7 @@ def test_set_popart_options(capfd):
     log.assert_contains(
         "poptorch.Options added 1 to "
         "accumulateOuterFragmentSettings.excludedVirtualGraphs")
+    log.assert_contains("poptorch.Options set enableExplicitIR to value true")
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
