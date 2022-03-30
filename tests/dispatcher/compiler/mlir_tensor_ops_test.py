@@ -61,6 +61,28 @@ def test_where():
 
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
+def test_as_strided():
+    def op_harness(op, *args):
+        t = torch.tensor([[1, 2, 3], [4, 5, 6], [6, 7, 8]])
+
+        cpu_result = op(t, *args)
+        ipu_result = IPUContext(op)(t, *args)
+
+        helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
+
+    op_harness(torch.as_strided, [3, 3], [3, 1])
+
+    err_msg = (
+        r"Poptorch does not support arbitrary manipulations of the shape and "
+        r"stride of a tensor\. Prefer other view functions like "
+        r"torch\.tensor\.expand\(\) over setting the shape and stride of a "
+        r"view manually\..*")
+    with pytest.raises(RuntimeError, match=err_msg):
+        op_harness(torch.as_strided, [3, 3], [1, 3])
+
+
+@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
+                    reason="CentOS 7 is not currently supported in MLIR.")
 def expand_reshape_view_harness(in_shape, new_shape, op):
     torch.manual_seed(42)
 

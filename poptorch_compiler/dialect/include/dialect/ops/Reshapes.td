@@ -14,7 +14,36 @@ def Poptorch_as_strided: Poptorch_Op<"as_strided", [ViewOp]> {
         $_state.addAttribute("size", $_builder.getI64ArrayAttr(size));
         $_state.addAttribute("strides", $_builder.getI64ArrayAttr(strides));
 
+        ERROR_ON_MSG(
+            strides.size() != size.size(),
+            "The new strides have a different number of dimensions to the new shape (" +
+            std::to_string(strides.size()) + " != " + std::to_string(size.size()) + ")");
+
+        // Check that we don't actually change the stride here
+        // TODO(T59600) consider moving this check to the MLIR level
+        std::vector<std::size_t> expected_strides(size.size(), 1);
+        std::partial_sum(size.rbegin(), size.rend() - 1,
+                        expected_strides.rbegin() + 1, std::multiplies<>{});
+
+        const auto new_num_elements = std::accumulate(
+            size.begin(), size.end(), 1.0, std::multiplies<>{});
+
+        const auto first_diff = std::mismatch(strides.begin(), strides.end(),
+                                              expected_strides.begin());
+
         mlir::RankedTensorType tensor = val1.getType().cast<mlir::RankedTensorType>();
+
+        // Note: this will have false positives/negatives if it follows a pytorch
+        // operation that would normally change the stride like expand, reshape or
+        // dimshuffle
+        ERROR_ON_MSG(
+            tensor.getNumElements() != new_num_elements ||
+                first_diff.first != strides.end(),
+            "Poptorch does not support arbitrary manipulations of the shape and "
+            "stride of a tensor. Prefer other view functions like "
+            "torch.tensor.expand() over setting the shape and stride of a view "
+            "manually.");
+
         $_state.addTypes(mlir::RankedTensorType::get(size, tensor.getElementType()));
      }]>];
 }

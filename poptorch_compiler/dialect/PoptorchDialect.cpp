@@ -5,6 +5,9 @@
 #include <mlir/IR/OpDefinition.h>
 #include <mlir/IR/OpImplementation.h>
 
+#include <algorithm>
+#include <numeric>
+
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch_ir {
