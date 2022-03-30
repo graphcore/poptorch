@@ -82,8 +82,25 @@ void JITDispatch::markOutputs(
     if (s == ')' || s == ']') {
       auto &construct_elem = construct_elem_stack.back();
       auto *node = construct_elem.node;
-      node->output()->setType(
-          c10::TupleType::create(construct_elem.element_types));
+      if (s == ')') {
+        node->output()->setType(
+            c10::TupleType::create(construct_elem.element_types));
+      } else {
+        if (construct_elem.element_types.empty()) {
+          node->output()->setType(c10::ListType::create(at::NoneType::get()));
+        } else {
+          ERROR_ON_MSG(
+              std::adjacent_find(
+                  std::begin(construct_elem.element_types),
+                  std::end(construct_elem.element_types),
+                  [](const c10::TypePtr &a, const c10::TypePtr &b) {
+                    return a->kind() != b->kind();
+                  }) != std::end(construct_elem.element_types),
+              "All elements in an output list must have the same type");
+          node->output()->setType(
+              c10::ListType::create(construct_elem.element_types[0]));
+        }
+      }
       construct_elem_stack.pop_back();
       graph.insertNode(node);
       val = node->output();
