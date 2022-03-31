@@ -511,11 +511,19 @@ class PoplarExecutor:
         # Unpack the inputs.
         inputs = unrollTensorList(in_tensors.asTuple())
 
+        # Store buffer and parameter memory addresses to make sure that these do
+        # not change during dispatching (which would give wrong results in a Jit
+        # trace)
+        buff_param_addresses = self._buffer_parameter_addresses()
+
         with IPUScope(inputs,
                       parameters_and_buffers=all_data(self._model),
                       options=self._options) as ipu:
             outputs = self._model(*in_tensors.asTuple())
             ipu.outputs(outputs)
+            self._error_on_buffer_parameter_address_change(
+                buff_param_addresses)
+
         return ipu._executable  # pylint: disable=protected-access
 
     @_impl.traceMethod("modelCompilation")
@@ -1265,7 +1273,7 @@ class PoplarExecutor:
 
         added_dummy_output = False
 
-        # Store buffer and paramter memory addresses to make sure that these do
+        # Store buffer and parameter memory addresses to make sure that these do
         # not change during tracing (which would give wrong results in a Jit
         # trace)
         buff_param_addresses = self._buffer_parameter_addresses()
