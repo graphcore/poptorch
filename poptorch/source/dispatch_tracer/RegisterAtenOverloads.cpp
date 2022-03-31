@@ -447,8 +447,6 @@ TORCH_LIBRARY_IMPL(aten, BackendSelect, m) {
 
 TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse2, m) {
   m.impl("detach", &poptorch::detach);
-  m.impl("convolution",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 }
 
 TORCH_LIBRARY_IMPL(poptorch, PrivateUse2, m) {

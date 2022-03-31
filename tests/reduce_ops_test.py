@@ -8,7 +8,17 @@ import helpers
 
 # Reduce Ops Harness
 # Checks that the IPU reduce ops match the CPU version.
-def reduce_harness(trace_model, reduce_op, input, expected_dtype=torch.bool):
+def reduce_harness(trace_model,
+                   func,
+                   input,
+                   dim=None,
+                   expected_dtype=torch.bool):
+    # dim must be passed this way to avoid named tensor errors
+    kwargs = {"dim": dim} if dim else {}
+
+    def reduce_op(x):
+        return func(x, **kwargs)
+
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
@@ -31,7 +41,10 @@ def reduce_harness(trace_model, reduce_op, input, expected_dtype=torch.bool):
     native_out = model(input)
     assert native_out.size() == pop_out.size()
 
-    helpers.assert_allequal(expected=native_out, actual=pop_out)
+    if torch.is_floating_point(native_out):
+        helpers.assert_allclose(expected=native_out, actual=pop_out)
+    else:
+        helpers.assert_allequal(expected=native_out, actual=pop_out)
 
 
 # torch.all, torch.any
@@ -41,11 +54,15 @@ def reduce_harness(trace_model, reduce_op, input, expected_dtype=torch.bool):
 @pytest.mark.parametrize("func", [torch.all, torch.any])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_any_all(trace_model, func, dim):
-    # dim must be passed this way to avoid named tensor errors
-    kwargs = {"dim": dim} if dim else {}
-
-    def reduce_op(x):
-        return func(x, **kwargs)
-
     input = torch.randint(low=0, high=3, size=(32, 128))
-    reduce_harness(trace_model, reduce_op, input)
+    reduce_harness(trace_model, func, input, dim)
+
+
+@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
+                    reason="Hardware IPU needed")
+@pytest.mark.parametrize("dim", [None, 0, -1])
+@pytest.mark.parametrize("func", [torch.sum, torch.mean])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_sum_mean(trace_model, func, dim):
+    input = torch.rand(32, 128)
+    reduce_harness(trace_model, func, input, dim, expected_dtype=torch.float32)

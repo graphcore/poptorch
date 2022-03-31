@@ -27,18 +27,22 @@
 # Activations
 ######################
 
+# hardsigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: hardsigmoid.out
   PopTorchDirect: hardsigmoid
   PopTorchDirectInplace: hardsigmoid_
   UnusedOutputArguments: {out}
 
+# hardswish.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: hardswish.out
   PopTorchDirect: hardswish
   UnusedOutputArguments: {out}
 
+# hardswish(Tensor self) -> Tensor
 - func: hardswish
   PopTorchDirect: hardswish
 
+# hardswish_(Tensor(a!) self) -> Tensor(a!)
 - func: hardswish_
   PopTorchDirectInplace: hardswish_
 
@@ -227,6 +231,14 @@
 - func: clamp.Tensor
   PopTorchDirect: clampTensor
 
+# hardtanh.out(Tensor self, Scalar min_val=-1, Scalar max_val=1, *, Tensor(a!) out) -> Tensor(a!)
+- func: hardtanh.out
+  PopTorchDirect: clamp
+  UnusedOutputArguments: {out}
+
+# hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> Tensor
+- func: hardtanh
+  PopTorchDirect: clamp
 
 # sum.IntList_out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 - func: sum.IntList_out
@@ -247,6 +259,12 @@
 # sqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: sqrt.out
   PopTorchDirect: sqrt
+  UnusedOutputArguments: {out}
+
+# mean.out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
+- func: mean.out
+  PopTorchDirect: reducemean
+  IgnoreArgs: {'dtype'}
   UnusedOutputArguments: {out}
 
 ##########

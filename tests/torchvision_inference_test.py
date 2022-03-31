@@ -147,5 +147,7 @@ def test_inception_v3():
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
                     reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.skip(
+    "TODO(T59568): Set is_leaf / grad_fn properly on MLIR tensors")
 def test_squeezenet1_1():
     inference_harness(models.squeezenet1_1)

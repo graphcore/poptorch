@@ -12,6 +12,8 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("empty_strided", &poptorch::emptyStrided);
 
   m.impl("detach", &poptorch::detach);
+  m.impl("convolution",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
   m.impl("transpose.int",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
