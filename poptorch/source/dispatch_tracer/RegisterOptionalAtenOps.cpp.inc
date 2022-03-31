@@ -82,6 +82,12 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("one_hot",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
+  m.impl("all",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+  m.impl("any",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
   // If we don't intercept this op, it will be decomposed to as_strided
   // which is harder to handle.
   m.impl("slice.Tensor",
