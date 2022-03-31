@@ -134,7 +134,8 @@ def op_harness(op,
                out_fn=None,
                native_out=None,
                fuzzy_errors=False,
-               trace_model=True):
+               trace_model=True,
+               allow_native_errors=True):
     """The op harness allows to test the native torch API against poptorch.
 
     This function wraps an operation into a model and allows training and
@@ -181,7 +182,8 @@ def op_harness(op,
             # native_out could be an alias of the input and so modified by
             # the poptorch_model, except if its an error
             if op_raises_exception:
-                pass
+                if not allow_native_errors:
+                    raise native_out[1]
             elif isinstance(native_out, tuple):
                 # pylint: disable=E1101
                 native_out = tuple([n.clone().detach() for n in native_out])
@@ -212,6 +214,8 @@ def op_harness(op,
         # Run on CPU.
         if native_out is None:
             native_out, op_raises_exception = exception_catcher(model, *inputs)
+            if op_raises_exception and not allow_native_errors:
+                raise native_out[1]
         else:
             op_raises_exception = isinstance(
                 native_out, tuple) and native_out[0] == "error"
@@ -347,13 +351,46 @@ class TestOpHarness:
 
 @pytest.mark.parametrize("dim", [0, 1])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_cat(dim, trace_model):
+@pytest.mark.parametrize(
+    "dtypes", [
+        [torch.float] * 3,
+        [torch.int] * 3,
+        [torch.int, torch.float],
+        [torch.float, torch.int],
+    ],
+    ids=["all_floats", "all_ints", "int,float", "float,int"])
+def test_cat(dim, trace_model, dtypes):
     torch.manual_seed(42)
-    x = torch.randn(2, 3)
+    # Cannot control the type of the first tensor as it needs to be
+    # torch.float32 to be a valid input to the Linear layer used in
+    # op_harness.
+    first_input = torch.randn(2, 3)
+    tensors = [torch.randn(2, 3).to(dtype=dtype) for dtype in dtypes]
 
     op = lambda *xs: torch.cat(xs, dim=dim)
+    op_harness(op,
+               first_input,
+               *tensors,
+               allow_native_errors=False,
+               trace_model=trace_model)
 
-    op_harness(op, x, x, x, trace_model=trace_model)
+
+@pytest.mark.parametrize("dim", [0, 1])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_cat_transpose(dim, trace_model):
+    """This combination of ops without ImplicitCasting causes the code to crash out."""
+    torch.manual_seed(42)
+    floatTensor = torch.randn(2, 3).to(dtype=torch.float)
+    intTensor = torch.randn(2, 3).to(dtype=torch.int)
+
+    op = lambda floatTensor, intTensor: torch.cat((intTensor, floatTensor),
+                                                  dim=dim).transpose(1, 0)
+
+    op_harness(op,
+               floatTensor,
+               intTensor,
+               allow_native_errors=False,
+               trace_model=trace_model)
 
 
 @pytest.mark.parametrize("dim_size", [11, 12, 13])

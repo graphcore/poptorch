@@ -563,7 +563,7 @@ new_node->f_(c10::Symbol::fromQualString("attr::min"),min);
 return new_node;
 }
 torch::jit::Node* createConcat(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::concat, args, ImplicitCast::None, OutputType::AsFirstInput);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::concat, args, ImplicitCast::All, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::axis"),axis);
 return new_node;
 }

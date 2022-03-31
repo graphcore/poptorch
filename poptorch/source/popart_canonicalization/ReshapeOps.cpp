@@ -576,17 +576,22 @@ torch::jit::Node *transposeHandler(torch::jit::Graph *graph,
   // moved (same operation, [3, 2]). So we need to make sure the IR reflects
   // that.
   std::vector<std::int64_t> permutation;
-  for (std::uint64_t i = 0; i < *dims.size(); ++i) {
+  c10::optional<size_t> size = dims.size();
+  ERROR_ON_MSG(!size, std::string("Number of dimensions for tensor %") +
+                          node->input(0)->debugName() + " is undefined. " +
+                          "About to read uninitialized memory," +
+                          " unexpected behaviour happened before transpose.");
+  for (std::uint64_t i = 0; i < *size; ++i) {
     permutation.push_back(i);
   }
 
   // Allow for python array style access.
   if (dim0 < 0) {
-    dim0 = *dims.size() + dim0;
+    dim0 = *size + dim0;
   }
 
   if (dim1 < 0) {
-    dim1 = *dims.size() + dim1;
+    dim1 = *size + dim1;
   }
 
   permutation[dim0] = dim1;
