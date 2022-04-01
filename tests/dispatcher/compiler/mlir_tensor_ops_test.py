@@ -14,7 +14,6 @@ def cat_stack_harness(op, dim, dtype):
     ipu_result = IPUContext(op)((t1, t2), dim)
     cpu_result = op((t1, t2), dim)
 
-    # pylint: disable=no-member
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
@@ -57,7 +56,6 @@ def test_where():
     ipu_result = IPUContext(torch.where)(cond, zeros, ones)
     cpu_result = torch.where(cond, zeros, ones)
 
-    # pylint: disable=no-member
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
@@ -85,11 +83,9 @@ def expand_reshape_view_harness(in_shape, new_shape, op):
 
     ipu_result = IPUContext(f)(t)
 
-    # pylint: disable=no-member
     helpers.assert_allequal(actual=ipu_result[0], expected=cpu_result[0])
 
     # Nb this is not guaranteed in all cases e.g. strides on CPU
-    # pylint: disable=no-member
     helpers.assert_allequal(actual=ipu_result[1], expected=t)
 
 
@@ -167,7 +163,7 @@ def is_view_harness(in_shape, fn, *args, **kwargs):
 
     ipu_res = IPUContext(is_view_fn)(t_ipu, *args, **kwargs)
     cpu_res = is_view_fn(t_cpu, *args, **kwargs)
-    # pylint: disable=no-member
+
     helpers.assert_allequal(actual=ipu_res, expected=cpu_res)
 
 

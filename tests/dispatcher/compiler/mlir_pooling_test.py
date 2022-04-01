@@ -68,7 +68,6 @@ def test_pool(op, params):
     cpu_result = pool(t)
     ipu_result = IPUContext(pool)(t)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(actual=ipu_result, expected=cpu_result)
 
 
@@ -95,5 +94,4 @@ def test_adaptive_avg_pool(op):
     cpu_result = op(output_size)(t)
     ipu_result = IPUContext(op(output_size))(t)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(actual=ipu_result, expected=cpu_result)

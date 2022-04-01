@@ -41,7 +41,6 @@ def test_matmul(size):
 
     assert ipu_result.size() == cpu_result.size()
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             atol=1e-05,
@@ -75,5 +74,4 @@ def test_addmm(params):
     cpu_result = addmm(t1, t2, t3)
     ipu_result = IPUContext(addmm)(t1, t2, t3)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)

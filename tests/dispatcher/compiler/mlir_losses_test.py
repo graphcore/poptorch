@@ -25,7 +25,7 @@ def test_nll_loss_forward(reduction, ignore_index):
 
     cpu_result = nll_loss(input1, input2)
     ipu_result = IPUContext(nll_loss)(input1, input2)
-    # pylint: disable=no-member
+
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
                             equal_nan=True)
@@ -56,7 +56,6 @@ def test_nll_loss_backward(reduction, ignore_index):
     input1.grad.detach_()
     cpu_result = nll_loss_backward(input1, input2)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
                             equal_nan=True)
@@ -75,7 +74,7 @@ def test_binary_cross_entropy_forward(reduction):
 
     ipu_result = IPUContext(bce)(input1, input2)
     cpu_result = bce(input1, input2)
-    # pylint: disable=no-member
+
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             equal_nan=True)
@@ -101,7 +100,7 @@ def test_binary_cross_entropy_backward(reduction):
     input1.grad.detach_()
     input1.grad.zero_()
     cpu_result = bce_backward(input1, input2)
-    # pylint: disable=no-member
+
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             equal_nan=True)
@@ -120,7 +119,7 @@ def test_binary_cross_entropy_with_logits_forward(reduction):
 
     cpu_result = IPUContext(bce_logit)(input1, input2)
     ipu_result = (bce_logit)(input1, input2)
-    # pylint: disable=no-member
+
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             equal_nan=True)
@@ -145,7 +144,7 @@ def test_binary_cross_entropy_with_logits_backward(reduction):
     input1.grad.detach_()
     input1.grad.zero_()
     cpu_result = bce_logit_backward(input1, input2)
-    # pylint: disable=no-member
+
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             equal_nan=True)

@@ -21,7 +21,6 @@ def test_simple_adder():
     cpu_result = add(t1, t2)
     ipu_result = add_ipu(t1, t2)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
 
 
@@ -35,7 +34,6 @@ def test_zero_inplace():
         t.zero_()
         return t
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=ipu_zero_(t), actual=torch.zeros(20))
 
 
@@ -51,7 +49,6 @@ def test_simple_inplace():
     ipu_result = IPUContext(mul_inplace)(t1)
     mul_inplace(t1)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
@@ -67,7 +64,6 @@ def test_simple_inplace_add():
     ipu_result = IPUContext(add_inplace)(t1)
     add_inplace(t1)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
@@ -86,7 +82,6 @@ def test_add_with_alpha():
     print(ipu_result)
     print(t1)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
@@ -102,7 +97,6 @@ def test_sub_with_alpha():
     ipu_result = IPUContext(sub_with_alpha)(t1)
     sub_with_alpha(t1)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
@@ -124,5 +118,4 @@ def test_wrapped_values(python_type):
     ipu_result = IPUContext(f)(t1)
     cpu_result = f(t1)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)

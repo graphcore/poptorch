@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-# pylint: disable=no-member
 import copy
 import torch
 import pytest

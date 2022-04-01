@@ -63,7 +63,6 @@ def test_mnist():
         out = model(input)
         ipu.outputs(out)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=model(input),
                             actual=ipu(input),
                             atol=1e-05,

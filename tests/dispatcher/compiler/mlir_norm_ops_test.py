@@ -58,12 +58,10 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
 
     # Test outputs and gradients
     for cpu, ipu in zip(cpu_result, ipu_result):
-        # pylint: disable=no-member
         helpers.assert_allclose(actual=ipu, expected=cpu)
 
     # Test running statistics
     if track_running_stats:
-        # pylint: disable=no-member
         helpers.assert_allclose(actual=ipu_norm.running_mean,
                                 expected=cpu_norm.running_mean,
                                 atol=1e-4,
@@ -92,5 +90,4 @@ def test_group_norm():
     # Run on IPU.
     ipu_result = IPUContext(norm, parameters_and_buffers=weights)(t)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(actual=ipu_result, expected=torch_out)

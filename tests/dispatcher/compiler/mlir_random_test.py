@@ -31,7 +31,6 @@ class StatChecker:
     # Compare two sets of results statistically, using the given functions
     def __call__(self, *args):
         for tf in args:
-            # pylint: disable=no-member
             helpers.assert_allclose(expected=tf(self.expect),
                                     actual=tf(self.actual),
                                     atol=1e-2,

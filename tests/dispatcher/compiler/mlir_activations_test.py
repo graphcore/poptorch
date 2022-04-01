@@ -61,7 +61,6 @@ def test_activations(op):
 
     tol = [0.01, 1e-3] if op is F.gelu else [1e-4, 1e-7]
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
                             atol=tol[0],
@@ -80,7 +79,6 @@ def test_softmax(dim):
     cpu_result = F.softmax(input1, dim)
     ipu_result = IPUContext(F.softmax)(input1, dim)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
                             equal_nan=True)
@@ -95,7 +93,7 @@ def test_logsoftmax_forward(dim):
 
     cpu_result = F.log_softmax(input1, dim)
     ipu_result = IPUContext(F.log_softmax)(input1, dim)
-    # pylint: disable=no-member
+
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
                             equal_nan=True)
@@ -120,7 +118,6 @@ def test_logsoftmax_backward(dim):
 
     cpu_result = log_softmax_backward(input1)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
                             equal_nan=True)

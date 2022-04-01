@@ -27,5 +27,4 @@ def test_gt_lt(op):
     cpu_result = op(t1, t2)
     ipu_result = IPUContext(op)(t1, t2)
 
-    # pylint: disable=no-member
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)

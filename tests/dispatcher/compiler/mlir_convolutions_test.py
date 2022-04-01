@@ -113,7 +113,6 @@ def test_conv(num_dims, size):
 
     assert ipu_result.size() == cpu_result.size()
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             atol=1e-05,

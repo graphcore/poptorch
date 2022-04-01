@@ -19,7 +19,6 @@ def test_simple_test():
         x = x * 3
         ipu.outputs(x)
 
-    # pylint: disable=no-member
     helpers.assert_allequal(actual=ipu(input),
                             expected=torch.empty(10).fill_(18.0))
 
@@ -38,7 +37,6 @@ def test_simple_conv():
     cpu = conv(input)
     ipu = ipu(input)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu,
                             actual=ipu,
                             atol=1e-05,
@@ -60,7 +58,6 @@ def test_tensor_constant():
     cpu = f(input)
     ipu = ipu(input)
 
-    # pylint: disable=no-member
     helpers.assert_allequal(expected=cpu, actual=ipu)
 
 

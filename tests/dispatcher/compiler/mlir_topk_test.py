@@ -20,12 +20,10 @@ def test_topk(largest, K, dim):
     ipu_value, ipu_indices = IPUContext(torch.topk)(input, K, dim, largest)
     cpu_value, cpu_indices = torch.topk(input, K, dim, largest)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_value,
                             actual=ipu_value,
                             equal_nan=True)
 
-    # pylint: disable=no-member
     helpers.assert_allclose(expected=cpu_indices,
                             actual=ipu_indices,
                             equal_nan=True)
