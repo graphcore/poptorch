@@ -301,7 +301,7 @@ emptyBase(at::IntArrayRef size,
           c10::optional<at::Device> device = c10::nullopt,
           c10::optional<bool> pin_memory = c10::nullopt,
           c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
-  // native calls are a dispatch endpoint so will not be redispatched.
+  // Native calls are a dispatch endpoint so will not be redispatched.
   at::Tensor output = at::native::empty_cpu(size, dtype, layout, device,
                                             pin_memory, memory_format);
   // We have to be careful with backend select kernels, we must return the

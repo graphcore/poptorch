@@ -219,8 +219,20 @@ at::Tensor JITDispatch::toCopyInplace(const at::Tensor &self,
 }
 
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
+  auto scalar_type = tensor.scalar_type();
+  auto coerced_scalar_type = coerceToSupportedType(scalar_type);
+
+  at::Tensor copy;
+  if (scalar_type != coerced_scalar_type) {
+    logging::warn("[TRACING-2][JIT] Empty tensor type coerced from {} to {}",
+                  scalar_type, coerced_scalar_type);
+    copy = tensor.to(coerced_scalar_type);
+  } else {
+    copy = tensor.clone();
+  }
+
   torch::jit::Node *n =
-      graph.createUninitialized(c10::TensorType::create(tensor));
+      graph.createUninitialized(c10::TensorType::create(copy));
   _mapper.addTensor(tensor, n->output(0), true);
 }
 
@@ -267,8 +279,8 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
         auto st = tensor.scalar_type();
         auto st_coerced = coerceToSupportedType(st);
         if (st != st_coerced) {
-          logging::warn("[TRACING-2][JIT] Type coerced from {} to {}", st,
-                        st_coerced);
+          logging::warn("[TRACING-2][JIT] Output type coerced from {} to {}",
+                        st, st_coerced);
           val->inferTypeFrom(tensor.to(st_coerced));
         } else {
           val->inferTypeFrom(tensor);
