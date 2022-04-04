@@ -39,7 +39,7 @@ def test_one_hot_invalid(trace_model):
 
     msg = "OneHot num classes must be specified and must be constant."
     # Run on IPU.
-    with pytest.raises((poptorch.Error, RuntimeError), match=msg):
+    with pytest.raises(poptorch.Error, match=msg):
         options = poptorch.Options()
         options.Jit.traceModel(trace_model)
         poptorch_model = poptorch.inferenceModel(model, options)
