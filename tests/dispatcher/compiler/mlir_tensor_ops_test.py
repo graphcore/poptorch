@@ -135,7 +135,7 @@ def test_expand():
     expand_reshape_view_harness((2, 1, 4), (2, 4, 4), "expand")
     expand_reshape_view_harness((2, 1, 4), (2, 2, 2, 4, 4), "expand")
 
-    # TODO T52507 Fully inplement expand
+    # TODO T52507 Fully implement expand
     with pytest.raises(RuntimeError):
         expand_reshape_view_harness((2, 1, 4), (2, 4, -1), "expand")
 
