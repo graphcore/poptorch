@@ -134,6 +134,10 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
 
 } // namespace
 
+at::ScalarType scalarTypeOrDefault(c10::optional<at::ScalarType> dtype) {
+  return dtype ? *dtype : at::ScalarType::Float;
+}
+
 torch::jit::Value *makeConstant(torch::jit::Graph &graph,
                                 const at::Tensor &tensor) {
   at::Tensor ct;

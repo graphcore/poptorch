@@ -25,12 +25,11 @@ public:
   MLIRDispatch();
 
   void initCompiler();
-  void createGraph(const std::vector<at::Tensor> &inputs,
-                   const std::vector<at::Tensor> &parameters) final;
-
-  void markOutputs(const std::vector<at::Tensor> &ids,
-                   const std::vector<at::Tensor> &persistent_data_storage,
-                   const std::string &output_structure) final;
+  at::Tensor addInput(const at::Tensor &cpu_tensor) final;
+  at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
+  void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
+  void createGraph() final;
+  void finalizeGraph() final;
 
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
@@ -87,6 +86,12 @@ protected:
   static poptorch_ir::TensorId getSingleOptionalTensorId(
       const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec);
 
+  at::Tensor allocateTensorImpl(
+      c10::IntArrayRef sizes, c10::optional<at::ScalarType> dtype,
+      c10::optional<at::Device> device, c10::optional<at::Layout> layout,
+      c10::optional<bool> pin_memory,
+      c10::optional<at::MemoryFormat> memory_format) final;
+
 private:
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
@@ -97,6 +102,10 @@ private:
   // We use the value mapper to map between incoming at::Tensors and JIT/MLIR
   // types.
   ValueMapper _mapper;
+  uint64_t _next_tensor_id{1};
+  uint64_t _next_input_idx{0};
+  uint64_t _next_output_idx{0};
+  uint64_t _next_parameter_idx{0};
 
   // We genenerate the lookup tables at object creation. This is the mechanism
   // by which that we use to target the right MLIR operation for a given aten

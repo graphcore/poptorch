@@ -75,8 +75,7 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
 // of them which we should copy the output into. This is to give us a persistent
 // return location.
 void markOutputs(const std::vector<at::Tensor> &outputs,
-                 const std::vector<at::Tensor> &data_storage,
-                 const std::string &output_structure);
+                 const std::vector<at::Tensor> &data_storage);
 
 // Get the captured JIT graph. In reality is just returning the
 // torch::jit::Graph it's already been compiling during the dispatch process.

@@ -19,136 +19,77 @@
 
 namespace poptorch {
 
-void JITDispatch::createGraph(const std::vector<at::Tensor> &inputs,
-                              const std::vector<at::Tensor> &parameters) {
-  auto add_input = [&](at::Tensor &tensor) {
-    torch::jit::Value *value = graph.addInput(tensor.name());
+at::Tensor JITDispatch::addInput(const at::Tensor &tensor) {
+  torch::jit::Value *value = graph.addInput(tensor.name());
 
-    auto scalar_type = tensor.scalar_type();
-    auto scalar_type_coerced = coerceToSupportedType(scalar_type);
-    if (scalar_type != scalar_type_coerced) {
-      logging::warn("[TRACING-2][JIT] Input %{} type coerced from {} to {}",
-                    value->debugName(), scalar_type, scalar_type_coerced);
-      value->inferTypeFrom(tensor.to(scalar_type_coerced));
-    } else {
-      value->inferTypeFrom(tensor);
-    }
-
-    _mapper.addTensor(tensor, value);
-  };
-
-  // Add any inputs.
-  for (at::Tensor tensor : inputs) {
-    add_input(tensor);
+  auto scalar_type = tensor.scalar_type();
+  auto scalar_type_coerced = coerceToSupportedType(scalar_type);
+  if (scalar_type != scalar_type_coerced) {
+    logging::warn("[TRACING-2][JIT] Input %{} type coerced from {} to {}",
+                  value->debugName(), scalar_type, scalar_type_coerced);
+    value->inferTypeFrom(tensor.to(scalar_type_coerced));
+  } else {
+    value->inferTypeFrom(tensor);
   }
 
-  // Add the parameters.
-  for (at::Tensor tensor : parameters) {
-    at::ScalarType type = tensor.scalar_type();
-    // PopART doesn't allow non-floating point variables so add them as
-    // constants instead. These will be deleted from parameters and buffers
-    // in python before passed to lowering.
-    if (!at::isFloatingType(type)) {
-      if (type == at::ScalarType::Long) {
-        tensor = tensor.to(at::ScalarType::Int);
-      }
-      auto *new_node = tensorToConstant(&graph, tensor);
-      _mapper.addTensor(tensor, new_node->output());
-    } else {
-      add_input(tensor);
-    }
-  }
+  _mapper.addTensor(tensor, value);
+  return tensor;
+}
 
+at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
+  at::ScalarType type = tensor.scalar_type();
+  // PopART doesn't allow non-floating point variables so add them as
+  // constants instead. These will be deleted from parameters and buffers
+  // in python before passed to lowering.
+  at::Tensor retval = tensor;
+  if (!at::isFloatingType(type)) {
+    if (type == at::ScalarType::Long) {
+      retval = retval.to(at::ScalarType::Int);
+    }
+    auto *new_node = tensorToConstant(&graph, retval);
+    _mapper.addTensor(retval, new_node->output());
+    return retval;
+  }
+  return addInput(retval);
+}
+
+void JITDispatch::createGraph() {
   // No need to create a MLIR graph, we're going to only use the dispatcher
   // for shape inference, so just initialise the compiler.
   _mlir_dispatch.initCompiler();
 }
 
-namespace {
-struct ConstructElement {
-  torch::jit::Node *node;
-  std::vector<c10::TypePtr> element_types;
+void JITDispatch::addOutput(const at::Tensor &ipu_src,
+                            const at::Tensor &cpu_dest) {
+  // The PopART backend will allocate its own buffers: ignore cpu_dest.
+  UNUSED(cpu_dest);
+  auto *val = _mapper.getValueForTensor(ipu_src);
+  ERROR_ON_MSG(val == nullptr,
+               "Internal: graph output tensor not present in the value mapper");
 
-  explicit ConstructElement(torch::jit::Node *_node) : node(_node) {}
-};
-} // namespace
+  logging::trace("[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} {}",
+                 reinterpret_cast<void *>(ipu_src.unsafeGetTensorImpl()),
+                 val->debugNameBase(), toString(ipu_src));
+  graph.registerOutput(val);
+  // For now, disable overlapping host IO on every output
+  auto overlap_symbol = getOverlapSymbol("_for_output", _next_output_idx);
+  const std::string value_str = "no_overlap";
+  graph.return_node()->s_(overlap_symbol, value_str);
 
-void JITDispatch::markOutputs(
-    const std::vector<at::Tensor> &outputs,
-    const std::vector<at::Tensor> &persistent_data_storage,
-    const std::string &output_structure) {
-  // 'persistent_data_storage' is only needed by the MLIR dispatcher.
-  UNUSED(persistent_data_storage);
+  _next_output_idx++;
+}
 
-  int64_t output_num = 0;
-  auto output_it = std::begin(outputs);
-  std::vector<ConstructElement> construct_elem_stack;
-
-  for (size_t i = 0; i < output_structure.size(); i++) {
-    char s = output_structure[i];
-    if (s == '(' || s == '[') {
-      auto *construct_node = graph.create(s == '(' ? c10::prim::TupleConstruct
-                                                   : c10::prim::ListConstruct);
-      construct_elem_stack.emplace_back(construct_node);
-      continue;
-    }
-    torch::jit::Value *val = nullptr;
-    if (s == ')' || s == ']') {
-      auto &construct_elem = construct_elem_stack.back();
-      auto *node = construct_elem.node;
-      if (s == ')') {
-        node->output()->setType(
-            c10::TupleType::create(construct_elem.element_types));
-      } else {
-        if (construct_elem.element_types.empty()) {
-          node->output()->setType(c10::ListType::create(at::NoneType::get()));
-        } else {
-          ERROR_ON_MSG(
-              std::adjacent_find(
-                  std::begin(construct_elem.element_types),
-                  std::end(construct_elem.element_types),
-                  [](const c10::TypePtr &a, const c10::TypePtr &b) {
-                    return a->kind() != b->kind();
-                  }) != std::end(construct_elem.element_types),
-              "All elements in an output list must have the same type");
-          node->output()->setType(
-              c10::ListType::create(construct_elem.element_types[0]));
-        }
-      }
-      construct_elem_stack.pop_back();
-      graph.insertNode(node);
-      val = node->output();
-    } else {
-      const auto &tensor = *output_it;
-      ++output_it;
-      val = _mapper.getValueForTensor(tensor);
-      ERROR_ON_MSG(
-          val == nullptr,
-          "Internal: graph output tensor not present in the value mapper");
-
-      logging::trace(
-          "[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} {}",
-          reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-          val->debugNameBase(), toString(tensor));
-    }
-    if (construct_elem_stack.empty()) {
-      graph.registerOutput(val);
-    } else {
-      auto &next_up_stack = construct_elem_stack.back();
-      next_up_stack.node->addInput(val);
-      next_up_stack.element_types.push_back(val->type());
-    }
-    if (s == 'x') {
-      // For now, disable overlapping host IO on every output
-      auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
-      const std::string value_str = "no_overlap";
-      graph.return_node()->s_(overlap_symbol, value_str);
-
-      output_num++;
-    }
-  }
-  ERROR_ON_MSG(output_it != std::end(outputs), "Didn't consume all outputs");
+void JITDispatch::finalizeGraph() {
   logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", graph);
+}
+
+at::Tensor JITDispatch::allocateTensorImpl(
+    c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Device> device, c10::optional<at::Layout> layout,
+    c10::optional<bool> pin_memory,
+    c10::optional<at::MemoryFormat> memory_format) {
+  return at::native::empty_cpu(size, dtype, layout, device, pin_memory,
+                               memory_format);
 }
 
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)

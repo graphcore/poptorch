@@ -19,13 +19,27 @@ class IDispatch {
 public:
   virtual ~IDispatch() {}
 
-  virtual void createGraph(const std::vector<at::Tensor> &inputs,
-                           const std::vector<at::Tensor> &parameters) = 0;
+  at::Tensor
+  allocateTensor(c10::IntArrayRef sizes,
+                 c10::optional<at::ScalarType> dtype = c10::nullopt,
+                 c10::optional<at::Device> device = c10::nullopt,
+                 c10::optional<at::Layout> layout = c10::nullopt,
+                 c10::optional<bool> pin_memory = c10::nullopt,
+                 c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
+    return allocateTensorImpl(sizes, dtype, device, layout, pin_memory,
+                              memory_format);
+  }
 
-  virtual void
-  markOutputs(const std::vector<at::Tensor> &ids,
-              const std::vector<at::Tensor> &persistent_data_storage,
-              const std::string &output_structure) = 0;
+  // Input tensor is a CPU tensor, returns an IPU tensor.
+  virtual at::Tensor addInput(const at::Tensor &cpu_tensor) = 0;
+  // Input tensor is a CPU tensor, returns an IPU tensor.
+  virtual at::Tensor addParameter(const at::Tensor &cpu_tensor) = 0;
+  // Source tensor is an IPU tensor, destination is a CPU tensor.
+  virtual void addOutput(const at::Tensor &ipu_src,
+                         const at::Tensor &cpu_dest) = 0;
+  virtual void finalizeGraph() = 0;
+
+  virtual void createGraph() = 0;
 
   virtual void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) = 0;
@@ -51,6 +65,14 @@ public:
   // unaltered as a convenience.
   virtual const at::Tensor &copyInplace(const at::Tensor &self,
                                         const at::Tensor &src) = 0;
+
+protected:
+  virtual at::Tensor
+  allocateTensorImpl(c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
+                     c10::optional<at::Device> device,
+                     c10::optional<at::Layout> layout,
+                     c10::optional<bool> pin_memory,
+                     c10::optional<at::MemoryFormat> memory_format) = 0;
 };
 
 } // namespace poptorch

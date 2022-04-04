@@ -57,6 +57,11 @@ struct GlobalTracerContext {
   // Return the passed filename if it doesn't match any of the registered
   // exclusions, else an empty c10::optional.
   c10::optional<std::string> filenameIfNotExcluded(const std::string &filename);
+
+  // TODO(T59880) Horrible hack to keep all tensors alive so that the
+  // ValueMapper doesn't get confused by storage being re-used by different
+  // unrelated tensors.
+  std::vector<at::Tensor> tracked_tensors;
 };
 
 c10::optional<std::string>
@@ -193,7 +198,17 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
 
   context.active_dispatch->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
-  context.active_dispatch->createGraph(inputs, parameters);
+  context.active_dispatch->createGraph();
+  // TODO(T59880) Adding tensors to tracked_tensor is a horrible hack to keep
+  // all tensors alive so that the ValueMapper doesn't get confused by storage
+  // being re-used by different unrelated tensors.
+  for (const auto &input : inputs) {
+    context.tracked_tensors.push_back(context.active_dispatch->addInput(input));
+  }
+  for (const auto &param : parameters) {
+    context.tracked_tensors.push_back(
+        context.active_dispatch->addParameter(param));
+  }
 }
 
 void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
@@ -256,14 +271,17 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 
 // Record these tensors as being the outputs of the graph.
 void markOutputs(const std::vector<at::Tensor> &outputs,
-                 const std::vector<at::Tensor> &data_storage,
-                 const std::string &output_structure) {
+                 const std::vector<at::Tensor> &data_storage) {
   // We will also catch pytorch calls called via C++ so we need to disable our
   // dispatch catcher while it is running.
   DisableDispatchScope guard;
   context.active_dispatch->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
-  context.active_dispatch->markOutputs(outputs, data_storage, output_structure);
+  ERROR_ON(outputs.size() != data_storage.size());
+  for (size_t i = 0; i < outputs.size(); ++i) {
+    context.active_dispatch->addOutput(outputs.at(i), data_storage.at(i));
+  }
+  context.active_dispatch->finalizeGraph();
 }
 
 // Appears in 1.10.

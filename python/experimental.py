@@ -51,6 +51,7 @@ class IPUScope:
         param_list = list(self._params_and_buffers.values())
 
         self._outputs = []
+        self._outputs_structure = None
         self._inputs = []
         self._upload_weights = True
 
@@ -126,25 +127,21 @@ class IPUScope:
             self._executable.execute(args)
             output = self._outputs
 
-        if len(output) == 1:
-            return output[0]
+        if self._outputs_structure is not None:
+            # Copy the original structure but replace all the tensors
+            # by values from the passed iterator
+            def copy_structure(x, it):
+                if isinstance(x, (tuple, list)):
+                    return type(x)(copy_structure(e, it) for e in x)
+                return next(it)
+
+            output = copy_structure(self._outputs_structure, iter(output))
 
         return output
 
     def outputs(self, tensors):
         # We don't want to catch anything in here.
         poptorch_core.endDispatch()
-
-        def structure(x):
-            if isinstance(x, tuple):
-                prefix = "("
-                postfix = ")"
-            elif isinstance(x, list):
-                prefix = "["
-                postfix = "]"
-            else:
-                return "x"
-            return prefix + "".join(structure(e) for e in x) + postfix
 
         def flatten(x):
             if isinstance(x, (tuple, list)):
@@ -153,6 +150,7 @@ class IPUScope:
             else:
                 yield x
 
+        self._outputs_structure = tensors
         flattened = list(flatten(tensors))
         if flattened != [None]:
             with torch.no_grad():
@@ -162,8 +160,7 @@ class IPUScope:
                     else:
                         self._outputs.append(tensor.clone())
 
-            poptorch_core.markOutputs(flattened, self._outputs,
-                                      structure(tensors))
+            poptorch_core.markOutputs(flattened, self._outputs)
 
         # Turn dispatch back on.
         poptorch_core.startDispatch()

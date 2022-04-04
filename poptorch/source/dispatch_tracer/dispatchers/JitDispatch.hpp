@@ -19,44 +19,49 @@ public:
   // The JIT graph we are building up.
   torch::jit::Graph graph;
 
-  void createGraph(const std::vector<at::Tensor> &inputs,
-                   const std::vector<at::Tensor> &parameters);
+  at::Tensor addInput(const at::Tensor &cpu_tensor) final;
+  at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
+  void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
+  void createGraph() final;
+  void finalizeGraph() final;
 
-  void markOutputs(const std::vector<at::Tensor> &outputs,
-                   const std::vector<at::Tensor> &persistent_data_storage,
-                   const std::string &output_structure);
-
-  void setCurrentCodeLocation(const torch::jit::SourceRange &source_location);
+  void
+  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack);
 
-  at::Tensor detach(const at::Tensor &self);
+  at::Tensor detach(const at::Tensor &self) final;
 
-  void registerEmptyTensor(const at::Tensor &tensor);
+  void registerEmptyTensor(const at::Tensor &tensor) final;
 
   // We can't control these function signatures.
-  // clang-format off
   at::Tensor
   toCopyInplace(const at::Tensor &self,
-           c10::optional<at::ScalarType> dtype = c10::nullopt,
-           c10::optional<at::Layout> layout = c10::nullopt,
-           c10::optional<at::Device> device = c10::nullopt,
-           c10::optional<bool> pin = c10::nullopt,
-           c10::optional<c10::MemoryFormat> fmt = c10::nullopt);
+                c10::optional<at::ScalarType> dtype = c10::nullopt,
+                c10::optional<at::Layout> layout = c10::nullopt,
+                c10::optional<at::Device> device = c10::nullopt,
+                c10::optional<bool> pin = c10::nullopt,
+                c10::optional<c10::MemoryFormat> fmt = c10::nullopt) final;
 
   const at::Tensor &copyInplace(const at::Tensor &self,
-                                const at::Tensor &src);
+                                const at::Tensor &src) final;
 
   // Node will be updated to the new target post canonicalisation.
   void canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
-                              c10::Stack &stack,
-                              torch::jit::Node **node,
-                              ValueMapper &mapper);
+                                c10::Stack &stack, torch::jit::Node **node,
+                                ValueMapper &mapper);
 
-  // clang-format on
+protected:
+  at::Tensor allocateTensorImpl(
+      c10::IntArrayRef sizes, c10::optional<at::ScalarType> dtype,
+      c10::optional<at::Device> device, c10::optional<at::Layout> layout,
+      c10::optional<bool> pin_memory,
+      c10::optional<at::MemoryFormat> memory_format) final;
+
 private:
   // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
   // types.
   ValueMapper _mapper;
+  uint64_t _next_output_idx{0};
   // We use the MLIR dispatch for shape inference.
   MLIRDispatch _mlir_dispatch;
 };

@@ -63,6 +63,8 @@ std::string toString(const at::Tensor &t);
 
 bool isHalfTensor(const at::Tensor &t);
 
+at::ScalarType scalarTypeOrDefault(c10::optional<at::ScalarType> dtype);
+
 } // namespace poptorch
 
 #endif // POPTORCH_DISPATCH_COMMON_HELPERS_HPP_
