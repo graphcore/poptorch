@@ -326,10 +326,26 @@ def test_dynamic_slice_one_dim_mix_up_float(trace_model):
 
 
 @pytest.mark.parametrize("dim", [0, 1, 2])
-def test_unbind(dim):
-    op = lambda x: torch.unbind(x, dim)
+@pytest.mark.parametrize("use_half", [True, False])
+def test_unbind(dim, use_half):
+    if use_half:
+        # Test correct implicit casting
+        def op(x):
+            unbound = torch.unbind(x, dim)
+            return unbound[0] + 2.0, unbound[1]
+    else:
+        op = lambda x: torch.unbind(x, dim)
+
     x = torch.randn(2, 3, 4)
+
     model = helpers.ModelWithWeights(op, x.shape, out_fn=lambda x: x[0])
+
+    if use_half:
+        x = x.half()
+        model.half()
+        # pylint: disable=protected-access
+        model._weights_before = model.lin.weight.detach().clone()
+
     poptorch_model = poptorch.trainingModel(model)
 
     native_out, _ = model((x, ))
@@ -340,7 +356,10 @@ def test_unbind(dim):
 
     # Inference test - check outputs
     for tensor_native, tensor_pop in zip(native_out, poptorch_out):
-        helpers.assert_allclose(expected=tensor_native, actual=tensor_pop)
+        helpers.assert_allclose(expected=tensor_native,
+                                actual=tensor_pop,
+                                atol=0.01,
+                                rtol=0.01)
 
     # Training test - check weights changed
     poptorch_model.assert_weights_changed()

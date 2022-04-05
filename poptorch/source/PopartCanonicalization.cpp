@@ -94,6 +94,58 @@ torch::jit::Node *handleSliceModification(torch::jit::Graph *graph,
   return new_node;
 }
 
+// Propagates half types across lists (tuple set to false) or tuples (tuple set
+// to true).
+// If the new node is a List/TupleConstruct, it will not, by default, have the
+// types set to half when they should be, because tracing is always performed
+// with floats. Use this function to rememby that on a List/Tuple construct
+// after it has been created.
+void propagateHalfOnListOrTupleConstruct(torch::jit::Node *n, bool tuple) {
+  auto constr_type = tuple ? at::prim::TupleConstruct : at::prim::ListConstruct;
+  auto unpack_type = tuple ? at::prim::TupleUnpack : at::prim::ListUnpack;
+
+  if (n->kind() != constr_type) {
+    return;
+  }
+
+  // Record which inputs were half: they would not have been on tracing but
+  // would be change during canonicalization
+  std::vector<bool> input_was_half;
+  input_was_half.reserve(n->inputs().size());
+  for (auto *input : n->inputs()) {
+    // Skip if it is not a tensor or has no scalar type
+    auto tensor_type = input->type()->cast<c10::TensorType>();
+    if ((!tensor_type) || !tensor_type->scalarType()) {
+      input_was_half.emplace_back(false);
+      continue;
+    }
+
+    input_was_half.emplace_back(getNodeScalarType(input) ==
+                                at::ScalarType::Half);
+  }
+
+  // Propagate types on the unpack node(s)
+  for (const auto &use : n->output()->uses()) {
+    torch::jit::Node *unpack = use.user;
+    if (unpack->kind() != unpack_type) {
+      continue;
+    }
+
+    size_t idx = 0;
+    for (auto *output : unpack->outputs()) {
+      // The output will be float as tracing was carried out using floats.
+      if (input_was_half[idx]) {
+        logging::trace("D");
+
+        output->setType(
+            output->type()->expect<c10::TensorType>()->withScalarType(
+                c10::ScalarType::Half));
+      }
+      idx++;
+    }
+  }
+}
+
 class CanonicalizeImpl {
 public:
   static void run(torch::jit::Graph *graph);
@@ -138,8 +190,14 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
 
       if (node->hasUses()) {
         for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
+          // As well as replacing the use, this will copy across shape/type
+          // if not explicitly set.
           replaceOutputUse(node, new_node, i);
         }
+
+        // Propagate half types across ListConstructs and TupleConstructs
+        propagateHalfOnListOrTupleConstruct(new_node, true);
+        propagateHalfOnListOrTupleConstruct(new_node, false);
       }
     }
   }
