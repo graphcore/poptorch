@@ -479,6 +479,7 @@ class _PopartOptions:
     def set(self, key: str, value: Union[int, float, str, List[str], Set[str]]
             ) -> "poptorch.options._PopartOptions":
         self.checkIsFrozen()
+
         self.options[key] = value
         return self
 
@@ -496,11 +497,10 @@ class _PopartOptions:
         :param level: Integer value corresponding to the
             ``popart::PatternsLevel`` to use to initialise the ``Patterns``.
         """
-        self.checkIsFrozen()
         assert isinstance(level, int)
         assert isinstance(patterns, dict)
-        self.options["patterns_level"] = level
-        self.options["patterns"] = patterns
+        self.set("patterns_level", level)
+        self.set("patterns", patterns)
         return self
 
 

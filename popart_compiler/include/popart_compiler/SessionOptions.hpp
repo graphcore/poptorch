@@ -36,9 +36,10 @@ struct SessionOptionsImpl {
   void set(const std::string &key, ValueType value,
            std::map<std::string, std::function<void(ValueType)>> &options,
            const std::string &typeStr) {
-    auto it = options.find(key);
+    const auto it = options.find(key);
     ERROR_ON_MSG(it == options.end(),
                  "Unknown " << typeStr << " option " << key);
+
     it->second(value);
     options_set.insert(key);
   }

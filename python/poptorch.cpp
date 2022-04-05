@@ -534,70 +534,73 @@ void parseAnchors(AnchorList *map, const py::list &list) {
   }
 }
 
-SessionOptions parseSessionOptions(const py::dict &opt) {
+SessionOptions parseSessionOptions(const py::dict &opts) {
   logging::LogContext ctx_func("parseSessionOptions");
   // steps, replicationFactor, profile
   SessionOptions options;
 
-  for (auto element : opt) {
-    auto option_name = element.first.cast<std::string>();
-    logging::LogContext ctx("option: " + option_name);
-    // Exception patterns_level is handled at the same time as "patterns"
-    if (option_name == "patterns_level" || option_name == "anchored_tensors") {
+  for (const auto &element : opts) {
+    const auto name = element.first.cast<std::string>();
+    const auto value = element.second;
+    logging::LogContext ctx("option: " + name);
+
+    // Exception: patterns_level is handled at the same time as "patterns".
+    // Exception: anchored_tensors is dealt with exclusively in Python.
+    if (name == "patterns_level" || name == "anchored_tensors") {
       continue;
     }
-    if (option_name == "compilation_progress_bar_fn") {
-      options.setCompilationProgressLogger(element.second.cast<py::function>());
-    } else if (py::isinstance<py::bool_>(element.second)) {
-      options.addBoolOption(option_name.c_str(), element.second.cast<bool>());
-    } else if (py::isinstance<py::float_>(element.second)) {
-      options.addDoubleOption(option_name.c_str(),
-                              element.second.cast<double>());
-    } else if (py::isinstance<py::int_>(element.second)) {
-      options.addUint64Option(option_name.c_str(),
-                              element.second.cast<std::uint64_t>());
-    } else if (py::isinstance<py::str>(element.second)) {
-      options.addStringOption(option_name.c_str(),
-                              element.second.cast<std::string>().c_str());
-    } else if (py::isinstance<py::set>(element.second) ||
-               py::isinstance<py::list>(element.second)) {
-      for (auto option : element.second.cast<py::list>()) {
-        options.insertStringOption(option_name.c_str(),
-                                   castToString(option).c_str());
-      }
-    } else if (py::isinstance<py::dict>(element.second)) {
-      const std::string &id = option_name;
 
-      if (id == "available_memory_proportion") {
-        for (auto option : element.second.cast<py::dict>()) {
+    if (name == "compilation_progress_bar_fn") {
+      options.setCompilationProgressLogger(value.cast<py::function>());
+    } else if (py::isinstance<py::bool_>(value)) {
+      options.addBoolOption(name.c_str(), value.cast<bool>());
+    } else if (py::isinstance<py::float_>(value)) {
+      options.addDoubleOption(name.c_str(), value.cast<double>());
+    } else if (py::isinstance<py::int_>(value)) {
+      options.addUint64Option(name.c_str(), value.cast<std::uint64_t>());
+    } else if (py::isinstance<py::str>(value)) {
+      options.addStringOption(name.c_str(), value.cast<std::string>().c_str());
+    } else if (py::isinstance<py::set>(value) ||
+               py::isinstance<py::list>(value)) {
+      for (auto option : value.cast<py::list>()) {
+        options.insertStringOption(name.c_str(), castToString(option).c_str());
+      }
+    } else if (py::isinstance<py::dict>(value)) {
+      if (name == "available_memory_proportion") {
+        for (auto option : value.cast<py::dict>()) {
           options.setMemoryProportion(option.first.cast<std::uint64_t>(),
                                       option.second.cast<float>());
         }
-      } else if (id == "patterns") {
-        options.setPatternsLevel(
-            opt.cast<py::dict>()["patterns_level"].cast<std::uint64_t>());
+      } else if (name == "patterns") {
+        ERROR_ON_MSG(!opts.contains("patterns_level"),
+                     "PopART option 'patterns' should not be set "
+                     "without first setting 'patterns_level'.");
 
-        for (auto option : element.second.cast<py::dict>()) {
+        options.setPatternsLevel(opts["patterns_level"].cast<std::uint64_t>());
+
+        for (auto option : value.cast<py::dict>()) {
           options.addPattern(option.first.cast<std::string>().c_str(),
                              option.second.cast<bool>());
         }
-      } else if (id.rfind("location_", 0) == 0) {
-        for (auto option : element.second.cast<py::dict>()) {
-          options.setTensorLocation(id.c_str(),
+      } else if (name.rfind("location_", 0) == 0) {
+        for (auto option : value.cast<py::dict>()) {
+          options.setTensorLocation(name.c_str(),
                                     option.first.cast<std::string>().c_str(),
                                     option.second.cast<std::uint64_t>());
         }
       } else {
-        for (auto option : element.second.cast<py::dict>()) {
+        for (auto option : value.cast<py::dict>()) {
           options.insertStringPairOption(
-              id.c_str(), option.first.cast<std::string>().c_str(),
+              name.c_str(), option.first.cast<std::string>().c_str(),
               castToString(option.second).c_str());
         }
       }
     } else {
-      ERROR("Unknown option type " << element.second.get_type());
+      ERROR("Unknown value type " << py::str(value.get_type()) << " for option "
+                                  << name);
     }
   }
+
   return options;
 }
 
@@ -1541,8 +1544,12 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("registerCPUCallBack", poptorch::registerCPUCallBack);
   m.def("isAlreadyRegistered", poptorch::alreadyRegistered);
   m.def("registerBuffersWithCallback", poptorch::registerBuffersWithCallback);
-
   m.def("mlirIsSupportedOnPlatform", poptorch::mlirIsSupportedOnPlatform);
+
+  // Wrap up the option parser, but without returning anything to just catch
+  // errors.
+  m.def("_validateOptions",
+        [](const py::dict &opts) { poptorch::parseSessionOptions(opts); });
 
 #if POPTORCH_BUILD_MLIR_COMPILER
   py::class_<poptorch::MLIRExecutable,

@@ -15,24 +15,35 @@ import helpers
 
 
 def test_set_options():
-    class Network(nn.Module):
-        def forward(self, x, y):
-            return x + y
+    # pylint: disable=protected-access
 
     # Create our model.
-    model = Network()
     opts = poptorch.Options()
+    opts.outputMode(poptorch.enums.OutputMode.All)
     # Just set a bunch of options and check they're successfully parsed.
     with tempfile.TemporaryDirectory() as tmp:
         opts.deviceIterations(1).setExecutionStrategy(
             poptorch.PipelinedExecution()).replicationFactor(1).logDir(
                 tmp).enableSyntheticData(True)
-    inference_model = poptorch.inferenceModel(model, opts)
 
-    x = torch.ones(2)
-    y = torch.zeros(2)
+    poptorch.poptorch_core._validateOptions(opts.toDict())
 
-    inference_model(x, y)
+
+@pytest.mark.parametrize("param", [
+    ("asdfasdf", True, r"Unknown .* option .*"),
+    ("dotChecks", torch.empty(1, 1), r"Unknown value type .* for option .*"),
+    ("asdfasdf", torch.empty(
+        1, 1), r"(Unknown .* option .*|Unknown value type .* for option .*)"),
+])
+def test_invalid_options(param):
+    # pylint: disable=protected-access
+    opts = poptorch.Options()
+    opts.outputMode(poptorch.enums.OutputMode.All)
+
+    opts._Popart.set(param[0], param[1])
+
+    with pytest.raises(RuntimeError, match=param[2]):
+        poptorch.poptorch_core._validateOptions(opts.toDict())
 
 
 @helpers.printCapfdOnExit
@@ -104,13 +115,9 @@ def test_set_options_from_file(capfd):
 @helpers.overridePoptorchLogLevel("DEBUG")
 def test_set_popart_options(capfd):
     # pylint: disable=protected-access
-    class Network(nn.Module):
-        def forward(self, x, y):
-            return x + y
 
-    # Create our model.
-    model = Network()
     opts = poptorch.Options()
+    opts.outputMode(poptorch.enums.OutputMode.All)
 
     opts._Popart.set("hardwareInstrumentations", set([0, 1]))
     opts._Popart.set("dotChecks", ["FINAL", "ALL"])
@@ -141,15 +148,7 @@ def test_set_popart_options(capfd):
                      ["0", "1"])
     opts._Popart.set("enableExplicitIR", True)
 
-    inference_model = poptorch.inferenceModel(model, opts)
-    x = torch.ones(2)
-    y = torch.zeros(2)
-
-    # The options above don't really make sense so check they're being passed
-    # to the backend without causing any error but don't actually run the
-    # model.
-    with pytest.raises(poptorch.Error, match=r"is not a valid .* option"):
-        inference_model.compile(x, y)
+    poptorch.poptorch_core._validateOptions(opts.toDict())
 
     log = helpers.LogChecker(capfd)
 
@@ -205,24 +204,17 @@ def test_set_popart_options(capfd):
     log.assert_contains("poptorch.Options set enableExplicitIR to value true")
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_popart_patterns(trace_model):
+def test_popart_patterns():
     # pylint: disable=protected-access
-    class Network(nn.Module):
-        def forward(self, x, y):
-            return x + y
 
     # Create our model.
-    model = Network()
     opts = poptorch.Options()
+    opts.outputMode(poptorch.enums.OutputMode.All)
+
     patterns = {"PadSum": True}
     opts._Popart.setPatterns(patterns, 0)
-    opts.Jit.traceModel(trace_model)
-    inference_model = poptorch.inferenceModel(model, opts)
-    x = torch.ones(2)
-    y = torch.zeros(2)
 
-    inference_model(x, y)
+    poptorch.poptorch_core._validateOptions(opts.toDict())
 
 
 @helpers.printCapfdOnExit
