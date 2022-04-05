@@ -26,6 +26,26 @@ constexpr bool supportedType(const at::ScalarType type) {
           type == at::ScalarType::Byte);
 }
 
+bool isBeforeHostSideCast(const torch::jit::Node *n) {
+  if (n->kind() == c10::prim::TupleUnpack ||
+      n->kind() == c10::prim::ListUnpack) {
+    // Recurse through unpacks until we find a host_side_cast or otherwise
+    // return false
+    for (const torch::jit::Value *output : n->outputs()) {
+      if (output->uses().size() != 1) {
+        continue;
+      }
+      if (isBeforeHostSideCast(output->uses()[0].user)) {
+        return true;
+      }
+    }
+  }
+
+  // Otherwise, the presence or lack of a host_side_cast will indicate whether
+  // to return true or false
+  return n->kind() == symbols::poptorch::host_side_cast;
+}
+
 void warnNonNativeSupport(torch::jit::Node *node,
                           const char *unsupported_type) {
   // Ignore nodes for which the type is inconsequential
@@ -154,9 +174,8 @@ void checkAndChangeOutputTypesForOutput(torch::jit::Node *node,
 void checkAndChangeOutputTypes(torch::jit::Graph *graph) {
   logging::LogContext ctx_func("CheckAndChangeOutputTypes");
   for (auto *n : graph->nodes()) {
-    // Unpacks will happen before a host side cast, so ignore here
-    if (n->kind() == c10::prim::TupleUnpack ||
-        n->kind() == c10::prim::ListUnpack) {
+    // Some unpacks will happen before the host side cast, so ignore them here
+    if (isBeforeHostSideCast(n)) {
       continue;
     }
 

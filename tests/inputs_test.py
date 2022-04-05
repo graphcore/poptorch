@@ -68,7 +68,9 @@ def test_type_change(trace_model):
 @pytest.mark.parametrize("use_half", [True, False])
 @pytest.mark.parametrize("thing_to_test", ['List', 'Tuple', 'Mixed'])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_nested_tuples_and_lists(use_half, thing_to_test, trace_model):
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_nested_tuples_and_lists(capfd, use_half, thing_to_test, trace_model):
     class SimpleAdder(nn.Module):
         def forward(self, tpl1, t2, tpl34567):
             (t1, ) = tpl1
@@ -120,6 +122,14 @@ def test_nested_tuples_and_lists(use_half, thing_to_test, trace_model):
         assert inference_model([
             t1,
         ], t2, [t3, (t4, t5), [t6, t7]]).float() == 28.0
+
+    # Ensure that a tuple element's type is not changed except after the
+    # "host_side_cast"
+    if not use_half:
+        testlog = helpers.LogChecker(capfd)
+        testlog.assert_contains_after(
+            "Double(1, strides=[1], requires_grad=0, device=cpu) = " +
+            "prim::TupleUnpack", "Graph right before popart")
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -395,7 +405,6 @@ def test_no_inputs():
             self.x = torch.tensor([1.], dtype=torch.float)
 
         def forward(self):
-            print("Called forward")
             self.x += 1.0
             return self.x
 

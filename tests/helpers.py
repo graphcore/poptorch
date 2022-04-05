@@ -271,6 +271,19 @@ class LogChecker:
                  "\n No line in the above log contains all of the strings "
                  f"{strings}")
 
+    def assert_contains_after(self, string, after):
+        """Assert there is a line in the log matching the string provided, at
+           least one after the the line containing the other provided string"""
+        after_hit = False
+        for line in self._lines:
+            if after_hit:
+                if string in line:
+                    return
+            elif after in line:
+                after_hit = True
+
+        raise AssertionError(f"Did not contain {string} after {after}")
+
     def assert_not_contains(self, *strings):
         """Assert there is no line in the log matching all the strings provided
         """
