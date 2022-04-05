@@ -281,3 +281,114 @@ def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
 
 }
 
+def Poptorch_constant_pad_nd : Poptorch_NotImplementedOp<"constant_pad_nd", []> {
+    let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad, F32Attr:$scalar);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::vector<std::int64_t>":$pad,
+                                      "float":$scalar),[{
+        $_state.addOperands({self});
+        $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
+        $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
+
+        ERROR_ON_MSG(pad.size() % 2 != 0,
+                     "Length of pad must be even but instead is equals " +
+                     std::to_string(pad.size()));
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto input_shape = tensor.getShape();
+
+        ERROR_ON_MSG(pad.size() > 2 * input_shape.size(),
+                     "Length of pad should be no more that twice the number of dimension "
+                     "of the input. Pad has " + std::to_string(pad.size()) +
+                     " dimensions while the input has " +
+                     std::to_string(input_shape.size()) + " dimensions");
+
+        llvm::SmallVector<std::int64_t, 4> shape{input_shape.begin(),
+                                                 input_shape.end()};
+
+        for (int i = 0; i < pad.size() / 2; ++i) {
+            const auto dim = shape.size() - 1 - i;
+            const auto lpad = pad[2 * i];
+            const auto rpad = pad[2 * i + 1];
+
+            ERROR_ON_MSG(shape[dim] + std::min(lpad, 0l) + std::min(rpad, 0l) < 0,
+                         "You cannot pad negatively by more than the size of dimension " +
+                         std::to_string(dim));
+            shape[dim] += lpad + rpad;
+        }
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+def Poptorch_index_select : Poptorch_NotImplementedOp<"index_select", []> {
+    let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::int64_t":$dim,
+                                      "mlir::Value":$index),[{
+        $_state.addOperands({self, index});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto input_shape = tensor.getShape();
+
+        ERROR_ON_MSG(dim >= input_shape.size() || -dim > input_shape.size(),
+                     "Cannot index outside the tensor (dims " +
+                     std::to_string(input_shape.size()) + ") with dim (" +
+                     std::to_string(dim) + ")");
+
+        if (dim < 0) dim += input_shape.size();
+
+        mlir::RankedTensorType index_tensor = index.getType().cast<mlir::RankedTensorType>();
+        const auto index_shape = index_tensor.getShape();
+
+        ERROR_ON_MSG(index_shape.size() != 1, "index must be a 1-D tensor");
+        ERROR_ON_MSG(!index_tensor.getElementType().isIntOrIndex(),
+                     "index must have integer type");
+
+        llvm::SmallVector<std::int64_t, 4> shape{input_shape.begin(),
+                                                 input_shape.end()};
+
+        shape[dim] = index_shape.front();
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+def Poptorch_permute : Poptorch_NotImplementedOp<"permute", []> {
+    let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dims);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$dims),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("dims", $_builder.getI64ArrayAttr(dims));
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto input_shape = tensor.getShape();
+
+        ERROR_ON_MSG(dims.size() != input_shape.size(),
+                     "Must have the same number of dims (" + std::to_string(dims.size()) +
+                     ") as the input dimension (" + std::to_string(input_shape.size()) + ")");
+
+        // Check that dims is a perumation
+        for (std::size_t i = 0; i < dims.size(); ++i) {
+            ERROR_ON_MSG(std::find(dims.begin(), dims.end(), i) == dims.end() &&
+                         std::find(dims.begin(), dims.end(), i - dims.size()) == dims.end(),
+                         "dims must be a perumation. Missing dim " +
+                         std::to_string(i));
+        }
+
+        llvm::SmallVector<std::int64_t, 4> shape;
+        shape.reserve(dims.size());
+
+        for (auto dim : dims) {
+            shape.push_back(input_shape[dim >= 0 ? dim : dim + dims.size()]);
+        }
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}

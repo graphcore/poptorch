@@ -137,12 +137,6 @@ void shapeddropout::lowerToPoplar(CompilerContext & /*context*/) {
                   "shapeddropout"
                   " is currently unimplemented.");
 }
-void fmod::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "fmod"
-                  " is currently unimplemented.");
-}
 void reverse::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
@@ -317,12 +311,6 @@ void gemm::lowerToPoplar(CompilerContext & /*context*/) {
                   "gemm"
                   " is currently unimplemented.");
 }
-void isnan::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "isnan"
-                  " is currently unimplemented.");
-}
 void maxunpool::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
@@ -425,18 +413,6 @@ void logical_xor::lowerToPoplar(CompilerContext & /*context*/) {
                   "logical_xor"
                   " is currently unimplemented.");
 }
-void argmax::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "argmax"
-                  " is currently unimplemented.");
-}
-void argmin::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "argmin"
-                  " is currently unimplemented.");
-}
 void clip::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
@@ -447,12 +423,6 @@ void convtranspose::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
                   "convtranspose"
-                  " is currently unimplemented.");
-}
-void elu::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "elu"
                   " is currently unimplemented.");
 }
 void gather::lowerToPoplar(CompilerContext & /*context*/) {
@@ -501,12 +471,6 @@ void lrn::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "
                   "lrn"
-                  " is currently unimplemented.");
-}
-void leakyrelu::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "leakyrelu"
                   " is currently unimplemented.");
 }
 void lpnormalization::lowerToPoplar(CompilerContext & /*context*/) {

@@ -160,3 +160,22 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward", [AttrSizedO
     $_state.addTypes({input.getType(), weight.getType(), weight.getType()});
   }]>];
 }
+
+def Poptorch_layer_norm : Poptorch_NotImplementedOp<"layer_norm", [AttrSizedOperandSegments]> {
+  let arguments = (ins Poptorch_tensor:$input,
+                        I64ArrayAttr:$normalized_shape,
+                        Optional<Poptorch_tensor>:$weight,
+                        Optional<Poptorch_tensor>:$bias,
+                        F32Attr:$epsilon);
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+                                    "const std::vector<std::int64_t>&":$normalized_shape,
+                                    "mlir::Value":$weight,
+                                    "mlir::Value":$bias,
+                                    "float":$epsilon), [{
+    $_state.addOperands({input, weight, bias});
+    $_state.addAttribute("normalized_shape",$_builder.getI64ArrayAttr(normalized_shape));
+    $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
+    $_state.addTypes(input.getType());
+  }]>];
+}

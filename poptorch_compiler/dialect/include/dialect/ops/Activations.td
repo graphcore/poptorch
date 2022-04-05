@@ -13,6 +13,58 @@ def Poptorch_swish: Poptorch_elem_unary<"swish"> {}
 def Poptorch_relu: Poptorch_elem_unary<"relu"> {}
 def Poptorch_gelu: Poptorch_elem_unary<"gelu"> {}
 
+def Poptorch_elu : Poptorch_NotImplementedOp<"elu", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$in1, F32Attr:$alpha, F32Attr:$scale, F32Attr:$input_scale);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "float":$alpha, "float":$scale, "float":$input_scale),[{
+        $_state.addOperands({self});
+        $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
+        $_state.addAttribute("scale",$_builder.getF32FloatAttr(scale));
+        $_state.addAttribute("input_scale",$_builder.getF32FloatAttr(input_scale));
+
+        $_state.addTypes(self.getType());
+     }]>
+    ];
+}
+
+def Poptorch_hardshrink : Poptorch_NotImplementedOp<"hardshrink", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$in1, F32Attr:$lambd);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "float":$lambd),[{
+        $_state.addOperands({self});
+        $_state.addAttribute("lambd",$_builder.getF32FloatAttr(lambd));
+
+        $_state.addTypes(self.getType());
+     }]>
+    ];
+}
+
+def Poptorch_leaky_relu_out : Poptorch_NotImplementedOp<"leaky_relu_out", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$in1, F32Attr:$negative_slope);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "float":$negative_slope),[{
+        $_state.addOperands({self});
+        $_state.addAttribute("negative_slope",$_builder.getF32FloatAttr(negative_slope));
+
+        $_state.addTypes(self.getType());
+     }]>
+    ];
+}
+
+def Poptorch_log_sigmoid_forward : Poptorch_NotImplementedOp<"log_sigmoid_forward", []> {
+    let arguments = (ins Poptorch_tensor:$in1);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
+        $_state.addOperands({self});
+
+        $_state.addTypes({self.getType(), self.getType()});
+     }]>
+    ];
+}
 
 // Inplace versions.
 def Poptorch_hardsigmoid_: Poptorch_elem_unary_in_place<"hardsigmoid_"> {}
@@ -20,8 +72,6 @@ def Poptorch_hardswish_: Poptorch_elem_unary_in_place<"hardswish_"> {}
 def Poptorch_swish_: Poptorch_elem_unary_in_place<"swish_"> {}
 def Poptorch_relu_: Poptorch_elem_unary_in_place<"relu_"> {}
 def Poptorch_gelu_: Poptorch_elem_unary_in_place<"gelu_"> {}
-
-
 
 // Softmax takes an additional "dim" argument.
 def Poptorch_softmax : Poptorch_Op<"softmax", [SameOperandsAndResultShape]> {

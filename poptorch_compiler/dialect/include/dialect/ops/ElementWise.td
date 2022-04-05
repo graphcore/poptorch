@@ -45,6 +45,19 @@ def Poptorch_square: Poptorch_elem_unary<"square"> {}
 def Poptorch_sigmoid: Poptorch_elem_unary<"sigmoid"> {}
 def Poptorch_rsqrt: Poptorch_elem_unary<"rsqrt"> {}
 
+def Poptorch_isnan :  Poptorch_NotImplementedOp<"isnan"> {
+    let arguments = (ins Poptorch_tensor:$in1);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1),[{
+        $_state.addOperands({v1});
+
+        mlir::RankedTensorType rtt = v1.getType().cast<mlir::RankedTensorType>();
+        $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, false)));
+     }]>
+    ];
+}
+
 class Poptorch_elem_unary_in_place<string name> :  Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$in1);
     let assemblyFormat = [{
@@ -116,18 +129,13 @@ class Poptorch_elem_binary<string name> :  Poptorch_Op<name, []> {
 }
 
 def Poptorch_atan2: Poptorch_elem_binary<"atan2"> {}
-def Poptorch_bitwiseAnd: Poptorch_elem_binary<"bitwiseand"> {}
-def Poptorch_bitwiseOr: Poptorch_elem_binary<"bitwiseor"> {}
-def Poptorch_bitwiseXor: Poptorch_elem_binary<"bitwisexor"> {}
-def Poptorch_bitwiseXnor: Poptorch_elem_binary<"bitwisexnor"> {}
+def Poptorch_bitwiseAnd: Poptorch_elem_binary<"bitwiseAnd"> {}
+def Poptorch_bitwiseOr: Poptorch_elem_binary<"bitwiseOr"> {}
+def Poptorch_bitwiseXor: Poptorch_elem_binary<"bitwiseXor"> {}
+def Poptorch_bitwiseXnor: Poptorch_elem_binary<"bitwiseXnor"> {}
 def Poptorch_div: Poptorch_elem_binary<"div"> {}
-def Poptorch_eq: Poptorch_elem_binary<"eq"> {}
-def Poptorch_gteq: Poptorch_elem_binary<"gteq"> {}
-def Poptorch_gt: Poptorch_elem_binary<"gt"> {}
-def Poptorch_lteq: Poptorch_elem_binary<"lteq"> {}
 def Poptorch_logicalAnd: Poptorch_elem_binary<"logicaland"> {}
 def Poptorch_logicalOr: Poptorch_elem_binary<"logicalor"> {}
-def Poptorch_lt: Poptorch_elem_binary<"lt"> {}
 def Poptorch_max: Poptorch_elem_binary<"max"> {}
 def Poptorch_min: Poptorch_elem_binary<"min"> {}
 def Poptorch_neq: Poptorch_elem_binary<"neq"> {}
@@ -173,10 +181,10 @@ class Poptorch_elem_binary_in_place<string name> :  Poptorch_Op<name, []> {
 }
 
 def Poptorch_atan2_: Poptorch_elem_binary_in_place<"atan2_"> {}
-def Poptorch_bitwiseAnd_: Poptorch_elem_binary_in_place<"bitwiseand_"> {}
-def Poptorch_bitwiseOr_: Poptorch_elem_binary_in_place<"bitwiseor_"> {}
-def Poptorch_bitwiseXor_: Poptorch_elem_binary_in_place<"bitwisexor_"> {}
-def Poptorch_bitwiseXnor_: Poptorch_elem_binary_in_place<"bitwisexnor_"> {}
+def Poptorch_bitwiseAnd_: Poptorch_elem_binary_in_place<"bitwiseAnd_"> {}
+def Poptorch_bitwiseOr_: Poptorch_elem_binary_in_place<"bitwiseOr_"> {}
+def Poptorch_bitwiseXor_: Poptorch_elem_binary_in_place<"bitwiseXor_"> {}
+def Poptorch_bitwiseXnor_: Poptorch_elem_binary_in_place<"bitwiseXnor_"> {}
 def Poptorch_div_: Poptorch_elem_binary_in_place<"div_"> {}
 def Poptorch_eq_: Poptorch_elem_binary_in_place<"eq_"> {}
 def Poptorch_gteq_: Poptorch_elem_binary_in_place<"gteq_"> {}
@@ -260,6 +268,52 @@ def Poptorch_addcmul_ : Poptorch_addcX<"addcmul_"> {}
 def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
 def Poptorch_addcdiv_ : Poptorch_addcX<"addcdiv_"> {}
 
+class Poptorch_NotImplemented_elem_binary<string name> :  Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
+        $_state.addOperands({v1, v2});
+        $_state.addTypes(inferType(v1, v2));
+     }]>
+    ];
+
+    // TODO: Will need to match the full shape inference rules.
+    let extraClassDeclaration = [{
+        static mlir::Type inferType(mlir::Value v1, mlir::Value v2) {
+            // Get the types of the inputs.
+            mlir::Type t1 = v1.getType();
+            mlir::Type t2 = v2.getType();
+
+            // Assume both are tensors for now.
+            mlir::RankedTensorType t1_tensor = t1.cast<mlir::RankedTensorType>();
+            mlir::RankedTensorType t2_tensor = t2.cast<mlir::RankedTensorType>();
+
+            // Get element type out
+            mlir::Type e1 = t1_tensor.getElementType();
+            return mlir::RankedTensorType::get(t1_tensor.getShape(), e1);
+        }
+    }];
+}
+
+def Poptorch_floor_divide : Poptorch_NotImplemented_elem_binary<"floor_divide"> {}
+def Poptorch_fmod : Poptorch_NotImplemented_elem_binary<"fmod"> {}
+
+class Poptorch_elem_binary_scalar<string name> :  Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$lhs, "float":$rhs),[{
+        $_state.addOperands(lhs);
+        $_state.addAttribute("rhs", $_builder.getF32FloatAttr(rhs));
+
+        $_state.addTypes(lhs.getType());
+     }]>
+    ];
+}
+
+def Poptorch_pow_Tensor_Scalar_out : Poptorch_elem_binary_scalar<"pow_Tensor_Scalar_out"> {}
+
 class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);
@@ -269,13 +323,35 @@ class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
     let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
         $_state.addOperands({v1, v2});
         mlir::RankedTensorType rtt = v1.getType().cast<mlir::RankedTensorType>();
-        $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, true)));
+        $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, false)));
      }]>
     ];
 }
 
-def Poptorch_greater: Poptorch_binary_conditional<"greater"> {}
-def Poptorch_less: Poptorch_binary_conditional<"less"> {}
+def Poptorch_eq: Poptorch_binary_conditional<"eq"> {}
+def Poptorch_gteq: Poptorch_binary_conditional<"gteq"> {}
+def Poptorch_gt: Poptorch_binary_conditional<"gt"> {}
+def Poptorch_lteq: Poptorch_binary_conditional<"lteq"> {}
+def Poptorch_lt: Poptorch_binary_conditional<"lt"> {}
+
+class Poptorch_NotImplemented_binary_conditional_scalar<string name> : Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$lhs, "float":$rhs),[{
+        $_state.addOperands({lhs});
+        $_state.addAttribute("rhs", $_builder.getF32FloatAttr(rhs));
+        mlir::RankedTensorType rtt = lhs.getType().cast<mlir::RankedTensorType>();
+        $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, false)));
+     }]>
+    ];
+}
+
+def Poptorch_lt_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"lt_Scalar_out"> {}
+def Poptorch_le_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"le_Scalar_out"> {}
+def Poptorch_gt_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"gt_Scalar_out"> {}
+def Poptorch_ge_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"ge_Scalar_out"> {}
+def Poptorch_eq_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"eq_Scalar_out"> {}
+def Poptorch_ne_Scalar_out : Poptorch_NotImplemented_binary_conditional_scalar<"ne_Scalar_out"> {}
 
 def Poptorch_clamp: Poptorch_Op<"clamp", []> {
   // defining input arguments

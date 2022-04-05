@@ -253,21 +253,6 @@ def Poptorch_shapeddropout : Poptorch_Op<"shapeddropout", []> {
 
 }
 
-def Poptorch_fmod : Poptorch_Op<"fmod", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_reverse : Poptorch_Op<"reverse", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$dimensions);
   let results = (outs Poptorch_tensor:$result);
@@ -754,21 +739,6 @@ def Poptorch_gemm : Poptorch_Op<"gemm", []> {
 
 }
 
-def Poptorch_isnan : Poptorch_Op<"isnan", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_maxunpool : Poptorch_Op<"maxunpool", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$kernel_shape, I64ArrayAttr:$pads, I64ArrayAttr:$strides);
   let results = (outs Poptorch_tensor:$result);
@@ -1050,39 +1020,6 @@ def Poptorch_logical_xor : Poptorch_Op<"logical_xor", []> {
 
 }
 
-def Poptorch_argmax : Poptorch_Op<"argmax", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$axis, I64Attr:$keepdims);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "std::int64_t":$axis, "std::int64_t":$keepdims), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("axis",$_builder.getI64IntegerAttr(axis));
-        $_state.addAttribute("keepdims",$_builder.getI64IntegerAttr(keepdims));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
-def Poptorch_argmin : Poptorch_Op<"argmin", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$axis, I64Attr:$keepdims);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "std::int64_t":$axis, "std::int64_t":$keepdims), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("axis",$_builder.getI64IntegerAttr(axis));
-        $_state.addAttribute("keepdims",$_builder.getI64IntegerAttr(keepdims));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
 
 def Poptorch_clip : Poptorch_Op<"clip", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, F32Attr:$max, F32Attr:$min);
@@ -1114,22 +1051,6 @@ def Poptorch_convtranspose : Poptorch_Op<"convtranspose", []> {
         $_state.addAttribute("output_shape",$_builder.getI64ArrayAttr(output_shape));
         $_state.addAttribute("pads",$_builder.getI64ArrayAttr(pads));
         $_state.addAttribute("strides",$_builder.getI64ArrayAttr(strides));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
-def Poptorch_elu : Poptorch_Op<"elu", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, F32Attr:$alpha);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "float":$alpha), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
 
         // Just take the first value type until this op is manually added.
 
@@ -1257,22 +1178,6 @@ def Poptorch_lrn : Poptorch_Op<"lrn", []> {
         $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
         $_state.addAttribute("beta",$_builder.getF32FloatAttr(beta));
         $_state.addAttribute("bias",$_builder.getF32FloatAttr(bias));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
-def Poptorch_leakyrelu : Poptorch_Op<"leakyrelu", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, F32Attr:$alpha);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "float":$alpha), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
 
         // Just take the first value type until this op is manually added.
 
