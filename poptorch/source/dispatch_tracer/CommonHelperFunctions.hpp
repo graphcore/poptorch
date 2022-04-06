@@ -27,6 +27,8 @@ class ValueMapper;
 torch::jit::Value *makeConstant(torch::jit::Graph &graph,
                                 const at::Tensor &tensor);
 
+at::Tensor copyAndCoerceType(const at::Tensor &tensor);
+
 c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &initial_op,
                                         c10::Dispatcher &dispatcher);
 

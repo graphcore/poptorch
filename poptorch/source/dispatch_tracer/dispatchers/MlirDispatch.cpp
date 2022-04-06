@@ -32,6 +32,7 @@ poptorch_ir::Type toCompilerType(const at::ScalarType &elem_type) {
   case at::ScalarType::Char:
     return poptorch_ir::Type::CHAR;
   case at::ScalarType::Float:
+  case at::ScalarType::Double: // We will convert this.
     return poptorch_ir::Type::FLOAT;
   case at::ScalarType::Half:
     return poptorch_ir::Type::HALF;

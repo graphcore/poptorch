@@ -330,7 +330,8 @@ emptyBase(at::IntArrayRef size,
   // Turn off dispatch so we can call CPU functions without catching them.
   DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting empty_base for tensor: {}, {}",
-                 output.data_ptr(), toString(output));
+                 static_cast<void *>(output.unsafeGetTensorImpl()),
+                 toString(output));
 
   context.active_dispatch->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());

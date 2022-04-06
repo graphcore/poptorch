@@ -21,17 +21,7 @@ namespace poptorch {
 
 at::Tensor JITDispatch::addInput(const at::Tensor &tensor) {
   torch::jit::Value *value = graph.addInput(tensor.name());
-
-  auto scalar_type = tensor.scalar_type();
-  auto scalar_type_coerced = coerceToSupportedType(scalar_type);
-  if (scalar_type != scalar_type_coerced) {
-    logging::warn("[TRACING-2][JIT] Input %{} type coerced from {} to {}",
-                  value->debugName(), scalar_type, scalar_type_coerced);
-    value->inferTypeFrom(tensor.to(scalar_type_coerced));
-  } else {
-    value->inferTypeFrom(tensor);
-  }
-
+  value->inferTypeFrom(copyAndCoerceType(tensor));
   _mapper.addTensor(tensor, value);
   return tensor;
 }
@@ -95,15 +85,22 @@ at::Tensor JITDispatch::allocateTensorImpl(
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
                                            const at::Tensor &src) {
-  if (src.unsafeGetTensorImpl()->is_wrapped_number()) {
-    torch::jit::Value *val = makeConstant(graph, src);
-    _mapper.addTensor(src, val, true);
+  ValueMapper::TrackedTensor *self_tracked = _mapper.rawTensorRecord(self);
+  if (self_tracked == nullptr) {
+    // This is probably an external tensor that we didn't catch. We track it
+    // but leave it uninitialized as we'll fix up self_tracked->jit later.
+    registerEmptyTensor(self);
+    self_tracked = _mapper.rawTensorRecord(self);
   }
 
-  ValueMapper::TrackedTensor *self_tracked = _mapper.rawTensorRecord(self);
   ValueMapper::TrackedTensor *src_tracked = _mapper.rawTensorRecord(src);
-  ERROR_ON(self_tracked == nullptr);
-  ERROR_ON(src_tracked == nullptr);
+  if (src_tracked == nullptr || src_tracked->is_empty) {
+    // This is either an external tensor that we didn't catch or an empty one.
+    // Assume it's a constant.
+    torch::jit::Value *val = makeConstant(graph, src);
+    _mapper.addTensor(src, val);
+    src_tracked = _mapper.rawTensorRecord(src);
+  }
 
   logging::trace(
       "[TRACING-2][JIT] copyInplace: src tensor {} (jit ir %{}), self tensor "
@@ -113,12 +110,19 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
       static_cast<void *>(self.unsafeGetTensorImpl()),
       self_tracked->jit->debugName());
 
+  auto self_st =
+      self_tracked->jit->type()->expect<c10::TensorType>()->scalarType();
+  auto src_st =
+      src_tracked->jit->type()->expect<c10::TensorType>()->scalarType();
+  ERROR_ON(!self_st.has_value());
+  ERROR_ON(!src_st.has_value());
+
   torch::jit::Value *copy;
-  if (self.scalar_type() == src.scalar_type()) {
+  if (*self_st == *src_st) {
     copy = createIdentity(&graph, {src_tracked->jit})->output();
-    copy->inferTypeFrom(self);
+    copy->setType(self_tracked->jit->type());
   } else {
-    copy = createCast(&graph, src_tracked->jit, self.scalar_type())->output();
+    copy = createCast(&graph, src_tracked->jit, *self_st)->output();
   }
 
   self_tracked->jit = copy;
@@ -149,7 +153,8 @@ at::Tensor JITDispatch::toCopyInplace(const at::Tensor &self,
   // after tracing.
   at::zero_(out);
 
-  torch::jit::Node *n = graph.createUninitialized(c10::TensorType::create(out));
+  torch::jit::Node *n = graph.createUninitialized(
+      c10::TensorType::create(copyAndCoerceType(out)));
   _mapper.addTensor(out, n->output(0), true);
 
   logging::trace("[TRACING-2][JIT] toCopyInplace: out tensor {} self tensor {}",
@@ -160,20 +165,8 @@ at::Tensor JITDispatch::toCopyInplace(const at::Tensor &self,
 }
 
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
-  auto scalar_type = tensor.scalar_type();
-  auto coerced_scalar_type = coerceToSupportedType(scalar_type);
-
-  at::Tensor copy;
-  if (scalar_type != coerced_scalar_type) {
-    logging::warn("[TRACING-2][JIT] Empty tensor type coerced from {} to {}",
-                  scalar_type, coerced_scalar_type);
-    copy = tensor.to(coerced_scalar_type);
-  } else {
-    copy = tensor.clone();
-  }
-
-  torch::jit::Node *n =
-      graph.createUninitialized(c10::TensorType::create(copy));
+  torch::jit::Node *n = graph.createUninitialized(
+      c10::TensorType::create(copyAndCoerceType(tensor)));
   _mapper.addTensor(tensor, n->output(0), true);
 }
 
@@ -217,15 +210,7 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       if (mapper.isHalfTensor(tensor)) {
         val->inferTypeFrom(tensor.to(at::ScalarType::Half));
       } else {
-        auto st = tensor.scalar_type();
-        auto st_coerced = coerceToSupportedType(st);
-        if (st != st_coerced) {
-          logging::warn("[TRACING-2][JIT] Output type coerced from {} to {}",
-                        st, st_coerced);
-          val->inferTypeFrom(tensor.to(st_coerced));
-        } else {
-          val->inferTypeFrom(tensor);
-        }
+        val->inferTypeFrom(copyAndCoerceType(tensor));
       }
       _mapper.addTensor(tensor, val);
 

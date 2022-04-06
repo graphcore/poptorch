@@ -45,7 +45,6 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       // as a constant and fix the mapping.
       if (record->is_empty) {
         val = makeConstant(graph, tensor);
-        record->jit = val;
         mapper.addTensor(tensor, val);
       }
     }
@@ -140,18 +139,23 @@ at::ScalarType scalarTypeOrDefault(c10::optional<at::ScalarType> dtype) {
 
 torch::jit::Value *makeConstant(torch::jit::Graph &graph,
                                 const at::Tensor &tensor) {
-  at::Tensor ct;
-  auto st = tensor.scalar_type();
-  auto st_coerced = coerceToSupportedType(st);
-  if (st != st_coerced) {
-    logging::warn("[TRACING-2][JIT] Constant type coerced from {} to {}", st,
-                  st_coerced);
-    ct = tensor.to(st_coerced);
-  } else {
-    ct = tensor.clone();
-  }
-  auto *constant = tensorToConstant(&graph, ct);
+  auto *constant = tensorToConstant(&graph, copyAndCoerceType(tensor));
   return constant->output();
+}
+
+at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
+  at::Tensor copy;
+  auto scalar_type = tensor.scalar_type();
+  auto coerced_scalar_type = coerceToSupportedType(scalar_type);
+  if (scalar_type != coerced_scalar_type) {
+    logging::warn("[TRACING-2] Tensor (ptr {}) type coerced from {} to {}",
+                  static_cast<void *>(tensor.unsafeGetTensorImpl()),
+                  scalar_type, coerced_scalar_type);
+    copy = tensor.to(coerced_scalar_type);
+  } else {
+    copy = tensor.clone();
+  }
+  return copy;
 }
 
 c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
