@@ -34,7 +34,9 @@ add_custom_command(
     --interface-header-file "${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.hpp.inc"
     --interface-cpp-file "${CMAKE_CURRENT_BINARY_DIR}/AutogenCompiler.cpp.inc"
   DEPENDS
-    poptorch_raw_tablegen
+    # This appears not to work so I'm adding the ${TABLEGEN_OUTPUT} directly instead
+    #poptorch_raw_tablegen
+    ${TABLEGEN_OUTPUT}
   )
 
 add_custom_target(poptorch_decls
