@@ -22,7 +22,8 @@ from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
 from . import _poptorch_data
-from ._utils import accessAttributes, unrollTensorList
+from ._utils import (accessAttributes, unrollTensorList,
+                     reconstruct_output_structure)
 from ._logging import logger
 from .experimental import IPUScope
 from .options import Options, PipelinedExecution, ShardedExecution
@@ -117,6 +118,7 @@ class PoplarExecutor:
         self._poptorch_version = poptorch_version
 
         self._executable = None
+        self._outputs_structure = None
         self._options = options
         # The args parser needs to be initilialised before the model gets wrapped
         # otherwise we will not be able to retrieve the real arguments list
@@ -521,6 +523,7 @@ class PoplarExecutor:
                       options=self._options) as ipu:
             outputs = self._model(*in_tensors.asTuple())
             ipu.outputs(outputs)
+            self._outputs_structure = ipu._outputs_structure  # pylint: disable=protected-access
             self._error_on_buffer_parameter_address_change(
                 buff_param_addresses)
 
@@ -904,6 +907,9 @@ class PoplarExecutor:
         # backward() on an output tensor
         self._assign_backward_error(output)
 
+        if self._outputs_structure is not None:
+            output = reconstruct_output_structure(self._outputs_structure,
+                                                  output)
         if len(output) == 0:
             return None
         if len(output) > 1:

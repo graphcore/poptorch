@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 import torch
 from . import enums, poptorch_core, _impl, accessAttributes
-from ._utils import unrollTensorList
+from ._utils import unrollTensorList, reconstruct_output_structure
 from .options import Options
 
 
@@ -128,15 +128,8 @@ class IPUScope:
             output = self._outputs
 
         if self._outputs_structure is not None:
-            # Copy the original structure but replace all the tensors
-            # by values from the passed iterator
-            def copy_structure(x, it):
-                if isinstance(x, (tuple, list)):
-                    return type(x)(copy_structure(e, it) for e in x)
-                return next(it)
-
-            output = copy_structure(self._outputs_structure, iter(output))
-
+            output = reconstruct_output_structure(self._outputs_structure,
+                                                  output)
         return output
 
     def outputs(self, tensors):

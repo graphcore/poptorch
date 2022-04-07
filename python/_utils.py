@@ -73,3 +73,15 @@ def unrollTensorList(tensor_or_list, accumulated_tensors=None):
     # If it's not a list/tuple or tensor, just ignore it
 
     return accumulated_tensors
+
+
+# Turns a flat 'output' into the same structure as 'outputs_structure'.
+def reconstruct_output_structure(outputs_structure, output):
+    # Copy the original structure but replace all the tensors
+    # by values from the passed iterator.
+    def copy_structure(x, it):
+        if isinstance(x, (tuple, list)):
+            return type(x)(copy_structure(e, it) for e in x)
+        return next(it)
+
+    return copy_structure(outputs_structure, iter(output))

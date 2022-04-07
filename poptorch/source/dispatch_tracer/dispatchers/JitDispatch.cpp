@@ -53,13 +53,25 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
                             const at::Tensor &cpu_dest) {
   // The PopART backend will allocate its own buffers: ignore cpu_dest.
   UNUSED(cpu_dest);
-  auto *val = _mapper.getValueForTensor(ipu_src);
-  ERROR_ON_MSG(val == nullptr,
+  auto *record = _mapper.rawTensorRecord(ipu_src);
+  ERROR_ON_MSG(record == nullptr,
                "Internal: graph output tensor not present in the value mapper");
 
-  logging::trace("[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} {}",
+  torch::jit::Value *val;
+  if (record->is_empty) {
+    val = makeConstant(graph, ipu_src);
+    _mapper.addTensor(ipu_src, val);
+  } else {
+    val = record->jit;
+  }
+
+  logging::trace("[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} "
+                 "(scalar type {})",
                  reinterpret_cast<void *>(ipu_src.unsafeGetTensorImpl()),
-                 val->debugNameBase(), toString(ipu_src));
+                 val->debugNameBase(),
+                 val->type()->expect<c10::TensorType>()->scalarType().value_or(
+                     at::ScalarType::Undefined));
+
   graph.registerOutput(val);
   // For now, disable overlapping host IO on every output
   auto overlap_symbol = getOverlapSymbol("_for_output", _next_output_idx);
@@ -214,9 +226,12 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       }
       _mapper.addTensor(tensor, val);
 
-      logging::trace("[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} {}",
-                     reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
-                     val->debugNameBase(), toString(tensor));
+      logging::trace(
+          "[TRACING-2][JIT] Output: Tensor ptr {}, jit ir %{} (scalar type {})",
+          reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
+          val->debugNameBase(),
+          val->type()->expect<c10::TensorType>()->scalarType().value_or(
+              at::ScalarType::Undefined));
     } else if (value.isTensorList()) {
       logging::trace("[TRACING-2][JIT] Output tensor list: jit ir %{}",
                      val->debugName());

@@ -38,7 +38,7 @@ bool popartOnlyNode(const torch::jit::NodeKind &kind) {
   return (!compilerStateChangingKind(kind) && kind != c10::prim::Constant &&
           kind != c10::prim::TupleConstruct &&
           kind != c10::prim::ListConstruct && kind != c10::prim::TupleUnpack &&
-          kind != c10::prim::ListUnpack);
+          kind != c10::prim::ListUnpack && kind != c10::prim::Return);
 }
 
 // Check whether the node is (eventually) used host side, IPU or both
@@ -48,6 +48,9 @@ UseOfNode getUseOfNode(torch::jit::Node *n,
   // This could be disabled explicitly by the caller.
   if (check_node_kind_itself && popartOnlyNode(n->kind())) {
     return UseOfNode::PopARTOnly;
+  }
+  if (check_node_kind_itself && n->kind() == c10::prim::Return) {
+    return UseOfNode::HostSideOnly;
   }
 
   bool popart_use = false;
