@@ -284,8 +284,6 @@ void markOutputs(const std::vector<at::Tensor> &outputs,
   context.active_dispatch->finalizeGraph();
 }
 
-// Appears in 1.10.
-#if TORCH_MINOR_VERSION >= 10
 // _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
 // device=None, bool? pin_memory=None, bool non_blocking=False, MemoryFormat?
 // memory_format=None) -> Tensor
@@ -310,7 +308,6 @@ at::Tensor toCopy(const at::Tensor &self,
                                                           device, pin, fmt);
   return out;
 }
-#endif
 
 at::Tensor
 emptyBase(at::IntArrayRef size,
@@ -459,13 +456,9 @@ TORCH_LIBRARY_IMPL(aten, BackendSelect, m) {
 
   m.impl("copy_", &poptorch::copyInplace);
   m.impl("empty.memory_format", &poptorch::emptyMemoryFormat);
-
   m.impl("empty.out", &poptorch::emptyOut);
   m.impl("empty_strided", &poptorch::emptyStrided);
-
-#if TORCH_MINOR_VERSION >= 10
   m.impl("_to_copy", &poptorch::toCopy);
-#endif
 
   // Turn logging back on.
   FLAGS_caffe2_log_level = log_level;

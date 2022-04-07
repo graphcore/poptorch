@@ -38,15 +38,6 @@ extern c10::Symbol argsort;                     // NOLINT
 extern c10::Symbol minimum;                     // NOLINT
 extern c10::Symbol maximum;                     // NOLINT
 
-// Removed in 1.10.
-#if TORCH_MINOR_VERSION < 10
-extern c10::Symbol amax;        // NOLINT
-extern c10::Symbol amin;        // NOLINT
-extern c10::Symbol logical_not; // NOLINT
-extern c10::Symbol logical_and; // NOLINT
-extern c10::Symbol logical_or;  // NOLINT
-extern c10::Symbol logical_xor; // NOLINT
-#endif
 } // namespace c10::aten
 
 namespace poptorch {

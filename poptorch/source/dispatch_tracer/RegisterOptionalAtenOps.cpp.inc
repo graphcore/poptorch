@@ -2,16 +2,12 @@
 
 TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("copy_", &poptorch::copyInplace);
-
-#if TORCH_MINOR_VERSION >= 10
   m.impl("_to_copy", &poptorch::toCopy);
-#endif
-
   m.impl("empty.memory_format", &poptorch::emptyMemoryFormat);
   m.impl("empty.out", &poptorch::emptyOut);
   m.impl("empty_strided", &poptorch::emptyStrided);
-
   m.impl("detach", &poptorch::detach);
+
   m.impl("convolution",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
