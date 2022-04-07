@@ -8,7 +8,12 @@ else()
   set(TESTS_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+if(ONLY_RUN_HW_TESTS)
+  set(TESTS_FLAGS "--hw-tests-only")
+else()
+  set(TESTS_FLAGS "")
+endif()
 run_poptorch_install_command(
-  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_test_file.py ${TESTS_PATH} ${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake --add-to-sys-path ${CMAKE_INSTALL_PREFIX}"
+  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_test_file.py ${TESTS_PATH} ${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake --add-to-sys-path ${CMAKE_INSTALL_PREFIX} ${TESTS_FLAGS}"
   "${PROJECT_BINARY_DIR}"
   "generate_test_file.py")
