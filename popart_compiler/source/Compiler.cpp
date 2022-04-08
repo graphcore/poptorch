@@ -673,16 +673,21 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
                            options.accumulationFactor > 1,
                            "enableGradientAccumulation");
 
-  // This is needed for both overlapped IO and explicit pipelining (not yet)
-  // supported.
-  _impl->setOptionIfNotSet(options.useHostCopyOps, _impl->using_overlapped_io,
-                           "useHostCopyOps");
+  // Only explicitly set these options if overlapped I/O are used
+  // otherwise we might be overwriting the values set implicitly
+  // by some other PopART options (like for example enableExplicitIR()).
+  if (_impl->using_overlapped_io) {
+    // This is needed for both overlapped IO and explicit pipelining (not yet)
+    // supported.
+    _impl->setOptionIfNotSet(options.useHostCopyOps, _impl->using_overlapped_io,
+                             "useHostCopyOps");
 
-  // This is needed but may cause regressions for existing models. When it is
-  // more developed, this will become the default.
-  _impl->setOptionIfNotSet(options.enableExplicitMainLoops,
-                           _impl->using_overlapped_io,
-                           "enableExplicitMainLoops");
+    // This is needed but may cause regressions for existing models. When it is
+    // more developed, this will become the default.
+    _impl->setOptionIfNotSet(options.enableExplicitMainLoops,
+                             _impl->using_overlapped_io,
+                             "enableExplicitMainLoops");
+  }
 
   // Create the anchors, these are used to copy to the host.
   auto data_flow = popart::DataFlow(_impl->options.steps, _impl->anchors);
