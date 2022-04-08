@@ -3,7 +3,6 @@
 import torch
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
@@ -17,8 +16,7 @@ def cat_stack_harness(op, dim, dtype):
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "params",
     [
@@ -31,8 +29,7 @@ def test_cat(params):
     cat_stack_harness(alias, dim, dtype)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "params",
     [
@@ -45,8 +42,7 @@ def test_stack(params):
     cat_stack_harness(torch.stack, dim, dtype)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_where():
     zeros = torch.zeros(3, 3)
     ones = torch.ones(3, 3)
@@ -59,8 +55,7 @@ def test_where():
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_as_strided():
     def op_harness(op, *args):
         t = torch.tensor([[1, 2, 3], [4, 5, 6], [6, 7, 8]])
@@ -81,8 +76,7 @@ def test_as_strided():
         op_harness(torch.as_strided, [3, 3], [1, 3])
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def expand_reshape_view_harness(in_shape, new_shape, op):
     torch.manual_seed(42)
 
@@ -111,8 +105,7 @@ def expand_reshape_view_harness(in_shape, new_shape, op):
     helpers.assert_allequal(actual=ipu_result[1], expected=t)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", ["reshape", "view"])
 def test_reshape_view(op):
     # Ordinary reshape/view
@@ -136,8 +129,7 @@ def test_reshape_view(op):
         expand_reshape_view_harness((3, 4), (-1, -1, 2), op)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_reshape_sparse():
     s = torch.sparse_coo_tensor([(0, 1), (2, 2), (2, 3)], [1.0, 2.0],
                                 (2, 3, 4))
@@ -151,8 +143,7 @@ def test_reshape_sparse():
         IPUContext(reshape_sparse)(s)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_expand():
     expand_reshape_view_harness((2, 1, 4), (2, 4, 4), "expand")
     expand_reshape_view_harness((2, 1, 4), (2, 2, 2, 4, 4), "expand")
@@ -189,8 +180,7 @@ def is_view_harness(in_shape, fn, *args, **kwargs):
     helpers.assert_allequal(actual=ipu_res, expected=cpu_res)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_view_is_view():
     shape = (3, 4, 5)
     view_shape = shape[::-1]
@@ -200,8 +190,7 @@ def test_view_is_view():
     is_view_harness(shape, fn, view_shape)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_expand_is_view():
     shape = (3, 1, 5)
     expanded_shape = (3, 4, 5)

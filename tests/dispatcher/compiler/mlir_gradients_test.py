@@ -4,12 +4,10 @@ import copy
 import torch
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_grad():
     model = torch.nn.Sequential(torch.nn.Linear(1, 10))
 
@@ -34,8 +32,7 @@ def test_grad():
         helpers.assert_allclose(expected=cpu_out, actual=ipu_out)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_SGD():
     torch.manual_seed(42)
 
@@ -69,8 +66,7 @@ def test_SGD():
             helpers.assert_allclose(expected=ipu_out, actual=cpu_out)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_Adam():
     torch.manual_seed(42)
     model = torch.nn.Sequential(torch.nn.Linear(1, 10))

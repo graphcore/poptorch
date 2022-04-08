@@ -23,8 +23,7 @@ def harness(setting, Model, args, trace_model):
         poptorch_model(*args)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Floating point exception not supported on model")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_div0(setting, trace_model):
@@ -37,8 +36,7 @@ def test_div0(setting, trace_model):
     harness(setting, Model, [x, y], trace_model)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Floating point exception not supported on model")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_mul0inf(setting, trace_model):
@@ -51,8 +49,7 @@ def test_mul0inf(setting, trace_model):
     harness(setting, Model, [x, y], trace_model)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Floating point exception not supported on model")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_nonreal(setting, trace_model):
@@ -65,8 +62,7 @@ def test_nonreal(setting, trace_model):
 
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Floating point exception not supported on model")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_nan(setting, trace_model):
     class Model(torch.nn.Module):
@@ -79,8 +75,7 @@ def test_nan(setting, trace_model):
 
 
 @pytest.mark.parametrize("setting", {"default", "true", "false"})
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Floating point exception not supported on model")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ovf(setting, trace_model):
     class Model(torch.nn.Module):

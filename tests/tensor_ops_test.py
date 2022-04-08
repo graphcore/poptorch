@@ -456,8 +456,7 @@ def fast_gather_last_dim(data, idx):
     return out
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to test this feature")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_fastgather_3dim(trace_model):
     torch.manual_seed(42)

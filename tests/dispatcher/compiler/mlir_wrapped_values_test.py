@@ -3,12 +3,10 @@
 import torch
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_simple_adder():
     t1 = torch.randn([20])
     t2 = torch.randn([20])
@@ -24,8 +22,7 @@ def test_simple_adder():
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_zero_inplace():
     t = torch.randn([20])
 
@@ -37,8 +34,7 @@ def test_zero_inplace():
     helpers.assert_allclose(expected=ipu_zero_(t), actual=torch.zeros(20))
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_simple_inplace():
     t1 = torch.randn([20])
 
@@ -52,8 +48,7 @@ def test_simple_inplace():
     helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_simple_inplace_add():
     t1 = torch.randn([20])
 
@@ -67,8 +62,7 @@ def test_simple_inplace_add():
     helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_add_with_alpha():
     t1 = torch.randn([20])
 
@@ -85,8 +79,7 @@ def test_add_with_alpha():
     helpers.assert_allclose(expected=t1, actual=ipu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_sub_with_alpha():
     t1 = torch.randn([20])
 
@@ -101,8 +94,7 @@ def test_sub_with_alpha():
 
 
 # TODO(T49190): More than just float and long
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("python_type", [float, int])
 def test_wrapped_values(python_type):
     dtype = torch.float if python_type is float else torch.int

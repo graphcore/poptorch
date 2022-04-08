@@ -5,7 +5,6 @@ import pytest
 
 import torch
 
-import poptorch
 from poptorch.experimental import IPUContext
 
 shape = (3, 4, 5)
@@ -18,8 +17,7 @@ for d in range(-len(shape), len(shape)):
 
 # torch.select.int
 @pytest.mark.parametrize("dim_idx", select_param_sets)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_select(dim_idx):
     num_elems = 1
     for d in shape:
@@ -38,8 +36,7 @@ def test_select(dim_idx):
 
 # Test that the result returned from `select.int` is a view, not a copy of the
 # input tensor.
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_select_is_view():
     num_elems = 1
     for d in shape:
@@ -61,8 +58,7 @@ def test_select_is_view():
 
 # torch.unbind
 @pytest.mark.parametrize("dim", range(-len(shape), len(shape)))
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_unbind(dim):
     num_elems = 1
     for d in shape:

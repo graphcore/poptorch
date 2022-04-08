@@ -60,8 +60,7 @@ def get_mean_cycle_count(trace_model, io_dtype, capfd):
     return np.array(cycle_counts).mean()
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("io_dtype1,io_dtype2",
                          [(torch.float32, torch.int8),
                           (torch.float32, torch.uint8),

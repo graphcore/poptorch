@@ -241,8 +241,7 @@ def test_torch_save():
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to test this feature")
+@pytest.mark.ipuHardwareRequired
 def test_seed_precompilation(capfd):
     # create a dummy model
     model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
@@ -293,8 +292,7 @@ def test_seed_precompilation(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to test this feature")
+@pytest.mark.ipuHardwareRequired
 def test_save_everything(capfd):
     # create a dummy model
     model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)

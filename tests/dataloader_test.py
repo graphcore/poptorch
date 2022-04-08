@@ -163,15 +163,13 @@ def test_device_iterations(trace_model):
     _run_test(trace_model, device_iterations=4)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed for replica > 1")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_replica(trace_model):
     _run_test(trace_model, replication_factor=4)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed for replica > 1")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_combined(trace_model):
     _run_test(trace_model,
@@ -240,8 +238,7 @@ def test_multithreaded2(trace_model):
                       num_workers=0)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed for replica > 1")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_multithreaded3(trace_model):
     _run_process_test(trace_model,

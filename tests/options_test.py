@@ -293,8 +293,7 @@ def test_automatic_loss_scaling(capfd, optim):
         'to value true')
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_real_ipu_selection():
     class Network(nn.Module):
         def forward(self, x, y):
@@ -310,8 +309,7 @@ def test_real_ipu_selection():
     inference_model(x, y)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_ipu_id_selection():
     class Network(nn.Module):
         def forward(self, x, y):
@@ -594,8 +592,7 @@ def test_ipu_context_flag(trace_model):
     assert model(x, y) == 100
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("enabled", [True, False, None])
 @helpers.overridePoptorchLogLevel("INFO")
 def test_ipu_model(enabled, capfd):
@@ -623,8 +620,7 @@ def test_ipu_model(enabled, capfd):
         log.assert_contains("From the user configuration: Ipu model: Disabled")
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to count IPU cycles")
+@pytest.mark.ipuHardwareRequired
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_log_cycle_count(capfd, trace_model):

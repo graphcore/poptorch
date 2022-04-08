@@ -210,8 +210,7 @@ def test_dropout_eval_during_training(dropout_op):
     helpers.assert_allequal(expected=x, actual=poptorch_out, msg=msg)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_dropout_training():
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout(drop_ratio)
@@ -231,8 +230,7 @@ def test_dropout_training():
     op_harness(dropout_op, [x], check_ratio)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_dropout2d_training():
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout2d(drop_ratio)
@@ -255,8 +253,7 @@ def test_dropout2d_training():
     op_harness(dropout_op, [x], check_ratio)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_dropout3d_training():
     drop_ratio = 0.6
     dropout_op = torch.nn.Dropout3d(drop_ratio)

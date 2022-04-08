@@ -5,11 +5,9 @@ import torch
 import torch.nn as nn
 from poptorch.experimental import IPUScope
 import helpers
-import poptorch
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_mnist():
     # A helper block to build convolution-pool-relu blocks.
     class Block(nn.Module):

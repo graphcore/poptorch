@@ -6,8 +6,7 @@ import helpers
 import poptorch
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_weight_update_replicas(process_id=0, num_processes=1):
     localReplicationFactor = 2
 
@@ -99,8 +98,7 @@ def test_weight_update_replicas(process_id=0, num_processes=1):
                                 atol=1e-03)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_too_many_ipus():
     localReplicationFactor = 128
 

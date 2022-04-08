@@ -4,7 +4,6 @@ import torch
 import torch.nn.functional as F
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
@@ -46,8 +45,7 @@ activation_functions = [
 ]
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", activation_functions)
 def test_activations(op):
     torch.manual_seed(42)
@@ -68,8 +66,7 @@ def test_activations(op):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
 def test_softmax(dim):
     torch.manual_seed(42)
@@ -84,8 +81,7 @@ def test_softmax(dim):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
 def test_logsoftmax_forward(dim):
     torch.manual_seed(42)
@@ -99,8 +95,7 @@ def test_logsoftmax_forward(dim):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
 def test_logsoftmax_backward(dim):
     torch.manual_seed(42)

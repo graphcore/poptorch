@@ -68,8 +68,7 @@ def get_model(num_mat_muls,
     return Model()
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_io_input():
     num_mat_muls = 20
     model = get_model(num_mat_muls,
@@ -97,8 +96,7 @@ def test_io_input():
     poptorch_model(input_a, input_b, labels)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_input_error_messages(trace_model):
     class DoubleInputUseModel(torch.nn.Module):
@@ -168,8 +166,7 @@ def test_input_error_messages(trace_model):
     poptorch_model(torch.tensor([1.0]))
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_overlap_host_io_output():
     num_mat_muls = 20
     model = get_model(num_mat_muls, poptorch.OverlapMode.NoOverlap,
@@ -199,8 +196,7 @@ def test_overlap_host_io_output():
     poptorch_model(input_a, input_b, labels)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_output_error_messages(trace_model):
     class DoubleOutputUseModel(torch.nn.Module):

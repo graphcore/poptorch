@@ -9,8 +9,7 @@ import poptorch
 
 
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "0"})
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to test this feature")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_attach_detach(trace_model):
     torch.manual_seed(42)
@@ -86,8 +85,7 @@ def test_attach_detach(trace_model):
         inference.detachFromDevice()
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to test this feature")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_attach_detach_accuracy(trace_model):
     class TrainingModelWithLoss(torch.nn.Module):

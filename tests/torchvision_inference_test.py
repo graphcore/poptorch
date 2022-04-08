@@ -7,7 +7,6 @@ import pytest
 import torch
 import torchvision.models as models
 from poptorch.experimental import IPUScope
-import poptorch
 import helpers
 
 # Torchvision models.
@@ -103,50 +102,43 @@ def inference_harness(imagenet_model, check=True):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_resnet18():
     inference_harness(models.resnet18)
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_resnext50_32x4d():
     inference_harness(models.resnext50_32x4d)
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_mnasnet1_0():
     inference_harness(models.mnasnet1_0)
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_mobilenet_v2():
     inference_harness(models.mobilenet_v2)
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_googlenet():
     inference_harness(models.googlenet)
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_inception_v3():
     inference_harness(models.inception_v3, False)
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.skip(
     "TODO(T59568): Set is_leaf / grad_fn properly on MLIR tensors")
 def test_squeezenet1_1():

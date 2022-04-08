@@ -9,8 +9,7 @@ import poptorch
 import helpers
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_simple_test():
     input = torch.ones([10])
 
@@ -23,8 +22,7 @@ def test_simple_test():
                             expected=torch.empty(10).fill_(18.0))
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_simple_conv():
     input = torch.ones([1, 5, 25, 25])
 
@@ -44,8 +42,7 @@ def test_simple_conv():
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_tensor_constant():
     def f(x):
         return x + torch.tensor([1.0, 2.0, 3.0])
@@ -66,8 +63,7 @@ def test_tensor_constant():
 @pytest.mark.parametrize("mode", ["default", "show_all", "hide_all"])
 @pytest.mark.parametrize("compiler",
                          [poptorch.Compiler.PopART, poptorch.Compiler.MLIR])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_source_location(capfd, compiler, mode):
     layer = torch.nn.Linear(1, 2)
     expected_filename = inspect.stack()[0].filename

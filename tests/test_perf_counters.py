@@ -70,8 +70,7 @@ def test_steps(trace_model):
     assert_latency_values(poptorch_model)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_replicas(trace_model):
     x = torch.randn(4, 100, 100)
@@ -93,8 +92,7 @@ def test_replicas(trace_model):
                                         (poptorch.OutputMode.EveryN, 2)])
 @pytest.mark.parametrize("steps", [2, 4])
 @pytest.mark.parametrize("replicas", [1, 2])
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inference(mode_tuple, steps, replicas, trace_model):
     model = Model()
@@ -127,8 +125,7 @@ def test_inference(mode_tuple, steps, replicas, trace_model):
 @pytest.mark.parametrize("steps", [2, 4])
 @pytest.mark.parametrize("accums", [1, 2])
 @pytest.mark.parametrize("replicas", [1, 2])
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_training(mode_tuple, steps, accums, replicas):
     torch.manual_seed(42)
     inputs = torch.randn(16, 100)

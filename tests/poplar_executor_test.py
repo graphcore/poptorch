@@ -15,8 +15,7 @@ import helpers
 import poptorch
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -42,8 +41,7 @@ def test_ExecutableCaching(capfd, trace_model):
         log.assert_contains("set enableEngineCaching to value true")
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -97,8 +95,7 @@ def test_offline_ipu_compileAndExport_file(trace_model, filename=None):
         _create_model_and_export(opts, filename)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_precompile_then_load(trace_model):
     opts = poptorch.Options().useOfflineIpuTarget(
@@ -203,8 +200,7 @@ def test_training_attributes():
     assert poptorch_model.attr == "MyAttr"
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="We need to be able to lock a specific IPU")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("use_half", [False])
 def test_explicit_destroy(use_half):
     class ExampleModel(torch.nn.Module):
@@ -383,8 +379,7 @@ def test_nondeterministic_warning_filter(trace_model):
         ]), f"Compilation generated unexpected warning.\nActual warning: {r}"
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to test this feature")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_get_cycles_error_msgs(trace_model):
     class Model(torch.nn.Module):

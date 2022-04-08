@@ -55,8 +55,7 @@ def rng_harness(trace_model,
 
 
 # torch.rand
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_rand(trace_model):
     def rng_op(x):
@@ -68,8 +67,7 @@ def test_rand(trace_model):
 
 
 # torch.distributions.Uniform
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_distributions_uniform(trace_model):
     def rng_op(x):
@@ -82,8 +80,7 @@ def test_distributions_uniform(trace_model):
 
 
 # torch.uniform_
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("dt", [torch.float, torch.half])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_uniform_(dt, trace_model):
@@ -96,8 +93,7 @@ def test_uniform_(dt, trace_model):
 
 
 # torch.normal
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_normal(trace_model):
     def rng_op(x):
@@ -109,8 +105,7 @@ def test_normal(trace_model):
 
 
 # torch.normal_
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("dt", [torch.float, torch.half])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_normal_(dt, trace_model):
@@ -124,8 +119,7 @@ def test_normal_(dt, trace_model):
 
 # torch.distributions.Normal
 # The sample method uses torch.normal(Tensor mean, Tensor std)
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_distributions_normal(trace_model):
     def rng_op(x):
@@ -145,8 +139,7 @@ def test_distributions_normal(trace_model):
 
 
 # torch.randn
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_randn(trace_model):
     def rng_op(x):
@@ -158,8 +151,7 @@ def test_randn(trace_model):
 
 
 # torch.normal(Tensor mean, float std)
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_normal_tensor_mean(trace_model):
     def rng_op(x):
@@ -171,8 +163,7 @@ def test_normal_tensor_mean(trace_model):
 
 
 # torch.normal(float mean, Tensor std)
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_normal_tensor_std(trace_model):
     def rng_op(x):
@@ -184,8 +175,7 @@ def test_normal_tensor_std(trace_model):
 
 
 # torch.bernoulli - test with both float and half types
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("t", [torch.float, torch.half])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bernoulli(t, trace_model):
@@ -199,8 +189,7 @@ def test_bernoulli(t, trace_model):
 
 
 # torch.bernoulli - check expected output for probability limits.
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("p", [0.0, 1.0])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bernoulli_limits(p, trace_model):
@@ -211,8 +200,7 @@ def test_bernoulli_limits(p, trace_model):
 
 
 # torch.bernoulli_
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bernoulli_(trace_model):
     def rng_op(x):
@@ -224,8 +212,7 @@ def test_bernoulli_(trace_model):
 
 
 # torch.distributions.Bernoulli
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_distributions_bernoulli(trace_model):
     def rng_op(x):
@@ -238,8 +225,7 @@ def test_distributions_bernoulli(trace_model):
 
 
 # torch.exponential_
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("lambd", [0.5, 1.0])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_exponential_(trace_model, lambd):
@@ -252,8 +238,7 @@ def test_exponential_(trace_model, lambd):
 
 
 # torch.distributions.Exponential
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_distributions_exponential(trace_model):
     def rng_op(x):
@@ -265,8 +250,7 @@ def test_distributions_exponential(trace_model):
     rng_harness(trace_model, rng_op, input, stat_funs)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_randperm(trace_model):
     def rng_op(x):
@@ -277,8 +261,7 @@ def test_randperm(trace_model):
     rng_harness(trace_model, rng_op, input, stat_funs, torch.int32)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_random_seed_repeatability(trace_model):
     class Model(torch.nn.Module):

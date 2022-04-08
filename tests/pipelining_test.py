@@ -351,8 +351,7 @@ def test_api_AutoIncrement(capfd, trace_model):
     log.assert_contains(" l4/Mul:0 ", " mode(Pipelined), ipu(1), stage(3)")
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Round up only needed for IPU Hardware")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ipu_round_up_error(trace_model):
     class Block(torch.nn.Module):

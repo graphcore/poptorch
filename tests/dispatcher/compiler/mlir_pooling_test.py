@@ -4,7 +4,6 @@ import torch
 from torch import nn
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 spatial_dim_map = {
@@ -20,8 +19,7 @@ spatial_dim_map = {
 }
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "params",
     [
@@ -71,8 +69,7 @@ def test_pool(op, params):
     helpers.assert_allclose(actual=ipu_result, expected=cpu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
     "op", [nn.AdaptiveAvgPool1d, nn.AdaptiveAvgPool2d, nn.AdaptiveAvgPool3d])
 def test_adaptive_avg_pool(op):

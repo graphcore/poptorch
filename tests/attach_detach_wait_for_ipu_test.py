@@ -36,8 +36,7 @@ def inference_process(event, trace_model):
 
 @helpers.printCapfdOnExit
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "1"})
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed to test POPTORCH_WAIT_FOR_IPU")
+@pytest.mark.ipuHardwareRequired
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_attach_detach_wait_for_ipu(capfd, trace_model):

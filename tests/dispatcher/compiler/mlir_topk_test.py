@@ -3,15 +3,13 @@
 import torch
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
 @pytest.mark.parametrize("largest", [True, False])
 @pytest.mark.parametrize("K", [1, 2, 3, 4])
 @pytest.mark.parametrize("dim", [-1, -2])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_topk(largest, K, dim):
     torch.manual_seed(42)
 

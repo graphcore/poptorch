@@ -101,8 +101,7 @@ def test_activation_numerics(op, trace_model):
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings("ignore:Output nr 1. of the traced function")
 @pytest.mark.filterwarnings("ignore:Output nr 2. of the traced function")

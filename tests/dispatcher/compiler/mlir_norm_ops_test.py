@@ -5,12 +5,10 @@ import torch
 from torch import nn
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("batch_norm, affine, track_running_stats, training", [
     (nn.BatchNorm1d, True, False, False),
     (nn.BatchNorm2d, True, False, True),
@@ -72,8 +70,7 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
                                 rtol=1e-4)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_group_norm():
     torch.manual_seed(42)
     num_groups = 4

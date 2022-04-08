@@ -1,7 +1,6 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import torch
 import pytest
-import poptorch
 from poptorch.experimental import IPUContext
 import helpers
 
@@ -16,8 +15,7 @@ def harness(op, **kwargs):
     helpers.assert_allclose(expected=cpu_result, actual=ipu_result)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("min_param,max_param", [(None, 0.5), (-0.5, None),
                                                  (-0.5, 0.5)])
 def test_clamp(min_param, max_param):
@@ -29,8 +27,7 @@ def test_clamp(min_param, max_param):
     harness(torch.clamp, **kwargs)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("min_param,max_param", [(None, 0.5), (-0.5, None),
                                                  (-0.5, 0.5)])
 def test_hardtanh(min_param, max_param):
@@ -43,8 +40,7 @@ def test_hardtanh(min_param, max_param):
     harness(torch.nn.Hardtanh(**kwargs))
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7.3 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("clamp_min,clamp_max", [(True, True), (True, False),
                                                  (False, True)])
 def test_clampTensor(clamp_min, clamp_max):

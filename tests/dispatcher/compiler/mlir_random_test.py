@@ -5,7 +5,6 @@ import pytest
 
 import torch
 
-import poptorch
 from poptorch.experimental import IPUContext
 
 import helpers
@@ -83,16 +82,14 @@ def var(inp):
 
 # torch.randn
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_randn(shape):
     rng_harness(torch.randn, shape)(mean, std)
 
 
 # torch.randn_like
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_randn_like(shape):
     torch.manual_seed(rng_seed)
     inp = torch.empty(shape)
@@ -102,16 +99,14 @@ def test_randn_like(shape):
 
 # torch.normal(float, float)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_float(shape):
     rng_harness(torch.normal, 5, 10, size=shape)(mean, std)
 
 
 # torch.normal(Tensor, Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_tensor_tensor(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -122,8 +117,7 @@ def test_normal_tensor_tensor(shape):
 
 # torch.normal(Tensor, float)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_tensor_float(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -134,8 +128,7 @@ def test_normal_tensor_float(shape):
 
 # torch.normal(float, Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_float_tensor(shape):
     torch.manual_seed(rng_seed)
     desired_mean = 10
@@ -146,8 +139,7 @@ def test_normal_float_tensor(shape):
 
 # torch.normal(Tensor, Tensor, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_tensor_tensor_out(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -163,8 +155,7 @@ def test_normal_tensor_tensor_out(shape):
 
 # torch.normal(Tensor, float, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_tensor_float_out(shape):
     torch.manual_seed(rng_seed)
     means = torch.rand(shape) * 10
@@ -180,8 +171,7 @@ def test_normal_tensor_float_out(shape):
 
 # torch.normal(float, Tensor, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_float_tensor_out(shape):
     torch.manual_seed(rng_seed)
     desired_mean = 10
@@ -197,8 +187,7 @@ def test_normal_float_tensor_out(shape):
 
 # torch.normal_
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_normal_(shape):
     def fn():
         return torch.empty(shape).normal_(5, 10)
@@ -208,16 +197,14 @@ def test_normal_(shape):
 
 # torch.rand
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_rand(shape):
     rng_harness(torch.rand, shape)(torch.min, torch.max, mean, var)
 
 
 # torch.rand_like
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_rand_like(shape):
     torch.manual_seed(rng_seed)
     inp = torch.empty(shape)
@@ -227,8 +214,7 @@ def test_rand_like(shape):
 
 # torch.uniform_
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_uniform_(shape):
     def fn():
         return torch.empty(shape).uniform_()
@@ -238,8 +224,7 @@ def test_uniform_(shape):
 
 # torch.exponential_
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_exponential_(shape):
     def fn():
         return torch.empty(shape).exponential_()
@@ -251,8 +236,7 @@ def test_exponential_(shape):
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype",
                          [torch.int, torch.float, torch.half, torch.bool])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_random_(shape, dtype):
     def fn():
         return torch.empty(shape, dtype=dtype).random_()
@@ -262,8 +246,7 @@ def test_random_(shape, dtype):
 
 # torch.random_(dtype=int8)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_random_int8(shape):
     # This is mainly to test boundaries of generated values.
     def fn():
@@ -276,8 +259,7 @@ def test_random_int8(shape):
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype", [torch.int, torch.float, torch.half])
 @pytest.mark.parametrize("limits", [(0, 1), (0, 2), (0, 3), (0, 5), (5, 500)])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_random_limits(shape, dtype, limits):
     def fn():
         return torch.empty(shape, dtype=dtype).random_(limits[0], limits[1])
@@ -289,8 +271,7 @@ def test_random_limits(shape, dtype, limits):
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype", [torch.int, torch.float, torch.half])
 @pytest.mark.parametrize("limits", [(0, 2), (0, 5), (5, 500)])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_randint(shape, dtype, limits):
     rng_harness(torch.randint, limits[0], limits[1], shape, dtype=dtype)\
                (torch.min, torch.max, mean, std)
@@ -300,8 +281,7 @@ def test_randint(shape, dtype, limits):
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype", [torch.int, torch.float])
 @pytest.mark.parametrize("limits", [(2, 5)])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_randint_like(shape, dtype, limits):
     torch.manual_seed(42)
     inp = torch.empty(shape, dtype=dtype)
@@ -313,8 +293,7 @@ def test_randint_like(shape, dtype, limits):
 # torch.bernoulli_(float)
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("prob", [0.0, 0.5, 1.0])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_bernoulli_(shape, prob):
     def fn():
         return torch.empty(shape).bernoulli_(prob)
@@ -325,8 +304,7 @@ def test_bernoulli_(shape, prob):
 # torch.bernoulli(Tensor, float)
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("prob", [0.0, 0.5, 1.0])
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_bernoulli_float(shape, prob):
     inp = torch.empty(shape)
 
@@ -335,8 +313,7 @@ def test_bernoulli_float(shape, prob):
 
 # torch.bernoulli(Tensor, Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_bernoulli_tensor(shape):
     torch.manual_seed(rng_seed)
     t = torch.rand(shape)
@@ -346,8 +323,7 @@ def test_bernoulli_tensor(shape):
 
 # torch.bernoulli(Tensor, Tensor, out=Tensor)
 @pytest.mark.parametrize("shape", tensor_shapes)
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="Your platform doesn't have MLIR support.")
+@pytest.mark.mlirSupportRequired
 def test_bernoulli_tensor_out(shape):
     torch.manual_seed(rng_seed)
     t = torch.rand(shape)

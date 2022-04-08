@@ -4,12 +4,10 @@ import torch
 import torch.nn.functional as F
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("ignore_index", [2, -100])
 def test_nll_loss_forward(reduction, ignore_index):
@@ -31,8 +29,7 @@ def test_nll_loss_forward(reduction, ignore_index):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("ignore_index", [2, -100])
 def test_nll_loss_backward(reduction, ignore_index):
@@ -61,8 +58,7 @@ def test_nll_loss_backward(reduction, ignore_index):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_binary_cross_entropy_forward(reduction):
     torch.manual_seed(42)
@@ -80,8 +76,7 @@ def test_binary_cross_entropy_forward(reduction):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_binary_cross_entropy_backward(reduction):
     torch.manual_seed(42)
@@ -106,8 +101,7 @@ def test_binary_cross_entropy_backward(reduction):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_binary_cross_entropy_with_logits_forward(reduction):
     torch.manual_seed(42)
@@ -125,8 +119,7 @@ def test_binary_cross_entropy_with_logits_forward(reduction):
                             equal_nan=True)
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_binary_cross_entropy_with_logits_backward(reduction):
     torch.manual_seed(42)

@@ -3,7 +3,6 @@
 import torch
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 to_test = [
@@ -52,8 +51,7 @@ to_test = [
 ]
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("num_dims", [1, 2, 3])
 @pytest.mark.parametrize("size", to_test)
 def test_conv(num_dims, size):

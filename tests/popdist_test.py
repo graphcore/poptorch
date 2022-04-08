@@ -48,8 +48,7 @@ def test_getters():
 
 
 # pylint: disable=protected-access,import-outside-toplevel
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Might error on no IPUs found")
+@pytest.mark.ipuHardwareRequired
 def test_to_dict():
     import popdist.poptorch
     opts = popdist.poptorch.Options(ipus_per_replica=2)

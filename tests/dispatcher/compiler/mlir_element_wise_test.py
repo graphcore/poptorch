@@ -3,7 +3,6 @@
 import torch
 import pytest
 import helpers
-import poptorch
 from poptorch.experimental import IPUContext
 
 
@@ -15,8 +14,7 @@ def lt(t1, t2):
     return t1 < t2
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("op", [gt, lt])
 def test_gt_lt(op):
     torch.manual_seed(42)

@@ -4,12 +4,10 @@ import math
 import torch
 import torch.nn.functional as F
 import pytest
-import poptorch
 from poptorch.experimental import IPUContext
 
 
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.mlirSupportRequired
 def test_dropout_eval():
     # Dropout in eval mode should be an Identity operation
     torch.manual_seed(42)
@@ -24,10 +22,8 @@ def test_dropout_eval():
     assert (t1 == t2).all()
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="IPU Model's random generator is insufficient.")
-@pytest.mark.skipif(not poptorch.hasMlirSupportOnPlatform(),
-                    reason="CentOS 7 is not currently supported in MLIR.")
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("p", [0.0, 0.1, 0.5, 1.0])
 def test_dropout_train(p):
     torch.manual_seed(42)

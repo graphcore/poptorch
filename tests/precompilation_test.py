@@ -61,8 +61,7 @@ def _compileAndExport(filename,
     return input, target
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 # TODO(T51159) Support dispatch tracing + serialized executables
 #@pytest.mark.parametrize("trace_model", [True, False])
 def test_export_then_load_live_model(trace_model=True):
@@ -83,8 +82,7 @@ def test_export_then_load_live_model(trace_model=True):
         poptorch_model(input)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_export_then_load():
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
@@ -94,8 +92,7 @@ def test_export_then_load():
         poptorch_model(input, target)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_export_then_load_setIpu():
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
@@ -108,8 +105,7 @@ def test_export_then_load_setIpu():
         poptorch_model(input, target)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_export_no_python_then_load():
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
@@ -125,8 +121,7 @@ def test_export_no_python_then_load():
         poptorch_model(input, target)
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_validate_no_python(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
@@ -168,8 +163,7 @@ def test_export_train_validate_no_python(trace_model):
         assert torch.argmax(out, dim=1) == target
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_validate(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
@@ -207,8 +201,7 @@ def test_export_train_validate(trace_model):
         assert torch.argmax(out, dim=1) == target
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_save_validate(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
@@ -244,8 +237,7 @@ def test_export_train_save_validate(trace_model):
         assert torch.argmax(out, dim=1) == target
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 def test_export_train_save_train():
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
@@ -280,8 +272,7 @@ def test_export_train_save_train():
         assert torch.argmax(out, dim=1) == target
 
 
-@pytest.mark.skipif(not poptorch.ipuHardwareIsAvailable(),
-                    reason="Hardware IPU needed")
+@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_save_validate_load_weights(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
