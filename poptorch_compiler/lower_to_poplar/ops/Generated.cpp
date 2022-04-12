@@ -275,12 +275,6 @@ void atanh::lowerToPoplar(CompilerContext & /*context*/) {
                   "atanh"
                   " is currently unimplemented.");
 }
-void cast::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "cast"
-                  " is currently unimplemented.");
-}
 void compress::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

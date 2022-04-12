@@ -54,6 +54,8 @@ struct CompilerContext {
   //       to handle loading, saving & restoring of the seed.
   poplar::Tensor &getRandomSeed();
 
+  static poplar::Type poplarTypeOf(mlir::Type elementType);
+
 private:
   // Persistent seed to use for RNG functions.
   //

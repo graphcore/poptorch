@@ -640,22 +640,6 @@ def Poptorch_atanh : Poptorch_Op<"atanh", []> {
 
 }
 
-def Poptorch_cast : Poptorch_Op<"cast", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, StrAttr:$to);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "const char*":$to), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("to",$_builder.getStringAttr(to));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_compress : Poptorch_Op<"compress", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$axis);
   let results = (outs Poptorch_tensor:$result);

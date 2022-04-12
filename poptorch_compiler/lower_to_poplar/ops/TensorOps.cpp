@@ -1,4 +1,3 @@
-
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include <poplar/Graph.hpp>
 #include <popops/Cast.hpp>
@@ -29,6 +28,14 @@ void fill_::lowerToPoplar(CompilerContext &context) {
   float value = this->value().convertToFloat();
 
   popops::fill(context.graph, in, context.seq, value);
+}
+
+void cast::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->self());
+  poplar::Tensor out = popops::cast(
+      context.graph, in,
+      poptorch_ir::CompilerContext::poplarTypeOf(this->dtype()), context.seq);
+  context.tensors[this->result()] = out;
 }
 
 void copy_::lowerToPoplar(CompilerContext &context) {

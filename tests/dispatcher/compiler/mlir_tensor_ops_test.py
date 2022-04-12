@@ -5,6 +5,23 @@ import pytest
 import helpers
 from poptorch.experimental import IPUContext
 
+SUPPORTED_TYPES = (torch.float16, torch.float32, torch.int32)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("cast_from", SUPPORTED_TYPES)
+@pytest.mark.parametrize("cast_to", SUPPORTED_TYPES)
+def test_cast(cast_from, cast_to):
+    t_in = torch.randint(low=0, high=10, size=(10, ), dtype=cast_from)
+
+    def cast_op(t):
+        return t.to(cast_to)
+
+    ipu_result = IPUContext(cast_op)(t_in)
+    cpu_result = cast_op(t_in)
+
+    helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
+
 
 def cat_stack_harness(op, dim, dtype):
     t1 = torch.ones(3, 2, dtype=dtype)

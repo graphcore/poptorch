@@ -235,6 +235,16 @@ at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
                                        c10::optional<at::Device> device,
                                        c10::optional<bool> pin,
                                        c10::optional<c10::MemoryFormat> fmt) {
+  // Handle a cast
+  // Ignore layout/device/pin/fmt
+  if (dtype && (self.dtype() != *dtype)) {
+    c10::Stack stack;
+    stack.push_back(self);
+    stack.push_back(*dtype);
+    to_dtype(stack);
+    return stack.at(0).toTensor();
+  }
+
   // Create the new output tensor.
   at::Tensor out =
       allocateTensor(self.sizes(), dtype, device, layout, pin, fmt);

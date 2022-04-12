@@ -26,6 +26,21 @@ def Poptorch_zero_: Poptorch_Op<"zero_", []> {
     let arguments = (ins Poptorch_tensor:$input);
 }
 
+// to.dtype(Tensor(a) self, ScalarType dtype, ...) -> Tensor(a)
+def Poptorch_cast : Poptorch_Op<"cast", []> {
+  let arguments = (ins Poptorch_tensor:$self, TypeAttr:$dtype);
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                    "mlir::Type":$dtype), [{
+        $_state.addOperands({self});
+        $_state.addAttribute("dtype", mlir::TypeAttr::get(dtype));
+
+        // Keep shape but overwrite type
+        $_state.addTypes(mlir::RankedTensorType::get(
+            self.getType().cast<mlir::RankedTensorType>().getShape(), dtype));
+  }]>];
+}
+
 def Poptorch_copy_: Poptorch_Op<"copy_", []> {
   let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$src);
 }

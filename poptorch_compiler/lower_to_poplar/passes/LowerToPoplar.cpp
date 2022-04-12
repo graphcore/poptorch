@@ -229,6 +229,10 @@ poplar::Tensor &CompilerContext::getRandomSeed() {
   return *_randomSeed;
 }
 
+poplar::Type CompilerContext::poplarTypeOf(mlir::Type elementType) {
+  return elementTypeFromMLIR(elementType);
+}
+
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createLowerToPoplarPass(poplar::Graph &graph, CompilerContext &context) {
   return std::make_unique<LowerToPoplar>(graph, context);

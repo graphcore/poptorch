@@ -554,6 +554,13 @@
 # Misc
 #########
 
+
+# to.dtype(Tensor(a) self, ScalarType dtype, bool non_blocking=False,
+#          bool copy=False, MemoryFormat? memory_format=None) -> Tensor(a)
+- func: to.dtype
+  PopTorchDirect: cast
+  IgnoreArgs: non_blocking, copy, memory_format
+
 - func: topk.values
   PopTorchDirect: topk
   UnusedOutputArguments: {values, indices}
