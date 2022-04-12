@@ -48,14 +48,30 @@ public:
   // TODO(T49565): Once we move from LLVM-13. See insertArgument in new API.
   mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
 
+  // Set the source code location (file line and col)
+  // The MLIR ImplicitLocOpBuilder maintains a source code location so that
+  // the location does not be sent as part of creating an op. This method allows
+  // the location to be set.
+  void setLoc(const char *filename, std::uint64_t line, std::uint64_t col) {
+    _builder.setLoc(_builder.getFileLineColLoc(_builder.getIdentifier(filename),
+                                               line, col));
+  }
+
+  // Create a new op
+  template <typename OpTy, typename... Args> OpTy createOp(Args &&...args) {
+    return _builder.create<OpTy>(std::forward<Args>(args)...);
+  }
+
   // We need to maintain some MLIR state.
 
   // The global context.
   mlir::MLIRContext context;
 
+private:
   // Builder to create ops.
-  mlir::ImplicitLocOpBuilder builder;
+  mlir::ImplicitLocOpBuilder _builder;
 
+public:
   // The main module which our functions are attached to.
   mlir::ModuleOp the_module;
 

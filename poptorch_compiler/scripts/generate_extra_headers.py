@@ -299,8 +299,7 @@ for op_name in poptorch_ops:
     cppFunction += func_args_str + ") {\n\n"
 
     # Create the IR op.
-
-    cppFunction += "auto tmp = _impl->builder.create<poptorch_ir::"
+    cppFunction += "auto tmp = _impl->createOp<poptorch_ir::"
     cppFunction += op_name + ">(" + ", ".join(parameters) + ");\n\n"
 
     # Add the IR op to the graph.
