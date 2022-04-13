@@ -125,7 +125,7 @@ def test_nested_tuples_and_lists(capfd, use_half, thing_to_test, trace_model):
 
     # Ensure that a tuple element's type is not changed except after the
     # "host_side_cast"
-    if not use_half:
+    if trace_model and not use_half:
         testlog = helpers.LogChecker(capfd)
         testlog.assert_contains_after(
             "Double(1, strides=[1], requires_grad=0, device=cpu) = " +
