@@ -36,10 +36,9 @@ EXPECTED_FAILURES = {
     "test_nn_GroupNorm_2d_no_affine_IN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
     "test_nn_GroupNorm_2d_no_affine_LN": "Weights & bias are mandatory in Popart: No input found for input 1 of Op(ai.graphcore.GroupNormalization:1, inputs=[Flatten:0], outputs=[]), but input is not optional",
 
-    # TODO(T31655): Zero-dim tensor support
-    "test_nn_interpolate_nearest_1d_zero_dim": "IStepIO unexpectedly did not provide input data for tensor input",
-    "test_nn_interpolate_nearest_2d_zero_dim": "IStepIO unexpectedly did not provide input data for tensor input",
-    "test_nn_interpolate_nearest_3d_zero_dim": "IStepIO unexpectedly did not provide input data for tensor input",
+    "test_nn_interpolate_nearest_1d_zero_dim": "Zero-sized tensors are unsupported",
+    "test_nn_interpolate_nearest_2d_zero_dim": "Zero-sized tensors are unsupported",
+    "test_nn_interpolate_nearest_3d_zero_dim": "Zero-sized tensors are unsupported",
 
     "test_nn_CrossMapLRN2d": "Broadcasting failed",
     "test_nn_PReLU_1d_multiparam": "Broadcasting failed",
@@ -270,10 +269,6 @@ EXPECTED_FAILURES = {
     "test_nn_Mish": "T42772",
     "test_nn_Mish_scalar": "T42772",
     "test_nn_Mish_no_batch_dim": "T42772",
-
-    # TODO(T46296): Support torch.nn.Hardswish, torch.nn.Hardsigmoid
-    "test_nn_Hardsigmoid_no_batch_dim": "T46296",
-    "test_nn_Hardswish_no_batch_dim": "T46296",
 
     # TODO(T48781): Support torch.nn.Unflatten
     "test_nn_Unflatten_no_batch_dim": "T48781",

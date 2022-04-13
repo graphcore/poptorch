@@ -73,7 +73,7 @@ void RemoveRedundantCopies::runOnOperation() {
         to_remove.push_back(first_user);
       }
     }
-    // TODO(T44785): Add more copy removal cases
+    // More copy removal cases to be added as-needed.
   }
   for (auto *op : to_remove) {
     op->erase();

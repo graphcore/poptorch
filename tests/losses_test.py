@@ -490,7 +490,6 @@ def test_TripletMarginLoss(p, swap, reduction, trace_model):
     positive = torch.randn(10, 5)
     negative = torch.randn(10, 5)
 
-    # TODO(T39941): Re-enable training by setting training=True once fixed
     loss_harness(trace_model,
                  F.triplet_margin_loss, [anchor, positive, negative],
                  None,

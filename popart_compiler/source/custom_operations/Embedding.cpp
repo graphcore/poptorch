@@ -137,23 +137,6 @@ popart::OpDefinition
                        {"padding_idx", {"*"}},
                    })});
 
-namespace {
-// TODO(T48571): This environment variable can be removed
-nonstd::optional<float> defaultMemoryProportion() {
-  nonstd::optional<float> default_value;
-  auto *env_value = std::getenv("POPART_GATHER_MEMORY");
-
-  if (env_value != nullptr) {
-    default_value = std::strtof(env_value, 0);
-    popart::logging::debug("using POPART_GATHER_MEMORY={} for available memory "
-                           "proportion for EmbeddingOp",
-                           *default_value);
-  }
-
-  return default_value;
-}
-} // namespace
-
 popart::OpCreator<EmbeddingOp> embedding_creator(
     popart::OpDefinitions({{poptorch_custom_ops::embedding, embedding_def}}),
     [](const popart::OpCreatorInfo &info) {
@@ -165,10 +148,8 @@ popart::OpCreator<EmbeddingOp> embedding_creator(
       }
 
       nonstd::optional<float> available_memory_proportion;
-      available_memory_proportion = defaultMemoryProportion();
 
-      if (info.attributes.hasAttribute(popart::sAvailMemAttribute) &&
-          !available_memory_proportion.has_value()) {
+      if (info.attributes.hasAttribute(popart::sAvailMemAttribute)) {
         available_memory_proportion =
             info.attributes.getAttribute<popart::Attributes::Float>(
                 popart::sAvailMemAttribute);

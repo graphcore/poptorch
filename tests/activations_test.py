@@ -51,7 +51,7 @@ def test_activations(op):
                             atol=tol[1],
                             equal_nan=True)
 
-    # TODO(T22591): Implement PReLU grad op in PopART
+    # PReLU grad op is not supported in PopART (T22591; WontFix)
     if not op is nn.PReLU:
         # Training test - check weights have changed
         poptorch_model.assert_weights_changed()

@@ -37,7 +37,8 @@ def execute_and_check_wrapper(trace_model,
                               training=True,
                               rtol=0.01,
                               atol=0.01):
-    # TODO(T6631): PopART does not support PadGradOp when mode is not "constant"
+    # TODO(T25617): PopART does not support PadGradOp when mode is not
+    # "constant"
     if hasattr(op, 'padding_mode') and op.padding_mode != 'zeros':
         return
 
@@ -173,7 +174,6 @@ def test_conv2D(op, padding_mode, training, trace_model):
                    padding=(4, 2),
                    dilation=(3),
                    padding_mode=padding_mode)
-        # TODO(T40086): Compile failure in training when padding >= kernel_size
         execute_and_check_wrapper(trace_model,
                                   model,
                                   input,

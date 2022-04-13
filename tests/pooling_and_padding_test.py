@@ -29,7 +29,7 @@ adaptive_avg_pool = [
 # torch.nn.AdaptiveMaxPool2d] # Adaptive max pooling isn't supported due to returning 2 outputs, easy fix.
 # TODO (T22978)
 
-# TODO(T6631): PopART does not support PadGradOp when mode is not "constant".
+# TODO(T25617): PopART does not support PadGradOp when mode is not "constant".
 # Ops without grad implementations in PopART
 ops_grad_unsupported = (
     torch.nn.ReflectionPad1d,

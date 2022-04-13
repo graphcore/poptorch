@@ -202,8 +202,8 @@ void EinsumOp::canonicalizeTensors(torch::jit::Graph *graph) {
     std::transform(p_lhs.begin(), p_lhs.end(), std::back_inserter(shape_p),
                    [&](auto d) { return shape[d]; });
 
-    // TODO(T6451): Implement diagonals whenever ai.onnx.EyeLike is implemented
-    //              in PopART
+    // TODO(T60456): Implement diagonals whenever ai.onnx.EyeLike is implemented
+    //               in PopART
 
     // Insert missing dims
     for (std::size_t j = 0; j < _ordered_chars.size(); j++) {
