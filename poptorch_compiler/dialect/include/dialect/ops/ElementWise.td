@@ -114,7 +114,8 @@ def Poptorch_rsqrt_: Poptorch_elem_unary_in_place<"rsqrt_"> {}
 /*
  * Binary ops.
  */
-class Poptorch_elem_binary<string name> :  Poptorch_Op<name, []> {
+class Poptorch_elem_binary<string name>
+  : Poptorch_Op<name, [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);
 

@@ -29,12 +29,45 @@
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
 #include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 
 namespace poptorch_ir {
 enum class AddToGraph { MAIN_GRAPH = 0, READ_WEIGHTS, WRITE_WEIGHTS };
 
 namespace detail {
+
+// Returns whether the op with class OpTy will implicitly cast the operand on
+// the specified index, idx.
+template <typename OpTy, size_t idx> constexpr bool implicitCastsOn() {
+  return OpTy::template hasTrait<
+      mlir::OpTrait::ImplicitCastOperand<idx>::template Impl>();
+}
+
+// Implementation of a for-each loop for the next function
+template <typename OpTy, std::size_t... Idxs>
+/// Equivalent code
+//  bool isImplicitCastingOpForLoop(OpTy, Idxs) {
+//   for(auto idx : Idxs) {
+//     if(implicitCatsOn<OpTy, idx>) { return true; }
+//   }
+//   return false;
+// }
+constexpr bool
+isImplicitCastingOpForEachLoop(std::index_sequence<Idxs...> /*unused*/) {
+  // Unfold all the indices into a long "or" expression.
+  // NB the actual parameter is "unused" but the type is used as the "Idx..."
+  // represents a compile time sequence of indices.
+  return (... || implicitCastsOn<OpTy, Idxs>());
+}
+
+// Returns whether OpTy is an implicing casting op: an op which requires
+// operands specified as implicit casting to be promoted, if necessary, to a
+// common type.
+template <typename OpTy> constexpr bool isImplicitCastingOp() {
+  return isImplicitCastingOpForEachLoop<OpTy>(
+      std::make_index_sequence<mlir::OpTrait::max_implicit_casting_operands>());
+}
 
 class PoptorchCompilerImpl {
 public:
@@ -70,6 +103,12 @@ public:
   // Create a new op
   template <typename OpTy, typename... Args>
   OpTy createOp(AddToGraph add_to_graph, Args &&...args) {
+    if (isImplicitCastingOp<OpTy>()) {
+      poptorch::logging::warn(
+          "Implicit casting not yet implemented, affected op: {}",
+          OpTy::getOperationName().str());
+    }
+
     OpTy op = _builder.create<OpTy>(std::forward<Args>(args)...);
 
     switch (add_to_graph) {

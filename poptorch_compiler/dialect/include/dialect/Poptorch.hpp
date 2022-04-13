@@ -32,6 +32,16 @@ public:
 template <typename ConcreteType>
 class NotImplementedOp : public TraitBase<ConcreteType, NotImplementedOp> {};
 
+const size_t max_implicit_casting_operands = 3;
+template <unsigned idx> class ImplicitCastOperand {
+public:
+  static_assert(idx < max_implicit_casting_operands);
+
+  template <typename ConcreteType>
+  class Impl : public TraitBase<ConcreteType, ImplicitCastOperand<idx>::Impl> {
+  };
+};
+
 } // namespace OpTrait
 } // namespace mlir
 

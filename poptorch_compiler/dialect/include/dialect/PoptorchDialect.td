@@ -24,6 +24,12 @@ def ViewOp : NativeOpTrait<"ViewOp">;
 // Poplar (yet).
 def NotImplementedOp : NativeOpTrait<"NotImplementedOp">;
 
+// Mark an op as implicit casting on the specified index
+// All indices marked in this way will have their operands cast to a
+// common type just before the op is called.
+class ImplicitCastOperand<int idx>
+  : ParamNativeOpTrait<"ImplicitCastOperand", !cast<string>(idx)>;
+
 // All operations coming through the dispatcher's fallback should inherit
 // from either Poptorch_Op if they can be lowered to Poplar or
 // Poptorch_NotImplementedOp if they cannot.
