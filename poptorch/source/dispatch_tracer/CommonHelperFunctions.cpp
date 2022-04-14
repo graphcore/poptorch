@@ -178,7 +178,10 @@ c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
     if (opt_op) {
       return *opt_op;
     }
-    return *dispatcher.findOp({name, ""});
+    opt_op = dispatcher.findOp({name, ""});
+    if (opt_op) {
+      return *opt_op;
+    }
   }
   return op;
 }
