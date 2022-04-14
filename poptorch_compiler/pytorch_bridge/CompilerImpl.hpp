@@ -7,6 +7,7 @@
 
 #include <llvm/ADT/StringSwitch.h>
 #include <mlir/IR/Attributes.h>
+#include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/ImplicitLocOpBuilder.h>
 #include <mlir/IR/TypeSupport.h>
 #include <mlir/IR/Types.h>
@@ -15,9 +16,10 @@
 #include <mlir/IR/Value.h>
 
 #include <mlir/IR/BuiltinOps.h>
-#include <mlir/IR/BuiltinTypes.h>
 
+#include <algorithm>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -36,6 +38,16 @@ namespace poptorch_ir {
 enum class AddToGraph { MAIN_GRAPH = 0, READ_WEIGHTS, WRITE_WEIGHTS };
 
 namespace detail {
+
+// Returns the element type of an MLIR value.
+mlir::Type getElementType(const mlir::Value &value);
+
+// Converts an MLIR type to a string representation.
+std::string mlirTypeToStr(mlir::Type &type);
+
+// Whether lhs is a higher ranked type than lhs: if true, rhs should be
+// implicitly casted to lhs (or a higher ranked type than both).
+bool higherThan(mlir::Type &lhs, mlir::Type &rhs);
 
 // Returns whether the op with class OpTy will implicitly cast the operand on
 // the specified index, idx.
@@ -69,6 +81,145 @@ template <typename OpTy> constexpr bool isImplicitCastingOp() {
       std::make_index_sequence<mlir::OpTrait::max_implicit_casting_operands>());
 }
 
+// Implementation of a for loop for the next function
+// Equivalent code for start = 0
+// void fn(OpTy, f, args) {
+//   for(size_t idx = 0; idx < end; idx++) {
+//     if(implicitCatsOn<OpTy, idx>) {
+//       f(args[start].getType().cast<mlir:RankedTensorType>().getElementType());
+//     }
+//   }
+// }
+template <typename OpTy, size_t start, size_t end, typename F, typename... Args>
+void callOnEachElementType(F &&f, const Args &...args) {
+  if constexpr (start < end) {
+    if constexpr (implicitCastsOn<OpTy, start>()) {
+      f(std::get<start>(std::forward_as_tuple(args...))
+            .getType()
+            .template cast<mlir::RankedTensorType>()
+            .getElementType());
+    }
+    callOnEachElementType<OpTy, start + 1, end>(f, args...);
+  }
+}
+
+// Returns the type to which the compiler should promote all implicit casting
+// operands
+template <typename OpTy, typename... Args>
+mlir::Type getCastToType(const mlir::MLIRContext & /*new_context*/,
+                         const Args &...args) {
+  // Maintain the highest type
+  mlir::Type highest_type;
+
+  // Loop on the number of operands, or the maximum number which can be
+  // implicitly cast, whichever is higher
+  constexpr size_t num_loops =
+      std::max(sizeof...(Args), mlir::OpTrait::max_implicit_casting_operands);
+
+  // Loop over all operands and update highest_type if necessary.
+  callOnEachElementType<OpTy, 0, num_loops>(
+      [&highest_type](mlir::Type new_type) {
+        if (higherThan(new_type, highest_type)) {
+          highest_type = new_type;
+        }
+      },
+      args...);
+
+  ERROR_ON(!highest_type);
+  return highest_type;
+}
+
+// Implicit cast an mlir::Value to promote_to if necessary, otherwise simply
+// forward element.
+template <typename OpTy, std::size_t Ind, typename Elt>
+auto castAndForwardElt(mlir::ImplicitLocOpBuilder &builder,
+                       mlir::FuncOp &main_graph, const mlir::Type &promote_to,
+                       Elt &&element) {
+  if constexpr (implicitCastsOn<OpTy, Ind>()) {
+    static_assert(
+        std::is_same<typename std::remove_reference<decltype(element)>::type,
+                     mlir::Value>::value,
+        "Only an mlir::Value can be implicitly casted.");
+
+    mlir::Type element_type = element.getType()
+                                  .template cast<mlir::RankedTensorType>()
+                                  .getElementType();
+
+    if (element_type != promote_to) {
+      // Create a casting op for the implicit casting and add it to the graph
+      // updating the operand to the promoted output.
+      // (poptorch_ir::cast is an automatically generated mlir::Op subclass.)
+      auto casted = builder.create<poptorch_ir::cast>(element, promote_to);
+      main_graph.front().push_back(casted);
+      return casted.result();
+    }
+  }
+
+  // Use perfect forwarding in other cases.
+  return std::forward<Elt>(element);
+}
+
+// Perform the looping for implicit casting by unfolding over indices.
+// Equivalent code
+// ArgsTuple castAndForward(OpTy, builder, main_graph, promote_to, old_args) {
+//   ArgsTuple new_args;
+//   for(auto idx: old_args.size()) {
+//     if(implicitCatsOn<OpTy, idx>) {
+//        if(old_args[idx].type() != promote_to) {
+//          auto casted = builder.create<cast>(old_args[idx], promote_to);
+//          main_graph.front().push_back(tmp);
+//          new_args.append(casted.result());
+//          continue;
+//        }
+//     }
+//     new_args.append(old_arg[idx]);
+//   }
+//   return new_args;
+// }
+template <typename OpTy, typename... Args, std::size_t... Inds>
+auto castAndForwardImpl(mlir::ImplicitLocOpBuilder &builder,
+                        mlir::FuncOp &main_graph, const mlir::Type &promote_to,
+                        std::tuple<Args...> &&input_tuple,
+                        std::index_sequence<Inds...> /*unused*/) {
+  // Calls castAndForwardElt on every argument through unwidning, with "Inds"
+  // becoming the given index, and returns a tuple of the lot.
+  return std::make_tuple(castAndForwardElt<OpTy, Inds>(
+      builder, main_graph, promote_to, std::get<Inds>(input_tuple))...);
+}
+
+// Loop through all operands, promote to promote_to if required for implicit
+// casting, and then return all operands as a tuple.
+// This uses template recursion, performing the promotions on the inital call
+// and then returning the final value.
+template <typename OpTy, typename... Args>
+auto castAndForward(mlir::ImplicitLocOpBuilder &builder,
+                    mlir::FuncOp &main_graph, const mlir::Type &promote_to,
+                    std::tuple<Args...> &&input_tuple) {
+  return castAndForwardImpl<OpTy>(builder, main_graph, promote_to,
+                                  std::move(input_tuple),
+                                  std::make_index_sequence<sizeof...(Args)>());
+}
+
+// Implicitly cast all implicit casting operands to promote_to and then create a
+// new op of class OpTy using the (possibly promoted) operands.
+// Uses the builder and main_graph to add the implicitly casting ops.
+// Consistent with other methods, this does *not* add the resulting op to
+// main_graph, though all the implicit casting ops are.
+template <typename OpTy, typename... Args>
+OpTy implicitCastAndCreate(mlir::ImplicitLocOpBuilder &builder,
+                           mlir::FuncOp &main_graph,
+                           const mlir::Type &promote_to, Args &&...args) {
+  // Call the builder create method by unpacking the tuple into arguments
+  // The tuple is formed all the (possibly promoted) operands, args,
+  // from calling castAndForward.
+  auto call_builder = [&builder](Args &&...args_inner) {
+    return builder.create<OpTy>(args_inner...);
+  };
+  return std::apply(call_builder,
+                    castAndForward<OpTy>(builder, main_graph, promote_to,
+                                         std::forward_as_tuple(args...)));
+}
+
 class PoptorchCompilerImpl {
 public:
   PoptorchCompilerImpl();
@@ -100,13 +251,16 @@ public:
                                                line, col));
   }
 
-  // Create a new op
+  // Create a new op of class OpTy, possibly casting operands specified by args.
   template <typename OpTy, typename... Args>
   OpTy createOp(AddToGraph add_to_graph, Args &&...args) {
-    if (isImplicitCastingOp<OpTy>()) {
-      poptorch::logging::warn(
-          "Implicit casting not yet implemented, affected op: {}",
-          OpTy::getOperationName().str());
+    if constexpr (isImplicitCastingOp<OpTy>()) {
+      ERROR_ON(add_to_graph != AddToGraph::MAIN_GRAPH);
+      mlir::Type promote_to = getCastToType<OpTy>(context, args...);
+      OpTy op = implicitCastAndCreate<OpTy>(_builder, _main_graph, promote_to,
+                                            std::forward<Args>(args)...);
+      _main_graph.front().push_back(op);
+      return op;
     }
 
     OpTy op = _builder.create<OpTy>(std::forward<Args>(args)...);

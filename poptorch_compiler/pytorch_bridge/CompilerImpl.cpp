@@ -4,6 +4,43 @@
 
 namespace poptorch_ir {
 namespace detail {
+mlir::Type getElementType(const mlir::Value &value) {
+  return value.getType().cast<mlir::RankedTensorType>().getElementType();
+}
+
+std::string mlirTypeToStr(mlir::Type &type) {
+  std::string str;
+  llvm::raw_string_ostream ostream(str);
+  type.print(ostream);
+  return str;
+}
+
+bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
+  ERROR_ON(!lhs);
+
+  // Null always comes last
+  if (!rhs) {
+    return true;
+  }
+
+  // Both floats or both ints
+  if ((lhs.isa<mlir::FloatType>() && rhs.isa<mlir::FloatType>()) ||
+      (lhs.isa<mlir::IntegerType>() && rhs.isa<mlir::IntegerType>())) {
+    return lhs.getIntOrFloatBitWidth() > rhs.getIntOrFloatBitWidth();
+  }
+
+  // Float always beats int
+  if (lhs.isa<mlir::FloatType>() && rhs.isa<mlir::IntegerType>()) {
+    return true;
+  }
+
+  if (lhs.isa<mlir::IntegerType>() && rhs.isa<mlir::FloatType>()) {
+    return false;
+  }
+
+  ERROR("Unsupported types for implicit cast:: "
+        << mlirTypeToStr(lhs) << " and " << mlirTypeToStr(rhs));
+}
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
     : _builder(mlir::UnknownLoc::get(&context), &context),
