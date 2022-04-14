@@ -300,10 +300,8 @@ for op_name in poptorch_ops:
 
     # Create the IR op.
     cppFunction += "auto tmp = _impl->createOp<poptorch_ir::"
-    cppFunction += op_name + ">(" + ", ".join(parameters) + ");\n\n"
-
-    # Add the IR op to the graph.
-    cppFunction += "appendToMainGraph(tmp);\n\n"
+    cppFunction += op_name + ">(poptorch_ir::AddToGraph::MAIN_GRAPH, "
+    cppFunction += ", ".join(parameters) + ");\n\n"
 
     # Allow for each return to be optional, normal or variadic.
     cppFunction += "poptorch_ir::ODSTensorResults results;\n"

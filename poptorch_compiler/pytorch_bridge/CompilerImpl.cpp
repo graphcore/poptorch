@@ -15,23 +15,23 @@ PoptorchCompilerImpl::PoptorchCompilerImpl()
 
   // We represent our graph as a simple function.
   auto func_type = _builder.getFunctionType({}, llvm::None);
-  main_graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
-  the_module.push_back(main_graph);
+  _main_graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
+  the_module.push_back(_main_graph);
 
   // Add an entry block.
-  main_graph.addEntryBlock();
+  _main_graph.addEntryBlock();
 
   // Same for write weights.
-  write_weights_graph =
+  _write_weights_graph =
       _builder.create<mlir::FuncOp>("WeightsToDevice", func_type);
-  main_graph.front().push_back(write_weights_graph);
-  write_weights_graph.addEntryBlock();
+  _main_graph.front().push_back(_write_weights_graph);
+  _write_weights_graph.addEntryBlock();
 
   // Same for read weights.
-  read_weights_graph =
+  _read_weights_graph =
       _builder.create<mlir::FuncOp>("WeightsToHost", func_type);
-  main_graph.front().push_back(read_weights_graph);
-  read_weights_graph.addEntryBlock();
+  _main_graph.front().push_back(_read_weights_graph);
+  _read_weights_graph.addEntryBlock();
 }
 
 mlir::Value PoptorchCompilerImpl::addArgument(mlir::FuncOp func,

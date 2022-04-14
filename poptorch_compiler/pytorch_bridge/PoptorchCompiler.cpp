@@ -26,11 +26,10 @@ TensorId PoptorchCompiler::addInput(void * /*unused*/,
   mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
 
   // Add the argument to the function args.
-  mlir::Value val = _impl->addArgument(_impl->main_graph, tensor);
+  mlir::Value val = _impl->addArgumentToMainGraph(tensor);
 
-  poptorch_ir::copy_from_host copy =
-      _impl->createOp<poptorch_ir::copy_from_host>(val, name);
-  _impl->main_graph.front().push_back(copy);
+  _impl->createOp<poptorch_ir::copy_from_host>(AddToGraph::MAIN_GRAPH, val,
+                                               name);
 
   _impl->value_map.push_back(val);
   _impl->input_callbacks.push_back(name);
@@ -54,21 +53,15 @@ TensorId PoptorchCompiler::addParameter(void *ptr,
 
   // Add the argument to the function args. Add to the main graph and both
   // weight copy graphs.
-  mlir::Value val = _impl->addArgument(_impl->main_graph, tensor);
+  mlir::Value val = _impl->addArgumentToMainGraph(tensor);
 
   // Write weights to the graph.
-  poptorch_ir::copy_from_host copy_from =
-
-      _impl->createOp<poptorch_ir::copy_from_host>(val, "Write-" +
-                                                            std::string(name));
-  _impl->write_weights_graph.front().push_back(copy_from);
+  _impl->createOp<poptorch_ir::copy_from_host>(AddToGraph::WRITE_WEIGHTS, val,
+                                               "Write-" + std::string(name));
 
   // Read weights from the graph.
-  poptorch_ir::copy_to_host copy_to =
-      _impl->createOp<poptorch_ir::copy_to_host>(val,
-                                                 "Read-" + std::string(name));
-
-  _impl->read_weights_graph.front().push_back(copy_to);
+  _impl->createOp<poptorch_ir::copy_to_host>(AddToGraph::READ_WEIGHTS, val,
+                                             "Read-" + std::string(name));
 
   // Add the main graph reference. Both copies are implicitly updating the main
   // graph reference.
@@ -86,9 +79,7 @@ TensorId PoptorchCompiler::addBuffer(void *ptr,
 
 void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {
   mlir::Value val = _impl->value_map[id];
-  poptorch_ir::copy_to_host copy =
-      _impl->createOp<poptorch_ir::copy_to_host>(val, name);
-  _impl->main_graph.front().push_back(copy);
+  _impl->createOp<poptorch_ir::copy_to_host>(AddToGraph::MAIN_GRAPH, val, name);
   _impl->output_callbacks.push_back({name, ptr});
 }
 
@@ -142,24 +133,9 @@ PoptorchCompiler::getRankedTensorType(TensorId id) const {
 
 void PoptorchCompiler::addReturn() {
   // Add returns to each of the graphs.
-  {
-    poptorch_ir::end_graph ret = _impl->createOp<poptorch_ir::end_graph>();
-    _impl->main_graph.front().push_back(ret);
-  }
-  {
-    poptorch_ir::end_graph ret = _impl->createOp<poptorch_ir::end_graph>();
-    _impl->write_weights_graph.front().push_back(ret);
-  }
-  {
-    poptorch_ir::end_graph ret = _impl->createOp<poptorch_ir::end_graph>();
-    _impl->read_weights_graph.front().push_back(ret);
-  }
-}
-
-void PoptorchCompiler::appendToMainGraph(mlir::Operation *op) {
-  _impl->all_ops_can_be_lowered &=
-      !op->hasTrait<mlir::OpTrait::NotImplementedOp>();
-  _impl->main_graph.front().push_back(op);
+  _impl->createOp<poptorch_ir::end_graph>(AddToGraph::MAIN_GRAPH);
+  _impl->createOp<poptorch_ir::end_graph>(AddToGraph::WRITE_WEIGHTS);
+  _impl->createOp<poptorch_ir::end_graph>(AddToGraph::READ_WEIGHTS);
 }
 
 bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {

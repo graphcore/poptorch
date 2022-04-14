@@ -68,10 +68,6 @@ public:
 #include "dialect/AutogenCompiler.hpp.inc"
 
 private:
-  // All the ops added by a handler to the graph should be added using this
-  // method to allow the compiler to keep track of whether or not all the ops
-  // can be lowered to Poplar.
-  void appendToMainGraph(mlir::Operation *op);
   mlir::RankedTensorType getRankedTensorType(TensorId id) const;
 
   std::unique_ptr<detail::PoptorchCompilerImpl> _impl;

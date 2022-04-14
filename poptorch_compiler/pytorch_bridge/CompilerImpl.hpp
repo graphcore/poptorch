@@ -28,9 +28,12 @@
 
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
+#include "poptorch_logging/Error.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 
 namespace poptorch_ir {
+enum class AddToGraph { MAIN_GRAPH = 0, READ_WEIGHTS, WRITE_WEIGHTS };
+
 namespace detail {
 
 class PoptorchCompilerImpl {
@@ -48,6 +51,10 @@ public:
   // TODO(T49565): Once we move from LLVM-13. See insertArgument in new API.
   mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
 
+  mlir::Value addArgumentToMainGraph(mlir::Type argType) {
+    return addArgument(_main_graph, argType);
+  }
+
   // Set the source code location (file line and col)
   // The MLIR ImplicitLocOpBuilder maintains a source code location so that
   // the location does not be sent as part of creating an op. This method allows
@@ -58,8 +65,26 @@ public:
   }
 
   // Create a new op
-  template <typename OpTy, typename... Args> OpTy createOp(Args &&...args) {
-    return _builder.create<OpTy>(std::forward<Args>(args)...);
+  template <typename OpTy, typename... Args>
+  OpTy createOp(AddToGraph add_to_graph, Args &&...args) {
+    OpTy op = _builder.create<OpTy>(std::forward<Args>(args)...);
+
+    switch (add_to_graph) {
+    case AddToGraph::MAIN_GRAPH:
+      all_ops_can_be_lowered &=
+          !OpTy::template hasTrait<mlir::OpTrait::NotImplementedOp>();
+      _main_graph.front().push_back(op);
+      break;
+    case AddToGraph::READ_WEIGHTS:
+      _read_weights_graph.front().push_back(op);
+      break;
+    case AddToGraph::WRITE_WEIGHTS:
+      _write_weights_graph.front().push_back(op);
+      break;
+    default:
+      ERROR("Invalid value for add_to_graph");
+    }
+    return op;
   }
 
   // We need to maintain some MLIR state.
@@ -76,7 +101,7 @@ public:
   std::vector<std::pair<std::string, void *>> weight_callbacks;
 
   poprithms::logging::ManualTimePartitionLogger timing_manager;
-  // When a new op is added to the graph using appendToMainGraph() we check and
+  // When a new op is added to the main graph using createOp we check and
   // store whether or not there is an actual handler for this op. (Some ops will
   // have been added with only shape inference and no implementation, in which
   // case we won't be able to lower them later on).
@@ -103,15 +128,17 @@ public:
   // The main module which our functions are attached to.
   mlir::ModuleOp the_module;
 
+private:
   // The main graph.
-  mlir::FuncOp main_graph;
+  mlir::FuncOp _main_graph;
 
   // Program to write weights onto the chip.
-  mlir::FuncOp write_weights_graph;
+  mlir::FuncOp _write_weights_graph;
 
   // Program to read weights off the chip.
-  mlir::FuncOp read_weights_graph;
+  mlir::FuncOp _read_weights_graph;
 
+public:
   // The executable.
   poptorch_ir::PoplarExecutable executable;
 };
