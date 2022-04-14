@@ -908,8 +908,8 @@ class PoplarExecutor:
         self._assign_backward_error(output)
 
         if self._outputs_structure is not None:
-            output = reconstruct_output_structure(self._outputs_structure,
-                                                  output)
+            return reconstruct_output_structure(self._outputs_structure,
+                                                output)
         if len(output) == 0:
             return None
         if len(output) > 1:
