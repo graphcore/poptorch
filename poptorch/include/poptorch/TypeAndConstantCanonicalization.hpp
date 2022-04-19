@@ -32,9 +32,12 @@ void addListNumElements(torch::jit::Graph *graph, bool revert = false);
 
 void evaluateConstexprs(torch::jit::Graph *graph);
 
-void makeConstantIntParams(
-    torch::jit::Graph *graph, const std::vector<std::string> &parameter_names,
-    const std::vector<at::Tensor> &traced_parameter_tensors);
+// Turn non-floating point parameters into constants as these are not supported
+// in popart. The pass also removes the affected graph inputs and modifies
+// 'parameter_names' and 'traced_parameter_tensors' accordingly.
+void makeConstantIntParams(torch::jit::Graph *graph,
+                           std::vector<std::string> &parameter_names,
+                           std::vector<at::Tensor> &traced_parameter_tensors);
 
 // Change the graph to add a poptorch::host_side_cast node after every graph
 // input whose type is unsupported (Long, Double, BFloat16) to reflect the
