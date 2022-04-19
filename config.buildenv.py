@@ -16,6 +16,7 @@ installers.add(
         "pytest=6.2.1",
         "setuptools=58.0.4",
         "spdlog=1.8.0",
+        "typing_extensions=4.1.1",
         "wheel=0.34.2",
         "zip=3.0",
     ))
