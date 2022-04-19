@@ -99,14 +99,6 @@ struct OutputType {
   int64_t num_elements{0};
 };
 
-/** Returns the IPU version of the device if the system contains a device with
- * num_ipus -1 if there is a device but the architecture is unknown. 0 if there
- * is no device with num_ipus.
- *
- * Note: This function doesn't check if the devices are currently in use.
- */
-std::int64_t ipuHardwareVersion(std::uint64_t num_ipus = 1);
-
 void setPopartLogLevel(logging::Level level);
 
 struct Optimizer {

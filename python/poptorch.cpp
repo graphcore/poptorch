@@ -17,8 +17,9 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "popart_compiler/CodeletsCompilation.hpp"
 #include "popart_compiler/Compiler.hpp"
-
+#include "popart_compiler/Utils.hpp"
 // Shared enums across the ABI boundary.
 #include "popart_compiler/PopartEnums.hpp"
 
@@ -1535,6 +1536,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("copyWeightsToHost_impl", poptorch::copyWeightsToHostImpl);
   m.def("ipuHardwareVersion", poptorch::ipuHardwareVersion,
         py::arg("numIpus") = 1);
+  m.def("setCustomCodeletsPath", poptorch::setCustomCodeletsPath);
   m.def("setLogLevel", poptorch::setLogLevel, py::arg("level") = 2);
   m.def("setPopartLogLevel", poptorch::setPopartLogLevelUInt);
   m.def("_getPopartIR", poptorch::getPopartIR);

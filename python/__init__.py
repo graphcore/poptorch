@@ -4,6 +4,7 @@ import copy
 import os
 from typing import Any, Callable, Dict, Iterator, Optional, Union
 import pickle
+import pkg_resources
 
 import torch
 
@@ -51,6 +52,12 @@ from . import experimental
 # pylint: enable=wrong-import-position
 
 __version__ = "@VERSION@-@SNAPSHOT@"
+
+# Use package discovery to pass the true filesystem path of the installed python
+# package to C++. The path could later be used to pre-compile custom codelets
+# on demand.
+poptorch_core.setCustomCodeletsPath(
+    pkg_resources.resource_filename("poptorch", ""))
 
 
 def load(filename: str,

@@ -1,15 +1,11 @@
-R"foo(
 // Copyright (c) 2022, Graphcore Ltd, All rights reserved.
-
 #ifdef __IPU__
 #include <ipu_vector_math>
 #else
-    #error Not supported on IPU Model
+  #error Not supported on IPU Model
 #endif
-
 #include <poplar/HalfFloat.hpp>
 #include <poplar/Vertex.hpp>
-
 
 using namespace poplar;
 
@@ -136,4 +132,3 @@ public:
 
 template class FastGatherVertex<float, int>;
 template class FastGatherVertex<half, int>;
-)foo"

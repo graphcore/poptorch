@@ -15,6 +15,7 @@
 #include <poputil/VertexTemplates.hpp>
 
 #include "CustomOps.hpp"
+#include "popart_compiler/CodeletsCompilation.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
 
 namespace {
@@ -692,18 +693,12 @@ public:
     // not strictly necessary, we check that op is castable to a UpsampleOp *.
     verifyOp<UpsampleOp>(op, poptorch_custom_ops::upsample_bilinear2d);
 
-    // We only want to register the codelets once, so check if the first
-    // codelet in the file has already been added
-    if (!graph().hasCodelet("BilinearMultipleVertex<float>")) {
-      std::stringstream compile_output;
-      std::stringstream codelets{
-#include "UpsampleBilinear2dCodelets.inc"
-      };
-
-      graph().addCodelets(
-          codelets, "-DNDEBUG -O3", compile_output,
-          poplar::CodeletFileType::CppSource); // add codelets to the graph
-    }
+    // Get around the ABI issues.
+    auto managed_ptr = poptorch::compileCustomCodeletIfNeeded(
+        "UpsampleBilinear2dCodelets.inc.cpp", /*hw_only_codelet=*/false);
+    const char *compiled_codelet_path =
+        static_cast<const char *>(managed_ptr.get());
+    graph().addCodelets(std::string(compiled_codelet_path));
   }
 
   void grow(poplar::program::Sequence &prog) const final {

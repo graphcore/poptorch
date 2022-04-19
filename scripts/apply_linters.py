@@ -89,7 +89,7 @@ class ILinterFamily:
 class CppLinters(ILinterFamily):
     def __init__(self):
         super().__init__(["hpp", "cpp"],
-                         excluded_extensions=["inc.hpp"],
+                         excluded_extensions=["inc.hpp", "inc.cpp"],
                          linters=[ClangTidy(),
                                   ClangFormat(),
                                   CppLint()])

@@ -8,6 +8,8 @@
 
 #include "CustomOps.hpp"
 #include "FastGatherLastDim.hpp"
+#include "popart_compiler/CodeletsCompilation.hpp"
+#include "popart_compiler/Utils.hpp"
 
 namespace poptorch_custom_ops {
 
@@ -31,6 +33,12 @@ std::unique_ptr<popart::Op> FastGatherLastDimOp::clone() const {
 }
 
 void FastGatherLastDimOp::setup() {
+  if (poptorch::ipuModelEnvironmentVariableIsEnabled() ||
+      poptorch::ipuSmallModelEnvironmentVariableIsEnabled()) {
+    throw popart::error(
+        "FastGatherLastDimOp requires hardware but IPU model is enabled");
+  }
+
   popart::Shape data_shape = this->inInfo(0).shape();
   popart::Shape idx_shape = this->inInfo(1).shape();
   popart::Shape out_shape = data_shape;
@@ -103,14 +111,12 @@ FastGatherLastDimOpx::FastGatherLastDimOpx(popart::Op *op,
     : popart::popx::Opx(op, devicex) {
   verifyOp<FastGatherLastDimOp>(op, poptorch_custom_ops::fast_gather_last_dim);
 
-  if (!graph().hasCodelet("FastGatherVertex<float,int>")) {
-    std::stringstream codelets{
-#include "FastGatherLastDimFwdCodelets.inc"
-    };
-    // add codelets to the graph
-    graph().addCodelets(codelets, "-DNDEBUG -O3", std::cerr,
-                        poplar::CodeletFileType::CppSource);
-  }
+  // Get around the ABI issues.
+  auto managed_ptr = poptorch::compileCustomCodeletIfNeeded(
+      "FastGatherLastDimFwdCodelets.inc.cpp", /*hw_only_codelet=*/true);
+  const char *compiled_codelet_path =
+      static_cast<const char *>(managed_ptr.get());
+  graph().addCodelets(std::string(compiled_codelet_path));
 }
 
 void FastGatherLastDimOpx::grow(poplar::program::Sequence &prog) const {
@@ -227,14 +233,12 @@ FastGatherLastDimGradOpx::FastGatherLastDimGradOpx(
   verifyOp<FastGatherLastDimGradOp>(
       op, poptorch_custom_ops::fast_gather_last_dim_grad);
 
-  if (!graph().hasCodelet("FastGatherGradVertex<float,int>")) {
-    std::stringstream codelets{
-#include "FastGatherLastDimBwdCodelets.inc"
-    };
-    // add codelets to the graph
-    graph().addCodelets(codelets, "-DNDEBUG -O3", std::cerr,
-                        poplar::CodeletFileType::CppSource);
-  }
+  // Get around the ABI issues.
+  auto managed_ptr = poptorch::compileCustomCodeletIfNeeded(
+      "FastGatherLastDimBwdCodelets.inc.cpp", /*hw_only_codelet=*/true);
+  const char *compiled_codelet_path =
+      static_cast<const char *>(managed_ptr.get());
+  graph().addCodelets(std::string(compiled_codelet_path));
 }
 
 void FastGatherLastDimGradOpx::grow(poplar::program::Sequence &prog) const {

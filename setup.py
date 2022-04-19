@@ -60,6 +60,9 @@ if wheel_lib_dirs:
     separator = "+" if "+" not in VERSION else "_"
     VERSION += separator + "standalone"
 
+# Copy custom codelets into the package so that we can pre-compile them later.
+package_data["poptorch"].append("*.inc.cpp")
+
 setup(
     name='poptorch',
     version=VERSION,

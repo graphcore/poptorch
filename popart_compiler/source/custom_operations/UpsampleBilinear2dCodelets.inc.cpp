@@ -1,6 +1,4 @@
-R"foo(
 // Copyright (c) 2021, Graphcore Ltd, All rights reserved.
-
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -12,7 +10,6 @@ R"foo(
 
 #include <poplar/HalfFloat.hpp>
 #include <poplar/Vertex.hpp>
-// #include <print.h>
 
 static constexpr auto ONE_PTR = poplar::VectorLayout::ONE_PTR;
 
@@ -89,4 +86,3 @@ public:
 
 template class BilinearGradMultipleVertex<float>;
 template class BilinearGradMultipleVertex<half>;
-)foo"
