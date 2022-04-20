@@ -13,6 +13,9 @@ from . import _logging
 from ._logging import logger
 # pylint: enable=wrong-import-order
 
+assert os.environ.get("POPLAR_SDK_ENABLED"), (
+    "Poplar SDK must be enabled to use PopTorch")
+
 assert torch.__version__.startswith("@TORCH_VERSION@"), (
     "This version"
     " of PopTorch only works with torch==@TORCH_VERSION@ but the version "
