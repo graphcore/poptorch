@@ -25,9 +25,15 @@ assert torch.__version__.startswith("@TORCH_VERSION@"), (
 if "RDMAV_FORK_SAFE" not in os.environ:
     os.environ["RDMAV_FORK_SAFE"] = "1"
 
-# pylint: disable=wrong-import-position
-import poptorch.poptorch_core as poptorch_core  # type: ignore
+try:
+    import poptorch.poptorch_core as poptorch_core  # type: ignore
+except ImportError as e:
+    raise ImportError("Unable to import PopTorch, this can be caused by "
+                      "attempting to import PopTorch without an active Poplar "
+                      "SDK\n  The SDK can be enabled by running: "
+                      "`source /path/to/poplar-sdk/enable.sh`") from e
 
+# pylint: disable=wrong-import-position
 from poptorch.poptorch_core import importPoptorchMetadataFromFile, Error, RecoverableError, UnrecoverableError
 from . import _dataloader
 from . import _impl
