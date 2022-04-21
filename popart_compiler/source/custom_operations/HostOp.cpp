@@ -3,6 +3,7 @@
 #include <memory>
 #include <popart/builder.hpp>
 #include <popart/devicemanager.hpp>
+#include <popart/iarray.hpp>
 
 #include <popart/ir.hpp>
 

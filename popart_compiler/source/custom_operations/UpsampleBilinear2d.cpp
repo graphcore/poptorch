@@ -10,6 +10,7 @@
 #include <popops/ElementWise.hpp>
 #include <popops/Reduce.hpp>
 
+#include <poputil/TileMapping.hpp>
 #include <poputil/Util.hpp>
 #include <poputil/VertexTemplates.hpp>
 

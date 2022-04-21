@@ -8,6 +8,7 @@
 #include <popart/popx/opxmanager.hpp>
 #include <popnn/NonLinearity.hpp>
 #include <popops/ElementWise.hpp>
+#include <snap/Graph.hpp>
 
 namespace poptorch_custom_ops {
 TorchSoftplusOp::TorchSoftplusOp(const popart::OperatorIdentifier &opid_,

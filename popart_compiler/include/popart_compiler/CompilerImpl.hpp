@@ -16,7 +16,11 @@
 #include <vector>
 
 #include <popart/builder.hpp>
+#include <popart/iarray.hpp>
+#include <popart/istepio.hpp>
 #include <popart/session.hpp>
+#include <popart/stepio.hpp>
+#include <popart/voiddata.hpp>
 #include <poplar/Tensor.hpp>
 
 #include "popart_compiler/Compiler.hpp"
