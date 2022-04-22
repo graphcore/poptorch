@@ -67,26 +67,6 @@ public:
   // The global context.
   mlir::MLIRContext context;
 
-private:
-  // Builder to create ops.
-  mlir::ImplicitLocOpBuilder _builder;
-
-public:
-  // The main module which our functions are attached to.
-  mlir::ModuleOp the_module;
-
-  // The main graph.
-  mlir::FuncOp main_graph;
-
-  // The main block in the graph, we only have one.
-  mlir::Block *main_graph_block;
-
-  // Program to write weights onto the chip.
-  mlir::FuncOp write_weights_graph;
-
-  // Program to read weights off the chip.
-  mlir::FuncOp read_weights_graph;
-
   // A mapping of SSA values to Poptorch IDs (the index in this vector)
   std::vector<mlir::Value> value_map;
 
@@ -94,9 +74,6 @@ public:
   std::vector<std::string> input_callbacks;
   std::vector<std::pair<std::string, void *>> output_callbacks;
   std::vector<std::pair<std::string, void *>> weight_callbacks;
-
-  // The executable.
-  poptorch_ir::PoplarExecutable executable;
 
   poprithms::logging::ManualTimePartitionLogger timing_manager;
   // When a new op is added to the graph using appendToMainGraph() we check and
@@ -117,6 +94,26 @@ public:
   // takes to trace a model.
   // mlir::TimingScope tracer_timer;
   // clang-format on
+
+private:
+  // Builder to create ops.
+  mlir::ImplicitLocOpBuilder _builder;
+
+public:
+  // The main module which our functions are attached to.
+  mlir::ModuleOp the_module;
+
+  // The main graph.
+  mlir::FuncOp main_graph;
+
+  // Program to write weights onto the chip.
+  mlir::FuncOp write_weights_graph;
+
+  // Program to read weights off the chip.
+  mlir::FuncOp read_weights_graph;
+
+  // The executable.
+  poptorch_ir::PoplarExecutable executable;
 };
 
 } // namespace detail
