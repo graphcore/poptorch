@@ -9,16 +9,16 @@ PoptorchExecutorWrapperImpl::~PoptorchExecutorWrapperImpl() {}
 } // namespace detail
 
 PoptorchExecutorWrapper PoptorchCompiler::compile() {
-  _impl->executable.compile(_impl->timing_manager);
+  _impl->compile();
 
   // Connect up the outputs.
   for (auto &pair : _impl->output_callbacks) {
-    _impl->executable.connectStream(pair.first, pair.second);
+    _impl->connectStream(pair.first, pair.second);
   }
 
   for (auto &pair : _impl->weight_callbacks) {
-    _impl->executable.connectStream("Write-" + pair.first, pair.second);
-    _impl->executable.connectStream("Read-" + pair.first, pair.second);
+    _impl->connectStream("Write-" + pair.first, pair.second);
+    _impl->connectStream("Read-" + pair.first, pair.second);
   }
 
   PoptorchExecutorWrapper executor;
@@ -32,8 +32,7 @@ void PoptorchExecutorWrapper::compile(
     detail::PoptorchCompilerImpl &compiler_impl) {
 
   _impl = std::make_shared<detail::PoptorchExecutorWrapperImpl>(
-      std::move(compiler_impl.input_callbacks),
-      std::move(compiler_impl.executable));
+      std::move(compiler_impl.input_callbacks), compiler_impl.getExecutable());
 }
 
 void PoptorchExecutorWrapper::execute(const std::vector<void *> &ptrs) {

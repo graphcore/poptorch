@@ -29,13 +29,26 @@ public:
 
   PoplarExecutable(PoplarExecutable &&other);
 
+  operator bool() const { return static_cast<bool>(_impl); }
+
   void init(mlir::ModuleOp module);
+
+  // Compile graph by running both PopTorch compiler passes and poplar
+  // compilation.
   void compile(poprithms::logging::ManualTimePartitionLogger &timer);
+
+  // Run graph on device.
   void execute();
 
+  // Transfer weights from host to device
   void weightsToDevice();
+
+  // Transfer weights from device to host
   void weightsToHost();
 
+  // Connect to a poplar stream with a fixed location in memory.
+  // Each time Poplar copies data to/from the named stream, it will read/write
+  // to/from this memory locaiton.
   void connectStream(const std::string &string, void *ptr);
 
 private:
