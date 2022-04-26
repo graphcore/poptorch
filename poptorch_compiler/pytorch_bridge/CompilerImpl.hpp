@@ -55,6 +55,9 @@ public:
     return addArgument(_main_graph, argType);
   }
 
+  // Print module to stderr
+  void dump() { _the_module->dump(); }
+
   // Set the source code location (file line and col)
   // The MLIR ImplicitLocOpBuilder maintains a source code location so that
   // the location does not be sent as part of creating an op. This method allows
@@ -124,11 +127,9 @@ private:
   // Builder to create ops.
   mlir::ImplicitLocOpBuilder _builder;
 
-public:
   // The main module which our functions are attached to.
-  mlir::ModuleOp the_module;
+  mlir::ModuleOp _the_module;
 
-private:
   // The main graph.
   mlir::FuncOp _main_graph;
 

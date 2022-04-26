@@ -7,8 +7,8 @@ namespace detail {
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
     : _builder(mlir::UnknownLoc::get(&context), &context),
-      the_module(mlir::ModuleOp::create(_builder.getLoc())),
-      executable(the_module) {
+      _the_module(mlir::ModuleOp::create(_builder.getLoc())),
+      executable(_the_module) {
 
   // Load the dialect.
   context.loadDialect<poptorch_ir::PoptorchDialect>();
@@ -16,7 +16,7 @@ PoptorchCompilerImpl::PoptorchCompilerImpl()
   // We represent our graph as a simple function.
   auto func_type = _builder.getFunctionType({}, llvm::None);
   _main_graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
-  the_module.push_back(_main_graph);
+  _the_module.push_back(_main_graph);
 
   // Add an entry block.
   _main_graph.addEntryBlock();

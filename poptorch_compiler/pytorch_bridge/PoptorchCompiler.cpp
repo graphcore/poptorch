@@ -108,7 +108,7 @@ void PoptorchCompiler::getTimingInfo() {
   // _impl->timing_manager.dumpAsTree();
 }
 
-void PoptorchCompiler::dump() { _impl->the_module.dump(); }
+void PoptorchCompiler::dump() { _impl->dump(); }
 
 bool PoptorchCompiler::isView(poptorch_ir::TensorId id) const {
   mlir::Operation *op = _impl->value_map[id].getDefiningOp();
