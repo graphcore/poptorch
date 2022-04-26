@@ -873,7 +873,7 @@ Some operations may result in the model running in float32 where float16 would
 be expected, or vice versa (see :numref:`float_16_op_support` for full details).
 
 Graphcore's tutorials repository contains a walkthrough on using half and mixed precision
-in PopTorch: `Half and mixed precision tutorial <https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut3_mixed_precision>`_.
+in PopTorch: `Half and mixed precision tutorial <https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/mixed_precision>`_.
 
 Automatic mixed-precision casting
 =================================

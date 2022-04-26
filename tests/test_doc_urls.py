@@ -20,10 +20,10 @@ EXCEPTIONS = [
     "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch",
     "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/simple_applications/pytorch",
     "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/popart/custom_operators",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut1_basics",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut2_efficient_data_loading",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut4_observing_tensors",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/tut3_mixed_precision",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/basics",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/efficient_data_loading",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/observing_tensors",
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/mixed_precision",
     "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/pytorch/custom_op"
 ]
 
