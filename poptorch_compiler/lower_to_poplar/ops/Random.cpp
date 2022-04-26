@@ -1,5 +1,8 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
+#include <iomanip>
+#include <limits>
+
 #include "lower_to_poplar/CompilerHelpers.hpp"
 
 #include <popops/Cast.hpp>
@@ -144,8 +147,13 @@ void exponential_::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor self = context.fromSsa(this->self());
   const float lambd = this->lambd().convertToFloat();
 
+  // poprand generates values in the closed interval [low, high] and we cannot
+  // take log of zero
+  const float low = std::numeric_limits<float>::min();
+  const float high = 1.0;
+
   auto res = poprand::uniform(context.graph, &context.getRandomSeed(), 0, self,
-                              poplar::FLOAT, 0.0, 1.0, context.seq);
+                              poplar::FLOAT, low, high, context.seq);
 
   popops::logInPlace(context.graph, res, context.seq);
   popops::negInPlace(context.graph, res, context.seq);

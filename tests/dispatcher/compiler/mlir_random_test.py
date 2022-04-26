@@ -232,6 +232,18 @@ def test_exponential_(shape):
     rng_harness(fn)(mean, std, var)
 
 
+# torch.exponential_
+@pytest.mark.mlirSupportRequired
+def test_exponential_inf():
+    # Hopefully 5e7 is enough to generate the boundaries. There isn't enough tile memory to set this much higher
+    def fn():
+        return torch.torch.empty((int(5e7))).exponential_()
+
+    ipu_res = IPUContext(fn)()
+
+    assert not torch.isinf(ipu_res).any()
+
+
 # torch.random_
 @pytest.mark.parametrize("shape", tensor_shapes)
 @pytest.mark.parametrize("dtype",
