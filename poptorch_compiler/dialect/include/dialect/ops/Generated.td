@@ -33,21 +33,6 @@ def Poptorch_subsample : Poptorch_Op<"subsample", []> {
 
 }
 
-def Poptorch_nop : Poptorch_Op<"nop", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_lstm : Poptorch_Op<"lstm", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$outputFullSequence);
   let results = (outs Poptorch_tensor:$result);

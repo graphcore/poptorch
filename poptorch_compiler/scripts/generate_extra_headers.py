@@ -231,17 +231,21 @@ for key in json_in.keys():
 # Create the builder Cpp/Hpp file.
 builder_call_translations = {
     "FLOAT_VEC": "const std::vector<float> &",
+    "OPTIONAL_FLOAT_VEC": "std::optional<std::vector<float>>",
     "STRING_VEC": "const std::vector<const char *> &",
     "INT_VEC": "const std::vector<std::int32_t> &",
     "LONG_VEC": "const std::vector<std::int64_t> &",
+    "OPTIONAL_LONG_VEC": "std::optional<std::vector<std::int64_t>>",
     "BOOL_VEC": "const std::vector<std::int64_t> &",  # Avoid packing issue
     "INT": "std::int32_t",
     "LONG": "std::int64_t",
     "OPTIONAL_LONG": "std::optional<std::int64_t>",
     "FLOAT": "float",
+    "OPTIONAL_FLOAT": "std::optional<float>",
     "DOUBLE": "double",
     "OPTIONAL_DOUBLE": "std::optional<double>",
     "STRING": "const char *",
+    "OPTIONAL_STRING": "std::optional<const char *>",
     "TENSOR": "poptorch_ir::TensorId",
     "OPTIONAL_TENSOR": "poptorch_ir::OptionalTensorId",
     "TENSOR_VEC": "const std::vector<poptorch_ir::TensorId> &",
@@ -300,8 +304,8 @@ for op_name in poptorch_ops:
 
     # Create the IR op.
     cppFunction += "auto tmp = _impl->createOp<poptorch_ir::"
-    cppFunction += op_name + ">(poptorch_ir::AddToGraph::MAIN_GRAPH, "
-    cppFunction += ", ".join(parameters) + ");\n\n"
+    cppFunction += op_name + ">(poptorch_ir::AddToGraph::MAIN_GRAPH"
+    cppFunction += "".join(", " + x for x in parameters) + ");\n\n"
 
     # Allow for each return to be optional, normal or variadic.
     cppFunction += "poptorch_ir::ODSTensorResults results;\n"

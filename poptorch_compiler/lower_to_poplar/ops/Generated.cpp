@@ -58,12 +58,6 @@ void subsample::lowerToPoplar(CompilerContext & /*context*/) {
                   "subsample"
                   " is currently unimplemented.");
 }
-void nop::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "nop"
-                  " is currently unimplemented.");
-}
 
 void lstm::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;

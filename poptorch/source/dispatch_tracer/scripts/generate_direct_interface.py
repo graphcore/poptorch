@@ -8,6 +8,7 @@ schemaToCpp = {
     "int[1]": "toIntVector",
     "int[2]": "toIntVector",
     "int[3]": "toIntVector",
+    "int[]?": "toOptionalIntVector",
     "int": "toInt",
     "int?": "toOptionalInt",
     "bool[]": "toBoolVector",
@@ -16,6 +17,11 @@ schemaToCpp = {
     "bool[3]": "toBoolVector",
     "bool": "toBool",
     "float": "toDouble",
+    "float[]": "toFloatVector",
+    "float[]?": "toOptionalFloatVector",
+    "float?": "toOptionalDouble",
+    "str": "toStr",
+    "str?": "toOptionalStr",
     # We treat all scalars as double for now.
     "Scalar": "toDouble",
     "Scalar?": "toOptionalDouble",
@@ -27,21 +33,28 @@ schemaToCpp = {
 # Convert a tensor into it's constituent pieces.
 def canonicalise_tensor(tensor):
     # Given a tensor type from the yml like Tensor(a!) we turn that into a nicer list format.
-    # The format is [id, inplace, view]
-    # Tensor(a!) -> [a, True, False]
-    # Tensor(a) -> [a, False, True]
-    # Tensor -> ["", False, False]
+    # The format is [id, inplace, view, list]
+    # Tensor(a!) -> [a, True, False, False]
+    # Tensor(a) -> [a, False, True, False]
+    # Tensor -> ["", False, False, False]
+    # Tensor(a!)[] -> [a, True, False, True]
+    # Tensor(a)[] -> [a, False, True, True]
+    # Tensor[] -> ["", False, False, True]
     # If a tensor is not inplace or a view there is nothing to refer to in the context of arguments and returns.
     # See the usage of these rules in native_functions.yml and in https://github.com/pytorch/pytorch/tree/master/aten/src/ATen/native for a full expansion of the precise rules (of which the above is an approximation).
 
     if not tensor.startswith("Tensor"):
-        raise ValueError(f"Type f{tensor} not implemented.")
+        raise ValueError(f"Type {tensor} not implemented.")
+
+    is_list = tensor.endswith("[]")
+    if is_list:
+        tensor = tensor[:-2]
 
     # We have a normal non-aliasing tensor.
     if '(' not in tensor:
         if tensor != "Tensor":
-            raise ValueError(f"Type f{tensor} not implemented.")
-        return ['', False, False]
+            raise ValueError(f"Type {tensor} not implemented.")
+        return ['', False, False, is_list]
 
     is_inplace = '!' in tensor
 
@@ -57,7 +70,7 @@ def canonicalise_tensor(tensor):
         assert tensor_id[-1] == '!'
         tensor_id = tensor_id[:-1]
 
-    return [tensor_id, is_inplace, is_view]
+    return [tensor_id, is_inplace, is_view, is_list]
 
 
 def add_outplace_op(function,
@@ -81,37 +94,63 @@ def add_outplace_op(function,
     function_decl += scope + "\t// Push the new outputs onto the stack\n"
     function_decl += scope + "\tstd::vector<poptorch_ir::OptionalTensorId> "
     function_decl += "t_ids;\n"
-    function_decl += scope + "\tpoptorch_ir::TensorId t_id;\n"
+    need_t_id = False
 
+    outputs_code = ""
     # Handle each of the outputs.
     for index, output in enumerate(outputs):
+        if output == "void":
+            continue
         # Capture all metadata related to each of the output tensors.
         output_info = canonicalise_tensor(output)
         tensor_id = output_info[0]
         is_inplace = output_info[1]
+        is_list = output_info[3]
 
         # We will get a list of tensor IDs, which could be zero for optional
-        # one ore more. For now, we will not support variadic.
-        function_decl += scope
-        function_decl += "\tt_ids = mlir_output.at(" + str(index) + ");\n"
+        # one ore more.
+        if not is_list:
+            outputs_code += scope
+            outputs_code += "\tt_ids = mlir_output.at(" + str(index) + ");\n"
 
-        function_decl += scope + "\tt_id = getSingleOptionalTensorId(t_ids);\n"
+            outputs_code += scope
+            outputs_code += "\tt_id = getSingleOptionalTensorId(t_ids);\n"
+            need_t_id = True
 
         # For each output tensor return it to pytorch in a different way
         # depending on what the schema tells us.
         if inplace_reshape:
             # Inplace operations should be inplaced versions of a certain input.
-            function_decl += scope + "\tstack.push_back(outputInplaceReshape_"
-            function_decl += function + "(t_id, " + named_tensors[tensor_id]
-            function_decl += "_pytorch, " + parameters + "));\n"
+            assert not is_list
+            outputs_code += scope + "\tstack.push_back(outputInplaceReshape_"
+            outputs_code += function + "(t_id, " + named_tensors[tensor_id]
+            outputs_code += "_pytorch, " + parameters + "));\n"
         elif is_inplace:
             # Inplace operations should be inplaced versions of a certain input.
-            function_decl += scope + "\tstack.push_back(outputIsInplaceOf(t_id"
-            function_decl += ", " + named_tensors[tensor_id] + "_pytorch));\n"
+            if is_list:
+                outputs_code += scope
+                outputs_code += "\tstack.push_back(outputIsInplaceOfList(t_ids"
+                outputs_code += ", " + named_tensors[
+                    tensor_id] + "_pytorch));\n"
+            else:
+                outputs_code += scope
+                outputs_code += "\tstack.push_back(outputIsInplaceOf(t_id"
+                outputs_code += ", " + named_tensors[
+                    tensor_id] + "_pytorch));\n"
         else:
-            # Otherwise we are returning a new tensor.
-            function_decl += scope + "\tstack.push_back(makeEmptyOutputTensor("
-            function_decl += "t_id, requires_grad));\n"
+            # Otherwise we are returning a new tensor or tensor list.
+            if is_list:
+                outputs_code += scope
+                outputs_code += "\tstack.push_back(makeEmptyOutputTensorList("
+                outputs_code += "t_ids, requires_grad));\n"
+            else:
+                outputs_code += scope
+                outputs_code += "\tstack.push_back(makeEmptyOutputTensor("
+                outputs_code += "t_id, requires_grad));\n"
+
+    if need_t_id:
+        function_decl += scope + "\tpoptorch_ir::TensorId t_id;\n"
+    function_decl += outputs_code
 
     return function_decl
 
@@ -190,8 +229,10 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
     key = "PopTorchDirectInplace"
     inplace_overload = None if key not in op_target else op_target[key]
 
-    # We need to check whether or not a node actually requires a grad.
-    function_decl = "\tbool requires_grad = false;\n"
+    # We may need to check whether or not a node actually requires a grad.
+    need_requires_grad = False
+
+    function_decl = ""
 
     arg_index = 0
     parameters = " "
@@ -208,28 +249,37 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
         arg_type = arg[1]
 
         # Handle tensor list e.g "_cat(Tensor[] tensors, int dim=0) -> Tensor"
-        if 'Tensor[]' in arg_type:
+        if "Tensor[]" in arg_type:
             # Error if this is not a list.
             function_decl += "ERROR_ON_MSG(!" + stack_at_index
             function_decl += ".isTensorList(), \"Expected list of tensors for"
             function_decl += " operation: {}\");\n".format(op_target['func'])
+
+            # Create the list of torch tensors in case this is being used
+            # inplace
+            function_decl += "\t[[maybe_unused]] std::vector<at::Tensor> "
+            function_decl += arg[0] + "_pytorch;\n"
 
             # Create the list converted into poptorch compiler tensors.
             function_decl += "\t[[maybe_unused]] std::vector<"
             function_decl += "poptorch_ir::OptionalTensorId> " + arg[0] + ";\n"
 
             # Placeholder value to store each IValue in the list
-            loop_placeholder = arg[0] + "_pytorch"
+            loop_placeholder = arg[0] + "_loopvar"
 
             # Iterate over the list.
             function_decl += "for (c10::IValue " + loop_placeholder + " : "
             function_decl += stack_at_index + ".toTensorVector()) {\n"
 
+            # Add the tensor to the output list
+            function_decl += "\t\t" + arg[0] + "_pytorch.push_back("
+            function_decl += "{}.toTensor() );\n".format(loop_placeholder)
             # Extract the tensor from the list and look it up.
             function_decl += "\t\t" + arg[0] + ".push_back(findTensor("
-            function_decl += "{}.toTensor()) );\n".format(loop_placeholder)
+            function_decl += arg[0] + "_pytorch.back()) );\n"
 
             # Update the requires grad stuff.
+            need_requires_grad = True
             function_decl += "\t\trequires_grad |= " + loop_placeholder
             function_decl += ".toTensor().requires_grad();\n\n"
 
@@ -257,6 +307,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
 
             function_decl += "\t[[maybe_unused]] poptorch_ir::TensorId " + arg[
                 0] + " = findTensor(" + arg[0] + "_pytorch);\n"
+            need_requires_grad = True
             function_decl += "\trequires_grad |= " + arg[
                 0] + "_pytorch.requires_grad();\n\n"
 
@@ -279,6 +330,9 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
             if 'Tensor' in arg_type:
                 tensor_params += ", " + arg[0] + "_pytorch"
         arg_index += 1
+
+    if need_requires_grad:
+        function_decl = "\tbool requires_grad = false;\n" + function_decl
 
     # Remove the comma
     parameters = parameters[:-1]
@@ -319,12 +373,13 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
 
 
 class DirectMlirGenerator:
-    def __init__(self, header_file, cpp_file, lookup_file):
+    def __init__(self, header_file, cpp_file, lookup_file, namespace):
 
         # The files to output the results into.
         self.header = header_file
         self.cpp = cpp_file
         self.lookup = lookup_file
+        self.namespace = namespace
 
     def gen_function(self, function_name, op_target, arguments, outputs):
         # We convert the args from the schema string to a list of lists.
@@ -358,10 +413,11 @@ class DirectMlirGenerator:
             # Tensor -> just a tensor.
             # Tensor(a) -> view of `a`
             # Tensor(a!) -> `a` modified inplace
+            # Tensor(a!)[] -> list
             if 'Tensor' in arg_type and '(' in arg_type:
                 # Turn the tensor into [Name, 'Tensor', id, is_inplace, is_view]
-                canonical = [arg_name, 'Tensor'
-                             ] + canonicalise_tensor(arg_type)
+                ct = canonicalise_tensor(arg_type)
+                canonical = [arg_name, 'Tensor[]' if ct[3] else "Tensor"] + ct
 
                 named_tensors[canonical[2]] = arg_name
                 canonicalised_args.append(canonical)
@@ -371,6 +427,7 @@ class DirectMlirGenerator:
 
         aten_name = function_name
         function_name = function_name.replace('.', '_')
+        function_name = "{}_{}".format(self.namespace, function_name)
 
         # Generate the C++ impl.
         function_decl = "void MLIRDispatch::" + function_name
@@ -386,6 +443,7 @@ class DirectMlirGenerator:
               file=self.header)
 
         # Generate the Aten Op to the C++ function map.
-        print("{\"aten::" + aten_name + "\", [=](c10::Stack& stack) { this->" +
-              function_name + "(stack);}},\n",
-              file=self.lookup)
+        print(
+            "{{\"{}::{}\", [=](c10::Stack& stack) {{ this->{}(stack);}}}},\n".
+            format(self.namespace, aten_name, function_name),
+            file=self.lookup)

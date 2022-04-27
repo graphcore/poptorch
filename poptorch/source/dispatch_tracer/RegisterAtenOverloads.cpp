@@ -485,16 +485,6 @@ TORCH_LIBRARY_IMPL(poptorch, PrivateUse2, m) {
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
   m.impl("identity_loss",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("while_loop_begin",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("end_loop_begin",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("start_if_true",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("start_if_false",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("end_if",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
   m.impl("start_for_loop",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
   m.impl("end_for_loop",

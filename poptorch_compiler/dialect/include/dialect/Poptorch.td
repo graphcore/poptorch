@@ -19,6 +19,8 @@ include "ops/PoolingOps.td"
 include "ops/Reshapes.td"
 include "ops/TensorOps.td"
 
+include "ops/Poptorch.td"
+
 def Poptorch_end_graph: Poptorch_AbstractOp<"end_graph", [HasParent<"::mlir::FuncOp">, Terminator]> {
     let summary = "Return op";
 }

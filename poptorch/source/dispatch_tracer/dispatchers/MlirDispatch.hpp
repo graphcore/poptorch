@@ -64,6 +64,13 @@ public:
   at::Tensor outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
                                const at::Tensor &original_input);
 
+  // Some times pytorch specifies the output of an operation as an argument
+  // without that operation being inplace, i.e matmul. In these cases we copy
+  // and let the compiler eliminate it.
+  std::vector<at::Tensor> outputIsInplaceOfList(
+      const std::vector<poptorch_ir::OptionalTensorId> &output_id,
+      const std::vector<at::Tensor> &original_input);
+
   // Handle the special case of squeeze_dim_, which is inplace in PyTorch but
   // changes the shape of the target tensor.
   // NOLINTNEXTLINE
@@ -75,9 +82,14 @@ public:
   at::Tensor makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
                                    bool requires_grad);
 
+  std::vector<at::Tensor> makeEmptyOutputTensorList(
+      const std::vector<poptorch_ir::OptionalTensorId> &output_id,
+      bool requires_grad);
+
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
 #include "AtenToMlirInterface.hpp.inc"
+#include "PoptorchToMlirInterface.hpp.inc"
 
 protected:
   // Returns the only tensor ID in the vector, if it exists, or

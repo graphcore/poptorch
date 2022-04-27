@@ -241,7 +241,7 @@ at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
     c10::Stack stack;
     stack.push_back(self);
     stack.push_back(*dtype);
-    to_dtype(stack);
+    aten_to_dtype(stack);
     return stack.at(0).toTensor();
   }
 
@@ -321,8 +321,9 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
   // (i.e. builders defined in tablegen), and repopulates the stack.
 
   // The handler will be found in the compiler dispatch table.
-  // See CompilerDispatchTable.cpp AtenToMlirDispatch.inc,
-  // AtenToMlirInterface.hpp.inc and AtenToMlirInterface.hpp.inc
+  // See CompilerDispatchTable.cpp, {Aten|Poptorch}ToMlirDispatch.inc,
+  // {Aten|Poptorch}ToMlirInterface.hpp.inc and
+  // {Aten|Poptorch}ToMlirInterface.cpp.inc
   mlir_handle->second(*stack);
   return schema_key;
 }
@@ -438,13 +439,23 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
   return val;
 }
 
-at::Tensor MLIRDispatch::outputIsInplaceOf(poptorch_ir::TensorId output_id,
-                                           const at::Tensor &original_input) {
+at::Tensor
+MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
+                                const at::Tensor &original_input) {
   ERROR_ON(output_id == poptorch_ir::none_id ||
            output_id == poptorch_ir::tensor_error_id);
 
   poptorch_ir::TensorId actual_output = findTensor(original_input);
   _compiler.copy_(actual_output, output_id);
+  return original_input;
+}
+
+std::vector<at::Tensor> MLIRDispatch::outputIsInplaceOfList(
+    const std::vector<poptorch_ir::OptionalTensorId> &output_id,
+    const std::vector<at::Tensor> &original_input) {
+  for (size_t i = 0; i < output_id.size(); i++) {
+    outputIsInplaceOf(output_id[i], original_input[i]);
+  }
   return original_input;
 }
 
@@ -478,6 +489,17 @@ at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
   _mapper.addTensor(new_output, output_id);
 
   return new_output;
+}
+
+std::vector<at::Tensor> MLIRDispatch::makeEmptyOutputTensorList(
+    const std::vector<poptorch_ir::OptionalTensorId> &output_ids,
+    bool requires_grad) {
+  std::vector<at::Tensor> output;
+  output.reserve(output_ids.size());
+  for (const auto &output_id : output_ids) {
+    output.push_back(makeEmptyOutputTensor(output_id, requires_grad));
+  }
+  return output;
 }
 
 poptorch_ir::OptionalTensorId MLIRDispatch::getSingleOptionalTensorId(
@@ -514,6 +536,15 @@ bool isInplaceOnInput(const at::Tensor &inplaceOutput,
 inline std::vector<std::int64_t> toIntVector(c10::IValue &value) {
   return value.toIntVector();
 }
+
+inline std::optional<std::vector<std::int64_t>>
+toOptionalIntVector(c10::IValue &value) {
+  if (value.isNone()) {
+    return std::nullopt;
+  }
+  return value.toIntVector();
+}
+
 inline std::int64_t toInt(c10::IValue &value) { return value.toInt(); }
 
 // Use an int vector to avoid the unusual std::vector<bool>: there is also no
@@ -551,6 +582,28 @@ inline double toDouble(c10::IValue &value) {
   ERROR("Unsupported value type " << value.type()->str() << " in `toDouble`");
 }
 
+inline std::vector<float> toFloatVector(c10::IValue &value) {
+  auto dv = value.toDoubleVector();
+  return std::vector<float>(std::begin(dv), std::end(dv));
+}
+
+inline std::optional<std::vector<float>>
+toOptionalFloatVector(c10::IValue &value) {
+  if (value.isNone()) {
+    return std::nullopt;
+  }
+  return toFloatVector(value);
+}
+
+const char *toStr(c10::IValue &value) { return value.toStringRef().c_str(); }
+
+inline std::optional<const char *> toOptionalStr(c10::IValue &value) {
+  if (value.isNone()) {
+    return std::nullopt;
+  }
+  return toStr(value);
+}
+
 inline poptorch_ir::Type toCompilerType(c10::IValue &value) {
   return toCompilerType(value.toScalarType());
 }
@@ -579,5 +632,6 @@ inline std::optional<double> toOptionalDouble(c10::IValue &value) {
 }
 
 #include "AtenToMlirInterface.cpp.inc"
+#include "PoptorchToMlirInterface.cpp.inc"
 
 } // namespace poptorch
