@@ -197,6 +197,7 @@ find_package(Torch ${TORCH_VERSION} EXACT REQUIRED)
 
 remove_use_distributed_definition(torch_cpu)
 
+add_subdirectory(poptorch_err)
 add_subdirectory(poptorch_logging)
 
 if (POPTORCH_BUILD_MLIR_COMPILER)

@@ -42,7 +42,7 @@ def test_invalid_options(param):
 
     opts._Popart.set(param[0], param[1])
 
-    with pytest.raises(RuntimeError, match=param[2]):
+    with pytest.raises(poptorch.Error, match=param[2]):
         poptorch.poptorch_core._validateOptions(opts.toDict())
 
 

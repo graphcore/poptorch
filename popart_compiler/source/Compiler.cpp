@@ -23,6 +23,8 @@
 #include "popart_compiler/SessionOptions.hpp"
 #include "popart_compiler/Utils.hpp"
 
+#include "poptorch_err/ExceptionInfo.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -1641,44 +1643,6 @@ void setPopartLogLevel(logging::Level level) {
   }
 }
 
-namespace detail {
-struct ExceptionInfoImpl {
-  std::string what;
-  std::string type;
-  std::vector<std::string> stack;
-  std::string filename;
-  std::string message;
-  uint64_t line;
-  std::string recovery_action;
-  ErrorCategory category;
-
-  void extractStack(const popart::error *e);
-};
-
-void ExceptionInfoImpl::extractStack(const popart::error *e) {
-  std::istringstream iss(e->stackreport());
-  std::string l;
-  // PopART adds a numbered prefix to each stack line: remove it:
-  // [0] top_level_fn()
-  // [1] main()
-  //
-  // Becomes:
-  //
-  // top_level_fn()
-  // main()
-  while (std::getline(iss, l)) {
-    size_t first_space = l.find_first_of(' ');
-    if (first_space == std::string::npos) {
-      first_space = 0;
-    } else {
-      // Start at the first character after the space
-      ++first_space;
-    }
-    stack.push_back(l.substr(first_space));
-  }
-}
-} // namespace detail
-
 void throwTestError(TestErrorType type) {
   logging::LogContext ctx_top{"throwTestError::topLevel"};
   {
@@ -1718,89 +1682,117 @@ void throwTestError(TestErrorType type) {
   ERROR("Unknown TestErrorType");
 }
 
-ExceptionInfo::ExceptionInfo(const std::exception &e, const char *type,
-                             const char *filename, uint64_t line)
-    : _impl(std::make_unique<detail::ExceptionInfoImpl>()) {
+namespace {
+class PopExceptionInfo : public ExceptionInfo {
+public:
+  ~PopExceptionInfo() override = default;
+  const char *what() const noexcept override;
+  const char *type() const override;
+  int64_t stackDepth() const override;
+  const char *stack(int64_t level) const override;
+  const char *filename() const override;
+  uint64_t line() const override;
+  const char *recoveryAction() const override;
+  ErrorCategory category() const override;
+  void extractStack(const popart::error &e);
 
-  _impl->filename = logging::shortPoptorchFilename(filename);
-  _impl->line = line;
-  _impl->category = ErrorCategory::Other;
-  std::string extra_info;
-  if (dynamic_cast<const popart::internal_error *>(&e) != nullptr) {
-    _impl->type = "popart_internal_exception";
-    _impl->extractStack(dynamic_cast<const popart::error *>(&e));
-  } else if (dynamic_cast<const popart::error *>(&e) != nullptr) {
-    _impl->type = "popart_exception";
-    _impl->extractStack(dynamic_cast<const popart::error *>(&e));
-  } else if (dynamic_cast<const poplar::poplar_error *>(&e) != nullptr) {
-    _impl->type = "poplar_";
-    _impl->type += dynamic_cast<const poplar::poplar_error *>(&e)->type;
-    if (dynamic_cast<const poplar::link_error *>(&e) != nullptr) {
-      // Note: for some reason this error doesn't set its type in Poplar
-      _impl->type = "poplar_link_error";
-      extra_info =
-          ". Output: " + dynamic_cast<const poplar::link_error *>(&e)->output;
-    } else if (dynamic_cast<const poplar::recoverable_runtime_error *>(&e) !=
-               nullptr) {
-      _impl->category = ErrorCategory::RuntimeRecoverable;
-      _impl->recovery_action = poplar::toString(
-          dynamic_cast<const poplar::recoverable_runtime_error *>(&e)
-              ->getRecoveryAction());
-    } else if (dynamic_cast<const poplar::unrecoverable_runtime_error *>(&e) !=
-               nullptr) {
-      _impl->category = ErrorCategory::RuntimeUnrecoverable;
-    }
-  } else if (dynamic_cast<const poputil::poplibs_error *>(&e) != nullptr) {
-    _impl->type = "poplibs_exception";
-  } else {
-    if (type != nullptr) {
-      _impl->type = type;
+  std::string mwhat;
+  std::string mtype;
+  std::vector<std::string> mstack;
+  std::string mfilename;
+  uint64_t mline;
+  std::string mrecovery_action;
+  ErrorCategory mcategory;
+};
+
+const char *PopExceptionInfo::what() const noexcept { return mwhat.c_str(); }
+
+const char *PopExceptionInfo::type() const { return mtype.c_str(); }
+
+int64_t PopExceptionInfo::stackDepth() const { return mstack.size(); }
+
+const char *PopExceptionInfo::stack(int64_t level) const {
+  return mstack.at(level).c_str();
+}
+
+const char *PopExceptionInfo::filename() const { return mfilename.c_str(); }
+
+uint64_t PopExceptionInfo::line() const { return mline; }
+
+const char *PopExceptionInfo::recoveryAction() const {
+  return mrecovery_action.c_str();
+}
+
+ErrorCategory PopExceptionInfo::category() const { return mcategory; }
+
+void PopExceptionInfo::extractStack(const popart::error &e) {
+  std::istringstream iss(e.stackreport());
+  std::string l;
+  // PopART adds a numbered prefix to each stack line: remove it:
+  // [0] top_level_fn()
+  // [1] main()
+  //
+  // Becomes:
+  //
+  // top_level_fn()
+  // main()
+  while (std::getline(iss, l)) {
+    size_t first_space = l.find_first_of(' ');
+    if (first_space == std::string::npos) {
+      first_space = 0;
     } else {
-      _impl->type = "std::exception";
+      // Start at the first character after the space
+      ++first_space;
     }
+    mstack.push_back(l.substr(first_space));
   }
-  std::string what;
-  // Poptorch errors will include a stack trace in what() which we don't want
-  // here, so keep only the message.
-  if (const auto *poptorch_error =
-          dynamic_cast<const poptorch::logging::Error *>(&e)) {
-    what = poptorch_error->message();
-    logging::trace("Full error: {}", poptorch_error->what());
-  } else {
-    what = e.what();
+}
+} // namespace
+
+void rethrowPopartOrPoplarException(const std::exception_ptr &eptr,
+                                    const char *filename, uint64_t line) {
+  PopExceptionInfo pei;
+  pei.mfilename = logging::shortPoptorchFilename(filename);
+  pei.mline = line;
+  pei.mcategory = ErrorCategory::Other;
+  std::string extra_info;
+  try {
+    std::rethrow_exception(eptr);
+  } catch (const popart::internal_error &ex) {
+    pei.mwhat = ex.what();
+    pei.mtype = "popart_internal_exception";
+    pei.extractStack(ex);
+  } catch (const popart::error &ex) {
+    pei.mwhat = ex.what();
+    pei.mtype = "popart_exception";
+    pei.extractStack(ex);
+  } catch (const poplar::link_error &ex) {
+    // Note: for some reason this error doesn't set its type in Poplar
+    pei.mwhat = ex.what();
+    pei.mwhat += ". Output: " + ex.output;
+    pei.mtype = "poplar_link_error";
+  } catch (const poplar::recoverable_runtime_error &ex) {
+    pei.mwhat = ex.what();
+    pei.mtype = "poplar_";
+    pei.mtype += ex.type;
+    pei.mcategory = ErrorCategory::RuntimeRecoverable;
+    pei.mrecovery_action = poplar::toString(ex.getRecoveryAction());
+  } catch (const poplar::unrecoverable_runtime_error &ex) {
+    pei.mwhat = ex.what();
+    pei.mtype = "poplar_";
+    pei.mtype += ex.type;
+    pei.mcategory = ErrorCategory::RuntimeUnrecoverable;
+  } catch (const poplar::poplar_error &ex) {
+    pei.mwhat = ex.what();
+    pei.mtype = "poplar_";
+    pei.mtype += ex.type;
+  } catch (const poputil::poplibs_error &ex) {
+    pei.mwhat = ex.what();
+    pei.mtype = "poplibs_exception";
+  } catch (...) {
+    return;
   }
-  if (std::count(what.begin(), what.end(), '\n') > 80) {
-    std::ofstream log;
-    log.open(ERROR_LOG);
-    log << what;
-    log << extra_info;
-    log.close();
-    _impl->message = "See " ERROR_LOG " for details";
-  } else {
-    _impl->message = what + extra_info;
-  }
-  _impl->what = _impl->message;
+  throw pei;
 }
 
-ErrorCategory ExceptionInfo::category() const { return _impl->category; }
-
-const char *ExceptionInfo::recoveryAction() const {
-  return _impl->recovery_action.c_str();
-}
-
-const char *ExceptionInfo::filename() const { return _impl->filename.c_str(); }
-
-uint64_t ExceptionInfo::line() const { return _impl->line; }
-
-const char *ExceptionInfo::what() const noexcept { return _impl->what.c_str(); }
-
-const char *ExceptionInfo::type() const { return _impl->type.c_str(); }
-
-int64_t ExceptionInfo::stackDepth() const { return _impl->stack.size(); }
-
-const char *ExceptionInfo::stack(int64_t level) const {
-  return _impl->stack.at(level).c_str();
-}
-
-ExceptionInfo::~ExceptionInfo() = default;
 } // namespace poptorch

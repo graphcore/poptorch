@@ -19,9 +19,17 @@ add_library(popart_compiler SHARED
 
 set_property(TARGET popart_compiler PROPERTY CXX_STANDARD 14)
 
-target_link_libraries(popart_compiler PRIVATE popef popart-only poptorch_logging)
+target_link_libraries(popart_compiler PRIVATE
+                                      popef
+                                      popart-only
+                                      poptorch_logging
+                                      poptorch_exception_info)
 
-target_include_directories(popart_compiler PUBLIC include PRIVATE source/include)
+target_include_directories(popart_compiler
+                           PUBLIC
+                           include
+                           PRIVATE
+                           source/include)
 
 # Copy custom codelet sources so that we can install and later pre-compile them
 # on-demand, configure_file keeps track of changes and always copies on new

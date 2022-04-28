@@ -10,6 +10,9 @@
 #include "CommonHelperFunctions.hpp"
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/Utils.hpp"
+
+#include "poptorch_err/ExceptionHandling.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -416,11 +419,11 @@ at::Tensor detach(const at::Tensor &self) {
 */
 
 TORCH_LIBRARY_IMPL(_, PrivateUse2, m) {
-  m.fallback(torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.fallback(PTC_BOXED(poptorch::fallback));
 }
 
 TORCH_LIBRARY_IMPL(_, AutogradPrivateUse2, m) {
-  m.fallback(torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.fallback(PTC_BOXED(poptorch::fallback));
 }
 
 /*
@@ -454,73 +457,46 @@ TORCH_LIBRARY_IMPL(aten, BackendSelect, m) {
   auto log_level = FLAGS_caffe2_log_level;
   FLAGS_caffe2_log_level = c10::GLOG_ERROR;
 
-  m.impl("copy_", &poptorch::copyInplace);
-  m.impl("empty.memory_format", &poptorch::emptyMemoryFormat);
-  m.impl("empty.out", &poptorch::emptyOut);
-  m.impl("empty_strided", &poptorch::emptyStrided);
-  m.impl("_to_copy", &poptorch::toCopy);
+  m.impl("copy_", PTC(poptorch::copyInplace));
+  m.impl("empty.memory_format", PTC(poptorch::emptyMemoryFormat));
+  m.impl("empty.out", PTC(poptorch::emptyOut));
+  m.impl("empty_strided", PTC(poptorch::emptyStrided));
+  m.impl("_to_copy", PTC(poptorch::toCopy));
 
   // Turn logging back on.
   FLAGS_caffe2_log_level = log_level;
 }
 
 TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse2, m) {
-  m.impl("detach", &poptorch::detach);
+  m.impl("detach", PTC(poptorch::detach));
 }
 
 TORCH_LIBRARY_IMPL(poptorch, PrivateUse2, m) {
-  m.impl("ipu_print_tensor",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("nop",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("begin_ipu_block",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("end_ipu_block",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("internal_cast",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("custom_operation",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("ctc_beam_search_decoder",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("identity_loss",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("start_for_loop",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("end_for_loop",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("optimizer_group",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("set_matmul_serialization",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("set_overlap_for_input",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("set_overlap_for_output",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("recomputation_checkpoint",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("set_available_memory",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("begin_multi_conv",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("end_multi_conv",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("push_name_scope",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("pop_name_scope",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("begin_autocast",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("suppress_autocast",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("restore_autocast",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("end_cpu_op",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("call_cpu_op",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("set_attribute",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-  m.impl("clear_attribute",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("ipu_print_tensor", PTC_BOXED(poptorch::fallback));
+  m.impl("nop", PTC_BOXED(poptorch::fallback));
+  m.impl("begin_ipu_block", PTC_BOXED(poptorch::fallback));
+  m.impl("end_ipu_block", PTC_BOXED(poptorch::fallback));
+  m.impl("internal_cast", PTC_BOXED(poptorch::fallback));
+  m.impl("custom_operation", PTC_BOXED(poptorch::fallback));
+  m.impl("ctc_beam_search_decoder", PTC_BOXED(poptorch::fallback));
+  m.impl("identity_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("start_for_loop", PTC_BOXED(poptorch::fallback));
+  m.impl("end_for_loop", PTC_BOXED(poptorch::fallback));
+  m.impl("optimizer_group", PTC_BOXED(poptorch::fallback));
+  m.impl("set_matmul_serialization", PTC_BOXED(poptorch::fallback));
+  m.impl("set_overlap_for_input", PTC_BOXED(poptorch::fallback));
+  m.impl("set_overlap_for_output", PTC_BOXED(poptorch::fallback));
+  m.impl("recomputation_checkpoint", PTC_BOXED(poptorch::fallback));
+  m.impl("set_available_memory", PTC_BOXED(poptorch::fallback));
+  m.impl("begin_multi_conv", PTC_BOXED(poptorch::fallback));
+  m.impl("end_multi_conv", PTC_BOXED(poptorch::fallback));
+  m.impl("push_name_scope", PTC_BOXED(poptorch::fallback));
+  m.impl("pop_name_scope", PTC_BOXED(poptorch::fallback));
+  m.impl("begin_autocast", PTC_BOXED(poptorch::fallback));
+  m.impl("suppress_autocast", PTC_BOXED(poptorch::fallback));
+  m.impl("restore_autocast", PTC_BOXED(poptorch::fallback));
+  m.impl("end_cpu_op", PTC_BOXED(poptorch::fallback));
+  m.impl("call_cpu_op", PTC_BOXED(poptorch::fallback));
+  m.impl("set_attribute", PTC_BOXED(poptorch::fallback));
+  m.impl("clear_attribute", PTC_BOXED(poptorch::fallback));
 }

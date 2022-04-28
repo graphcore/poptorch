@@ -91,6 +91,7 @@ target_link_libraries(poptorch_core PRIVATE
   popart_compiler
   torch
   ${TORCH_PYTHON_LIBRARY}
+  poptorch_err
   poptorch_logging
   dispatch_tracer
   poptorch_core_headers

@@ -56,12 +56,9 @@ static constexpr TensorId NoneTensor = 0; // NOLINT
 namespace detail {
 struct CompilerImpl;
 struct SessionOptionsImpl;
-struct ExceptionInfoImpl;
 } // namespace detail
 
 enum class OutputElemType { Tensor, Tuple, List };
-
-enum class ErrorCategory { RuntimeRecoverable, RuntimeUnrecoverable, Other };
 
 // For testing only: throw an exception of the selected type.
 enum class TestErrorType {
@@ -76,23 +73,11 @@ enum class TestErrorType {
 };
 void throwTestError(TestErrorType type);
 
-class ExceptionInfo : public std::exception {
-public:
-  explicit ExceptionInfo(const std::exception &e, const char *type,
-                         const char *filename, uint64_t line);
-  ~ExceptionInfo() override;
-  const char *what() const noexcept override;
-  const char *type() const;
-  int64_t stackDepth() const;
-  const char *stack(int64_t level) const;
-  const char *filename() const;
-  uint64_t line() const;
-  const char *recoveryAction() const;
-  ErrorCategory category() const;
-
-private:
-  std::unique_ptr<detail::ExceptionInfoImpl> _impl;
-};
+// Examines the supplied exception. If it is a popart or poplar exception,
+// rethrow it as an ExceptionInfo subclass (which gives easy access to the
+// exception detail)
+void rethrowPopartOrPoplarException(const std::exception_ptr &eptr,
+                                    const char *filename, uint64_t line);
 
 struct OutputType {
   OutputElemType type;

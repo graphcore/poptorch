@@ -9,8 +9,6 @@
 #include <stdexcept>
 #include <string>
 
-#define ERROR_LOG "poptorch_error.log"
-
 namespace poptorch {
 namespace logging {
 

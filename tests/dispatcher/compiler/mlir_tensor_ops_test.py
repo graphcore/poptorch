@@ -3,6 +3,7 @@
 import torch
 import pytest
 import helpers
+import poptorch
 from poptorch.experimental import IPUContext
 
 SUPPORTED_TYPES = (torch.float16, torch.float32, torch.int32)
@@ -89,7 +90,7 @@ def test_as_strided():
         r"stride of a tensor\. Prefer other view functions like "
         r"torch\.tensor\.expand\(\) over setting the shape and stride of a "
         r"view manually\..*")
-    with pytest.raises(RuntimeError, match=err_msg):
+    with pytest.raises(poptorch.Error, match=err_msg):
         op_harness(torch.as_strided, [3, 3], [1, 3])
 
 
@@ -135,14 +136,14 @@ def test_reshape_view(op):
 
     # Error conditions shape\'\[1, 7\]\'
     err_msg = (r"\]\' is invalid for input of size 8")
-    with pytest.raises(RuntimeError, match=err_msg):
+    with pytest.raises(poptorch.Error, match=err_msg):
         expand_reshape_view_harness((2, 4), (1, 7), op)
 
     err_msg = ("only one dimension can be inferred")
-    with pytest.raises(RuntimeError, match=err_msg):
+    with pytest.raises(poptorch.Error, match=err_msg):
         expand_reshape_view_harness((7, 4), (-1, -1), op)
 
-    with pytest.raises(RuntimeError, match=err_msg):
+    with pytest.raises(poptorch.Error, match=err_msg):
         expand_reshape_view_harness((3, 4), (-1, -1, 2), op)
 
 
@@ -166,7 +167,7 @@ def test_expand():
     expand_reshape_view_harness((2, 1, 4), (2, 2, 2, 4, 4), "expand")
 
     # TODO T52507 Fully implement expand
-    with pytest.raises(RuntimeError):
+    with pytest.raises(poptorch.Error):
         expand_reshape_view_harness((2, 1, 4), (2, 4, -1), "expand")
 
 

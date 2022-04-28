@@ -18,6 +18,7 @@
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
+#include "poptorch_err/ExceptionHandling.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 #include "../CommonHelperFunctions.hpp"
@@ -72,29 +73,42 @@ MLIRExecutable::MLIRExecutable(
 MLIRExecutable::~MLIRExecutable() {}
 
 void MLIRExecutable::execute(const std::vector<at::Tensor> &inputs) {
-  std::vector<void *> ptrs;
-  ptrs.resize(inputs.size());
+  try {
+    std::vector<void *> ptrs;
+    ptrs.resize(inputs.size());
 
-  // Keep the refs around.
-  std::vector<at::Tensor> converted;
+    // Keep the refs around.
+    std::vector<at::Tensor> converted;
 
-  for (std::size_t i = 0; i < inputs.size(); ++i) {
-    const at::Tensor &tensor = inputs[i];
-    if (tensor.scalar_type() == at::ScalarType::Long) {
-      converted.push_back(tensor.to(at::ScalarType::Int));
-      ptrs[i] = converted.back().data_ptr();
-    } else {
-      ptrs[i] = tensor.data_ptr();
+    for (std::size_t i = 0; i < inputs.size(); ++i) {
+      const at::Tensor &tensor = inputs[i];
+      if (tensor.scalar_type() == at::ScalarType::Long) {
+        converted.push_back(tensor.to(at::ScalarType::Int));
+        ptrs[i] = converted.back().data_ptr();
+      } else {
+        ptrs[i] = tensor.data_ptr();
+      }
     }
-  }
 
-  _impl->execute(ptrs);
-  _impl->weightsToHost();
+    _impl->execute(ptrs);
+    _impl->weightsToHost();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-void MLIRExecutable::weightsToDevice() { _impl->weightsToDevice(); }
+void MLIRExecutable::weightsToDevice() {
+  try {
+    _impl->weightsToDevice();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
 
-void MLIRExecutable::weightsToHost() { _impl->weightsToHost(); }
+void MLIRExecutable::weightsToHost() {
+  try {
+    _impl->weightsToHost();
+  }
+  CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
+}
 
 MLIRDispatch::MLIRDispatch() { this->generateDispatchTable(); }
 
