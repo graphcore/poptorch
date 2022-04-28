@@ -181,3 +181,108 @@ def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
 
   }]>];
 }
+
+def Poptorch_zeros_like : Poptorch_NotImplementedOp<"zeros_like", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+          $_state.addOperands(self);
+          $_state.addTypes({self.getType()});
+
+  }]>];
+}
+
+def Poptorch_full_like : Poptorch_NotImplementedOp<"full_like", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self, F32Attr:$fill_value);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "float":$fill_value), [{
+          $_state.addOperands(self);
+          $_state.addAttribute("fill_value", $_builder.getF32FloatAttr(fill_value));
+
+          $_state.addTypes({self.getType()});
+  }]>];
+}
+
+def Poptorch_one_hot : Poptorch_NotImplementedOp<"one_hot", []> {
+  let arguments = (ins Poptorch_tensor:$self, I64Attr:$num_classes);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "std::int64_t":$num_classes), [{
+    $_state.addOperands(self);
+
+    ERROR_ON_MSG(num_classes == -1,
+                "OneHot num classes must be specified and must be constant.");
+
+    $_state.addAttribute("num_classes", $_builder.getI64IntegerAttr(num_classes));
+
+    mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+
+    auto ref = tensor.getShape();
+    llvm::SmallVector<std::int64_t, 4> shape{ref.begin(), ref.end()};
+    shape.push_back(num_classes);
+
+    $_state.addTypes(mlir::RankedTensorType::get(shape, $_builder.getIntegerType(32, true)));
+  }]>];
+}
+
+def Poptorch_arange_start_out : Poptorch_NotImplementedOp<"arange_start_out", []> {
+  let arguments = (ins F32Attr:$start, F32Attr:$end, F32Attr:$step);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "float":$start, "float":$end, "float":$step), [{
+          $_state.addAttribute("start", $_builder.getF32FloatAttr(start));
+          $_state.addAttribute("end", $_builder.getF32FloatAttr(end));
+          $_state.addAttribute("step", $_builder.getF32FloatAttr(step));
+
+          const auto count = static_cast<int64_t>((end - start) / step);
+
+          $_state.addTypes(mlir::RankedTensorType::get({count}, $_builder.getF32Type()));
+  }]>];
+}
+
+def Poptorch_masked_fill_Scalar : Poptorch_NotImplementedOp<"masked_fill_Scalar", []> {
+  let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$mask, F32Attr:$scalar);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "mlir::Value":$mask, "float":$scalar), [{
+    $_state.addOperands({self, mask});
+    $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
+
+    constexpr auto broadcastShape = [](const llvm::ArrayRef<std::int64_t> lhs,
+                                       const llvm::ArrayRef<std::int64_t> rhs) {
+      llvm::SmallVector<std::int64_t, 4> out_shape;
+      auto lhsItr = lhs.begin();
+      auto rhsItr = rhs.begin();
+      if (lhs.size() < rhs.size()) {
+        const auto diff = rhs.size() - lhs.size();
+        out_shape.insert(out_shape.end(), rhsItr, rhsItr + diff);
+        rhsItr += diff;
+      }
+      else if (rhs.size() < lhs.size()) {
+        const auto diff = lhs.size() - rhs.size();
+        out_shape.insert(out_shape.end(), lhsItr, lhsItr + diff);
+        lhsItr += diff;
+      }
+
+      for (; rhsItr != rhs.end(); ++rhsItr, ++lhsItr) {
+        if (*rhsItr == *lhsItr || *lhsItr == 1 || *rhsItr == 1) {
+          out_shape.push_back(std::max(*rhsItr, *lhsItr));
+        }
+        else {
+          ERROR("Tensors are not broadcastable mismatch in dimension " +
+                std::to_string(lhsItr - lhs.begin()) + " (" +
+                std::to_string(*lhsItr) + " != " +
+                std::to_string(*rhsItr) + ")");
+        }
+      }
+      return out_shape;
+    };
+
+    mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+    mlir::RankedTensorType mask_tensor = mask.getType().cast<mlir::RankedTensorType>();
+
+    $_state.addTypes(mlir::RankedTensorType::get(broadcastShape(tensor.getShape(), mask_tensor.getShape()), tensor.getElementType()));
+  }]>];
+}

@@ -58,6 +58,24 @@ def Poptorch_isnan :  Poptorch_NotImplementedOp<"isnan"> {
     ];
 }
 
+class Poptorch_NotImplemented_elem_unary<string name> :  Poptorch_NotImplementedOp<name, [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$in1);
+    let results = (outs Poptorch_tensor:$result);
+
+    let assemblyFormat = [{
+        `(`$in1`)` `(`type($in1)`)` `->` type($result) attr-dict
+    }];
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1),[{
+        $_state.addOperands({v1});
+        $_state.addTypes(v1.getType());
+     }]>
+    ];
+}
+
+def Poptorch_round_out: Poptorch_NotImplemented_elem_unary<"round_out"> {}
+def Poptorch_trunc: Poptorch_NotImplemented_elem_unary<"trunc"> {}
+
 class Poptorch_elem_unary_in_place<string name> :  Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$in1);
     let assemblyFormat = [{
@@ -134,8 +152,8 @@ def Poptorch_bitwiseOr: Poptorch_elem_binary<"bitwiseOr"> {}
 def Poptorch_bitwiseXor: Poptorch_elem_binary<"bitwiseXor"> {}
 def Poptorch_bitwiseXnor: Poptorch_elem_binary<"bitwiseXnor"> {}
 def Poptorch_div: Poptorch_elem_binary<"div"> {}
-def Poptorch_logicalAnd: Poptorch_elem_binary<"logicaland"> {}
-def Poptorch_logicalOr: Poptorch_elem_binary<"logicalor"> {}
+def Poptorch_logicalAnd: Poptorch_elem_binary<"logicalAnd"> {}
+def Poptorch_logicalOr: Poptorch_elem_binary<"logicalOr"> {}
 def Poptorch_max: Poptorch_elem_binary<"max"> {}
 def Poptorch_min: Poptorch_elem_binary<"min"> {}
 def Poptorch_neq: Poptorch_elem_binary<"neq"> {}
@@ -144,7 +162,6 @@ def Poptorch_rem: Poptorch_elem_binary<"rem"> {}
 def Poptorch_shiftLeft: Poptorch_elem_binary<"shiftleft"> {}
 def Poptorch_shiftRight: Poptorch_elem_binary<"shiftright"> {}
 def Poptorch_shiftRightSignExtend: Poptorch_elem_binary<"shiftrightsignextend"> {}
-
 
 
 
@@ -190,8 +207,8 @@ def Poptorch_eq_: Poptorch_elem_binary_in_place<"eq_"> {}
 def Poptorch_gteq_: Poptorch_elem_binary_in_place<"gteq_"> {}
 def Poptorch_gt_: Poptorch_elem_binary_in_place<"gt_"> {}
 def Poptorch_lteq_: Poptorch_elem_binary_in_place<"lteq_"> {}
-def Poptorch_logicalAnd_: Poptorch_elem_binary_in_place<"logicaland_"> {}
-def Poptorch_logicalOr_: Poptorch_elem_binary_in_place<"logicalor_"> {}
+def Poptorch_logicalAnd_: Poptorch_elem_binary_in_place<"logicalAnd_"> {}
+def Poptorch_logicalOr_: Poptorch_elem_binary_in_place<"logicalOr_"> {}
 def Poptorch_lt_: Poptorch_elem_binary_in_place<"lt_"> {}
 def Poptorch_max_: Poptorch_elem_binary_in_place<"max_"> {}
 def Poptorch_min_: Poptorch_elem_binary_in_place<"min_"> {}
@@ -297,7 +314,10 @@ class Poptorch_NotImplemented_elem_binary<string name> :  Poptorch_NotImplemente
 }
 
 def Poptorch_floor_divide : Poptorch_NotImplemented_elem_binary<"floor_divide"> {}
+def Poptorch_remainder_Tensor_out : Poptorch_NotImplemented_elem_binary<"remainder_Tensor_out"> {}
 def Poptorch_fmod : Poptorch_NotImplemented_elem_binary<"fmod"> {}
+def Poptorch_logicalXor: Poptorch_NotImplemented_elem_binary<"logicalXor"> {}
+
 
 class Poptorch_elem_binary_scalar<string name> :  Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
@@ -408,3 +428,40 @@ def Poptorch_clampTensor: Poptorch_Op<"clampTensor", [AttrSizedOperandSegments]>
     }]>
   ];
 }
+
+def Poptorch_threshold_out: Poptorch_NotImplementedOp<"threshold_out", []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       F32Attr:$threshold,
+                       F32Attr:$value);
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                    "float":$threshold,
+                                    "float":$value), [{
+    $_state.addOperands(self);
+
+    $_state.addAttribute("threshold", $_builder.getF32FloatAttr(threshold));
+    $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
+
+    $_state.addTypes(self.getType());
+  }]>
+  ];
+}
+
+/*
+ * Scatter ops.
+ */
+
+class Poptorch_elem_binary_scatter<string name> :  Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index, Poptorch_tensor:$src);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "std::int64_t":$dim, "mlir::Value":$index, "mlir::Value":$src),[{
+        $_state.addOperands({self, index, src});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addTypes(self.getType());
+      }]>
+    ];
+}
+
+def Poptorch_scatter_add_out : Poptorch_elem_binary_scatter<"scatter_add_out"> {}

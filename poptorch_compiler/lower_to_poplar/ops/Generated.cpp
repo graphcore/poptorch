@@ -323,12 +323,6 @@ void onehot::lowerToPoplar(CompilerContext & /*context*/) {
                   "onehot"
                   " is currently unimplemented.");
 }
-void prelu::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "prelu"
-                  " is currently unimplemented.");
-}
 void scatter::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

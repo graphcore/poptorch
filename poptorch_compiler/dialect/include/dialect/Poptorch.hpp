@@ -2,12 +2,16 @@
 #ifndef POPTORCH_CODEGEN_POPTORCH_IR_H_
 #define POPTORCH_CODEGEN_POPTORCH_IR_H_
 
+#include <vector>
+
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+
+#include "poptorch_logging/Error.hpp"
 
 /*
  * Custom traits.
@@ -34,6 +38,27 @@ class NotImplementedOp : public TraitBase<ConcreteType, NotImplementedOp> {};
 namespace poptorch_ir {
 
 struct CompilerContext;
+
+inline std::int64_t convertToPositiveDim(std::int64_t dim,
+                                         std::size_t numDims) {
+  if (dim < 0) {
+    dim += numDims;
+  }
+
+  ERROR_ON_MSG(dim >= static_cast<std::int64_t>(numDims) ||
+                   dim < std::int64_t{0},
+               "Dimension must be within the range of the tensor");
+
+  return dim;
+}
+inline std::vector<std::int64_t>
+convertToPositiveDim(std::vector<std::int64_t> dim, std::size_t numDims) {
+  for (auto &d : dim) {
+    d = convertToPositiveDim(d, numDims);
+  }
+
+  return dim;
+}
 
 // Add our interfaces. These allow us to call poptorch specific functions on
 // generic ops.

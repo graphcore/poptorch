@@ -1,6 +1,8 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "MlirDispatch.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -583,8 +585,20 @@ inline double toDouble(c10::IValue &value) {
 }
 
 inline std::vector<float> toFloatVector(c10::IValue &value) {
-  auto dv = value.toDoubleVector();
-  return std::vector<float>(std::begin(dv), std::end(dv));
+  if (value.isDoubleList()) {
+    auto dv = value.toDoubleVector();
+    return std::vector<float>(std::begin(dv), std::end(dv));
+  }
+  if (value.isIntList()) {
+    auto int_vec = value.toIntVector();
+    std::vector<float> ret;
+    ret.reserve(int_vec.size());
+    std::transform(int_vec.begin(), int_vec.end(), std::back_inserter(ret),
+                   [](std::int64_t val) { return static_cast<double>(val); });
+    return ret;
+  }
+  ERROR("Unsupported value type " << value.type()->str()
+                                  << " in `toDoubleVector`");
 }
 
 inline std::optional<std::vector<float>>

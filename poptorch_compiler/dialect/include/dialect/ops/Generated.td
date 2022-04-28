@@ -772,21 +772,6 @@ def Poptorch_onehot : Poptorch_Op<"onehot", []> {
 
 }
 
-def Poptorch_prelu : Poptorch_Op<"prelu", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values), [{
-
-        $_state.addOperands(values);
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_scatter : Poptorch_Op<"scatter", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64Attr:$axis);
   let results = (outs Poptorch_tensor:$result);

@@ -8,7 +8,10 @@ schemaToCpp = {
     "int[1]": "toIntVector",
     "int[2]": "toIntVector",
     "int[3]": "toIntVector",
+    "int[4]": "toIntVector",
+    "int[6]": "toIntVector",
     "int[]?": "toOptionalIntVector",
+    "int[1]?": "toOptionalIntVector",
     "int": "toInt",
     "int?": "toOptionalInt",
     "bool[]": "toBoolVector",
@@ -366,7 +369,8 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
                                         inplace_ins[0] + "_pytorch")
     else:
         raise KeyError("Couldn't find a valid PopTorch direct mapping " +
-                       "(eg. PopTorchDirect, or PopTorchDirectInplace)")
+                       "(eg. PopTorchDirect, or PopTorchDirectInplace)" +
+                       f" for {op_target}")
 
     function_decl += "}\n"
     return function_decl

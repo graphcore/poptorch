@@ -12,18 +12,18 @@ def Poptorch_mse_loss : Poptorch_Op<"mse_loss", []> {
       $_state.addOperands({self, target});
       $_state.addAttribute(
           "reduction", $_builder.getI64IntegerAttr(reduction));
-      mlir::RankedTensorType input_type =
+      mlir::RankedTensorType tensor =
           self.getType().cast<mlir::RankedTensorType>();
       std::vector<std::int64_t> shape;
       if (reduction == 0) {
-        shape = input_type.getShape();
+        shape = tensor.getShape();
         shape.erase(shape.begin());
       }
       // Otherwise reduce to a scalar by passing an empty shape
       // This corresponds to torch.Size([])
 
       $_state.addTypes(mlir::RankedTensorType::get(
-          shape, input_type.getElementType()));
+          shape, tensor.getElementType()));
     }]>
     ];
 }
@@ -67,17 +67,17 @@ def Poptorch_nll_loss : Poptorch_Op<"nll_loss", []> {
         $_state.addOperands({self, target});
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         $_state.addAttribute("ignore_index",$_builder.getI64IntegerAttr(ignore_index));
-        mlir::RankedTensorType input_type = self.getType().cast<mlir::RankedTensorType>();
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> shape;
         if (reduction == 0){  // if none reduction applied the output shape is the same as input, otherwise torch.Size([])
-            shape = input_type.getShape();
+            shape = tensor.getShape();
             shape.erase(shape.begin());
         } else {
             shape.push_back(1);
         }
 
-        $_state.addTypes({mlir::RankedTensorType::get(shape, input_type.getElementType()),
-                          mlir::RankedTensorType::get(shape, input_type.getElementType())});
+        $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType()),
+                          mlir::RankedTensorType::get(shape, tensor.getElementType())});
     }]>
     ];
 }
@@ -121,13 +121,13 @@ def Poptorch_binary_cross_entropy : Poptorch_Op<"binary_cross_entropy", []> {
                                       "std::int64_t":$reduction),[{
         $_state.addOperands({self, target});
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
-        mlir::RankedTensorType input_type = self.getType().cast<mlir::RankedTensorType>();
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> shape;
         if (reduction == 0){
-            shape = input_type.getShape();
+            shape = tensor.getShape();
         }
 
-        $_state.addTypes({mlir::RankedTensorType::get(shape, input_type.getElementType())});
+        $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType())});
     }]>
     ];
 }
@@ -167,12 +167,12 @@ def Poptorch_binary_cross_entropy_with_logits : Poptorch_Op<"binary_cross_entrop
                                       "std::int64_t":$reduction),[{
         $_state.addOperands({self, target});
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
-        mlir::RankedTensorType input_type = self.getType().cast<mlir::RankedTensorType>();
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> shape;
         if (reduction == 0){  // if none reduction applied the output shape is the same as input, otherwise torch.Size([])
-            shape = input_type.getShape();
+            shape = tensor.getShape();
         }
-        $_state.addTypes({mlir::RankedTensorType::get(shape, input_type.getElementType())});
+        $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType())});
     }]>
     ];
 }
@@ -195,6 +195,33 @@ def Poptorch_binary_cross_entropy_with_logits_backward : Poptorch_Op<"binary_cro
         $_state.addOperands({grad_output, self, target});
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         $_state.addTypes(self.getType());
+    }]>
+    ];
+}
+
+def Poptorch_smooth_l1_loss : Poptorch_NotImplementedOp<"smooth_l1_loss", []> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         Poptorch_tensor:$target,
+                         I64Attr:$reduction,
+                         F32Attr:$beta);
+
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "mlir::Value":$target,
+                                      "std::int64_t":$reduction,
+                                      "float":$beta),[{
+        $_state.addOperands({self, target});
+        $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
+        $_state.addAttribute("beta",$_builder.getF32FloatAttr(beta));
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+
+        llvm::ArrayRef<std::int64_t> shape;
+        if (reduction == 0) {  // if none reduction applied the output shape is the same as input, otherwise torch.Size([])
+            shape = tensor.getShape();
+        }
+
+        $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType())});
     }]>
     ];
 }

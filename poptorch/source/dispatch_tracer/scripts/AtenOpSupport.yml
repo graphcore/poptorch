@@ -47,6 +47,11 @@
   PopTorchDirect: hardshrink
   UnusedOutputArguments: {out}
 
+# func: softshrink.out(Tensor self, Scalar lambd=0.5, *, Tensor(a!) out) -> Tensor(a!)
+- func: softshrink.out
+  PopTorchDirect: softshrink_out
+  UnusedOutputArguments: {out}
+
 # hardswish_(Tensor(a!) self) -> Tensor(a!)
 - func: hardswish_
   PopTorchDirectInplace: hardswish_
@@ -59,9 +64,19 @@
 - func: relu
   PopTorchDirect: relu
 
+# func: rrelu_with_noise(Tensor self, Tensor noise, Scalar lower=0.125, Scalar upper=0.3333333333333333, bool training=False, Generator? generator=None) -> Tensor
+- func: rrelu_with_noise
+  PopTorchDirect: rrelu_with_noise
+  IgnoreArgs: {'generator'}
+
 # func: leaky_relu.out(Tensor self, Scalar negative_slope=0.01, *, Tensor(a!) out) -> Tensor(a!)
 - func: leaky_relu.out
   PopTorchDirect: leaky_relu_out
+  UnusedOutputArguments: {out}
+
+# func: prelu(Tensor self, Tensor weight) -> Tensor
+- func: prelu
+  PopTorchDirect: prelu
   UnusedOutputArguments: {out}
 
 # tanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
@@ -122,6 +137,11 @@
 - func: log_sigmoid_forward
   PopTorchDirect: log_sigmoid_forward
 
+# func: glu.out(Tensor self, int dim=-1, *, Tensor(a!) out) -> Tensor(a!)
+- func: glu.out
+  PopTorchDirect: glu_out
+  UnusedOutputArguments: {out}
+
 ######################
 # Views and reshapes
 ######################
@@ -180,6 +200,10 @@
 - func: select.int
   PopTorchDirect: select
 
+# func: slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -> Tensor(a)
+- func: slice.Tensor
+  PopTorchDirect: slice_Tensor
+
 # unsqueeze(Tensor(a) self, int dim) -> Tensor(a)
 - func: unsqueeze
   PopTorchDirect: unsqueeze
@@ -187,6 +211,30 @@
 # func: constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> Tensor
 - func: constant_pad_nd
   PopTorchDirect: constant_pad_nd
+
+# func: reflection_pad1d.out(Tensor self, int[2] padding, *, Tensor(a!) out) -> Tensor(a!)
+- func: reflection_pad1d.out
+  PopTorchDirect: reflection_pad1d_out
+  UnusedOutputArguments: {out}
+
+# func: reflection_pad2d(Tensor self, int[4] padding) -> Tensor
+- func: reflection_pad2d
+  PopTorchDirect: reflection_pad2d
+
+# func: replication_pad1d.out(Tensor self, int[2] padding, *, Tensor(a!) out) -> Tensor(a!)
+- func: replication_pad1d.out
+  PopTorchDirect: replication_pad1d_out
+  UnusedOutputArguments: {out}
+
+# func: replication_pad2d.out(Tensor self, int[4] padding, *, Tensor(a!) out) -> Tensor(a!)
+- func: replication_pad2d.out
+  PopTorchDirect: replication_pad2d_out
+  UnusedOutputArguments: {out}
+
+# func: replication_pad3d.out(Tensor self, int[6] padding, *, Tensor(a!) out) -> Tensor(a!)
+- func: replication_pad3d.out
+  PopTorchDirect: replication_pad3d_out
+  UnusedOutputArguments: {out}
 
 # func: index_select(Tensor self, int dim, Tensor index) -> Tensor
 - func: index_select
@@ -196,6 +244,46 @@
 - func: permute
   PopTorchDirect: permute
 
+# func: upsample_trilinear3d.out(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: upsample_trilinear3d.out
+  PopTorchDirect: upsample_trilinear3d_out
+  UnusedOutputArguments: {out}
+
+# func: upsample_bilinear2d.out(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: upsample_bilinear2d.out
+  PopTorchDirect: upsample_bilinear2d_out
+  UnusedOutputArguments: {out}
+
+# func: upsample_nearest1d.out(Tensor self, int[1] output_size, float? scales=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: upsample_nearest1d.out
+  PopTorchDirect: upsample_nearest1d_out
+  UnusedOutputArguments: {out}
+
+# func: upsample_nearest2d.out(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: upsample_nearest2d.out
+  PopTorchDirect: upsample_nearest2d_out
+  UnusedOutputArguments: {out}
+
+# func: upsample_nearest3d.out(Tensor self, int[3] output_size, float? scales_d=None, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: upsample_nearest3d.out
+  PopTorchDirect: upsample_nearest3d_out
+  UnusedOutputArguments: {out}
+
+# func: upsample_nearest3d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -> Tensor
+# This isn't being forwarded to 'upsample_nearest3d.out' so we need to do our own computation of the output_size
+- func: upsample_nearest3d.vec
+  PopTorchDirect: upsample_nearest3d_vec
+  UnusedOutputArguments: {out}
+
+# func: upsample_bicubic2d.out(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: upsample_bicubic2d.out
+  PopTorchDirect: upsample_bicubic2d_out
+  UnusedOutputArguments: {out}
+
+# func: upsample_linear1d.out(Tensor self, int[1] output_size, bool align_corners, float? scales=None, *, Tensor(a!) out) -> Tensor(a!)
+- func: upsample_linear1d.out
+  PopTorchDirect: upsample_linear1d_out
+  UnusedOutputArguments: {out}
 
 ################
 # Element wise
@@ -213,6 +301,16 @@
   PopTorchDirectInplace: div_
   UnusedOutputArguments: {out}
 
+# func: remainder.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+- func: remainder.Tensor_out
+  PopTorchDirect: remainder_Tensor_out
+  UnusedOutputArguments: {out}
+
+# func: round.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: round.out
+  PopTorchDirect: round_out
+  UnusedOutputArguments: {out}
+
 # func: fmod.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: fmod.Tensor_out
   PopTorchDirect: fmod
@@ -221,6 +319,12 @@
 # func: floor_divide(Tensor self, Tensor other) -> Tensor
 - func: floor_divide
   PopTorchDirect: floor_divide
+
+# func: sign.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: sign.out
+  PopTorchDirect: signum
+  PopTorchDirectInplace: signum_
+  UnusedOutputArguments: {out}
 
 # aten::zero_(Tensor(a!) self) -> (Tensor(a!))
 - func: zero_
@@ -297,6 +401,29 @@
   PopTorchDirectInplace: bitwiseXor_
   UnusedOutputArguments: {out}
 
+# func: logical_and.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+- func: logical_and.out
+  PopTorchDirect: logicalAnd
+  PopTorchDirectInplace: logicalAnd_
+  UnusedOutputArguments: {out}
+
+# func: logical_or.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+- func: logical_or.out
+  PopTorchDirect: logicalOr
+  PopTorchDirectInplace: logicalOr_
+  UnusedOutputArguments: {out}
+
+# func: logical_xor.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+- func: logical_xor.out
+  PopTorchDirect: logicalXor
+  UnusedOutputArguments: {out}
+
+# func: logical_not.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: logical_not.out
+  PopTorchDirect: logicalNot
+  PopTorchDirectInplace: logicalNot_
+  UnusedOutputArguments: {out}
+
 # dropout(Tensor input, float p, bool train) -> Tensor
 - func: dropout
   PopTorchDirect: dropout
@@ -305,6 +432,12 @@
 - func: abs.out
   PopTorchDirect: abs
   PopTorchDirectInplace: abs_
+  UnusedOutputArguments: {out}
+
+# neg.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: neg.out
+  PopTorchDirect: neg
+  PopTorchDirectInplace: neg_
   UnusedOutputArguments: {out}
 
 # func: minimum(Tensor self, Tensor other) -> Tensor
@@ -336,6 +469,16 @@
 - func: floor.out
   PopTorchDirect: floor
   PopTorchDirectInplace: floor_
+  UnusedOutputArguments: {out}
+
+# func: trunc(Tensor self) -> Tensor
+- func: trunc
+  PopTorchDirect: trunc
+  UnusedOutputArguments: {out}
+
+# func: threshold.out(Tensor self, Scalar threshold, Scalar value, *, Tensor(a!) out) -> Tensor(a!)
+- func: threshold.out
+  PopTorchDirect: threshold_out
   UnusedOutputArguments: {out}
 
 # hardtanh.out(Tensor self, Scalar min_val=-1, Scalar max_val=1, *, Tensor(a!) out) -> Tensor(a!)
@@ -422,6 +565,12 @@
   PopTorchDirect: sqrt
   UnusedOutputArguments: {out}
 
+# func: scatter_add.out(Tensor self, int dim, Tensor index, Tensor src, *, Tensor(a!) out) -> Tensor(a!)
+- func: scatter_add.out
+  PopTorchDirect: scatter_add_out
+  UnusedOutputArguments: {out}
+
+
 ##########
 # Linalg
 ##########
@@ -469,6 +618,10 @@
   PopTorchDirect: addmm
   UnusedOutputArguments: {out}
 
+# func: norm.out(Tensor self, Scalar? p, int[1] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
+- func: norm.out
+  PopTorchDirect: norm_out
+  UnusedOutputArguments: {out}
 
 #############
 # Random number generation
@@ -554,12 +707,16 @@
 # Misc
 #########
 
-
 # to.dtype(Tensor(a) self, ScalarType dtype, bool non_blocking=False,
 #          bool copy=False, MemoryFormat? memory_format=None) -> Tensor(a)
 - func: to.dtype
   PopTorchDirect: cast
   IgnoreArgs: non_blocking, copy, memory_format
+
+# func: arange.start_out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
+- func: arange.start_out
+  PopTorchDirect: arange_start_out
+  UnusedOutputArguments: {out}
 
 - func: topk.values
   PopTorchDirect: topk
@@ -583,6 +740,29 @@
   IgnoreArgs: {'dtype'}
   UnusedOutputArguments: {out}
 
+# func: all(Tensor self) -> Tensor
+- func: all
+  PopTorchDirect: all
+
+# func: any(Tensor self) -> Tensor
+- func: any
+  PopTorchDirect: any
+
+# func: all.out(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
+- func: all.out
+  PopTorchDirect: all_out
+  UnusedOutputArguments: {out}
+
+# func: any.out(Tensor self, int dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
+- func: any.out
+  PopTorchDirect: any_out
+  UnusedOutputArguments: {out}
+
+# func: prod(Tensor self, *, ScalarType? dtype=None) -> Tensor
+- func: prod
+  PopTorchDirect: prod
+  IgnoreArgs: {'dtype'}
+
 # func: argmax.out(Tensor self, int? dim=None, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
 - func: argmax.out
   PopTorchDirect: argmax_out
@@ -596,6 +776,60 @@
 # func: argsort(Tensor self, int dim=-1, bool descending=False) -> Tensor
 - func: argsort
   PopTorchDirect: argsort
+
+# func: std(Tensor self, bool unbiased=True) -> Tensor
+- func: std
+  PopTorchDirect: standard_deviation
+
+# func: std.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> Tensor
+- func: std.correction
+  PopTorchDirect: std_correction
+
+# func: std_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
+- func: std_mean
+  PopTorchDirect: std_mean
+
+# func: std_mean.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> (Tensor, Tensor)
+- func: std_mean.correction
+  PopTorchDirect: std_mean_correction
+
+# func: var(Tensor self, bool unbiased=True) -> Tensor
+- func: var
+  PopTorchDirect: var
+
+# func: var.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> Tensor
+- func: var.correction
+  PopTorchDirect: var_correction
+
+# func: var_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
+- func: var_mean
+  PopTorchDirect: var_mean
+
+# func: var_mean.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> (Tensor, Tensor)
+- func: var_mean.correction
+  PopTorchDirect: var_mean_correction
+
+# func: zeros_like(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
+- func: zeros_like
+  PopTorchDirect: zeros_like
+  IgnoreArgs: {'dtype', 'layout', 'device', 'pin_memory', 'memory_format'}
+
+# func: full_like(Tensor self, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
+- func: full_like
+  PopTorchDirect: full_like
+  IgnoreArgs: {'dtype', 'layout', 'device', 'pin_memory', 'memory_format'}
+
+# func: one_hot(Tensor self, int num_classes=-1) -> Tensor
+- func: one_hot
+  PopTorchDirect: one_hot
+
+# func: masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> Tensor
+- func: masked_fill.Scalar
+  PopTorchDirect: masked_fill_Scalar
+
+# func: _embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq=False, int mode=0, bool sparse=False, Tensor? per_sample_weights=None, bool include_last_offset=False, int padding_idx=-1) -> (Tensor, Tensor, Tensor, Tensor)
+- func: _embedding_bag
+  PopTorchDirect: embedding_bag
 
 #########
 # Norms
@@ -664,6 +898,10 @@
 # binary_cross_entropy_with_logits_backward(Tensor grad_output, Tensor self, Tensor target, Tensor? weight=None, Tensor? pos_weight=None, int reduction=Mean) -> Tensor
 - func: binary_cross_entropy_with_logits_backward
   PopTorchDirect: binary_cross_entropy_with_logits_backward
+
+# func: smooth_l1_loss(Tensor self, Tensor target, int reduction=Mean, float beta=1.0) -> Tensor
+- func: smooth_l1_loss
+  PopTorchDirect: smooth_l1_loss
 
 ###########
 # Pooling

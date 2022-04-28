@@ -257,6 +257,60 @@ def Poptorch_select : Poptorch_Op<"select", [ViewOp]> {
     ];
 }
 
+def Poptorch_slice_Tensor : Poptorch_NotImplementedOp<"slice_Tensor", []> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64Attr:$dim,
+                         OptionalAttr<I64Attr>:$start,
+                         OptionalAttr<I64Attr>:$end,
+                         I64Attr:$step);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::int64_t":$dim,
+                                      "std::optional<std::int64_t>":$start,
+                                      "std::optional<std::int64_t>":$end,
+                                      "std::int64_t":$step),[{
+        // The logic here is taken from pytorch in the function aten/src/ATen/native/TensorShape.cpp:slice()
+        $_state.addOperands({self});
+
+        mlir::RankedTensorType input_tensor = self.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 4> out_shape {input_tensor.getShape().begin(),
+                                                      input_tensor.getShape().end()};
+
+        ERROR_ON_MSG(out_shape.size() == 0, "slice() cannot be applied to a 0-dim tensor.");
+
+        ERROR_ON_MSG(step <= 0, "slice step must be positive");
+        // TODO: there is a TODO in the pytorch code to support negative step slices
+        //ERROR_ON_MSG(step == 0, "slice step cannot be zero");
+
+        dim = convertToPositiveDim(dim, out_shape.size());
+
+        std::int64_t actual_start = start.value_or(0);
+        std::int64_t actual_end = end.value_or(out_shape[dim]);
+
+        if (actual_start < 0) {
+            actual_start += out_shape[dim];
+        }
+        if (actual_end < 0) {
+            actual_end += out_shape[dim];
+        }
+
+        actual_start = std::clamp(actual_start, int64_t{0}, out_shape[dim]);
+        actual_end = std::clamp(actual_end, actual_start, out_shape[dim]);
+
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("start", $_builder.getI64IntegerAttr(actual_start));
+        $_state.addAttribute("end", $_builder.getI64IntegerAttr(actual_end));
+        $_state.addAttribute("step", $_builder.getI64IntegerAttr(step));
+
+        out_shape[dim] = (actual_end - actual_start) / std::abs(step);
+
+        $_state.addTypes(mlir::RankedTensorType::get(out_shape, input_tensor.getElementType()));
+     }]>
+    ];
+}
+
 // unsqueeze(Tensor(a) self, int dim) -> Tensor(a)
 def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
     let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
@@ -281,46 +335,102 @@ def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
 
 }
 
-def Poptorch_constant_pad_nd : Poptorch_NotImplementedOp<"constant_pad_nd", []> {
+class Poptorch_NotImplemented_padding<string name> : Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$pad),[{
+        $_state.addOperands({self});
+        $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
+
+        $_state.addTypes(inferShape(self, pad));
+    }]>];
+
+    let extraClassDeclaration = [{
+        using CheckPadding = std::function<void(std::int64_t shape, std::int64_t lpad, std::int64_t rpad, std::size_t dim)>;
+
+        static void defaultCheckPadding(std::int64_t shape, std::int64_t lpad, std::int64_t rpad, std::size_t dim) {
+            ERROR_ON_MSG(shape + std::min(lpad, 0l) + std::min(rpad, 0l) < 0,
+                        "You cannot pad negatively by more than the size of dimension " +
+                        std::to_string(dim));
+        }
+
+        static mlir::Type inferShape(mlir::Value self, const std::vector<std::int64_t>& pad, const CheckPadding& checkPadding = &defaultCheckPadding) {
+            ERROR_ON_MSG(pad.size() % 2 != 0,
+                        "Length of pad (" + std::to_string(pad.size()) +
+                        ") must be even");
+
+            mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+            const auto input_shape = tensor.getShape();
+
+            ERROR_ON_MSG(pad.size() > 2 * input_shape.size(),
+                        "Length of pad should be no more that twice the number of dimension "
+                        "of the input. Pad has " + std::to_string(pad.size()) +
+                        " dimensions while the input has " +
+                        std::to_string(input_shape.size()) + " dimensions");
+
+            llvm::SmallVector<std::int64_t, 4> shape{input_shape.begin(),
+                                                    input_shape.end()};
+
+            for (std::size_t i = 0; i < pad.size() / 2; ++i) {
+                const auto dim = shape.size() - 1 - i;
+                const auto lpad = pad[2 * i];
+                const auto rpad = pad[2 * i + 1];
+
+                checkPadding(shape[dim], lpad, rpad, dim);
+
+                shape[dim] += lpad + rpad;
+            }
+
+            return mlir::RankedTensorType::get(shape, tensor.getElementType());
+        }
+    }];
+}
+
+def Poptorch_replication_pad1d_out : Poptorch_NotImplemented_padding<"replication_pad1d_out"> {}
+def Poptorch_replication_pad2d_out : Poptorch_NotImplemented_padding<"replication_pad2d_out"> {}
+def Poptorch_replication_pad3d_out : Poptorch_NotImplemented_padding<"replication_pad3d_out"> {}
+
+def Poptorch_constant_pad_nd : Poptorch_NotImplemented_padding<"constant_pad_nd"> {
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad, F32Attr:$scalar);
     let results = (outs Poptorch_tensor:$result);
     let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
-                                      "std::vector<std::int64_t>":$pad,
+                                      "const std::vector<std::int64_t>&":$pad,
                                       "float":$scalar),[{
         $_state.addOperands({self});
         $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
         $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
 
-        ERROR_ON_MSG(pad.size() % 2 != 0,
-                     "Length of pad must be even but instead is equals " +
-                     std::to_string(pad.size()));
-
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
-        const auto input_shape = tensor.getShape();
-
-        ERROR_ON_MSG(pad.size() > 2 * input_shape.size(),
-                     "Length of pad should be no more that twice the number of dimension "
-                     "of the input. Pad has " + std::to_string(pad.size()) +
-                     " dimensions while the input has " +
-                     std::to_string(input_shape.size()) + " dimensions");
-
-        llvm::SmallVector<std::int64_t, 4> shape{input_shape.begin(),
-                                                 input_shape.end()};
-
-        for (int i = 0; i < pad.size() / 2; ++i) {
-            const auto dim = shape.size() - 1 - i;
-            const auto lpad = pad[2 * i];
-            const auto rpad = pad[2 * i + 1];
-
-            ERROR_ON_MSG(shape[dim] + std::min(lpad, 0l) + std::min(rpad, 0l) < 0,
-                         "You cannot pad negatively by more than the size of dimension " +
-                         std::to_string(dim));
-            shape[dim] += lpad + rpad;
-        }
-
-        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+        $_state.addTypes(inferShape(self, pad));
     }]>];
 }
+
+class Poptorch_NotImplemented_reflection_padding<string name> : Poptorch_NotImplemented_padding<name> {
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$pad),[{
+        $_state.addOperands({self});
+        $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
+
+        constexpr auto checkReflectionPadding = [](std::int64_t shape, std::int64_t lpad, std::int64_t rpad, std::size_t dim) {
+            ERROR_ON_MSG(lpad >= shape || rpad >= shape,
+                         "Note that the padding (" + std::to_string(lpad) + ", " +
+                         std::to_string(rpad) +") in dimension " + std::to_string(dim) +
+                         " must be strictly less that the dimension size (" +
+                         std::to_string(shape) + ")");
+
+            // NOTE: this isn't as strict as constant pad
+            ERROR_ON_MSG(shape + lpad + rpad < 0,
+                         "You cannot pad negatively by more than the size of dimension " +
+                         std::to_string(dim));
+        };
+
+
+        $_state.addTypes(inferShape(self, pad, checkReflectionPadding));
+    }]>];
+}
+
+def Poptorch_reflection_pad1d_out : Poptorch_NotImplemented_reflection_padding<"reflection_pad1d_out"> {}
+def Poptorch_reflection_pad2d : Poptorch_NotImplemented_reflection_padding<"reflection_pad2d"> {}
 
 def Poptorch_index_select : Poptorch_NotImplementedOp<"index_select", []> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index);
@@ -388,6 +498,236 @@ def Poptorch_permute : Poptorch_NotImplementedOp<"permute", []> {
         for (auto dim : dims) {
             shape.push_back(input_shape[dim >= 0 ? dim : dim + dims.size()]);
         }
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+class Poptorch_upsample<string name> : Poptorch_NotImplementedOp<name, []> {
+    let results = (outs Poptorch_tensor:$result);
+    let extraClassDeclaration = [{
+        static auto computeShape(const std::vector<std::int64_t>& output_size, mlir::RankedTensorType tensor) {
+            const auto input_shape = tensor.getShape();
+            ERROR_ON_MSG(output_size.size() > input_shape.size(),
+                        "The number of dimensions of the input (" + std::to_string(input_shape.size()) +
+                        ") must be more than the number of dimensions in the output (" +
+                        std::to_string(output_size.size()) + ")");
+
+            llvm::SmallVector<std::int64_t, 4> shape(input_shape.begin(), input_shape.end() - output_size.size());
+            shape.insert(shape.end(), output_size.begin(), output_size.end());
+
+            return shape;
+        }
+    }];
+}
+
+def Poptorch_upsample_linear1d_out : Poptorch_upsample<"upsample_linear1d_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$output_size,
+                         BoolAttr:$align_corners,
+                         OptionalAttr<F64Attr>:$scales);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$output_size,
+                                      "bool":$align_corners,
+                                      "std::optional<double>":$scales),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
+        $_state.addAttribute("align_corners", $_builder.getBoolAttr(align_corners));
+        if (scales) {
+            $_state.addAttribute("scales", $_builder.getF64FloatAttr(*scales));
+        }
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto shape = computeShape(output_size, tensor);
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+def Poptorch_upsample_nearest1d_out : Poptorch_upsample<"upsample_nearest1d_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$output_size,
+                         OptionalAttr<F64Attr>:$scales);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$output_size,
+                                      "std::optional<double>":$scales),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
+        if (scales) {
+            $_state.addAttribute("scales", $_builder.getF64FloatAttr(*scales));
+        }
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto shape = computeShape(output_size, tensor);
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+class Poptorch_upsample2d_out<string name> : Poptorch_upsample<name> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$output_size,
+                         BoolAttr:$align_corners,
+                         OptionalAttr<F64Attr>:$scales_h,
+                         OptionalAttr<F64Attr>:$scales_w);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$output_size,
+                                      "bool":$align_corners,
+                                      "std::optional<double>":$scales_h,
+                                      "std::optional<double>":$scales_w),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
+        $_state.addAttribute("align_corners", $_builder.getBoolAttr(align_corners));
+        if (scales_h) {
+            $_state.addAttribute("scales_h", $_builder.getF64FloatAttr(*scales_h));
+        }
+        if (scales_w) {
+            $_state.addAttribute("scales_w", $_builder.getF64FloatAttr(*scales_w));
+        }
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto shape = computeShape(output_size, tensor);
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+def Poptorch_upsample_bilinear2d_out : Poptorch_upsample2d_out<"upsample_bilinear2d_out"> {}
+def Poptorch_upsample_bicubic2d_out : Poptorch_upsample2d_out<"upsample_bicubic2d_out"> {}
+
+def Poptorch_upsample_nearest2d_out : Poptorch_upsample<"upsample_nearest2d_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$output_size,
+                         OptionalAttr<F64Attr>:$scales_h,
+                         OptionalAttr<F64Attr>:$scales_w);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$output_size,
+                                      "std::optional<double>":$scales_h,
+                                      "std::optional<double>":$scales_w),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
+        if (scales_h) {
+            $_state.addAttribute("scales_h", $_builder.getF64FloatAttr(*scales_h));
+        }
+        if (scales_w) {
+            $_state.addAttribute("scales_w", $_builder.getF64FloatAttr(*scales_w));
+        }
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto shape = computeShape(output_size, tensor);
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+
+class Poptorch_upsample3d_out<string name> : Poptorch_upsample<name> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$output_size,
+                         BoolAttr:$align_corners,
+                         OptionalAttr<F64Attr>:$scales_d,
+                         OptionalAttr<F64Attr>:$scales_h,
+                         OptionalAttr<F64Attr>:$scales_w);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$output_size,
+                                      "bool":$align_corners,
+                                      "std::optional<double>":$scales_d,
+                                      "std::optional<double>":$scales_h,
+                                      "std::optional<double>":$scales_w),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
+        $_state.addAttribute("align_corners", $_builder.getBoolAttr(align_corners));
+        if (scales_d) {
+            $_state.addAttribute("scales_d", $_builder.getF64FloatAttr(*scales_d));
+        }
+        if (scales_h) {
+            $_state.addAttribute("scales_h", $_builder.getF64FloatAttr(*scales_h));
+        }
+        if (scales_w) {
+            $_state.addAttribute("scales_w", $_builder.getF64FloatAttr(*scales_w));
+        }
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto shape = computeShape(output_size, tensor);
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+def Poptorch_upsample_trilinear3d_out : Poptorch_upsample3d_out<"upsample_trilinear3d_out"> {}
+
+def Poptorch_upsample_nearest3d_out : Poptorch_upsample<"upsample_nearest3d_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$output_size,
+                         OptionalAttr<F64Attr>:$scales_d,
+                         OptionalAttr<F64Attr>:$scales_h,
+                         OptionalAttr<F64Attr>:$scales_w);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "const std::vector<std::int64_t>&":$output_size,
+                                      "std::optional<double>":$scales_d,
+                                      "std::optional<double>":$scales_h,
+                                      "std::optional<double>":$scales_w),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
+        if (scales_d) {
+            $_state.addAttribute("scales_d", $_builder.getF64FloatAttr(*scales_d));
+        }
+        if (scales_h) {
+            $_state.addAttribute("scales_h", $_builder.getF64FloatAttr(*scales_h));
+        }
+        if (scales_w) {
+            $_state.addAttribute("scales_w", $_builder.getF64FloatAttr(*scales_w));
+        }
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto shape = computeShape(output_size, tensor);
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+    }]>];
+}
+
+// upsample_nearest3d.vec isn't being forwarded to 'upsample_nearest3d.out' so we need to do our own computation of the output_size in a builder
+def Poptorch_upsample_nearest3d_vec : Poptorch_upsample<"upsample_nearest3d_vec"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         OptionalAttr<I64ArrayAttr>:$output_size,
+                         OptionalAttr<F32ArrayAttr>:$scales);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                      "const std::optional<std::vector<std::int64_t>>&":$output_size,
+                      "const std::optional<std::vector<float>>&":$scale_factors),[{
+        $_state.addOperands(self);
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto input_shape = tensor.getShape();
+
+        ERROR_ON_MSG(!scale_factors && !output_size,
+                         "Must specify exactly one of output_size and scale_factors");
+        std::vector<int64_t> actual_output_size;
+        if (output_size) {
+            ERROR_ON_MSG(scale_factors,
+                            "Must specify exactly one of output_size and scale_factors");
+            actual_output_size = *output_size;
+            $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(actual_output_size));
+        }
+        else if (scale_factors) {
+            std::transform(scale_factors->begin(), scale_factors->end(),
+                           input_shape.end() - scale_factors->size(),
+                           std::back_inserter(actual_output_size),
+                           [](double sf, std::int64_t shape) {
+                               return static_cast<int64_t>(static_cast<double>(shape) * sf);
+                           });
+
+            $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(actual_output_size));
+            $_state.addAttribute("scales", $_builder.getF32ArrayAttr(*scale_factors));
+        }
+
+        const auto shape = computeShape(actual_output_size, tensor);
 
         $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
     }]>];

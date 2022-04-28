@@ -169,3 +169,46 @@ def Poptorch_addmm : Poptorch_Op<"addmm", []> {
      }]>
     ];
 }
+
+// func: norm.out(Tensor self, Scalar? p, int[1] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
+def Poptorch_norm_out : Poptorch_NotImplementedOp<"norm_out", []> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         OptionalAttr<F64Attr>:$p,
+                         I64ArrayAttr:$dim,
+                         BoolAttr:$keepdim);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::optional<double>":$p,
+                                      "const std::vector<std::int64_t>&":$dim,
+                                      "bool":$keepdim),[{
+        $_state.addOperands(self);
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto ref = tensor.getShape();
+
+        if (p.has_value()) {
+            $_state.addAttribute("p", $_builder.getF32FloatAttr(*p));
+        }
+        auto actual_dims = convertToPositiveDim(dim, ref.size());
+        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+        llvm::SmallVector<std::int64_t, 4> shape;
+        if (!actual_dims.empty()) {
+            // Sort in descending order so when we erase dimension it doesn't invalidate future erasings
+            std::sort(actual_dims.begin(), actual_dims.end(), std::greater<>{});
+            shape.insert(shape.begin(), ref.begin(), ref.end());
+            for (auto d : actual_dims) {
+                if (keepdim) {
+                    shape[d] = 1;
+                }
+                else {
+                    shape.erase(shape.begin() + d);
+                }
+            }
+        }
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+     }]>
+    ];
+}

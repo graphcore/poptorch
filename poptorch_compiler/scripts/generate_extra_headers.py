@@ -44,6 +44,7 @@ json_in = json.load(parse_args.input_file)
 
 attr_types = {
     "F32ArrayAttr": "FLOAT_VEC",
+    "F64ArrayAttr": "DOUBLE_VEC",
     "StrArrayAttr": "STRING_VEC",
     "I32ArrayAttr": "INT_VEC",
     "I64ArrayAttr": "LONG_VEC",
@@ -244,6 +245,7 @@ builder_call_translations = {
     "OPTIONAL_FLOAT": "std::optional<float>",
     "DOUBLE": "double",
     "OPTIONAL_DOUBLE": "std::optional<double>",
+    "OPTIONAL_DOUBLE_VEC": "const std::optional<std::vector<double>>&",
     "STRING": "const char *",
     "OPTIONAL_STRING": "std::optional<const char *>",
     "TENSOR": "poptorch_ir::TensorId",

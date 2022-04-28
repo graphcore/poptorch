@@ -41,6 +41,34 @@ def Poptorch_hardshrink : Poptorch_NotImplementedOp<"hardshrink", [SameOperandsA
     ];
 }
 
+def Poptorch_softshrink_out : Poptorch_NotImplementedOp<"softshrink_out", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$in1, F32Attr:$lambd);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "float":$lambd),[{
+        $_state.addOperands({self});
+        $_state.addAttribute("lambd",$_builder.getF32FloatAttr(lambd));
+
+        $_state.addTypes(self.getType());
+     }]>
+    ];
+}
+
+def Poptorch_rrelu_with_noise : Poptorch_NotImplementedOp<"rrelu_with_noise", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$noise, F32Attr:$lower, F32Attr:$upper, BoolAttr:$training);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "mlir::Value":$noise, "float":$lower, "float":$upper, "bool":$training),[{
+        $_state.addOperands({self, noise});
+        $_state.addAttribute("lower",$_builder.getF32FloatAttr(lower));
+        $_state.addAttribute("upper",$_builder.getF32FloatAttr(upper));
+        $_state.addAttribute("training",$_builder.getBoolAttr(training));
+
+        $_state.addTypes(self.getType());
+     }]>
+    ];
+}
+
 def Poptorch_leaky_relu_out : Poptorch_NotImplementedOp<"leaky_relu_out", [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1, F32Attr:$negative_slope);
     let results = (outs Poptorch_tensor:$result);
@@ -54,9 +82,21 @@ def Poptorch_leaky_relu_out : Poptorch_NotImplementedOp<"leaky_relu_out", [SameO
     ];
 }
 
+def Poptorch_prelu : Poptorch_NotImplementedOp<"prelu", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$weight);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "mlir::Value":$weight),[{
+        $_state.addOperands({self, weight});
+
+        $_state.addTypes(self.getType());
+     }]>
+    ];
+}
+
 def Poptorch_log_sigmoid_forward : Poptorch_NotImplementedOp<"log_sigmoid_forward", []> {
     let arguments = (ins Poptorch_tensor:$in1);
-    let results = (outs Poptorch_tensor:$result);
+    let results = (outs Poptorch_tensorlist:$result);
 
     let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
         $_state.addOperands({self});
@@ -120,5 +160,28 @@ def Poptorch_softplus : Poptorch_NotImplementedOp<"softplus", []> {
         $_state.addOperands({input});
         $_state.addTypes(input.getType());
   }]>];
+}
 
+def Poptorch_glu_out : Poptorch_NotImplementedOp<"glu_out", []> {
+  let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim);
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "std::int64_t":$dim), [{
+        $_state.addOperands({self});
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        auto ref = tensor.getShape();
+
+        dim = convertToPositiveDim(dim, ref.size());
+
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+        llvm::SmallVector<std::int64_t, 4> shape{ref.begin(), ref.end()};
+
+        ERROR_ON_MSG(shape[dim] % 2 != 0,
+                     "The size of the given dimension (" + std::to_string(dim) +
+                     ") must be a multiple of 2.");
+        shape[dim] /= 2;
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+  }]>];
 }
