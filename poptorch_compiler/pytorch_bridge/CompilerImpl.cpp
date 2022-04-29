@@ -55,23 +55,21 @@ mlir::Value PoptorchCompilerImpl::addArgument(mlir::FuncOp func,
 }
 
 mlir::Type PoptorchCompilerImpl::convertType(Type type) {
-  auto unsigned_ty = mlir::IntegerType::SignednessSemantics::Unsigned;
-  auto signed_ty = mlir::IntegerType::SignednessSemantics::Signed;
-
   switch (type) {
   case Type::BOOL:
-    return _builder.getIntegerType(1, signed_ty != 0u);
+    return _builder.getIntegerType(1, false);
   case Type::CHAR:
+    return _builder.getIntegerType(8, true);
   case Type::UNSIGNED_CHAR:
-    return _builder.getIntegerType(8, signed_ty != 0u);
+    return _builder.getIntegerType(8, false);
   case Type::SHORT:
-    return _builder.getIntegerType(16, signed_ty != 0u);
+    return _builder.getIntegerType(16, true);
   case Type::UNSIGNED_SHORT:
-    return _builder.getIntegerType(16, unsigned_ty != 0u);
+    return _builder.getIntegerType(16, false);
   case Type::UNSIGNED_INT:
-    return _builder.getIntegerType(32, unsigned_ty != 0u);
+    return _builder.getIntegerType(32, false);
   case Type::INT:
-    return _builder.getIntegerType(32, signed_ty != 0u);
+    return _builder.getIntegerType(32, true);
   case Type::HALF:
     return _builder.getF16Type();
   case Type::FLOAT:
