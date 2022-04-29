@@ -48,7 +48,6 @@ def reduce_harness(trace_model,
 
 
 # torch.all, torch.any
-@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("dim", [None, 0, -1])
 @pytest.mark.parametrize("func", [torch.all, torch.any])
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -57,7 +56,6 @@ def test_any_all(trace_model, func, dim):
     reduce_harness(trace_model, func, input, dim)
 
 
-@pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("dim", [None, 0, -1])
 @pytest.mark.parametrize("func", [torch.sum, torch.mean])
 @pytest.mark.parametrize("trace_model", [True, False])
