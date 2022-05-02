@@ -78,6 +78,23 @@ def test_einsum_chained():
     op_harness(op, *inputs, assert_fn=assert_fn)
 
 
+def test_einsum_transpose():
+    torch.manual_seed(42)
+
+    def op(x):
+        return torch.einsum('n c h w -> n h w c', x)
+
+    inputs = [torch.randn(2, 3, 4, 5, dtype=torch.float)]
+
+    def assert_fn(native_out, poptorch_out):
+        helpers.assert_allclose(expected=native_out,
+                                actual=poptorch_out,
+                                rtol=1e-3,
+                                atol=1e-3)
+
+    op_harness(op, *inputs, assert_fn=assert_fn)
+
+
 @pytest.mark.parametrize("arr_lengths",
                          ([3], [3, 3], [2, 4], [3, 2, 4], [5, 2, 3, 4]))
 def test_meshgrid(arr_lengths):

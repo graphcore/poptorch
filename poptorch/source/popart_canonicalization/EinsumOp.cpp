@@ -75,16 +75,23 @@ EinsumOp::create(torch::jit::Graph *graph,
 
   torch::jit::Node *output = nullptr;
 
-  // One tensor means only a summation is applied
+  // One tensor means summation or transpose is applied
   if (_tensors.size() == 1) {
-    std::vector<std::int64_t> axes;
+    if (_lhs.size() > _rhs.size()) {
+      std::vector<std::int64_t> axes;
 
-    for (std::size_t i = 0; i < _n_dims; i++) {
-      if (!_rhs_bs[i]) {
-        axes.push_back(static_cast<std::int64_t>(i));
+      for (std::size_t i = 0; i < _n_dims; i++) {
+        if (!_rhs_bs[i]) {
+          axes.push_back(static_cast<std::int64_t>(i));
+        }
       }
+      output = createReducesum(graph, {_tensors[0]}, axes, 1);
+    } else {
+      std::vector<std::int64_t> p_lhs =
+        sortedPermutation(_rhs_char_indices, _labels[0]);
+
+      output = createTranspose(graph, {_tensors[0]}, p_lhs);
     }
-    output = createReducesum(graph, {_tensors[0]}, axes, 1);
   } else {
     updateCharCounts(_labels[0]);
     // Base output

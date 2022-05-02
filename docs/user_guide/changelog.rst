@@ -15,6 +15,7 @@ Bug Fixes
 ---------
 
 - Fix remaining in-place operations on slices
+- Fix einsum transpose error
 
 v2.5 (Poplar SDK 2.5)
 =====================
