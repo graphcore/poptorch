@@ -20,10 +20,6 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
   m.impl("adaptive_avg_pool1d", PTC_BOXED(poptorch::fallback));
   m.impl("adaptive_avg_pool2d", PTC_BOXED(poptorch::fallback));
   m.impl("adaptive_avg_pool3d", PTC_BOXED(poptorch::fallback));
-  m.impl("var", PTC_BOXED(poptorch::fallback));
-  m.impl("var_mean", PTC_BOXED(poptorch::fallback));
-  m.impl("std", PTC_BOXED(poptorch::fallback));
-  m.impl("std_mean", PTC_BOXED(poptorch::fallback));
   m.impl("trunc", PTC_BOXED(poptorch::fallback));
   m.impl("min", PTC_BOXED(poptorch::fallback));
   m.impl("minimum", PTC_BOXED(poptorch::fallback));

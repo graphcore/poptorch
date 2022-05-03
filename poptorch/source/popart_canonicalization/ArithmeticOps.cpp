@@ -216,12 +216,20 @@ calculateVarMean(torch::jit::Graph *graph,
     std::iota(dims.begin(), dims.end(), 0);
     unbiased = constantToBool(inputs[1]->node());
   } break;
-  case 4:
+  case 4: {
     // aten::var(Tensor input, int[] dim, bool unbiased, bool keepdim)
-    dims = constantToLongVec(inputs[1]->node());
+    // or torch.var.correction(Tensor input, int[]? dim, *, bool unbiased, bool
+    // keepdim) from the compiler
+    if (inputs[1]->node()->kind() == c10::prim::ListConstruct) {
+      dims = constantToLongVec(inputs[1]->node());
+    } else {
+      dims.resize(shape.size());
+      // dims are unspecified so reduce over all
+      std::iota(dims.begin(), dims.end(), 0);
+    }
     unbiased = constantToBool(inputs[2]->node());
     keepdim = constantToBool(inputs[3]->node());
-    break;
+  } break;
   default:
     ERROR("Invalid number of arguments to aten::" << op_name);
   }
