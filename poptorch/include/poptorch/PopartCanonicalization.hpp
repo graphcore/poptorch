@@ -66,6 +66,13 @@ void addDetachOperations(torch::jit::Graph *graph);
 // explicit and sub-optimal index expansion before the scatter_add ops.
 void removeScatterAddIndexExpansion(torch::jit::Graph *graph);
 
+// PyTorch's `gather` works differently to PopART's (aka. PyTorch's
+// `index_select`), but in certain cases when the indices tensor has been
+// passed through an `expand`, they're equivalent (if the non-expanded indices
+// are used). Swapping out the handling saves some ops, but is also more
+// efficient if the expanded indices tensor is just a long series of slices.
+void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph);
+
 // Adds the op as the possible true input op to set_available_memory. Some ops
 // are composed of multiple ops, and their return values might not be an op that
 // accepts set_available_memory.

@@ -891,6 +891,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   poptorch::removeScatterAddIndexExpansion(graph.get());
 
+  poptorch::simplifyGatherWithExpandedIndices(graph.get());
+
   logging::trace("Graph right before canonicalization:\n{}", *graph);
   // Convert any unsupported ATEN nodes in the graph to a popart
   // representation.

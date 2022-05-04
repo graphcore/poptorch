@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+from contextlib import contextmanager
 import re
 
 import torch
@@ -182,6 +183,7 @@ def test_2d_scatter_add_with_index_expansion(capfd, expand_as):
     helpers.assert_allclose(actual=poptorch_out, expected=out)
 
     # Make sure the expand op is removed.
+    look_for = "aten::expand_as" if expand_as else "aten::expand"
     log = helpers.LogChecker(capfd)
     it = log.createIterator()
     it.findNext("Removing index expansion node:")
@@ -189,7 +191,122 @@ def test_2d_scatter_add_with_index_expansion(capfd, expand_as):
             AssertionError,
             match=r".*The log above doesn't contain lines matching.*",
     ):
-        it.findNext("aten::expand_as")
+        it.findNext(look_for)
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+@pytest.mark.parametrize("expand_as", [True, False])
+@pytest.mark.parametrize("params", [
+    {
+        "shape": (3, 5),
+        "gather_dim": 0,
+        "expand_dim": 0,
+        "should_optimise": False
+    },
+    {
+        "shape": (3, 5),
+        "gather_dim": 0,
+        "expand_dim": 1,
+        "should_optimise": True
+    },
+    {
+        "shape": (3, 5),
+        "gather_dim": 1,
+        "expand_dim": 0,
+        "should_optimise": True
+    },
+    {
+        "shape": (3, 5),
+        "gather_dim": 1,
+        "expand_dim": 1,
+        "should_optimise": False
+    },
+    {
+        "shape": (1, 1, 3, 1, 5, 1),
+        "gather_dim": 3,
+        "expand_dim": 2,
+        "should_optimise": False
+    },
+    {
+        "shape": (1, 1, 3, 1, 5, 1),
+        "gather_dim": 2,
+        "expand_dim": 4,
+        "should_optimise": True
+    },
+    {
+        "shape": (1, 1, 3, 1, 5, 1),
+        "gather_dim": 4,
+        "expand_dim": 2,
+        "should_optimise": True
+    },
+    {
+        "shape": (1, 1, 3, 1, 5, 1),
+        "gather_dim": 4,
+        "expand_dim": 1,
+        "should_optimise": False
+    },
+    {
+        "shape": (3, 4, 5),
+        "gather_dim": 0,
+        "expand_dim": 1,
+        "should_optimise": False
+    },
+])
+def test_gather_with_index_expansion(capfd, expand_as, params):
+    # Work out params to model.
+    torch.manual_seed(42)
+
+    data = torch.randint(10, params["shape"], dtype=torch.int)
+
+    indices_shape = list(data.shape)
+    indices_shape[params["expand_dim"]] = 1
+    indices = torch.randint(high=data.shape[params["gather_dim"]],
+                            size=indices_shape)
+
+    # Make model.
+    class Model(torch.nn.Module):
+        def forward(self, data, indices):
+            if expand_as:
+                indices = indices.expand_as(data)
+            else:
+                indices = indices.expand(data.shape)
+
+            # Also do an `add`, to check we can pipe the results onward.
+            return torch.gather(data, params["gather_dim"], indices).add(8)
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model)
+
+    # Run model, check result is still correct.
+    cpu_out = model(data, indices)
+    ipu_out = poptorch_model(data, indices)
+    helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
+
+    # Check gather is optimised by looking at logs.
+    @contextmanager
+    def does_not_raise():
+        yield
+
+    log = helpers.LogChecker(capfd)
+    it = log.createIterator()
+
+    # Look for the log saying we did the optimisation, only if we should have.
+    if params["should_optimise"]:
+        with does_not_raise():
+            it.findNext("Optimising gather:")
+
+    # Look for the (non-)presence of the expand op that should be removed.
+    remove_if_optimised = "aten::expand_as" if expand_as else "aten::expand"
+
+    expectation = does_not_raise()
+    if params["should_optimise"]:
+        expectation = pytest.raises(
+            AssertionError,
+            match=r".*The log above doesn't contain lines matching.*")
+
+    with expectation:
+        it.findNext(remove_if_optimised)
 
 
 @helpers.printCapfdOnExit

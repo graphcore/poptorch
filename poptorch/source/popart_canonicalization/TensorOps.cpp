@@ -216,6 +216,7 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
       ERROR_ON(input_shape[s] < index_shape[s]);
     }
   }
+
   // Move gather axis to the innermost dim
   std::vector<int64_t> permutation;
   unsigned input_num_dims = input_shape.size();

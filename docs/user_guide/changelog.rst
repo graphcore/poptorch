@@ -8,6 +8,8 @@ v2.6 (Poplar SDK 2.6)
 New features
 ------------
 
+- Improve performance of ``torch.gather`` in some cases where the index tensor has come from an ``expand`` or ``expand_as``.
+
 API changes
 -----------
 
