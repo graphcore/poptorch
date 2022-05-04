@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import numpy as np
 import torch
 import torch.nn as nn
 import pytest
 import poptorch
 import helpers
 
-MANY_TYPES = (torch.float32, torch.float64, torch.int32, torch.int64)
+MANY_TYPES = (torch.float16, torch.float32, torch.float64, torch.int32,
+              torch.int64)
 
 DEMOTED_ON_IPU = (torch.float64, torch.int64)
 
@@ -57,6 +59,28 @@ def test_many_implicit_cast(input_1_type, input_2_type, output_type,
                             expected=torch.tensor([3., 60., 0., 115.4]),
                             atol=0.5,
                             rtol=0)
+
+
+def get_unpack_clamp(trace_model):
+    class UnpackClamp(nn.Module):
+        def forward(self, x):
+            i, _ = x
+            return i.clamp(-1, 1)
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    return poptorch.inferenceModel(UnpackClamp(), options)
+
+
+@pytest.mark.parametrize("input_type", MANY_TYPES)
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_clamp_many_types(input_type, trace_model):
+    model = get_unpack_clamp(trace_model)
+    x = torch.tensor([[-2, -1, 0, 1, 2], [0, 0, 0, 0, 0]], dtype=input_type)
+
+    y = model(x)
+
+    np.testing.assert_allclose(y.numpy(), np.array([-1, -1, 0, 1, 1]))
 
 
 def get_simple_add_two(trace_model):
@@ -163,6 +187,9 @@ def test_many_implicit_cast_equals(input_1_type, input_2_type, trace_model):
     t2 = torch.tensor([2.4, 2, 2.0, 550.4], dtype=input_2_type)
 
     depends = False
+
+    if (input_1_type == torch.float16 and input_2_type == torch.float16):
+        depends = True
 
     if (input_1_type in (torch.float32, torch.float64)
             and input_2_type in (torch.float32, torch.float64)):
