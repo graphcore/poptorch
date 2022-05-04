@@ -9,33 +9,128 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
                                       "const std::vector<std::int64_t>&":$axes,
                                       "std::int64_t":$keepdim),[{
         $_state.addOperands(values);
-        $_state.addAttribute("axes", $_builder.getI64ArrayAttr(axes));
-        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
         mlir::RankedTensorType tensor = values[0].getType().cast<mlir::RankedTensorType>();
+        auto in_shape = tensor.getShape();
 
-        auto ref = tensor.getShape();
+        auto dims = parseDims(axes, in_shape.size());
 
-        llvm::SmallVector<std::int64_t, 4> shape {ref.begin(), ref.end()};
+        $_state.addAttribute("axes", $_builder.getI64ArrayAttr(dims));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
-        // Flatten those axes.
-        for (std::int64_t dim : axes) {
-            // Dim reduced to 1 or zero depending on keep dim.
-            shape[dim] = (std::int64_t)keepdim;
-        }
+        const auto in_element_type = tensor.getElementType();
 
-        // Remove all zeros if we aren't keeping the dim.
+        // It appears that the promotion rules for torch are the similar to numpy.
+        // From the numpy manual (https://numpy.org/doc/stable/reference/generated/numpy.sum.html):
+        //  The dtype of a is used by default unless a has an integer dtype of less precision
+        //  than the default platform integer. In that case, if a is signed then the platform
+        //  integer is used while if a is unsigned then an unsigned integer of the same
+        //  precision as the platform integer is used.
+        // Although, from testing it appears that pytorch converts uint8-s (the only unsigned type pytorch
+        // supports) to a signed type
+        // Note: our intergal type is 32 bit and we explicity don't support 64 bit at the moment so every
+        // integral type is converted to a signed 32 bit integer
+        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
 
-        if (!keepdim) {
-            if (ref.size() == axes.size()) {
-                $_state.addTypes(mlir::RankedTensorType::get({}, tensor.getElementType()));
-                return;
+        $_state.addTypes(mlir::RankedTensorType::get(inferShape(std::move(dims), in_shape, keepdim), out_element_type));
+     }]>
+    ];
+
+    let extraClassDeclaration = [{
+        static std::vector<std::int64_t> parseDims(const std::vector<std::int64_t>& axes,
+                                                   std::size_t in_dim_count) {
+            auto dims = convertToPositiveDim(axes, in_dim_count);
+
+            // NOTE: an empty list of dimensions means we're reducing over all the dimensions
+            if (dims.empty()) {
+                dims.resize(in_dim_count);
+                std::iota(dims.begin(), dims.end(), 0);
             }
 
-            shape.erase(std::remove(shape.begin(), shape.end(), 0), shape.end());
-        }
+            // If we are dealing with a scalar value don't reduce at all
+            if (in_dim_count == 0) {
+                dims.clear();
+            }
 
-        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+            return dims;
+        }
+        static llvm::SmallVector<std::int64_t, 4> inferShape(std::vector<std::int64_t> dims,
+                                                             llvm::ArrayRef<std::int64_t> in_shape,
+                                                             bool keepdim) {
+            llvm::SmallVector<std::int64_t, 4> shape {in_shape.begin(), in_shape.end()};
+
+            // Optimization for when we are reducing over all the dimensions or the input is a scalar
+            if (in_shape.size() == dims.size() || in_shape.empty()) {
+                if (!keepdim) {
+                    return {};
+                } else {
+                    std::fill(shape.begin(), shape.end(), 1);
+
+                    return shape;
+                }
+            }
+
+            // Sort in descending order so erasing elements doesn't invalidate future erases
+            std::sort(dims.begin(), dims.end(), std::greater<>{});
+
+            // Flatten those dims.
+            for (std::int64_t dim : dims) {
+                // Dim reduced to 1 or zero depending on keep dim.
+                if (keepdim) {
+                    shape[dim] = 1;
+                } else {
+                    shape.erase(shape.begin() + dim);
+                }
+            }
+
+            return shape;
+        }
+    }];
+}
+
+def Poptorch_reducemean : Poptorch_reduce<"reducemean"> {}
+def Poptorch_reducesum : Poptorch_reduce<"reducesum"> {}
+
+def Poptorch_prod : Poptorch_Op<"prod", []> {
+    let arguments = (ins Poptorch_tensor:$input);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
+        $_state.addOperands(self);
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+
+        const auto in_element_type = tensor.getElementType();
+        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
+
+        $_state.addTypes(mlir::RankedTensorType::get({}, out_element_type));
+     }]>
+    ];
+}
+
+def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
+    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim, BoolAttr:$keepdim);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "std::int64_t":$dim, "bool":$keepdim),[{
+        $_state.addOperands(self);
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto ref = tensor.getShape();
+
+        dim = convertToPositiveDim(dim, ref.size());
+
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+        const auto shape = inferShape({dim}, ref, keepdim);
+
+        const auto in_element_type = tensor.getElementType();
+        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, out_element_type));
      }]>
     ];
 }
@@ -52,67 +147,21 @@ class Poptorch_partial<string name> : Poptorch_NotImplementedOp<name, []> {
 
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
 
-        $_state.addTypes(tensor);
+        const auto in_element_type = tensor.getElementType();
+        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
+
+        $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), out_element_type));
      }]>
     ];
 }
-
-class Poptorch_NotImplemented_reduce_single_dim<string name> : Poptorch_NotImplementedOp<name, []> {
-    let arguments = (ins Poptorch_tensor:$self, OptionalAttr<I64Attr>:$dim, BoolAttr:$keepdim);
-
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
-                                      "std::optional<std::int64_t>":$dim,
-                                      "std::int64_t":$keepdim),[{
-        $_state.addOperands(self);
-
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
-        if (dim.has_value()) {
-            *dim = convertToPositiveDim(*dim, tensor.getShape().size());
-
-            $_state.addAttribute("dim", $_builder.getI64IntegerAttr(*dim));
-        }
-        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
-
-        auto getShape = [&]() {
-            // We are flattenning the dimenion we're passed
-            if (dim.has_value()) {
-                auto ref = tensor.getShape();
-
-                llvm::SmallVector<std::int64_t, 4> shape{ref.begin(), ref.end()};
-
-                if (!keepdim) {
-                    shape.erase(shape.begin() + *dim);
-                } else {
-                    shape[*dim] = 1;
-                }
-
-                return shape;
-            } else {
-                return llvm::SmallVector<std::int64_t, 4>{0};
-            }
-        };
-
-        $_state.addTypes(mlir::RankedTensorType::get(getShape(), $_builder.getI32Type()));
-     }]>
-    ];
-}
-
-
-def Poptorch_reducemean : Poptorch_reduce<"reducemean"> {}
-def Poptorch_reducesum : Poptorch_reduce<"reducesum"> {}
 
 def Poptorch_cumsum_out : Poptorch_partial<"cumsum_out"> {}
-
-def Poptorch_argmax_out : Poptorch_NotImplemented_reduce_single_dim<"argmax_out"> {}
-def Poptorch_argmin_out : Poptorch_NotImplemented_reduce_single_dim<"argmin_out"> {}
 
 
 // From the docs: https://pytorch.org/docs/stable/generated/torch.all.html
 // NOTE: This function matches the behaviour of NumPy in returning output of dtype bool
 // for all supported dtypes except uint8. For uint8 the dtype of output is uint8 itself.
-class Poptorch_binary_reduction<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_binary_reduction<string name> : Poptorch_reduce<name> {
     let arguments = (ins Poptorch_tensor:$input);
 
     let results = (outs Poptorch_tensor:$result);
@@ -122,12 +171,12 @@ class Poptorch_binary_reduction<string name> : Poptorch_NotImplementedOp<name, [
 
         mlir::RankedTensorType tensor = values[0].getType().cast<mlir::RankedTensorType>();
 
-        if (tensor.getElementType().isUnsignedInteger(8)) {
-            $_state.addTypes(mlir::RankedTensorType::get({}, tensor.getElementType()));
-        }
-        else {
-            $_state.addTypes(mlir::RankedTensorType::get({}, $_builder.getIntegerType(1, false)));
-        }
+        const auto in_element_type = tensor.getElementType();
+        const auto out_element_type = in_element_type.isUnsignedInteger(8)
+                ? in_element_type
+                : $_builder.getIntegerType(1, false);
+
+        $_state.addTypes(mlir::RankedTensorType::get({}, out_element_type));
      }]>
     ];
 }
@@ -135,10 +184,11 @@ class Poptorch_binary_reduction<string name> : Poptorch_NotImplementedOp<name, [
 def Poptorch_all : Poptorch_binary_reduction<"all"> {}
 def Poptorch_any : Poptorch_binary_reduction<"any"> {}
 
+
 // From the docs: https://pytorch.org/docs/stable/generated/torch.all.html
 // NOTE: This function matches the behaviour of NumPy in returning output of dtype bool
 // for all supported dtypes except uint8. For uint8 the dtype of output is uint8 itself.
-class Poptorch_binary_reduction_out<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_binary_reduction_out<string name> : Poptorch_reduce<name> {
     let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim, BoolAttr:$keepdim);
 
     let results = (outs Poptorch_tensor:$result);
@@ -154,20 +204,14 @@ class Poptorch_binary_reduction_out<string name> : Poptorch_NotImplementedOp<nam
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
-        llvm::SmallVector<std::int64_t, 4> shape {ref.begin(), ref.end()};
+        const auto shape = inferShape({dim}, ref, keepdim);
 
-        if (keepdim) {
-            shape[dim] = 1;
-        } else {
-            shape.erase(shape.begin() + dim);
-        }
+        const auto in_element_type = tensor.getElementType();
+        const auto out_element_type = in_element_type.isUnsignedInteger(8)
+                ? in_element_type
+                : $_builder.getIntegerType(1, false);
 
-        if (tensor.getElementType().isUnsignedInteger(8)) {
-            $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
-        }
-        else {
-            $_state.addTypes(mlir::RankedTensorType::get(shape, $_builder.getIntegerType(1, false)));
-        }
+        $_state.addTypes(mlir::RankedTensorType::get(shape, out_element_type));
      }]>
     ];
 }
@@ -175,75 +219,8 @@ class Poptorch_binary_reduction_out<string name> : Poptorch_NotImplementedOp<nam
 def Poptorch_all_out : Poptorch_binary_reduction_out<"all_out"> {}
 def Poptorch_any_out : Poptorch_binary_reduction_out<"any_out"> {}
 
-def Poptorch_prod : Poptorch_NotImplementedOp<"prod", []> {
-    let arguments = (ins Poptorch_tensor:$input);
 
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
-        $_state.addOperands(self);
-
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
-        $_state.addTypes(mlir::RankedTensorType::get({}, tensor.getElementType()));
-     }]>
-    ];
-}
-
-def Poptorch_argsort : Poptorch_NotImplementedOp<"argsort", []> {
-    let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, BoolAttr:$descending);
-
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
-                                      "std::int64_t":$dim,
-                                      "std::int64_t":$descending),[{
-        $_state.addOperands(self);
-        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
-        $_state.addAttribute("descending", $_builder.getBoolAttr(descending));
-
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
-
-        $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), $_builder.getIntegerType(32, true)));
-     }]>
-    ];
-}
-
-class Poptorch_NotImplemented_std_var<string name> : Poptorch_NotImplementedOp<name, []> {
-    let arguments = (ins Poptorch_tensor:$self, BoolAttr:$unbiased);
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
-                                      "bool":$unbiased),[{
-        $_state.addOperands(self);
-        $_state.addAttribute("unbiased", $_builder.getBoolAttr(unbiased));
-
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
-        $_state.addTypes(getTypes(mlir::RankedTensorType::get({}, tensor.getElementType())));
-     }]>
-    ];
-
-    let extraClassDeclaration = [{
-        static std::vector<mlir::Type> getTypes(mlir::Type type) {
-            return {type};
-        }
-    }];
-}
-
-def Poptorch_standard_deviation : Poptorch_NotImplemented_std_var<"standard_deviation"> {}
-def Poptorch_var : Poptorch_NotImplemented_std_var<"var"> {}
-
-class Poptorch_NotImplemented_std_var_mean<string name> : Poptorch_NotImplemented_std_var<name> {
-    let extraClassDeclaration = [{
-        static std::vector<mlir::Type> getTypes(mlir::Type type) {
-            return {type, type};
-        }
-    }];
-}
-
-def Poptorch_std_mean : Poptorch_NotImplemented_std_var_mean<"std_mean"> {}
-def Poptorch_var_mean : Poptorch_NotImplemented_std_var_mean<"var_mean"> {}
-
-class Poptorch_NotImplemented_std_var_correction<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_std_var_correction<string name> : Poptorch_reduce<name> {
     let arguments = (ins Poptorch_tensor:$self,
                          OptionalAttr<I64ArrayAttr>:$dim,
                          OptionalAttr<I64Attr>:$correction,
@@ -256,56 +233,57 @@ class Poptorch_NotImplemented_std_var_correction<string name> : Poptorch_NotImpl
                                       "bool":$keepdim),[{
         $_state.addOperands(self);
 
-        llvm::SmallVector<std::int64_t, 4> shape;
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        auto in_shape = tensor.getShape();
 
-        if (dim.has_value()) {
-            *dim = convertToPositiveDim(*dim, tensor.getShape().size());
+        dim = parseDims(dim.value_or(std::vector<std::int64_t>{}), in_shape.size());
 
-            // Sort in descending order so when we erase dimension it doesn't invalidate future erasings
-            std::sort(dim->begin(), dim->end(), std::greater<>{});
-            shape.insert(shape.begin(), tensor.getShape().begin(), tensor.getShape().end());
-            // Remove the specified dimensions from the shape inference
-            for (auto itr = dim->rbegin(); itr != dim->rend(); ++itr) {
-                if (keepdim) {
-                    shape[*itr] = 1;
-                }
-                else {
-                    shape.erase(shape.begin() + *itr);
-                }
-            }
-
-            $_state.addAttribute("dim", $_builder.getI64ArrayAttr(*dim));
-        }
-        if (correction.has_value()) {
-            $_state.addAttribute("correction", $_builder.getI64IntegerAttr(*correction));
-        }
+        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(*dim));
+        // Note: correction is always in {0, 1} and corresponds to whether to apply Bessel's correction
+        $_state.addAttribute("correction", $_builder.getI64IntegerAttr(correction.value_or(1)));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
-        $_state.addTypes(getTypes(mlir::RankedTensorType::get(shape, tensor.getElementType())));
+        const auto shape = inferShape(std::move(*dim), in_shape, keepdim);
+
+        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
      }]>
     ];
-
-    let extraClassDeclaration = [{
-        static std::vector<mlir::Type> getTypes(mlir::Type type) {
-            return {type};
-        }
-    }];
 }
 
-def Poptorch_std_correction : Poptorch_NotImplemented_std_var_correction<"std_correction"> {}
-def Poptorch_var_correction : Poptorch_NotImplemented_std_var_correction<"var_correction"> {}
+def Poptorch_std_correction : Poptorch_std_var_correction<"std_correction"> {}
+def Poptorch_var_correction : Poptorch_std_var_correction<"var_correction"> {}
 
-class Poptorch_NotImplemented_std_var_mean_correction<string name> : Poptorch_NotImplemented_std_var_correction<name> {
-    let extraClassDeclaration = [{
-        static std::vector<mlir::Type> getTypes(mlir::Type type) {
-            return {type, type};
-        }
-    }];
+
+class Poptorch_std_var_mean_correction<string name> : Poptorch_std_var_correction<name> {
+    let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$mean);
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::optional<std::vector<std::int64_t>>":$dim,
+                                      "std::optional<std::int64_t>":$correction,
+                                      "bool":$keepdim),[{
+        $_state.addOperands(self);
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        auto in_shape = tensor.getShape();
+
+        dim = parseDims(dim.value_or(std::vector<std::int64_t>{}), in_shape.size());
+
+        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(*dim));
+        // Note: correction is always in {0, 1} and corresponds to whether to apply Bessel's correction
+        $_state.addAttribute("correction", $_builder.getI64IntegerAttr(correction.value_or(1)));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+        const auto shape = inferShape(std::move(*dim), in_shape, keepdim);
+
+        $_state.addTypes({
+                mlir::RankedTensorType::get(shape, tensor.getElementType()),
+                mlir::RankedTensorType::get(shape, tensor.getElementType())
+            });
+     }]>
+    ];
 }
 
-def Poptorch_std_mean_correction : Poptorch_NotImplemented_std_var_mean_correction<"std_mean_correction"> {}
-def Poptorch_var_mean_correction : Poptorch_NotImplemented_std_var_mean_correction<"var_mean_correction"> {}
+def Poptorch_std_mean_correction : Poptorch_std_var_mean_correction<"std_mean_correction"> {}
+def Poptorch_var_mean_correction : Poptorch_std_var_mean_correction<"var_mean_correction"> {}
 
 // func: _embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq=False, int mode=0, bool sparse=False, Tensor? per_sample_weights=None, bool include_last_offset=False, int padding_idx=-1) -> (Tensor, Tensor, Tensor, Tensor)
 // NOTE: shape inference for the cpu version of embedding_bag may by found in pytorch here:

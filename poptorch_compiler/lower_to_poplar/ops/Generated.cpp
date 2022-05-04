@@ -533,12 +533,6 @@ void reducemin::lowerToPoplar(CompilerContext & /*context*/) {
                   "reducemin"
                   " is currently unimplemented.");
 }
-void reduceprod::lowerToPoplar(CompilerContext & /*context*/) {
-  (void)this;
-  assert(false && "Function: "
-                  "reduceprod"
-                  " is currently unimplemented.");
-}
 void reducesumsquare::lowerToPoplar(CompilerContext & /*context*/) {
   (void)this;
   assert(false && "Function: "

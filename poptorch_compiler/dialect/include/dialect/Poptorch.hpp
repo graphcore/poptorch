@@ -2,6 +2,8 @@
 #ifndef POPTORCH_CODEGEN_POPTORCH_IR_H_
 #define POPTORCH_CODEGEN_POPTORCH_IR_H_
 
+#include <algorithm>
+#include <numeric>
 #include <vector>
 
 #include "mlir/IR/BuiltinAttributes.h"
@@ -51,6 +53,15 @@ struct CompilerContext;
 
 inline std::int64_t convertToPositiveDim(std::int64_t dim,
                                          std::size_t numDims) {
+  // Pytorch allows you to index into the dimensions of scalar values using 0
+  // and -1
+  if (numDims == 0) {
+    ERROR_ON_MSG(!(dim == -1 || dim == 0),
+                 "When indexing into a scalar value the dimension must be in "
+                 "the range [-1, 0]");
+    return 0;
+  }
+
   if (dim < 0) {
     dim += numDims;
   }

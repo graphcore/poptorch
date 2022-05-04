@@ -763,6 +763,12 @@
   PopTorchDirect: prod
   IgnoreArgs: {'dtype'}
 
+# func: prod.int_out(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
+- func: prod.int_out
+  PopTorchDirect: prod_dim
+  IgnoreArgs: {'dtype'}
+  UnusedOutputArguments: {out}
+
 # func: argmax.out(Tensor self, int? dim=None, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
 - func: argmax.out
   PopTorchDirect: argmax_out
@@ -777,33 +783,17 @@
 - func: argsort
   PopTorchDirect: argsort
 
-# func: std(Tensor self, bool unbiased=True) -> Tensor
-- func: std
-  PopTorchDirect: standard_deviation
-
 # func: std.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> Tensor
 - func: std.correction
   PopTorchDirect: std_correction
-
-# func: std_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
-- func: std_mean
-  PopTorchDirect: std_mean
 
 # func: std_mean.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> (Tensor, Tensor)
 - func: std_mean.correction
   PopTorchDirect: std_mean_correction
 
-# func: var(Tensor self, bool unbiased=True) -> Tensor
-- func: var
-  PopTorchDirect: var
-
 # func: var.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> Tensor
 - func: var.correction
   PopTorchDirect: var_correction
-
-# func: var_mean(Tensor self, bool unbiased=True) -> (Tensor, Tensor)
-- func: var_mean
-  PopTorchDirect: var_mean
 
 # func: var_mean.correction(Tensor self, int[1]? dim, *, int? correction, bool keepdim=False) -> (Tensor, Tensor)
 - func: var_mean.correction

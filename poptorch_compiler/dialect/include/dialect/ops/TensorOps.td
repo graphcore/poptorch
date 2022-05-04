@@ -153,6 +153,73 @@ def Poptorch_topk : Poptorch_Op<"topk", []> {
     ];
 }
 
+
+class Poptorch_NotImplemented_reduce_single_dim<string name> : Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$self, OptionalAttr<I64Attr>:$dim, BoolAttr:$keepdim);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::optional<std::int64_t>":$dim,
+                                      "std::int64_t":$keepdim),[{
+        $_state.addOperands(self);
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        if (dim.has_value()) {
+            *dim = convertToPositiveDim(*dim, tensor.getShape().size());
+
+            $_state.addAttribute("dim", $_builder.getI64IntegerAttr(*dim));
+        }
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+        auto getShape = [&]() {
+            // We are flattenning the dimenion we're passed
+            if (dim.has_value()) {
+                auto ref = tensor.getShape();
+
+                llvm::SmallVector<std::int64_t, 4> shape{ref.begin(), ref.end()};
+
+                if (!shape.empty()) {
+                    if (!keepdim) {
+                        shape.erase(shape.begin() + *dim);
+                    } else {
+                        shape[*dim] = 1;
+                    }
+                }
+
+                return shape;
+            } else {
+                return llvm::SmallVector<std::int64_t, 4>{};
+            }
+        };
+
+        $_state.addTypes(mlir::RankedTensorType::get(getShape(), $_builder.getIntegerType(32, true)));
+     }]>
+    ];
+}
+
+def Poptorch_argmax_out : Poptorch_NotImplemented_reduce_single_dim<"argmax_out"> {}
+def Poptorch_argmin_out : Poptorch_NotImplemented_reduce_single_dim<"argmin_out"> {}
+
+def Poptorch_argsort : Poptorch_NotImplementedOp<"argsort", []> {
+    let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, BoolAttr:$descending);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::int64_t":$dim,
+                                      "std::int64_t":$descending),[{
+        $_state.addOperands(self);
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("descending", $_builder.getBoolAttr(descending));
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+
+        $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), $_builder.getIntegerType(32, true)));
+     }]>
+    ];
+}
+
 def Poptorch_dropout : Poptorch_Op<"dropout", []> {
     let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$training);
 

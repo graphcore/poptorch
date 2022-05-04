@@ -1365,23 +1365,6 @@ def Poptorch_reducemin : Poptorch_Op<"reducemin", []> {
 
 }
 
-def Poptorch_reduceprod : Poptorch_Op<"reduceprod", []> {
-  let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$axes, I64Attr:$keepdims);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "const std::vector<std::int64_t>&":$axes, "std::int64_t":$keepdims), [{
-
-        $_state.addOperands(values);
-        $_state.addAttribute("axes",$_builder.getI64ArrayAttr(axes));
-        $_state.addAttribute("keepdims",$_builder.getI64IntegerAttr(keepdims));
-
-        // Just take the first value type until this op is manually added.
-
-        $_state.addTypes(values[0].getType());
-
-  }]>];
-
-}
-
 def Poptorch_reducesumsquare : Poptorch_Op<"reducesumsquare", []> {
   let arguments = (ins Variadic<Poptorch_tensor>:$inputs, I64ArrayAttr:$axes, I64Attr:$keepdims);
   let results = (outs Poptorch_tensor:$result);
