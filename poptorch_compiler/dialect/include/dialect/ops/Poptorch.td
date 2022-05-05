@@ -120,12 +120,12 @@ def Poptorch_ctc_beam_search_decoder : Poptorch_NotImplementedOp<"ctc_beam_searc
 // identity_loss(Tensor x, str reduction) -> Tensor
 def Poptorch_identity_loss : Poptorch_NotImplementedOp<"identity_loss", []> {
   let arguments = (ins Poptorch_tensor:$x,
-                       StrAttr:$reduction);
+                       I64Attr:$reduction);
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilderDAG<(ins "mlir::Value":$x,
-                                    "const char *":$reduction), [{
+                                    "int64_t":$reduction), [{
           $_state.addOperands({x});
-          $_state.addAttribute("reduction", $_builder.getStringAttr(reduction));
+          $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
           $_state.addTypes({x.getType()});
      }]>
     ];

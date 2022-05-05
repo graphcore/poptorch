@@ -28,7 +28,7 @@
    PopTorchDirect: ctc_beam_search_decoder
 
  - func: identity_loss
-   native_func: identity_loss(Tensor x, str reduction) -> Tensor
+   native_func: identity_loss(Tensor x, int reduction) -> Tensor
    PopTorchDirect: identity_loss
 
  - func: start_for_loop
