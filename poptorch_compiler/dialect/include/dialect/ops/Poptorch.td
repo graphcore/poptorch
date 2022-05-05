@@ -1,7 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 // ipu_print_tensor(Tensor self, str? title) -> Tensor
-def Poptorch_ipu_print_tensor : Poptorch_Op<"ipu_print_tensor", []> {
+def Poptorch_ipu_print_tensor : Poptorch_NotImplementedOp<"ipu_print_tensor", []> {
   let arguments = (ins Poptorch_tensor:$self,
                        OptionalAttr<StrAttr>:$title);
   let results = (outs Poptorch_tensor:$result);
@@ -17,7 +17,7 @@ def Poptorch_ipu_print_tensor : Poptorch_Op<"ipu_print_tensor", []> {
 }
 
 // nop(Tensor self) -> Tensor
-def Poptorch_nop : Poptorch_Op<"nop", []> {
+def Poptorch_nop : Poptorch_NotImplementedOp<"nop", []> {
   let arguments = (ins Poptorch_tensor:$self);
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
@@ -28,7 +28,7 @@ def Poptorch_nop : Poptorch_Op<"nop", []> {
 }
 
 // begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> void
-def Poptorch_begin_ipu_block : Poptorch_Op<"begin_ipu_block", []> {
+def Poptorch_begin_ipu_block : Poptorch_NotImplementedOp<"begin_ipu_block", []> {
   let arguments = (ins I64Attr:$stage_id,
                        I64Attr:$phase_id,
                        I64Attr:$ipu_id);
@@ -43,11 +43,11 @@ def Poptorch_begin_ipu_block : Poptorch_Op<"begin_ipu_block", []> {
 }
 
 // end_ipu_block() -> void
-def Poptorch_end_ipu_block : Poptorch_Op<"end_ipu_block", []> {
+def Poptorch_end_ipu_block : Poptorch_NotImplementedOp<"end_ipu_block", []> {
 }
 
 // internal_cast(Tensor self, str dtype) -> Tensor
-def Poptorch_internal_cast : Poptorch_Op<"internal_cast", []> {
+def Poptorch_internal_cast : Poptorch_NotImplementedOp<"internal_cast", []> {
   let arguments = (ins Poptorch_tensor:$self,
                        StrAttr:$dtype);
   let results = (outs Poptorch_tensor:$result);
@@ -61,7 +61,7 @@ def Poptorch_internal_cast : Poptorch_Op<"internal_cast", []> {
 }
 
 // custom_operation(Tensor[] inputs, str name, str domain, int domain_version, int num_outputs, Tensor(a!)[] outputs, str attributes) -> Tensor(a!)[]
-def Poptorch_custom_operation : Poptorch_Op<"custom_operation", [AttrSizedOperandSegments]> {
+def Poptorch_custom_operation : Poptorch_NotImplementedOp<"custom_operation", [AttrSizedOperandSegments]> {
   let arguments = (ins Poptorch_tensorlist:$inputs,
                        StrAttr:$name,
                        StrAttr:$domain,
@@ -96,7 +96,7 @@ def Poptorch_custom_operation : Poptorch_Op<"custom_operation", [AttrSizedOperan
 }
 
 // ctc_beam_search_decoder(Tensor probs, Tensor lengths, int blank, int beam_width, int top_paths) -> Tensor[]
-def Poptorch_ctc_beam_search_decoder : Poptorch_Op<"ctc_beam_search_decoder", []> {
+def Poptorch_ctc_beam_search_decoder : Poptorch_NotImplementedOp<"ctc_beam_search_decoder", []> {
   let arguments = (ins Poptorch_tensor:$probs,
                        Poptorch_tensor:$lengths,
                        I64Attr:$blank,
@@ -118,7 +118,7 @@ def Poptorch_ctc_beam_search_decoder : Poptorch_Op<"ctc_beam_search_decoder", []
 }
 
 // identity_loss(Tensor x, str reduction) -> Tensor
-def Poptorch_identity_loss : Poptorch_Op<"identity_loss", []> {
+def Poptorch_identity_loss : Poptorch_NotImplementedOp<"identity_loss", []> {
   let arguments = (ins Poptorch_tensor:$x,
                        StrAttr:$reduction);
   let results = (outs Poptorch_tensor:$result);
@@ -132,12 +132,12 @@ def Poptorch_identity_loss : Poptorch_Op<"identity_loss", []> {
 }
 
 // start_for_loop(Tensor[] inputs) -> void
-def Poptorch_start_for_loop : Poptorch_Op<"start_for_loop", []> {
+def Poptorch_start_for_loop : Poptorch_NotImplementedOp<"start_for_loop", []> {
   let arguments = (ins Poptorch_tensorlist:$inputs);
 }
 
 // end_for_loop(Tensor(a!)[] outputs, Tensor[] inputs, int trip_count) -> Tensor(a!)[]
-def Poptorch_end_for_loop : Poptorch_Op<"end_for_loop", [AttrSizedOperandSegments]> {
+def Poptorch_end_for_loop : Poptorch_NotImplementedOp<"end_for_loop", [AttrSizedOperandSegments]> {
   let arguments = (ins Poptorch_tensorlist:$outputs,
                        Poptorch_tensorlist:$inputs,
                        I64Attr:$trip_count);
@@ -159,7 +159,7 @@ def Poptorch_end_for_loop : Poptorch_Op<"end_for_loop", [AttrSizedOperandSegment
 }
 
 // optimizer_group(int group, Tensor[] inputs) -> void
-def Poptorch_optimizer_group : Poptorch_Op<"optimizer_group", []> {
+def Poptorch_optimizer_group : Poptorch_NotImplementedOp<"optimizer_group", []> {
   let arguments = (ins I64Attr:$group,
                        Poptorch_tensorlist:$inputs);
   let builders = [OpBuilderDAG<(ins "int64_t":$group,
@@ -171,7 +171,7 @@ def Poptorch_optimizer_group : Poptorch_Op<"optimizer_group", []> {
 }
 
 // set_matmul_serialization(Tensor matmul, str mode, int factor, int keep_precision) -> Tensor
-def Poptorch_set_matmul_serialization : Poptorch_Op<"set_matmul_serialization", []> {
+def Poptorch_set_matmul_serialization : Poptorch_NotImplementedOp<"set_matmul_serialization", []> {
   let arguments = (ins Poptorch_tensor:$matmul,
                        StrAttr:$mode,
                        I64Attr:$factor,
@@ -191,7 +191,7 @@ def Poptorch_set_matmul_serialization : Poptorch_Op<"set_matmul_serialization", 
 }
 
 // set_overlap_for_input(Tensor t, str mode) -> Tensor
-def Poptorch_set_overlap_for_input : Poptorch_Op<"set_overlap_for_input", []> {
+def Poptorch_set_overlap_for_input : Poptorch_NotImplementedOp<"set_overlap_for_input", []> {
   let arguments = (ins Poptorch_tensor:$t,
                        StrAttr:$mode);
   let results = (outs Poptorch_tensor:$result);
@@ -205,7 +205,7 @@ def Poptorch_set_overlap_for_input : Poptorch_Op<"set_overlap_for_input", []> {
 }
 
 // set_overlap_for_output(Tensor t, str mode) -> Tensor
-def Poptorch_set_overlap_for_output : Poptorch_Op<"set_overlap_for_output", []> {
+def Poptorch_set_overlap_for_output : Poptorch_NotImplementedOp<"set_overlap_for_output", []> {
   let arguments = (ins Poptorch_tensor:$t,
                        StrAttr:$mode);
   let results = (outs Poptorch_tensor:$result);
@@ -219,7 +219,7 @@ def Poptorch_set_overlap_for_output : Poptorch_Op<"set_overlap_for_output", []> 
 }
 
 // recomputation_checkpoint(Tensor self) -> Tensor
-def Poptorch_recomputation_checkpoint : Poptorch_Op<"recomputation_checkpoint", []> {
+def Poptorch_recomputation_checkpoint : Poptorch_NotImplementedOp<"recomputation_checkpoint", []> {
   let arguments = (ins Poptorch_tensor:$self);
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
@@ -230,7 +230,7 @@ def Poptorch_recomputation_checkpoint : Poptorch_Op<"recomputation_checkpoint", 
 }
 
 // set_available_memory(Tensor t, float mem) -> Tensor
-def Poptorch_set_available_memory : Poptorch_Op<"set_available_memory", []> {
+def Poptorch_set_available_memory : Poptorch_NotImplementedOp<"set_available_memory", []> {
   let arguments = (ins Poptorch_tensor:$t,
                        F32Attr:$mem);
   let results = (outs Poptorch_tensor:$result);
@@ -244,11 +244,11 @@ def Poptorch_set_available_memory : Poptorch_Op<"set_available_memory", []> {
 }
 
 // begin_multi_conv() -> void
-def Poptorch_begin_multi_conv : Poptorch_Op<"begin_multi_conv", []> {
+def Poptorch_begin_multi_conv : Poptorch_NotImplementedOp<"begin_multi_conv", []> {
 }
 
 // end_multi_conv(float[]? available_memory_proportions, int[]? partials_types, int? plan_type, int? per_conv_reserved_tiles, float? cycle_back_off, int[]? enableConvDithering) -> void
-def Poptorch_end_multi_conv : Poptorch_Op<"end_multi_conv", []> {
+def Poptorch_end_multi_conv : Poptorch_NotImplementedOp<"end_multi_conv", []> {
   let arguments = (ins OptionalAttr<F32ArrayAttr>:$available_memory_proportions,
                        OptionalAttr<I64ArrayAttr>:$partials_types,
                        OptionalAttr<I64Attr>:$plan_type,
@@ -284,28 +284,28 @@ def Poptorch_end_multi_conv : Poptorch_Op<"end_multi_conv", []> {
 }
 
 // push_name_scope(str name) -> void
-def Poptorch_push_name_scope : Poptorch_Op<"push_name_scope", []> {
+def Poptorch_push_name_scope : Poptorch_NotImplementedOp<"push_name_scope", []> {
   let arguments = (ins StrAttr:$name);
 }
 
 // pop_name_scope() -> void
-def Poptorch_pop_name_scope : Poptorch_Op<"pop_name_scope", []> {
+def Poptorch_pop_name_scope : Poptorch_NotImplementedOp<"pop_name_scope", []> {
 }
 
 // begin_autocast() -> void
-def Poptorch_begin_autocast : Poptorch_Op<"begin_autocast", []> {
+def Poptorch_begin_autocast : Poptorch_NotImplementedOp<"begin_autocast", []> {
 }
 
 // suppress_autocast() -> void
-def Poptorch_suppress_autocast : Poptorch_Op<"suppress_autocast", []> {
+def Poptorch_suppress_autocast : Poptorch_NotImplementedOp<"suppress_autocast", []> {
 }
 
 // restore_autocast() -> void
-def Poptorch_restore_autocast : Poptorch_Op<"restore_autocast", []> {
+def Poptorch_restore_autocast : Poptorch_NotImplementedOp<"restore_autocast", []> {
 }
 
 // end_cpu_op(Tensor[] output) -> Tensor[]
-def Poptorch_end_cpu_op : Poptorch_Op<"end_cpu_op", []> {
+def Poptorch_end_cpu_op : Poptorch_NotImplementedOp<"end_cpu_op", []> {
   let arguments = (ins Poptorch_tensorlist:$output);
   let results = (outs Poptorch_tensorlist:$result);
   let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$output), [{
@@ -320,20 +320,20 @@ def Poptorch_end_cpu_op : Poptorch_Op<"end_cpu_op", []> {
 }
 
 // call_cpu_op(Tensor[] inputs, str name) -> void
-def Poptorch_call_cpu_op : Poptorch_Op<"call_cpu_op", []> {
+def Poptorch_call_cpu_op : Poptorch_NotImplementedOp<"call_cpu_op", []> {
   let arguments = (ins Poptorch_tensorlist:$inputs,
                        StrAttr:$name);
 }
 
 // set_attribute(str attribute, str key, str value) -> void
-def Poptorch_set_attribute : Poptorch_Op<"set_attribute", []> {
+def Poptorch_set_attribute : Poptorch_NotImplementedOp<"set_attribute", []> {
   let arguments = (ins StrAttr:$attribute,
                        StrAttr:$key,
                        StrAttr:$value);
 }
 
 // clear_attribute(str attribute, str key) -> void
-def Poptorch_clear_attribute : Poptorch_Op<"clear_attribute", []> {
+def Poptorch_clear_attribute : Poptorch_NotImplementedOp<"clear_attribute", []> {
   let arguments = (ins StrAttr:$attribute,
                        StrAttr:$key);
 }

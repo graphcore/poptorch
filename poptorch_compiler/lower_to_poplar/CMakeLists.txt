@@ -8,7 +8,6 @@ add_library(lower_to_poplar STATIC
         ops/NormOps.cpp
         ops/Ops.cpp
         ops/PoolingOps.cpp
-        ops/Poptorch.cpp
         ops/Random.cpp
         ops/Reductions.cpp
         ops/Reshapes.cpp
