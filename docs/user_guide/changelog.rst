@@ -18,6 +18,7 @@ Bug Fixes
 
 - Fix remaining in-place operations on slices
 - Fix einsum transpose error
+- Fix floating point exception in ``torch.Tensor.exponential_`` and ``torch.distributions.Exponential``
 
 v2.5 (Poplar SDK 2.5)
 =====================

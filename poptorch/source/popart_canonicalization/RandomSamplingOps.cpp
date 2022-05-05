@@ -1,4 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <limits>
+
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "../PoptorchStaticInit.hpp"
@@ -76,13 +78,19 @@ torch::jit::Node *bernoulliHandler(torch::jit::Graph *graph,
 torch::jit::Node *exponentialHandler(torch::jit::Graph *graph,
                                      torch::jit::Node *node) {
   // aten::exponential_(Tensor self, double lambda)
+  torch::jit::Value *self = node->input(0);
   torch::jit::Value *lambda = node->input(1);
+  torch::jit::Value *output = node->output();
 
-  std::vector<int64_t> shape = shapeFromTensor(node->output());
-  c10::ScalarType dtype = getNodeScalarType(node->input(0));
+  std::vector<int64_t> shape = shapeFromTensor(output);
+  c10::ScalarType dtype = getNodeScalarType(self);
+  c10::ScalarType dtype_rng = c10::ScalarType::Float;
 
+  // Use smallest non-zero value to prevent the posibility of
+  // log(0) with minimal bias on the sampling distribution
+  float low = std::numeric_limits<float>::min();
   torch::jit::Value *x =
-      createRandomUniform(graph, nullptr, shape, 1.0, 0.0, dtype)->output();
+      createRandomUniform(graph, nullptr, shape, 1.0, low, dtype_rng)->output();
 
   auto *log_x = createLog(graph, {x})->output();
   auto *neg_log_x = createNeg(graph, {log_x})->output();
