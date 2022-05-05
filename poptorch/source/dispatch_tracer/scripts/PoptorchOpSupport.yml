@@ -44,7 +44,7 @@
    PopTorchDirect: optimizer_group
 
  - func: set_matmul_serialization
-   native_func: set_matmul_serialization(Tensor matmul, str mode, int factor, int keep_precision) -> Tensor
+   native_func: set_matmul_serialization(Tensor matmul, str mode, int factor, bool keep_precision) -> Tensor
    PopTorchDirect: set_matmul_serialization
 
  - func: set_overlap_for_input

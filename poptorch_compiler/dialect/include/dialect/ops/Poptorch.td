@@ -170,21 +170,21 @@ def Poptorch_optimizer_group : Poptorch_NotImplementedOp<"optimizer_group", []> 
     ];
 }
 
-// set_matmul_serialization(Tensor matmul, str mode, int factor, int keep_precision) -> Tensor
+// set_matmul_serialization(Tensor matmul, str mode, int factor, bool keep_precision) -> Tensor
 def Poptorch_set_matmul_serialization : Poptorch_NotImplementedOp<"set_matmul_serialization", []> {
   let arguments = (ins Poptorch_tensor:$matmul,
                        StrAttr:$mode,
                        I64Attr:$factor,
-                       I64Attr:$keep_precision);
+                       BoolAttr:$keep_precision);
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilderDAG<(ins "mlir::Value":$matmul,
                                     "const char *":$mode,
                                     "int64_t":$factor,
-                                    "int64_t":$keep_precision), [{
+                                    "bool":$keep_precision), [{
           $_state.addOperands({matmul});
           $_state.addAttribute("mode", $_builder.getStringAttr(mode));
           $_state.addAttribute("factor", $_builder.getI64IntegerAttr(factor));
-          $_state.addAttribute("keep_precision", $_builder.getI64IntegerAttr(keep_precision));
+          $_state.addAttribute("keep_precision", $_builder.getBoolAttr(keep_precision));
           $_state.addTypes({matmul.getType()});
      }]>
     ];
