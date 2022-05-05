@@ -1,6 +1,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import collections
 import copy
+import functools
 import itertools
 import json
 import os
@@ -1262,16 +1263,24 @@ class PoplarExecutor:
         ) if self.options._module_namescope_enabled else None
 
         # Override half so users can use it in their models.
-        def internal_half(tensor):
-            # Half is always outplace, if we don't clone, we might see the
-            # casted tensor in places where the original tensor should be used
-            # in the trace.
-            tensor = tensor.clone()
-            return _impl.internal_cast(tensor, torch.half)
+        def internal_to(tensor, *args, **kwargs):
+            # If dtype is in args, it's either at index 0 or 1, and never both.
+            arg_dtype = [a for a in args[:2] if isinstance(a, torch.dtype)]
+            dtype = arg_dtype[0] if len(arg_dtype) > 0 else kwargs.get("dtype")
+            if dtype is torch.half:
+                # Cast is always outplace, if we don't clone, we might see the
+                # casted tensor in places where the original tensor should be used
+                # in the trace.
+                tensor = tensor.clone()
+                return _impl.internal_cast(tensor, dtype)
+            return old_to(tensor, *args, **kwargs)
 
-        # Store the old half so it can be restored.
+        # Store the old methods so they can be restored.
         old_half = torch.Tensor.half
-        torch.Tensor.half = internal_half
+        torch.Tensor.half = functools.partialmethod(internal_to,
+                                                    dtype=torch.half)
+        old_to = torch.Tensor.to
+        torch.Tensor.to = internal_to
 
         # Trace only a copy to avoid updating original weights during compilation.
         temp_model = copy.deepcopy(self._model.state_dict())
@@ -1296,8 +1305,9 @@ class PoplarExecutor:
 
         self._error_on_buffer_parameter_address_change(buff_param_addresses)
 
-        # Restore half to its old meaning.
+        # Restore methods to their old meanings.
         torch.Tensor.half = old_half
+        torch.Tensor.to = old_to
 
         # Revert the traced copy to the inital weights.
         self._trace.load_state_dict(temp_model, strict=False)

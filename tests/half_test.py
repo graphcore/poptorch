@@ -323,6 +323,36 @@ def test_half_casts_outplace(trace_model, casting):
     assert x2_cast.dtype == torch.float16
 
 
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_8bit_io_casting(trace_model):
+    torch.manual_seed(42)
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(1, 1)
+
+        def forward(self, x):
+            x1 = self.linear(x.half())
+            x2 = self.linear(x.to(torch.half))
+            x3 = self.linear(x.float())
+            x4 = self.linear(x.to(torch.float))
+            return x1, x2, x3, x4
+
+    model = Model()
+    poptorch_model = poptorch.inferenceModel(model, opts)
+
+    x = torch.tensor([0], dtype=torch.uint8)
+
+    y = poptorch_model(x)
+    assert y[0].dtype == torch.half
+    assert y[1].dtype == torch.half
+    assert y[2].dtype == torch.float
+    assert y[3].dtype == torch.float
+
+
 def test_buffers_without_parameters_can_be_traced():
     torch.manual_seed(0)
 
