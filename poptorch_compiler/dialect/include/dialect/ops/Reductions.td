@@ -298,7 +298,10 @@ def Poptorch_embedding_bag : Poptorch_NotImplementedOp<"embedding_bag", []> {
                          Optional<Poptorch_tensor>:$per_sample_weights,
                          BoolAttr:$include_last_offset,
                          I64Attr:$padding_idx);
-    let results = (outs Poptorch_tensorlist:$result);
+    let results = (outs Poptorch_tensor:$output,
+                        Poptorch_tensor:$offset2bag,
+                        Poptorch_tensor:$bag_size,
+                        Poptorch_tensor:$max_indices);
 
     let builders = [OpBuilderDAG<(ins "mlir::Value":$weight,
                                       "mlir::Value":$indices,

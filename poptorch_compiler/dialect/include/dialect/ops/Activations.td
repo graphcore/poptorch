@@ -96,7 +96,8 @@ def Poptorch_prelu : Poptorch_NotImplementedOp<"prelu", [SameOperandsAndResultSh
 
 def Poptorch_log_sigmoid_forward : Poptorch_NotImplementedOp<"log_sigmoid_forward", []> {
     let arguments = (ins Poptorch_tensor:$in1);
-    let results = (outs Poptorch_tensorlist:$result);
+    let results = (outs Poptorch_tensor:$output,
+                        Poptorch_tensor:$buffer);
 
     let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
         $_state.addOperands({self});
