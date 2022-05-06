@@ -1,4 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <ATen/core/jit_type.h>
+#include <c10/core/ScalarType.h>
+
 #include "../PoptorchStaticInit.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
@@ -100,16 +103,24 @@ torch::jit::Node *clampHandler(torch::jit::Graph *graph,
   auto *min_val = node->input(1);
   auto *max_val = node->input(2);
 
+  const c10::ScalarType type =
+      x->type()->expect<c10::TensorType>()->scalarType().value();
+  const auto apply_with_casting = [&](auto func, auto *lhs, auto *rhs) {
+    if (isNone(rhs->node())) {
+      return lhs->node();
+    }
+    auto *cast_rhs = createCast(graph, rhs, type);
+    return func(graph, {lhs, cast_rhs->output()});
+  };
+
   // We can't use PopART clip because it doesn't support integers,
   // so the following is used instead:
   // output = min(max(x, min_value), max_value)
-  auto *max =
-      isNone(min_val->node()) ? x->node() : createMax(graph, {x, min_val});
-  auto *min = isNone(max_val->node())
-                  ? max
-                  : createMin(graph, {max->output(), max_val});
+  auto *clamped_to_min_value = apply_with_casting(createMax, x, min_val);
+  auto *clamped_value =
+      apply_with_casting(createMin, clamped_to_min_value->output(), max_val);
 
-  return min;
+  return clamped_value;
 }
 
 torch::jit::Node *clampMinHandler(torch::jit::Graph *graph,

@@ -237,14 +237,39 @@ def test_clamp_min_max(op, trace_model):
     op_harness(trace_model, op_clamp, [input], assert_, test_training=True)
 
 
-def test_clamp_min_max_int():
+clamp_int_inputs = [
+    {
+        "min": -4.5,
+        "max": 5.5
+    },
+    {
+        "min": -4.5
+    },
+    {
+        "max": 5.5
+    },
+    {
+        "min": -5,
+        "max": 5
+    },
+    {
+        "min": -5
+    },
+    {
+        "max": 5
+    },
+]
+
+
+@pytest.mark.parametrize("args", clamp_int_inputs)
+def test_clamp_min_max_int(args):
     torch.manual_seed(42)
 
     t = torch.randint(-100, 100, (100, ))
 
     class Model(torch.nn.Module):
         def forward(self, x):
-            return torch.clamp(x, min=-5, max=5)
+            return torch.clamp(x, **args)
 
     model = Model()
     ipu_model = poptorch.inferenceModel(model)
