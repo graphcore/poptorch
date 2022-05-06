@@ -2,6 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 import pytest
 import torch
+import torch.nn as nn
 import poptorch
 import helpers
 
@@ -299,3 +300,20 @@ def test_outline_attribute(capfd, trace_model):
     # Ensure the second group norm doesn't have the attribute,
     # as it is outside the attribute scope
     testlog.assert_no_matches(get_regex("gn2"), per_line=False)
+
+
+# Note: the ipu models are not supported by poptorch.ConnectionType.Never
+@pytest.mark.ipuHardwareRequired
+def test_compile_without_ipu():
+    class SimpleAdder(nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    model = SimpleAdder()
+    opts = poptorch.Options().connectionType(poptorch.ConnectionType.Never)
+    inference_model = poptorch.inferenceModel(model, opts)
+
+    t1 = torch.tensor([1.])
+    t2 = torch.tensor([2.])
+
+    inference_model.compile(t1, t2)

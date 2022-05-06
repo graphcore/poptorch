@@ -190,10 +190,10 @@ public:
   WeightsIO weights;
   WeightsIO optim_state_tensors;
 
-  bool is_training;
+  bool is_training = false;
 
   // At least one use of overlapped host IO
-  bool using_overlapped_io;
+  bool using_overlapped_io = false;
 
   // Record the final loss, it is guaranteed by previous passes to be just one
   // loss.
@@ -202,9 +202,9 @@ public:
   // List of options which have been explicitely set by the user.
   std::set<std::string> options_set;
 
-  popart::SessionOptions popart_options;
+  popart::SessionOptions popart_options{};
 
-  CompilerOptions options;
+  CompilerOptions options{};
 
   // We add operations using a state based system so the user would set the
   // active IPU and all subsequent operations will be added to that IPU until

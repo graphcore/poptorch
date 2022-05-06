@@ -21,6 +21,7 @@
 #include <popart/tensors.hpp>
 
 #include "popart_compiler/CompilerImpl.hpp"
+#include "popart_compiler/CompilerOptions.hpp"
 #include "popart_compiler/MultiConvBuilder.hpp"
 #include "popart_compiler/Utils.hpp"
 
@@ -576,10 +577,16 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
                    "Offline compilation targeting a specific id not supported");
       errorOnCycleLogging();
 
+      const auto get_ipu_version = [&]() -> std::int64_t {
+        if (options.ipu_version == CompilerOptions::use_system_ipu_version) {
+          return ipuHardwareVersion();
+        }
+        return options.ipu_version;
+      };
+
       std::map<std::string, std::string> device_options;
       device_options["numIPUs"] = std::to_string(num_ipus);
-      device_options["ipuVersion"] =
-          "ipu" + std::to_string(options.ipu_version);
+      device_options["ipuVersion"] = "ipu" + std::to_string(get_ipu_version());
       device_options["syncPattern"] =
           popart::syncPatternToString(options.sync_pattern);
       _device =
