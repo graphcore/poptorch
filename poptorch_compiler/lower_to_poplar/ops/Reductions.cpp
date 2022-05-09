@@ -1,19 +1,35 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include <mlir/IR/BuiltinTypes.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+
 #include "dialect/Poptorch.hpp"
 #include "lower_to_poplar/CompilerHelpers.hpp"
 
 #include <poplar/ArrayRef.hpp>
 #include <poplar/Graph.hpp>
 #include <poplar/Tensor.hpp>
+#include <poplar/Type.hpp>
+#include <poplin/ConvParams.hpp>
+#include <poplin/Convolution.hpp>
 #include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/OperationDef.hpp>
+#include <popops/Pad.hpp>
 #include <popops/Reduce.hpp>
 #include <poputil/Broadcast.hpp>
 
 namespace poptorch_ir {
+
+inline poplar::Tensor mayCast(CompilerContext &context,
+                              const poplar::Tensor &in,
+                              const poplar::Type &cast_to) {
+  return in.elementType() != cast_to
+             ? popops::cast(context.graph, in, cast_to, context.seq)
+             : in;
+}
 
 // Helper function for cansting and performing reductions. The tensor in is cast
 // to op_type, then the reduction op is applied and the output of that is cast
@@ -27,9 +43,7 @@ reduceWithCasts(CompilerContext &context,
                 const std::vector<std::size_t> &reduction_dims,
                 const poplar::Tensor &in, const poplar::Type &op_type,
                 popops::Operation op, const poplar::Type &out_type) {
-  auto out = in.elementType() != op_type
-                 ? popops::cast(context.graph, in, op_type, context.seq)
-                 : in;
+  auto out = mayCast(context, in, op_type);
 
   out = out.shape().empty()
             ? (op == popops::Operation::SQUARE_ADD
@@ -38,9 +52,7 @@ reduceWithCasts(CompilerContext &context,
             : popops::reduce(context.graph, out, reduction_dims, {op},
                              context.seq);
 
-  out = out.elementType() != out_type
-            ? popops::cast(context.graph, out, out_type, context.seq)
-            : out;
+  out = mayCast(context, out, out_type);
 
   return out;
 }
@@ -323,6 +335,105 @@ void any_out::lowerToPoplar(CompilerContext &context) {
                                        popops::Operation::LOGICAL_OR, out_type);
 
   context.tensors.insert({this->result(), output_tensor});
+}
+
+// Perform a prefix sum by doing a convolution with an array of ones
+//
+// E.g. if we have a 1d array [1, 2, 3] we pad before to with N - 1 zeros to get
+// [0, 0, 1, 2, 3] then perform a convolution with N ones.
+//
+// [0, 0, 1, 2, 3]
+// [1, 1, 1]                   = 1
+//    [1, 1, 1]    = 1 + 2     = 3
+//       [1, 1, 1] = 1 + 2 + 3 = 6
+//
+// This gives the partial sum.
+//
+// Note: this isn't the quickest algorithm for performing a prefix sum on the
+// ipu it is however easy to implement
+void cumsum_out::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+
+  const auto in_shape = in.shape();
+
+  const auto out_type = CompilerContext::poplarTypeOf(
+      this->result().getType().cast<mlir::RankedTensorType>().getElementType());
+
+  // The pytorch api states we cast to the output_type before doing the partial
+  // sum
+  auto cast_in = mayCast(context, in, out_type);
+
+  // We don't need to do anything if the input is a scalar or if there are no
+  // elements in the input
+  if (in.numElements() == 0 || in_shape.empty()) {
+    context.tensors.insert({this->result(), cast_in});
+    return;
+  }
+
+  const auto dim = this->dim();
+  const auto sum_size = in_shape[dim];
+
+  // We don't need to do anything if the the sum is over one element
+  if (sum_size == 1) {
+    context.tensors.insert({this->result(), cast_in});
+    return;
+  }
+
+  // poplibs can only do convolutions on floating point types. If the type
+  // isn't a half we cast to a float to attempt to avoid precision loss
+  // Note: there may be two casts in a row here but we cannot removed either
+  const auto working_type =
+      out_type == poplar::HALF ? poplar::HALF : poplar::FLOAT;
+  cast_in = mayCast(context, cast_in, working_type);
+
+  // Convolution input is of the form [B x inChans x W] we will convolve
+  // over W and set H and inChans to 1
+  const auto swapped_to_last_channel = cast_in.dimRoll(dim, cast_in.rank() - 1);
+
+  auto ignored_shape = swapped_to_last_channel.shape();
+  ignored_shape.pop_back();
+
+  const auto flattened =
+      swapped_to_last_channel.flatten(0, swapped_to_last_channel.rank() - 1);
+  const auto flattened_shape = flattened.shape();
+  const auto ignored_dims = flattened_shape.front();
+
+  const auto reshaped =
+      flattened.reshape({ignored_dims, 1, flattened_shape.back()});
+
+  const auto to_convolve = popops::pad(context.graph, reshaped, sum_size - 1, 0,
+                                       reshaped.rank() - 1, 0.0f);
+
+  // The weights tensor has shape
+  // [convGroups x outChansPerConvGroup x inChansPerConvGroup x W]
+  std::vector<std::size_t> ones_shape{1, 1, 1, sum_size};
+  const auto ones =
+      createConstant(context, to_convolve.elementType(), ones_shape, 1);
+
+  poplin::ConvParams params(to_convolve.elementType() /*input type*/,
+                            to_convolve.dim(0) /*batch_size*/,
+                            {to_convolve.dim(2)} /*input field shape*/,
+                            {ones_shape.back()} /*kernel shape*/,
+                            1 /*input channels per group*/,
+                            1 /*output channels per group*/, 1 /*groups*/);
+  const auto convolved = poplin::convolution(context.graph, to_convolve, ones,
+                                             params, false, context.seq);
+
+  ERROR_ON(convolved.shape() !=
+           std::vector<std::size_t>({ignored_dims, 1, sum_size}));
+
+  const auto convolved_swapped_to_last_channel =
+      convolved.reshapePartial(0, 2, ignored_shape);
+  const auto prefix_sum = convolved_swapped_to_last_channel.dimRoll(
+      convolved_swapped_to_last_channel.rank() - 1, dim);
+
+  ERROR_ON(in_shape != prefix_sum.shape());
+
+  // Since we cast to a floating point type to do the sum we must cast back to
+  // the output type
+  const auto output = mayCast(context, prefix_sum, out_type);
+
+  context.tensors.insert({this->result(), output});
 }
 
 } // namespace poptorch_ir

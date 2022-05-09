@@ -135,28 +135,6 @@ def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
     ];
 }
 
-class Poptorch_partial<string name> : Poptorch_NotImplementedOp<name, []> {
-    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
-
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
-                                      "std::int64_t":$dim),[{
-        $_state.addOperands({self});
-        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
-
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
-
-        const auto in_element_type = tensor.getElementType();
-        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
-
-        $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), out_element_type));
-     }]>
-    ];
-}
-
-def Poptorch_cumsum_out : Poptorch_partial<"cumsum_out"> {}
-
 
 // From the docs: https://pytorch.org/docs/stable/generated/torch.all.html
 // NOTE: This function matches the behaviour of NumPy in returning output of dtype bool
@@ -348,3 +326,30 @@ def Poptorch_embedding_bag : Poptorch_NotImplementedOp<"embedding_bag", []> {
         $_state.addTypes({output, offset2bag, bag_size, max_indices});
     }]>];
 }
+
+
+class Poptorch_prefix_sum<string name> : Poptorch_Op<name, []> {
+    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::int64_t":$dim),[{
+        $_state.addOperands({self});
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+
+        dim = convertToPositiveDim(dim, tensor.getShape().size());
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+        const auto in_element_type = tensor.getElementType();
+        auto out_element_type = in_element_type.isa<mlir::IntegerType>()
+                ? $_builder.getIntegerType(32, true)
+                : in_element_type;
+
+        $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), out_element_type));
+     }]>
+    ];
+}
+
+def Poptorch_cumsum_out : Poptorch_prefix_sum<"cumsum_out"> {}

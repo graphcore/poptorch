@@ -131,3 +131,10 @@ def test_any_all(func, input):
 @pytest.mark.parametrize("keepdim", [True, False])
 def test_any_all_dim(func, input, dim, keepdim):
     reduce_harness(func, input, dim, keepdim)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("input", all_test_cases)
+@pytest.mark.parametrize("dim", [0, -1])
+def test_cumsum(input, dim):
+    reduce_harness(torch.cumsum, input, dim)
