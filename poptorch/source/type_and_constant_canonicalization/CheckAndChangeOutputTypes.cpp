@@ -23,7 +23,7 @@ constexpr bool supportedType(const at::ScalarType type) {
           type == at::ScalarType::Half || type == at::ScalarType::Float ||
           type == at::ScalarType::Double || type == at::ScalarType::Bool ||
           type == at::ScalarType::BFloat16 || type == at::ScalarType::Char ||
-          type == at::ScalarType::Byte);
+          type == at::ScalarType::Byte || type == at::ScalarType::Short);
 }
 
 bool isBeforeHostSideCast(const torch::jit::Node *n) {

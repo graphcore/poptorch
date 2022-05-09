@@ -9,6 +9,7 @@ New features
 ------------
 
 - Improve performance of ``torch.gather`` in some cases where the index tensor has come from an ``expand`` or ``expand_as``.
+- Improve error message when trying to apply bitwise ops to unsupported scalar types.
 
 API changes
 -----------
@@ -19,6 +20,7 @@ Bug Fixes
 - Fix remaining in-place operations on slices
 - Fix einsum transpose error
 - Fix floating point exception in ``torch.Tensor.exponential_`` and ``torch.distributions.Exponential``
+- Improve support for ``torch.int16`` tensors.
 
 v2.5 (Poplar SDK 2.5)
 =====================

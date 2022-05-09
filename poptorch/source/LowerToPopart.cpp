@@ -136,6 +136,9 @@ std::string typeToPopartStr(at::ScalarType type) {
   if (type == at::ScalarType::Half) {
     return "FLOAT16";
   }
+  if (type == at::ScalarType::Short) {
+    return "INT16";
+  }
   if (type == at::ScalarType::Int || type == at::ScalarType::Long) {
     return "INT32";
   }
@@ -168,7 +171,8 @@ at::ScalarType fromPopartType(const poptorch::PopartType type) {
   case poptorch::PopartType::INT8: {
     return at::ScalarType::Char;
   }
-  case poptorch::PopartType::INT16: {
+  case poptorch::PopartType::INT16:
+  case poptorch::PopartType::UINT16: {
     return at::ScalarType::Short;
   }
   case poptorch::PopartType::INT32:
@@ -200,7 +204,7 @@ at::ScalarType fromPopartType(const poptorch::PopartType type) {
     return at::ScalarType::ComplexDouble;
   }
   default:
-    ERROR("Unsupported PopART data type");
+    ERROR("Unsupported PopART data type " << toPopartTypeStr(type));
   }
 }
 
@@ -243,7 +247,7 @@ PopartType toPopartType(const at::ScalarType type) {
     return PopartType::COMPLEX128;
   }
   default:
-    ERROR("Unsupported PyTorch scalar type");
+    ERROR("Unsupported PyTorch scalar type " << toString(type));
   }
 }
 

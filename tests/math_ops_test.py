@@ -448,6 +448,24 @@ def test_binary_int_ops(op, trace_model):
     op_harness(trace_model, op, [input1, input2], assert_)
 
 
+# Poplar doesn't support binary ops on 8-bit integral types, but test we can
+# pass the rest of them.
+@pytest.mark.parametrize("dtype", [torch.int16, torch.int32, torch.int64])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_binary_int_op_types(dtype, trace_model):
+    input1 = torch.tensor([-4, 7, 5, 4, -7, 8], dtype=dtype)
+    input2 = torch.tensor([2, -3, 8, -2, 3, 5], dtype=dtype)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out,
+                                expected=native_out,
+                                atol=1e-05,
+                                rtol=1e-05,
+                                equal_nan=True)
+
+    op_harness(trace_model, torch.bitwise_and, [input1, input2], assert_)
+
+
 binary_op_bool = [
     torch.bitwise_and,
     torch.bitwise_or,

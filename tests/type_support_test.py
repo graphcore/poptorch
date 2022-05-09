@@ -281,16 +281,16 @@ def test_many_implicit_cast_one_less_than(input_type, trace_model):
                             expected=torch.tensor([True, False, True, True]))
 
 
-@pytest.mark.parametrize("input_type", [torch.int8, torch.uint8])
+@pytest.mark.parametrize("input_type", [torch.int8, torch.uint8, torch.int16])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_int8(input_type, trace_model):
+def test_small_int(input_type, trace_model):
     class Model(nn.Module):
         def forward(self, x):
             return x.float()
 
     input = torch.arange(100)
 
-    # Convert to int8/uint8
+    # Convert to desired input type
     input = input.to(input_type)
 
     options = poptorch.Options()
@@ -303,16 +303,16 @@ def test_int8(input_type, trace_model):
     helpers.assert_allequal(actual=output, expected=input.float())
 
 
-@pytest.mark.parametrize("input_type", [torch.int8, torch.uint8])
+@pytest.mark.parametrize("input_type", [torch.int8, torch.uint8, torch.int16])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_int8_return(input_type, trace_model):
+def test_small_int_return(input_type, trace_model):
     class Model(nn.Module):
         def forward(self, x):
             return x, x.float() + x.float()
 
     input = torch.arange(100)
 
-    # Convert to int8/uint8
+    # Convert to desired input/output type
     input = input.to(input_type)
 
     options = poptorch.Options()

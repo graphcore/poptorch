@@ -32,10 +32,20 @@ reduceHelperDimensionCreator(torch::jit::Value *value,
 // an empty std::function otherwise.
 SymbolHandler getHandler(torch::jit::NodeKind kind);
 
+// Returns true if all inputs to `node` are of the given `type`.
+//
+// \param ignore_input Index of an input to not check.
+//
+// \note Errors if a not-ignored input is not a tensor, or doesn't have a scalar
+//       type.
+bool allInputsOfType(torch::jit::Node *node, at::ScalarType type,
+                     int ignore_input = -1);
+
 // Returns true if all inputs are Bools
 bool allInputsBool(torch::jit::Node *node, int ignore_input = -1);
 
-// Returns true if all inputs are Bools
+// Returns true if all inputs are of integral type, compatible with
+// c10::isIntegralType.
 bool allInputsInteger(torch::jit::Node *node, int ignore_input = -1);
 
 // Get the tensor shape and add it to the IR as a constant primitive.
