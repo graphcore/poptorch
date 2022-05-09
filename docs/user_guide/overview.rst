@@ -922,7 +922,7 @@ In addition, you can apply ``poptorch.autocast(enabled=True)`` to a code-block, 
 
 .. literalinclude:: autocast.py
     :language: python
-    :caption: Controlling automatic casting via decorator
+    :caption: Applying automatic casting to a code-block
     :start-after: block_autocast_start
     :end-before: block_autocast_end
     :emphasize-lines: 3
@@ -933,8 +933,8 @@ method of :py:class:`~poptorch.options._PrecisionOptions`.
 .. literalinclude:: autocast.py
     :language: python
     :caption: Disabling automatic casting
-    :start-after: block_autocast_start
-    :end-before: block_autocast_end
+    :start-after: disable_autocast_start
+    :end-before: disable_autocast_end
     :emphasize-lines: 2
 
 Custom casting policies
