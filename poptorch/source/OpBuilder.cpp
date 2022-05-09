@@ -353,9 +353,12 @@ createCustomOperation(torch::jit::Graph *graph,
                       const std::string &name, const std::string &domain,
                       std::int64_t domainVersion, std::int64_t numOutputs,
                       const std::string &attributes_id_str) {
+  OutputType type =
+      (numOutputs > 1) ? OutputType::Unknown : OutputType::AsFirstInput;
+
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::custom_operation, inputs,
-                          ImplicitCast::None, OutputType::Unknown, numOutputs);
+                          ImplicitCast::None, type, numOutputs);
 
   new_node->s_(c10::Symbol::fromQualString("attr::name"), name);
   new_node->s_(c10::Symbol::fromQualString("attr::domain"), domain);
