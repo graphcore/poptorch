@@ -72,7 +72,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/EvaluateConstexprs.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/MakeConstantIntParams.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Utils.cpp"
-  "${PROJECT_SOURCE_DIR}/poptorch/source/WarnOnUnsupportedAten.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/ErrorOnUnsupportedAten.cpp"
   )
 
 # Same as pybind11_add_module but without stripping the symbols and setting the visibility to hidden.
