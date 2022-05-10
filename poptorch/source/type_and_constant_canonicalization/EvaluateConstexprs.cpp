@@ -33,22 +33,6 @@ size_t numValuesInGraph(const torch::jit::Graph *g) {
   return num_values;
 }
 
-bool nodeEndsUpAsSubgraphInput(const torch::jit::Node *node) {
-  if (node->kind() == symbols::poptorch::start_for_loop) {
-    return true;
-  }
-
-  for (const auto *output : node->outputs()) {
-    for (const auto &use : output->uses()) {
-      if (nodeEndsUpAsSubgraphInput(use.user)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 class ConstExprEvaluator {
 public:
   explicit ConstExprEvaluator(torch::jit::Graph *g)
@@ -59,7 +43,7 @@ public:
   void evaluate();
 
 private:
-  void copyAllConstNodesToConstexprGraph();
+  void copyAllConstNodesToToConstexprGraph();
 
   void removeLoneConstants();
 
@@ -98,7 +82,7 @@ void ConstExprEvaluator::evaluate() {
 
   // Copy all nodes which can be evaluated as a constant expression into a new
   // graph. In addition, set outputs of the new graph where required
-  copyAllConstNodesToConstexprGraph();
+  copyAllConstNodesToToConstexprGraph();
 
   // We do not want to evaluate lone constants only to replace them with an
   // identical constants
@@ -116,7 +100,7 @@ void ConstExprEvaluator::evaluate() {
   removeUnusedNodes();
 }
 
-void ConstExprEvaluator::copyAllConstNodesToConstexprGraph() {
+void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
   logging::LogContext ctx_func("ConstExprEvaluator");
   std::vector<torch::jit::Node *> nodes_plus_return;
   for (auto *node : _graph->nodes()) {
@@ -124,22 +108,10 @@ void ConstExprEvaluator::copyAllConstNodesToConstexprGraph() {
   }
   nodes_plus_return.push_back(_graph->return_node());
 
-  // Keep track of subgraphs to avoid evaluating constexprs that are part of
-  // a subgraph.
-  int num_unclosed_subgraphs = 0;
-
   for (auto *node : nodes_plus_return) {
     logging::LogContext ctx("processing " + nodeToString(node));
 
-    if (node->kind() == symbols::poptorch::start_for_loop) {
-      num_unclosed_subgraphs++;
-    } else if (node->kind() == symbols::poptorch::end_for_loop) {
-      ERROR_ON(num_unclosed_subgraphs <= 0);
-      num_unclosed_subgraphs--;
-    }
-
-    if (num_unclosed_subgraphs == 0 && !nodeEndsUpAsSubgraphInput(node) &&
-        nodeIsConstExpr(*node)) {
+    if (nodeIsConstExpr(*node)) {
       copyNodeToConstexprGraph(node);
     } else {
       for (auto *input : node->inputs()) {
@@ -152,8 +124,6 @@ void ConstExprEvaluator::copyAllConstNodesToConstexprGraph() {
       }
     }
   }
-
-  ERROR_ON(num_unclosed_subgraphs != 0);
   logging::trace("Constexpr graph: {}", *_constexpr_graph);
 }
 
@@ -164,10 +134,6 @@ void ConstExprEvaluator::removeLoneConstants() {
     }
 
     if (node->outputs().size() != 1) {
-      continue;
-    }
-
-    if (_nodes_map.find(node) == _nodes_map.end()) {
       continue;
     }
 
