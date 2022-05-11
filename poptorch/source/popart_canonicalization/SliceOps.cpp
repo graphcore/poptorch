@@ -280,7 +280,7 @@ torch::jit::Node *dynamicSliceHandler(torch::jit::Graph *graph,
                    << "dimension (" << length_of_dim << ").");
 
   // Make sure the start_node is a tensor not an int
-  if (start_node->kind() == c10::aten::Int) {
+  if (start_node->output()->type()->kind() == c10::TypeKind::IntType) {
     start_node = start_node->input()->node();
   }
 
