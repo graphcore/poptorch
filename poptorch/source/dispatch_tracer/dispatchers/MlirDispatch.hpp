@@ -25,6 +25,7 @@ public:
   MLIRDispatch();
 
   void initCompiler();
+  at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
   at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
   void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
@@ -39,14 +40,6 @@ public:
   at::Tensor detach(const at::Tensor &self) final;
 
   void registerEmptyTensor(const at::Tensor &tensor) final;
-
-  at::Tensor
-  toCopyInplace(const at::Tensor &self,
-                c10::optional<at::ScalarType> dtype = c10::nullopt,
-                c10::optional<at::Layout> layout = c10::nullopt,
-                c10::optional<at::Device> device = c10::nullopt,
-                c10::optional<bool> pin = c10::nullopt,
-                c10::optional<c10::MemoryFormat> fmt = c10::nullopt) final;
 
   const at::Tensor &copyInplace(const at::Tensor &self,
                                 const at::Tensor &src) final;
@@ -98,12 +91,6 @@ protected:
   static poptorch_ir::TensorId getSingleOptionalTensorId(
       const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec);
 
-  at::Tensor allocateTensorImpl(
-      c10::IntArrayRef sizes, c10::optional<at::ScalarType> dtype,
-      c10::optional<at::Device> device, c10::optional<at::Layout> layout,
-      c10::optional<bool> pin_memory,
-      c10::optional<at::MemoryFormat> memory_format) final;
-
 private:
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
@@ -111,10 +98,8 @@ private:
   poptorch_ir::PoptorchCompiler _compiler;
 #endif
 
-  // We use the value mapper to map between incoming at::Tensors and JIT/MLIR
-  // types.
-  ValueMapper _mapper;
-  uint64_t _next_tensor_id{1};
+  // These are used to generate unique names
+  // for each added input / output / parameter.
   uint64_t _next_input_idx{0};
   uint64_t _next_output_idx{0};
   uint64_t _next_parameter_idx{0};

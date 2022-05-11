@@ -20,7 +20,7 @@ void PoptorchCompiler::init() {
   _impl = std::make_unique<detail::PoptorchCompilerImpl>();
 }
 
-TensorId PoptorchCompiler::addInput(void * /*unused*/,
+TensorId PoptorchCompiler::addInput(const Buffer &ptr,
                                     const std::vector<std::int64_t> &shape,
                                     Type type, const char *name) {
   mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
@@ -32,7 +32,7 @@ TensorId PoptorchCompiler::addInput(void * /*unused*/,
                                                name);
 
   _impl->value_map.push_back(val);
-  _impl->input_callbacks.push_back(name);
+  _impl->input_callbacks.push_back({name, ptr});
 
   return _impl->value_map.size() - 1;
 }
@@ -46,7 +46,7 @@ void PoptorchCompiler::setCurrentPythonCodeLocation(const char *filename,
   }
 }
 
-TensorId PoptorchCompiler::addParameter(void *ptr,
+TensorId PoptorchCompiler::addParameter(const Buffer &ptr,
                                         const std::vector<std::int64_t> &shape,
                                         Type type, const char *name) {
   mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
@@ -69,12 +69,6 @@ TensorId PoptorchCompiler::addParameter(void *ptr,
 
   _impl->weight_callbacks.push_back({name, ptr});
   return _impl->value_map.size() - 1;
-}
-
-TensorId PoptorchCompiler::addBuffer(void *ptr,
-                                     const std::vector<std::int64_t> &shape,
-                                     Type type, const char *name) {
-  return addParameter(ptr, shape, type, name);
 }
 
 void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {

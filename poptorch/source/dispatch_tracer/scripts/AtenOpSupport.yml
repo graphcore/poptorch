@@ -570,6 +570,18 @@
   PopTorchDirect: scatter_add_out
   UnusedOutputArguments: {out}
 
+# abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: abs.out
+  PopTorchDirect: abs
+  PopTorchDirectInplace: abs_
+  UnusedOutputArguments: {out}
+
+# mean.out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
+- func: mean.out
+  PopTorchDirect: reducemean
+  IgnoreArgs: {'dtype'}
+  UnusedOutputArguments: {out}
+
 
 ##########
 # Linalg
@@ -580,6 +592,14 @@
 #             int[] padding, int[] dilation, bool transposed,
 #             int[] output_padding, int groups) -> Tensor
 - func: convolution
+  PopTorchDirect: conv
+  IgnoreArgs: {'transposed'}
+
+# convolution_overrideable(Tensor input, Tensor weight, Tensor? bias,
+#                          int[] stride, int[] padding, int[] dilation,
+#                          bool transposed, int[] output_padding,
+#                          int groups) -> Tensor
+- func: convolution_overrideable
   PopTorchDirect: conv
   IgnoreArgs: {'transposed'}
 

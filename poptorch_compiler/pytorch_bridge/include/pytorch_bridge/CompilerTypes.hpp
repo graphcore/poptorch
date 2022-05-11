@@ -4,9 +4,13 @@
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <vector>
 
 namespace poptorch_ir {
+
+// Host blob of memory containing data to transfer to the IPU.
+using Buffer = std::shared_ptr<std::vector<char>>;
 
 // A token representing an SSA value on our side. PyTorch records it's
 // tensors->TensorId and we record TensorId->mlir::Value. This stops either side

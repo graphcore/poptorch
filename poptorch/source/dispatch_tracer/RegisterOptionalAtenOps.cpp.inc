@@ -1,13 +1,16 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
-TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
+//TODO(T59880) rename XLA -> IPU
+TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("copy_", PTC(poptorch::copyInplace));
-  m.impl("_to_copy", PTC(poptorch::toCopy));
+  m.impl("_local_scalar_dense", PTC(poptorch::localScalarDense));
+
   m.impl("empty.memory_format", PTC(poptorch::emptyMemoryFormat));
-  m.impl("empty.out", PTC(poptorch::emptyOut));
   m.impl("empty_strided", PTC(poptorch::emptyStrided));
   m.impl("detach", PTC(poptorch::detach));
+
   m.impl("convolution", PTC_BOXED(poptorch::fallback));
+  m.impl("convolution_overrideable", PTC_BOXED(poptorch::fallback));
   m.impl("transpose.int", PTC_BOXED(poptorch::fallback));
   m.impl("layer_norm", PTC_BOXED(poptorch::fallback));
   m.impl("expand", PTC_BOXED(poptorch::fallback));
@@ -58,5 +61,4 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse2, m) {
 
   m.impl("constant_pad_nd", PTC_BOXED(poptorch::fallback));
   m.impl("binary_cross_entropy_with_logits", PTC_BOXED(poptorch::fallback));
-  m.impl("binary_cross_entropy_with_logits_backward", PTC_BOXED(poptorch::fallback));
 }

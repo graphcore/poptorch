@@ -37,13 +37,11 @@ public:
   void setCurrentPythonCodeLocation(const char *filename, std::uint64_t line,
                                     std::uint64_t col);
 
-  TensorId addInput(void *ptr, const std::vector<std::int64_t> &shape, Type,
-                    const char *);
-  TensorId addParameter(void *ptr, const std::vector<std::int64_t> &shape, Type,
+  TensorId addInput(const Buffer &ptr, const std::vector<std::int64_t> &shape,
+                    Type, const char *);
+  TensorId addParameter(const Buffer &ptr,
+                        const std::vector<std::int64_t> &shape, Type,
                         const char *);
-  TensorId addBuffer(void *ptr, const std::vector<std::int64_t> &shape, Type,
-                     const char *);
-
   void addOutput(TensorId id, void *ptr, const char *);
 
   PoptorchExecutorWrapper compile();

@@ -447,10 +447,11 @@ class ClangTidy(ILinter):
                 prefix="poptorchLinter_")
             self.autofix = autofix
 
-        def __call__(self, output, returncode):
+        def __call__(self, raw_output, returncode):
             self.num_jobs -= 1
             logger.debug("1 clang-tidy job completed, %d remaining",
                          self.num_jobs)
+            logger.debug("clang-tidy output: %s", raw_output)
             if self.num_jobs == 0:
                 diagnostics = []
                 # Combine the diagnostics from the different reports
@@ -498,11 +499,15 @@ class ClangTidy(ILinter):
                         print("Output of clang-tidy:")
                     print(output)
                     printed.append(output)
+                if not printed and returncode != 0:
+                    # If we didn't manage to parse the diagnostics but clang-tidy
+                    # returned a failure at least print the raw output.
+                    print(raw_output)
                 # Apply the fixes using clang-apply-replacements
                 if self.autofix:
                     CondaCommand("clang-apply-replacements",
                                  self.tmp_folder.name).run()
-            return output, returncode
+            return raw_output, returncode
 
     def __init__(self):
         self.configs = []

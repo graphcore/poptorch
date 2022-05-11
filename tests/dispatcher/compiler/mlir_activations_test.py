@@ -104,6 +104,7 @@ def test_logsoftmax_backward(dim):
     def log_softmax_backward(t):
         out = F.log_softmax(t, dim)
         loss = torch.sum(out)
+        t.retain_grad()
         loss.backward()
         return t.grad
 

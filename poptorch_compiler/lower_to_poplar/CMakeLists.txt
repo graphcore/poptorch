@@ -24,6 +24,7 @@ find_package(popef)
 target_link_libraries(lower_to_poplar PRIVATE
         MLIRIR
         MLIRPass
+        MLIRTransforms
         poptorch_mlir_passes
 
         model_runtime

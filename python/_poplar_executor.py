@@ -22,8 +22,8 @@ from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
 from . import _poptorch_data
-from ._utils import (accessAttributes, unrollTensorList,
-                     reconstruct_output_structure)
+from ._utils import (accessAttributes, flattenTensorStructure,
+                     reconstructTensorStructure)
 from ._logging import logger
 from .experimental import IPUScope
 from .options import Options, PipelinedExecution, ShardedExecution
@@ -511,7 +511,7 @@ class PoplarExecutor:
             yield from model.named_buffers()
 
         # Unpack the inputs.
-        inputs = unrollTensorList(in_tensors.asTuple())
+        inputs = flattenTensorStructure(in_tensors.asTuple())
 
         # Store buffer and parameter memory addresses to make sure that these do
         # not change during dispatching (which would give wrong results in a Jit
@@ -908,8 +908,7 @@ class PoplarExecutor:
         self._assign_backward_error(output)
 
         if self._outputs_structure is not None:
-            return reconstruct_output_structure(self._outputs_structure,
-                                                output)
+            return reconstructTensorStructure(self._outputs_structure, output)
         if len(output) == 0:
             return None
         if len(output) > 1:

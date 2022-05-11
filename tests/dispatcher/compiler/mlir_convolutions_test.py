@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+import copy
 import torch
 import pytest
 import helpers
@@ -105,9 +106,9 @@ def test_conv(num_dims, size):
                                groups,
                                bias=bias)
 
-    ipu_result = IPUContext(conv,
-                            parameters_and_buffers=conv.named_parameters())(t1)
-    cpu_result = conv(t1)
+    cpu_conv = copy.deepcopy(conv)
+    ipu_result = IPUContext(conv, model=conv)(t1)
+    cpu_result = cpu_conv(t1)
 
     assert ipu_result.size() == cpu_result.size()
 

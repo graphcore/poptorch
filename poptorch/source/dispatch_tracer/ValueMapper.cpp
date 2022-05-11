@@ -1,14 +1,30 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "ValueMapper.hpp"
+
+#include "Tensor.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 
-bool ValueMapper::isDirectAlias(const at::Tensor &t) {
-  auto itr = storage_map.find(t.storage().unsafeGetStorageImpl());
+bool ValueMapper::TrackedTensor::isSame(const at::Tensor &other) const {
+  return ipuTensorId(other) == ipu_tensor_id;
+}
 
-  if (itr == storage_map.end()) {
+ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor,
+                                          bool _is_empty)
+    : tensor_impl(tensor.unsafeGetTensorImpl()),
+      tracker(tensor.getIntrusivePtr()), jit(nullptr),
+      mlir(poptorch_ir::tensor_error_id), ipu_tensor_id(ipuTensorId(tensor)),
+      is_empty(_is_empty) {}
+
+bool ValueMapper::isDirectAlias(const at::Tensor &t) {
+  if (!isIpuTensor(t)) {
+    return false;
+  }
+  auto itr = ipu_ids_map.find(ipuTensorId(t));
+
+  if (itr == ipu_ids_map.end()) {
     return false;
   }
 
@@ -65,7 +81,7 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
   itr->second.is_empty = is_empty;
 
   // If this map insert fails then we add the storage to the existing list.
-  auto pair = storage_map.insert({t.storage().unsafeGetStorageImpl(), {}});
+  auto pair = ipu_ids_map.insert({ipuTensorId(t), {}});
   pair.first->second.push_back(&itr->second);
 }
 
@@ -86,7 +102,7 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
   values_map.insert({val, &itr.first->second});
 
   // If this map insert fails then we add the storage to the existing list.
-  auto pair = storage_map.insert({t.storage().unsafeGetStorageImpl(), {}});
+  auto pair = ipu_ids_map.insert({ipuTensorId(t), {}});
   pair.first->second.push_back(&itr.first->second);
 }
 
@@ -95,6 +111,16 @@ ValueMapper::TrackedTensor *ValueMapper::rawTensorRecord(const at::Tensor &t) {
 
   if (itr != tensors.end()) {
     return &itr->second;
+  }
+
+  return nullptr;
+}
+
+ValueMapper::TrackedTensor *
+ValueMapper::rawTensorRecord(torch::jit::Value *val) {
+  auto itr = values_map.find(val);
+  if (itr != values_map.end()) {
+    return itr->second;
   }
 
   return nullptr;

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+import copy
 import pytest
 import torch
 import torch.nn as nn
-from poptorch.experimental import IPUScope
+from poptorch.experimental import IPUContext
 import helpers
+import poptorch
 
 
 @pytest.mark.mlirSupportRequired
@@ -52,17 +54,12 @@ def test_mnist():
     model = Network()
     input = torch.ones([1, 1, 28, 28])
 
-    # Gather up all the buffers and parameters.
-    def all_data(model):
-        yield from model.named_parameters()
-        yield from model.named_buffers()
+    cpu_model = copy.deepcopy(model)
+    ipu_out = IPUContext(model, model=model,
+                         compiler=poptorch.Compiler.PopART)(input)
 
-    with IPUScope([input], all_data(model)) as ipu:
-        out = model(input)
-        ipu.outputs(out)
-
-    helpers.assert_allclose(expected=model(input),
-                            actual=ipu(input),
+    helpers.assert_allclose(expected=cpu_model(input),
+                            actual=ipu_out,
                             atol=1e-05,
                             rtol=1e-05,
                             equal_nan=True)

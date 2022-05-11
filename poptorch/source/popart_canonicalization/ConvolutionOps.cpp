@@ -208,6 +208,7 @@ torch::jit::Node *cumsumHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::convolution, convolutionHandler);
+  registerHandler(c10::aten::convolution_overrideable, convolutionHandler);
   registerHandler(c10::aten::_convolution, convolutionHandler);
   registerHandler(c10::aten::mkldnn_convolution, conv2dHandler);
   registerHandler(c10::aten::conv2d, conv2dHandler);

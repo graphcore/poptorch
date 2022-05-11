@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/PoplarExecutable.hpp"
 #include "poptorch/Utils.hpp"
@@ -40,43 +41,47 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors) {
     // Handle input based on the PyTorch input type
     at::ScalarType elem_type = pytorch_tensor.scalar_type();
 
+    void *data_ptr = nullptr;
+    if (pytorch_tensor.is_cpu()) {
+      data_ptr = pytorch_tensor.data_ptr();
+    } else {
+      data_ptr = getDataSource(pytorch_tensor);
+    }
+    ERROR_ON(data_ptr == nullptr);
+
     switch (elem_type) {
     case at::ScalarType::Byte:
-      _compiler.setUpInputOp(
-          popart_id, static_cast<std::uint8_t *>(pytorch_tensor.data_ptr()),
-          popart_dims);
+      _compiler.setUpInputOp(popart_id, static_cast<std::uint8_t *>(data_ptr),
+                             popart_dims);
       break;
     case at::ScalarType::Char:
-      _compiler.setUpInputOp(
-          popart_id, static_cast<std::int8_t *>(pytorch_tensor.data_ptr()),
-          popart_dims);
+      _compiler.setUpInputOp(popart_id, static_cast<std::int8_t *>(data_ptr),
+                             popart_dims);
       break;
     case at::ScalarType::Float:
-      _compiler.setUpInputOp(popart_id,
-                             static_cast<float *>(pytorch_tensor.data_ptr()),
+      _compiler.setUpInputOp(popart_id, static_cast<float *>(data_ptr),
                              popart_dims);
       break;
     case at::ScalarType::Half:
-      _compiler.setUpInputOp(
-          popart_id, static_cast<std::int16_t *>(pytorch_tensor.data_ptr()),
-          popart_dims, true);
+      _compiler.setUpInputOp(popart_id, static_cast<std::int16_t *>(data_ptr),
+                             popart_dims, true);
       break;
     case at::ScalarType::Short:
-      _compiler.setUpInputOp(
-          popart_id, static_cast<std::int16_t *>(pytorch_tensor.data_ptr()),
-          popart_dims);
+      _compiler.setUpInputOp(popart_id, static_cast<std::int16_t *>(data_ptr),
+                             popart_dims);
       break;
     case at::ScalarType::Int:
-      _compiler.setUpInputOp(
-          popart_id, static_cast<std::int32_t *>(pytorch_tensor.data_ptr()),
-          popart_dims);
+      _compiler.setUpInputOp(popart_id, static_cast<std::int32_t *>(data_ptr),
+                             popart_dims);
       break;
     case at::ScalarType::Bool:
-      _compiler.setUpInputOp(popart_id,
-                             static_cast<bool *>(pytorch_tensor.data_ptr()),
+      _compiler.setUpInputOp(popart_id, static_cast<bool *>(data_ptr),
                              popart_dims);
       break;
     case at::ScalarType::Long:
+      // If it's an IPU tensor then it should have been handled by the
+      // dispatcher.
+      ERROR_ON_MSG(!pytorch_tensor.is_cpu(), "Only supported for CPU tensors");
       _converted_inputs[i] = pytorch_tensor.toType(at::ScalarType::Int);
       _compiler.setUpInputOp(
           popart_id,
@@ -85,6 +90,9 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors) {
       break;
     case at::ScalarType::Double:
     case at::ScalarType::BFloat16:
+      // If it's an IPU tensor then it should have been handled by the
+      // dispatcher.
+      ERROR_ON_MSG(!pytorch_tensor.is_cpu(), "Only supported for CPU tensors");
       _converted_inputs[i] = pytorch_tensor.toType(at::ScalarType::Float);
       _compiler.setUpInputOp(
           popart_id, static_cast<float *>(_converted_inputs[i].data_ptr()),

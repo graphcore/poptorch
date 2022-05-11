@@ -74,14 +74,10 @@ def inference_harness(imagenet_model, check=True):
     # Run on CPU.
     native_out = model(image_input)
 
-    parameters_named = {
-        **dict(model.named_parameters()),
-        **dict(model.named_buffers())
-    }
-
     # Run on IPU.
-    with IPUScope([image_input], parameters_named) as poptorch_model:
-        out = model(image_input)
+    with IPUScope([image_input], model=model) as poptorch_model:
+        img = image_input.to("xla")
+        out = model(img)
         poptorch_model.outputs(out)
 
     poptorch_out = poptorch_model(image_input)

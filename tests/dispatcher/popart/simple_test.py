@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import inspect
+import copy
 import pytest
 import torch
 import torch.nn as nn
@@ -14,7 +15,8 @@ def test_simple_test():
     input = torch.ones([10])
 
     with IPUScope([input]) as ipu:
-        x = input + 5
+        x = input.to("xla")
+        x = x + 5
         x = x * 3
         ipu.outputs(x)
 
@@ -27,12 +29,14 @@ def test_simple_conv():
     input = torch.ones([1, 5, 25, 25])
 
     conv = nn.Conv2d(5, 10, 5)
+    cpu_conv = copy.deepcopy(conv)
 
-    with IPUScope([input], conv.named_parameters()) as ipu:
-        x = conv(input)
+    with IPUScope([input], model=conv) as ipu:
+        x = input.to("xla")
+        x = conv(x)
         ipu.outputs(x)
 
-    cpu = conv(input)
+    cpu = cpu_conv(input)
     ipu = ipu(input)
 
     helpers.assert_allclose(expected=cpu,
@@ -45,11 +49,12 @@ def test_simple_conv():
 @pytest.mark.mlirSupportRequired
 def test_tensor_constant():
     def f(x):
-        return x + torch.tensor([1.0, 2.0, 3.0])
+        return x + torch.tensor([1.0, 2.0, 3.0], device=helpers.outputDevice())
 
     input = torch.rand(3)
     with IPUScope([input]) as ipu:
-        y = f(input)
+        y = input.to("xla")
+        y = f(y)
         ipu.outputs(y)
 
     cpu = f(input)
@@ -84,10 +89,9 @@ def test_source_location(capfd, compiler, mode):
         opts.appendToLocationExcludes("/")
 
     input = torch.Tensor([[1.], [-1.]])
-    with IPUScope([input],
-                  layer.named_parameters(),
-                  compile_using=compiler,
+    with IPUScope([input], model=layer, compile_using=compiler,
                   options=opts) as ipu:
+        input = input.to("xla")
         y = f(input)
         ipu.outputs([y])
 

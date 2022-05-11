@@ -33,11 +33,6 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
     ipu_norm.train(training)
     cpu_norm = copy.deepcopy(ipu_norm)
 
-    weights = {
-        **dict(ipu_norm.named_parameters()),
-        **dict(ipu_norm.named_buffers())
-    }
-
     t2 = torch.ones_like(t)
 
     if affine:
@@ -46,28 +41,19 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
             out = norm(x1)
             loss = torch.nn.functional.mse_loss(out, x2)
             loss.backward()
-            return out, norm.weight.grad, norm.bias.grad
+            ret = [out, norm.weight.grad, norm.bias.grad]
+            if track_running_stats:
+                ret.append(norm.running_mean)
+            return ret
     else:
         cpu_step = lambda norm, x1, _: norm(x1)
 
-    ipu_result = IPUContext(cpu_step, parameters_and_buffers=weights)(ipu_norm,
-                                                                      t, t2)
+    ipu_result = IPUContext(cpu_step, model=ipu_norm)(ipu_norm, t, t2)
     cpu_result = cpu_step(cpu_norm, t, t2)
 
     # Test outputs and gradients
     for cpu, ipu in zip(cpu_result, ipu_result):
         helpers.assert_allclose(actual=ipu, expected=cpu)
-
-    # Test running statistics
-    if track_running_stats:
-        helpers.assert_allclose(actual=ipu_norm.running_mean,
-                                expected=cpu_norm.running_mean,
-                                atol=1e-4,
-                                rtol=1e-4)
-        helpers.assert_allclose(actual=ipu_norm.running_var,
-                                expected=cpu_norm.running_var,
-                                atol=1e-4,
-                                rtol=1e-4)
 
 
 @pytest.mark.mlirSupportRequired
@@ -83,8 +69,7 @@ def test_group_norm():
     # Run pytorch native on CPU.
     torch_out = norm(t)
 
-    weights = {**dict(norm.named_parameters()), **dict(norm.named_buffers())}
     # Run on IPU.
-    ipu_result = IPUContext(norm, parameters_and_buffers=weights)(t)
+    ipu_result = IPUContext(norm, model=norm)(t)
 
     helpers.assert_allclose(actual=ipu_result, expected=torch_out)

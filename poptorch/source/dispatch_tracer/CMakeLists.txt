@@ -16,6 +16,7 @@ endif()
 add_library(dispatch_tracer STATIC
         RegisterAtenOverloads.cpp
         CommonHelperFunctions.cpp
+        dispatchers/IDispatch.cpp
         dispatchers/JitDispatch.cpp
         dispatchers/MlirDispatchUtils.cpp
 
@@ -24,6 +25,7 @@ add_library(dispatch_tracer STATIC
 
         dispatchers/CompilerDispatchTable.cpp
         ValueMapper.cpp
+        Tensor.cpp
 )
 
 target_link_libraries(dispatch_tracer

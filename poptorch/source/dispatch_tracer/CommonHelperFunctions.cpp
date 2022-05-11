@@ -38,14 +38,14 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       // This is probably an external tensor that we didn't catch. Assume
       // it's a constant.
       val = makeConstant(graph, tensor);
-      mapper.addTensor(tensor, val);
+      // Don't track constants in the ValueMapper as they are CPU tensors.
     } else {
       auto *record = mapper.rawTensorRecord(tensor);
       // If this isn't an input or node-output tensor, add it to the graph now
       // as a constant and fix the mapping.
       if (record->is_empty) {
         val = makeConstant(graph, tensor);
-        mapper.addTensor(tensor, val);
+        // Don't track constants in the ValueMapper as they are CPU tensors.
       }
     }
 
@@ -151,11 +151,9 @@ at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
     logging::warn("[TRACING-2] Tensor (ptr {}) type coerced from {} to {}",
                   static_cast<void *>(tensor.unsafeGetTensorImpl()),
                   scalar_type, coerced_scalar_type);
-    copy = tensor.to(coerced_scalar_type);
-  } else {
-    copy = tensor.clone();
+    return tensor.to(coerced_scalar_type);
   }
-  return copy;
+  return tensor;
 }
 
 c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
@@ -347,6 +345,11 @@ void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
 
 bool isHalfTensor(const at::Tensor &t) {
   return t.scalar_type() == at::ScalarType::Half;
+}
+
+c10::Device deviceOrDefaultIpu(c10::optional<c10::Device> device) {
+  // TODO(T59880) rename kXLA -> kIPU
+  return device ? *device : c10::Device(at::kXLA, 0);
 }
 
 } // namespace poptorch

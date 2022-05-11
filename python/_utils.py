@@ -61,27 +61,32 @@ def accessAttributes(attribute_id_str):
     return attributes
 
 
-def unrollTensorList(tensor_or_list, accumulated_tensors=None):
-    if accumulated_tensors is None:
-        accumulated_tensors = []
+def flattenTensorStructure(tensors):
+    def flatten(x):
+        if isinstance(x, dict):
+            for t in x.values():
+                yield from flatten(t)
+        elif isinstance(x, (list, tuple)):
+            for t in x:
+                yield from flatten(t)
+        elif isinstance(x, torch.Tensor):
+            yield x
+        # If it's not a dict/list/tuple or tensor, just ignore it
 
-    if isinstance(tensor_or_list, (list, tuple)):
-        for t in tensor_or_list:
-            accumulated_tensors = unrollTensorList(t, accumulated_tensors)
-    elif isinstance(tensor_or_list, torch.Tensor):
-        accumulated_tensors.append(tensor_or_list)
-    # If it's not a list/tuple or tensor, just ignore it
-
-    return accumulated_tensors
+    return list(flatten(tensors))
 
 
 # Turns a flat 'output' into the same structure as 'outputs_structure'.
-def reconstruct_output_structure(outputs_structure, output):
+def reconstructTensorStructure(outputs_structure, output):
     # Copy the original structure but replace all the tensors
     # by values from the passed iterator.
     def copy_structure(x, it):
+        if isinstance(x, dict):
+            return {k: copy_structure(v, it) for k, v in x.items()}
         if isinstance(x, (tuple, list)):
             return type(x)(copy_structure(e, it) for e in x)
-        return next(it)
+        if isinstance(x, torch.Tensor):
+            return next(it)
+        return x
 
     return copy_structure(outputs_structure, iter(output))

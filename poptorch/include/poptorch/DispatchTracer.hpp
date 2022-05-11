@@ -24,10 +24,6 @@ class PoptorchExecutorWrapper;
 
 namespace poptorch {
 
-namespace detail {
-class MLIRExecutableImpl;
-}
-
 // Toggled by the user in python to choose which backend to target when tracing.
 // CPU and SENTINEL will only be toggled by us.
 enum TracingMode {
@@ -67,13 +63,19 @@ private:
 
 // Create a new graph.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
-                 const std::vector<at::Tensor> &parameters,
                  const std::vector<std::string> &source_location_excludes);
+
+// The current graph is complete: finalize it.
+//
+// Trying to add ops after this call is undefined behaviour.
+void finalizeGraph();
 
 // Mark the outputs of the graph. |outputs| are the outputs as seen in the
 // graph, i.e, the tensors as seen/used by the user. `data_storage` are clones
 // of them which we should copy the output into. This is to give us a persistent
 // return location.
+//
+// Will implicitly finalizeGraph() once the outputs have been marked.
 void markOutputs(const std::vector<at::Tensor> &outputs,
                  const std::vector<at::Tensor> &data_storage);
 
@@ -85,10 +87,24 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph();
 // binary at the end, wrapped by `MLIRExecutable`.
 std::shared_ptr<MLIRExecutable> compileMLIR();
 
+// Get a pointer to the data source for an IPU input / parameter tensor.
+// If the value is not a parameter or an input, return nullptr.
+void *getDataSource(const at::Tensor &tensor);
+
+// Get a pointer to the data source for a given JIT value.
+// The value must be an IPU value.
+// If the value is not a parameter or an input, return nullptr.
+void *getDataSourceForValue(torch::jit::Value *value);
+
+// Return true if the given IPU tensor is a parameter.
+bool isParameter(torch::jit::Value *value);
+
 // Start capturing calls.
+// TODO(T61528): not needed anymore?
 void startDispatch();
 
 // Stop capturing calls.
+// TODO(T61528): not needed anymore?
 void endDispatch();
 
 // Return true if the dispatcher is active.

@@ -73,6 +73,25 @@ def test_where():
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
+# Check the canonicalizer for copy_ is not too eager with its optimisations
+@pytest.mark.mlirSupportRequired
+def test_copy_optim():
+    def fn(input, t2):
+        a = torch.empty([3, 3], device=helpers.outputDevice())
+        a.copy_(input)
+        input.copy_(t2)
+        return a, input
+
+    t = torch.tensor([[1, 2, 3], [4, 5, 6], [6, 7, 8]]).float()
+    t2 = torch.ones(3, 3)
+    ipu_result = IPUContext(fn)(t, t2)
+    cpu_result = fn(t, t2)
+
+    for ipu_out, cpu_out in zip(ipu_result, cpu_result):
+        print(f"ipu {ipu_out} cpu {cpu_out}", flush=True)
+        helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
+
+
 @pytest.mark.mlirSupportRequired
 def test_as_strided():
     def op_harness(op, *args):

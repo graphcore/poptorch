@@ -15,6 +15,7 @@
 #include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/PopartEnums.hpp"
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -277,13 +278,14 @@ namespace detail {
  */
 class LowerToPopartImpl {
 public:
-  LowerToPopartImpl(torch::jit::Graph *g, std::vector<at::Tensor> params,
-                    std::vector<std::string> parameter_names,
+  LowerToPopartImpl(torch::jit::Graph *g,
                     std::shared_ptr<InplaceOpHandler> inplace_op_handler,
                     bool training, std::vector<Optimizer> &&opt,
                     const SessionOptions &options,
                     const py::function &attribute_accessor,
                     CPUCallbackMap &&callback, const AnchorList &&anchors);
+  void setParameters(const std::vector<at::Tensor> &params,
+                     const std::vector<std::string> &parameter_names);
 
   void lower(std::vector<at::Tensor> *in_tensors);
 
@@ -295,6 +297,7 @@ private:
   torch::jit::Graph &_graph;
 
   bool _lowered;
+  bool _built_in_params;
 
   std::vector<at::Tensor> _parameters;
   std::vector<std::string> _parameter_names;
@@ -351,6 +354,14 @@ void maskVector(std::vector<T> *vec, const std::vector<bool> &mask,
   vec->erase(erase_begin, vec->end());
 }
 } // namespace
+
+void LowerToPopartImpl::setParameters(
+    const std::vector<at::Tensor> &params,
+    const std::vector<std::string> &parameter_names) {
+  _parameters = params;
+  _parameter_names = parameter_names;
+  _built_in_params = false;
+}
 
 /*
  * Lower to popart impl.
@@ -913,72 +924,150 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   // This will provide a view of all the tensors in _graph.inputs(), i.e.
   // by collapsing tuples.
   auto graph_t_inputs = collapsedGraphInputHierachy(&_graph);
-  std::size_t num_input_tensors = graph_t_inputs.size() - _parameters.size();
-  ERROR_ON(graph_t_inputs.size() != (in_tensors->size() + _parameters.size()));
-  ERROR_ON(num_input_tensors + _parameters.size() != graph_t_inputs.size());
 
-  // Store the number of inputs in _graph.inputs() before _parameters shrinks
-  const size_t num_inputs = _graph.inputs().size() - _parameters.size();
+  std::function<bool(torch::jit::Value * value)> is_parameter;
+  std::function<bool(torch::jit::Value * value)> is_parameter_tensor;
+  std::function<void *(torch::jit::Value * value)> get_data_ptr;
+  std::function<std::string(size_t index)> get_parameter_name;
+  std::function<void(torch::jit::Value * value, at::ScalarType & scalar_type,
+                     std::vector<int64_t> & dims)>
+      get_type_info;
 
-  // Step 0, remove unused parameters
-  // graph_t_inputs is updated but _graph.inputs() will retain unused parameters
-  std::vector<bool> parameter_used(_parameters.size(), true);
-  for (size_t index = 0; index < _parameters.size(); index++) {
-    ERROR_ON(!parameter_used.at(index));
-    auto *value = graph_t_inputs[num_input_tensors + index];
-    if (value->uses().empty()) {
-      parameter_used.at(index) = false;
+  if (_built_in_params) {
+    ERROR_ON_MSG(in_tensors != nullptr,
+                 "[Internal] Inputs expected to be in the graph.");
+    // Bind to the DispatchTracer functions.
+    is_parameter = poptorch::isParameter;
+    is_parameter_tensor = poptorch::isParameter;
+    get_data_ptr = poptorch::getDataSourceForValue;
+    get_parameter_name = [](size_t param_index) {
+      return "Parameter/" + std::to_string(param_index);
+    };
+    get_type_info = [](torch::jit::Value *value, at::ScalarType &scalar_type,
+                       std::vector<int64_t> &dims) {
+      auto tensor_type = value->type()->cast<at::TensorType>();
+      scalar_type = *tensor_type->scalarType();
+      dims = *tensor_type->sizes().concrete_sizes();
+    };
+  } else {
+    // We're using tracing: the parameters have been provided separately
+    // and the graph still needs to be cleaned up.
+    std::size_t num_params = _parameters.size();
+    const size_t num_t_inputs = graph_t_inputs.size() - num_params;
+    // in_tensors contains both "true" inputs and parameters.
+    ERROR_ON(in_tensors == nullptr);
+    ERROR_ON(in_tensors->size() != num_t_inputs);
+    ERROR_ON(graph_t_inputs.size() != (in_tensors->size() + num_params));
 
-      logging::trace("Skipping unused parameter: {}",
-                     _parameter_names.at(index));
+    // Step 0, remove unused parameters
+    // graph_t_inputs is updated but _graph.inputs() will retain unused
+    // parameters
+    std::vector<bool> parameter_used(_parameters.size(), true);
+    for (size_t index = 0; index < _parameters.size(); index++) {
+      ERROR_ON(!parameter_used.at(index));
+      auto *value = graph_t_inputs[num_t_inputs + index];
+      if (value->uses().empty()) {
+        parameter_used.at(index) = false;
+
+        logging::trace("Skipping unused parameter: {}",
+                       _parameter_names.at(index));
+      }
     }
+
+    size_t num_inputs = _graph.inputs().size() - _parameters.size();
+
+    maskVector(&graph_t_inputs, parameter_used, num_t_inputs);
+    // Use remove-erase idiom to remove parameters with linear complexity
+    maskVector(&_parameters, parameter_used);
+    maskVector(&_parameter_names, parameter_used);
+    ERROR_ON(num_t_inputs + _parameters.size() != graph_t_inputs.size());
+
+    std::set<torch::jit::Value *> input_values;
+    for (size_t i = 0; i < num_inputs; ++i) {
+      input_values.emplace(_graph.inputs().at(i));
+    }
+
+    // value from _graph.inputs()
+    is_parameter = [=](torch::jit::Value *value) {
+      return input_values.count(value) == 0;
+    };
+
+    std::map<torch::jit::Value *, size_t> index_map_tensors;
+    for (size_t i = 0; i < graph_t_inputs.size(); ++i) {
+      index_map_tensors.emplace(graph_t_inputs[i], i);
+    }
+
+    // value from graph_t_inputs
+    auto index_of_tensor = [=](torch::jit::Value *value) {
+      return index_map_tensors.at(value);
+    };
+
+    is_parameter_tensor = [=](torch::jit::Value *value) {
+      return index_of_tensor(value) >= num_t_inputs;
+    };
+
+    // value comes from graph_t_inputs
+    get_data_ptr = [=](torch::jit::Value *value) {
+      auto index = index_of_tensor(value);
+      at::Tensor &tensor(is_parameter_tensor(value)
+                             ? _parameters.at(index - num_t_inputs)
+                             : (*in_tensors)[index]);
+      return tensor.data_ptr();
+    };
+
+    get_parameter_name = [&](size_t param_index) {
+      return _parameter_names.at(param_index);
+    };
+
+    get_type_info = [=](torch::jit::Value *value, at::ScalarType &scalar_type,
+                        std::vector<int64_t> &dims) {
+      auto index = index_of_tensor(value);
+      at::Tensor &tensor(is_parameter_tensor(value)
+                             ? _parameters.at(index - num_t_inputs)
+                             : (*in_tensors)[index]);
+      scalar_type = tensor.scalar_type();
+      dims = tensor.sizes().vec();
+    };
   }
 
-  // Use remove-erase idiom to remove parameters with linear complexity
-  maskVector(&_parameters, parameter_used);
-  maskVector(&_parameter_names, parameter_used);
-  maskVector(&graph_t_inputs, parameter_used, num_input_tensors);
-  ERROR_ON(num_input_tensors + _parameters.size() != graph_t_inputs.size());
-
-  // Step 1, add tensor inputs for all tensors in the hierachy and obtain the
-  // the resulting popart IDs. This can be done with collapsed hierachy.
-  // The collapsed hierachy has a 1 to 1 mapping with in_tensors, which contains
-  // both "true" inputs and parameters.
+  // Step 1, add tensor inputs for all tensors in the hierarchy and obtain
+  // the resulting popart IDs. This can be done with collapsed hierarchy.
   ValueMap::TensorList parameter_popart_ids;
-  for (size_t index = 0; index < graph_t_inputs.size(); index++) {
-    bool is_input_tensor = index < num_input_tensors;
+  std::vector<torch::jit::Value *> parameter_values;
+  size_t input_index = 0;
+  size_t param_index = 0;
+  for (auto *value : graph_t_inputs) {
+    at::ScalarType scalar_type;
+    std::vector<int64_t> dims;
+    get_type_info(value, scalar_type, dims);
+    std::string popart_type = typeToPopartStr(scalar_type);
+    void *data_ptr = get_data_ptr(value);
+    if (is_parameter_tensor(value)) {
+      ERROR_ON(value->uses().empty());
 
-    at::Tensor &tensor(is_input_tensor
-                           ? (*in_tensors)[index]
-                           : _parameters.at(index - num_input_tensors));
-
-    std::vector<int64_t> dims = getTensorDimensions(tensor);
-
-    if (index < num_input_tensors) {
-      // Return the input tensor id for input tensor of given type and dims.
-
-      auto overlap_symbol = getOverlapSymbol("_for_input", index);
+      std::string name = get_parameter_name(param_index);
+      auto id = _compiler.addInitializedInputTensor(
+          name.c_str(), popart_type.c_str(), dims, data_ptr);
+      parameter_values.push_back(value);
+      parameter_popart_ids.push_back(id);
+      param_index++;
+    } else {
+      auto overlap_symbol = getOverlapSymbol("_for_input", input_index);
       std::string overlap_str("no_overlap");
       if (_graph.param_node()->hasAttribute(overlap_symbol)) {
         overlap_str = _graph.param_node()->s(overlap_symbol);
       }
 
-      auto id = _compiler.addInputTensor(
-          typeToPopartStr(tensor.scalar_type()).c_str(), dims,
-          overlap_str.c_str());
+      auto id = _compiler.addInputTensor(popart_type.c_str(), dims,
+                                         overlap_str.c_str());
       _input_tensor_hooks.push_back(id);
-    } else {
-      ERROR_ON(graph_t_inputs[index]->uses().empty());
-
-      const std::string &name = _parameter_names.at(index - num_input_tensors);
-      std::string popart_type = typeToPopartStr(tensor.scalar_type());
-      auto id = _compiler.addInitializedInputTensor(
-          name.c_str(), popart_type.c_str(), dims, tensor.data_ptr());
-      parameter_popart_ids.push_back(id);
+      input_index++;
     }
   }
 
-  ERROR_ON(parameter_popart_ids.size() != _parameters.size());
+  if (!_built_in_params) {
+    ERROR_ON(parameter_popart_ids.size() != _parameters.size());
+  }
 
   // Step 2, map the PopART tensor IDs to the JIT Value of the (not collapsed)
   // graph inputs
@@ -986,9 +1075,9 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   auto input_tensor_it = _input_tensor_hooks.begin();
   size_t index = 0;
   for (torch::jit::Value *value : _graph.inputs()) {
-    if (index == num_inputs) {
-      // The rest are parameters
-      break;
+    if (is_parameter(value)) {
+      // Only process inputs
+      continue;
     }
     ERROR_ON(value->node()->kind() != c10::prim::Param);
     size_t num_tensors = numTensorsForType(value->type());
@@ -1018,11 +1107,10 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
 
     index++;
   }
-  ERROR_ON(parameter_popart_ids.size() != _parameters.size());
 
   // Step 3, map the PopART tensor IDs to the JIT Value of the parameters
   for (index = 0; index < parameter_popart_ids.size(); index++) {
-    auto *value = graph_t_inputs.at(num_input_tensors + index);
+    auto *value = parameter_values.at(index);
     auto &tensor(parameter_popart_ids.at(index));
 
     std::ostringstream ss;
@@ -1193,14 +1281,11 @@ convertCustomOpAttributes(const torch::jit::Node *node,
 } // namespace
 
 LowerToPopartImpl::LowerToPopartImpl(
-    torch::jit::Graph *g, std::vector<at::Tensor> params,
-    std::vector<std::string> parameter_names,
-    std::shared_ptr<InplaceOpHandler> inplace_op_handler, bool training,
-    std::vector<Optimizer> &&opt, const SessionOptions &options,
+    torch::jit::Graph *g, std::shared_ptr<InplaceOpHandler> inplace_op_handler,
+    bool training, std::vector<Optimizer> &&opt, const SessionOptions &options,
     const py::function &attribute_accessor, CPUCallbackMap &&callback,
     const AnchorList &&anchors)
-    : _graph(*g), _lowered(false), _parameters(std::move(params)),
-      _parameter_names(std::move(parameter_names)),
+    : _graph(*g), _lowered(false), _built_in_params(true),
       _inplace_op_handler(std::move(inplace_op_handler)), _optimizers(opt),
       _anchors(anchors), _compiler({training, options}), _callbacks(callback) {
   // Init the function implementation map. This map will be populated by
@@ -1286,19 +1371,28 @@ LowerToPopartImpl::LowerToPopartImpl(
 } // namespace detail
 
 LowerToPopart::LowerToPopart(
-    torch::jit::Graph *graph, std::vector<at::Tensor> parameters,
-    std::vector<std::string> parameter_names,
+    torch::jit::Graph *graph, const std::vector<at::Tensor> &parameters,
+    const std::vector<std::string> &parameter_names,
     const std::shared_ptr<InplaceOpHandler> &inplace_op_handler, bool training,
     std::vector<Optimizer> &&opt, const SessionOptions &options,
     const py::function &attribute_accessor, CPUCallbackMap callbacks,
     AnchorList &&anchors) {
-  std::srand(std::time(nullptr));
   _impl = std::make_unique<detail::LowerToPopartImpl>(
-      graph, std::move(parameters), std::move(parameter_names),
-      inplace_op_handler, training, std::move(opt), std::move(options),
+      graph, inplace_op_handler, training, std::move(opt), std::move(options),
       attribute_accessor, std::move(callbacks), std::move(anchors));
+  _impl->setParameters(parameters, parameter_names);
 }
 
+LowerToPopart::LowerToPopart(
+    torch::jit::Graph *graph,
+    const std::shared_ptr<InplaceOpHandler> &inplace_op_handler, bool training,
+    std::vector<Optimizer> &&opt, const SessionOptions &options,
+    const py::function &attribute_accessor, CPUCallbackMap callbacks,
+    AnchorList &&anchors) {
+  _impl = std::make_unique<detail::LowerToPopartImpl>(
+      graph, inplace_op_handler, training, std::move(opt), std::move(options),
+      attribute_accessor, std::move(callbacks), std::move(anchors));
+}
 void LowerToPopart::lower(std::vector<at::Tensor> *in_tensors) {
   _impl->lower(in_tensors);
 }

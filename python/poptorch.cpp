@@ -931,9 +931,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::logging::Tracepoint::begin(lower_to_popart);
 
   poptorch::LowerToPopart lower(
-      graph.get(), std::move(traced_parameter_tensors), std::move(parameters),
-      inplace_op_handler, training, std::move(optimizers), parsed_options,
-      attribute_accessor, callbacks, std::move(anchors_list));
+      graph.get(), traced_parameter_tensors, parameters, inplace_op_handler,
+      training, std::move(optimizers), parsed_options, attribute_accessor,
+      callbacks, std::move(anchors_list));
   lower.lower(&input_tensors);
 
   // Clear the callbacks after compilation.
@@ -1319,10 +1319,9 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
   return lower.compile();
 }
 
-std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
-    std::vector<at::Tensor> &inputs, const std::vector<at::Tensor> &parameters,
-    const std::vector<std::string> &parameter_names,
-    const pybind11::dict &options, const py::function &attribute_accessor) {
+std::shared_ptr<poptorch::PoplarExecutable>
+compileWithManualTracing(const pybind11::dict &options,
+                         const py::function &attribute_accessor) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   logging::debug("Compile with manual tracing");
 
@@ -1349,21 +1348,24 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
   // TODO(T55228): remove after we use our own dispatch key.
   removeDeadImplicitCasts(graph.get());
 
-  // We need to keep the dispatcher alive until after the passes because
-  // some of them call isDispatcherActive().
-  destroyDispatcher();
-
   logging::debug("Graph right before popart:\n{}", *graph);
 
   AnchorList anchors_list;
   std::vector<Optimizer> optimizers;
 
   poptorch::LowerToPopart lower(
-      graph.get(), parameters, parameter_names, inplace_op_handler, false,
-      std::move(optimizers), parseSessionOptions(options), attribute_accessor,
-      callbacks, std::move(anchors_list));
+      graph.get(), inplace_op_handler, false, std::move(optimizers),
+      parseSessionOptions(options), attribute_accessor, callbacks,
+      std::move(anchors_list));
 
-  lower.lower(&inputs);
+  lower.lower(nullptr);
+
+  // We need to keep the dispatcher alive until after the passes because
+  // some of them call isDispatcherActive() and until after the lowering
+  // because the dispatcher is used to retrieve data pointers associated
+  // with jit::Value for inputs and parameters.
+  destroyDispatcher();
+
   return lower.compile();
 }
 
@@ -1433,6 +1435,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("endDispatch", PTC(poptorch::endDispatch));
   m.def("createGraph", PTC(poptorch::createGraph));
   m.def("markOutputs", PTC(poptorch::markOutputs));
+  m.def("finalizeGraph", PTC(poptorch::finalizeGraph));
   m.def("compileWithManualTracing", PTC(poptorch::compileWithManualTracing));
   m.def("_throwTestError", PTC(poptorch::throwTestError));
 

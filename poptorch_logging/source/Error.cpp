@@ -33,8 +33,9 @@ std::string getStackTrace() {
   std::stringstream out;
   // 3 to get out of gccs + getStackTrace + Error constructor
   constexpr size_t num_frames_to_skip = 3;
-  constexpr size_t max_depth = 20;
-  out << "\nStacktrace:\n" << gccs::getStackTrace(num_frames_to_skip, max_depth);
+  constexpr size_t max_depth = 100;
+  out << "\nStacktrace:\n"
+      << gccs::getStackTrace(num_frames_to_skip, max_depth);
   return out.str();
 }
 

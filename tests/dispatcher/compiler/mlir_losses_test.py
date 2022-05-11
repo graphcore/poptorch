@@ -44,6 +44,7 @@ def test_nll_loss_backward(reduction, ignore_index):
                           ignore_index=ignore_index)
         if reduction == "none":
             loss = loss.sum()
+        t1.retain_grad()
         loss.backward()
         return t1.grad
 
@@ -88,6 +89,7 @@ def test_binary_cross_entropy_backward(reduction):
         loss = F.binary_cross_entropy(t1, t2, reduction=reduction)
         if reduction == "none":
             loss = loss.sum()
+        t1.retain_grad()
         loss.backward()
         return t1.grad
 
@@ -130,6 +132,7 @@ def test_binary_cross_entropy_with_logits_backward(reduction):
         loss = F.binary_cross_entropy_with_logits(t1, t2, reduction=reduction)
         if reduction == "none":
             loss = loss.sum()
+        t1.retain_grad()
         loss.backward()
         return t1.grad
 

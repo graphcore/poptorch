@@ -1,13 +1,16 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include <ATen/native/CPUFallback.h>
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
 
+#include <set>
 #include <string>
 #include <unordered_map>
 
 #include "../popart_canonicalization/PopartCanonicalizationUtils.hpp"
 #include "CommonHelperFunctions.hpp"
+#include "Tensor.hpp"
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -27,9 +30,27 @@ namespace poptorch {
 
 namespace {
 
-// This is just a useful helper since sometimes we need to pass both keys in.
-c10::DispatchKeySet dispatch_key_set{c10::DispatchKey::PrivateUse2,
-                                     c10::DispatchKey::AutogradPrivateUse2};
+std::string valueToString(const c10::IValue &ivalue) {
+  if (ivalue.isTensor()) {
+    return str(ivalue.toTensor());
+  }
+  // Don't rely on operator<< for everything as we're currently using
+  // the XLA dispatch key but using our own Tensor type: bad things
+  // might happen if upstream torch tries to print a tensor by itself.
+  if (ivalue.isNone() || ivalue.isScalar() || ivalue.isString() ||
+      ivalue.isDevice() || ivalue.isStream() || ivalue.isObject() ||
+      ivalue.isEnum()) {
+    std::stringstream ss;
+    ss << ivalue;
+    return ss.str();
+  }
+  return "<" + ivalue.tagKind() + ">";
+}
+
+bool isIpuDevice(const c10::Device &d) {
+  // TODO(T59880): replace XLA -> IPU
+  return d.type() == c10::DeviceType::XLA;
+}
 
 /*
  * The dispatchers are statically registered and called without any additional
@@ -41,13 +62,18 @@ struct GlobalTracerContext {
   // When we are in a live dispatch context. Used to prevent redispatch back
   // to us when we call CPU implementations and to call CPU when we are in
   // BackendSelect and out of scope.
-  inline bool isDispatchOn() { return raii_dispatch_context && dispatch_on; }
+  inline bool isDispatchOn() { return dispatch_on; }
 
-  // The active dispatcher. Created once upon dispatch start.
-  std::unique_ptr<IDispatch> active_dispatch;
+  bool hasActiveDispatch() { return static_cast<bool>(_active_dispatch); }
 
-  // Activates the interceptor which catches the pytorch calls.
-  std::unique_ptr<c10::impl::IncludeDispatchKeyGuard> raii_dispatch_context;
+  IDispatch *activeDispatch() {
+    ERROR_ON_MSG(!_active_dispatch, "There is no active dispatch");
+    return _active_dispatch.get();
+  }
+
+  void resetActiveDispatch(std::unique_ptr<IDispatch> new_dispatch) {
+    _active_dispatch = std::move(new_dispatch);
+  }
 
   // When setting the location source ignore all the frames containing one of
   // these strings.
@@ -61,10 +87,21 @@ struct GlobalTracerContext {
   // exclusions, else an empty c10::optional.
   c10::optional<std::string> filenameIfNotExcluded(const std::string &filename);
 
-  // TODO(T59880) Horrible hack to keep all tensors alive so that the
-  // ValueMapper doesn't get confused by storage being re-used by different
-  // unrelated tensors.
-  std::vector<at::Tensor> tracked_tensors;
+  // Each tensor allocated must have a unique id.
+  uint64_t next_tensor_id{1};
+
+  // We can't make the difference between inputs and constants so for
+  // now we ask the user to manually specify the input tensors.
+  // We use TensorImpl* cast as void* to identify them.
+  //
+  // Note: these should only be used for pointer comparisons and should never
+  // be dereferenced as TensorImpl objects as we don't know if they still
+  // exist.
+  std::set<void *> graph_inputs;
+
+private:
+  // The active dispatcher. Created once upon dispatch start.
+  std::unique_ptr<IDispatch> _active_dispatch;
 };
 
 c10::optional<std::string>
@@ -78,6 +115,14 @@ GlobalTracerContext::filenameIfNotExcluded(const std::string &filename) {
 }
 
 GlobalTracerContext context;
+
+// Poplar doesn't support long, so cast to int if needed.
+at::Tensor castToIntIfNeeded(const at::Tensor &t) {
+  if (t.scalar_type() == at::ScalarType::Long) {
+    return t.to(at::ScalarType::Int);
+  }
+  return t;
+}
 
 // adapted from torch/csrc/jit/python/python_tracer.cpp because the header file
 // had too many dependepencies
@@ -112,33 +157,57 @@ torch::jit::SourceRange getPythonInterpreterSourceRange() {
   logging::trace("Setting op source to: {}:{}", *source_filename, source_line);
   return torch::jit::SourceRange(source, 0, stack_trace_text.size());
 }
-/*
- * Small helper to stop us from intercepting CPU calls called by us.
- */
-struct DisableDispatchScope {
-  // Wrap the existing tracer guard.
-  c10::impl::ExcludeDispatchKeyGuard dispatch_intercept_off;
 
-  DisableDispatchScope() : dispatch_intercept_off(dispatch_key_set) {
-    // dispatch_intercept_off =  {dispatch_key_set};
-    context.dispatch_on = false;
-  }
-
-  ~DisableDispatchScope() { context.dispatch_on = true; }
-};
-
+// copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
                         bool non_blocking) {
-  if (!context.isDispatchOn()) {
-    return at::native::copy_(self, src, non_blocking);
-  }
-  // We will also catch pytorch calls called via C++ so we need to disable our
-  // dispatch catcher while it is running.
-  DisableDispatchScope guard;
-  logging::trace("[TRACING-2] Intercepting aten::copy_");
-  context.active_dispatch->setCurrentCodeLocation(
+  context.activeDispatch()->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
-  context.active_dispatch->copyInplace(self, src);
+  UNUSED(non_blocking);
+  logging::trace("[TRACING-2] Intercepting aten::copy_");
+  logging::trace("[Input copy_] self {}", str(self));
+  logging::trace("[Input copy_] src {}", str(src));
+
+  // TODO(T59880) rename is_xla() -> is_ipu()
+  if (self.is_xla()) {
+    if (src.is_cpu()) {
+      logging::trace("copy_ CPU -> IPU");
+      // TODO(T61574) use already allocated self instead of allocating a new
+      // tensor.
+      if (isParameter(self)) {
+        self = context.activeDispatch()->addParameter(castToIntIfNeeded(src));
+        // Make sure the parameter flag is preserved.
+        setIsParameter(self, true);
+        logging::trace("copy_ parameter CPU -> IPU, new self {}", str(self));
+      } else {
+        if (context.graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
+          self = context.activeDispatch()->addInput(castToIntIfNeeded(src));
+        } else {
+          self = context.activeDispatch()->addConstant(castToIntIfNeeded(src));
+        }
+        logging::trace("copy_ input CPU -> IPU, new self {}", str(self));
+        // Make sure the parameter flag is preserved.
+        setIsParameter(self, false);
+      }
+    } else {
+      // TODO(T59880) rename is_xla() -> is_ipu()
+      ERROR_ON(!src.is_xla());
+      logging::trace("copy_ IPU {} -> IPU {}", src.dtype(), self.dtype());
+      context.activeDispatch()->copyInplace(self, src);
+    }
+  } else {
+    ERROR_ON(!self.is_cpu());
+    // TODO(T59880) rename is_xla() -> is_ipu()
+    if (src.is_xla()) {
+      logging::trace("copy_ output IPU -> CPU");
+      context.activeDispatch()->addOutput(src, self);
+    } else {
+      ERROR("Unexpected tensor of type "
+            << src.unsafeGetTensorImpl()->device_type()
+            << ", did you forget to move a tensor to "
+               "the IPU?");
+    }
+  }
 
   return self;
 }
@@ -146,51 +215,38 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
 } // namespace
 
 // Turn on.
-void startDispatch() {
-  context.raii_dispatch_context =
-      std::make_unique<c10::impl::IncludeDispatchKeyGuard>(dispatch_key_set);
-  context.dispatch_on = true;
-}
+void startDispatch() { context.dispatch_on = true; }
 
 // Turn off.
-void endDispatch() {
-  context.dispatch_on = false;
-  context.raii_dispatch_context.reset();
-}
-
-// Returns true if the dispatcher is active.
-bool isDispatcherActive() {
-  // We can't use context.dispatch_on here, because isDispatcherActive() gets
-  // used by the handlers, and we disable the dispatcher using
-  // DisableDispatchScope when calling handlers.
-  return static_cast<bool>(context.active_dispatch);
-}
+void endDispatch() { context.dispatch_on = false; }
 
 void destroyDispatcher() {
   if (context.isDispatchOn()) {
     endDispatch();
   }
-  context.active_dispatch.reset();
+  context.resetActiveDispatch(nullptr);
 }
+
+// Returns true if the dispatcher is active.
+bool isDispatcherActive() { return context.hasActiveDispatch(); }
 
 // Take the inputs to the graph and turn them into our IR graph
 // inputs/parameters.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
-                 const std::vector<at::Tensor> &parameters,
                  const std::vector<std::string> &source_location_excludes) {
   context.source_location_excludes = source_location_excludes;
   if (mode == TracingMode::POPART) {
-// We don't build this on Centos TODO(T49566)
+// TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
-    context.active_dispatch = std::make_unique<JITDispatch>();
+    context.resetActiveDispatch(std::make_unique<JITDispatch>());
 #else
     ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
           "use the dispatcher");
 #endif
   } else if (mode == TracingMode::MLIR) {
-// We don't build this on Centos TODO(T49566)
+// TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
-    context.active_dispatch = std::make_unique<MLIRDispatch>();
+    context.resetActiveDispatch(std::make_unique<MLIRDispatch>());
 #else
     ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
           "use the dispatcher");
@@ -199,45 +255,45 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
     ERROR("Unsupported target");
   }
 
-  context.active_dispatch->setCurrentCodeLocation(
+  context.activeDispatch()->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
-  context.active_dispatch->createGraph();
-  // TODO(T59880) Adding tensors to tracked_tensor is a horrible hack to keep
-  // all tensors alive so that the ValueMapper doesn't get confused by storage
-  // being re-used by different unrelated tensors.
+  context.activeDispatch()->createGraph();
+  context.graph_inputs.clear();
   for (const auto &input : inputs) {
-    context.tracked_tensors.push_back(context.active_dispatch->addInput(input));
+    context.graph_inputs.emplace(
+        reinterpret_cast<void *>(input.unsafeGetTensorImpl()));
   }
-  for (const auto &param : parameters) {
-    context.tracked_tensors.push_back(
-        context.active_dispatch->addParameter(param));
-  }
+}
+
+void cpuFallback(const c10::OperatorHandle &op, torch::jit::Stack *stack) {
+  const auto name = c10::toString(op.operator_name());
+
+  logging::trace("[CPU Fallback] Running {} on CPU", name);
+
+  // Call the actual boxed CPU fallback.
+  at::native::cpu_fallback(op, stack);
 }
 
 void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
-  if (!context.isDispatchOn()) {
-    // Redirect back to CPU if we are not in our own dispatch context.
-    auto &dispatcher = c10::Dispatcher::singleton();
-    dispatcher.callBoxed(op, stack);
-    return;
-  }
-  // We will also catch pytorch calls called via C++ so we need to disable our
-  // dispatch catcher while it is running.
-  DisableDispatchScope guard;
-
   const c10::FunctionSchema &schema = op.schema();
   logging::trace("[TRACING-2] Intercepting {} ", schema);
 
-  context.active_dispatch->setCurrentCodeLocation(
+  context.activeDispatch()->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
-  context.active_dispatch->fallback(op, stack);
+  for (const auto &t : *stack) {
+    logging::trace("[Input {}] {}", schema.name(), valueToString(t));
+  }
+  context.activeDispatch()->fallback(op, stack);
+  for (const auto &t : *stack) {
+    logging::trace("[Output {}] {}", schema.name(), valueToString(t));
+  }
 }
 
-// We don't build this on Centos TODO(T49566)
+// TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
 
 std::shared_ptr<MLIRExecutable> compileMLIR() {
-  auto *mlir = dynamic_cast<MLIRDispatch *>(context.active_dispatch.get());
+  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
   ERROR_ON(mlir == nullptr);
   auto executable = mlir->compile();
   destroyDispatcher();
@@ -248,16 +304,12 @@ std::shared_ptr<MLIRExecutable> compileMLIR() {
 
 std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 #if POPTORCH_BUILD_MLIR_COMPILER
-  auto *jit = dynamic_cast<JITDispatch *>(context.active_dispatch.get());
+  auto *jit = dynamic_cast<JITDispatch *>(context.activeDispatch());
   ERROR_ON_MSG(jit == nullptr, "[User Unreachable] Tracer context is null.");
-  auto copied_graph = jit->graph.copy();
-
-  // torch::jit does not copy attributes on the return node, so copy them here
-  copied_graph->return_node()->copyAttributes(*jit->graph.return_node());
 
   // Build a list of nodes marked for deletion.
   std::unordered_set<torch::jit::Node *> to_delete;
-  for (torch::jit::Node *node : copied_graph->nodes()) {
+  for (torch::jit::Node *node : jit->graph->nodes()) {
     if (isMarkedForDeletion(node)) {
       to_delete.insert(node);
     }
@@ -266,7 +318,10 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
   // Remove the dead nodes.
   searchAndPossiblyDestroy(to_delete);
 
-  return copied_graph;
+  // Return the real graph because popart_compiler will call
+  // getDataSourceForValue() on some of these nodes and if we
+  // clone the graph we won't be able to find the mappings.
+  return jit->graph;
 #else
   ERROR("PopTorch must be compiled with -DPOPTORCH_BUILD_MLIR_COMPILER=ON");
 #endif
@@ -275,41 +330,37 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 // Record these tensors as being the outputs of the graph.
 void markOutputs(const std::vector<at::Tensor> &outputs,
                  const std::vector<at::Tensor> &data_storage) {
-  // We will also catch pytorch calls called via C++ so we need to disable our
-  // dispatch catcher while it is running.
-  DisableDispatchScope guard;
-  context.active_dispatch->setCurrentCodeLocation(
+  context.activeDispatch()->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
   ERROR_ON(outputs.size() != data_storage.size());
   for (size_t i = 0; i < outputs.size(); ++i) {
-    context.active_dispatch->addOutput(outputs.at(i), data_storage.at(i));
+    context.activeDispatch()->addOutput(outputs.at(i), data_storage.at(i));
   }
-  context.active_dispatch->finalizeGraph();
+  context.activeDispatch()->finalizeGraph();
 }
 
-// _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
-// device=None, bool? pin_memory=None, bool non_blocking=False, MemoryFormat?
-// memory_format=None) -> Tensor
-at::Tensor toCopy(const at::Tensor &self,
-                  c10::optional<at::ScalarType> dtype = c10::nullopt,
-                  c10::optional<at::Layout> layout = c10::nullopt,
-                  c10::optional<at::Device> device = c10::nullopt,
-                  c10::optional<bool> pin = c10::nullopt,
-                  bool non_blocking = false,
-                  c10::optional<c10::MemoryFormat> fmt = c10::nullopt) {
-  if (!context.isDispatchOn()) {
-    return at::native::_to_copy(self, dtype, layout, device, pin, non_blocking,
-                                fmt);
-  }
-  // Turn off dispatch so we can call CPU functions without catching them.
-  DisableDispatchScope guard;
-  logging::trace("[TRACING-2] Intercepting aten::_to_copy");
+void finalizeGraph() { context.activeDispatch()->finalizeGraph(); }
 
-  context.active_dispatch->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
-  at::Tensor out = context.active_dispatch->toCopyInplace(self, dtype, layout,
-                                                          device, pin, fmt);
-  return out;
+void *getDataSource(const at::Tensor &tensor) {
+  return getCpuData(tensor)->data();
+}
+
+void *getDataSourceForValue(torch::jit::Value *value) {
+  return context.activeDispatch()->getDataSource(value);
+}
+
+bool isParameter(torch::jit::Value *value) {
+  return context.activeDispatch()->isParameter(value);
+}
+
+// This is the function called by Torch to trigger an IPU to Host
+// sync: we forward it to the CPU backend which will then issue
+// some copy_ calls between IPU and CPU tensors instead.
+at::Scalar localScalarDense(const at::Tensor &self) {
+  logging::trace("Sync to CPU");
+
+  return at::native::call_fallback_fn<&poptorch::cpuFallback,
+                                      ATEN_OP(_local_scalar_dense)>::call(self);
 }
 
 at::Tensor
@@ -319,26 +370,33 @@ emptyBase(at::IntArrayRef size,
           c10::optional<at::Device> device = c10::nullopt,
           c10::optional<bool> pin_memory = c10::nullopt,
           c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
+  ERROR_ON(!device); // Internal error: shouldn't happen
+  if (isIpuDevice(*device)) {
+    context.activeDispatch()->setCurrentCodeLocation(
+        getPythonInterpreterSourceRange());
+
+    // We use the device ID to determine if a tensor is a parameter
+    // (device 1) or not (device 0) but in reality all the tensors
+    // currently live on the same IPU so always use the default IPU.
+    at::Tensor output = context.activeDispatch()->allocateTensor(
+        size, dtype, deviceOrDefaultIpu({}), layout, pin_memory, memory_format);
+    // TODO(T61576) Find a better way to identify parameters and buffers.
+    setIsParameter(output, device->index() != 0);
+
+    logging::trace("[TRACING-2] Intercepting IPU empty_base");
+    context.activeDispatch()->registerEmptyTensor(output);
+    return output;
+  }
   // Native calls are a dispatch endpoint so will not be redispatched.
   at::Tensor output = at::native::empty_cpu(size, dtype, layout, device,
                                             pin_memory, memory_format);
-  // We have to be careful with backend select kernels, we must return the
-  // original result if we are not tracing.
-  if (!context.isDispatchOn()) {
-    return output;
-  }
-  // Turn off dispatch so we can call CPU functions without catching them.
-  DisableDispatchScope guard;
-  logging::trace("[TRACING-2] Intercepting empty_base for tensor: {}, {}",
-                 static_cast<void *>(output.unsafeGetTensorImpl()),
-                 toString(output));
-
-  context.active_dispatch->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
-  context.active_dispatch->registerEmptyTensor(output);
+  logging::trace("[TRACING-2] Ignoring empty_base for CPU tensor: {}",
+                 str(output));
   return output;
 }
 
+// Handler for IPU empty tensors: this means the returned tensor must be
+// an IPU tensor.
 at::Tensor emptyMemoryFormat(
     at::IntArrayRef size, c10::optional<at::ScalarType> dtype = c10::nullopt,
     c10::optional<at::Layout> layout = c10::nullopt,
@@ -346,28 +404,9 @@ at::Tensor emptyMemoryFormat(
     c10::optional<bool> pin_memory = c10::nullopt,
     c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
 
-  if (!context.isDispatchOn()) {
-    return at::native::empty_cpu(size, dtype, layout, device, pin_memory,
-                                 memory_format);
-  }
-  logging::trace("[TRACING-2] Intercepting memory_format");
-  return poptorch::emptyBase(size, dtype, layout, device, pin_memory,
-                             memory_format);
-}
-// empty.out(int[] size, *, MemoryFormat? memory_format=None, Tensor(a!) out)
-// -> Tensor(a!)
-at::Tensor &emptyOut(at::IntArrayRef size, c10::optional<at::MemoryFormat> fmt,
-                     at::Tensor &out) {
-  if (!context.isDispatchOn()) {
-    return at::native::empty_out(size, fmt, out);
-  }
-  DisableDispatchScope guard;
-  logging::trace("[TRACING-2] Intercepting empty.out");
-
-  context.active_dispatch->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
-  context.active_dispatch->registerEmptyTensor(out);
-  return out;
+  logging::trace("[TRACING-2] Intercepting IPU memory_format");
+  return poptorch::emptyBase(size, dtype, layout, deviceOrDefaultIpu(device),
+                             pin_memory, memory_format);
 }
 
 // func: empty_strided(int[] size, int[] stride, *, ScalarType? dtype=None,
@@ -377,40 +416,22 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
                         c10::optional<at::Layout> layout = c10::nullopt,
                         c10::optional<at::Device> device = c10::nullopt,
                         c10::optional<bool> pin_memory = c10::nullopt) {
-  // native calls are a dispatch endpoint so will not be redispatched.
-  at::Tensor output = at::native::empty_strided_cpu(size, stride, dtype, layout,
-                                                    device, pin_memory);
-  // We have to be careful with backend select kernels, we must return the
-  // original result if we are not tracing.
-  if (!context.isDispatchOn()) {
-    return output;
-  }
-  // Turn off dispatch so we can call CPU functions without catching them.
-  DisableDispatchScope guard;
+  ERROR_ON(!device); // Internal error: shouldn't happen
+  ERROR_ON(!isIpuDevice(*device));
   logging::trace("[TRACING-2] Intercepting empty_strided");
-
-  context.active_dispatch->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
-  context.active_dispatch->registerEmptyTensor(output);
-
-  return output;
+  ERROR_ON(at::detail::defaultStrides(size) != stride);
+  return emptyBase(size, dtype, layout, device, pin_memory);
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
 at::Tensor detach(const at::Tensor &self) {
-  if (!context.isDispatchOn()) {
-    return at::native::detach(self);
-  }
-  // Turn off dispatch so we can call CPU functions without catching them.
-  DisableDispatchScope guard;
   logging::trace("[TRACING-2] Intercepting aten::detach");
 
-  context.active_dispatch->setCurrentCodeLocation(
+  context.activeDispatch()->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
-  at::Tensor out = context.active_dispatch->detach(self);
+  at::Tensor out = context.activeDispatch()->detach(self);
   return out;
 }
-
 } // namespace poptorch
 
 /*
@@ -418,13 +439,14 @@ at::Tensor detach(const at::Tensor &self) {
   fall through to our fallback catchers.
 */
 
-TORCH_LIBRARY_IMPL(_, PrivateUse2, m) {
-  m.fallback(PTC_BOXED(poptorch::fallback));
-}
+// TODO(T59880) rename XLA -> IPU
+TORCH_LIBRARY_IMPL(_, XLA, m) { m.fallback(PTC_BOXED(poptorch::fallback)); }
 
-TORCH_LIBRARY_IMPL(_, AutogradPrivateUse2, m) {
+/* TODO(T59880) Fallback already registered upstream. Re-enable for AutogradIPU
+TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
   m.fallback(PTC_BOXED(poptorch::fallback));
 }
+*/
 
 /*
   There are two kinds of PyTorch ops: the ones that require registration
@@ -444,34 +466,15 @@ TORCH_LIBRARY_IMPL(_, AutogradPrivateUse2, m) {
 */
 #include "RegisterOptionalAtenOps.cpp.inc"
 
-/*
- * We need to override the BackendSelect key as well. This key is used when
- * PyTorch can't work out which backend *should* be dispatched to. We will catch
- * ALL kernels here even when we are not in scope. This means we need to be
- * careful to ensure we are in scope otherwise we should redirect back to
- * PyTorch.
- */
-TORCH_LIBRARY_IMPL(aten, BackendSelect, m) {
-  // Silence all warnings and info logs. This is due to the backend select
-  // warning when we override these kernels.
-  auto log_level = FLAGS_caffe2_log_level;
-  FLAGS_caffe2_log_level = c10::GLOG_ERROR;
-
-  m.impl("copy_", PTC(poptorch::copyInplace));
-  m.impl("empty.memory_format", PTC(poptorch::emptyMemoryFormat));
-  m.impl("empty.out", PTC(poptorch::emptyOut));
-  m.impl("empty_strided", PTC(poptorch::emptyStrided));
-  m.impl("_to_copy", PTC(poptorch::toCopy));
-
-  // Turn logging back on.
-  FLAGS_caffe2_log_level = log_level;
-}
-
-TORCH_LIBRARY_IMPL(aten, AutogradPrivateUse2, m) {
+// TODO(T59880) rename AutogradXLA -> AutogradIPU
+TORCH_LIBRARY_IMPL(aten, AutogradXLA, m) {
   m.impl("detach", PTC(poptorch::detach));
+  m.impl("binary_cross_entropy_with_logits_backward",
+         PTC_BOXED(poptorch::fallback));
 }
 
-TORCH_LIBRARY_IMPL(poptorch, PrivateUse2, m) {
+// TODO(T59880) rename XLA -> IPU
+TORCH_LIBRARY_IMPL(poptorch, XLA, m) {
   m.impl("ipu_print_tensor", PTC_BOXED(poptorch::fallback));
   m.impl("nop", PTC_BOXED(poptorch::fallback));
   m.impl("begin_ipu_block", PTC_BOXED(poptorch::fallback));

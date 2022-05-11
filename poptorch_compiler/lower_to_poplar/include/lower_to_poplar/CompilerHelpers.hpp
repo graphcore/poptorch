@@ -96,6 +96,18 @@ poplar::Tensor createConstant(CompilerContext &context, poplar::Type type,
   return constant;
 }
 
+// TODO(T60724) Not currently used, but will be useful when we add support for
+// constant tensors.
+template <typename T>
+poplar::Tensor createConstantTensor(CompilerContext &context, poplar::Type type,
+                                    const std::vector<uint64_t> &shape,
+                                    const std::vector<T> &values) {
+  poplar::Tensor constant =
+      context.graph.addConstant<T>(type, shape, poplar::ArrayRef<T>(values));
+  context.graph.setTileMapping(constant, context.graph_const_count++);
+  return constant;
+}
+
 } // namespace poptorch_ir
 
 #endif // POPTORCH_COMPILER_HELPER_HPP_

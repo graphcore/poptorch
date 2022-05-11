@@ -13,6 +13,7 @@
 
 namespace poptorch {
 
+// TODO(T61602) Clean up ValueMapper following dispatcher refactoring.
 /*
  * The value mapper is the core of the tracer functionality. It provides the
  * system by which we map an incoming at::Tensor onto the compiler IRs. We take
@@ -46,10 +47,7 @@ public:
   // Each tensor we are tracking has a short record containing a pointer to the
   // tensor and its corresponding values in the two IRs.
   struct TrackedTensor {
-    explicit TrackedTensor(const at::Tensor &tensor, bool _is_empty)
-        : tensor_impl(tensor.unsafeGetTensorImpl()),
-          tracker(tensor.getIntrusivePtr()), jit(nullptr),
-          mlir(poptorch_ir::tensor_error_id), is_empty(_is_empty) {}
+    explicit TrackedTensor(const at::Tensor &tensor, bool _is_empty);
 
     // The PyTorch tensor impl. Most of the time it is "the tensor" on the
     // PyTorch side. However the autograd can create non-view aliases so
@@ -65,6 +63,7 @@ public:
     // out of scope. This was intended to give us a way to remove invalid
     // pointers, however, it turns out just by tracking them even with a weak
     // reference we stop them from ever completely falling out of scope.
+    // TODO(T61602) not needed anymore? (We don't use storage as IDs anymore)
     c10::weak_intrusive_ptr<at::TensorImpl> tracker;
 
     // The value in JIT IR
@@ -73,14 +72,14 @@ public:
     // The value in our mlir backend.
     poptorch_ir::TensorId mlir;
 
+    // Unique ID of the storage associated to this tensor.
+    uint64_t ipu_tensor_id;
+
     // Is this tensor empty?
     bool is_empty;
 
     // Autograd can create tensors which mirror the original tensor storage.
-    bool isSame(const at::Tensor &other) {
-      // If we share storage then we are an alias.
-      return tensor_impl->storage().is_alias_of(other.storage());
-    }
+    bool isSame(const at::Tensor &other) const;
   };
 
   // We map each PyTorch tensor to a record of all the metadata we are tracking
@@ -89,8 +88,7 @@ public:
 
   // We also map the storage of the tensor to the same structure so we can check
   // for aliases. We do not expect this to be large.
-  std::unordered_map<at::StorageImpl *, std::vector<TrackedTensor *>>
-      storage_map;
+  std::unordered_map<uint64_t, std::vector<TrackedTensor *>> ipu_ids_map;
 
   // We also need to map the values to the mlir so we can query the mlir for a
   // given value.
@@ -99,13 +97,16 @@ public:
   // List of tensors which are actually half-valued from our point of view,
   // but which are floats in PyTorch land because the CPU can't handle half
   // typed values.
-  std::unordered_set<at::TensorImpl *> half_tensors;
+  std::unordered_set<at::TensorImpl *>
+      half_tensors; // TODO(T61602) remove? no boxed CPU execution anymore.
 
   // Map each prim::ListConstruct to a corresponding jit output value.
   std::unordered_map<TensorList, torch::jit::Value *, TensorListHash>
       tensor_lists;
 
   TrackedTensor *rawTensorRecord(const at::Tensor &t);
+
+  TrackedTensor *rawTensorRecord(torch::jit::Value *val);
 
   torch::jit::Value *getValueForTensor(const at::Tensor &t);
 

@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "pytorch_bridge/CompilerTypes.hpp"
+
 namespace poprithms {
 namespace logging {
 class ManualTimePartitionLogger;
@@ -50,6 +52,7 @@ public:
   // Each time Poplar copies data to/from the named stream, it will read/write
   // to/from this memory locaiton.
   void connectStream(const std::string &string, void *ptr);
+  void connectStream(const std::string &string, Buffer ptr);
 
 private:
   // Impl

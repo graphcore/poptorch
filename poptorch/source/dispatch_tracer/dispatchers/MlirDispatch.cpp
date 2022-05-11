@@ -22,6 +22,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "../CommonHelperFunctions.hpp"
+#include "../Tensor.hpp"
 
 namespace poptorch {
 
@@ -82,16 +83,27 @@ void MLIRExecutable::execute(const std::vector<at::Tensor> &inputs) {
 
     for (std::size_t i = 0; i < inputs.size(); ++i) {
       const at::Tensor &tensor = inputs[i];
-      if (tensor.scalar_type() == at::ScalarType::Long) {
-        converted.push_back(tensor.to(at::ScalarType::Int));
-        ptrs[i] = converted.back().data_ptr();
+      // TODO(T59880) rename is_xla() -> is_ipu()
+      if (tensor.is_xla()) {
+        // This is the tensor we used to compile the executable: the pointer
+        // was already set when _compiler.addInput() was called.
+        ptrs[i] = getCpuData(tensor)->data();
       } else {
-        ptrs[i] = tensor.data_ptr();
+        ERROR_ON_MSG(!tensor.is_cpu(),
+                     "Input tensors expected to either be IPU or CPU but input "
+                         << i << " is of type "
+                         << tensor.unsafeGetTensorImpl()->device_type());
+        if (tensor.scalar_type() == at::ScalarType::Long) {
+          converted.push_back(tensor.to(at::ScalarType::Int));
+          ptrs[i] = converted.back().data_ptr();
+        } else {
+          ptrs[i] = tensor.data_ptr();
+        }
       }
     }
 
     _impl->execute(ptrs);
-    _impl->weightsToHost();
+    _impl->weightsToHost(); // TODO(T61527) don't call weightsToHost every time.
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
@@ -117,20 +129,24 @@ void MLIRDispatch::initCompiler() {
   _compiler.init();
 }
 
-at::Tensor MLIRDispatch::allocateTensorImpl(
-    c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Device> device, c10::optional<at::Layout> layout,
-    c10::optional<bool> pin_memory,
-    c10::optional<at::MemoryFormat> memory_format) {
-  UNUSED(device);
+at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
+  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
 
-  at::Tensor output = at::native::empty_cpu(size, dtype, layout, device,
-                                            pin_memory, memory_format);
+  ERROR("T60724: not implemented");
+  /* TODO(T60724)
+  at::Tensor tensor = allocateTensor(
+      cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
 
-  logging::trace("[TRACING-2] Allocated tensor: {} {}",
-                 static_cast<void *>(output.unsafeGetTensorImpl()),
-                 toString(output));
-  return output;
+  const std::string str = "Input/" + std::to_string(_next_input_idx++);
+  logging::trace("[TRACING-2] Adding constant: {} with cpu ptr {}",
+                 static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
+                 cpu_tensor.data_ptr());
+  poptorch_ir::TensorId value =
+      _compiler.addConstantTensor(poptorch::getCpuData(tensor),
+  toCompilerShape(tensor), toCompilerType(tensor), str.c_str(),
+  cpu_tensor.data_ptr()); _mapper.addTensor(tensor, value);
+  return tensor;
+  */
 }
 
 at::Tensor MLIRDispatch::addInput(const at::Tensor &cpu_tensor) {
@@ -140,15 +156,14 @@ at::Tensor MLIRDispatch::addInput(const at::Tensor &cpu_tensor) {
       cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
 
   const std::string str = "Input/" + std::to_string(_next_input_idx++);
-  logging::trace("[TRACING-2] Adding input: {} ",
-                 static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()));
+  logging::trace("[TRACING-2] Adding input: {} with cpu ptr {}",
+                 static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
+                 cpu_tensor.data_ptr());
+  copyDataFromCpuSource(tensor, cpu_tensor);
   poptorch_ir::TensorId value =
-      _compiler.addInput(cpu_tensor.data_ptr(), toCompilerShape(tensor),
+      _compiler.addInput(poptorch::getCpuData(tensor), toCompilerShape(tensor),
                          toCompilerType(tensor), str.c_str());
   _mapper.addTensor(tensor, value);
-  // TODO(T59880) Next line shouldn't be needed anymore: we should only see
-  // tensors we've allocated ourselves.
-  _mapper.addTensor(cpu_tensor, value);
   return tensor;
 }
 
@@ -159,17 +174,15 @@ at::Tensor MLIRDispatch::addParameter(const at::Tensor &cpu_tensor) {
 
   const std::string str = "Parameter/" + std::to_string(_next_parameter_idx++);
 
-  logging::trace(
-      "[TRACING-2] Adding parameter: {} with storage {}", cpu_tensor.data_ptr(),
-      static_cast<void *>(cpu_tensor.storage().unsafeGetStorageImpl()));
+  logging::trace("[TRACING-2] Adding parameter: {} with cpu ptr {}",
+                 static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
+                 cpu_tensor.data_ptr());
 
-  poptorch_ir::TensorId value =
-      _compiler.addParameter(cpu_tensor.data_ptr(), toCompilerShape(tensor),
-                             toCompilerType(tensor), str.c_str());
+  copyDataFromCpuSource(tensor, cpu_tensor);
+  poptorch_ir::TensorId value = _compiler.addParameter(
+      poptorch::getCpuData(tensor), toCompilerShape(tensor),
+      toCompilerType(tensor), str.c_str());
   _mapper.addTensor(tensor, value);
-  // TODO(T59880) Next line shouldn't be needed anymore: we should only see
-  // tensors we've allocated ourselves.
-  _mapper.addTensor(cpu_tensor, value);
   return tensor;
 }
 
@@ -186,10 +199,9 @@ void MLIRDispatch::addOutput(const at::Tensor &ipu_src,
 
   const std::string str = "Output/" + std::to_string(_next_output_idx++);
   poptorch_ir::TensorId id = _mapper.getMLIRForTensor(ipu_src);
-  logging::trace(
-      "[TRACING-2] Marking output: {} with storage {}",
-      static_cast<void *>(cpu_dest.unsafeGetTensorImpl()),
-      static_cast<void *>(cpu_dest.storage().unsafeGetStorageImpl()));
+  logging::trace("[TRACING-2] Marking output: {} with cpu ptr {}",
+                 static_cast<void *>(cpu_dest.unsafeGetTensorImpl()),
+                 cpu_dest.data_ptr());
 
   if (id != poptorch_ir::tensor_error_id && id != poptorch_ir::none_id) {
     _compiler.addOutput(id, storage, str.c_str());
@@ -219,16 +231,8 @@ MLIRDispatch::mlirFromStack(c10::Stack &stack) {
 
 const at::Tensor &MLIRDispatch::copyInplace(const at::Tensor &self,
                                             const at::Tensor &src) {
-  // We have to look the tensors up first as they might be a special case.
   _compiler.copy_(findTensor(self), findTensor(src));
 
-  // Convert the tensors to MLIR and create the copy.
-  ValueMapper::TrackedTensor *self_info = _mapper.rawTensorRecord(self);
-  ValueMapper::TrackedTensor *src_info = _mapper.rawTensorRecord(src);
-
-  // Update the tensor info so it now refers to the other metadata.
-  self_info->jit = src_info->jit;
-  self_info->mlir = src_info->mlir;
   return self;
 }
 
@@ -241,51 +245,6 @@ void packStack(c10::Stack &stack, T &arg, Args... args) {
   packStack(stack, args...);
 }
 
-// _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
-// device=None, bool? pin_memory=None, bool non_blocking=False, MemoryFormat?
-// memory_format=None) -> Tensor
-// Apears in 1.10.
-at::Tensor MLIRDispatch::toCopyInplace(const at::Tensor &self,
-                                       c10::optional<at::ScalarType> dtype,
-                                       c10::optional<at::Layout> layout,
-                                       c10::optional<at::Device> device,
-                                       c10::optional<bool> pin,
-                                       c10::optional<c10::MemoryFormat> fmt) {
-  // Handle a cast
-  // Ignore layout/device/pin/fmt
-  if (dtype && (self.dtype() != *dtype)) {
-    c10::Stack stack;
-    stack.push_back(self);
-    stack.push_back(*dtype);
-    aten_to_dtype(stack);
-    return stack.at(0).toTensor();
-  }
-
-  // Create the new output tensor.
-  at::Tensor out =
-      allocateTensor(self.sizes(), dtype, device, layout, pin, fmt);
-
-  // Zero tensor as it's possible that the tensor is accessible by the user
-  // after tracing.
-  at::zero_(out);
-
-  // Make an empty IR node.
-  // (empty_tensor returns an ODSTensorResults instance, which is a vector of a
-  // vector of a tensor)
-  poptorch_ir::TensorId out_id =
-      _compiler
-          .empty_tensor(self.sizes().vec(),
-                        toCompilerType(scalarTypeOrDefault(dtype)))
-          .at(0)
-          .at(0);
-
-  // Track it in our mapper.
-  _mapper.addTensor(out, out_id);
-
-  // Create a normal copy in the graph (this does not alter the at::tensor)
-  return copyInplace(out, self);
-}
-
 void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
   poptorch_ir::TensorId id =
       _compiler.empty_tensor(tensor.sizes().vec(), toCompilerType(tensor))
@@ -296,7 +255,13 @@ void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
 at::Tensor MLIRDispatch::detach(const at::Tensor &self) {
-  return toCopyInplace(self, c10::nullopt, c10::nullopt, self.device());
+  at::Tensor out(self.unsafeGetTensorImpl()->shallow_copy_and_detach(
+      /*version_counter=*/self.unsafeGetTensorImpl()->version_counter(),
+      /*allow_tensor_metadata_change=*/true));
+
+  // The new tensor points at the same mlir tensor as the source.
+  _mapper.addTensor(out, findTensor(self));
+  return out;
 }
 
 void MLIRDispatch::setCurrentCodeLocation(
@@ -430,7 +395,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
         ERROR("Wrapped values of scalar type " << tensor.scalar_type()
                                                << " are not supported.");
       }
-      _mapper.addTensor(tensor, val);
+      // Don't track constants in the ValueMaper: they're CPU tensors.
 
       logging::trace(
           "[TRACING-2] Added wrapped value tensor, addr: {} with storage {}",
@@ -478,8 +443,10 @@ std::vector<at::Tensor> MLIRDispatch::outputIsInplaceOfList(
 at::Tensor MLIRDispatch::outputInplaceReshape_squeeze_dim_(
     poptorch_ir::TensorId output_id, const at::Tensor &original_input,
     poptorch_ir::TensorId self, int dim) {
-  (void)self;
-  original_input.squeeze_(dim);
+  UNUSED(self);
+  UNUSED(dim);
+  const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
+  original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
   _mapper.addTensor(original_input, output_id);
   return original_input;
 }
@@ -498,9 +465,6 @@ at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
   auto dtype = compilerTypeToScalarType(compiler_type);
   // Create new tensor
   at::Tensor new_output = allocateTensor(shape, dtype);
-  // Zero tensor as it's possible that the tensor is accessible by the user
-  // after tracing.
-  at::zero_(new_output);
   new_output.set_requires_grad(requires_grad);
   _mapper.addTensor(new_output, output_id);
 

@@ -341,3 +341,13 @@ class LogChecker:
                     f"{self._log}"
                     "\n The log above matches all of the expressions "
                     f"{exprs}")
+
+
+# When we're running on the CPU we don't need to specify a device
+# but for IPU devices we need to make sure the output buffers are
+# created on the IPU.
+def outputDevice():
+    if poptorch.isRunningOnIpu():
+        # TODO(T59880) rename "xla" -> "ipu"
+        return "xla"
+    return None

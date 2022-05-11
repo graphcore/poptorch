@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "JitDispatch.hpp"
 
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -16,12 +17,42 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "../CommonHelperFunctions.hpp"
+#include "../Tensor.hpp"
 
 namespace poptorch {
 
-at::Tensor JITDispatch::addInput(const at::Tensor &tensor) {
-  torch::jit::Value *value = graph.addInput(tensor.name());
-  value->inferTypeFrom(copyAndCoerceType(tensor));
+at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
+  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
+
+  auto src = copyAndCoerceType(cpu_tensor);
+
+  at::Tensor tensor =
+      allocateTensor(src.sizes(), c10::typeMetaToScalarType(src.dtype()));
+
+  torch::jit::Value *value = makeConstant(*graph, src);
+
+  logging::trace("[TRACING-2] Adding constant: Value {} with cpu ptr {}",
+                 static_cast<void *>(value), cpu_tensor.data_ptr());
+
+  _mapper.addTensor(tensor, value);
+  return tensor;
+}
+
+at::Tensor JITDispatch::addInput(const at::Tensor &cpu_tensor) {
+  ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
+
+  at::Tensor tensor = allocateTensor(
+      cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
+
+  tensor = copyAndCoerceType(tensor);
+
+  torch::jit::Value *value = graph->addInput(cpu_tensor.name());
+  value->inferTypeFrom(tensor);
+
+  logging::trace("[TRACING-2] Adding input: Value {} with cpu ptr {}",
+                 static_cast<void *>(value), cpu_tensor.data_ptr());
+
+  copyDataFromCpuSource(tensor, cpu_tensor);
   _mapper.addTensor(tensor, value);
   return tensor;
 }
@@ -31,19 +62,15 @@ at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
   // PopART doesn't allow non-floating point variables so add them as
   // constants instead. These will be deleted from parameters and buffers
   // in python before passed to lowering.
-  at::Tensor retval = tensor;
   if (!at::isFloatingType(type)) {
-    if (type == at::ScalarType::Long) {
-      retval = retval.to(at::ScalarType::Int);
-    }
-    auto *new_node = tensorToConstant(&graph, retval);
-    _mapper.addTensor(retval, new_node->output());
-    return retval;
+    return addConstant(tensor);
   }
-  return addInput(retval);
+  return addInput(tensor);
 }
 
 void JITDispatch::createGraph() {
+  graph = std::make_shared<torch::jit::Graph>();
+
   // No need to create a MLIR graph, we're going to only use the dispatcher
   // for shape inference, so just initialise the compiler.
   _mlir_dispatch.initCompiler();
@@ -59,7 +86,7 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
 
   torch::jit::Value *val;
   if (record->is_empty) {
-    val = makeConstant(graph, ipu_src);
+    val = makeConstant(*graph, ipu_src);
     _mapper.addTensor(ipu_src, val);
   } else {
     val = record->jit;
@@ -72,47 +99,26 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
                  val->type()->expect<c10::TensorType>()->scalarType().value_or(
                      at::ScalarType::Undefined));
 
-  graph.registerOutput(val);
+  graph->registerOutput(val);
   // For now, disable overlapping host IO on every output
   auto overlap_symbol = getOverlapSymbol("_for_output", _next_output_idx);
   const std::string value_str = "no_overlap";
-  graph.return_node()->s_(overlap_symbol, value_str);
+  graph->return_node()->s_(overlap_symbol, value_str);
 
   _next_output_idx++;
 }
 
 void JITDispatch::finalizeGraph() {
-  logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", graph);
-}
-
-at::Tensor JITDispatch::allocateTensorImpl(
-    c10::IntArrayRef size, c10::optional<at::ScalarType> dtype,
-    c10::optional<at::Device> device, c10::optional<at::Layout> layout,
-    c10::optional<bool> pin_memory,
-    c10::optional<at::MemoryFormat> memory_format) {
-  return at::native::empty_cpu(size, dtype, layout, device, pin_memory,
-                               memory_format);
+  logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", *graph);
 }
 
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
                                            const at::Tensor &src) {
   ValueMapper::TrackedTensor *self_tracked = _mapper.rawTensorRecord(self);
-  if (self_tracked == nullptr) {
-    // This is probably an external tensor that we didn't catch. We track it
-    // but leave it uninitialized as we'll fix up self_tracked->jit later.
-    registerEmptyTensor(self);
-    self_tracked = _mapper.rawTensorRecord(self);
-  }
-
   ValueMapper::TrackedTensor *src_tracked = _mapper.rawTensorRecord(src);
-  if (src_tracked == nullptr || src_tracked->is_empty) {
-    // This is either an external tensor that we didn't catch or an empty one.
-    // Assume it's a constant.
-    torch::jit::Value *val = makeConstant(graph, src);
-    _mapper.addTensor(src, val);
-    src_tracked = _mapper.rawTensorRecord(src);
-  }
+  ERROR_ON(self_tracked == nullptr);
+  ERROR_ON(src_tracked == nullptr);
 
   logging::trace(
       "[TRACING-2][JIT] copyInplace: src tensor {} (jit ir %{}), self tensor "
@@ -131,10 +137,10 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
 
   torch::jit::Value *copy;
   if (*self_st == *src_st) {
-    copy = createIdentity(&graph, {src_tracked->jit})->output();
+    copy = createIdentity(graph.get(), {src_tracked->jit})->output();
     copy->setType(self_tracked->jit->type());
   } else {
-    copy = createCast(&graph, src_tracked->jit, *self_st)->output();
+    copy = createCast(graph.get(), src_tracked->jit, *self_st)->output();
   }
 
   self_tracked->jit = copy;
@@ -150,40 +156,31 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   return self;
 }
 
-// _to_copy(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device?
-// device=None, bool? pin_memory=None, bool non_blocking=False, MemoryFormat?
-// memory_format=None) -> Tensor
-at::Tensor JITDispatch::toCopyInplace(const at::Tensor &self,
-                                      c10::optional<at::ScalarType> dtype,
-                                      c10::optional<at::Layout> layout,
-                                      c10::optional<at::Device> device,
-                                      c10::optional<bool> pin,
-                                      c10::optional<c10::MemoryFormat> fmt) {
-  at::Tensor out =
-      at::native::empty_cpu(self.sizes(), dtype, layout, device, pin, fmt);
-  // Zero tensor as it's possible that the tensor is accessible by the user
-  // after tracing.
-  at::zero_(out);
-
-  torch::jit::Node *n = graph.createUninitialized(
-      c10::TensorType::create(copyAndCoerceType(out)));
-  _mapper.addTensor(out, n->output(0), true);
-
-  logging::trace("[TRACING-2][JIT] toCopyInplace: out tensor {} self tensor {}",
-                 static_cast<void *>(out.unsafeGetTensorImpl()),
-                 static_cast<void *>(self.unsafeGetTensorImpl()));
-
-  return copyInplace(out, self);
-}
-
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
-  torch::jit::Node *n = graph.createUninitialized(
-      c10::TensorType::create(copyAndCoerceType(tensor)));
+  // Do not call copyAndCoerceType from this method:
+  // the source tensor hasn't been added to the mapper yet.
+
+  // The tensor shouldn't need converting anyway: it should be created with a
+  // valid type.
+  auto coerced_scalar_type = coerceToSupportedType(tensor.scalar_type());
+  ERROR_ON_MSG(
+      coerced_scalar_type != tensor.scalar_type(),
+      "[Internal error] The empty tensor should have a valid compiler type");
+  torch::jit::Node *n =
+      graph->createUninitialized(c10::TensorType::create(tensor));
   _mapper.addTensor(tensor, n->output(0), true);
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
-at::Tensor JITDispatch::detach(const at::Tensor &self) { return self; }
+at::Tensor JITDispatch::detach(const at::Tensor &self) {
+  at::Tensor out(self.unsafeGetTensorImpl()->shallow_copy_and_detach(
+      /*version_counter=*/self.unsafeGetTensorImpl()->version_counter(),
+      /*allow_tensor_metadata_change=*/true));
+
+  // The new tensor points at the same mlir tensor as the source.
+  _mapper.addTensor(out, _mapper.getValueForTensor(self));
+  return out;
+}
 
 void JITDispatch::setCurrentCodeLocation(
     const torch::jit::SourceRange &source_location) {
@@ -193,9 +190,8 @@ void JITDispatch::setCurrentCodeLocation(
 // Convert the operation into our normal IR style operation.
 void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                                            c10::Stack &stack,
-                                           torch::jit::Node **node,
-                                           ValueMapper &mapper) {
-  torch::jit::Node *new_node = canonicalise(schema, *node, graph, false);
+                                           torch::jit::Node **node) {
+  torch::jit::Node *new_node = canonicalise(schema, *node, *graph, false);
   *node = new_node;
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation {}", *new_node);
@@ -219,7 +215,7 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
     if (value.isTensor()) {
       at::Tensor tensor = value.toTensor();
 
-      if (mapper.isHalfTensor(tensor)) {
+      if (_mapper.isHalfTensor(tensor)) {
         val->inferTypeFrom(tensor.to(at::ScalarType::Half));
       } else {
         val->inferTypeFrom(copyAndCoerceType(tensor));
@@ -238,8 +234,8 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       val->setType(value.type()->expect<c10::ListType>());
       auto tensor_list = value.toTensorVector();
       // Always insert list unpack if output value is a list.
-      auto *unpack = graph.createListUnpack(val, tensor_list.size());
-      graph.insertNode(unpack);
+      auto *unpack = graph->createListUnpack(val, tensor_list.size());
+      graph->insertNode(unpack);
 
       for (size_t i = 0; i < tensor_list.size(); ++i) {
         at::Tensor tensor = tensor_list.at(i);
@@ -270,7 +266,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   const c10::FunctionSchema &schema = op.schema();
 
   // Create a fake IR node for us to target using the schema.
-  torch::jit::Node *node = lowerFromSchema(schema, stack, graph, _mapper);
+  torch::jit::Node *node = lowerFromSchema(schema, stack, *graph, _mapper);
 
   // The MLIR dispatcher is going to use the shape and type of the inputs to
   // infer the shape and type of the outputs so we need to create dummy MLIR
@@ -284,7 +280,11 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
                      "[Internal error] Non-empty tensor of type 'Undefined'");
         continue;
       }
-      _mlir_dispatch.registerEmptyTensor(tensor);
+      // If the tensor is not tracked by JIT then don't track it in MLIR.
+      // (It's probably a CPU constant)
+      if (_mapper.getValueForTensor(tensor) != nullptr) {
+        _mlir_dispatch.registerEmptyTensor(tensor);
+      }
     }
   }
   _mlir_dispatch.handleOp(op, stack);
@@ -295,10 +295,10 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
   // Run our normal canonicalisation passes on it.
   // The original node will be deleted but replaced with a new node.
-  canonicaliseAndFixOutput(schema, *stack, &node, _mapper);
+  canonicaliseAndFixOutput(schema, *stack, &node);
 
   // Annotate for loops as subgraphs.
-  annotateSubgraphsDispatch(&graph, node);
+  annotateSubgraphsDispatch(graph.get(), node);
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation and fix output {}",
                  *node);
@@ -338,7 +338,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   }
 
   logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",
-                 schema.name(), graph);
+                 schema.name(), *graph);
 }
 
 } // namespace poptorch

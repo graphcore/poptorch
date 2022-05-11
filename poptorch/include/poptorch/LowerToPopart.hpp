@@ -49,8 +49,18 @@ class InplaceOpHandler;
 
 class LowerToPopart {
 public:
-  LowerToPopart(torch::jit::Graph *graph, std::vector<at::Tensor> parameters,
-                std::vector<std::string> parameter_names,
+  // JIT trace entry point: we manually provide the parameters.
+  LowerToPopart(torch::jit::Graph *graph,
+                const std::vector<at::Tensor> &parameters,
+                const std::vector<std::string> &parameter_names,
+                const std::shared_ptr<InplaceOpHandler> &inplace_op_handler,
+                bool training, std::vector<Optimizer> &&opt,
+                const SessionOptions &options,
+                const py::function &attribute_accessor, CPUCallbackMap callback,
+                AnchorList &&anchors);
+
+  // Dispatcher entry point: the parameters are embedded in the jit::Graph.
+  LowerToPopart(torch::jit::Graph *graph,
                 const std::shared_ptr<InplaceOpHandler> &inplace_op_handler,
                 bool training, std::vector<Optimizer> &&opt,
                 const SessionOptions &options,

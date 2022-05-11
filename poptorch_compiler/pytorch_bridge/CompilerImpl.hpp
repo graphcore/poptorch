@@ -144,6 +144,11 @@ public:
     _executable.connectStream(string, ptr);
   }
 
+  void connectStream(const std::string &string, Buffer buffer) {
+    ERROR_ON(!_executable);
+    _executable.connectStream(string, std::move(buffer));
+  }
+
   // Return the executable such that it can be moved out this class
   poptorch_ir::PoplarExecutable &&getExecutable() {
     return std::move(_executable);
@@ -158,9 +163,9 @@ public:
   std::vector<mlir::Value> value_map;
 
   // Input and output callbacks to give to poplar.
-  std::vector<std::string> input_callbacks;
+  std::vector<std::pair<std::string, Buffer>> input_callbacks;
   std::vector<std::pair<std::string, void *>> output_callbacks;
-  std::vector<std::pair<std::string, void *>> weight_callbacks;
+  std::vector<std::pair<std::string, Buffer>> weight_callbacks;
 
   poprithms::logging::ManualTimePartitionLogger timing_manager;
   // When a new op is added to the main graph using createOp we check and

@@ -24,9 +24,44 @@
 #include "passes/LowerToPoplar.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch_ir {
 namespace detail {
+
+namespace {
+
+// Implementation of LLVM's ostream which prints
+// to poptorch::logging::trace
+class LLVMStreamToTrace : public llvm::raw_ostream {
+public:
+  LLVMStreamToTrace() {
+    // Don't buffer otherwise the calls might be printed out of order:
+    // for example if the LLVM stream is used to print the graph before
+    // and after passes but the pass prints messages using poptorch::logging.
+    SetUnbuffered();
+  }
+  void write_impl(const char *ptr, size_t size) override {
+    for (size_t i = 0; i < size; ++i, ++ptr) {
+      // If we have an entire line: print it.
+      if (*ptr == '\n') {
+        poptorch::logging::trace("{}", _buf);
+        _buf.clear();
+      } else {
+        _buf += *ptr;
+      }
+    }
+    _pos += size;
+  }
+
+  uint64_t current_pos() const override { return _pos; }
+
+private:
+  uint64_t _pos;
+  std::string _buf;
+};
+
+} // namespace
 
 class PoplarExecutableImpl {
 public:
@@ -46,6 +81,10 @@ public:
   CompilerContext context;
 
   std::unique_ptr<poplar::Engine> engine;
+
+  // Keep a reference to the buffers which are currently connected to
+  // Poplar callbacks.
+  std::map<std::string, Buffer> owned_buffers;
 };
 
 PoplarExecutableImpl::PoplarExecutableImpl(
@@ -63,9 +102,31 @@ void PoplarExecutableImpl::compile(
   // Disable MLIR pass verification as we have our own definition of
   // valid IR state
   manager.enableVerifier(false);
+  LLVMStreamToTrace output;
 
+  // If Poptorch's TRACE logging level is enabled then print the graph
+  // in between passes.
+  if (poptorch::logging::shouldLog(poptorch::logging::Level::Trace)) {
+    // LLVM's printing doesn't work if multi-threading is enabled.
+    module.getContext()->disableMultithreading();
+    mlir::OpPrintingFlags flags{};
+    // enableDebugInfo = add location() at the end of each line.
+    // pretty = true -> Print the actual filename:line:col rather than loc0,
+    // loc1, etc which are IDs in the mlir::SourceManager.
+    flags.enableDebugInfo(/* prettyForm=*/true);
+    manager.enableIRPrinting([](mlir::Pass * /*unused*/,
+                                mlir::Operation * /*unused*/) { return true; },
+                             [](mlir::Pass * /*unused*/,
+                                mlir::Operation * /*unused*/) { return true; },
+                             /*printModuleScope =*/true,
+                             /* printAfterOnlyOnChange =*/true, output, flags);
+  }
+
+  manager.addPass(mlir::createCanonicalizerPass());
+  // TODO(T61603) Figure out why MLIR's DCE pass doesn't do the same as our
+  // RemoveUnusedOperationsPass.
+  // manager.addPass(mlir::createSymbolDCEPass());
   manager.addPass(poptorch_ir::createRemoveUnusedOperationsPass());
-  manager.addPass(poptorch_ir::createRemoveRedundantCopiesPass());
   manager.addPass(poptorch_ir::createLowerToPoplarPass(the_graph, context));
 
   timer.start("Poplar graph construction");
@@ -82,7 +143,13 @@ void PoplarExecutableImpl::compile(
 
 } // namespace detail
 
+void PoplarExecutable::connectStream(const std::string &string, Buffer ptr) {
+  _impl->owned_buffers.insert_or_assign(string, ptr);
+  _impl->engine->connectStream(string, ptr->data());
+}
+
 void PoplarExecutable::connectStream(const std::string &string, void *ptr) {
+  _impl->owned_buffers.erase(string);
   _impl->engine->connectStream(string, ptr);
 }
 

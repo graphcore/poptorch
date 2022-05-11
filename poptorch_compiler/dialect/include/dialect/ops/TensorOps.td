@@ -43,6 +43,7 @@ def Poptorch_cast : Poptorch_Op<"cast", []> {
 
 def Poptorch_copy_: Poptorch_Op<"copy_", []> {
   let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$src);
+  let hasCanonicalizer = 1; // See CanonicalizeInplaceCopies.cpp
 }
 
 

@@ -33,9 +33,6 @@ void RemoveUnusedOperations::runOnOperation() {
 
   std::vector<mlir::Operation *> to_remove;
 
-  poptorch::logging::trace("Graph right before RemoveUnusedOperations:\n{}",
-                           mlirOpToStr(module));
-
   mlir::FuncOp main_graph = *module.getOps<mlir::FuncOp>().begin();
   ERROR_ON(main_graph.getName().str() != "MainGraph");
   for (mlir::Operation &op : main_graph.getOps()) {

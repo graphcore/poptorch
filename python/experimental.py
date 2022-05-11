@@ -5,15 +5,17 @@ from typing import Dict, List, Optional
 
 import torch
 from . import enums, poptorch_core, _impl, accessAttributes
-from ._utils import unrollTensorList, reconstruct_output_structure
+from ._utils import flattenTensorStructure, reconstructTensorStructure
 from .options import Options
 
 
+# TODO(T61604): remove parameter_and_buffers (model should always be used)
 class IPUScope:
     def __init__(
             self,
             inputs: List['torch.Tensor'],
             parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
+            model: Optional['torch.nn.Module'] = None,
             options: Optional['poptorch.Options'] = None,
             compile_using=enums.Compiler.PopART):
 
@@ -30,6 +32,9 @@ class IPUScope:
             if tensor.is_sparse:
                 raise ValueError("You cannot pass sparse tensors as inputs " +
                                  "to IPUScope.")
+
+        if model and not isinstance(model, torch.nn.Module):
+            raise ValueError("model must inherit from torch.nn.Module")
 
         self._executable = None
         self._options = options or Options()
@@ -48,21 +53,27 @@ class IPUScope:
         else:
             self._params_and_buffers = parameters_and_buffers
 
-        param_list = list(self._params_and_buffers.values())
+        self._model = model
 
         self._outputs = []
         self._outputs_structure = None
-        self._inputs = []
         self._upload_weights = True
-
-        with torch.no_grad():
-            self._inputs = [t.clone() for t in inputs]
 
         # Create the graph. Futured captured calls will be written into this
         # graph behind the scenes.
         poptorch_core.createGraph(
-            poptorch_core.TracingMode(self._compile_using), inputs, param_list,
+            poptorch_core.TracingMode(self._compile_using), inputs,
             self._options._source_location_excludes)
+
+        # TODO(T61576) Hack: we use the device index to indicate whether a
+        # tensor is an input or a buffer / parameter.
+        # Normally we would call torch.nn.Module.to(device) directly inside
+        # the IPUScope and that would move the parameters / buffers to the
+        # IPU and we could determine if a tensor is a parameter/buffer by
+        # checking the python stacktrace.
+        d = torch.device("xla:1")
+        if self._model:
+            self._model.apply(lambda l: l.to(d))
 
         # JITDispatch::createGraph() doesn't add non-floating point parameters
         # and buffers as graph inputs as they are not supported in PopART.
@@ -101,9 +112,7 @@ class IPUScope:
         if self._compile_using == enums.Compiler.PopART:
             # Compile the captured graph using PopART.
             self._executable = poptorch_core.compileWithManualTracing(
-                self._inputs, list(self._params_and_buffers.values()),
-                list(self._params_and_buffers.keys()), self._options.toDict(),
-                accessAttributes)
+                self._options.toDict(), accessAttributes)
         else:
             # Compile the captured graph using MLIR.
             self._executable = poptorch_core.compileWithMlir()
@@ -111,9 +120,8 @@ class IPUScope:
     def __call__(self, *args):
         if self._upload_weights:
             if self._compile_using == enums.Compiler.PopART:
-                poptorch_core.copyWeightsToDevice_impl(
-                    self._executable, tuple(self._params_and_buffers.keys()),
-                    tuple(self._params_and_buffers.values()))
+                poptorch_core.copyWeightsToDevice_impl(self._executable,
+                                                       tuple(), tuple())
             else:
                 self._executable.weightsToDevice()
             self._upload_weights = False
@@ -128,57 +136,61 @@ class IPUScope:
             output = self._outputs
 
         if self._outputs_structure is not None:
-            output = reconstruct_output_structure(self._outputs_structure,
-                                                  output)
+            output = reconstructTensorStructure(self._outputs_structure,
+                                                output)
         return output
 
     def outputs(self, tensors):
-        # We don't want to catch anything in here.
-        poptorch_core.endDispatch()
-
         def flatten(x):
             if isinstance(x, (tuple, list)):
                 for e in x:
                     yield from flatten(e)
             else:
+                if x.device.type != "xla":
+                    raise ValueError(
+                        "Output expected to be on the IPU but is on %s" %
+                        x.device.type)
+
                 yield x
 
         self._outputs_structure = tensors
-        flattened = list(flatten(tensors))
-        if flattened != [None]:
-            with torch.no_grad():
-                for tensor in flattened:
-                    if tensor.dtype == torch.long:
-                        self._outputs.append(tensor.int())
-                    else:
-                        self._outputs.append(tensor.clone())
+        self._outputs = list(flatten(tensors))
+        self._outputs = [
+            out.int() if out.dtype == torch.long else out
+            for out in self._outputs
+        ]
+        self._outputs = [out.cpu() for out in self._outputs]
 
-            poptorch_core.markOutputs(flattened, self._outputs)
-
-        # Turn dispatch back on.
-        poptorch_core.startDispatch()
+        poptorch_core.finalizeGraph()
 
 
 # TODO(T45467): Modify this wrapper so that sentinel dispatch occurs on each
 #               call after compilation so that changes to wrapped values
 #               can be picked up
 class _IPUContext:
-    def __init__(self, func, params, compiler, options):
+    def __init__(self, func, compiler, options, model):
         functools.update_wrapper(self, func)
         self.func = func
         self.ipu = None
         self.compiler = compiler
-        self.params = params
         self.options = options
+        self.model = model
 
     def __call__(self, *args, **kwargs):
         # Collect all tensor arguments and pass them to IPUScope
-        tensor_args = unrollTensorList((*args, *kwargs.values()))
+        tensor_args = flattenTensorStructure((args, kwargs))
         if self.ipu is None:
             with IPUScope(tensor_args,
-                          parameters_and_buffers=self.params,
+                          model=self.model,
                           options=self.options,
                           compile_using=self.compiler) as ipu:
+                d = torch.device("xla:0")
+                # Move all the inputs to the IPU
+                tensor_args = [t.to(d) for t in tensor_args]
+                # Re-inject moved tensors in args and kwargs:
+                args, kwargs = reconstructTensorStructure((args, kwargs),
+                                                          tensor_args)
+
                 result = self.func(*args, **kwargs)
                 ipu.outputs(result)
             self.ipu = ipu
@@ -198,9 +210,9 @@ class _IPUContext:
 #
 # You can also pass in parameters and poptorch options:
 #
-# 1. ipu_func = IPUContext(func, parameters_and_buffers=..., options=...)(inputs)
+# 1. ipu_func = IPUContext(func, model=..., options=...)(inputs)
 #
-# 2. @IPUContext(parameters_and_buffers=..., options=...)
+# 2. @IPUContext(model=..., options=...)
 #    def ipu_func(inputs):
 #        ...
 #        return outputs
@@ -208,21 +220,20 @@ class _IPUContext:
 # Note that the function being wrapped MUST take the graph inputs as inputs to the
 # function, and MUST return the outputs of the graph. Any non-tensor inputs will
 # be ignored by the graph. The function outputs must consist of tensors only
-def IPUContext(
-        func=None,
-        *,
-        parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
-        compiler=enums.Compiler.MLIR,
-        options: Optional['poptorch.Options'] = None):
+def IPUContext(func=None,
+               *,
+               compiler=enums.Compiler.MLIR,
+               options: Optional['poptorch.Options'] = None,
+               model: Optional['torch.nn.Module'] = None):
     # If our decorator is passed any explicit keyword arguments, "func"
     # will be None so we need to return a new decorator with the keyword
     # arguments hardcoded in
     if func is None:
 
         def wrapper(f):
-            return _IPUContext(f, parameters_and_buffers, compiler, options)
+            return _IPUContext(f, compiler, options, model)
 
         return wrapper
     # Otherwise the decorator has no extra args: just pass the
     # default arguments
-    return _IPUContext(func, parameters_and_buffers, compiler, options)
+    return _IPUContext(func, compiler, options, model)

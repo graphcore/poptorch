@@ -29,14 +29,13 @@
  *  PopART set. Once we have full 1:1 coverage we might want to consider sharing
  *  the same list.
  *
- * JIT fallback ops are defined in: PopartAPISupportedOps.h.inc
  */
 
 namespace poptorch {
 
 /*
- * The first dispatch table. This is the one which maps from an aten operation
- * onto the above table.
+ * The dispatch table maps aten and poptorch operations schemas to their
+ * handler in the MLIRDispatch.
  */
 void MLIRDispatch::generateDispatchTable() { // NOLINT
   // The generated mapping of PyTorch/Aten -> MLIR functions.
@@ -50,12 +49,6 @@ void MLIRDispatch::generateDispatchTable() { // NOLINT
 #include "AtenToMlirDispatch.inc"
 #include "PoptorchToMlirDispatch.inc"
   };
-
-  /*
-   * The second dispatch table is used to dispatch from the current TracingV1
-   * like PopART/JIT IR nodes we create. This is so we can still support the
-   * normal handler path.
-   */
 }
 
 } // namespace poptorch

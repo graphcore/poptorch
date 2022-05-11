@@ -9,6 +9,7 @@ from poptorch.experimental import IPUContext
 
 @pytest.mark.mlirSupportRequired
 def test_grad():
+    torch.manual_seed(42)
     model = torch.nn.Sequential(torch.nn.Linear(1, 10))
 
     t1 = torch.tensor([3.5])
@@ -24,9 +25,7 @@ def test_grad():
     cpu_model = copy.deepcopy(model)
     cpu_result = grad(t1, t2, cpu_model)
 
-    ipu_result = IPUContext(grad,
-                            parameters_and_buffers=model.named_parameters())(
-                                t1, t2, model)
+    ipu_result = IPUContext(grad, model=model)(t1, t2, model)
 
     for ipu_out, cpu_out in zip(ipu_result, cpu_result):
         helpers.assert_allclose(expected=cpu_out, actual=ipu_out)
@@ -41,25 +40,27 @@ def test_SGD():
     t1 = torch.tensor([3.5])
     t2 = torch.ones([10])
 
-    ipu_opt = torch.optim.SGD(model.parameters(), lr=0.01)
-    cpu_opt = torch.optim.SGD(cpu_model.parameters(), lr=0.01)
+    ipu_opt = []
+    cpu_opt = []
 
-    def sgd(x1, x2, m, o):
-        o.zero_grad()
+    def sgd(x1, x2, m, opts):
+        if not opts:
+            opts.append(torch.optim.SGD(m.parameters(), lr=0.01))
+
+        opts[0].zero_grad()
         out = m(x1)
 
         loss = torch.nn.functional.mse_loss(out, x2)
         loss.backward()
 
-        o.step()
+        opts[0].step()
         return m[0].weight.grad, m[0].bias.grad, m[0].weight, m[0].bias
 
-    ipu_sgd = IPUContext(sgd, parameters_and_buffers=model.named_parameters())
+    ipu_sgd = IPUContext(sgd, model=model)
 
     for _ in range(5):
         # Run on IPU.
         ipu_result = ipu_sgd(t1, t2, model, ipu_opt)
-
         cpu_result = sgd(t1, t2, cpu_model, cpu_opt)
 
         for ipu_out, cpu_out in zip(ipu_result, cpu_result):
@@ -75,26 +76,26 @@ def test_Adam():
     t1 = torch.tensor([3.5])
     t2 = torch.ones([10])
 
-    ipu_opt = torch.optim.Adam(model.parameters(), lr=0.01)
-    cpu_opt = torch.optim.Adam(cpu_model.parameters(), lr=0.01)
+    ipu_opt = []
+    cpu_opt = []
 
     def adam(x1, x2, m, o):
-        o.zero_grad()
+        if not o:
+            o.append(torch.optim.Adam(m.parameters(), lr=0.01))
+        o[0].zero_grad()
         out = m(x1)
 
         loss = torch.nn.functional.mse_loss(out, x2)
         loss.backward()
 
-        o.step()
+        o[0].step()
         return m[0].weight.grad, m[0].bias.grad, m[0].weight, m[0].bias
 
-    ipu_adam = IPUContext(adam,
-                          parameters_and_buffers=model.named_parameters())
+    ipu_adam = IPUContext(adam, model=model)
 
     for i in range(0, 5):
         # Run on IPU.
         ipu_result = ipu_adam(t1, t2, model, ipu_opt)
-
         cpu_result = adam(t1, t2, cpu_model, cpu_opt)
 
         for ipu_out, cpu_out in zip(ipu_result, cpu_result):

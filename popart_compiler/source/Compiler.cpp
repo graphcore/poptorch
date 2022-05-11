@@ -1015,8 +1015,12 @@ void Compiler::copyWeightsToDevice(const std::vector<void *> &host_buffers) {
   }
 
   logging::info("Writing weights from host to IPU memory.");
-  _impl->weights.updateData(host_buffers);
-  _impl->session->writeWeights(_impl->weights);
+  // Do we need to update the host buffers pointers before
+  // uploading to the IPU?
+  if (!host_buffers.empty()) {
+    _impl->weights.updateData(host_buffers);
+    _impl->session->writeWeights(_impl->weights);
+  }
   _impl->session->weightsFromHost();
 }
 

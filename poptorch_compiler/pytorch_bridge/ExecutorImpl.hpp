@@ -14,14 +14,15 @@ namespace detail {
 
 class PoptorchExecutorWrapperImpl {
 public:
-  PoptorchExecutorWrapperImpl(std::vector<std::string> &&callbacks,
-                              poptorch_ir::PoplarExecutable &&exe)
+  PoptorchExecutorWrapperImpl(
+      std::vector<std::pair<std::string, Buffer>> &&callbacks,
+      poptorch_ir::PoplarExecutable &&exe)
       : input_callbacks(std::move(callbacks)), executable(std::move(exe)) {}
 
   ~PoptorchExecutorWrapperImpl();
 
   // Input and output callbacks to give to poplar.
-  std::vector<std::string> input_callbacks;
+  std::vector<std::pair<std::string, Buffer>> input_callbacks;
 
   // The executable.
   poptorch_ir::PoplarExecutable executable;
