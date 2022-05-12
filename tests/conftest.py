@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import enum
 import gc
 import pytest
+import torch
 import poptorch
 
 
@@ -17,6 +19,17 @@ def cleanup():
 
 mlir_available = poptorch.hasMlirSupportOnPlatform()
 hw_available = poptorch.ipuHardwareIsAvailable()
+
+
+def pytest_make_parametrize_id(val, argname):
+    if val is None or isinstance(
+            val, (bool, int, str, float, torch.dtype, enum.Enum)):
+        return f"{argname}:{val}"
+    if isinstance(val, type):
+        return f"{argname}:{val.__name__}"
+
+    # Use default
+    return None
 
 
 def pytest_configure(config):
