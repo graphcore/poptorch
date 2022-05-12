@@ -6,6 +6,7 @@ installers.add(
     CondaPackages(
         "ccache=4.3",
         "cmake=3.18.2",
+        "libstdcxx-ng=11.2.0",
         "lld=" + _llvm_version,
         "llvmdev=" + _llvm_version,
         "make=4.3",
