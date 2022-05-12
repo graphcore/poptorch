@@ -90,6 +90,16 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
     _mapper.addTensor(ipu_src, val);
   } else {
     val = record->jit;
+
+    // If the output is an input: add an identity op to make sure the graph
+    // is not empty.
+    // TODO(T62169) handle empty graphs better.
+    for (auto *i : graph->inputs()) {
+      if (i == val) {
+        val = createIdentity(graph.get(), {val})->output();
+        break;
+      }
+    }
   }
 
   logging::trace("[TRACING-2][JIT] Graph output: Tensor ptr {}, jit ir %{} "

@@ -23,10 +23,9 @@ from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
 from . import _poptorch_data
-from ._utils import (accessAttributes, flattenTensorStructure,
-                     reconstructTensorStructure)
+from ._utils import (accessAttributes, reconstructTensorStructure)
 from ._logging import logger
-from .experimental import IPUScope
+from .experimental import IPUContext
 from .options import Options, PipelinedExecution, ShardedExecution
 from .optim import Optimizer
 
@@ -41,6 +40,30 @@ BUFFERS_CAN_CHANGE = (
     torch.nn.BatchNorm3d,
     torch.nn.modules.batchnorm.BatchNorm3d,
 )
+
+
+# Hacky way to make sure tensors end up on the IPU rather than the CPU by default.
+# Note: this is only needed for backward compatibility with tracing but we will
+# eventually stop supporting this approach so make sure a warning is printed.
+class _SetDefaultDeviceType:
+    def __init__(self):
+        self.tensor = torch.tensor
+
+    def __enter__(self):
+        @functools.wraps(torch.tensor)
+        def _tensor(*args, **kwargs):
+            if "device" not in kwargs:
+                logger.warning(
+                    "No device set in torch.tensor(): forcing to IPU")
+                kwargs["device"] = "xla"
+            return self.tensor(*args, **kwargs)
+
+        torch.tensor = _tensor
+        return self
+
+    def __exit__(self, exc_type, value, traceback):
+        # Restore the real Torch function
+        torch.tensor = self.tensor
 
 
 # pylint: disable=too-many-public-methods
@@ -507,28 +530,24 @@ class PoplarExecutor:
             self._write_optim_state_dict_if_needed()
 
     def _compileWithDispatch(self, in_tensors):
-        def all_data(model):
-            yield from model.named_parameters()
-            yield from model.named_buffers()
-
-        # Unpack the inputs.
-        inputs = flattenTensorStructure(in_tensors.asTuple())
-
         # Store buffer and parameter memory addresses to make sure that these do
         # not change during dispatching (which would give wrong results in a Jit
         # trace)
         buff_param_addresses = self._buffer_parameter_addresses()
 
-        with IPUScope(inputs,
-                      parameters_and_buffers=all_data(self._model),
-                      options=self._options) as ipu:
-            outputs = self._model(*in_tensors.asTuple())
-            ipu.outputs(outputs)
-            self._outputs_structure = ipu._outputs_structure  # pylint: disable=protected-access
-            self._error_on_buffer_parameter_address_change(
-                buff_param_addresses)
+        with _SetDefaultDeviceType():
+            # The IPUContext is going to move the model to the IPU so create a copy
+            # to make sure we don't modify the user's model.
+            model = copy.deepcopy(self._model)
+            ctx = IPUContext(model,
+                             compiler=enums.Compiler.PopART,
+                             model=model,
+                             options=self._options)
+            ctx.compile(*in_tensors.asTuple())
+            self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
+        self._error_on_buffer_parameter_address_change(buff_param_addresses)
 
-        return ipu._executable  # pylint: disable=protected-access
+        return ctx.ipu._executable  # pylint: disable=protected-access
 
     @_impl.traceMethod("modelCompilation")
     def _compile(self, in_tensors):

@@ -160,6 +160,10 @@ class IPUScope:
             out.int() if out.dtype == torch.long else out
             for out in self._outputs
         ]
+        self._outputs = [
+            out.float() if out.dtype == torch.double else out
+            for out in self._outputs
+        ]
         self._outputs = [out.cpu() for out in self._outputs]
 
         poptorch_core.finalizeGraph()
@@ -177,24 +181,32 @@ class _IPUContext:
         self.options = options
         self.model = model
 
+    def compile(self, *args, **kwargs):
+        tensor_args = flattenTensorStructure((args, kwargs))
+        with IPUScope(tensor_args,
+                      model=self.model,
+                      options=self.options,
+                      compile_using=self.compiler) as ipu:
+            d = torch.device("xla:0")
+            # Move all the inputs to the IPU
+            tensor_args = [t.to(d) for t in tensor_args]
+            # Re-inject moved tensors in args and kwargs:
+            args, kwargs = reconstructTensorStructure((args, kwargs),
+                                                      tensor_args)
+
+            result = self.func(*args, **kwargs)
+            if result is None:
+                result = []
+            ipu.outputs(result)
+        self.ipu = ipu
+        return tensor_args
+
     def __call__(self, *args, **kwargs):
         # Collect all tensor arguments and pass them to IPUScope
-        tensor_args = flattenTensorStructure((args, kwargs))
         if self.ipu is None:
-            with IPUScope(tensor_args,
-                          model=self.model,
-                          options=self.options,
-                          compile_using=self.compiler) as ipu:
-                d = torch.device("xla:0")
-                # Move all the inputs to the IPU
-                tensor_args = [t.to(d) for t in tensor_args]
-                # Re-inject moved tensors in args and kwargs:
-                args, kwargs = reconstructTensorStructure((args, kwargs),
-                                                          tensor_args)
-
-                result = self.func(*args, **kwargs)
-                ipu.outputs(result)
-            self.ipu = ipu
+            tensor_args = self.compile(*args, **kwargs)
+        else:
+            tensor_args = flattenTensorStructure((args, kwargs))
         return self.ipu(*tensor_args)
 
 

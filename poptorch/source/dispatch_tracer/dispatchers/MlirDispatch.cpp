@@ -93,8 +93,12 @@ void MLIRExecutable::execute(const std::vector<at::Tensor> &inputs) {
                      "Input tensors expected to either be IPU or CPU but input "
                          << i << " is of type "
                          << tensor.unsafeGetTensorImpl()->device_type());
+        // Handle the implicit downcasts here:
         if (tensor.scalar_type() == at::ScalarType::Long) {
           converted.push_back(tensor.to(at::ScalarType::Int));
+          ptrs[i] = converted.back().data_ptr();
+        } else if (tensor.scalar_type() == at::ScalarType::Double) {
+          converted.push_back(tensor.to(at::ScalarType::Float));
           ptrs[i] = converted.back().data_ptr();
         } else {
           ptrs[i] = tensor.data_ptr();

@@ -117,9 +117,14 @@ GlobalTracerContext::filenameIfNotExcluded(const std::string &filename) {
 GlobalTracerContext context;
 
 // Poplar doesn't support long, so cast to int if needed.
-at::Tensor castToIntIfNeeded(const at::Tensor &t) {
+// All the downcasts added here must also be handled
+// in MLIRExecutable::execute()
+at::Tensor downCastIfNeeded(const at::Tensor &t) {
   if (t.scalar_type() == at::ScalarType::Long) {
     return t.to(at::ScalarType::Int);
+  }
+  if (t.scalar_type() == at::ScalarType::Double) {
+    return t.to(at::ScalarType::Float);
   }
   return t;
 }
@@ -175,15 +180,15 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
       // TODO(T61574) use already allocated self instead of allocating a new
       // tensor.
       if (isParameter(self)) {
-        self = context.activeDispatch()->addParameter(castToIntIfNeeded(src));
+        self = context.activeDispatch()->addParameter(downCastIfNeeded(src));
         // Make sure the parameter flag is preserved.
         setIsParameter(self, true);
         logging::trace("copy_ parameter CPU -> IPU, new self {}", str(self));
       } else {
         if (context.graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
-          self = context.activeDispatch()->addInput(castToIntIfNeeded(src));
+          self = context.activeDispatch()->addInput(downCastIfNeeded(src));
         } else {
-          self = context.activeDispatch()->addConstant(castToIntIfNeeded(src));
+          self = context.activeDispatch()->addConstant(downCastIfNeeded(src));
         }
         logging::trace("copy_ input CPU -> IPU, new self {}", str(self));
         // Make sure the parameter flag is preserved.
