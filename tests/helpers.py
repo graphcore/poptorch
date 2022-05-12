@@ -7,7 +7,12 @@ import poptorch
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
 
-def assert_allclose(*, actual=None, expected=None, check_dtype=False,
+def assert_allclose(*,
+                    actual=None,
+                    expected=None,
+                    check_dtype=False,
+                    atol=None,
+                    rtol=None,
                     **kwargs):
     """Assertion function that enforces passing the 'actual' and 'expected'
     arguments to torch.testing.assert_close in the correct order by forcing
@@ -42,8 +47,15 @@ def assert_allclose(*, actual=None, expected=None, check_dtype=False,
     if not isinstance(expected, torch.Tensor):
         expected = torch.tensor(expected)
 
+    if atol is None and expected.dtype == torch.float16:
+        atol = 5e-4
+    if rtol is None and expected.dtype == torch.float16:
+        rtol = 5e-3
+
     torch.testing.assert_close(actual,
                                expected,
+                               atol=atol,
+                               rtol=rtol,
                                check_dtype=check_dtype,
                                **kwargs)
 

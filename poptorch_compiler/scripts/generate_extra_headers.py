@@ -252,7 +252,8 @@ builder_call_translations = {
     "OPTIONAL_TENSOR": "poptorch_ir::OptionalTensorId",
     "TENSOR_VEC": "const std::vector<poptorch_ir::TensorId> &",
     "BOOL": "bool",
-    "TYPE": "poptorch_ir::Type"
+    "TYPE": "poptorch_ir::Type",
+    "OPTIONAL_TYPE": "std::optional<poptorch_ir::Type>"
 }
 
 #"results": {"args": [
@@ -290,9 +291,13 @@ for op_name in poptorch_ops:
                          arg.name)
 
         # If the argument is an MLIR type we want to convert it first.
-        # pylint: disable=literal-comparison
-        if arg.macro_type() is "TYPE":
+        if arg.macro_type() == "TYPE":
             parameters.append("_impl->convertType(" + arg.name + ")")
+        elif arg.macro_type() == "OPTIONAL_TYPE":
+            parameters.append(
+                arg.name +
+                ".has_value() ? std::optional<mlir::Type>(_impl->convertType(*"
+                + arg.name + ")) : std::nullopt")
         else:
             parameters.append("convert(" + arg.name + ", _impl->value_map)")
 

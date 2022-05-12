@@ -745,19 +745,16 @@
 # sum.IntList_out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 - func: sum.IntList_out
   PopTorchDirect: reducesum
-  IgnoreArgs: {'dtype'}
   UnusedOutputArguments: {out}
 
 # func: cumsum.out(Tensor self, int dim, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 - func: cumsum.out
   PopTorchDirect: cumsum_out
-  IgnoreArgs: {'dtype'}
   UnusedOutputArguments: {out}
 
 # mean.out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 - func: mean.out
   PopTorchDirect: reducemean
-  IgnoreArgs: {'dtype'}
   UnusedOutputArguments: {out}
 
 # func: all(Tensor self) -> Tensor
@@ -781,12 +778,10 @@
 # func: prod(Tensor self, *, ScalarType? dtype=None) -> Tensor
 - func: prod
   PopTorchDirect: prod
-  IgnoreArgs: {'dtype'}
 
 # func: prod.int_out(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
 - func: prod.int_out
   PopTorchDirect: prod_dim
-  IgnoreArgs: {'dtype'}
   UnusedOutputArguments: {out}
 
 # func: argmax.out(Tensor self, int? dim=None, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)

@@ -20,6 +20,7 @@ def reduce_harness(fn, *args, **kwargs):
     ipu_res = IPUContext(fn)(*args, **kwargs)
     print(f"From IPU: {ipu_res}")
 
+    # TODO(T62262): Handle int64s properly
     check_dtype = isinstance(
         cpu_res, torch.Tensor
     ) and cpu_res.dtype != torch.int64 and cpu_res.dtype != torch.int32
@@ -67,11 +68,13 @@ all_test_cases = (int_test_cases + uint8_test_cases + bool_test_cases +
                   float_test_cases)
 
 
+# TODO(T62262): Test with int64 dtypes
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("func", [torch.sum, torch.prod])
 @pytest.mark.parametrize("input", all_test_cases)
-def test_sum_prod(func, input):
-    reduce_harness(func, input)
+@pytest.mark.parametrize("dtype", [None, torch.float32, torch.int32])
+def test_sum_prod(func, input, dtype):
+    reduce_harness(func, input, dtype=dtype)
 
 
 @pytest.mark.mlirSupportRequired
@@ -79,22 +82,25 @@ def test_sum_prod(func, input):
 @pytest.mark.parametrize("keepdim", [True, False])
 @pytest.mark.parametrize("input", all_test_cases)
 @pytest.mark.parametrize("dim", [0, -1])
-def test_sum_prod_dim(func, input, dim, keepdim):
-    reduce_harness(func, input, dim, keepdim)
+@pytest.mark.parametrize("dtype", [None, torch.float32, torch.int32])
+def test_sum_prod_dim(func, input, dim, keepdim, dtype):
+    reduce_harness(func, input, dim, keepdim, dtype=dtype)
 
 
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input", float_test_cases)
-def test_mean(input):
-    reduce_harness(torch.mean, input)
+@pytest.mark.parametrize("dtype", [None, torch.float16, torch.float32])
+def test_mean(input, dtype):
+    reduce_harness(torch.mean, input, dtype=dtype)
 
 
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input", float_test_cases)
 @pytest.mark.parametrize("dim", [0, -1])
 @pytest.mark.parametrize("keepdim", [True, False])
-def test_mean_dim(input, dim, keepdim):
-    reduce_harness(torch.mean, input, dim, keepdim)
+@pytest.mark.parametrize("dtype", [None, torch.float16, torch.float32])
+def test_mean_dim(input, dim, keepdim, dtype):
+    reduce_harness(torch.mean, input, dim, keepdim, dtype=dtype)
 
 
 @pytest.mark.mlirSupportRequired
@@ -136,5 +142,6 @@ def test_any_all_dim(func, input, dim, keepdim):
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("input", all_test_cases)
 @pytest.mark.parametrize("dim", [0, -1])
-def test_cumsum(input, dim):
-    reduce_harness(torch.cumsum, input, dim)
+@pytest.mark.parametrize("dtype", [None, torch.float32, torch.int32])
+def test_cumsum(input, dim, dtype):
+    reduce_harness(torch.cumsum, input, dim, dtype=dtype)

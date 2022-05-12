@@ -1,13 +1,17 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
 class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
-    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$axes, BoolAttr:$keepdim);
+    let arguments = (ins Poptorch_tensor:$input,
+                         I64ArrayAttr:$axes,
+                         BoolAttr:$keepdim,
+                         OptionalAttr<TypeAttr>:$dtype);
 
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values,
                                       "const std::vector<std::int64_t>&":$axes,
-                                      "std::int64_t":$keepdim),[{
+                                      "std::int64_t":$keepdim,
+                                      "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands(values);
 
         mlir::RankedTensorType tensor = values[0].getType().cast<mlir::RankedTensorType>();
@@ -17,6 +21,9 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
 
         $_state.addAttribute("axes", $_builder.getI64ArrayAttr(dims));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+        if (dtype.has_value()) {
+            $_state.addAttribute("dtype", mlir::TypeAttr::get(*dtype));
+        }
 
         const auto in_element_type = tensor.getElementType();
 
@@ -30,7 +37,12 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
         // supports) to a signed type
         // Note: our intergal type is 32 bit and we explicity don't support 64 bit at the moment so every
         // integral type is converted to a signed 32 bit integer
-        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
+        // TODO(T62262): This will need to be updated when we can have int64 inputs
+        auto out_element_type =
+            dtype.value_or(
+                in_element_type.isa<mlir::IntegerType>()
+                    ? $_builder.getIntegerType(32, true)
+                    : in_element_type);
 
         $_state.addTypes(mlir::RankedTensorType::get(inferShape(std::move(dims), in_shape, keepdim), out_element_type));
      }]>
@@ -92,29 +104,45 @@ def Poptorch_reducemean : Poptorch_reduce<"reducemean"> {}
 def Poptorch_reducesum : Poptorch_reduce<"reducesum"> {}
 
 def Poptorch_prod : Poptorch_Op<"prod", []> {
-    let arguments = (ins Poptorch_tensor:$input);
+    let arguments = (ins Poptorch_tensor:$input, OptionalAttr<TypeAttr>:$dtype);
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands(self);
+        if (dtype.has_value()) {
+            $_state.addAttribute("dtype", mlir::TypeAttr::get(*dtype));
+        }
 
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
 
         const auto in_element_type = tensor.getElementType();
-        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
+        // TODO(T62262): This will need to be updated when we can have int64 inputs
+        auto out_element_type =
+            dtype.value_or(
+                in_element_type.isa<mlir::IntegerType>()
+                    ? $_builder.getIntegerType(32, true)
+                    : in_element_type);
 
         $_state.addTypes(mlir::RankedTensorType::get({}, out_element_type));
      }]>
     ];
 }
 
+
 def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
-    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim, BoolAttr:$keepdim);
+    let arguments = (ins Poptorch_tensor:$input,
+                         I64Attr:$dim,
+                         BoolAttr:$keepdim,
+                         OptionalAttr<TypeAttr>:$dtype);
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "std::int64_t":$dim, "bool":$keepdim),[{
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+                                      "std::int64_t":$dim,
+                                      "bool":$keepdim,
+                                      "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands(self);
 
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
@@ -124,11 +152,19 @@ def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
 
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+        if (dtype.has_value()) {
+            $_state.addAttribute("dtype", mlir::TypeAttr::get(*dtype));
+        }
 
         const auto shape = inferShape({dim}, ref, keepdim);
 
         const auto in_element_type = tensor.getElementType();
-        auto out_element_type = in_element_type.isa<mlir::IntegerType>() ? $_builder.getIntegerType(32, true) : in_element_type;
+        // TODO(T62262): This will need to be updated when we can have int64 inputs
+        auto out_element_type =
+            dtype.value_or(
+                in_element_type.isa<mlir::IntegerType>()
+                    ? $_builder.getIntegerType(32, true)
+                    : in_element_type);
 
         $_state.addTypes(mlir::RankedTensorType::get(shape, out_element_type));
      }]>
@@ -329,23 +365,32 @@ def Poptorch_embedding_bag : Poptorch_NotImplementedOp<"embedding_bag", []> {
 
 
 class Poptorch_prefix_sum<string name> : Poptorch_Op<name, []> {
-    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
+    let arguments = (ins Poptorch_tensor:$input,
+                         I64Attr:$dim,
+                         OptionalAttr<TypeAttr>:$dtype);
 
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
-                                      "std::int64_t":$dim),[{
+                                      "std::int64_t":$dim,
+                                      "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands({self});
 
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
 
         dim = convertToPositiveDim(dim, tensor.getShape().size());
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        if (dtype.has_value()) {
+            $_state.addAttribute("dtype", mlir::TypeAttr::get(*dtype));
+        }
 
         const auto in_element_type = tensor.getElementType();
-        auto out_element_type = in_element_type.isa<mlir::IntegerType>()
-                ? $_builder.getIntegerType(32, true)
-                : in_element_type;
+        // TODO(T62262): This will need to be updated when we can have int64 inputs
+        auto out_element_type =
+            dtype.value_or(
+                in_element_type.isa<mlir::IntegerType>()
+                    ? $_builder.getIntegerType(32, true)
+                    : in_element_type);
 
         $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), out_element_type));
      }]>
