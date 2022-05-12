@@ -101,12 +101,12 @@ class IPUScope:
         _impl.setIpuContext(False)
         _impl.setDispatchTracing(False)
         # Turn off the dispatcher.
-        poptorch_core.endDispatch()
+        poptorch_core.endDispatch(exc_type is not None)
 
         # Dispatch stopped because of an exception: don't try to compile
         # the graph.
         if exc_type is not None:
-            return
+            return False
 
         # Compile for IPU.
         if self._compile_using == enums.Compiler.PopART:
@@ -116,6 +116,7 @@ class IPUScope:
         else:
             # Compile the captured graph using MLIR.
             self._executable = poptorch_core.compileWithMlir()
+        return True
 
     def __call__(self, *args):
         if self._upload_weights:

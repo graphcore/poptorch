@@ -218,7 +218,14 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
 void startDispatch() { context.dispatch_on = true; }
 
 // Turn off.
-void endDispatch() { context.dispatch_on = false; }
+void endDispatch(bool error_occurred) {
+  context.dispatch_on = false;
+  if (error_occurred) {
+    // If an error occurred we need to destroy the dispatcher as it will be in
+    // an inconsistent state.
+    destroyDispatcher();
+  }
+}
 
 void destroyDispatcher() {
   if (context.isDispatchOn()) {

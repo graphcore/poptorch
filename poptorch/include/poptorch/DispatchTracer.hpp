@@ -105,7 +105,7 @@ void startDispatch();
 
 // Stop capturing calls.
 // TODO(T61528): not needed anymore?
-void endDispatch();
+void endDispatch(bool error_occurred = false);
 
 // Return true if the dispatcher is active.
 bool isDispatcherActive();
