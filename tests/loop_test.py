@@ -290,3 +290,30 @@ def test_loop_body_inplace_ops_4(trace_model):
     out = poptorch_model(x)
     helpers.assert_allequal(actual=x, expected=x_copy * 3)
     helpers.assert_allequal(actual=out, expected=x_copy * 5)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_with_constant_inputs_only(trace_model):
+    class Model(torch.nn.Module):
+        def forward(self):
+            # 't0' will be evaluated as part of constexpr folding.
+            t0 = torch.tensor([0., 0.])
+            t0 = t0 + 8
+            # 't1' and 't2' must not be evaluated as part of constexpr folding.
+            t1 = torch.tensor([1., 2.])
+            t2 = torch.tensor([3., 4.])
+
+            def func(x, y):
+                x = x * 2
+                y = y * x
+                return x, y
+
+            t1, t2 = poptorch.for_loop(5, func, [t1, t2])
+            return t1, t0
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(Model(), options)
+    helpers.assert_allequal(actual=poptorch_model(),
+                            expected=(torch.tensor([32., 64.]),
+                                      torch.tensor([8., 8.])))

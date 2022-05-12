@@ -33,6 +33,32 @@ size_t numValuesInGraph(const torch::jit::Graph *g) {
   return num_values;
 }
 
+const c10::Symbol exclude_node_attr =
+    c10::Symbol::fromQualString("attr::exclude_node");
+
+void markForExclusion(torch::jit::Node *node) {
+  node->i_(exclude_node_attr, 1);
+}
+
+void recursivelyMarkInputsForExclusion(torch::jit::Node *node) {
+  if (node->kind() == c10::prim::Param) {
+    return;
+  }
+  markForExclusion(node);
+  for (auto *input : node->inputs()) {
+    recursivelyMarkInputsForExclusion(input->node());
+  }
+}
+
+bool isMarkedForExclusion(torch::jit::Node *node) {
+  return node->hasAttribute(exclude_node_attr) &&
+         node->i(exclude_node_attr) > 0;
+}
+
+void unmarkForExclusion(torch::jit::Node *node) {
+  node->removeAttribute(exclude_node_attr);
+}
+
 class ConstExprEvaluator {
 public:
   explicit ConstExprEvaluator(torch::jit::Graph *g)
@@ -43,7 +69,11 @@ public:
   void evaluate();
 
 private:
-  void copyAllConstNodesToToConstexprGraph();
+  void markSubgraphNodesForExclusion();
+
+  void copyAllConstNodesToConstexprGraph();
+
+  void removeExclusionAttributes();
 
   void removeLoneConstants();
 
@@ -81,8 +111,11 @@ void ConstExprEvaluator::evaluate() {
   _constexpr_graph = std::make_shared<torch::jit::Graph>();
 
   // Copy all nodes which can be evaluated as a constant expression into a new
-  // graph. In addition, set outputs of the new graph where required
-  copyAllConstNodesToToConstexprGraph();
+  // graph with exception of subgraph nodes. In addition, set outputs of the
+  // new graph where required
+  markSubgraphNodesForExclusion();
+  copyAllConstNodesToConstexprGraph();
+  removeExclusionAttributes();
 
   // We do not want to evaluate lone constants only to replace them with an
   // identical constants
@@ -100,7 +133,31 @@ void ConstExprEvaluator::evaluate() {
   removeUnusedNodes();
 }
 
-void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
+void ConstExprEvaluator::markSubgraphNodesForExclusion() {
+  // Keep track of subgraphs to avoid evaluating constexprs that are part of
+  // a subgraph.
+  int num_unclosed_subgraphs = 0;
+  for (auto *node : _graph->nodes()) {
+    if (node->kind() == symbols::poptorch::start_for_loop) {
+      num_unclosed_subgraphs++;
+      // All nodes that eventually end up as subgraph inputs also need
+      // to be excluded.
+      recursivelyMarkInputsForExclusion(node->input()->node());
+      continue;
+    }
+    if (node->kind() == symbols::poptorch::end_for_loop) {
+      ERROR_ON(num_unclosed_subgraphs <= 0);
+      num_unclosed_subgraphs--;
+      continue;
+    }
+    if (num_unclosed_subgraphs > 0) {
+      markForExclusion(node);
+    }
+  }
+  ERROR_ON(num_unclosed_subgraphs != 0);
+}
+
+void ConstExprEvaluator::copyAllConstNodesToConstexprGraph() {
   logging::LogContext ctx_func("ConstExprEvaluator");
   std::vector<torch::jit::Node *> nodes_plus_return;
   for (auto *node : _graph->nodes()) {
@@ -111,7 +168,7 @@ void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
   for (auto *node : nodes_plus_return) {
     logging::LogContext ctx("processing " + nodeToString(node));
 
-    if (nodeIsConstExpr(*node)) {
+    if (!isMarkedForExclusion(node) && nodeIsConstExpr(*node)) {
       copyNodeToConstexprGraph(node);
     } else {
       for (auto *input : node->inputs()) {
@@ -127,6 +184,14 @@ void ConstExprEvaluator::copyAllConstNodesToToConstexprGraph() {
   logging::trace("Constexpr graph: {}", *_constexpr_graph);
 }
 
+void ConstExprEvaluator::removeExclusionAttributes() {
+  for (auto *node : _graph->nodes()) {
+    if (isMarkedForExclusion(node)) {
+      unmarkForExclusion(node);
+    }
+  }
+}
+
 void ConstExprEvaluator::removeLoneConstants() {
   for (auto *node : _graph->nodes()) {
     if (!node->inputs().empty()) {
@@ -134,6 +199,10 @@ void ConstExprEvaluator::removeLoneConstants() {
     }
 
     if (node->outputs().size() != 1) {
+      continue;
+    }
+
+    if (_nodes_map.find(node) == _nodes_map.end()) {
       continue;
     }
 
