@@ -12,9 +12,10 @@ parser = argparse.ArgumentParser(description="Generate CTestTestfile.cmake")
 parser.add_argument("test_dir", help="Path to the folder containing the tests")
 parser.add_argument("output_file", help="Path to CTestTestfile.cmake")
 parser.add_argument("--add-to-sys-path", help="Path to add to sys.path")
-parser.add_argument("--hw-tests-only",
-                    action="store_true",
-                    help="Only run tests requiring HW to run")
+parser.add_argument("--extra-pytest-args",
+                    type=str,
+                    help=("Extra arguments to pass to pytest when generating "
+                          "the list of tests."))
 
 args = parser.parse_args()
 
@@ -26,8 +27,8 @@ if args.add_to_sys_path:
 # Collect the list of tests:
 list_tests = io.StringIO()
 pytest_args = ["-x", args.test_dir, "--collect-only", "-q"]
-if args.hw_tests_only:
-    pytest_args.append("--hw-tests-only")
+if args.extra_pytest_args:
+    pytest_args += args.extra_pytest_args.replace("\"", "").split(",")
 
 with contextlib.redirect_stdout(list_tests):
     retval = pytest.main(pytest_args)

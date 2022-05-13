@@ -15,7 +15,6 @@ set(SDK_DIR CACHE PATH "Path to an extracted SDK archive or to a Poplar & Popart
 set(BUILD_DOCS OFF CACHE BOOL "Build PopTorch's documentation")
 set(COPY_TESTS OFF CACHE BOOL "Copy tests files to the build folder (instead of running them from the sources folder)")
 set(ENABLE_WERROR ON CACHE BOOL "Treat C++ warnings as errors")
-set(ONLY_RUN_HW_TESTS OFF CACHE BOOL "Make CTest only run HW tests") # DEPRECATED: will be removed in a separate commit
 set(EXTRA_PYTEST_ARGS "" CACHE STRING "Extra arguments to pass to pytest when generating the list of tests to run")
 
 # Always use the gold linker to avoid segfaults with PopART / Poplar on some OSes.
