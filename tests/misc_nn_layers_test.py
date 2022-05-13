@@ -89,8 +89,26 @@ def test_upsample_bilinear_factor_shapes(shapes):
     op_harness(op, [x])
 
 
+@pytest.mark.parametrize("shape", [(2, 2, 14, 14)])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_upsample_bicubic(shape, trace_model):
+    torch.manual_seed(42)
+    model = torch.nn.Upsample(scale_factor=0.4357, mode='bicubic')
+    x = torch.randn(*shape)
+
+    # Run on CPU.
+    native_out = model(x)
+
+    # Run on IPU.
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_out = poptorch_model(x)
+
+    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
 @pytest.mark.parametrize("mode, input_shape", [("linear", (1, 2, 3)),
-                                               ("bicubic", (1, 2, 3, 4)),
                                                ("trilinear", (1, 2, 3, 4, 5))])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_unsupported_upsample(mode, input_shape, trace_model):
@@ -532,8 +550,8 @@ def test_weight_norm(trace_model, dim):
     # Ensure that the original weight tensor does NOT exist -
     # autograd should be performed with respect to the decomposed tensors
     # only
-    assert not "model.lin.weight" in tensor_names
-    assert not "UpdatedVar___model.lin.weight" in tensor_names
+    assert "model.lin.weight" not in tensor_names
+    assert "UpdatedVar___model.lin.weight" not in tensor_names
 
     n = 3
     # Run a few more times to ensure that the decomposed weights are being

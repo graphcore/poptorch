@@ -365,7 +365,7 @@ normal PyTorch operations, where they have to opt in to the gradient pass.
 
 Vision Layers
 -------------
-Only nearest is supported.
+Support nearest and bicubic mode.
 
 * ``torch.nn.Upsample``
 
