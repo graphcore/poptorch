@@ -6,24 +6,99 @@ import helpers
 from poptorch.experimental import IPUContext
 
 
-def gt(t1, t2):
-    return t1 > t2
+def op_harness(fn, *args, **kwargs):
+    # Get the result from the CPU
+    cpu_res = fn(*args, **kwargs)
+    print(f"From CPU: {cpu_res}")
+
+    ipu_res = IPUContext(fn)(*args, **kwargs)
+    print(f"From IPU: {ipu_res}")
+
+    check_dtype = isinstance(
+        cpu_res, torch.Tensor
+    ) and cpu_res.dtype != torch.int64 and cpu_res.dtype != torch.int32
+    return helpers.assert_allclose(expected=cpu_res,
+                                   actual=ipu_res,
+                                   check_dtype=check_dtype,
+                                   equal_nan=True)
 
 
-def lt(t1, t2):
-    return t1 < t2
+# TODO(T62028): Fix the failing binary operations
+binary_ops = [
+    lambda x, y: x > y,
+    lambda x, y: x >= y,
+    lambda x, y: x < y,
+    lambda x, y: x <= y,
+    lambda x, y: x == y,
+    lambda x, y: x + y,
+    lambda x, y: x - y,
+    #lambda x, y: x / y,
+    lambda x, y: x * y,
+    #torch.atan2,
+    #lambda x, y: x << y,
+    #lambda x, y: x >> y,
+    #lambda x, y: x and y,
+    #lambda x, y: x or y,
+    torch.max,
+    # min of nan and 0.0 should be nan but is in fact 0.0
+    #torch.min,
+    #torch.pow,
+]
+
+torch.manual_seed(42)
+binary_test_cases = [
+    (torch.tensor(2.0), torch.tensor(1.0)),
+    (torch.tensor(70), torch.tensor(3)),
+    # TODO(T59576): Casting isn't implemented yet
+    #(torch.tensor(2), torch.tensor(1.0)),
+    (torch.tensor([]), torch.tensor([1.0])),
+    # TODO(T62028): This doesn't work with addition we should replace bool addition with AND
+    #(torch.tensor([[True, False], [True, False]]),
+    #torch.tensor([[False, True], [True, False]])),
+    (torch.tensor([torch.nan, torch.inf, torch.nan,
+                   torch.inf]), torch.tensor([torch.nan, torch.inf, 0.0,
+                                              0.0])),
+    (torch.randn(3, 3), torch.randn(3, 3))
+]
 
 
 @pytest.mark.mlirSupportRequired
-@pytest.mark.parametrize("op", [gt, lt])
-def test_gt_lt(op):
-    torch.manual_seed(42)
+@pytest.mark.parametrize("op", binary_ops)
+@pytest.mark.parametrize("input", binary_test_cases)
+def test_binary(op, input):
+    op_harness(op, *input)
 
-    t1 = torch.randn(3, 3)
-    t2 = torch.randn(3, 3)
 
-    cpu_result = op(t1, t2)
-    ipu_result = IPUContext(op)(t1, t2)
+bitwise_ops = [
+    lambda x, y: x & y,
+    lambda x, y: x | y,
+    lambda x, y: x ^ y,
+]
+
+bitwise_test_cases = [
+    (torch.tensor(70), torch.tensor(3)),
+    (torch.tensor([], dtype=torch.int32), torch.tensor([], dtype=torch.int32)),
+    (torch.tensor([[True, False],
+                   [True, False]]), torch.tensor([[False, True], [True,
+                                                                  False]])),
+    (torch.tensor([70, 123],
+                  dtype=torch.uint8), torch.tensor([3, 7], dtype=torch.uint8)),
+]
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("op", binary_ops)
+@pytest.mark.parametrize("input", binary_test_cases)
+def test_bitwise(op, input):
+    op_harness(op, *input)
+
+
+@pytest.mark.mlirSupportRequired
+def test_isnan():
+    t = torch.tensor([torch.nan, 1.0, torch.inf])
+
+    cpu_result = torch.isnan(t)
+    ipu_result = IPUContext(torch.isnan)(t)
 
     helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 

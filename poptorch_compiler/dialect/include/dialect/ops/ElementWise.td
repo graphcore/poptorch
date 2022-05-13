@@ -45,14 +45,14 @@ def Poptorch_square: Poptorch_elem_unary<"square"> {}
 def Poptorch_sigmoid: Poptorch_elem_unary<"sigmoid"> {}
 def Poptorch_rsqrt: Poptorch_elem_unary<"rsqrt"> {}
 
-def Poptorch_isnan :  Poptorch_NotImplementedOp<"isnan"> {
-    let arguments = (ins Poptorch_tensor:$in1);
+def Poptorch_isnan :  Poptorch_Op<"isnan"> {
+    let arguments = (ins Poptorch_tensor:$self);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1),[{
-        $_state.addOperands({v1});
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
+        $_state.addOperands({self});
 
-        mlir::RankedTensorType rtt = v1.getType().cast<mlir::RankedTensorType>();
+        mlir::RankedTensorType rtt = self.getType().cast<mlir::RankedTensorType>();
         $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, false)));
      }]>
     ];

@@ -2,6 +2,8 @@
 #include "lower_to_poplar/CompilerHelpers.hpp"
 #include <popops/ElementWise.hpp>
 
+#include <popops/Expr.hpp>
+#include <popops/ExprOp.hpp>
 #include <popops/ScaledAdd.hpp>
 
 namespace pe = popops::expr;
@@ -117,6 +119,14 @@ void sub_::lowerToPoplar(CompilerContext &context) {
 #include "unary_ops.h.inc"
 
 #undef UNARY_OP
+
+void isnan::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+
+  auto out = popops::map(context.graph, popops::expr::UnaryOpType::IS_NAN, self,
+                         context.seq);
+  context.tensors.insert({this->result(), out});
+}
 
 void scaledadd_::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());
