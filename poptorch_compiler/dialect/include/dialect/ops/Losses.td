@@ -64,16 +64,28 @@ def Poptorch_nll_loss : Poptorch_Op<"nll_loss", []> {
                                       "mlir::Value":$weight,
                                       "std::int64_t":$reduction,
                                       "std::int64_t":$ignore_index),[{
+        mlir::RankedTensorType target_t = target.getType().cast<
+                                          mlir::RankedTensorType>();
+        ERROR_ON_MSG(!target_t.getElementType().isIntOrIndex(),
+                     "An NLLLoss target must be an integer type.");
+
         $_state.addOperands({self, target});
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         $_state.addAttribute("ignore_index",$_builder.getI64IntegerAttr(ignore_index));
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> shape;
-        if (reduction == 0){  // if none reduction applied the output shape is the same as input, otherwise torch.Size([])
+        // If reduction is none, the shape is the the input without number of
+        // classes, which is the second element, i.e. (N, C, ...) to (N, ...)
+        // except in the case of a 1D input (C) when it is ().
+        if (reduction == 0){
             shape = tensor.getShape();
-            shape.erase(shape.begin());
-        } else {
-            shape.push_back(1);
+            if(shape.size() == 1) {
+              shape.clear();
+
+            } else {
+              ERROR_ON(shape.size() < 2);
+              shape.erase(shape.begin() + 1);
+            }
         }
 
         $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType()),

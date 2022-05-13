@@ -9,8 +9,83 @@ from poptorch.experimental import IPUContext
 
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
+@pytest.mark.parametrize("num_dims", [1, 2, 4])
+def test_nll_loss_forward(reduction, num_dims):
+    torch.manual_seed(42)
+
+    if num_dims == 1:
+        # (C) and ()
+        input1 = torch.randn([4])
+        input2 = torch.tensor(2)
+    if num_dims == 2:
+        # (N, C) and (N)
+        input1 = torch.randn([4, 10])
+        input2 = torch.tensor([1, 2, 3, 4])
+    if num_dims == 4:
+        return  # not yet implemented TODO T62380
+        # (N, C, d1, d2) and (N, d1, d2)
+        # input1 = torch.randn([4, 10, 2, 2])
+        # input2 = torch.tensor([1, 2, 3, 4]).unsqueeze(1).unsqueeze(1)
+        # input2 = input2.expand(4, 2, 2)
+
+    def nll_loss(t1, t2):
+        return F.nll_loss(
+            t1,
+            t2,
+            reduction=reduction,
+        )
+
+    cpu_result = nll_loss(input1, input2)
+    ipu_result = IPUContext(nll_loss)(input1, input2)
+
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
+                            equal_nan=True)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("reduction", ["mean"])
+@pytest.mark.parametrize("num_dims", [1, 2, 4])
+def test_nll_loss_backward(reduction, num_dims):
+    torch.manual_seed(42)
+
+    if num_dims == 1:
+        # (C) and ()
+        input1 = torch.nn.parameter.Parameter(torch.randn([4]))
+        input2 = torch.tensor(2)
+    if num_dims == 2:
+        # (N, C) and (N)
+        input1 = torch.nn.parameter.Parameter(torch.randn([4, 10]))
+        input2 = torch.tensor([1, 2, 3, 4])
+    if num_dims == 4:
+        # (N, C, d1, d2) and (N, d1, d2)
+        return  # not yet implemented TODO T62380
+        # input1 = torch.nn.parameter.Parameter(torch.randn([4, 10, 2, 2]))
+        # input2 = torch.tensor([1, 2, 3, 4]).unsqueeze(1).unsqueeze(1)
+
+    def nll_loss_backward(t1, t2):
+        loss = F.nll_loss(t1, t2, reduction=reduction)
+        if reduction == "none":
+            loss = loss.sum()
+        t1.retain_grad()
+        loss.backward()
+        return t1.grad
+
+    ipu_result = IPUContext(nll_loss_backward)(input1, input2)
+
+    input1.grad.zero_()
+    input1.grad.detach_()
+    cpu_result = nll_loss_backward(input1, input2)
+
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
+                            equal_nan=True)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("ignore_index", [2, -100])
-def test_nll_loss_forward(reduction, ignore_index):
+def test_nll_loss_forward_ignore(reduction, ignore_index):
     torch.manual_seed(42)
     input1 = torch.randn([4, 10])
     input2 = torch.Tensor([1, 2, 3, 4]).long()
@@ -32,10 +107,10 @@ def test_nll_loss_forward(reduction, ignore_index):
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("ignore_index", [2, -100])
-def test_nll_loss_backward(reduction, ignore_index):
+def test_nll_loss_backward_ignore(reduction, ignore_index):
     torch.manual_seed(42)
     input1 = torch.nn.parameter.Parameter(torch.randn([4, 10]))
-    input2 = torch.Tensor([1, 2, 3, 4]).long()
+    input2 = torch.tensor([1, 2, 3, 4])
 
     def nll_loss_backward(t1, t2):
         loss = F.nll_loss(t1,

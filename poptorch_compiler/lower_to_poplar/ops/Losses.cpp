@@ -10,6 +10,8 @@
 #include <popops/Reduce.hpp>
 #include <popops/ScaledAdd.hpp>
 
+#include "poptorch_logging/Logging.hpp"
+
 namespace pe = popops::expr;
 
 namespace poptorch_ir {
@@ -99,8 +101,14 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
                      onehot, probs2d, context.seq);
   poplar::Tensor out = popops::reduce(context.graph, onehot, {1},
                                       {popops::Operation::ADD}, context.seq);
-  auto total_elements =
-      createConstant(context, input.elementType(), {}, target.shape()[0]);
+
+  poplar::Tensor total_elements;
+  if (target.shape().empty()) {
+    total_elements = createConstant(context, input.elementType(), {}, 1);
+  } else {
+    total_elements =
+        createConstant(context, input.elementType(), {}, target.shape()[0]);
+  }
 
   if (ignore_index >= 0) {
     total_elements = maskTensor(context, out, target, ignore_index);
@@ -115,6 +123,12 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
   }
   popops::mapInPlace(context.graph, popops::expr::UnaryOpType::NEGATE, out,
                      context.seq);
+
+  if (result().getType().cast<mlir::RankedTensorType>().getShape().empty()) {
+    while (!out.shape().empty()) {
+      out = out.squeeze({0});
+    }
+  }
 
   context.tensors.insert({result(), out});
   context.tensors.insert({total_weight(), out});
@@ -134,8 +148,15 @@ void nll_loss_backward::lowerToPoplar(CompilerContext &context) {
   popops::mapInPlace(context.graph, pe::UnaryOpType::NEGATE, onehot,
                      context.seq);
   poplar::Tensor grad = onehot.reshape(input.shape());
-  auto total_elements =
-      createConstant(context, input.elementType(), {}, target.shape()[0]);
+
+  poplar::Tensor total_elements;
+  if (target.shape().empty()) {
+    total_elements = createConstant(context, input.elementType(), {}, 1);
+  } else {
+    total_elements =
+        createConstant(context, input.elementType(), {}, target.shape()[0]);
+  }
+
   if (ignore_index >= 0) {
     total_elements = maskTensor(context, grad, labels1d, ignore_index);
   }
