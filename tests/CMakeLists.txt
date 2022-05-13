@@ -8,12 +8,14 @@ else()
   set(TESTS_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+ # DEPRECATED: will be removed in a separate commit
 if(ONLY_RUN_HW_TESTS)
-  set(TESTS_FLAGS "--hw-tests-only")
+  set(EXTRA_PYTEST_ARGS "--hw-tests-only")
 else()
-  set(TESTS_FLAGS "")
+  set(EXTRA_PYTEST_ARGS "")
 endif()
+
 run_poptorch_install_command(
-  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_test_file.py ${TESTS_PATH} ${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake --add-to-sys-path ${CMAKE_INSTALL_PREFIX} ${TESTS_FLAGS}"
+  "python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_test_file.py ${TESTS_PATH} ${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake --add-to-sys-path ${CMAKE_INSTALL_PREFIX} ${EXTRA_PYTEST_ARGS}"
   "${PROJECT_BINARY_DIR}"
   "generate_test_file.py")

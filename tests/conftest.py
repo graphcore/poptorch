@@ -53,19 +53,25 @@ def pytest_runtest_setup(item):
 
 # Source: https://raphael.codes/blog/customizing-your-pytest-test-suite-part-2/
 def pytest_collection_modifyitems(session, config, items):  # pylint: disable=unused-argument
-    if not config.getoption("hw_tests_only"):
+    if not config.getoption("hw_tests_only") and not config.getoption(
+            "no_hw_tests"):
         return
     # if --hw-tests-only is set: only keep tests with a "ipuHardwareRequired"
     # marker.
-    selected = []
-    deselected = []
+    # if --no-hw-tests is set: keep only the other ones.
+    hw_required = []
+    hw_not_required = []
     for item in items:
         if any(item.iter_markers("ipuHardwareRequired")):
-            selected.append(item)
+            hw_required.append(item)
         else:
-            deselected.append(item)
-    config.hook.pytest_deselected(items=deselected)
-    items[:] = selected
+            hw_not_required.append(item)
+    if config.getoption("hw_tests_only"):
+        config.hook.pytest_deselected(items=hw_not_required)
+        items[:] = hw_required
+    else:
+        config.hook.pytest_deselected(items=hw_required)
+        items[:] = hw_not_required
 
 
 def pytest_addoption(parser):
@@ -73,3 +79,7 @@ def pytest_addoption(parser):
                      action="store_true",
                      default=False,
                      help="Only run HW tests")
+    parser.addoption("--no-hw-tests",
+                     action="store_true",
+                     default=False,
+                     help="Exclude all tests requiring HW")
