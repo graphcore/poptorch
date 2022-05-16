@@ -15,9 +15,10 @@ def Poptorch_mse_loss : Poptorch_Op<"mse_loss", []> {
       mlir::RankedTensorType tensor =
           self.getType().cast<mlir::RankedTensorType>();
       std::vector<std::int64_t> shape;
+
+      // If reduction is none, the shape is equal to the input.
       if (reduction == 0) {
         shape = tensor.getShape();
-        shape.erase(shape.begin());
       }
       // Otherwise reduce to a scalar by passing an empty shape
       // This corresponds to torch.Size([])

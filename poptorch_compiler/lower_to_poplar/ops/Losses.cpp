@@ -29,13 +29,15 @@ void mse_loss::lowerToPoplar(CompilerContext &context) {
                   {input, target}, context.seq);
 
   if (reduction != TorchReduction::NONE) {
-    sqr_error = popops::reduce(context.graph, sqr_error, {0},
+    std::vector<std::size_t> dims(input.rank());
+    std::iota(dims.begin(), dims.end(), 0);
+    sqr_error = popops::reduce(context.graph, sqr_error, dims,
                                {popops::Operation::ADD}, context.seq);
 
     if (reduction == TorchReduction::MEAN) {
-      sqr_error = popops::map(context.graph,
-                              pe::Divide(pe::_1, pe::Const(target.shape()[0])),
-                              {sqr_error}, context.seq);
+      sqr_error = popops::map(
+          context.graph, pe::Divide(pe::_1, pe::Const(input.numElements())),
+          {sqr_error}, context.seq);
     }
   }
 

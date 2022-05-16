@@ -10,6 +10,76 @@ from poptorch.experimental import IPUContext
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("num_dims", [1, 2, 4])
+def test_mse_loss_forward(reduction, num_dims):
+    torch.manual_seed(42)
+
+    if num_dims == 1:
+        input_dims = [5]
+    if num_dims == 2:
+        input_dims = [3, 4]
+    if num_dims == 4:
+        input_dims = [2, 4, 5, 3]
+
+    input1 = torch.rand(input_dims)
+    input2 = torch.rand(input_dims)
+
+    def mse_loss(t1, t2):
+        return F.mse_loss(
+            t1,
+            t2,
+            reduction=reduction,
+        )
+
+    cpu_result = mse_loss(input1, input2)
+    ipu_result = IPUContext(mse_loss)(input1, input2)
+
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
+                            equal_nan=True)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
+@pytest.mark.parametrize("num_dims", [1, 2, 4])
+def test_mse_loss_backward(reduction, num_dims):
+    torch.manual_seed(42)
+
+    if num_dims == 1:
+        input_dims = [5]
+    if num_dims == 2:
+        input_dims = [3, 4]
+    if num_dims == 4:
+        input_dims = [2, 4, 5, 3]
+
+    input1 = torch.nn.parameter.Parameter(torch.rand(input_dims))
+    input2 = torch.rand(input_dims)
+
+    def mse_loss_backward(t1, t2):
+        loss = F.mse_loss(
+            t1,
+            t2,
+            reduction=reduction,
+        )
+        if reduction == "none":
+            loss = loss.sum()
+        t1.retain_grad()
+        loss.backward()
+        return t1.grad
+
+    ipu_result = IPUContext(mse_loss_backward)(input1, input2)
+
+    input1.grad.zero_()
+    input1.grad.detach_()
+    cpu_result = mse_loss_backward(input1, input2)
+
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
+                            equal_nan=True)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
+@pytest.mark.parametrize("num_dims", [1, 2, 4])
 def test_nll_loss_forward(reduction, num_dims):
     torch.manual_seed(42)
 
