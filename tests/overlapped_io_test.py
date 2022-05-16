@@ -266,3 +266,55 @@ def test_output_error_messages(trace_model):
 
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_overlap_both_non_input_marked(trace_model):
+    class NotOnInputModel(torch.nn.Module):
+        def forward(self, x):
+            x = poptorch.set_overlap_for_input(
+                x, poptorch.OverlapMode.OverlapAccumulationLoop)
+            y = x + 1
+            y2 = poptorch.set_overlap_for_input(
+                y, poptorch.OverlapMode.OverlapAccumulationLoop)
+            return y, y2
+
+    opts = poptorch.Options()
+    opts.setExecutionStrategy(poptorch.ShardedExecution())
+    opts.Jit.traceModel(trace_model)
+    opts.TensorLocations.numIOTiles(32)
+
+    model = NotOnInputModel()
+    poptorch_model = poptorch.inferenceModel(model, opts)
+
+    err_msg = (r"poptorch\.set_overlap_for_input applied on a node which is " +
+               r"not a tensor input to the model\.")
+    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+        poptorch_model(torch.tensor([1.0]))
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_overlap_both_non_output_marked(trace_model):
+    class OutputBeforeLoss(torch.nn.Module):
+        def forward(self, x):
+            x = poptorch.set_overlap_for_input(
+                x, poptorch.OverlapMode.OverlapAccumulationLoop)
+            x = x + torch.ones_like(x)
+            x = poptorch.set_overlap_for_output(
+                x, poptorch.OverlapMode.OverlapAccumulationLoop)
+            return torch.mean(x)
+
+    model = OutputBeforeLoss()
+
+    opts = poptorch.Options()
+    opts.setExecutionStrategy(poptorch.ShardedExecution())
+    opts.Jit.traceModel(trace_model)
+    opts.TensorLocations.numIOTiles(32)
+
+    inference_model = poptorch.inferenceModel(model, opts)
+
+    err_msg = (
+        r"poptorch\.set_overlap_for_output applied on a node which is " +
+        r"not a tensor output to the model\.")
+    with pytest.raises(poptorch.Error, match=err_msg):
+        inference_model(torch.tensor([1.0]))

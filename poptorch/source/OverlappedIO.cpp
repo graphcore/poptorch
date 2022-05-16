@@ -25,33 +25,28 @@ void attributiseOverlappedInputs(
     input_num++;
     auto input_uses = input->uses();
 
-    // Sort by topological
-    std::sort(input_uses.begin(), input_uses.end(),
-              [](const torch::jit::Use &first, const torch::jit::Use &second) {
-                return first.user->isBefore(second.user);
-              });
-
     if (input_uses.empty()) {
       continue;
     }
 
-    auto &first_user(input_uses[0].user);
+    auto &user(input_uses[0].user);
 
     if ((input_uses.size() == 1) &&
-        (first_user->kind() ==
-         poptorch::symbols::poptorch::set_overlap_for_input)) {
-      auto *value_node = first_user->input(1)->node();
+        (user->kind() == poptorch::symbols::poptorch::set_overlap_for_input)) {
+      auto *value_node = user->input(1)->node();
       ERROR_ON(value_node->kind() != c10::prim::Constant);
       const auto &value_str = value_node->s(c10::attr::value);
-      to_delete->push_back(first_user);
-      first_user->removeInput(1);
+      to_delete->push_back(user);
+      user->removeInput(1);
 
       // String constant may be shared
-      to_erase_output_and_delete->insert(value_node);
+      if (value_node->output()->uses().empty()) {
+        to_erase_output_and_delete->insert(value_node);
+      }
 
       graph->param_node()->s_(getOverlapSymbol("_for_input", input_num),
                               value_str);
-      first_user->output()->replaceAllUsesWith(input);
+      user->output()->replaceAllUsesWith(input);
       continue;
     }
 
@@ -119,7 +114,9 @@ void attributiseOverlappedOutputs(
       node->removeInput(1);
 
       // String constant may be shared
-      to_erase_output_and_delete->insert(value_node);
+      if (value_node->output()->uses().empty()) {
+        to_erase_output_and_delete->insert(value_node);
+      }
 
       graph->return_node()->s_(overlap_symbol, value_str);
       node->output()->replaceAllUsesWith(node->input(0));
