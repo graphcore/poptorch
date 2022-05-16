@@ -11,8 +11,6 @@ endif()
  # DEPRECATED: will be removed in a separate commit
 if(ONLY_RUN_HW_TESTS)
   set(EXTRA_PYTEST_ARGS "--hw-tests-only")
-else()
-  set(EXTRA_PYTEST_ARGS "")
 endif()
 
 run_poptorch_install_command(
