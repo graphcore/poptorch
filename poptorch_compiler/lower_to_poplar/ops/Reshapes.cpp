@@ -17,7 +17,7 @@ void reshape::lowerToPoplar(CompilerContext &context) {
   // NB intentionally inplace. PyTorch users are told when using reshape
   // that "you should not depend on the copying vs. viewing behavior".
   in = in.reshape(new_shape);
-  context.tensors.insert({result(), in});
+  context.addTensor(result(), in);
 }
 
 void squeeze_dim::lowerToPoplar(CompilerContext &context) {
@@ -29,7 +29,7 @@ void squeeze_dim::lowerToPoplar(CompilerContext &context) {
     dim += in.rank();
   }
   in = in.squeeze({static_cast<size_t>(dim)});
-  context.tensors.insert({result(), in});
+  context.addTensor(result(), in);
 }
 
 void squeeze_dim_::lowerToPoplar(CompilerContext &context) {
@@ -41,7 +41,7 @@ void squeeze_dim_::lowerToPoplar(CompilerContext &context) {
     dim += in.rank();
   }
   in = in.squeeze({static_cast<size_t>(dim)});
-  context.tensors.insert({result(), in});
+  context.addTensor(result(), in);
 }
 
 void unsqueeze::lowerToPoplar(CompilerContext &context) {
@@ -59,7 +59,7 @@ void unsqueeze::lowerToPoplar(CompilerContext &context) {
   auto shape = in.shape();
   shape.insert(shape.begin() + dim, 1);
   in = in.reshape(shape);
-  context.tensors.insert({result(), in});
+  context.addTensor(result(), in);
 }
 
 void expand::lowerToPoplar(CompilerContext &context) {
@@ -83,7 +83,7 @@ void expand::lowerToPoplar(CompilerContext &context) {
     }
   }
 
-  context.tensors.insert({result(), in});
+  context.addTensor(result(), in);
 }
 
 void as_strided::lowerToPoplar(CompilerContext &context) {
@@ -105,7 +105,7 @@ void as_strided::lowerToPoplar(CompilerContext &context) {
       convertIntArray<std::size_t>(this->size());
   in = in.reshape(new_shape);
 
-  context.tensors.insert({result(), in});
+  context.addTensor(result(), in);
 }
 
 void transpose::lowerToPoplar(CompilerContext &context) {
@@ -122,7 +122,7 @@ void transpose::lowerToPoplar(CompilerContext &context) {
 
   poplar::Tensor view = in.dimShuffle(permutation);
 
-  context.tensors.insert({result(), view});
+  context.addTensor(result(), view);
 }
 
 void select::lowerToPoplar(CompilerContext &context) {
@@ -130,9 +130,16 @@ void select::lowerToPoplar(CompilerContext &context) {
   const int64_t dim = this->dim();
   const int64_t idx = this->idx();
 
-  const poplar::Tensor res = self.slice(idx, idx + 1, dim);
+  poplar::Tensor res = self.slice(idx, idx + 1, dim);
 
-  context.tensors.insert({this->result(), res});
+  // The Poplar slice doesn't remove the selected dimension
+  // from the shape, whereas Torch select expects it to be
+  // removed, this is handled properly in the MLIR shape
+  // inference so just resize to the MLIR shape instead of
+  // duplicating the logic.
+  res = reshapeToMlirShape(res, this->result().getType());
+
+  context.addTensor(this->result(), res);
 }
 
 } // namespace poptorch_ir

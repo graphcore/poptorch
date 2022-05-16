@@ -75,9 +75,9 @@ void avg_pool::lowerToPoplar(CompilerContext &context) {
   auto remainder_fn = [&](std::size_t s) {
     return (input.shape()[2 + s] + 2 * padding[s] - kernel_size[s]) % stride[s];
   };
-  context.tensors[this->result()] =
-      pool(context, input, kernel_size, stride, padding, ceil_mode,
-           popnn::PoolingType::AVG, remainder_fn);
+  context.addTensor(this->result(),
+                    pool(context, input, kernel_size, stride, padding,
+                         ceil_mode, popnn::PoolingType::AVG, remainder_fn));
 }
 
 void max_pool::lowerToPoplar(CompilerContext &context) {
@@ -99,9 +99,9 @@ void max_pool::lowerToPoplar(CompilerContext &context) {
             dilation[s] * (kernel_size[s] - 1) - 1) %
            stride[s];
   };
-  context.tensors[this->result()] =
-      pool(context, input, kernel_size, stride, padding, ceil_mode,
-           popnn::PoolingType::MAX, remainder_fn);
+  context.addTensor(this->result(),
+                    pool(context, input, kernel_size, stride, padding,
+                         ceil_mode, popnn::PoolingType::MAX, remainder_fn));
 }
 
 // Implemented using average pooling until adaptive pooling is
@@ -149,8 +149,9 @@ void adaptive_avg_pool::lowerToPoplar(CompilerContext &context) {
                                          input_shape[0], /* batch_size */
                                          input.elementType()};
 
-  context.tensors[this->result()] =
-      popnn::pooling::pool(context.graph, pool_params, input, context.seq);
+  context.addTensor(
+      this->result(),
+      popnn::pooling::pool(context.graph, pool_params, input, context.seq));
 }
 
 } // namespace poptorch_ir

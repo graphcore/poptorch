@@ -31,7 +31,7 @@ inline poplar::Tensor mayCast(CompilerContext &context,
              : in;
 }
 
-// Helper function for cansting and performing reductions. The tensor in is cast
+// Helper function for casting and performing reductions. The tensor in is cast
 // to op_type, then the reduction op is applied and the output of that is cast
 // to out_type. This function won't do casts that that aren't necessary
 //
@@ -150,7 +150,10 @@ void reducemean::lowerToPoplar(CompilerContext &context) {
       static_cast<float>(out_elms) / static_cast<float>(in_elms);
   popops::mulInPlace(context.graph, output_tensor, ratio, context.seq);
 
-  context.tensors.insert({this->result(), output_tensor});
+  // In case keep_dim = True
+  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+
+  context.addTensor(this->result(), output_tensor);
 }
 
 void std_correction::lowerToPoplar(CompilerContext &context) {
@@ -173,7 +176,11 @@ void std_correction::lowerToPoplar(CompilerContext &context) {
     popops::sqrtInPlace(context.graph, var_output.variance, context.seq);
   }
 
-  context.tensors.insert({this->result(), var_output.variance});
+  // In case keep_dim = True
+  var_output.variance =
+      reshapeToMlirShape(var_output.variance, this->result().getType());
+
+  context.addTensor(this->result(), var_output.variance);
 }
 void var_correction::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->self());
@@ -190,7 +197,11 @@ void var_correction::lowerToPoplar(CompilerContext &context) {
   auto var_output = computeMeanAndVariance(context, dims, in,
                                            this->correction().getValue() != 0);
 
-  context.tensors.insert({this->result(), var_output.variance});
+  // In case keep_dim = True
+  var_output.variance =
+      reshapeToMlirShape(var_output.variance, this->result().getType());
+
+  context.addTensor(this->result(), var_output.variance);
 }
 void std_mean_correction::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->self());
@@ -212,8 +223,13 @@ void std_mean_correction::lowerToPoplar(CompilerContext &context) {
     popops::sqrtInPlace(context.graph, var_output.variance, context.seq);
   }
 
-  context.tensors.try_emplace(this->result(), std::move(var_output.variance));
-  context.tensors.try_emplace(this->mean(), std::move(var_output.mean));
+  // In case keep_dim = True
+  var_output.mean = reshapeToMlirShape(var_output.mean, this->mean().getType());
+  var_output.variance =
+      reshapeToMlirShape(var_output.variance, this->result().getType());
+
+  context.addTensor(this->result(), var_output.variance);
+  context.addTensor(this->mean(), var_output.mean);
 }
 void var_mean_correction::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->self());
@@ -230,8 +246,13 @@ void var_mean_correction::lowerToPoplar(CompilerContext &context) {
   auto var_output = computeMeanAndVariance(context, dims, in,
                                            this->correction().getValue() != 0);
 
-  context.tensors.try_emplace(this->result(), std::move(var_output.variance));
-  context.tensors.try_emplace(this->mean(), std::move(var_output.mean));
+  // In case keep_dim = True
+  var_output.mean = reshapeToMlirShape(var_output.mean, this->mean().getType());
+  var_output.variance =
+      reshapeToMlirShape(var_output.variance, this->result().getType());
+
+  context.addTensor(this->result(), var_output.variance);
+  context.addTensor(this->mean(), var_output.mean);
 }
 
 void reducesum::lowerToPoplar(CompilerContext &context) {
@@ -245,7 +266,10 @@ void reducesum::lowerToPoplar(CompilerContext &context) {
   auto output_tensor = reduceWithCasts(context, dims, in, out_type,
                                        popops::Operation::ADD, out_type);
 
-  context.tensors.insert({this->result(), output_tensor});
+  // In case keep_dim = True
+  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+
+  context.addTensor(this->result(), output_tensor);
 }
 
 void prod::lowerToPoplar(CompilerContext &context) {
@@ -260,7 +284,7 @@ void prod::lowerToPoplar(CompilerContext &context) {
   auto output_tensor = reduceWithCasts(context, dims, in, out_type,
                                        popops::Operation::MUL, out_type);
 
-  context.tensors.insert({this->result(), output_tensor});
+  context.addTensor(this->result(), output_tensor);
 }
 
 void prod_dim::lowerToPoplar(CompilerContext &context) {
@@ -274,7 +298,10 @@ void prod_dim::lowerToPoplar(CompilerContext &context) {
   auto output_tensor = reduceWithCasts(context, dims, in, out_type,
                                        popops::Operation::MUL, out_type);
 
-  context.tensors.insert({this->result(), output_tensor});
+  // In case keep_dim = True
+  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+
+  context.addTensor(this->result(), output_tensor);
 }
 
 void all::lowerToPoplar(CompilerContext &context) {
@@ -290,7 +317,7 @@ void all::lowerToPoplar(CompilerContext &context) {
       reduceWithCasts(context, dims, in, poplar::BOOL,
                       popops::Operation::LOGICAL_AND, out_type);
 
-  context.tensors.insert({this->result(), output_tensor});
+  context.addTensor(this->result(), output_tensor);
 }
 
 void all_out::lowerToPoplar(CompilerContext &context) {
@@ -305,7 +332,10 @@ void all_out::lowerToPoplar(CompilerContext &context) {
       reduceWithCasts(context, dims, in, poplar::BOOL,
                       popops::Operation::LOGICAL_AND, out_type);
 
-  context.tensors.insert({this->result(), output_tensor});
+  // In case keep_dim = True
+  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+
+  context.addTensor(this->result(), output_tensor);
 }
 
 void any::lowerToPoplar(CompilerContext &context) {
@@ -320,7 +350,7 @@ void any::lowerToPoplar(CompilerContext &context) {
   auto output_tensor = reduceWithCasts(context, dims, in, poplar::BOOL,
                                        popops::Operation::LOGICAL_OR, out_type);
 
-  context.tensors.insert({this->result(), output_tensor});
+  context.addTensor(this->result(), output_tensor);
 }
 
 void any_out::lowerToPoplar(CompilerContext &context) {
@@ -334,7 +364,10 @@ void any_out::lowerToPoplar(CompilerContext &context) {
   auto output_tensor = reduceWithCasts(context, dims, in, poplar::BOOL,
                                        popops::Operation::LOGICAL_OR, out_type);
 
-  context.tensors.insert({this->result(), output_tensor});
+  // In case keep_dim = True
+  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+
+  context.addTensor(this->result(), output_tensor);
 }
 
 // Perform a prefix sum by doing a convolution with an array of ones
@@ -366,7 +399,7 @@ void cumsum_out::lowerToPoplar(CompilerContext &context) {
   // We don't need to do anything if the input is a scalar or if there are no
   // elements in the input
   if (in.numElements() == 0 || in_shape.empty()) {
-    context.tensors.insert({this->result(), cast_in});
+    context.addTensor(this->result(), cast_in);
     return;
   }
 
@@ -375,7 +408,7 @@ void cumsum_out::lowerToPoplar(CompilerContext &context) {
 
   // We don't need to do anything if the the sum is over one element
   if (sum_size == 1) {
-    context.tensors.insert({this->result(), cast_in});
+    context.addTensor(this->result(), cast_in);
     return;
   }
 
@@ -433,7 +466,7 @@ void cumsum_out::lowerToPoplar(CompilerContext &context) {
   // the output type
   const auto output = mayCast(context, prefix_sum, out_type);
 
-  context.tensors.insert({this->result(), output});
+  context.addTensor(this->result(), output);
 }
 
 } // namespace poptorch_ir

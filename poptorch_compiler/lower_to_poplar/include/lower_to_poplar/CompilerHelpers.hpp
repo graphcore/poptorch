@@ -33,9 +33,6 @@ struct CompilerContext {
   // All poplar programs.
   std::array<poplar::program::Program, 3> programs;
 
-  // Map of SSA->Poplar Tensors.
-  llvm::DenseMap<mlir::Value, poplar::Tensor> tensors;
-
   // Handles to their datastreams.
   std::unordered_map<std::string, poplar::DataStream> streams;
 
@@ -56,13 +53,25 @@ struct CompilerContext {
 
   static poplar::Type poplarTypeOf(mlir::Type elementType);
 
+  // Map the SSA to the corresponding Poplar tensor.
+  // update_if_present: if the SSA is already present in the map then update
+  // it to point at this new tensor.
+  void addTensor(const mlir::Value &value, const poplar::Tensor &tensor,
+                 bool update_if_present = false);
+
 private:
+  // Map of SSA->Poplar Tensors.
+  llvm::DenseMap<mlir::Value, poplar::Tensor> _tensors;
+
   // Persistent seed to use for RNG functions.
   //
   // NOTE: This is a temporary workaround while TODO(T51096) remains unresolved,
   //       to handle loading, saving & restoring of the seed.
   std::optional<poplar::Tensor> _randomSeed;
 };
+
+poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
+                                  mlir::Type mlirType);
 
 template <typename T>
 std::vector<T> convertFloatArray(const mlir::ArrayAttr &array) {

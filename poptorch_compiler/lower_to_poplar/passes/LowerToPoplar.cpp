@@ -186,12 +186,46 @@ void LowerToPoplar::verifyOperations(const mlir::FuncOp &function) {
   }
 }
 
+std::string toString(const std::vector<std::size_t> &shape,
+                     const poplar::Type &type) {
+  std::stringstream ss;
+  ss << type << "[";
+  std::string sep{};
+  for (const auto &s : shape) {
+    ss << sep << s;
+    sep = ", ";
+  }
+  ss << "]";
+  return ss.str();
+}
 } // namespace
+
+void CompilerContext::addTensor(const mlir::Value &value,
+                                const poplar::Tensor &tensor,
+                                bool update_if_present) {
+  auto mlir_type = processType(value.getType());
+  std::string mlir_shape = toString(mlir_type.shape, mlir_type.element_type);
+  std::string poplar_shape = toString(tensor.shape(), tensor.elementType());
+  ERROR_ON_MSG(mlir_shape != poplar_shape,
+               "The shape of the Poplar tensor "
+                   << poplar_shape
+                   << " doesn't match the shape of the MLIR tensor it's "
+                      "associated with: "
+                   << mlir_shape << " for " << mlirToStr(value));
+
+  if (update_if_present) {
+    _tensors[value] = tensor;
+  } else {
+    auto res = _tensors.insert({value, tensor});
+    ERROR_ON_MSG(!res.second,
+                 "[Internal] Tensor already present for " << mlirToStr(value));
+  }
+}
 
 // Get the poplar tensor which corresponds to a specific value of MLIR.
 poplar::Tensor CompilerContext::fromSsa(mlir::Value value) {
-  auto itr = tensors.find(value);
-  if (itr != tensors.end()) {
+  auto itr = _tensors.find(value);
+  if (itr != _tensors.end()) {
     return itr->second;
   }
 
@@ -202,7 +236,7 @@ poplar::Tensor CompilerContext::fromSsa(mlir::Value value) {
       this->graph.addVariable(tensor_type.element_type, tensor_type.shape,
                               poplar::VariableMappingMethod::LINEAR);
 
-  tensors.insert({value, tensor});
+  addTensor(value, tensor);
   return tensor;
 }
 
@@ -231,6 +265,11 @@ poplar::Tensor &CompilerContext::getRandomSeed() {
 
 poplar::Type CompilerContext::poplarTypeOf(mlir::Type elementType) {
   return elementTypeFromMLIR(elementType);
+}
+
+poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
+                                  mlir::Type mlirType) {
+  return src.reshape(processType(mlirType).shape);
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>

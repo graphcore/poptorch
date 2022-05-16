@@ -16,7 +16,7 @@ namespace poptorch_ir {
     poplar::Tensor input2 = context.fromSsa(this->in2());                      \
     poplar::Tensor out =                                                       \
         popops::popops_name(context.graph, input1, input2, context.seq);       \
-    context.tensors.insert({this->result(), out});                             \
+    context.addTensor(this->result(), out);                                    \
   }
 #define BINARY_OP_INPLACE(name, popops_name)                                   \
   void name##_::lowerToPoplar(CompilerContext &context) {                      \
@@ -50,7 +50,7 @@ void add::lowerToPoplar(CompilerContext &context) {
     out = popops::add(context.graph, input1, input2, context.seq);
   }
 
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void add_::lowerToPoplar(CompilerContext &context) {
@@ -84,7 +84,7 @@ void sub::lowerToPoplar(CompilerContext &context) {
     out = popops::sub(context.graph, input1, input2, context.seq);
   }
 
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void sub_::lowerToPoplar(CompilerContext &context) {
@@ -109,7 +109,7 @@ void sub_::lowerToPoplar(CompilerContext &context) {
   void name::lowerToPoplar(CompilerContext &context) {                         \
     poplar::Tensor input1 = context.fromSsa(this->in1());                      \
     poplar::Tensor out = popops::name(context.graph, input1, context.seq);     \
-    context.tensors.insert({this->result(), out});                             \
+    context.addTensor(this->result(), out);                                    \
   }                                                                            \
   void name##_::lowerToPoplar(CompilerContext &context) {                      \
     poplar::Tensor input1 = context.fromSsa(this->in1());                      \
@@ -125,7 +125,7 @@ void isnan::lowerToPoplar(CompilerContext &context) {
 
   auto out = popops::map(context.graph, popops::expr::UnaryOpType::IS_NAN, self,
                          context.seq);
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void scaledadd_::lowerToPoplar(CompilerContext &context) {
@@ -158,7 +158,7 @@ void addcmul::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor out =
       popops::map(context.graph, expr, {input, tensor1, tensor2}, context.seq);
 
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void addcmul_::lowerToPoplar(CompilerContext &context) {
@@ -190,7 +190,7 @@ void addcdiv::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor out =
       popops::map(context.graph, expr, {input, tensor1, tensor2}, context.seq);
 
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void addcdiv_::lowerToPoplar(CompilerContext &context) {
@@ -226,7 +226,7 @@ void clamp::lowerToPoplar(CompilerContext &context) {
   auto expr = pe::Clamp(pe::_1, pe::Const(min), pe::Const(max));
   poplar::Tensor out = popops::map(context.graph, expr, {self}, context.seq);
 
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void clampTensor::lowerToPoplar(CompilerContext &context) {
@@ -248,6 +248,6 @@ void clampTensor::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor out =
       popops::map(context.graph, expr, {self, min, max}, context.seq);
 
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 } // namespace poptorch_ir

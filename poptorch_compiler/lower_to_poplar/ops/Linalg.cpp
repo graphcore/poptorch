@@ -62,7 +62,7 @@ void conv::lowerToPoplar(CompilerContext &context) {
     poplin::addBias(context.graph, output, bias, context.seq);
   }
 
-  context.tensors.insert({this->result(), output});
+  context.addTensor(this->result(), output);
 }
 
 void matmul::lowerToPoplar(CompilerContext &context) {
@@ -109,7 +109,7 @@ void matmul::lowerToPoplar(CompilerContext &context) {
   out = out.reshape(poplar_ref);
 
   // Record the result.
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void addmm::lowerToPoplar(CompilerContext &context) {
@@ -136,7 +136,7 @@ void addmm::lowerToPoplar(CompilerContext &context) {
     popops::addInPlace(context.graph, out, input, context.seq);
   }
 
-  context.tensors[this->result()] = out;
+  context.addTensor(this->result(), out);
 }
 
 } // namespace poptorch_ir

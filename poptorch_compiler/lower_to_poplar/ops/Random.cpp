@@ -70,7 +70,7 @@ void normal_::lowerToPoplar(CompilerContext &context) {
       poprand::normal(context.graph, &context.getRandomSeed(), 0, self,
                       poplar::FLOAT, mean, stdv, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void normal_Tensor_Tensor::lowerToPoplar(CompilerContext &context) {
@@ -84,7 +84,7 @@ void normal_Tensor_Tensor::lowerToPoplar(CompilerContext &context) {
   popops::mulInPlace(context.graph, res, stdvs, context.seq);
   popops::addInPlace(context.graph, res, means, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void normal_Tensor_float::lowerToPoplar(CompilerContext &context) {
@@ -98,7 +98,7 @@ void normal_Tensor_float::lowerToPoplar(CompilerContext &context) {
   popops::mulInPlace(context.graph, res, stdv, context.seq);
   popops::addInPlace(context.graph, res, means, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void normal_float_Tensor::lowerToPoplar(CompilerContext &context) {
@@ -112,7 +112,7 @@ void normal_float_Tensor::lowerToPoplar(CompilerContext &context) {
   popops::mulInPlace(context.graph, res, stdvs, context.seq);
   popops::addInPlace(context.graph, res, mean, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void uniform_::lowerToPoplar(CompilerContext &context) {
@@ -124,7 +124,7 @@ void uniform_::lowerToPoplar(CompilerContext &context) {
       poprand::uniform(context.graph, &context.getRandomSeed(), 0, self,
                        poplar::FLOAT, from, to, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void random_::lowerToPoplar(CompilerContext &context) {
@@ -140,7 +140,7 @@ void random_::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor res =
       popops::cast(context.graph, as_ints, self.elementType(), context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void exponential_::lowerToPoplar(CompilerContext &context) {
@@ -159,7 +159,7 @@ void exponential_::lowerToPoplar(CompilerContext &context) {
   popops::negInPlace(context.graph, res, context.seq);
   popops::divInPlace(context.graph, res, lambd, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void bernoulli__float::lowerToPoplar(CompilerContext &context) {
@@ -170,7 +170,7 @@ void bernoulli__float::lowerToPoplar(CompilerContext &context) {
       poprand::bernoulli(context.graph, &context.getRandomSeed(), 0, input,
                          poplar::FLOAT, prob, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void bernoulli__tensor::lowerToPoplar(CompilerContext &context) {
@@ -187,7 +187,7 @@ void bernoulli__tensor::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor res =
       popops::cast(context.graph, as_bools, poplar::FLOAT, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 void random__from::lowerToPoplar(CompilerContext &context) {
@@ -212,7 +212,7 @@ void random__from::lowerToPoplar(CompilerContext &context) {
                          self.elementType(), from, to + 0.99, context.seq);
     popops::floorInPlace(context.graph, res, context.seq);
 
-    context.tensors.insert({this->result(), res});
+    context.addTensor(this->result(), res);
   } else {
     // For everything else, generate the biggest ints we can and cast down
     // if-needed.
@@ -225,7 +225,7 @@ void random__from::lowerToPoplar(CompilerContext &context) {
     const poplar::Tensor res =
         popops::cast(context.graph, as_ints, self.elementType(), context.seq);
 
-    context.tensors.insert({this->result(), res});
+    context.addTensor(this->result(), res);
   }
 }
 
@@ -242,7 +242,7 @@ void bernoulli_out::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor res =
       popops::cast(context.graph, as_bools, poplar::FLOAT, context.seq);
 
-  context.tensors.insert({this->result(), res});
+  context.addTensor(this->result(), res);
 }
 
 } // namespace poptorch_ir

@@ -39,7 +39,7 @@ void mse_loss::lowerToPoplar(CompilerContext &context) {
     }
   }
 
-  context.tensors[result()] = sqr_error;
+  context.addTensor(result(), sqr_error);
 }
 
 void mse_loss_backward::lowerToPoplar(CompilerContext &context) {
@@ -63,7 +63,7 @@ void mse_loss_backward::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor out = popops::map(context.graph, expr,
                                    {input, target, grad_output}, context.seq);
 
-  context.tensors.insert({result(), out});
+  context.addTensor(result(), out);
 }
 
 poplar::Tensor maskTensor(CompilerContext &context, poplar::Tensor &tensor,
@@ -124,14 +124,12 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
   popops::mapInPlace(context.graph, popops::expr::UnaryOpType::NEGATE, out,
                      context.seq);
 
-  if (result().getType().cast<mlir::RankedTensorType>().getShape().empty()) {
-    while (!out.shape().empty()) {
-      out = out.squeeze({0});
-    }
-  }
+  // MLIR might be [] and Poplar [1] so for consistency reshape the Poplar
+  // tensor to match the MLIR one.
+  out = reshapeToMlirShape(out, this->result().getType());
 
-  context.tensors.insert({result(), out});
-  context.tensors.insert({total_weight(), out});
+  context.addTensor(result(), out);
+  context.addTensor(total_weight(), out);
 }
 
 void nll_loss_backward::lowerToPoplar(CompilerContext &context) {
@@ -169,7 +167,7 @@ void nll_loss_backward::lowerToPoplar(CompilerContext &context) {
   }
   popops::mapInPlace(context.graph, popops::expr::BinaryOpType::MULTIPLY, grad,
                      grad_output, context.seq);
-  context.tensors.insert({result(), grad});
+  context.addTensor(result(), grad);
 }
 
 poplar::Tensor bce(CompilerContext &context, poplar::Tensor &pred,
@@ -219,7 +217,7 @@ void binary_cross_entropy::lowerToPoplar(CompilerContext &context) {
   popops::mapInPlace(context.graph, popops::expr::UnaryOpType::NEGATE, out,
                      context.seq);
 
-  context.tensors.insert({result(), out});
+  context.addTensor(result(), out);
 }
 
 void binary_cross_entropy_backward::lowerToPoplar(CompilerContext &context) {
@@ -250,7 +248,7 @@ void binary_cross_entropy_backward::lowerToPoplar(CompilerContext &context) {
 
   popops::mapInPlace(context.graph, popops::expr::BinaryOpType::MULTIPLY, grad,
                      grad_output, context.seq);
-  context.tensors.insert({result(), grad});
+  context.addTensor(result(), grad);
 }
 
 void binary_cross_entropy_with_logits::lowerToPoplar(CompilerContext &context) {
@@ -273,7 +271,7 @@ void binary_cross_entropy_with_logits::lowerToPoplar(CompilerContext &context) {
   popops::mapInPlace(context.graph, popops::expr::UnaryOpType::NEGATE, out,
                      context.seq);
 
-  context.tensors.insert({result(), out});
+  context.addTensor(result(), out);
 }
 
 void binary_cross_entropy_with_logits_backward::lowerToPoplar(
@@ -296,7 +294,7 @@ void binary_cross_entropy_with_logits_backward::lowerToPoplar(
   }
   popops::mapInPlace(context.graph, popops::expr::BinaryOpType::MULTIPLY, grad,
                      grad_output, context.seq);
-  context.tensors.insert({result(), grad});
+  context.addTensor(result(), grad);
 }
 
 } // namespace poptorch_ir

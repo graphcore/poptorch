@@ -35,7 +35,7 @@ void cast::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor out = popops::cast(
       context.graph, in,
       poptorch_ir::CompilerContext::poplarTypeOf(this->dtype()), context.seq);
-  context.tensors[this->result()] = out;
+  context.addTensor(this->result(), out);
 }
 
 void copy_::lowerToPoplar(CompilerContext &context) {
@@ -76,7 +76,7 @@ void tensorconstant_int::lowerToPoplar(CompilerContext &context) {
 void concat::lowerToPoplar(CompilerContext &context) {
   std::vector<poplar::Tensor> tensors = context.fromSsa(this->tensors());
 
-  context.tensors[this->result()] = poplar::concat(tensors, this->dim());
+  context.addTensor(this->result(), poplar::concat(tensors, this->dim()));
 }
 
 void topk::lowerToPoplar(CompilerContext &context) {
@@ -116,8 +116,8 @@ void topk::lowerToPoplar(CompilerContext &context) {
   // Cast to signed int.
   indices = indices.reinterpret(poplar::INT);
 
-  context.tensors.insert({this->values(), values});
-  context.tensors.insert({this->indices(), indices});
+  context.addTensor(this->values(), values);
+  context.addTensor(this->indices(), indices);
 }
 
 void dropout::lowerToPoplar(CompilerContext &context) {
@@ -130,7 +130,7 @@ void dropout::lowerToPoplar(CompilerContext &context) {
     if (p == 1.0) {
       poplar::Tensor result = context.graph.clone(tensor.elementType(), tensor);
       popops::zero(context.graph, result, context.seq);
-      context.tensors[this->result()] = result;
+      context.addTensor(this->result(), result);
       return;
     }
     // NB: Seeds not implemented yet.
@@ -139,9 +139,9 @@ void dropout::lowerToPoplar(CompilerContext &context) {
     poplar::Tensor result =
         poprand::dropout(context.graph, &context.getRandomSeed(), 0, tensor,
                          tensor, 1. - p, 1. / (1. - p), context.seq);
-    context.tensors[this->result()] = result;
+    context.addTensor(this->result(), result);
   } else {
-    context.tensors[this->result()] = tensor;
+    context.addTensor(this->result(), tensor);
   }
 }
 
@@ -152,7 +152,7 @@ void where::lowerToPoplar(CompilerContext &context) {
 
   auto result =
       popops::select(context.graph, self, other, condition, context.seq);
-  context.tensors[this->result()] = result;
+  context.addTensor(this->result(), result);
 }
 
 } // namespace poptorch_ir

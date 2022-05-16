@@ -19,21 +19,21 @@ void swish::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());
   poplar::Tensor out = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::SWISH, input1, context.seq);
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void relu::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());
   poplar::Tensor out = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::RELU, input1, context.seq);
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void gelu::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());
   poplar::Tensor out = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::GELU, input1, context.seq);
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 // Inplace versions.
@@ -104,7 +104,7 @@ void hardsigmoid::lowerToPoplar(CompilerContext &context) {
 
   poplar::Tensor out =
       popops::map(context.graph, clamped, {input}, context.seq);
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void hardswish::lowerToPoplar(CompilerContext &context) {
@@ -128,7 +128,7 @@ void hardswish::lowerToPoplar(CompilerContext &context) {
 
   poplar::Tensor out =
       popops::map(context.graph, clamp_upper, {input}, context.seq);
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void softmax::lowerToPoplar(CompilerContext &context) {
@@ -152,7 +152,7 @@ void softmax::lowerToPoplar(CompilerContext &context) {
     out = out.dimShufflePartial({axis, out.rank() - 1}, {out.rank() - 1, axis});
   }
 
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 void logsoftmax::lowerToPoplar(CompilerContext &context) {
@@ -168,7 +168,7 @@ void logsoftmax::lowerToPoplar(CompilerContext &context) {
   if (axis + 1 != input.rank()) {
     out = out.dimShufflePartial({axis, out.rank() - 1}, {out.rank() - 1, axis});
   }
-  context.tensors.insert({this->result(), out});
+  context.addTensor(this->result(), out);
 }
 
 poplar::Tensor coerceTo2D(const poplar::Tensor &t) {
@@ -211,7 +211,7 @@ void logsoftmax_backward::lowerToPoplar(CompilerContext &context) {
   if (axis + 1 != grad_shape.size()) {
     dv = dv.dimShufflePartial({axis, dv.rank() - 1}, {dv.rank() - 1, axis});
   }
-  context.tensors.insert({this->result(), dv});
+  context.addTensor(this->result(), dv);
 }
 
 } // namespace poptorch_ir
