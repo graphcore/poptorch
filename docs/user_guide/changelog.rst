@@ -11,6 +11,7 @@ New features
 - Improve performance of ``torch.gather`` in some cases where the index tensor has come from an ``expand`` or ``expand_as``.
 - Improve error message when trying to apply bitwise ops to unsupported scalar types.
 - Add support for upsample bicubic mode.
+- Add support for ``zero_infinity`` in ``torch.nn.CTCLoss``.
 
 API changes
 -----------

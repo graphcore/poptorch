@@ -34,6 +34,5 @@ torch.nn.CTCLoss
 
 The CTCLoss operator is supported, with some limitations:
 
-#. The ``zero_infinity`` parameter must be set to ``False``
 #. The ``reduction`` parameter must be set to either ``sum`` or ``mean``
 #. The ``targets`` tensor must be 2D, corresponding to stacked, padded layout

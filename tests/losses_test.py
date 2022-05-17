@@ -502,12 +502,13 @@ def test_TripletMarginLoss(p, swap, reduction, trace_model):
 @pytest.mark.parametrize("blank", {0, 3})
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_CTCLoss(blank, reduction, trace_model):
+@pytest.mark.parametrize("zero_infinity", [True, False])
+def test_CTCLoss(blank, reduction, trace_model, zero_infinity):
 
     T = 10  # Input sequence length
     N = 4  # Batch size
     C = 5  # Number of classes
-    S = 6  # Target sequence length
+    S = 6 if not zero_infinity else 10  # Target sequence length
     S_min = 3  # Minimum target length
 
     torch.manual_seed(42)
@@ -531,7 +532,8 @@ def test_CTCLoss(blank, reduction, trace_model):
                  reduction,
                  input_lengths=input_lengths,
                  target_lengths=target_lengths,
-                 blank=blank)
+                 blank=blank,
+                 zero_infinity=zero_infinity)
 
 
 @pytest.mark.parametrize("reduction", ("mean", "sum"))
