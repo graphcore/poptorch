@@ -47,9 +47,8 @@ bool isNondeterministic(const torch::jit::Node &node) {
 
 std::string nodeToString(const torch::jit::Node *node) {
   std::stringstream ss;
-  ss << *node;
+  node->print(ss, 0, nullptr, true, false, false, false);
   std::string node_str = ss.str();
-  node_str.pop_back(); // Remove trailing line return
   return node_str;
 }
 
