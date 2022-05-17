@@ -93,11 +93,6 @@ torch::jit::Node* createSequenceslice(torch::jit::Graph *graph,  const std::vect
 new_node->i_(c10::Symbol::fromQualString("attr::zeroUnused"),zeroUnused);
 return new_node;
 }
-torch::jit::Node* createReplicatedallreduce(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::vector<int64_t> commGroup) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::replicatedallreduce, args, ImplicitCast::None, OutputType::AsFirstInput);
-new_node->is_(c10::Symbol::fromQualString("attr::commGroup"),commGroup);
-return new_node;
-}
 torch::jit::Node* createL1loss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const float lambda,std::int32_t reduction) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::l1loss, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->f_(c10::Symbol::fromQualString("attr::lambda"),lambda);
@@ -116,11 +111,12 @@ torch::jit::Node* createIdentityloss(torch::jit::Graph *graph,  const std::vecto
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 return new_node;
 }
-torch::jit::Node* create_ctcloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,const unsigned int blank,const std::string & outDataType) {
+torch::jit::Node* create_ctcloss(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,std::int32_t reduction,const unsigned int blank,const std::string & outDataType,const bool zeroInfinity) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::_ctcloss, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::fromQualString("attr::reduction"),reduction);
 new_node->i_(c10::Symbol::fromQualString("attr::blank"),blank);
 new_node->s_(c10::Symbol::fromQualString("attr::outDataType"),outDataType);
+new_node->i_(c10::Symbol::fromQualString("attr::zeroInfinity"),zeroInfinity);
 return new_node;
 }
 torch::jit::Node* createCtcbeamsearchdecoder(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int blank,unsigned int beamWidth,unsigned int topPaths) {
@@ -159,6 +155,13 @@ return new_node;
 torch::jit::Node* createReverse(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & dimensions) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::reverse, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->is_(c10::Symbol::fromQualString("attr::dimensions"),dimensions);
+return new_node;
+}
+torch::jit::Node* createSlice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::vector<int64_t> & ends,const std::vector<int64_t> & starts,const std::vector<int64_t> & axes) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::slice, args, ImplicitCast::None, OutputType::AsFirstInput);
+new_node->is_(c10::Symbol::fromQualString("attr::ends"),ends);
+new_node->is_(c10::Symbol::fromQualString("attr::starts"),starts);
+new_node->is_(c10::Symbol::fromQualString("attr::axes"),axes);
 return new_node;
 }
 torch::jit::Node* createBitwisenot(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
@@ -294,10 +297,6 @@ new_node->i_(c10::Symbol::fromQualString("attr::sampling_ratio"),sampling_ratio)
 new_node->f_(c10::Symbol::fromQualString("attr::spatial_scale"),spatial_scale);
 return new_node;
 }
-torch::jit::Node* createSlice(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::slice, args, ImplicitCast::None, OutputType::AsFirstInput);
-return new_node;
-}
 torch::jit::Node* createThresholdedrelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,float alpha) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::thresholdedrelu, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->f_(c10::Symbol::fromQualString("attr::alpha"),alpha);
@@ -325,8 +324,8 @@ torch::jit::Node* createAtanh(torch::jit::Graph *graph,  const std::vector<torch
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::atanh, args, ImplicitCast::None, OutputType::AsFirstInput);
 return new_node;
 }
-torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFourthFifth, OutputType::AsFirstInput);
+torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum, unsigned int num_node_outputs) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFourthFifth, OutputType::AsFirstInput, num_node_outputs);
 new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"),num_outputs);
 new_node->f_(c10::Symbol::fromQualString("attr::epsilon"),epsilon);
 new_node->f_(c10::Symbol::fromQualString("attr::momentum"),momentum);
@@ -563,7 +562,7 @@ new_node->f_(c10::Symbol::fromQualString("attr::min"),min);
 return new_node;
 }
 torch::jit::Node* createConcat(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::concat, args, ImplicitCast::All, OutputType::AsFirstInput);
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::concat, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
 new_node->i_(c10::Symbol::fromQualString("attr::axis"),axis);
 return new_node;
 }

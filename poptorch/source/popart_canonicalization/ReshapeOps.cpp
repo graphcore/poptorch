@@ -199,9 +199,7 @@ torch::jit::Node *selectHandler(torch::jit::Graph *graph,
       index += dims.at(dim);
     }
 
-    slice_node = createSlice(graph, {input, wrapInConstant1D(graph, index),
-                                     wrapInConstant1D(graph, index + 1),
-                                     wrapInConstant1D(graph, dim)});
+    slice_node = createSlice(graph, {input}, {index + 1}, {index}, {dim});
   }
 
   // Reshape to remove the singleton dimenson left in by slice
@@ -301,8 +299,7 @@ torch::jit::Node *reorderBasedOnStride(torch::jit::Graph *graph,
                                        torch::jit::Value *padded,
                                        const std::vector<int64_t> &data_shape,
                                        int64_t stride, int64_t last_dim_size,
-                                       std::vector<int64_t> *indices,
-                                       WrappedIntConstantReuser *consts) {
+                                       std::vector<int64_t> *indices) {
   // Reshape to allow slicing based on index modulo stride
   auto *reshaped =
       createReshape(graph, padded, {data_shape[0], data_shape[1], -1, stride});
@@ -311,11 +308,9 @@ torch::jit::Node *reorderBasedOnStride(torch::jit::Graph *graph,
   std::vector<torch::jit::Value *> stride_sliced_flattened;
   stride_sliced_flattened.reserve(stride);
 
-  auto *dim_const = consts->getConst(3);
   for (int64_t start = 0; start < stride; start++) {
     auto *stride_sliced =
-        createSlice(graph, {reshaped->output(), consts->getConst(start),
-                            consts->getConst(start + 1), dim_const});
+        createSlice(graph, {reshaped->output()}, {start + 1}, {start}, {3});
     auto *stride_flattened = createReshape(graph, stride_sliced->output(),
                                            {data_shape[0], data_shape[1], -1});
     stride_sliced_flattened.push_back(stride_flattened->output());
@@ -408,28 +403,22 @@ torch::jit::Node *im2colHandler(torch::jit::Graph *graph,
                        kernel_shape[0], dilation[1], dilation[0], padding[1],
                        padding[0], extra_padding, strides[1], strides[0]);
 
-  // Use to create or reuse integer constants
-  WrappedIntConstantReuser reuser(graph);
-
   // Calculate the last dim size as if it was flattened
   auto last_dim_size = current_width * (data_shape[2] + padding[0] * 2);
 
   // Reorder to allow fewer slices then each index became a slice
-  auto *rearranged =
-      reorderBasedOnStride(graph, padded->output(), data_shape, strides[1],
-                           last_dim_size, &indices, &reuser);
+  auto *rearranged = reorderBasedOnStride(graph, padded->output(), data_shape,
+                                          strides[1], last_dim_size, &indices);
   auto slices_start_end = indicesToSlices(indices);
 
   // Slice and concat for the reordering
   std::vector<torch::jit::Value *> sliced;
-  auto *dim_const = reuser.getConst(2);
   sliced.reserve(slices_start_end.size());
   for (auto slice_start_end : slices_start_end) {
-    sliced.push_back(
-        createSlice(graph, {rearranged->output(),
-                            reuser.getConst(slice_start_end.first),
-                            reuser.getConst(slice_start_end.second), dim_const})
-            ->output());
+    sliced.push_back(createSlice(graph, {rearranged->output()},
+                                 {slice_start_end.second},
+                                 {slice_start_end.first}, {2})
+                         ->output());
   }
 
   auto *concat = createConcat(graph, sliced, 2);
@@ -689,10 +678,8 @@ torch::jit::Node *splitChunkHandler(torch::jit::Graph *graph,
 
   // Slice up according to the canonicalised split vector.
   for (std::int64_t slice_size : size_of_each_split) {
-    torch::jit::Node *slice =
-        createSlice(graph, {node->input(0), wrapInConstant1D(graph, index),
-                            wrapInConstant1D(graph, index + slice_size),
-                            wrapInConstant1D(graph, axis)});
+    torch::jit::Node *slice = createSlice(
+        graph, {node->input(0)}, {index + slice_size}, {index}, {axis});
 
     // Add the slice to the graph.
     slices.push_back(slice->output());

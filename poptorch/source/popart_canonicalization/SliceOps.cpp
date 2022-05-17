@@ -349,9 +349,7 @@ torch::jit::Node *sliceCommon(torch::jit::Graph *graph, torch::jit::Node *node,
     end = dims[dim];
   }
 
-  auto *slice = createSlice(graph, {input, wrapInConstant1D(graph, start),
-                                    wrapInConstant1D(graph, end),
-                                    wrapInConstant1D(graph, dim)});
+  auto *slice = createSlice(graph, {input}, {end}, {start}, {dim});
   return subsampleSlice(graph, slice, dims.size(), dim, step);
 }
 } // namespace

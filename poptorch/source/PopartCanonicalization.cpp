@@ -58,16 +58,28 @@ torch::jit::Node *handleSliceModification(torch::jit::Graph *graph,
   while (input->node()->kind() == symbols::popart::slice) {
     auto *slice = input->node();
     auto *slice_input = slice->input(0);
-    auto *slice_offset = slice->input(1);
 
     // Record the indices that we sliced: We need these for DynamicUpdate
-    int32_t slice_start = constantToInt(slice_offset->node());
-    int32_t slice_end = constantToInt(slice->input(2)->node());
-    int32_t slice_dim = constantToInt(slice->input(3)->node());
+    std::vector<int64_t> slice_starts =
+        slice->is(c10::Symbol::fromQualString("attr::starts"));
+    std::vector<int64_t> slice_ends =
+        slice->is(c10::Symbol::fromQualString("attr::ends"));
+    std::vector<int64_t> slice_dims =
+        slice->is(c10::Symbol::fromQualString("attr::axes"));
 
-    auto *dynamic_update = createDynamicupdate(
-        graph, {slice_input, slice_offset, modified_slice}, {slice_dim},
-        {slice_end - slice_start}, /* noOverlap = */ 1);
+    auto *slice_offset =
+        createConstantInt(graph, slice_starts,
+                          {static_cast<int64_t>(slice_starts.size())})
+            ->output();
+
+    std::vector<int64_t> sizes(slice_starts.size());
+    std::transform(std::begin(slice_ends), std::end(slice_ends),
+                   std::begin(slice_starts), std::begin(sizes),
+                   std::minus<int64_t>());
+
+    auto *dynamic_update =
+        createDynamicupdate(graph, {slice_input, slice_offset, modified_slice},
+                            slice_dims, sizes, /* noOverlap = */ 1);
 
     // Replace uses of slice input after inplace op with result of
     // the dynamic update (i.e. the modified tensor)

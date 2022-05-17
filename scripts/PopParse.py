@@ -63,6 +63,7 @@ options_not_handled = [
     "automaticLossScalingSettings",
     "autodiffSettings",
     "_enableRngStateManagement",
+    "createImplicitPipeliningFwdOnlyProgram",
 ]
 
 
@@ -215,6 +216,7 @@ CastingOps = [
     "bitshift",
     "call",
     "clip",
+    "concat",
     "conv",
     "convtranspose",
     "div",
@@ -441,6 +443,11 @@ MultipleOutputsOps = {
     "split": "num_outputs",
     "topk": "2",
     "reducemedian": "2",
+    "batchnormalization": "num_node_outputs",
+}
+
+ExtraArgumentOps = {
+    "batchnormalization": ["unsigned int num_node_outputs"],
 }
 
 CXXTypeToTypeClass = {
@@ -701,6 +708,9 @@ for opset in classes:
 
             cppFile += "new_node->" + attr + "_(c10::Symbol::fromQualString("\
                 "\"attr::" + arg["name"] + "\")," + arg["name"] + ");\n"
+
+        if name in ExtraArgumentOps:
+            header += ", " + ", ".join(ExtraArgumentOps[name])
 
         if name in OutputTypeAsDtype:
             cppFile += "setNodeOutputsTypes(new_node, ImplicitCast::None, "

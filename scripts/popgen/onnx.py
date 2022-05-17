@@ -219,6 +219,10 @@ def parse_signatures():
         'nonstd::optional<std::string>': ['cstr', 'None'],
         'nonstd::optional<std::vector<int64_t> >':
         ['clong_list', 'dimension_list', 'None'],
+        'nonstd::optional<CollectiveOperator>':
+        'ignore',
+        'nonstd::optional<CommGroup>':
+        'ignore',
         'Attributes::Float': ['cfloat'],
         'Attributes::Int': ['clong'],
         'Attributes::Ints': ['clong_list', 'empty_initializer'],

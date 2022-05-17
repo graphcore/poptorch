@@ -119,6 +119,7 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   }
 
   bool training = constantToBool(node->input(5)->node());
+  bool three_outputs = (node->kind() == c10::aten::native_batch_norm);
 
   std::vector<int64_t> param_shape{input_shape[1]};
 
@@ -142,11 +143,11 @@ torch::jit::Node *batchNormHandler(torch::jit::Graph *graph,
   // Popart supports this with "if (output->n() > 1)"
   auto *batch_norm = createBatchnormalization(
       graph, {input, weight, bias, running_mean, running_var}, training ? 5 : 1,
-      epsilon, 1.0f - momentum);
+      epsilon, 1.0f - momentum, training && three_outputs ? 3 : 1);
 
   // If the input size was of rank 2, we need to squeeze out the added dim
   if (input_shape.size() == 2) {
-    batch_norm = createSqueeze(graph, {batch_norm->output()}, {2});
+    batch_norm = createSqueeze(graph, {batch_norm->output(0)}, {2});
   }
   return batch_norm;
 }

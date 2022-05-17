@@ -278,10 +278,8 @@ torch::jit::Node *gatherHandler(torch::jit::Graph *graph,
 
     for (unsigned k = 0; k < offset_shape.size(); ++k) {
       if (offset_shape[k] != temp_offsets_shape[k]) {
-        auto *dim = wrapInConstant1D(graph, k);
-        auto *start = wrapInConstant1D(graph, 0);
-        auto *end = wrapInConstant1D(graph, offset_shape[k]);
-        offsets = createSlice(graph, {offsets, start, end, dim})->output();
+        offsets = createSlice(graph, {offsets}, {offset_shape[k]}, {0}, {k})
+                      ->output();
       }
     }
   } else {

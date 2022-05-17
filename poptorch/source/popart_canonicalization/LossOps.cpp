@@ -567,9 +567,6 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
   auto reduction = constantToLong(node->input(5)->node());
   auto zero_inf = constantToBool(node->input(6)->node());
 
-  ERROR_ON_MSG(zero_inf, "CTCLoss with zero_infinity parameter set to true is "
-                         "currenly not supported");
-
   ERROR_ON_MSG(reduction == 0,
                "CTCLoss with reduction=\"none\" is currently not supported");
 
@@ -580,7 +577,7 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
   reduction = convertReduceToPopart(reduction);
   auto *loss =
       create_ctcloss(graph, {log_probs, targets, input_lengths, target_lengths},
-                     reduction, blank, "UNDEFINED");
+                     reduction, blank, "UNDEFINED", zero_inf);
 
   return createIdentityloss(graph, {loss->output()}, reduction);
 }

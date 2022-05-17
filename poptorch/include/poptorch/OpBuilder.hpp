@@ -139,20 +139,6 @@ torch::jit::Node *createAddUntypedInputTensor(torch::jit::Graph *graph,
 torch::jit::Node *createAddOutputTensor(torch::jit::Graph *graph,
                                         torch::jit::Value *output);
 
-// A class to allow duplication constant of int64 constants in the IR, by
-// providing them on demand
-class WrappedIntConstantReuser {
-public:
-  explicit WrappedIntConstantReuser(torch::jit::Graph *graph);
-
-  torch::jit::Value *getConst(int64_t val);
-
-private:
-  torch::jit::Graph *_graph;
-
-  std::unordered_map<int64_t, torch::jit::Value *> _consts;
-};
-
 torch::jit::Value *wrapInConstantVec(torch::jit::Graph *graph,
                                      const std::vector<int64_t> &data);
 

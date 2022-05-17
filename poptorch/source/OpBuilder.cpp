@@ -386,17 +386,6 @@ torch::jit::Node *createAddOutputTensor(torch::jit::Graph *graph,
   return new_node;
 }
 
-WrappedIntConstantReuser::WrappedIntConstantReuser(torch::jit::Graph *graph)
-    : _graph(graph) {}
-
-torch::jit::Value *WrappedIntConstantReuser::getConst(int64_t val) {
-  if (_consts.count(val) == 0u) {
-    _consts[val] = wrapInConstant1D(_graph, val);
-  }
-
-  return _consts[val];
-}
-
 torch::jit::Node *createStartForLoop(torch::jit::Graph *graph,
                                      torch::jit::Value *inputs) {
   torch::jit::Node *new_node =
