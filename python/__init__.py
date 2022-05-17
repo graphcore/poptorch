@@ -46,6 +46,7 @@ from .options import *
 from ._impl import isRunningOnIpu, createPoptorchError
 from ._utils import accessAttributes
 from ._poplar_executor import PoplarExecutor, hasMlirSupportOnPlatform
+from ._printing import *
 from . import optim
 from . import profiling
 from . import experimental

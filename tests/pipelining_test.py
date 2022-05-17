@@ -3,6 +3,7 @@
 import copy
 import io
 import json
+import re
 import subprocess
 import tempfile
 import torch
@@ -270,6 +271,54 @@ def test_api_wrap_2stages(capfd, trace_model):
     log.assert_contains(" l2/Mul:0 ", " mode(Pipelined), ipu(1), stage(1)")
 
 
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_begin_block_printing(trace_model):
+    class Block(torch.nn.Module):
+        def forward(self, x):
+            return x * 6
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.l1 = Block()
+            self.l2 = Block()
+
+        def forward(self, x):
+            x = self.l1(x)
+            x = self.l2(x)
+            return x
+
+    m = Model()
+
+    begin_l1 = re.compile(r'\(l1\):\s*BeginBlock\(user_id=None, ipu_id=1\)')
+    begin_l2 = re.compile(r'\(l2\):\s*BeginBlock\(user_id=None, ipu_id=1\)')
+
+    module_repr = poptorch.module_repr(m)
+    assert not "BeginBlock(" in module_repr
+    assert not begin_l1.search(module_repr)
+    assert not begin_l2.search(module_repr)
+
+    poptorch.BeginBlock(m.l1, ipu_id=1)
+
+    module_repr = poptorch.module_repr(m)
+    assert begin_l1.search(module_repr)
+    assert not begin_l2.search(module_repr)
+
+    poptorch.BeginBlock(m.l2, ipu_id=1)
+
+    module_repr = poptorch.module_repr(m)
+    assert begin_l1.search(module_repr)
+    assert begin_l2.search(module_repr)
+
+    opts = poptorch.Options()
+    opts.deviceIterations(2)
+    opts.Jit.traceModel(trace_model)
+
+    module_repr = repr(poptorch.inferenceModel(m, opts))
+    assert begin_l1.search(module_repr)
+    assert begin_l2.search(module_repr)
+
+
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -479,7 +528,6 @@ def test_begin_block_functionality():
 
     assert m.l2.__class__ is Block
     poptorch.BeginBlock(m.l2, ipu_id=2)
-    assert m.l2.__class__ is not Block
 
     new_all_names = [n for n, _ in m.named_parameters()]
     new_state_dict = m.state_dict()
@@ -519,12 +567,12 @@ def test_begin_block_functionality():
 
 
 def run_in_python_and_get_block_details(model_file_path):
-    python_script = b"import poptorch\nimport torch\n"
-    python_script += b"with open(\"" + model_file_path.encode('utf-8')
-    python_script += b"\", \"rb\") as f:\n"
-    python_script += b"    m = torch.load(f)\nprint(m.__class__)\n"
-    python_script += b"print(m.__dict__['_user_id'])\n"
-    python_script += b"print(m.__dict__['_ipu_id'])"
+    python_script = (b"import poptorch\n"
+                     b"import torch\n"
+                     b"with open(\"" + model_file_path.encode('utf-8') +
+                     b"\", \"rb\") as f:\n"
+                     b"    m = torch.load(f)\n"
+                     b"print(poptorch.module_repr(m))\n")
 
     s = subprocess.Popen(["python3"],
                          stdin=subprocess.PIPE,
@@ -541,7 +589,7 @@ def test_saving_of_begin_block():
         torch.save(m, f)
 
         out = run_in_python_and_get_block_details(f.name)
-        assert 'torch.nn.modules.container.Sequential' in out
+        assert 'Sequential(' in out
         poptorch.BeginBlock(m, user_id=1, ipu_id=2)
 
         model_class_before_save = m.__class__
@@ -554,13 +602,7 @@ def test_saving_of_begin_block():
         torch.save(m, f)
 
         out = run_in_python_and_get_block_details(f.name)
-        assert 'poptorch.ops.BeginBlock.<locals>.BlockModule' in out
-
-        # Check ipu_id and user_id
-        # NB the class may span two lines so take the last two lines
-        out = out.strip().split()
-        assert out[-2] == "1"
-        assert out[-1] == "2"
+        assert 'BeginBlock(user_id=1, ipu_id=2)' in out
 
 
 def test_begin_block_copy():
@@ -574,32 +616,20 @@ def test_begin_block_copy():
 
     m = torch.nn.Sequential(b_1, b_2)
 
-    block_model_cls_str = "poptorch.ops.BeginBlock.<locals>.BlockModule"
-
-    assert block_model_cls_str in str(m[0].__class__)
-    assert block_model_cls_str in str(m[1].__class__)
-    assert m[0].__dict__['_user_id'] == 1
-    assert m[0].__dict__['_ipu_id'] == 1
-    assert m[1].__dict__['_user_id'] == 2
-    assert m[1].__dict__['_ipu_id'] == 2
+    assert "BeginBlock(user_id=1, ipu_id=1)" in poptorch.module_repr(m[0])
+    assert "BeginBlock(user_id=2, ipu_id=2)" in poptorch.module_repr(m[1])
 
     m_copy = copy.copy(m)
 
-    assert block_model_cls_str in str(m_copy[0].__class__)
-    assert block_model_cls_str in str(m_copy[1].__class__)
-    assert m_copy[0].__dict__['_user_id'] == 1
-    assert m_copy[0].__dict__['_ipu_id'] == 1
-    assert m_copy[1].__dict__['_user_id'] == 2
-    assert m_copy[1].__dict__['_ipu_id'] == 2
+    assert "BeginBlock(user_id=1, ipu_id=1)" in poptorch.module_repr(m_copy[0])
+    assert "BeginBlock(user_id=2, ipu_id=2)" in poptorch.module_repr(m_copy[1])
 
     m_deep_copy = copy.deepcopy(m)
 
-    assert block_model_cls_str in str(m_deep_copy[0].__class__)
-    assert block_model_cls_str in str(m_deep_copy[1].__class__)
-    assert m_deep_copy[0].__dict__['_user_id'] == 1
-    assert m_deep_copy[0].__dict__['_ipu_id'] == 1
-    assert m_deep_copy[1].__dict__['_user_id'] == 2
-    assert m_deep_copy[1].__dict__['_ipu_id'] == 2
+    assert "BeginBlock(user_id=1, ipu_id=1)" in poptorch.module_repr(
+        m_deep_copy[0])
+    assert "BeginBlock(user_id=2, ipu_id=2)" in poptorch.module_repr(
+        m_deep_copy[1])
 
 
 def model_fn(inputs):

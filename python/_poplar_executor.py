@@ -19,6 +19,7 @@ from . import _utils
 from . import _args_parser
 from . import _optimizer_attributes
 from . import enums
+from . import _printing
 from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
@@ -391,7 +392,8 @@ class PoplarExecutor:
         return out
 
     def __repr__(self):
-        return self._user_model.__repr__()
+        # We've created out repr function to provide info on BeginBlock
+        return _printing.module_repr(self._user_model)
 
     def __getattr__(self, attr):
         return getattr(self._user_model, attr)

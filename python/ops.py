@@ -1,7 +1,6 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+from collections import OrderedDict
 from typing import Callable, Dict, List, Union, Tuple, Optional
-import copy
-import copyreg
 import torch
 
 from . import enums
@@ -62,8 +61,8 @@ def ipu_print_tensor(tensor: "torch.Tensor",
         a = c + d
         return a + b
 
-    If the result of ``ipu_print_tensor()`` is not used, the function will be optimised
-    out by the graph optimiser and the tensor will not be printed.
+    If the result of ``ipu_print_tensor()`` is not used, the function will be
+    optimised out by the graph optimiser and the tensor will not be printed.
 
     So if you want to print the value of `a`, you should do:
 
@@ -76,9 +75,9 @@ def ipu_print_tensor(tensor: "torch.Tensor",
 
     Optionally, you can add a second string argument to be used as a title, as
     shown in the following example.
-    The value of `a` will be printed after the title "summation". The
-    value of the gradient of `a` will be printed after the title "summation_gradient"
-    if the operation is called in the backward pass.
+    The value of `a` will be printed after the title "summation". The value of
+    the gradient of `a` will be printed after the title "summation_gradient" if
+    the operation is called in the backward pass.
 
     .. code-block:: python
 
@@ -409,22 +408,6 @@ class Block(torch.nn.Module):
         _end_ipu_block()
 
 
-# The pickle handler is needed for torch.save and for any copying.
-# As the BlockModule class is defined within a function, it does not exist
-# in a fresh python process. Hence, the easier way to recreate the object is to
-# store the original model and call BeginBlock again
-def _pickle_reduce_block(model):
-    user_id = model.__dict__['_user_id']
-    ipu_id = model.__dict__['_ipu_id']
-
-    orig_model_class = model.__class__
-    model.__class__ = model.__class__.__bases__[0]
-    model_orig = copy.copy(model)
-    model.__class__ = orig_model_class
-
-    return BeginBlock, (model_orig, user_id, ipu_id)
-
-
 # Used to allow BeginBlock to be used with a function
 class LegacyBeginBlockFn(torch.nn.Module):
     def __init__(self, layer_to_call, user_id=None, ipu_id=None):
@@ -442,6 +425,35 @@ class LegacyBeginBlockFn(torch.nn.Module):
         return out
 
 
+class _BlockHook():
+    """ A hook to define the blocks of the model.
+
+    You can use ``_BlockHook`` as a forward_pre_hook for a ``torch.nn.Module``
+    as follows:
+    >>> m.register_forward_pre_hook(_BlockHook(user_id, ipu_id))
+
+    All layers called after the hook has run will be run on the specified IPU,
+    if one is specified. In addition, you can combine multiple blocks into a
+    stage.
+
+    .. seealso:: :py:meth:`poptorch.Options.setExecutionStrategy`
+    """
+
+    def __init__(self, user_id, ipu_id) -> None:
+        super().__init__()
+        self._user_id = user_id
+        self._ipu_id = ipu_id
+
+    def __call__(self, module, input):
+        if Block._stages_manager is not None:
+            if self._user_id is None:
+                self._user_id = (Block._stages_manager.nextAutoId())
+            Block._stages_manager.beginStage(self._user_id, self._ipu_id)
+
+    def __repr__(self):
+        return f"BeginBlock(user_id={self._user_id}, ipu_id={self._ipu_id})"
+
+
 def removeBlocks(module):
     """Recursively remove BeginBlock annotations from a Module if it
     contains any.
@@ -450,7 +462,10 @@ def removeBlocks(module):
     """
     assert isinstance(module, torch.nn.Module)
     for m in module.modules():
-        _impl.unwrapIfWrapped(m)
+        # pylint: disable=protected-access
+        m._forward_pre_hooks = OrderedDict(
+            filter(lambda elt: not isinstance(elt[1], _BlockHook),
+                   m._forward_pre_hooks.items()))
 
 
 def BeginBlock(layer_to_call: torch.nn.Module,
@@ -464,9 +479,9 @@ def BeginBlock(layer_to_call: torch.nn.Module,
     >>> poptorch.BeginBlock(myModel.a_layer)
     >>> poptorch.BeginBlock(MyNewLayer())
 
-    The wrapped module and all sub-modules will be part of this block until
-    a sub-module is similar modified to be another block. In addition, if an IPU
-    is specified, the module and its submodules will run on the specified IPU.
+    The module and all sub-modules will be part of this block until a
+    sub-module is modified to be in another block. In addition, if an IPU is
+    specified, the module and its submodules will run on the specified IPU.
 
     You can combine multiple blocks into a stage.
 
@@ -493,32 +508,14 @@ def BeginBlock(layer_to_call: torch.nn.Module,
         raise _impl.createPoptorchError(
             "module is not an instance of torch.nn.Module or " + "function.")
 
-    class BlockModule(type(layer_to_call)):
-        def __call__(self, *input, **kwargs):
-            if Block._stages_manager is not None:
-                if self._user_id is None:
-                    self.__dict__['_user_id'] = (
-                        Block._stages_manager.nextAutoId())
-                Block._stages_manager.beginStage(self._user_id, self._ipu_id)
-
-            return super().__call__(*input, **kwargs)
-
-        def __repr__(self):
-            return f"BeginBlock(user_id={user_id}, ipu_id={ipu_id}) " + super(
-            ).__repr__()
-
-    if str(layer_to_call.__class__) == str(BlockModule):
+    # pylint: disable=protected-access
+    if any(
+            isinstance(hook, _BlockHook)
+            for hook in layer_to_call._forward_pre_hooks.values()):
         raise _impl.createPoptorchError(
             "module has already been assigned to a block.")
 
-    BlockModule.__name__ = type(layer_to_call).__name__
-    _impl.registerWrapperType(BlockModule)
-    layer_to_call.__class__ = BlockModule
-    layer_to_call.__dict__['_user_id'] = user_id
-    layer_to_call.__dict__['_ipu_id'] = ipu_id
-
-    # Register custom function to copy / serialize wrappers
-    copyreg.pickle(BlockModule, _pickle_reduce_block)
+    layer_to_call.register_forward_pre_hook(_BlockHook(user_id, ipu_id))
 
     # There is no need to return as it is passed by reference, but this is for
     # backward compatibility
