@@ -28,7 +28,9 @@ if args.add_to_sys_path:
 list_tests = io.StringIO()
 pytest_args = ["-x", args.test_dir, "--collect-only", "-q"]
 if args.extra_pytest_args:
-    pytest_args += args.extra_pytest_args.replace("\"", "").split(",")
+    arg = args.extra_pytest_args.replace("\"", "")
+    if arg:
+        pytest_args += arg.split(",")
 
 with contextlib.redirect_stdout(list_tests):
     retval = pytest.main(pytest_args)
