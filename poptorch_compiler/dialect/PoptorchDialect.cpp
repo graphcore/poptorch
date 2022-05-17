@@ -57,7 +57,7 @@ std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
 
   // If it's missing in rhs, copy the dimension from lhs.
   std::vector<int64_t> output_shape(lhs.size());
-  output_shape.insert(output_shape.end(), lhs_itr, lhs_itr + missing_dims);
+  std::copy(lhs_itr, lhs_itr + missing_dims, output_shape.begin());
 
   // Otherwise line up the trailing dimension and process.
   lhs_itr += missing_dims;
