@@ -271,8 +271,16 @@ class Poptorch_addcOutplaceX<string name> : Poptorch_addcX<name> {
 
     let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2, "float":$value),[{
         $_state.addOperands({input, tensor1, tensor2});
+
+        auto in_shape = getShape(input);
+        auto t1_shape = getShape(tensor1);
+        auto t2_shape = getShape(tensor2);
+
+        auto out_shape = broadcast(in_shape, broadcast(t1_shape, t2_shape));
+
         $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
-        $_state.addTypes(input.getType());
+        $_state.addTypes(mlir::RankedTensorType::get(out_shape, getElementType(input)));
+
      }]>
     ];
 }

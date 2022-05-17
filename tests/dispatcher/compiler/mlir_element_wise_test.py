@@ -94,6 +94,21 @@ def test_bitwise(op, input):
     op_harness(op, *input)
 
 
+addc_test_cases = (
+    ((2, 2), (2, 2), (2, 2)),
+    ((3, 2, 2), (1, 2, 2), (3, 2, 1)),
+    ((1, 1, 2), (4, 2), (2, 4, 1)),
+)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("input_shapes", addc_test_cases)
+@pytest.mark.parametrize("op", (torch.addcmul, torch.addcdiv))
+def test_addc(op, input_shapes):
+    inputs = [torch.randn(input_shape) for input_shape in input_shapes]
+    op_harness(op, *inputs)
+
+
 @pytest.mark.mlirSupportRequired
 def test_isnan():
     t = torch.tensor([torch.nan, 1.0, torch.inf])

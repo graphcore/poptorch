@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <vector>
 
 #include "poptorch_logging/Error.hpp"
 
@@ -35,6 +36,63 @@ std::vector<llvm::StringRef> convert(const std::vector<const char *> &strs) {
   return vec;
 }
 
+std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
+                               const std::vector<int64_t> &rhs) {
+  // Ensure lhs dims >= rhs dims or swap and process,
+  if (lhs.size() < rhs.size()) {
+    return broadcast(rhs, lhs);
+  }
+
+  ERROR_ON_MSG(rhs.empty(), "One of the tensor inputs is a scalar. This "
+                            "prevents broadcasting.");
+
+  auto lhs_itr = lhs.begin();
+  auto rhs_itr = rhs.begin();
+
+  // The rhs may have fewer dims.
+  size_t missing_dims = lhs.size() - rhs.size();
+
+  // The resolution happens from the trailing dimensions but the indices
+  // are from leading dimensions.
+
+  // If it's missing in rhs, copy the dimension from lhs.
+  std::vector<int64_t> output_shape(lhs.size());
+  output_shape.insert(output_shape.end(), lhs_itr, lhs_itr + missing_dims);
+
+  // Otherwise line up the trailing dimension and process.
+  lhs_itr += missing_dims;
+
+  for (size_t dim = missing_dims; dim < lhs.size();
+       dim++, lhs_itr++, rhs_itr++) {
+    size_t lhs_dim = *lhs_itr;
+    size_t rhs_dim = *rhs_itr;
+
+    if (lhs_dim == rhs_dim) {
+      output_shape.at(dim) = lhs_dim;
+    } else {
+      if (lhs_dim == 1) {
+        output_shape.at(dim) = rhs_dim;
+      } else if (rhs_dim == 1) {
+        output_shape.at(dim) = lhs_dim;
+      } else {
+        ERROR("The tensors cannot be broadcasted. See "
+              "https://pytorch.org/docs/stable/notes/broadcasting.html for "
+              "guidance on broadcasting.");
+      }
+    }
+  }
+
+  return output_shape;
+}
+
+std::vector<int64_t> getShape(const mlir::Value value) {
+  return value.getType().cast<mlir::RankedTensorType>().getShape();
+}
+
+mlir::Type getElementType(const mlir::Value value) {
+  return value.getType().cast<mlir::RankedTensorType>().getElementType();
+}
+
 #include "dialect/PoptorchInterfaces.cpp.inc"
 
 void PoptorchDialect::initialize() {
@@ -45,7 +103,6 @@ void PoptorchDialect::initialize() {
 #undef GET_OP_LIST
       >();
 }
-
 } // namespace poptorch_ir
 
 // Include the operation definitions.

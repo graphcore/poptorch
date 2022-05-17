@@ -318,39 +318,10 @@ def Poptorch_masked_fill_Scalar : Poptorch_NotImplementedOp<"masked_fill_Scalar"
     $_state.addOperands({self, mask});
     $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
 
-    constexpr auto broadcastShape = [](const llvm::ArrayRef<std::int64_t> lhs,
-                                       const llvm::ArrayRef<std::int64_t> rhs) {
-      llvm::SmallVector<std::int64_t, 4> out_shape;
-      auto lhsItr = lhs.begin();
-      auto rhsItr = rhs.begin();
-      if (lhs.size() < rhs.size()) {
-        const auto diff = rhs.size() - lhs.size();
-        out_shape.insert(out_shape.end(), rhsItr, rhsItr + diff);
-        rhsItr += diff;
-      }
-      else if (rhs.size() < lhs.size()) {
-        const auto diff = lhs.size() - rhs.size();
-        out_shape.insert(out_shape.end(), lhsItr, lhsItr + diff);
-        lhsItr += diff;
-      }
-
-      for (; rhsItr != rhs.end(); ++rhsItr, ++lhsItr) {
-        if (*rhsItr == *lhsItr || *lhsItr == 1 || *rhsItr == 1) {
-          out_shape.push_back(std::max(*rhsItr, *lhsItr));
-        }
-        else {
-          ERROR("Tensors are not broadcastable mismatch in dimension " +
-                std::to_string(lhsItr - lhs.begin()) + " (" +
-                std::to_string(*lhsItr) + " != " +
-                std::to_string(*rhsItr) + ")");
-        }
-      }
-      return out_shape;
-    };
 
     mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
     mlir::RankedTensorType mask_tensor = mask.getType().cast<mlir::RankedTensorType>();
 
-    $_state.addTypes(mlir::RankedTensorType::get(broadcastShape(tensor.getShape(), mask_tensor.getShape()), tensor.getElementType()));
+    $_state.addTypes(mlir::RankedTensorType::get(broadcast(tensor.getShape(), mask_tensor.getShape()), tensor.getElementType()));
   }]>];
 }
