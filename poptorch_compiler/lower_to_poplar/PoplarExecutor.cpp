@@ -143,6 +143,21 @@ void PoplarExecutableImpl::compile(
 
 } // namespace detail
 
+namespace {
+
+bool waitIfIpuIsUnavailable() {
+  bool wait = false;
+  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
+    wait = std::stoi(env_wait_for_ipu) != 0;
+    poptorch::logging::info(
+        "From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
+        "is available: {}",
+        wait ? "Wait" : "Fail & exit");
+  }
+  return wait;
+}
+} // namespace
+
 void PoplarExecutable::connectStream(const std::string &string, Buffer ptr) {
   _impl->owned_buffers.insert_or_assign(string, ptr);
   _impl->engine->connectStream(string, ptr->data());
@@ -191,7 +206,10 @@ PoplarExecutable::PoplarExecutable(mlir::ModuleOp module) {
   }
   // Run on an actual device.
   if (!device) {
-    device = manager.getDevice(1);
+    device =
+        manager.getDevice(1, {},
+                          waitIfIpuIsUnavailable() ? model_runtime::WAIT_FOREVER
+                                                   : model_runtime::NO_WAIT);
   }
   ERROR_ON_MSG(!device, "Failed to acquire a device");
 
