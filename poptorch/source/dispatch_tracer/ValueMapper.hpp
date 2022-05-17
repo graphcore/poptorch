@@ -133,6 +133,8 @@ public:
   // Returns true if this is a direct alias and adds it to the approved alias
   // map.
   bool isDirectAlias(const at::Tensor &t);
+
+  void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 };
 
 } // namespace poptorch

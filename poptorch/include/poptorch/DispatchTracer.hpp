@@ -124,6 +124,7 @@ void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
                                  torch::jit::Value *target,
                                  torch::jit::Value *replacement);
 
+void replaceValueDispatcher(torch::jit::Value *v_old, torch::jit::Value *v_new);
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_

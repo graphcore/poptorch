@@ -190,4 +190,13 @@ torch::jit::Value *ValueMapper::getValueForTensorList(const TensorList &list) {
   return nullptr;
 }
 
+void ValueMapper::replaceValue(torch::jit::Value *v_old,
+                               torch::jit::Value *v_new) {
+  for (auto &rec : tensors) {
+    if (rec.second.jit == v_old) {
+      rec.second.jit = v_new;
+    }
+  }
+}
+
 } // namespace poptorch

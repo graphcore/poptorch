@@ -655,6 +655,8 @@ void categoriseConstantsDispatch(torch::jit::Graph *graph) {
     if (node->kind() != symbols::poptorch::tensor_constant) {
       continue;
     }
+    torch::jit::Value *v_old = node->output();
+    torch::jit::Value *v_new = nullptr;
 
     // Don't check the kind of the node itself as we are not calling on a
     // prim::Constant.
@@ -662,14 +664,21 @@ void categoriseConstantsDispatch(torch::jit::Graph *graph) {
     case UseOfNode::PopARTOnly:
       break;
     case UseOfNode::HostSideOnly:
-      node->replaceWithNewSymbol(symbols::poptorch::host_side_tensor_constant);
+      v_new = node->replaceWithNewSymbol(
+                      symbols::poptorch::host_side_tensor_constant)
+                  ->output();
       to_delete.insert(node);
       break;
     case UseOfNode::HostSideAndPopART:
-      node->replaceWithNewSymbol(
-          symbols::poptorch::host_and_ipu_side_tensor_constant);
+      v_new = node->replaceWithNewSymbol(
+                      symbols::poptorch::host_and_ipu_side_tensor_constant)
+                  ->output();
       to_delete.insert(node);
       break;
+    }
+
+    if (v_new != nullptr) {
+      poptorch::replaceValueDispatcher(v_old, v_new);
     }
   }
 

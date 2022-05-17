@@ -444,6 +444,14 @@ at::Tensor detach(const at::Tensor &self) {
   at::Tensor out = context.activeDispatch()->detach(self);
   return out;
 }
+
+void replaceValueDispatcher(torch::jit::Value *v_old,
+                            torch::jit::Value *v_new) {
+  if (!context.hasActiveDispatch()) {
+    return;
+  }
+  context.activeDispatch()->replaceValue(v_old, v_new);
+}
 } // namespace poptorch
 
 /*

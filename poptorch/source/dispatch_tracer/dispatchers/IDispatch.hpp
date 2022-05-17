@@ -60,6 +60,8 @@ public:
   void *getDataSource(torch::jit::Value *val);
   bool isParameter(torch::jit::Value *val);
 
+  void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
+
 protected:
   // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
   // types.

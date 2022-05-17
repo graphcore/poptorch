@@ -51,4 +51,9 @@ bool IDispatch::isParameter(torch::jit::Value *value) {
                "JIT value not tracked " << reinterpret_cast<void *>(value));
   return poptorch::isParameter(*record->tensor_impl);
 }
+
+void IDispatch::replaceValue(torch::jit::Value *v_old,
+                             torch::jit::Value *v_new) {
+  _mapper.replaceValue(v_old, v_new);
+}
 } // namespace poptorch
