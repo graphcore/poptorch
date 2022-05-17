@@ -49,13 +49,13 @@ def Poptorch_avg_pool : Poptorch_Op<"avg_pool", []> {
 
         mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();
         std::vector<std::int64_t> input_shape = input_type.getShape();
-
+        size_t offset = (input_shape.size() == kernel_size.size() + 1) ? 1 : 2;
         for (auto s = 0u; s < kernel_size.size(); s++) {
-          double tmp = (input_shape[2 + s] + 2. * padding[s] - kernel_size[s]) / stride[s] + 1.;
+          double tmp = (input_shape[offset + s] + 2. * padding[s] - kernel_size[s]) / stride[s] + 1.;
           if (ceil_mode) {
-            input_shape[2 + s] = std::ceil(tmp);
+            input_shape[offset + s] = std::ceil(tmp);
           } else {
-            input_shape[2 + s] = std::floor(tmp);
+            input_shape[offset + s] = std::floor(tmp);
           }
         }
         $_state.addTypes({mlir::RankedTensorType::get(input_shape, input_type.getElementType())});
