@@ -1,7 +1,6 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 import functools
-import types
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import torch
 from . import enums, poptorch_core, _impl, accessAttributes
@@ -9,15 +8,12 @@ from ._utils import flattenTensorStructure, reconstructTensorStructure
 from .options import Options
 
 
-# TODO(T61604): remove parameter_and_buffers (model should always be used)
 class IPUScope:
-    def __init__(
-            self,
-            inputs: List['torch.Tensor'],
-            parameters_and_buffers: Optional[Dict[str, 'torch.Tensor']] = None,
-            model: Optional['torch.nn.Module'] = None,
-            options: Optional['poptorch.Options'] = None,
-            compile_using=enums.Compiler.PopART):
+    def __init__(self,
+                 inputs: List['torch.Tensor'],
+                 model: Optional['torch.nn.Module'] = None,
+                 options: Optional['poptorch.Options'] = None,
+                 compile_using=enums.Compiler.PopART):
 
         if not isinstance(inputs, (list, tuple)):
             raise ValueError("You can only pass a list or tuple as the " +
@@ -43,16 +39,6 @@ class IPUScope:
 
         self._compile_using = compile_using
 
-        if isinstance(parameters_and_buffers, types.GeneratorType):
-            parameters_and_buffers = {
-                **dict(parameters_and_buffers),
-            }
-
-        if parameters_and_buffers is None:
-            self._params_and_buffers = {}
-        else:
-            self._params_and_buffers = parameters_and_buffers
-
         self._model = model
 
         self._outputs = []
@@ -74,18 +60,6 @@ class IPUScope:
         d = torch.device("xla:1")
         if self._model:
             self._model.apply(lambda l: l.to(d))
-
-        # JITDispatch::createGraph() doesn't add non-floating point parameters
-        # and buffers as graph inputs as they are not supported in PopART.
-        # Instead, they are added as constant nodes. We can safely delete them
-        # here.
-        if self._compile_using == enums.Compiler.PopART:
-            to_delete = []
-            for k, v in self._params_and_buffers.items():
-                if not torch.is_floating_point(v):
-                    to_delete.append(k)
-            for k in to_delete:
-                del self._params_and_buffers[k]
 
     # Start capturing calls.
     def __enter__(self):
@@ -221,7 +195,7 @@ class _IPUContext:
 #            ...
 #            return outputs
 #
-# You can also pass in parameters and poptorch options:
+# You can also pass in a model and poptorch options:
 #
 # 1. ipu_func = IPUContext(func, model=..., options=...)(inputs)
 #
@@ -230,9 +204,10 @@ class _IPUContext:
 #        ...
 #        return outputs
 #
-# Note that the function being wrapped MUST take the graph inputs as inputs to the
-# function, and MUST return the outputs of the graph. Any non-tensor inputs will
-# be ignored by the graph. The function outputs must consist of tensors only
+# Note that the function being wrapped MUST take the graph inputs as inputs to
+# the function, and MUST return the outputs of the graph. Any non-tensor inputs
+# will be ignored by the graph. The function outputs must consist of tensors
+# only
 def IPUContext(func=None,
                *,
                compiler=enums.Compiler.MLIR,
