@@ -132,15 +132,31 @@ def Poptorch_binary_cross_entropy : Poptorch_Op<"binary_cross_entropy", []> {
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
                                       "std::int64_t":$reduction),[{
-        $_state.addOperands({self, target});
+        std::vector<mlir::Value> operands = {self, target};
+
+        if(weight) {
+          // Weight will have been expanded at this point to the broadcasted
+          //shape of weight and target.
+          operands.push_back(weight);
+        }
+        $_state.addOperands(operands);
+
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+
         std::vector<std::int64_t> shape;
         if (reduction == 0){
-            shape = tensor.getShape();
+            shape = getShape(self);
+
+            // Note that weight can be broadcast to shape, but shape must not
+            // change. This should have been be checked by PyTorch by known
+            // currently supported dispatch paths, so there is no extra error
+            // message here.
+            if(weight) {
+              ERROR_ON(shape != broadcast(shape, getShape(weight)));
+            }
         }
 
-        $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType())});
+        $_state.addTypes({mlir::RankedTensorType::get(shape, getElementType(self))});
     }]>
     ];
 }
@@ -158,7 +174,15 @@ def Poptorch_binary_cross_entropy_backward : Poptorch_Op<"binary_cross_entropy_b
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
                                       "std::int64_t":$reduction),[{
-        $_state.addOperands({grad_output, self, target});
+        std::vector<mlir::Value> operands = {grad_output, self, target};
+
+        if(weight) {
+          // Weight will have been expanded at this point to the broadcasted
+          // shape of weight and target.
+          operands.push_back(weight);
+        }
+        $_state.addOperands(operands);
+
         $_state.addAttribute("reduction",$_builder.getI64IntegerAttr(reduction));
         $_state.addTypes(self.getType());
     }]>

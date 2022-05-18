@@ -219,12 +219,21 @@ void binary_cross_entropy::lowerToPoplar(CompilerContext &context) {
   const TorchReduction reduction = getTorchReduction(this->reduction());
   poplar::Tensor out = bce(context, input, target);
 
+  if (this->weight()) {
+    popops::mulInPlace(context.graph, out, context.fromSsa(this->weight()),
+                       context.seq);
+  }
+
   if (reduction != TorchReduction::NONE) {
-    out = popops::reduce(context.graph, out, {0}, {popops::Operation::ADD},
+    std::vector<size_t> dims(out.rank());
+    std::iota(dims.begin(), dims.end(), 0);
+
+    out = popops::reduce(context.graph, out, dims, {popops::Operation::ADD},
                          context.seq);
+
     if (reduction == TorchReduction::MEAN) {
-      auto total_elements =
-          createConstant(context, input.elementType(), {}, target.shape()[0]);
+      poplar::Tensor total_elements =
+          createConstant(context, input.elementType(), {}, input.numElements());
       popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, out,
                          total_elements, context.seq);
     }
@@ -254,9 +263,15 @@ void binary_cross_entropy_backward::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor grad =
       popops::map(context.graph, pe::Neg(pe::Add(pe::_1, pe::_2)),
                   {first_term, second_term}, context.seq);
+
+  if (this->weight()) {
+    popops::mulInPlace(context.graph, grad, context.fromSsa(this->weight()),
+                       context.seq);
+  }
+
   if (reduction == TorchReduction::MEAN) {
     auto total_elements =
-        createConstant(context, input.elementType(), {}, target.shape()[0]);
+        createConstant(context, input.elementType(), {}, input.numElements());
     popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, grad,
                        total_elements, context.seq);
   }
