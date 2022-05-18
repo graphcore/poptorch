@@ -89,7 +89,7 @@ def Poptorch_nll_loss : Poptorch_Op<"nll_loss", []> {
         }
 
         $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType()),
-                          mlir::RankedTensorType::get(shape, tensor.getElementType())});
+                          mlir::RankedTensorType::get({}, tensor.getElementType())});
     }]>
     ];
 }

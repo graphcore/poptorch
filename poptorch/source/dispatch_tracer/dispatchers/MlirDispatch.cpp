@@ -432,6 +432,8 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
 
   poptorch_ir::TensorId actual_output = findTensor(original_input);
   _compiler.copy_(actual_output, output_id);
+  const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
+  original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
   return original_input;
 }
 
