@@ -590,7 +590,6 @@
 #             int[] output_padding, int groups) -> Tensor
 - func: convolution
   PopTorchDirect: conv
-  IgnoreArgs: {'transposed'}
 
 # convolution_overrideable(Tensor input, Tensor weight, Tensor? bias,
 #                          int[] stride, int[] padding, int[] dilation,
@@ -598,7 +597,6 @@
 #                          int groups) -> Tensor
 - func: convolution_overrideable
   PopTorchDirect: conv
-  IgnoreArgs: {'transposed'}
 
 # bmm(Tensor self, Tensor mat2) -> (Tensor)
 # Batch matrix-matrix multiplication

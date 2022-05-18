@@ -37,10 +37,14 @@ def execute_and_check_wrapper(trace_model,
                               training=True,
                               rtol=0.01,
                               atol=0.01):
-    # TODO(T25617): PopART does not support PadGradOp when mode is not
-    # "constant"
+
+    if not trace_model and "ConvTranspose" in op.__class__.__name__:
+        pytest.skip(
+            "TODO(T62545): Add shape inference for transposed convolutions")
+
     if hasattr(op, 'padding_mode') and op.padding_mode != 'zeros':
-        return
+        pytest.skip("TODO(T25617): PopART does not support PadGradOp when"
+                    " mode is not 'constant'")
 
     model = helpers.ModelWithWeights(op,
                                      input.shape,
@@ -102,9 +106,10 @@ def execute_and_check_wrapper(trace_model,
 @pytest.mark.parametrize("training", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_conv1D(op, padding_mode, training, trace_model):
-    if (op is torch.nn.ConvTranspose1d and padding_mode != 'zeros') or \
-       padding_mode == 'circular': # TODO(T31811)
-        pytest.skip('skipping unsupported padding_mode')
+    # This combination doesn't exist in upstream Torch:
+    # ValueError: Only "zeros" padding mode is supported for ConvTranspose1d
+    if (op is torch.nn.ConvTranspose1d and padding_mode != 'zeros'):
+        return
     torch.manual_seed(42)
     C_IN = 4
     C_OUT = 8
@@ -114,15 +119,18 @@ def test_conv1D(op, padding_mode, training, trace_model):
     model = op(C_IN, C_OUT, 3, stride=2, padding_mode=padding_mode)
     execute_and_check_wrapper(trace_model, model, input, training)
 
-    if op is not torch.nn.ConvTranspose1d:
-        # non-square kernels and unequal stride and with padding and dilation
-        model = op(C_IN,
-                   C_OUT, (3),
-                   stride=(2),
-                   padding=(4),
-                   dilation=(3),
-                   padding_mode=padding_mode)
-        execute_and_check_wrapper(trace_model, model, input, training)
+    if op is torch.nn.ConvTranspose1d:
+        # 'popart_exception': Non default value for dilations is not supported.
+        return
+
+    # non-square kernels and unequal stride and with padding and dilation
+    model = op(C_IN,
+               C_OUT, (3),
+               stride=(2),
+               padding=(4),
+               dilation=(3),
+               padding_mode=padding_mode)
+    execute_and_check_wrapper(trace_model, model, input, training)
 
 
 @pytest.mark.parametrize("op", conv_2D)

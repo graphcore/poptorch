@@ -8,14 +8,16 @@ def Poptorch_conv : Poptorch_Op<"conv", []> {
   let arguments = (ins Poptorch_tensor:$input,
                         Poptorch_tensor:$weight,
                         Optional<Poptorch_tensor>:$bias,
-                        I64ArrayAttr:$strides, I64ArrayAttr:$padding, 
-                        I64ArrayAttr:$dilation, I64ArrayAttr:$output_padding, I64Attr:$groups);
+                        I64ArrayAttr:$strides, I64ArrayAttr:$padding,
+                        I64ArrayAttr:$dilation, BoolAttr:$transposed, I64ArrayAttr:$output_padding, I64Attr:$groups);
 
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$weights, "mlir::Value":$bias,
                                 "const std::vector<std::int64_t>&":$strides,
                                 "const std::vector<std::int64_t>&":$padding, "const std::vector<std::int64_t>&":$dilation,
+                                "bool": $transposed,
                                 "const std::vector<std::int64_t>&":$output_padding, "std::int64_t":$groups), [{
+        ERROR_ON_MSG(transposed, "transposed=True not implemented"); // TODO(T62545)
         if (bias) {
             $_state.addOperands({input, weights, bias});
         } else {
@@ -26,6 +28,7 @@ def Poptorch_conv : Poptorch_Op<"conv", []> {
         $_state.addAttribute("dilation",$_builder.getI64ArrayAttr(dilation));
         $_state.addAttribute("output_padding",$_builder.getI64ArrayAttr(output_padding));
         $_state.addAttribute("groups",$_builder.getI64IntegerAttr(groups));
+        $_state.addAttribute("transposed",$_builder.getBoolAttr(transposed));
 
 
         mlir::RankedTensorType weight_shape = weights.getType().cast<mlir::RankedTensorType>();

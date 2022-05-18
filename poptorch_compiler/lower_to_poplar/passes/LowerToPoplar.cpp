@@ -96,7 +96,7 @@ poplar::Type elementTypeFromMLIR(mlir::Type elementType) {
   if (elementType.isInteger(32) || elementType.isInteger(64)) {
     return poplar::INT;
   }
-  assert(false && "Unsupported MLIR type");
+  ERROR("Unsupported MLIR type");
 
   return poplar::FLOAT;
 }
