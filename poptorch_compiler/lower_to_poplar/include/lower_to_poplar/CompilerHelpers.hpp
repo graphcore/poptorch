@@ -101,7 +101,10 @@ poplar::Tensor createConstant(CompilerContext &context, poplar::Type type,
                               const std::vector<uint64_t> &shape,
                               const T &value) {
   poplar::Tensor constant = context.graph.addConstant<T>(type, shape, value);
-  context.graph.setTileMapping(constant, context.graph_const_count++);
+
+  auto tile_num =
+      (context.graph_const_count++) % context.graph.getTarget().getNumTiles();
+  context.graph.setTileMapping(constant, tile_num);
   return constant;
 }
 
@@ -113,7 +116,9 @@ poplar::Tensor createConstantTensor(CompilerContext &context, poplar::Type type,
                                     const std::vector<T> &values) {
   poplar::Tensor constant =
       context.graph.addConstant<T>(type, shape, poplar::ArrayRef<T>(values));
-  context.graph.setTileMapping(constant, context.graph_const_count++);
+  auto tile_num =
+      (context.graph_const_count++) % context.graph.getTarget().getNumTiles();
+  context.graph.setTileMapping(constant, tile_num);
   return constant;
 }
 

@@ -117,6 +117,13 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
     out = popops::reduce(context.graph, out, {0}, {popops::Operation::ADD},
                          context.seq);
     if (reduction == TorchReduction::MEAN) {
+      if (ignore_index >= 0) {
+        // Prevent dividing by zero
+        popops::mapInPlace(
+            context.graph, popops::expr::BinaryOpType::MAXIMUM, total_elements,
+            createConstant(context, input.elementType(), {}, 1), context.seq);
+      }
+
       popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, out,
                          total_elements, context.seq);
     }
@@ -129,7 +136,7 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
   out = reshapeToMlirShape(out, this->result().getType());
 
   context.addTensor(result(), out);
-  context.addTensor(total_weight(), out);
+  context.addTensor(total_weight(), total_elements);
 }
 
 void nll_loss_backward::lowerToPoplar(CompilerContext &context) {
@@ -160,6 +167,12 @@ void nll_loss_backward::lowerToPoplar(CompilerContext &context) {
   }
 
   if (reduction == TorchReduction::MEAN) {
+    if (ignore_index >= 0) {
+      // Prevent dividing by zero
+      popops::mapInPlace(
+          context.graph, popops::expr::BinaryOpType::MAXIMUM, total_elements,
+          createConstant(context, input.elementType(), {}, 1), context.seq);
+    }
     popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, grad,
                        total_elements, context.seq);
   } else if (reduction == TorchReduction::NONE) {
