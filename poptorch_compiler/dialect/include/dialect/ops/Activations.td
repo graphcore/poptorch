@@ -155,10 +155,17 @@ def Poptorch_logsoftmax_backward : Poptorch_Op<"logsoftmax_backward", [SameOpera
 }
 
 def Poptorch_softplus : Poptorch_NotImplementedOp<"softplus", []> {
-  let arguments = (ins Poptorch_tensor:$input);
+  let arguments = (ins Poptorch_tensor:$input,
+                       F32Attr:$beta,
+                       F32Attr:$threshold);
+
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$input), [{
+  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+                                    "float":$beta,
+                                    "float":$threshold), [{
         $_state.addOperands({input});
+        $_state.addAttribute("beta", $_builder.getF32FloatAttr(beta));
+        $_state.addAttribute("threshold", $_builder.getF32FloatAttr(threshold));
         $_state.addTypes(input.getType());
   }]>];
 }

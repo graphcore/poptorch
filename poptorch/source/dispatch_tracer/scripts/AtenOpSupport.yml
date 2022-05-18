@@ -87,7 +87,6 @@
 # func: softplus.out(Tensor self, Scalar beta=1, Scalar threshold=20, *, Tensor(a!) out) -> Tensor(a!)
 - func: softplus.out
   PopTorchDirect: softplus
-  IgnoreArgs: {'beta', 'threshold'}
   UnusedOutputArguments: {out}
 
 # sigmoid.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
@@ -149,12 +148,10 @@
 # aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
 - func: as_strided
   PopTorchDirect: as_strided
-  IgnoreArgs: {'storage_offset'}
 
 # aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> (Tensor(a))
 - func: expand
   PopTorchDirect: expand
-  IgnoreArgs: {'implicit'}
 
 # aten::reshape(Tensor(a) self, int[] shape) -> (Tensor(a))
 # Ideally we would use the native cpu function but have an equivalent

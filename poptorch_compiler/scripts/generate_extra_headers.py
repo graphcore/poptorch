@@ -182,7 +182,7 @@ def vals_from_json(json_in, op_key, sub_key, allow_attributes=True):
             print(f"{arg_name} has an unexpected number of superclasses.")
             sys.exit(1)
 
-        # Only attribute sshould have a default value
+        # Only attributes should have a default value
         assert "default_value" not in resolved_type_details
 
         type_str = resolved_type_details["baseType"]["def"]
@@ -283,12 +283,16 @@ for op_name in poptorch_ops:
 
     # One space to give the comma removal thing something to remove when there are no args.
     func_args = []
+    func_args_decl = []
     parameters = []
 
     # Turn the args into function signitures.
     for arg in poptorch_ops[op_name]["args"]:
-        func_args.append(builder_call_translations[arg.macro_type()] + " " +
-                         arg.name)
+        new_arg = builder_call_translations[arg.macro_type()] + " " + arg.name
+        func_args.append(new_arg)
+        if arg.default_value is not None:
+            new_arg += " = " + arg.default_value
+        func_args_decl.append(new_arg)
 
         # If the argument is an MLIR type we want to convert it first.
         if arg.macro_type() == "TYPE":
@@ -333,6 +337,6 @@ for op_name in poptorch_ops:
     cppFunction += "}\n\n"
 
     # Save the header file and implementation
-    print(headerFunction + func_args_str + ");",
+    print(headerFunction + ", ".join(func_args_decl) + ");",
           file=parse_args.interface_header_file)
     print(cppFunction, file=parse_args.interface_cpp_file)

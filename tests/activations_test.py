@@ -16,11 +16,18 @@ import helpers
 #'torch.nn.Softmin', 'torch.nn.Softmax', 'torch.nn.Softmax2d', 'torch.nn.LogSoftmax', 'torch.nn.AdaptiveLogSoftmaxWithLoss', 'torch.nn.AdaptiveLogSoftmaxWithLoss.log_prob',
 #'torch.nn.AdaptiveLogSoftmaxWithLoss.predict',
 
+
+# A version of Softplus with non default arguments
+class SoftplusWithParams(nn.Softplus):
+    def __init__(self):
+        super().__init__(beta=5.0, threshold=4.0)
+
+
 activation_functions = [
     nn.ReLU, nn.Tanh, nn.Sigmoid, nn.PReLU, nn.SELU, nn.SiLU, nn.ELU, nn.GELU,
     nn.Softmax, nn.LogSoftmax, nn.Softsign, nn.LeakyReLU, nn.Hardtanh,
     nn.Softplus, nn.Softshrink, nn.Hardshrink, nn.CELU, nn.Hardsigmoid,
-    nn.Hardswish
+    nn.Hardswish, SoftplusWithParams
 ]
 
 

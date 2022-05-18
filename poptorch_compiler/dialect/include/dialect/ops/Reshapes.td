@@ -2,14 +2,20 @@
 
 // aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
 def Poptorch_as_strided: Poptorch_Op<"as_strided", [ViewOp]> {
-    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$size, I64ArrayAttr:$strides);
+    let arguments = (ins Poptorch_tensor:$input,
+                         I64ArrayAttr:$size,
+                         I64ArrayAttr:$strides,
+                         OptionalAttr<I64Attr>:$storage_offset);
 
     let results = (outs Poptorch_tensor:$result);
 
 
     let builders = [OpBuilderDAG<(ins "mlir::Value":$val1,
                                       "const std::vector<std::int64_t>&":$size,
-                                      "const std::vector<std::int64_t>&":$strides),[{
+                                      "const std::vector<std::int64_t>&":$strides,
+                                      "std::optional<std::int64_t>":$storage_offset),[{
+        ERROR_ON_MSG(storage_offset.value_or(0), "as_strided: Storage offset "
+                                                 "not supported");
         $_state.addOperands({val1});
         $_state.addAttribute("size", $_builder.getI64ArrayAttr(size));
         $_state.addAttribute("strides", $_builder.getI64ArrayAttr(strides));
@@ -154,10 +160,16 @@ def Poptorch_reshape: Poptorch_Op<"reshape", [ViewOp]> {
 // dimensions to the same as the input. New dimensions are added at the front
 // TODO T52507 Fully inplement expand
 def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
-      let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
+      let arguments = (ins Poptorch_tensor:$input,
+                           I64ArrayAttr:$shape,
+                           DefaultValuedAttr<BoolAttr,"false">:$implicit);
   let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "const std::vector<std::int64_t>&":$shape),[{
+    let builders = [OpBuilderDAG<(ins "mlir::Value":$value,
+                                      "const std::vector<std::int64_t>&":$shape,
+                                      "bool":$implicit
+                                      ),[{
+        ERROR_ON_MSG(implicit,"expand: implicit=True not supported");
         $_state.addOperands({value});
         $_state.addAttribute("shape", $_builder.getI64ArrayAttr(shape));
 

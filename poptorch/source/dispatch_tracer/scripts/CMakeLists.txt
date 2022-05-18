@@ -22,7 +22,10 @@ add_custom_command(
 
       # Namespace for these symbols
      --namespace aten
-   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/AtenOpSupport.yml"
+   DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/AtenOpSupport.yml
+     ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/generate_direct_interface.py
 )
 
 add_custom_command(
@@ -45,7 +48,10 @@ add_custom_command(
 
       # Namespace for these symbols
      --namespace poptorch
-   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/PoptorchOpSupport.yml"
+   DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/PoptorchOpSupport.yml
+     ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/generate_direct_interface.py
 )
 
 add_custom_target(generate_supported_ops_interface
