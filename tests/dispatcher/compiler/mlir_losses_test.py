@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 import pytest
 import helpers
+import poptorch
 from poptorch.experimental import IPUContext
 
 
@@ -333,3 +334,27 @@ def test_binary_cross_entropy_with_logits_backward(reduction):
     helpers.assert_allclose(expected=ipu_result,
                             actual=cpu_result,
                             equal_nan=True)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
+@pytest.mark.parametrize("num_dims", [1, 2])
+@pytest.mark.parametrize("beta", [0.5, 1.0, 1.5])
+def test_smooth_l1_loss_forward(reduction, num_dims, beta):
+    torch.manual_seed(42)
+
+    if num_dims == 1:
+        input_dims = [5]
+    if num_dims == 2:
+        input_dims = [3, 4]
+    input1 = torch.rand(input_dims)
+    input2 = torch.rand(input_dims)
+
+    def smooth_l1_loss(t1, t2):
+        return F.smooth_l1_loss(t1, t2, reduction=reduction, beta=beta)
+
+    smooth_l1_loss(input1, input2)
+
+    err_msg = "smooth_l1_loss cannot currently be lowered to Poplar"
+    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+        IPUContext(smooth_l1_loss)(input1, input2)
