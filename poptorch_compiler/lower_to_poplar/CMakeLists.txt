@@ -3,7 +3,6 @@ add_library(lower_to_poplar STATIC
         PoplarExecutor.cpp
         ops/Activations.cpp
         ops/ElementWise.cpp
-        ops/Generated.cpp
         ops/Linalg.cpp
         ops/Losses.cpp
         ops/NormOps.cpp

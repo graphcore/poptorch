@@ -9,7 +9,6 @@ include "PoptorchDialect.td"
 // include "ops/ElementWise.td"
 
 include "ops/Activations.td"
-include "ops/Generated.td"
 include "ops/Linalg.td"
 include "ops/Losses.td"
 include "ops/Random.td"
