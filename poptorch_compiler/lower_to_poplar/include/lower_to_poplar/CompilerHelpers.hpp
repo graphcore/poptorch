@@ -6,6 +6,7 @@
 #include <mlir/IR/Value.h>
 
 #include <array>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -17,6 +18,10 @@
 #include <poplar/Program.hpp>
 
 #include "dialect/PoptorchDialect.hpp"
+
+namespace model_runtime {
+class Device;
+}
 
 namespace poptorch_ir {
 
@@ -72,6 +77,10 @@ private:
 
 poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
                                   mlir::Type mlirType);
+
+poplar::Type elementTypeFromMLIR(mlir::Type elementType);
+
+std::shared_ptr<model_runtime::Device> getDevice();
 
 template <typename T>
 std::vector<T> convertFloatArray(const mlir::ArrayAttr &array) {

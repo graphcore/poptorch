@@ -33,8 +33,6 @@ public:
 
   operator bool() const { return static_cast<bool>(_impl); }
 
-  void init(mlir::ModuleOp module);
-
   // Compile graph by running both PopTorch compiler passes and poplar
   // compilation.
   void compile(poprithms::logging::ManualTimePartitionLogger &timer);

@@ -11,7 +11,7 @@ class ModuleOp;
 
 namespace poplar {
 class Graph;
-}
+} // namespace poplar
 
 namespace poptorch_ir {
 

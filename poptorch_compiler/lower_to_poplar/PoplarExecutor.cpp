@@ -143,21 +143,6 @@ void PoplarExecutableImpl::compile(
 
 } // namespace detail
 
-namespace {
-
-bool waitIfIpuIsUnavailable() {
-  bool wait = false;
-  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
-    wait = std::stoi(env_wait_for_ipu) != 0;
-    poptorch::logging::info(
-        "From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
-        "is available: {}",
-        wait ? "Wait" : "Fail & exit");
-  }
-  return wait;
-}
-} // namespace
-
 void PoplarExecutable::connectStream(const std::string &string, Buffer ptr) {
   _impl->owned_buffers.insert_or_assign(string, ptr);
   _impl->engine->connectStream(string, ptr->data());
@@ -183,37 +168,8 @@ void PoplarExecutable::weightsToHost() {
   _impl->engine->run(poptorch_ir::Programs::WeightsToHost);
 }
 
-void PoplarExecutable::init(mlir::ModuleOp /*unused*/) {}
-
 PoplarExecutable::PoplarExecutable(mlir::ModuleOp module) {
-  std::shared_ptr<model_runtime::Device> device;
-  model_runtime::DeviceManager manager;
-
-  bool model_enabled = false;
-
-  // Run on model if the env var is set.
-  if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
-    model_enabled = std::stoi(env_use_model) != 0;
-    if (model_enabled) {
-      device = manager.createIpuModelDevice(1);
-    }
-  }
-  if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
-    model_enabled = std::stoi(env_use_model) != 0;
-    if (!device && model_enabled) {
-      device = manager.createSmallIpuModelDevice(1);
-    }
-  }
-  // Run on an actual device.
-  if (!device) {
-    device =
-        manager.getDevice(1, {},
-                          waitIfIpuIsUnavailable() ? model_runtime::WAIT_FOREVER
-                                                   : model_runtime::NO_WAIT);
-  }
-  ERROR_ON_MSG(!device, "Failed to acquire a device");
-
-  _impl = std::make_unique<detail::PoplarExecutableImpl>(module, device);
+  _impl = std::make_unique<detail::PoplarExecutableImpl>(module, getDevice());
 }
 
 PoplarExecutable::PoplarExecutable(PoplarExecutable &&other) {

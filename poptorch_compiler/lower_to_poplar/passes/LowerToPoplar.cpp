@@ -65,42 +65,6 @@ struct PoplarTypePair {
   std::vector<std::size_t> shape;
 };
 
-// Mlir type to poplar type helper.
-poplar::Type elementTypeFromMLIR(mlir::Type elementType) {
-  if (elementType.isF16()) {
-    return poplar::HALF;
-  }
-  if (elementType.isF32()) {
-    return poplar::FLOAT;
-  }
-  if (elementType.isUnsignedInteger(8)) {
-    return poplar::UNSIGNED_CHAR;
-  }
-  if (elementType.isUnsignedInteger(16)) {
-    return poplar::UNSIGNED_SHORT;
-  }
-  if (elementType.isUnsignedInteger(32) || elementType.isUnsignedInteger(64)) {
-    return poplar::UNSIGNED_INT;
-  }
-  // We use isInteger from here onwards to capture both
-  // isSignedInteger and isSignlessInteger
-  if (elementType.isInteger(1)) {
-    return poplar::BOOL;
-  }
-  if (elementType.isInteger(8)) {
-    return poplar::SIGNED_CHAR;
-  }
-  if (elementType.isInteger(16)) {
-    return poplar::SHORT;
-  }
-  if (elementType.isInteger(32) || elementType.isInteger(64)) {
-    return poplar::INT;
-  }
-  ERROR("Unsupported MLIR type");
-
-  return poplar::FLOAT;
-}
-
 PoplarTypePair processType(mlir::Type mlirType) {
   // Turn it into a ranked tensor.
   mlir::RankedTensorType tensor_type = mlirType.cast<mlir::RankedTensorType>();
