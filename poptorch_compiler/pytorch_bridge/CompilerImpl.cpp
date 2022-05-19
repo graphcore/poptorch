@@ -1,18 +1,38 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "CompilerImpl.hpp"
+
 #include <vector>
+
+#include "passes/PassUtils.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch_ir {
 namespace detail {
-mlir::Type getElementType(const mlir::Value &value) {
-  return value.getType().cast<mlir::RankedTensorType>().getElementType();
+
+namespace {
+
+mlir::LogicalResult printDiagnostic(mlir::Diagnostic &d) {
+  poptorch::logging::Level lvl;
+  switch (d.getSeverity()) {
+  case mlir::DiagnosticSeverity::Error:
+    lvl = poptorch::logging::Level::Err;
+    break;
+  case mlir::DiagnosticSeverity::Warning:
+    lvl = poptorch::logging::Level::Warn;
+    break;
+  default:
+    lvl = poptorch::logging::Level::Trace;
+    break;
+  }
+  if (poptorch::logging::shouldLog(lvl)) {
+    poptorch::logging::log(lvl, "{} [{}]", d.str(), mlirToStr(d.getLocation()));
+  }
+  return mlir::success();
 }
 
-std::string mlirTypeToStr(mlir::Type &type) {
-  std::string str;
-  llvm::raw_string_ostream ostream(str);
-  type.print(ostream);
-  return str;
+} // namespace
+mlir::Type getElementType(const mlir::Value &value) {
+  return value.getType().cast<mlir::RankedTensorType>().getElementType();
 }
 
 bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
@@ -38,14 +58,16 @@ bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
     return false;
   }
 
-  ERROR("Unsupported types for implicit cast:: "
-        << mlirTypeToStr(lhs) << " and " << mlirTypeToStr(rhs));
+  ERROR("Unsupported types for implicit cast from " << mlirToStr(lhs) << " to "
+                                                    << mlirToStr(rhs));
 }
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
     : _builder(mlir::UnknownLoc::get(&context), &context),
       _the_module(mlir::ModuleOp::create(_builder.getLoc())),
       _executable(_the_module) {
+
+  context.getDiagEngine().registerHandler(printDiagnostic);
 
   // Load the dialect.
   context.loadDialect<poptorch_ir::PoptorchDialect>();
