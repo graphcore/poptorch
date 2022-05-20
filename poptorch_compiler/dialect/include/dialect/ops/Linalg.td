@@ -12,7 +12,7 @@ def Poptorch_conv : Poptorch_Op<"conv", []> {
                         I64ArrayAttr:$dilation, BoolAttr:$transposed, I64ArrayAttr:$output_padding, I64Attr:$groups);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$weights, "mlir::Value":$bias,
+  let builders = [OpBuilder<(ins "mlir::Value":$input, "mlir::Value":$weights, "mlir::Value":$bias,
                                 "const std::vector<std::int64_t>&":$strides,
                                 "const std::vector<std::int64_t>&":$padding, "const std::vector<std::int64_t>&":$dilation,
                                 "bool": $transposed,
@@ -55,7 +55,7 @@ def Poptorch_matmul : Poptorch_Op<"matmul", []> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
         $_state.addOperands({v1, v2});
         $_state.addTypes(inferType(v1, v2));
      }]>
@@ -154,7 +154,7 @@ def Poptorch_addmm : Poptorch_Op<"addmm", []> {
                          F32Attr:$alpha);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+    let builders = [OpBuilder<(ins "mlir::Value":$input,
                                       "mlir::Value":$mat1,
                                       "mlir::Value":$mat2,
                                       "float":$beta,
@@ -181,7 +181,7 @@ def Poptorch_norm_out : Poptorch_NotImplementedOp<"norm_out", []> {
                          BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::optional<double>":$p,
                                       "const std::vector<std::int64_t>&":$dim,
                                       "bool":$keepdim),[{

@@ -4,7 +4,7 @@ def Poptorch_empty_tensor: Poptorch_Op<"empty_tensor", []> {
     let arguments = (ins I64ArrayAttr:$size, TypeAttr:$type);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "const std::vector<std::int64_t>&":$size, "mlir::Type":$type),[{
+    let builders = [OpBuilder<(ins "const std::vector<std::int64_t>&":$size, "mlir::Type":$type),[{
         $_state.addAttribute("size", $_builder.getI64ArrayAttr(size));
         $_state.addAttribute("type", mlir::TypeAttr::get(type));
         $_state.addTypes(mlir::RankedTensorType::get(size, type));
@@ -14,7 +14,7 @@ def Poptorch_empty_tensor: Poptorch_Op<"empty_tensor", []> {
 def Poptorch_fill_: Poptorch_Op<"fill_", []> {
     let arguments = (ins Poptorch_tensor:$input, F32Attr:$value);
 
-    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values,
+    let builders = [OpBuilder<(ins "mlir::ValueRange":$values,
                                       "float":$value),[{
         $_state.addOperands(values);
         $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
@@ -30,7 +30,7 @@ def Poptorch_zero_: Poptorch_Op<"zero_", []> {
 def Poptorch_cast : Poptorch_Op<"cast", []> {
   let arguments = (ins Poptorch_tensor:$self, TypeAttr:$dtype);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "mlir::Type":$dtype), [{
         $_state.addOperands({self});
         $_state.addAttribute("dtype", mlir::TypeAttr::get(dtype));
@@ -56,7 +56,7 @@ def Poptorch_tensorconstant_float : Poptorch_Op<"tensorconstant_float", []> {
     let arguments = (ins F32ArrayAttr:$data);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "const std::vector<float>&":$data),[{
+    let builders = [OpBuilder<(ins "const std::vector<float>&":$data),[{
         $_state.addAttribute("data", $_builder.getF32ArrayAttr(data));
         $_state.addTypes(mlir::RankedTensorType::get(1, $_builder.getF32Type()));
      }]>];
@@ -66,7 +66,7 @@ def Poptorch_tensorconstant_int : Poptorch_Op<"tensorconstant_int", []> {
     let arguments = (ins I32ArrayAttr:$data);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "const std::vector<std::int32_t>&":$data),[{
+    let builders = [OpBuilder<(ins "const std::vector<std::int32_t>&":$data),[{
         $_state.addAttribute("data", $_builder.getI32ArrayAttr(data));
         $_state.addTypes(mlir::RankedTensorType::get(1, $_builder.getIntegerType(32, true)));
      }]>];
@@ -79,7 +79,7 @@ def Poptorch_concat: Poptorch_Op<"concat", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$tensors,
+    let builders = [OpBuilder<(ins "mlir::ValueRange":$tensors,
                                       "std::uint64_t":$dim),[{
         $_state.addOperands(tensors);
 
@@ -120,7 +120,7 @@ def Poptorch_topk : Poptorch_Op<"topk", []> {
 
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor:$indices);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, 
+    let builders = [OpBuilder<(ins "mlir::Value":$self, 
                                       "std::int64_t":$K,
                                       "std::int64_t":$dim,
                                       "bool":$largest,
@@ -160,7 +160,7 @@ class Poptorch_NotImplemented_reduce_single_dim<string name> : Poptorch_NotImple
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::optional<std::int64_t>":$dim,
                                       "std::int64_t":$keepdim),[{
         $_state.addOperands(self);
@@ -207,7 +207,7 @@ def Poptorch_argsort : Poptorch_NotImplementedOp<"argsort", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::int64_t":$dim,
                                       "std::int64_t":$descending),[{
         $_state.addOperands(self);
@@ -226,7 +226,7 @@ def Poptorch_dropout : Poptorch_Op<"dropout", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "float":$p, "bool":$training),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$input, "float":$p, "bool":$training),[{
         $_state.addOperands({input});
         $_state.addAttribute("p", $_builder.getF32FloatAttr(p));
         $_state.addAttribute("training", $_builder.getBoolAttr(training));
@@ -241,7 +241,7 @@ def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
                        Poptorch_tensor:$other);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$condition,
+  let builders = [OpBuilder<(ins "mlir::Value":$condition,
                                     "mlir::Value":$self,
                                     "mlir::Value":$other), [{
           $_state.addOperands({condition, self, other});
@@ -254,7 +254,7 @@ def Poptorch_zeros_like : Poptorch_NotImplementedOp<"zeros_like", [SameOperandsA
   let arguments = (ins Poptorch_tensor:$self);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self), [{
           $_state.addOperands(self);
           $_state.addTypes({self.getType()});
 
@@ -265,7 +265,7 @@ def Poptorch_full_like : Poptorch_NotImplementedOp<"full_like", [SameOperandsAnd
   let arguments = (ins Poptorch_tensor:$self, F32Attr:$fill_value);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "float":$fill_value), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self, "float":$fill_value), [{
           $_state.addOperands(self);
           $_state.addAttribute("fill_value", $_builder.getF32FloatAttr(fill_value));
 
@@ -277,7 +277,7 @@ def Poptorch_one_hot : Poptorch_NotImplementedOp<"one_hot", []> {
   let arguments = (ins Poptorch_tensor:$self, I64Attr:$num_classes);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "std::int64_t":$num_classes), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$num_classes), [{
     $_state.addOperands(self);
 
     ERROR_ON_MSG(num_classes == -1,
@@ -299,7 +299,7 @@ def Poptorch_arange_start_out : Poptorch_NotImplementedOp<"arange_start_out", []
   let arguments = (ins F32Attr:$start, F32Attr:$end, F32Attr:$step);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "float":$start, "float":$end, "float":$step), [{
+  let builders = [OpBuilder<(ins "float":$start, "float":$end, "float":$step), [{
           $_state.addAttribute("start", $_builder.getF32FloatAttr(start));
           $_state.addAttribute("end", $_builder.getF32FloatAttr(end));
           $_state.addAttribute("step", $_builder.getF32FloatAttr(step));
@@ -314,7 +314,7 @@ def Poptorch_masked_fill_Scalar : Poptorch_NotImplementedOp<"masked_fill_Scalar"
   let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$mask, F32Attr:$scalar);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "mlir::Value":$mask, "float":$scalar), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$mask, "float":$scalar), [{
     $_state.addOperands({self, mask});
     $_state.addAttribute("scalar", $_builder.getF32FloatAttr(scalar));
 

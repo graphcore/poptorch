@@ -88,7 +88,7 @@ EinsumOp::create(torch::jit::Graph *graph,
       output = createReducesum(graph, {_tensors[0]}, axes, 1);
     } else {
       std::vector<std::int64_t> p_lhs =
-        sortedPermutation(_rhs_char_indices, _labels[0]);
+          sortedPermutation(_rhs_char_indices, _labels[0]);
 
       output = createTranspose(graph, {_tensors[0]}, p_lhs);
     }

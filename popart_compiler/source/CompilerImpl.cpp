@@ -234,27 +234,27 @@ namespace detail {
 popart::ConstVoidData StepIO::in(popart::TensorId id, int64_t num_elems,
                                  bool prefetch) {
   (void)prefetch;
-  timestamp(&in_times, id);
-  return get<popart::ConstVoidData>(id, &inputs_info, num_elems);
+  timestamp(&_in_times, id);
+  return get<popart::ConstVoidData>(id, &_inputs_info, num_elems);
 }
 
 void StepIO::inComplete(popart::TensorId id, int64_t num_elems) {
   (void)num_elems;
-  timestamp(&in_complete_times, id);
+  timestamp(&_in_complete_times, id);
 }
 
 popart::MutableVoidData StepIO::out(popart::TensorId id, int64_t num_elems) {
-  timestamp(&out_times, id);
-  return get<popart::MutableVoidData>(id, &outputs_info, num_elems);
+  timestamp(&_out_times, id);
+  return get<popart::MutableVoidData>(id, &_outputs_info, num_elems);
 }
 
 void StepIO::outComplete(popart::TensorId id) {
-  timestamp(&out_complete_times, id);
+  timestamp(&_out_complete_times, id);
 }
 
 void StepIO::computeStepDataInfo(const popart::TensorId &id,
                                  popart::IArray *array) {
-  if (step_data_info.find(id) != step_data_info.end()) {
+  if (_step_data_info.find(id) != _step_data_info.end()) {
     return;
   }
 
@@ -266,24 +266,24 @@ void StepIO::computeStepDataInfo(const popart::TensorId &id,
     shape.push_back(AccessorType::getArrayDim(*array, i));
   }
 
-  step_data_info.insert({id, popart::TensorInfo(dtype, shape)});
+  _step_data_info.insert({id, popart::TensorInfo(dtype, shape)});
 }
 
 void StepIO::populate(const TensorArrayMap &inputs,
                       const TensorArrayMap &outputs) {
-  inputs_info.clear();
+  _inputs_info.clear();
   for (const auto &input : inputs) {
-    inputs_info.insert({input.first, {input.second, 0}});
-    in_times[input.first].clear();
-    in_complete_times[input.first].clear();
+    _inputs_info.insert({input.first, {input.second, 0}});
+    _in_times[input.first].clear();
+    _in_complete_times[input.first].clear();
     computeStepDataInfo(input.first, &input.second);
   }
 
-  outputs_info.clear();
+  _outputs_info.clear();
   for (const auto &output : outputs) {
-    outputs_info.insert({output.first, {output.second, 0}});
-    out_times[output.first].clear();
-    out_complete_times[output.first].clear();
+    _outputs_info.insert({output.first, {output.second, 0}});
+    _out_times[output.first].clear();
+    _out_complete_times[output.first].clear();
     computeStepDataInfo(output.first, &output.second);
   }
 }
@@ -295,8 +295,8 @@ T StepIO::get(const popart::TensorId &id, TensorArrayInfo *map,
   ERROR_ON_MSG(it == map->end(), "Internal Compiler Error in StepIO");
   auto &array_info = it->second;
 
-  auto it2 = step_data_info.find(id);
-  ERROR_ON_MSG(it2 == step_data_info.end(),
+  auto it2 = _step_data_info.find(id);
+  ERROR_ON_MSG(it2 == _step_data_info.end(),
                "Internal Compiler Error in StepIO");
 
   T step_data;

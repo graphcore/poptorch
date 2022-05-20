@@ -47,8 +47,9 @@ include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
 link_directories(${LLVM_LIBRARY_DIRS})
 
 # Use lld instead of gold for the poptorch_compiler (To avoid issues when linking against LLVM)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=lld")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -fuse-ld=lld")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}  -fuse-ld=lld")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}  -fuse-ld=lld")
+set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS}  -fuse-ld=lld")
 
 # Setup for our sources + generated tablegen includes
 # Add the root project.

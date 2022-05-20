@@ -5,7 +5,7 @@ def Poptorch_adaptive_avg_pool : Poptorch_Op<"adaptive_avg_pool", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "const std::vector<std::int64_t>&":$output_size),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$input, "const std::vector<std::int64_t>&":$output_size),[{
         $_state.addOperands({input});
         $_state.addAttribute("output_size", $_builder.getI64ArrayAttr(output_size));
         mlir::RankedTensorType input_type = input.getType().cast<mlir::RankedTensorType>();
@@ -30,7 +30,7 @@ def Poptorch_avg_pool : Poptorch_Op<"avg_pool", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+    let builders = [OpBuilder<(ins "mlir::Value":$input,
                                       "const std::vector<std::int64_t>&":$kernel_size,
                                       "const std::vector<std::int64_t>&":$stride,
                                       "const std::vector<std::int64_t>&":$padding,
@@ -74,7 +74,7 @@ def Poptorch_max_pool : Poptorch_Op<"max_pool", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+    let builders = [OpBuilder<(ins "mlir::Value":$input,
                                       "const std::vector<std::int64_t>&":$kernel_size,
                                       "const std::vector<std::int64_t>&":$stride,
                                       "const std::vector<std::int64_t>&":$padding,

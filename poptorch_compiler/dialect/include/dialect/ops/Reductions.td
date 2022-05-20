@@ -8,7 +8,7 @@ class Poptorch_reduce<string name> : Poptorch_Op<name, []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values,
+    let builders = [OpBuilder<(ins "mlir::ValueRange":$values,
                                       "const std::vector<std::int64_t>&":$axes,
                                       "std::int64_t":$keepdim,
                                       "std::optional<mlir::Type>":$dtype),[{
@@ -108,7 +108,7 @@ def Poptorch_prod : Poptorch_Op<"prod", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands(self);
         if (dtype.has_value()) {
@@ -139,7 +139,7 @@ def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::int64_t":$dim,
                                       "bool":$keepdim,
                                       "std::optional<mlir::Type>":$dtype),[{
@@ -180,7 +180,7 @@ class Poptorch_binary_reduction<string name> : Poptorch_reduce<name> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values),[{
+    let builders = [OpBuilder<(ins "mlir::ValueRange":$values),[{
         $_state.addOperands(values);
 
         mlir::RankedTensorType tensor = values[0].getType().cast<mlir::RankedTensorType>();
@@ -207,7 +207,7 @@ class Poptorch_binary_reduction_out<string name> : Poptorch_reduce<name> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$values, "std::int64_t":$dim, "bool":$keepdim),[{
+    let builders = [OpBuilder<(ins "mlir::ValueRange":$values, "std::int64_t":$dim, "bool":$keepdim),[{
         $_state.addOperands(values);
 
         mlir::RankedTensorType tensor = values[0].getType().cast<mlir::RankedTensorType>();
@@ -241,7 +241,7 @@ class Poptorch_std_var_correction<string name> : Poptorch_reduce<name> {
                          BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::optional<std::vector<std::int64_t>>":$dim,
                                       "std::optional<std::int64_t>":$correction,
                                       "bool":$keepdim),[{
@@ -270,7 +270,7 @@ def Poptorch_var_correction : Poptorch_std_var_correction<"var_correction"> {}
 
 class Poptorch_std_var_mean_correction<string name> : Poptorch_std_var_correction<name> {
     let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$mean);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::optional<std::vector<std::int64_t>>":$dim,
                                       "std::optional<std::int64_t>":$correction,
                                       "bool":$keepdim),[{
@@ -317,7 +317,7 @@ def Poptorch_embedding_bag : Poptorch_NotImplementedOp<"embedding_bag", []> {
                         Poptorch_tensor:$bag_size,
                         Poptorch_tensor:$max_indices);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$weight,
+    let builders = [OpBuilder<(ins "mlir::Value":$weight,
                                       "mlir::Value":$indices,
                                       "mlir::Value":$offsets,
                                       "bool":$scale_grad_by_freq,
@@ -371,7 +371,7 @@ class Poptorch_prefix_sum<string name> : Poptorch_Op<name, []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::int64_t":$dim,
                                       "std::optional<mlir::Type>":$dtype),[{
         $_state.addOperands({self});

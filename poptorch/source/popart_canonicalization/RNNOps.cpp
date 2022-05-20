@@ -80,7 +80,7 @@ torch::jit::Node *gruHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
 
     biases = createConcat(graph, {gate_biases, recur_biases}, 1)->output();
   } else {
-    biases = createConstantFloatLike(graph, input, {0.}, {1, 6 * hidden_size})
+    biases = createConstantFloatLike(graph, input, {0.}, {1l, 6l * hidden_size})
                  ->output();
   }
 

@@ -6,7 +6,7 @@ def Poptorch_mse_loss : Poptorch_Op<"mse_loss", []> {
                        I64Attr:$reduction);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "mlir::Value":$target,
                                     "std::int64_t":$reduction),[{
       $_state.addOperands({self, target});
@@ -38,7 +38,7 @@ def Poptorch_mse_loss_backward : Poptorch_Op<"mse_loss_backward", []> {
                        I64Attr:$reduction);
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$grad,
+  let builders = [OpBuilder<(ins "mlir::Value":$grad,
                                     "mlir::Value":$input,
                                     "mlir::Value":$target,
                                     "std::int64_t":$reduction),[{
@@ -60,7 +60,7 @@ def Poptorch_nll_loss : Poptorch_Op<"nll_loss", []> {
 
     let results = (outs Poptorch_tensor:$result,
                         Poptorch_tensor:$total_weight);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
                                       "std::int64_t":$reduction,
@@ -105,7 +105,7 @@ def Poptorch_nll_loss_backward : Poptorch_Op<"nll_loss_backward", []> {
                          Poptorch_tensor:$total_weight);
 
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$grad_output,
+    let builders = [OpBuilder<(ins "mlir::Value":$grad_output,
                                       "mlir::Value":$self,
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
@@ -128,7 +128,7 @@ def Poptorch_binary_cross_entropy : Poptorch_Op<"binary_cross_entropy", []> {
                          I64Attr:$reduction);
   
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
                                       "std::int64_t":$reduction),[{
@@ -153,7 +153,7 @@ def Poptorch_binary_cross_entropy_backward : Poptorch_Op<"binary_cross_entropy_b
                          I64Attr:$reduction);
   
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$grad_output,
+    let builders = [OpBuilder<(ins "mlir::Value":$grad_output,
                                       "mlir::Value":$self,
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
@@ -173,7 +173,7 @@ def Poptorch_binary_cross_entropy_with_logits : Poptorch_Op<"binary_cross_entrop
                          I64Attr:$reduction);
   
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
                                       "mlir::Value":$pos_weight,
@@ -199,7 +199,7 @@ def Poptorch_binary_cross_entropy_with_logits_backward : Poptorch_Op<"binary_cro
                          I64Attr:$reduction);
   
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$grad_output,
+    let builders = [OpBuilder<(ins "mlir::Value":$grad_output,
                                       "mlir::Value":$self,
                                       "mlir::Value":$target,
                                       "mlir::Value":$weight,
@@ -219,7 +219,7 @@ def Poptorch_smooth_l1_loss : Poptorch_NotImplementedOp<"smooth_l1_loss", []> {
                          F32Attr:$beta);
 
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "mlir::Value":$target,
                                       "std::int64_t":$reduction,
                                       "float":$beta),[{

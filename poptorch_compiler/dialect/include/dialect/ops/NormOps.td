@@ -10,7 +10,7 @@ def Poptorch_batch_norm : Poptorch_Op<"batch_norm", [AttrSizedOperandSegments]> 
                         F32Attr:$momentum,
                         F32Attr:$epsilon);
   let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$save_mean, Poptorch_tensor:$save_invstd);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+  let builders = [OpBuilder<(ins "mlir::Value":$input,
                                     "mlir::Value":$weight,
                                     "mlir::Value":$bias,
                                     "mlir::Value":$running_mean,
@@ -60,7 +60,7 @@ def Poptorch_group_norm : Poptorch_Op<"group_norm",
   let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$mean,
                       Poptorch_tensor:$rstd);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+  let builders = [OpBuilder<(ins "mlir::Value":$input,
                                     "mlir::Value":$weight,
                                     "mlir::Value":$bias,
                                     "int":$N,
@@ -122,7 +122,7 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward", [AttrSizedO
                        BoolAttr:$training,
                        F32Attr:$epsilon);
   let results = (outs Poptorch_tensor:$grad_input, Poptorch_tensor:$grad_weight, Poptorch_tensor:$grad_bias);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$grad_out,
+  let builders = [OpBuilder<(ins "mlir::Value":$grad_out,
                                     "mlir::Value":$input,
                                     "mlir::Value":$weight,
                                     "mlir::Value":$running_mean,
@@ -168,7 +168,7 @@ def Poptorch_layer_norm : Poptorch_NotImplementedOp<"layer_norm", [AttrSizedOper
                         Optional<Poptorch_tensor>:$bias,
                         F32Attr:$epsilon);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+  let builders = [OpBuilder<(ins "mlir::Value":$input,
                                     "const std::vector<std::int64_t>&":$normalized_shape,
                                     "mlir::Value":$weight,
                                     "mlir::Value":$bias,

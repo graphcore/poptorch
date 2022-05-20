@@ -3,6 +3,7 @@
 #define POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_IMPL_HPP_
 
 #include <mlir/IR/DialectImplementation.h>
+#include <mlir/IR/Location.h>
 #include <mlir/IR/MLIRContext.h>
 
 #include <llvm/ADT/StringSwitch.h>
@@ -247,8 +248,8 @@ public:
   // the location does not be sent as part of creating an op. This method allows
   // the location to be set.
   void setLoc(const char *filename, std::uint64_t line, std::uint64_t col) {
-    _builder.setLoc(_builder.getFileLineColLoc(_builder.getIdentifier(filename),
-                                               line, col));
+    _builder.setLoc(mlir::FileLineColLoc::get(
+        _builder.getContext(), _builder.getIdentifier(filename), line, col));
   }
 
   // Create a new op of class OpTy, possibly casting operands specified by args.

@@ -5,7 +5,7 @@ def Poptorch_ipu_print_tensor : Poptorch_NotImplementedOp<"ipu_print_tensor", []
   let arguments = (ins Poptorch_tensor:$self,
                        OptionalAttr<StrAttr>:$title);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "std::optional<const char *>":$title), [{
           $_state.addOperands({self});
           if (title.has_value()) {
@@ -20,7 +20,7 @@ def Poptorch_ipu_print_tensor : Poptorch_NotImplementedOp<"ipu_print_tensor", []
 def Poptorch_nop : Poptorch_NotImplementedOp<"nop", []> {
   let arguments = (ins Poptorch_tensor:$self);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self), [{
           $_state.addOperands({self});
           $_state.addTypes({self.getType()});
      }]>
@@ -32,7 +32,7 @@ def Poptorch_begin_ipu_block : Poptorch_NotImplementedOp<"begin_ipu_block", []> 
   let arguments = (ins I64Attr:$stage_id,
                        I64Attr:$phase_id,
                        I64Attr:$ipu_id);
-  let builders = [OpBuilderDAG<(ins "int64_t":$stage_id,
+  let builders = [OpBuilder<(ins "int64_t":$stage_id,
                                     "int64_t":$phase_id,
                                     "int64_t":$ipu_id), [{
           $_state.addAttribute("stage_id", $_builder.getI64IntegerAttr(stage_id));
@@ -51,7 +51,7 @@ def Poptorch_internal_cast : Poptorch_NotImplementedOp<"internal_cast", []> {
   let arguments = (ins Poptorch_tensor:$self,
                        StrAttr:$dtype);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "const char *":$dtype), [{
           $_state.addOperands({self});
           $_state.addAttribute("dtype", $_builder.getStringAttr(dtype));
@@ -70,7 +70,7 @@ def Poptorch_custom_operation : Poptorch_NotImplementedOp<"custom_operation", [A
                        Poptorch_tensorlist:$outputs,
                        StrAttr:$attributes);
   let results = (outs Poptorch_tensorlist:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$inputs,
+  let builders = [OpBuilder<(ins "mlir::ValueRange":$inputs,
                                     "const char *":$name,
                                     "const char *":$domain,
                                     "int64_t":$domain_version,
@@ -103,7 +103,7 @@ def Poptorch_ctc_beam_search_decoder : Poptorch_NotImplementedOp<"ctc_beam_searc
                        I64Attr:$beam_width,
                        I64Attr:$top_paths);
   let results = (outs Poptorch_tensorlist:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$probs,
+  let builders = [OpBuilder<(ins "mlir::Value":$probs,
                                     "mlir::Value":$lengths,
                                     "int64_t":$blank,
                                     "int64_t":$beam_width,
@@ -122,7 +122,7 @@ def Poptorch_identity_loss : Poptorch_NotImplementedOp<"identity_loss", []> {
   let arguments = (ins Poptorch_tensor:$x,
                        I64Attr:$reduction);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$x,
+  let builders = [OpBuilder<(ins "mlir::Value":$x,
                                     "int64_t":$reduction), [{
           $_state.addOperands({x});
           $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
@@ -142,7 +142,7 @@ def Poptorch_end_for_loop : Poptorch_NotImplementedOp<"end_for_loop", [AttrSized
                        Poptorch_tensorlist:$inputs,
                        I64Attr:$trip_count);
   let results = (outs Poptorch_tensorlist:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$outputs,
+  let builders = [OpBuilder<(ins "mlir::ValueRange":$outputs,
                                     "mlir::ValueRange":$inputs,
                                     "int64_t":$trip_count), [{
           std::vector<mlir::Value> operands(std::begin(inputs), std::end(inputs));
@@ -162,7 +162,7 @@ def Poptorch_end_for_loop : Poptorch_NotImplementedOp<"end_for_loop", [AttrSized
 def Poptorch_optimizer_group : Poptorch_NotImplementedOp<"optimizer_group", []> {
   let arguments = (ins I64Attr:$group,
                        Poptorch_tensorlist:$inputs);
-  let builders = [OpBuilderDAG<(ins "int64_t":$group,
+  let builders = [OpBuilder<(ins "int64_t":$group,
                                     "mlir::ValueRange":$inputs), [{
           $_state.addOperands({inputs});
           $_state.addAttribute("group", $_builder.getI64IntegerAttr(group));
@@ -177,7 +177,7 @@ def Poptorch_set_matmul_serialization : Poptorch_NotImplementedOp<"set_matmul_se
                        I64Attr:$factor,
                        BoolAttr:$keep_precision);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$matmul,
+  let builders = [OpBuilder<(ins "mlir::Value":$matmul,
                                     "const char *":$mode,
                                     "int64_t":$factor,
                                     "bool":$keep_precision), [{
@@ -195,7 +195,7 @@ def Poptorch_set_overlap_for_input : Poptorch_NotImplementedOp<"set_overlap_for_
   let arguments = (ins Poptorch_tensor:$t,
                        StrAttr:$mode);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$t,
+  let builders = [OpBuilder<(ins "mlir::Value":$t,
                                     "const char *":$mode), [{
           $_state.addOperands({t});
           $_state.addAttribute("mode", $_builder.getStringAttr(mode));
@@ -209,7 +209,7 @@ def Poptorch_set_overlap_for_output : Poptorch_NotImplementedOp<"set_overlap_for
   let arguments = (ins Poptorch_tensor:$t,
                        StrAttr:$mode);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$t,
+  let builders = [OpBuilder<(ins "mlir::Value":$t,
                                     "const char *":$mode), [{
           $_state.addOperands({t});
           $_state.addAttribute("mode", $_builder.getStringAttr(mode));
@@ -222,7 +222,7 @@ def Poptorch_set_overlap_for_output : Poptorch_NotImplementedOp<"set_overlap_for
 def Poptorch_recomputation_checkpoint : Poptorch_NotImplementedOp<"recomputation_checkpoint", []> {
   let arguments = (ins Poptorch_tensor:$self);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self), [{
           $_state.addOperands({self});
           $_state.addTypes({self.getType()});
      }]>
@@ -234,7 +234,7 @@ def Poptorch_set_available_memory : Poptorch_NotImplementedOp<"set_available_mem
   let arguments = (ins Poptorch_tensor:$t,
                        F32Attr:$mem);
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$t,
+  let builders = [OpBuilder<(ins "mlir::Value":$t,
                                     "float":$mem), [{
           $_state.addOperands({t});
           $_state.addAttribute("mem", $_builder.getF32FloatAttr(mem));
@@ -255,7 +255,7 @@ def Poptorch_end_multi_conv : Poptorch_NotImplementedOp<"end_multi_conv", []> {
                        OptionalAttr<I64Attr>:$per_conv_reserved_tiles,
                        OptionalAttr<F32Attr>:$cycle_back_off,
                        OptionalAttr<I64ArrayAttr>:$enableConvDithering);
-  let builders = [OpBuilderDAG<(ins "std::optional<std::vector<float>>":$available_memory_proportions,
+  let builders = [OpBuilder<(ins "std::optional<std::vector<float>>":$available_memory_proportions,
                                     "std::optional<std::vector<int64_t>>":$partials_types,
                                     "std::optional<int64_t>":$plan_type,
                                     "std::optional<int64_t>":$per_conv_reserved_tiles,
@@ -308,7 +308,7 @@ def Poptorch_restore_autocast : Poptorch_NotImplementedOp<"restore_autocast", []
 def Poptorch_end_cpu_op : Poptorch_NotImplementedOp<"end_cpu_op", []> {
   let arguments = (ins Poptorch_tensorlist:$output);
   let results = (outs Poptorch_tensorlist:$result);
-  let builders = [OpBuilderDAG<(ins "mlir::ValueRange":$output), [{
+  let builders = [OpBuilder<(ins "mlir::ValueRange":$output), [{
           $_state.addOperands({output});
           std::vector<Type> types;
           for (const auto &o: output) {

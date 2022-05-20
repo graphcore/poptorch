@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "popart/sessionoptions.hpp"
 #include "popart_compiler/CompilerOptions.hpp"
 
 namespace poptorch {

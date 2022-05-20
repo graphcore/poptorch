@@ -11,7 +11,7 @@ class Poptorch_elem_unary<string name> :  Poptorch_Op<name, [SameOperandsAndResu
         `(`$in1`)` `(`type($in1)`)` `->` type($result) attr-dict
     }];
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1),[{
         $_state.addOperands({v1});
         $_state.addTypes(v1.getType());
      }]>
@@ -49,7 +49,7 @@ def Poptorch_isnan :  Poptorch_Op<"isnan"> {
     let arguments = (ins Poptorch_tensor:$self);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$self),[{
         $_state.addOperands({self});
 
         mlir::RankedTensorType rtt = self.getType().cast<mlir::RankedTensorType>();
@@ -66,7 +66,7 @@ class Poptorch_NotImplemented_elem_unary<string name> :  Poptorch_NotImplemented
         `(`$in1`)` `(`type($in1)`)` `->` type($result) attr-dict
     }];
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1),[{
         $_state.addOperands({v1});
         $_state.addTypes(v1.getType());
      }]>
@@ -123,7 +123,7 @@ class Poptorch_elem_binary<string name>
         `(`$in1 `,` $in2 `)` `(`type($in1)`,`type($in2)`)` `->` type($result) attr-dict
     }];
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
         $_state.addOperands({v1, v2});
         $_state.addTypes(inferType(v1, v2));
      }]>
@@ -171,7 +171,7 @@ class Poptorch_elem_binary_with_alpha<string name> :  Poptorch_elem_binary<name>
     let results = (outs Poptorch_tensor:$result);
 
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$alpha),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$alpha),[{
         $_state.addOperands({v1, v2});
 
         $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
@@ -225,7 +225,7 @@ def Poptorch_mul_: Poptorch_elem_binary_in_place<"mul_"> {}
 class Poptorch_elem_binary_in_place_with_alpha<string name> :  Poptorch_elem_binary_in_place<name> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2, DefaultValuedAttr<F32Attr, "1.0">:$alpha);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$alpha),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$alpha),[{
         $_state.addOperands({v1, v2});
         $_state.addAttribute("alpha",$_builder.getF32FloatAttr(alpha));
      }]>
@@ -244,7 +244,7 @@ class Poptorch_scaled<string name> : Poptorch_Op<name, []> {
     }];
 
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$scale),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2, "float":$scale),[{
         $_state.addOperands({v1, v2});
         $_state.addAttribute("scale", $_builder.getF32FloatAttr(scale));
      }]>
@@ -258,7 +258,7 @@ def Poptorch_scaledsub_: Poptorch_scaled<"scaled_sub_"> {}
 class Poptorch_addcX<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$input, Poptorch_tensor:$tensor1, Poptorch_tensor:$tensor2, F32Attr:$value);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2, "float":$value),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2, "float":$value),[{
         $_state.addOperands({input, tensor1, tensor2});
         $_state.addAttribute("value", $_builder.getF32FloatAttr(value));
      }]>
@@ -269,7 +269,7 @@ class Poptorch_addcX<string name> : Poptorch_Op<name, []> {
 class Poptorch_addcOutplaceX<string name> : Poptorch_addcX<name> {
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2, "float":$value),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2, "float":$value),[{
         $_state.addOperands({input, tensor1, tensor2});
 
         auto in_shape = getShape(input);
@@ -298,7 +298,7 @@ class Poptorch_NotImplemented_elem_binary<string name> :  Poptorch_NotImplemente
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
         $_state.addOperands({v1, v2});
         $_state.addTypes(inferType(v1, v2));
      }]>
@@ -332,7 +332,7 @@ class Poptorch_elem_binary_scalar<string name> :  Poptorch_NotImplementedOp<name
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$lhs, "float":$rhs),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$lhs, "float":$rhs),[{
         $_state.addOperands(lhs);
         $_state.addAttribute("rhs", $_builder.getF32FloatAttr(rhs));
 
@@ -349,7 +349,7 @@ class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
     let assemblyFormat = [{
         `(`$in1 `,` $in2 `)` `(`type($in1)`,`type($in2)`)` `->` type($result) attr-dict
     }];
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
         $_state.addOperands({v1, v2});
         mlir::RankedTensorType rtt = v1.getType().cast<mlir::RankedTensorType>();
         $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, false)));
@@ -366,7 +366,7 @@ def Poptorch_lt: Poptorch_binary_conditional<"lt"> {}
 class Poptorch_NotImplemented_binary_conditional_scalar<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$lhs, "float":$rhs),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$lhs, "float":$rhs),[{
         $_state.addOperands({lhs});
         $_state.addAttribute("rhs", $_builder.getF32FloatAttr(rhs));
         mlir::RankedTensorType rtt = lhs.getType().cast<mlir::RankedTensorType>();
@@ -391,7 +391,7 @@ def Poptorch_clamp: Poptorch_Op<"clamp", []> {
   let results = (outs Poptorch_tensor:$result);
 
   // builders allow us to tell MIR the types
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "std::optional<double>":$min,
                                     "std::optional<double>":$max),
 
@@ -416,7 +416,7 @@ def Poptorch_clampTensor: Poptorch_Op<"clampTensor", [AttrSizedOperandSegments]>
   let results = (outs Poptorch_tensor:$result);
 
   // builders allow us to tell MIR the types
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "mlir::Value":$min,
                                     "mlir::Value":$max),
 
@@ -444,7 +444,7 @@ def Poptorch_threshold_out: Poptorch_NotImplementedOp<"threshold_out", []> {
                        F32Attr:$value);
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "float":$threshold,
                                     "float":$value), [{
     $_state.addOperands(self);
@@ -465,7 +465,7 @@ class Poptorch_elem_binary_scatter<string name> :  Poptorch_NotImplementedOp<nam
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index, Poptorch_tensor:$src);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self, "std::int64_t":$dim, "mlir::Value":$index, "mlir::Value":$src),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim, "mlir::Value":$index, "mlir::Value":$src),[{
         $_state.addOperands({self, index, src});
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
         $_state.addTypes(self.getType());

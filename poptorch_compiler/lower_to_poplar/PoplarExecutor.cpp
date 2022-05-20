@@ -119,7 +119,8 @@ void PoplarExecutableImpl::compile(
                              [](mlir::Pass * /*unused*/,
                                 mlir::Operation * /*unused*/) { return true; },
                              /*printModuleScope =*/true,
-                             /* printAfterOnlyOnChange =*/true, output, flags);
+                             /* printAfterOnlyOnChange =*/true,
+                             /* printAfterOnlyOnFailure =*/true, output, flags);
   }
 
   manager.addPass(mlir::createCanonicalizerPass());

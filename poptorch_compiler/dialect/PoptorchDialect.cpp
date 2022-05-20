@@ -15,8 +15,7 @@ namespace poptorch_ir {
 struct CompilerContext;
 }
 
-// TODO(T49565): Needed in LLVM-13
-//#include "dialect/PoptorchDialect.cpp.inc"
+#include "dialect/PoptorchDialect.cpp.inc"
 
 // Easier to handle the tablegen include.
 // Lint exception: Do not use namespace using-directives.

@@ -432,7 +432,7 @@ class ClangFormat(ILinter):
                             print_output=autofix)
 
     def check_version(self):
-        return compare_versions_from_conda("clang-tools", "12.0.1")
+        return compare_versions_from_conda("clang-tools", "13.0.1")
 
 
 class ClangTidy(ILinter):
@@ -686,7 +686,7 @@ class ClangTidy(ILinter):
                         output_processor=parse_compile_commands_file).run():
             return False
 
-        return compare_versions_from_conda("clang-tools", "12.0.1")
+        return compare_versions_from_conda("clang-tools", "13.0.1")
 
     def is_enabled(self, filename, autofix):
         return "custom_cube_op.cpp" not in filename

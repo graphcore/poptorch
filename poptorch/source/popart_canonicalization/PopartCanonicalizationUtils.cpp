@@ -100,10 +100,10 @@ std::vector<torch::jit::Value *> handleTensorList(torch::jit::Node *node) {
 // Add a vector of ints to the IR as a constant.
 torch::jit::Value *
 intVectorToIrConstant(torch::jit::Graph *graph,
-                      const std::vector<std::int64_t> &shape) {
+                      const std::vector<std::int64_t> &ints) {
   const std::vector<std::int64_t> dimensions = {
-      static_cast<std::int64_t>(shape.size())};
-  return createConstantInt(graph, shape, dimensions)->output();
+      static_cast<std::int64_t>(ints.size())};
+  return createConstantInt(graph, ints, dimensions)->output();
 }
 
 // Get the shape of a tensor and add it to the graph as a constant value.

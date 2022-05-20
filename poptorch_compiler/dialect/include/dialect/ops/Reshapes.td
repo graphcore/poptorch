@@ -10,7 +10,7 @@ def Poptorch_as_strided: Poptorch_Op<"as_strided", [ViewOp]> {
     let results = (outs Poptorch_tensor:$result);
 
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$val1,
+    let builders = [OpBuilder<(ins "mlir::Value":$val1,
                                       "const std::vector<std::int64_t>&":$size,
                                       "const std::vector<std::int64_t>&":$strides,
                                       "std::optional<std::int64_t>":$storage_offset),[{
@@ -61,7 +61,7 @@ def Poptorch_transpose: Poptorch_Op<"transpose", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim0,  I64Attr:$dim1);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "std::int64_t":$dim0, "std::int64_t":$dim1),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim0, "std::int64_t":$dim1),[{
         $_state.addOperands({value});
         $_state.addAttribute("dim0", $_builder.getI64IntegerAttr(dim0));
         $_state.addAttribute("dim1", $_builder.getI64IntegerAttr(dim1));
@@ -84,7 +84,7 @@ def Poptorch_reshape: Poptorch_Op<"reshape", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "const std::vector<std::int64_t>&":$shape),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$value, "const std::vector<std::int64_t>&":$shape),[{
         $_state.addOperands({value});
 
         // At most one element can be -1, for which the shape will need to be
@@ -165,7 +165,7 @@ def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
                            DefaultValuedAttr<BoolAttr,"false">:$implicit);
   let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$value,
+    let builders = [OpBuilder<(ins "mlir::Value":$value,
                                       "const std::vector<std::int64_t>&":$shape,
                                       "bool":$implicit
                                       ),[{
@@ -186,7 +186,7 @@ def Poptorch_squeeze_dim: Poptorch_Op<"squeeze_dim", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
         $_state.addOperands({value});
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
 
@@ -210,7 +210,7 @@ def Poptorch_squeeze_dim_: Poptorch_Op<"squeeze_dim_", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
         $_state.addOperands({value});
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
 
@@ -237,7 +237,7 @@ def Poptorch_select : Poptorch_Op<"select", [ViewOp]> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::int64_t":$dim,
                                       "std::int64_t":$idx),[{
 
@@ -278,7 +278,7 @@ def Poptorch_slice_Tensor : Poptorch_NotImplementedOp<"slice_Tensor", []> {
 
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::int64_t":$dim,
                                       "std::optional<std::int64_t>":$start,
                                       "std::optional<std::int64_t>":$end,
@@ -327,7 +327,7 @@ def Poptorch_slice_Tensor : Poptorch_NotImplementedOp<"slice_Tensor", []> {
 def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
     let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
+    let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
         $_state.addOperands({value});
         $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
 
@@ -350,7 +350,7 @@ def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
 class Poptorch_NotImplemented_padding<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$pad),[{
         $_state.addOperands({self});
         $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
@@ -406,7 +406,7 @@ def Poptorch_replication_pad3d_out : Poptorch_NotImplemented_padding<"replicatio
 def Poptorch_constant_pad_nd : Poptorch_NotImplemented_padding<"constant_pad_nd"> {
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad, F32Attr:$scalar);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$pad,
                                       "float":$scalar),[{
         $_state.addOperands({self});
@@ -418,7 +418,7 @@ def Poptorch_constant_pad_nd : Poptorch_NotImplemented_padding<"constant_pad_nd"
 }
 
 class Poptorch_NotImplemented_reflection_padding<string name> : Poptorch_NotImplemented_padding<name> {
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$pad),[{
         $_state.addOperands({self});
         $_state.addAttribute("pad", $_builder.getI64ArrayAttr(pad));
@@ -448,7 +448,7 @@ def Poptorch_index_select : Poptorch_NotImplementedOp<"index_select", []> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::int64_t":$dim,
                                       "mlir::Value":$index),[{
         $_state.addOperands({self, index});
@@ -484,7 +484,7 @@ def Poptorch_permute : Poptorch_NotImplementedOp<"permute", []> {
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dims);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$dims),[{
         $_state.addOperands(self);
         $_state.addAttribute("dims", $_builder.getI64ArrayAttr(dims));
@@ -539,7 +539,7 @@ def Poptorch_upsample_linear1d_out : Poptorch_upsample<"upsample_linear1d_out"> 
                          BoolAttr:$align_corners,
                          OptionalAttr<F64Attr>:$scales);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$output_size,
                                       "bool":$align_corners,
                                       "std::optional<double>":$scales),[{
@@ -562,7 +562,7 @@ def Poptorch_upsample_nearest1d_out : Poptorch_upsample<"upsample_nearest1d_out"
                          I64ArrayAttr:$output_size,
                          OptionalAttr<F64Attr>:$scales);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$output_size,
                                       "std::optional<double>":$scales),[{
         $_state.addOperands(self);
@@ -585,7 +585,7 @@ class Poptorch_upsample2d_out<string name> : Poptorch_upsample<name> {
                          OptionalAttr<F64Attr>:$scales_h,
                          OptionalAttr<F64Attr>:$scales_w);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$output_size,
                                       "bool":$align_corners,
                                       "std::optional<double>":$scales_h,
@@ -616,7 +616,7 @@ def Poptorch_upsample_nearest2d_out : Poptorch_upsample<"upsample_nearest2d_out"
                          OptionalAttr<F64Attr>:$scales_h,
                          OptionalAttr<F64Attr>:$scales_w);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$output_size,
                                       "std::optional<double>":$scales_h,
                                       "std::optional<double>":$scales_w),[{
@@ -645,7 +645,7 @@ class Poptorch_upsample3d_out<string name> : Poptorch_upsample<name> {
                          OptionalAttr<F64Attr>:$scales_h,
                          OptionalAttr<F64Attr>:$scales_w);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$output_size,
                                       "bool":$align_corners,
                                       "std::optional<double>":$scales_d,
@@ -680,7 +680,7 @@ def Poptorch_upsample_nearest3d_out : Poptorch_upsample<"upsample_nearest3d_out"
                          OptionalAttr<F64Attr>:$scales_h,
                          OptionalAttr<F64Attr>:$scales_w);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "const std::vector<std::int64_t>&":$output_size,
                                       "std::optional<double>":$scales_d,
                                       "std::optional<double>":$scales_h,
@@ -710,7 +710,7 @@ def Poptorch_upsample_nearest3d_vec : Poptorch_upsample<"upsample_nearest3d_vec"
                          OptionalAttr<I64ArrayAttr>:$output_size,
                          OptionalAttr<F32ArrayAttr>:$scales);
     let results = (outs Poptorch_tensor:$result);
-    let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
                       "const std::optional<std::vector<std::int64_t>>&":$output_size,
                       "const std::optional<std::vector<float>>&":$scale_factors),[{
         $_state.addOperands(self);

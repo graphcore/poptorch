@@ -18,15 +18,15 @@ namespace {
 
 class AutocastPolicy {
 public:
-  AutocastPolicy() : is_enabled(false) {}
+  AutocastPolicy() : _is_enabled(false) {}
 
   bool decision(const torch::jit::Node *node, at::ScalarType *type) const;
 
-  bool enabled() const { return is_enabled; }
+  bool enabled() const { return _is_enabled; }
 
   void enabled(bool value) {
     logging::debug("poptorch.Options set autocastEnabled to {}", value);
-    is_enabled = value;
+    _is_enabled = value;
   }
 
   static void initSet(std::set<std::string> *set,
@@ -38,40 +38,40 @@ public:
   }
 
   void initHalf(const std::vector<std::string> &ops) {
-    initSet(&fp16, ops);
+    initSet(&_fp16, ops);
 
     std::string set_image;
-    renderSet(fp16, &set_image);
+    renderSet(_fp16, &set_image);
     logging::debug("Automatic casting policy fp16 set to: {}", set_image);
   }
 
   void initFloat(const std::vector<std::string> &ops) {
-    initSet(&fp32, ops);
+    initSet(&_fp32, ops);
 
     std::string set_image;
-    renderSet(fp32, &set_image);
+    renderSet(_fp32, &set_image);
     logging::debug("Automatic casting policy fp32 set to: {}", set_image);
   }
 
   void initPromote(const std::vector<std::string> &ops) {
-    initSet(&promote, ops);
+    initSet(&_promote, ops);
 
     std::string set_image;
-    renderSet(promote, &set_image);
+    renderSet(_promote, &set_image);
     logging::debug("Automatic casting policy promote set to: {}", set_image);
   }
 
   void initDemote(const std::vector<std::string> &ops) {
-    initSet(&demote, ops);
+    initSet(&_demote, ops);
 
     std::string set_image;
-    renderSet(demote, &set_image);
+    renderSet(_demote, &set_image);
     logging::debug("Automatic casting policy demote set to: {}", set_image);
   }
 
 protected:
-  bool is_enabled;
-  std::set<std::string> fp16, fp32, promote, demote;
+  bool _is_enabled;
+  std::set<std::string> _fp16, _fp32, _promote, _demote;
 
   static void renderSet(const std::set<std::string> &set, std::string *str) {
     if (set.empty()) {
@@ -134,28 +134,28 @@ bool AutocastPolicy::decision(const torch::jit::Node *node,
 
   // for mixed precision nodes, try to apply promote or demote rule first
   if (mixed_precision) {
-    auto it = promote.find(kind);
-    if (it != promote.end()) {
+    auto it = _promote.find(kind);
+    if (it != _promote.end()) {
       *type = at::ScalarType::Float;
       return true;
     }
 
-    it = demote.find(kind);
-    if (it != demote.end()) {
+    it = _demote.find(kind);
+    if (it != _demote.end()) {
       *type = at::ScalarType::Half;
       return true;
     }
   }
 
   // try to apply fp16 or fp32 rules
-  auto it = fp16.find(kind);
-  if (it != fp16.end()) {
+  auto it = _fp16.find(kind);
+  if (it != _fp16.end()) {
     *type = at::ScalarType::Half;
     return true;
   }
 
-  it = fp32.find(kind);
-  if (it != fp32.end()) {
+  it = _fp32.find(kind);
+  if (it != _fp32.end()) {
     *type = at::ScalarType::Float;
     return true;
   }

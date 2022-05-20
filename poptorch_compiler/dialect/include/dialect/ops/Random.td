@@ -11,7 +11,7 @@ def Poptorch_normal_ : Poptorch_Op<"normal_", [SameOperandsAndResultShape]> {
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "float":$mean,
                                     "float":$stdv), [{
         $_state.addOperands({self});
@@ -28,7 +28,7 @@ def Poptorch_normal_Tensor_Tensor : Poptorch_Op<"normal_Tensor_Tensor",
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$means,
+  let builders = [OpBuilder<(ins "mlir::Value":$means,
                                     "mlir::Value":$stdvs), [{
         $_state.addOperands({means, stdvs});
         $_state.addTypes({means.getType()});
@@ -42,7 +42,7 @@ def Poptorch_normal_Tensor_float : Poptorch_Op<"normal_Tensor_float",
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$means,
+  let builders = [OpBuilder<(ins "mlir::Value":$means,
                                     "float":$stdv), [{
         $_state.addOperands({means});
         $_state.addAttribute("stdv", $_builder.getF32FloatAttr(stdv));
@@ -57,7 +57,7 @@ def Poptorch_normal_float_Tensor : Poptorch_Op<"normal_float_Tensor",
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "float":$mean,
+  let builders = [OpBuilder<(ins "float":$mean,
                                     "mlir::Value":$stdvs), [{
         $_state.addOperands({stdvs});
         $_state.addAttribute("mean", $_builder.getF32FloatAttr(mean));
@@ -72,7 +72,7 @@ def Poptorch_uniform_ : Poptorch_Op<"uniform_", [SameOperandsAndResultShape]> {
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "float":$from,
                                     "float":$to), [{
         $_state.addOperands({self});
@@ -87,7 +87,7 @@ def Poptorch_random_ : Poptorch_Op<"random_", [SameOperandsAndResultShape]> {
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self), [{
         $_state.addOperands({self});
         $_state.addTypes({self.getType()});
   }]>];
@@ -100,7 +100,7 @@ def Poptorch_random__from : Poptorch_Op<"random__from", [SameOperandsAndResultSh
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "int64_t":$from,
                                     "std::optional<int64_t>":$to), [{
         $_state.addOperands({self});
@@ -119,7 +119,7 @@ def Poptorch_exponential_ : Poptorch_Op<"exponential_", [SameOperandsAndResultSh
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self,
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
                                     "float":$lamb), [{
         $_state.addOperands({self});
         $_state.addAttribute("lambd", $_builder.getF32FloatAttr(lamb));
@@ -133,7 +133,7 @@ def Poptorch_bernoulli__float : Poptorch_Op<"bernoulli__float", [SameOperandsAnd
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+  let builders = [OpBuilder<(ins "mlir::Value":$input,
                                     "float":$prob), [{
         $_state.addOperands({input});
         $_state.addAttribute("prob", $_builder.getF32FloatAttr(prob));
@@ -151,7 +151,7 @@ def Poptorch_bernoulli__tensor : Poptorch_Op<"bernoulli__tensor", [SameOperandsA
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$input,
+  let builders = [OpBuilder<(ins "mlir::Value":$input,
                                     "mlir::Value":$probs), [{
         $_state.addOperands({input, probs});
 
@@ -167,7 +167,7 @@ def Poptorch_bernoulli_out : Poptorch_Op<"bernoulli_out", [SameOperandsAndResult
 
   let results = (outs Poptorch_tensor:$result);
 
-  let builders = [OpBuilderDAG<(ins "mlir::Value":$self), [{
+  let builders = [OpBuilder<(ins "mlir::Value":$self), [{
         $_state.addOperands({self});
 
         mlir::RankedTensorType self_tensor = self.getType().cast<mlir::RankedTensorType>();

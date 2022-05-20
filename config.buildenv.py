@@ -2,7 +2,7 @@
 
 # IMPORTANT: Keep requirements in sync with ./requirements.txt.
 
-_llvm_version = "12.0.1"
+_llvm_version = "13.0.1"
 
 installers.add(
     CondaPackages(

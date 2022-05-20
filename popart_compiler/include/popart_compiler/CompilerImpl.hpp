@@ -101,33 +101,33 @@ public:
 
   const std::vector<double> &
   getInputTimestamps(const popart::TensorId &id) const {
-    return in_times.at(id);
+    return _in_times.at(id);
   }
 
   const std::vector<double> &
   getInputCompleteTimestamps(const popart::TensorId &id) const {
-    return in_complete_times.at(id);
+    return _in_complete_times.at(id);
   }
 
   const std::vector<double> &
   getOutputTimestamps(const popart::TensorId &id) const {
-    return out_times.at(id);
+    return _out_times.at(id);
   }
 
   const std::vector<double> &
   getOutputCompleteTimestamps(const popart::TensorId &id) const {
-    return out_complete_times.at(id);
+    return _out_complete_times.at(id);
   }
 
 protected:
-  TensorArrayInfo inputs_info;
-  TensorArrayInfo outputs_info;
-  TensorStepDataInfo step_data_info;
+  TensorArrayInfo _inputs_info;
+  TensorArrayInfo _outputs_info;
+  TensorStepDataInfo _step_data_info;
 
-  TensorTimestamps in_times;
-  TensorTimestamps in_complete_times;
-  TensorTimestamps out_times;
-  TensorTimestamps out_complete_times;
+  TensorTimestamps _in_times;
+  TensorTimestamps _in_complete_times;
+  TensorTimestamps _out_times;
+  TensorTimestamps _out_complete_times;
 };
 
 class WeightsIO : public popart::IWeightsIO {
