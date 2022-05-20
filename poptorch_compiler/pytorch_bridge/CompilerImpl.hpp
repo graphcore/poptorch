@@ -230,11 +230,7 @@ public:
   mlir::RankedTensorType getTensor(Type type,
                                    const std::vector<std::int64_t> &dims);
 
-  // We have to jump through some hoops to add a new input after creation.
-  // There's nicer ways of doing this in LLVM tree, once we upgrade should
-  // change this.
-  // TODO(T49565): Once we move from LLVM-13. See insertArgument in new API.
-  mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
+  static mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
 
   mlir::Value addArgumentToMainGraph(mlir::Type argType) {
     return addArgument(_main_graph, argType);

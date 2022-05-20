@@ -96,21 +96,10 @@ PoptorchCompilerImpl::PoptorchCompilerImpl()
 mlir::Value PoptorchCompilerImpl::addArgument(mlir::FuncOp func,
                                               mlir::Type argType) {
   // Add the argument to the region.
-  mlir::Value val = func.getBody().addArgument(argType);
+  const auto insert_pos = func.getNumArguments();
+  func.insertArgument(insert_pos, argType, {});
 
-  // Rebuild the FunctionType from the above.
-  llvm::SmallVector<mlir::Type> types;
-  for (mlir::Value arg : func.front().getArguments()) {
-    types.push_back(arg.getType());
-  }
-
-  // Create the new type.
-  mlir::FunctionType function_ty = _builder.getFunctionType(types, llvm::None);
-
-  // Give the function its new type.
-  func.setType(function_ty);
-
-  return val;
+  return func.getArgument(insert_pos);
 }
 
 mlir::Type PoptorchCompilerImpl::convertType(Type type) {
