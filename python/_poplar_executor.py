@@ -48,23 +48,37 @@ BUFFERS_CAN_CHANGE = (
 # eventually stop supporting this approach so make sure a warning is printed.
 class _SetDefaultDeviceType:
     def __init__(self):
-        self.tensor = torch.tensor
+        self.overrides = dict()
 
     def __enter__(self):
-        @functools.wraps(torch.tensor)
-        def _tensor(*args, **kwargs):
-            if "device" not in kwargs:
-                logger.warning(
-                    "No device set in torch.tensor(): forcing to IPU")
-                kwargs["device"] = "xla"
-            return self.tensor(*args, **kwargs)
+        def create_wrapper(f):
+            @functools.wraps(f)
+            def _wrapper(*args, **kwargs):
+                if "device" not in kwargs:
+                    logger.warning(
+                        "No device set in torch.%s(): forcing to IPU",
+                        f.__name__)
+                    kwargs["device"] = "xla"
+                return f(*args, **kwargs)
 
-        torch.tensor = _tensor
+            return _wrapper
+
+        # All the ops with FACTORY_PARAMS in <torch>/tools/pyi/gen_pyi.py
+        for name in [
+                "arange", "full", "full_like", "linspace", "logspace",
+                "randint", "range", "tensor", "zeros_like"
+        ]:
+            func = getattr(torch, name)
+
+            self.overrides[name] = func
+            setattr(torch, name, create_wrapper(func))
+
         return self
 
     def __exit__(self, exc_type, value, traceback):
-        # Restore the real Torch function
-        torch.tensor = self.tensor
+        # Restore the real Torch functions
+        for name, real in self.overrides.items():
+            setattr(torch, name, real)
 
 
 # pylint: disable=too-many-public-methods
