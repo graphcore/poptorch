@@ -19,8 +19,9 @@
  * Custom traits.
  */
 
-// TODO(T49565) in next LLVM version (Current 12.0) we can move this into our
-// own namespace
+// TODO(T62821) in next LLVM version (Current 13.0) we can move this into our
+// own namespace. Note: this comment was also present for LLVM 13.0 so remove it
+// if we can't do this in LLVM 14
 namespace mlir {
 namespace OpTrait {
 
