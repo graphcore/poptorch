@@ -874,6 +874,7 @@ class PipelinedExecution(_IExecutionStrategy):
         their `ipu_id` explicitly set when using `AutoStage`.
 
         Example 1: Blocks `user_id` are known, IPUs are inferred.
+
         >>> with poptorch.Block("A"):
         ...     layer1()
         >>> with poptorch.Block("B"):
@@ -888,13 +889,15 @@ class PipelinedExecution(_IExecutionStrategy):
         ...                                                       "C","D"))
 
         Stages can also be set explicitly:
+
         >>> # Create a 2 stages pipeline with the blocks `user_id`, 2 IPUs will be used.
         >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
         ...    poptorch.Stage("A","B"),
         ...    poptorch.Stage("C","D")))
 
         Example 2: Blocks `ipu_id` are known, use default AutoStage.
-        poptorch.Block.useAutoId()
+
+        >>> poptorch.Block.useAutoId()
         >>> with poptorch.Block(ipu_id=0):
         ...     layer1()
         >>> with poptorch.Block(ipu_id=1):
@@ -909,6 +912,7 @@ class PipelinedExecution(_IExecutionStrategy):
         >>> # is the default execution strategy when blocks are defined.
 
         Example 3:  Non-consecutive stages placed on the same IPU.
+
         >>> with poptorch.Block(ipu_id=0):
         ...     layer1()
         >>> with poptorch.Block(ipu_id=1):

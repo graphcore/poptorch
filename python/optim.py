@@ -149,6 +149,7 @@ class SGD(Optimizer, torch.optim.SGD):
 
     .. note:: If the number of gradient accumulations is high, you can use off
         chip memory for the velocity tensors with a minimal performance hit.
+
         >>> opts.TensorLocations.setOptimizerLocation(
         ...     poptorch.TensorLocationSettings().useOnChipStorage(False))
 
