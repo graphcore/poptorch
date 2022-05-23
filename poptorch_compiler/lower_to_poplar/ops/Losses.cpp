@@ -16,6 +16,17 @@ namespace pe = popops::expr;
 
 namespace poptorch_ir {
 
+namespace {
+// Reduce the tensor to a scalar by summing over all dimensions
+poplar::Tensor reduceToScalar(poplar::Tensor &in, CompilerContext &context) {
+  std::vector<std::size_t> dims(in.rank());
+  std::iota(dims.begin(), dims.end(), 0);
+  return popops::reduce(context.graph, in, dims, {popops::Operation::ADD},
+                        context.seq);
+}
+
+} // namespace
+
 void mse_loss::lowerToPoplar(CompilerContext &context) {
   // aten::mse_loss(Tensor self, Tensor target, int reduction) -> Tensor
 
@@ -29,11 +40,7 @@ void mse_loss::lowerToPoplar(CompilerContext &context) {
                   {input, target}, context.seq);
 
   if (reduction != TorchReduction::NONE) {
-    std::vector<std::size_t> dims(input.rank());
-    std::iota(dims.begin(), dims.end(), 0);
-    sqr_error = popops::reduce(context.graph, sqr_error, dims,
-                               {popops::Operation::ADD}, context.seq);
-
+    sqr_error = reduceToScalar(sqr_error, context);
     if (reduction == TorchReduction::MEAN) {
       sqr_error = popops::map(
           context.graph, pe::Divide(pe::_1, pe::Const(input.numElements())),
@@ -225,12 +232,7 @@ void binary_cross_entropy::lowerToPoplar(CompilerContext &context) {
   }
 
   if (reduction != TorchReduction::NONE) {
-    std::vector<size_t> dims(out.rank());
-    std::iota(dims.begin(), dims.end(), 0);
-
-    out = popops::reduce(context.graph, out, dims, {popops::Operation::ADD},
-                         context.seq);
-
+    out = reduceToScalar(out, context);
     if (reduction == TorchReduction::MEAN) {
       poplar::Tensor total_elements =
           createConstant(context, input.elementType(), {}, input.numElements());
