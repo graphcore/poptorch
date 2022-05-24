@@ -23,6 +23,33 @@ struct Value;
 
 namespace poptorch {
 
+// Store information related to Graph inputs modified in place.
+struct InplaceGraphInfo {
+  // Mapping for a graph input which is not modified in place.
+  static constexpr size_t no_mapping = std::numeric_limits<size_t>::max();
+
+  // Number of outputs from the graph which are not used to emulate
+  // inplace ops. (An output may be a list or tuple as well as a tensor).
+  size_t num_normal_outputs{0};
+
+  // Number of tensors output from the graph which are not used to
+  // emulate inplace ops. (This differs from the previous if the graph returns
+  // one or more tuples/lists.)
+  size_t num_tensor_outputs{0};
+
+  // Mapping between each input tensor and the output tensor used
+  // to update the input. If the input tensor is not changed in place, it will
+  // be equal to InplaceGraphInfo::no_mapping
+  //
+  // Note: these are inputs only, not parameters.
+  //
+  // If the input at graph_input_idx is modified in place:
+  //   m[graph_input_idx] = graph_output_idx
+  // else
+  //   m[graph_input_idx] = no_mapping
+  std::vector<size_t> input_output_mapping{};
+};
+
 // A replacement for and modification to
 // torch/csrc/jit/passes/remove_inplace_ops.cpp.
 // In addition to replacing inplace ops with their outplace variants,
@@ -30,88 +57,22 @@ namespace poptorch {
 // original lowered graph, would correspond to an input tensor modified in
 // place. As a result, PopTorch can use returned outputs to update the input
 // tensors and, in doing so, emulate inplace op behaviour.
-class InplaceOpHandler {
-public:
-  InplaceOpHandler(const std::shared_ptr<torch::jit::Graph> &graph,
-                   size_t num_parameters, size_t num_anchors,
-                   bool replicas_needing_broadcast);
-
-  // Returns the mapping between each input tensor and the output tensor used
-  // to update the input. If the input tensor is not changed in place, it will
-  // be equal to InplaceOpHandler::no_mapping
-  const std::vector<size_t> &getInputMapping() const {
-    return _input_output_mapping;
-  }
-
-  // Return the number of outputs from the graph which are not used to emulate
-  // inplace ops. (An output may be a list or tuple as well as a tensor).
-  size_t getNumNormalOutputs() const {
-    return _num_normal_outputs + _num_anchors;
-  }
-
-  // Return the number of tensors output from the graph which are not used to
-  // emulate inplace ops. (This differs from the previous if the graph returns
-  // one or more tuples/lists.)
-  size_t getNumTensorOutputs() const {
-    return _num_normal_tensor_outputs + _num_anchors;
-  }
-
-  static constexpr size_t no_mapping = std::numeric_limits<size_t>::max();
-
-private:
-  // Store the number of tensors out, including those in tuples.
-  void storeNumTensorOutputs();
-
-  // Process the input by changing any nodes to inplace variants and adding an
-  // addition output if required.
-  void processInput(size_t input);
-
-  // Remove any remaining inplace ops that are not connected with an input or
-  // an alias so can simply be replace with an outplace equivalents.
-  void removeRemainingInplaceOps();
-
-  // Whenever loop body has inplace ops that change the input of the body,
-  // the trace we see is incorrect. It is incorrect because during loop
-  // lowering we use the inputs of poptorch::end_for_loop which comes after
-  // the inplace ops in the trace and hence has the input-changing op's output
-  // as an input. We fix this by simply overwriting the input of
-  // poptorch::end_for_loop with the input of poptorch::start_for_loop which
-  // points to the correct ssa value because it comes before the inplace ops
-  // in the trace.
-  void fixForLoopInputs();
-
-  // Outplace op by swapping it with the correct variant (usually but not always
-  // removing the trailing '_') and making any other changes
-  torch::jit::Node *outplaceOp(torch::jit::Node *node);
-
-  torch::jit::Graph *_graph;
-  std::vector<torch::jit::Value *> _collapsed_inputs;
-
-  // Map from inputs in, which are modified in place, to "output" which should
-  // be used to update the input
-  std::vector<size_t> _input_output_mapping;
-
-  // The number of tensors which are (real) inputs
-  std::size_t _num_tensor_inputs;
-
-  // The number of outputs which should be returned in PyTorch. This is the
-  // first "num_normal_outputs" in the graph. The rest are used to update inputs
-  // which, in the PyTorch model, should be modified in place.
-  size_t _num_normal_outputs;
-
-  // The number of tensors which are not model outputs but which should be
-  // returned to the user. Not affected by inplacing rules.
-  size_t _num_anchors;
-
-  // Number of tensors: this will differ from the previous in the case of
-  // (possibly nested) tuples to include the number of tensors returned,
-  // including those which are elements of tuples.
-  size_t _num_normal_tensor_outputs;
-
-  // Whether or not there is at least one replica: this is relevant in the case
-  // of buffers modified in place, which is not supported with replicas
-  bool _replicas_needing_broadcast;
-};
+//
+// num_parameters: the number of elements in graph.inputs() which are
+// parameters.
+//
+// num_anchors: the number of tensors which are not model outputs but which
+//              should be returned to the user. Not affected by inplacing
+//              rules.
+//
+// replicas_needing_broadcast: whether or not there is at least one replica:
+//                             this is relevant in the case of buffers
+//                             modified in place, which is not supported
+//                             with replicas.
+InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
+                                         size_t num_parameters,
+                                         size_t num_anchors,
+                                         bool replicas_needing_broadcast);
 
 // Get the NodeKind corresponding to the outplace version of the given
 // inplace op NodeKind

@@ -831,8 +831,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   // contains the number of elements in a list
   poptorch::type_and_constant_canonicalization::addListNumElements(graph.get());
 
-  auto inplace_op_handler = std::make_shared<InplaceOpHandler>(
-      graph, traced_parameter_tensors.size(), anchors.size(),
+  InplaceGraphInfo inplace_info = handleInplaceOpsInGraph(
+      *graph, traced_parameter_tensors.size(), anchors.size(),
       parsed_options.replicationFactor() > 1 &&
           parsed_options.broadcastBuffers());
 
@@ -931,9 +931,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   poptorch::logging::Tracepoint::begin(lower_to_popart);
 
   poptorch::LowerToPopart lower(
-      graph.get(), traced_parameter_tensors, parameters, inplace_op_handler,
-      training, std::move(optimizers), parsed_options, attribute_accessor,
-      callbacks, std::move(anchors_list));
+      graph.get(), traced_parameter_tensors, parameters,
+      std::move(inplace_info), training, std::move(optimizers), parsed_options,
+      attribute_accessor, callbacks, std::move(anchors_list));
   lower.lower(&input_tensors);
 
   // Clear the callbacks after compilation.
@@ -1326,8 +1326,23 @@ compileWithManualTracing(const pybind11::dict &options,
   logging::debug("Compile with manual tracing");
 
   std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
+  SessionOptions parsed_options = parseSessionOptions(options);
+
+  AnchorList anchors_list;
+  std::vector<Optimizer> optimizers;
 
   logging::debug("Traced graph:\n{}", *graph);
+
+  // Make sure all constants are correctly categorised as either
+  // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
+  // that we have a full graph.
+  poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
+      graph.get());
+
+  InplaceGraphInfo inplace_info =
+      handleInplaceOpsInGraph(*graph, 0, anchors_list.size(),
+                              parsed_options.replicationFactor() > 1 &&
+                                  parsed_options.broadcastBuffers());
 
   if (graph->outputs().empty()) {
     logging::trace("No outputs, so all nodes cleared");
@@ -1336,27 +1351,14 @@ compileWithManualTracing(const pybind11::dict &options,
     }
   }
 
-  // Make sure all constants are correctly categorised as either
-  // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
-  // that we have a full graph.
-  poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
-      graph.get());
-
-  auto inplace_op_handler =
-      std::make_shared<InplaceOpHandler>(graph, 0, 0, true);
-
   // TODO(T55228): remove after we use our own dispatch key.
   removeDeadImplicitCasts(graph.get());
 
   logging::debug("Graph right before popart:\n{}", *graph);
 
-  AnchorList anchors_list;
-  std::vector<Optimizer> optimizers;
-
   poptorch::LowerToPopart lower(
-      graph.get(), inplace_op_handler, false, std::move(optimizers),
-      parseSessionOptions(options), attribute_accessor, callbacks,
-      std::move(anchors_list));
+      graph.get(), std::move(inplace_info), false, std::move(optimizers),
+      parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
 
   lower.lower(nullptr);
 

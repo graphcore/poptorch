@@ -161,6 +161,29 @@ def test_inplace_masked_fill(trace_model):
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
+def test_chained_inplace(trace_model):
+    class Model(nn.Module):
+        def forward(self, x, y):
+            x += y
+            x += 2.0
+            x += y
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = Model()
+    t1 = torch.tensor([1.])
+    cpu_t1 = torch.tensor([1.])
+    t2 = torch.tensor([2.])
+    poptorch_model = poptorch.inferenceModel(model, options)
+    out = model(cpu_t1, t2)
+    assert out is None
+    out = poptorch_model(t1, t2)
+    assert out is None
+    assert cpu_t1 == 7.0
+    assert t1 == 7.0
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_inplace_zero(trace_model):
     class Model(nn.Module):
         def forward(self, x):

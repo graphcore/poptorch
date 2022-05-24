@@ -39,61 +39,94 @@ const std::unordered_set<torch::jit::NodeKind> &viewOps() {
       aten::swapaxes, aten::swapdims,   aten::view_as};
   return view_ops;
 }
-} // namespace
 
-InplaceOpHandler::InplaceOpHandler(
-    const std::shared_ptr<torch::jit::Graph> &graph, size_t num_parameters,
-    size_t num_anchors, bool replicas_needing_broadcast)
-    : _graph(graph.get()), _num_anchors(num_anchors),
-      _replicas_needing_broadcast(replicas_needing_broadcast) {
-  _collapsed_inputs = collapsedGraphInputHierachy(graph.get());
-  _num_tensor_inputs = _collapsed_inputs.size() - num_parameters;
+size_t countNumTensorOutputs(torch::jit::Graph &graph) {
+  size_t num_tensors = 0;
 
-  // To begin with, none of the outputs are used for emulating inplacing.
-  // Store the number of outputs (which may be nested) and the total number
-  // of tensors output becase we will need these when handling the return values
-  // from PopART to separate the original from additional outputs.
-  _num_normal_outputs = graph->outputs().size();
-  storeNumTensorOutputs();
-
-  // Now process each input and make changes if it is modified in place.
-  for (size_t input = 0; input < _collapsed_inputs.size(); input++) {
-    processInput(input);
-  }
-
-  // There may still be inplace ops (which do not affect an input).
-  // These must also be removed.
-  removeRemainingInplaceOps();
-
-  // TODO(T60455): Remove the if statement after the pass is adapted for
-  // the dispatcher (most of the pass, including this call, won't be needed).
-  if (!isDispatcherActive()) {
-    // Make sure poptorch::end_for_loop has the non-changed value as an input.
-    fixForLoopInputs();
-  }
-}
-
-void InplaceOpHandler::storeNumTensorOutputs() {
-  _num_normal_tensor_outputs = 0;
-
-  for (const auto &output : _graph->outputs()) {
+  for (const auto &output : graph.outputs()) {
     if (output->node()->kind() == c10::prim::ListConstruct) {
       for (const auto &input : output->node()->inputs()) {
-        _num_normal_tensor_outputs += numTensorsForType(input->type());
+        num_tensors += numTensorsForType(input->type());
       }
     } else {
-      _num_normal_tensor_outputs += numTensorsForType(output->type());
+      num_tensors += numTensorsForType(output->type());
+    }
+  }
+  return num_tensors;
+}
+
+void fixForLoopInputs(torch::jit::Graph &graph) {
+  torch::jit::Value *correct_loop_input = nullptr;
+  for (auto *node : graph.nodes()) {
+    if (node->kind() == symbols::poptorch::start_for_loop) {
+      correct_loop_input = node->input();
+    } else if (node->kind() == symbols::poptorch::end_for_loop) {
+      ERROR_ON_MSG(!correct_loop_input,
+                   "[Internal] poptorch::end_for_loop "
+                   "encountered before poptorch::start_for_loop");
+      node->replaceInput(1, correct_loop_input);
     }
   }
 }
 
-void InplaceOpHandler::processInput(size_t input_num) {
-  torch::jit::Value *current_alias = _collapsed_inputs[input_num];
+torch::jit::Node *outplaceOp(torch::jit::Graph &graph, torch::jit::Node *node) {
+  torch::jit::NodeKind new_kind = outplaceKind(node->kind());
+
+  torch::jit::WithInsertPoint insert_point(node);
+  auto *new_node = graph.create(new_kind);
+  graph.insertNode(new_node);
+
+  for (auto *input : node->inputs()) {
+    new_node->addInput(input);
+  }
+
+  torch::jit::addAdditionalInputsIfRequired(&graph, node, new_node);
+
+  new_node->output()->setType(node->output()->type());
+  replaceAllUsesWith(node->output(), new_node->output());
+  replaceAllUsesAfterNodeWith(node, node->input(0), node->output());
+
+  return new_node;
+}
+
+void removeRemainingInplaceOps(torch::jit::Graph &graph) {
+  std::vector<torch::jit::Node *> to_delete;
+  for (auto *node : graph.nodes()) {
+    // Skip if not in-place
+    if (!torch::jit::isInplaceOp(node)) {
+      continue;
+    }
+
+    // Keep it in place if there is only an inplace version
+    if (onlyInplaceOps().count(node->kind()) != 0) {
+      continue;
+    }
+
+    // If the input is a view operation, it's unsafe to
+    // outplace at this stage because aliasing information
+    // is lost. This special case will be handled during
+    // PopART canonicalisation
+    if (viewOps().count(node->input(0)->node()->kind()) != 0) {
+      continue;
+    }
+
+    outplaceOp(graph, node);
+    to_delete.push_back(node);
+  }
+
+  for (auto *node : to_delete) {
+    node->destroy();
+  }
+}
+
+size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
+                    bool is_parameter, bool replicas_needing_broadcast) {
+  torch::jit::Value *current_alias = graph_input;
   std::vector<torch::jit::Node *> to_delete;
 
   // Pass through the nodes in topological order rather than jumping through
   // outputs
-  for (auto *node : _graph->nodes()) {
+  for (auto *node : graph.nodes()) {
     // Skip if not in-place
     if (!torch::jit::isInplaceOp(node)) {
       continue;
@@ -110,6 +143,9 @@ void InplaceOpHandler::processInput(size_t input_num) {
     while (viewOps().count(input->node()->kind()) != 0) {
       input = input->node()->input(0);
     }
+
+    // The inplace tensor it refers to is not related to the input
+    // we're currently processing: ignore.
     if (input != current_alias) {
       continue;
     }
@@ -136,103 +172,113 @@ void InplaceOpHandler::processInput(size_t input_num) {
       continue;
     }
 
-    if (viewOps().count(node->input(0)->node()->kind()) != 0) {
-      current_alias = node->output();
-      continue;
-    }
-
-    auto *new_node = outplaceOp(node);
-    to_delete.push_back(node);
-    current_alias = new_node->output();
-  }
-
-  // Handle differently for normal inputs and parameters
-  bool is_parameter = input_num >= _num_tensor_inputs;
-
-  // Check if it is not modified in place at all
-  bool is_modified_inplace = current_alias != _collapsed_inputs[input_num];
-  if (!is_modified_inplace) {
-    if (!is_parameter) {
-      _input_output_mapping.push_back(InplaceOpHandler::no_mapping);
-    }
-
-    ERROR_ON(!to_delete.empty());
-    return;
-  }
-
-  if (is_parameter) {
-    // This is not supported with replicas needing broadcast
-    ERROR_ON_MSG(_replicas_needing_broadcast,
-                 "PopTorch does not support broadcasting buffers. If your "
-                 "model is able to tolerate buffers becoming out of sync "
-                 "between replicas, you can disable buffer broadcasting using "
-                 "poptorch.Options.broadcastBuffers(False).");
-
-    auto *new_node = _graph->create(symbols::poptorch::update_param_inplace, 1);
-    new_node->addInput(_collapsed_inputs[input_num]);
-    new_node->addInput(current_alias);
-    new_node->insertAfter(current_alias->node());
-    new_node->output()->setType(current_alias->type());
-
-  } else {
-    // Not a parameter : handle by adding it as an output which will be used
-    // to update the input tensor
-    size_t output_mapping = InplaceOpHandler::no_mapping;
-
-    if (is_modified_inplace) {
-      for (size_t output = 0; output < _graph->outputs().size(); output++) {
-        if (_graph->outputs()[output] == current_alias) {
-          output_mapping = output;
-        }
-      }
-    }
-
-    if (output_mapping == InplaceOpHandler::no_mapping) {
-      output_mapping = _graph->registerOutput(current_alias);
-
-      // Ensure the overlap flag is set to no overlap (any models wanting the
-      // additional efficiency of overalpped host IO should not use inplace
-      // ops.)
-      auto overlap_symbol =
-          getOverlapSymbol("_for_output", _graph->outputs().size() - 1);
-      _graph->return_node()->s_(overlap_symbol, "no_overlap");
-    }
-    _input_output_mapping.push_back(output_mapping);
-  }
-
-  for (auto *node : to_delete) {
-    node->destroy();
-  }
-}
-
-void InplaceOpHandler::removeRemainingInplaceOps() {
-  std::vector<torch::jit::Node *> to_delete;
-  for (auto *node : _graph->nodes()) {
-    // Skip if not in-place
-    if (!torch::jit::isInplaceOp(node)) {
-      continue;
-    }
-
-    // Keep it in place if there is only an inplace version
-    if (onlyInplaceOps().count(node->kind()) != 0) {
-      continue;
-    }
-
     // If the input is a view operation, it's unsafe to
     // outplace at this stage because aliasing information
     // is lost. This special case will be handled during
     // PopART canonicalisation
     if (viewOps().count(node->input(0)->node()->kind()) != 0) {
+      current_alias = node->output();
       continue;
     }
 
-    outplaceOp(node);
+    // Otherwise outplace the op.
+    auto *new_node = outplaceOp(graph, node);
     to_delete.push_back(node);
+    current_alias = new_node->output();
+  }
+
+  // Check if it is not modified in place at all
+  bool is_modified_inplace = current_alias != graph_input;
+  if (!is_modified_inplace) {
+    ERROR_ON(!to_delete.empty());
+    return InplaceGraphInfo::no_mapping;
+  }
+  size_t output_mapping = InplaceGraphInfo::no_mapping;
+  if (is_parameter) {
+    // The input is a parameter which is modified in place.
+
+    // This is not supported with replicas needing broadcast.
+    ERROR_ON_MSG(replicas_needing_broadcast,
+                 "PopTorch does not support broadcasting buffers. If your "
+                 "model is able to tolerate buffers becoming out of sync "
+                 "between replicas, you can disable buffer broadcasting using "
+                 "poptorch.Options.broadcastBuffers(False).");
+
+    auto *new_node = graph.create(symbols::poptorch::update_param_inplace, 1);
+    new_node->addInput(graph_input);
+    new_node->addInput(current_alias);
+    new_node->insertAfter(current_alias->node());
+    new_node->output()->setType(current_alias->type());
+
+  } else {
+    // The input is a graph input which is modified in place.
+
+    // Handle by adding it as an output which will be used
+    // to update the input tensor.
+
+    for (size_t output = 0; output < graph.outputs().size(); output++) {
+      if (graph.outputs()[output] == current_alias) {
+        output_mapping = output;
+      }
+    }
+
+    if (output_mapping == InplaceGraphInfo::no_mapping) {
+      output_mapping = graph.registerOutput(current_alias);
+
+      // Ensure the overlap flag is set to no overlap (any models wanting the
+      // additional efficiency of overalpped host IO should not use inplace
+      // ops).
+      auto overlap_symbol =
+          getOverlapSymbol("_for_output", graph.outputs().size() - 1);
+      graph.return_node()->s_(overlap_symbol, "no_overlap");
+    }
   }
 
   for (auto *node : to_delete) {
     node->destroy();
   }
+  return output_mapping;
+}
+} // namespace
+
+InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
+                                         size_t num_parameters,
+                                         size_t num_anchors,
+                                         bool replicas_needing_broadcast) {
+  // TODO(D67666): enable once D67666 has landed.
+  // ERROR_ON_MSG(isDispatcherActive(),"[Internal] This function should only be
+  // called for traced graphs");
+  InplaceGraphInfo out;
+  std::vector<torch::jit::Value *> collapsed_inputs =
+      collapsedGraphInputHierachy(&graph);
+  size_t num_tensor_inputs = collapsed_inputs.size() - num_parameters;
+
+  // To begin with, none of the outputs are used for emulating inplacing.
+  // Store the number of outputs (which may be nested) and the total number
+  // of tensors output becase we will need these when handling the return values
+  // from PopART to separate the original from additional outputs.
+  out.num_normal_outputs = graph.outputs().size() + num_anchors;
+  out.num_tensor_outputs = countNumTensorOutputs(graph) + num_anchors;
+  out.input_output_mapping.reserve(num_tensor_inputs);
+
+  // Now process each input and make changes if it is modified in place.
+  for (size_t input = 0; input < collapsed_inputs.size(); input++) {
+    bool is_parameter = input >= num_tensor_inputs;
+    auto mapping = processInput(graph, collapsed_inputs.at(input), is_parameter,
+                                replicas_needing_broadcast);
+    if (!is_parameter) {
+      out.input_output_mapping.push_back(mapping);
+    }
+  }
+
+  // There may still be inplace ops (which do not affect an input).
+  // These must also be removed.
+  removeRemainingInplaceOps(graph);
+
+  // Make sure poptorch::end_for_loop has the non-changed value as an input.
+  fixForLoopInputs(graph);
+
+  return out;
 }
 
 torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind) {
@@ -251,40 +297,6 @@ torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind) {
   }
 
   return new_kind;
-}
-
-torch::jit::Node *InplaceOpHandler::outplaceOp(torch::jit::Node *node) {
-  torch::jit::NodeKind new_kind = outplaceKind(node->kind());
-
-  torch::jit::WithInsertPoint insert_point(node);
-  auto *new_node = _graph->create(new_kind);
-  _graph->insertNode(new_node);
-
-  for (auto *input : node->inputs()) {
-    new_node->addInput(input);
-  }
-
-  torch::jit::addAdditionalInputsIfRequired(_graph, node, new_node);
-
-  new_node->output()->setType(node->output()->type());
-  replaceAllUsesWith(node->output(), new_node->output());
-  replaceAllUsesAfterNodeWith(node, node->input(0), node->output());
-
-  return new_node;
-}
-
-void InplaceOpHandler::fixForLoopInputs() {
-  torch::jit::Value *correct_loop_input = nullptr;
-  for (auto *node : _graph->nodes()) {
-    if (node->kind() == symbols::poptorch::start_for_loop) {
-      correct_loop_input = node->input();
-    } else if (node->kind() == symbols::poptorch::end_for_loop) {
-      ERROR_ON_MSG(!correct_loop_input,
-                   "Unreachable internal error: poptorch::end_for_loop "
-                   "encountered before poptorch::start_for_loop");
-      node->replaceInput(1, correct_loop_input);
-    }
-  }
 }
 
 } // namespace poptorch

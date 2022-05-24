@@ -162,16 +162,16 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors) {
   // Execute the compiled poplar graph.
   _compiler.run();
 
-  const auto &mapping = _inplace_op_handler->getInputMapping();
+  const auto &mapping = _inplace_info.input_output_mapping;
   for (size_t i = 0; i < mapping.size(); i++) {
-    if (mapping[i] == InplaceOpHandler::no_mapping) {
+    if (mapping[i] == InplaceGraphInfo::no_mapping) {
       continue;
     }
     auto out_tensor = returnees.at(mapping[i]).toTensor();
     (*inTensors)[i].copy_(out_tensor, false);
   }
 
-  returnees.resize(_inplace_op_handler->getNumTensorOutputs());
+  returnees.resize(_inplace_info.num_tensor_outputs);
 
   return returnees;
 }

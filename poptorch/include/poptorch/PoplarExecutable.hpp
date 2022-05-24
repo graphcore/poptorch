@@ -12,10 +12,9 @@
 #include <vector>
 
 #include "popart_compiler/Compiler.hpp"
+#include "poptorch/InplaceOps.hpp"
 
 namespace poptorch {
-
-class InplaceOpHandler;
 
 class PoplarExecutable {
 public:
@@ -25,11 +24,11 @@ public:
                    std::vector<poptorch::TensorId> &&outputs,
                    std::vector<at::ScalarType> &&outputTypes,
                    std::vector<std::string> parameter_names,
-                   std::shared_ptr<InplaceOpHandler> inplace_op_handler)
+                   InplaceGraphInfo &&inplace_info)
       : _compiler(std::move(c)), _popart_inputs(inputs),
         _popart_outputs(outputs), _popart_output_types(outputTypes),
         _parameter_names(std::move(parameter_names)),
-        _inplace_op_handler(std::move(inplace_op_handler)) {
+        _inplace_info(std::move(inplace_info)) {
     for (size_t i = 0; i < inputs.size(); i++) {
       _converted_inputs.emplace_back();
     }
@@ -74,7 +73,7 @@ private:
   std::vector<at::ScalarType> _popart_output_types;
   const std::vector<std::string> _parameter_names;
 
-  std::shared_ptr<InplaceOpHandler> _inplace_op_handler;
+  const InplaceGraphInfo _inplace_info;
 };
 
 } // namespace poptorch

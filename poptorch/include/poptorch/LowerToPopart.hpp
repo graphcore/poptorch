@@ -45,7 +45,7 @@ using AnchorList = std::vector<Anchor>;
  * Take the transformed graph and create a poponnx graph from it.
  */
 
-class InplaceOpHandler;
+struct InplaceGraphInfo;
 
 class LowerToPopart {
 public:
@@ -53,15 +53,13 @@ public:
   LowerToPopart(torch::jit::Graph *graph,
                 const std::vector<at::Tensor> &parameters,
                 const std::vector<std::string> &parameter_names,
-                const std::shared_ptr<InplaceOpHandler> &inplace_op_handler,
-                bool training, std::vector<Optimizer> &&opt,
-                const SessionOptions &options,
+                InplaceGraphInfo &&inplace_info, bool training,
+                std::vector<Optimizer> &&opt, const SessionOptions &options,
                 const py::function &attribute_accessor, CPUCallbackMap callback,
                 AnchorList &&anchors);
 
   // Dispatcher entry point: the parameters are embedded in the jit::Graph.
-  LowerToPopart(torch::jit::Graph *graph,
-                const std::shared_ptr<InplaceOpHandler> &inplace_op_handler,
+  LowerToPopart(torch::jit::Graph *graph, InplaceGraphInfo &&inplace_info,
                 bool training, std::vector<Optimizer> &&opt,
                 const SessionOptions &options,
                 const py::function &attribute_accessor, CPUCallbackMap callback,
