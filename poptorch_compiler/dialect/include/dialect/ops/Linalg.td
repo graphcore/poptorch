@@ -92,55 +92,13 @@ def Poptorch_matmul : Poptorch_Op<"matmul", []> {
                 return mlir::RankedTensorType::get(t1.getShape().drop_back(1), e1);
             }
 
+            auto s1 = t1.getShape();
+            auto s2 = t2.getShape();
+            auto shape = broadcast(s1, s2, 2);
+            shape[shape.size() - 2] = s1[s1.size() - 2];
+            shape[shape.size() - 1] = s2[s2.size() - 1];
 
-            // Normal matrix-matrix
-            if (t1.getRank() == 2 && t2.getRank() == 2) {
-                return mlir::RankedTensorType::get({t1.getDimSize(0), t2.getDimSize(1)}, e1);
-            }
-
-
-            llvm::SmallVector<std::int64_t, 4> shape1 {t1.getShape().begin(), t1.getShape().end()};
-            llvm::SmallVector<std::int64_t, 4> shape2 { t2.getShape().begin(),  t2.getShape().end()};
-
-
-            // Batched matrix with broadcast.
-            if (t1.getRank() >= 2 && t2.getRank() >= 2) {
-
-                // [Groups, M, K] * [K, N] = [Groups, M, N]
-                if (t2.getRank() == 2) {
-                    // Swap K and N.
-                    std::swap(*(shape2.end()-1), *(shape1.end()-1));
-                    return mlir::RankedTensorType::get(shape1, e1);
-                }
-
-                // [M, K] * [Groups, K, N] = [Groups, M, N]
-                if (t1.getRank() == 2) {
-                    // Swap M and K.
-                    std::swap(*(shape2.end()-2), *(shape1.end()-2));
-                    return mlir::RankedTensorType::get(shape2, e1);
-                }
-
-                // Broadcast to match.
-                // [1, 5, 4, 3, N, K] * [3, K, M] = [1, 5, 4, 3, N, M]
-                if (t2.getRank() > t1.getRank()) {
-                    shape1.insert(shape1.begin(), t2.getRank() - t1.getRank(), 1);
-                }
-
-                if (t1.getRank() > t2.getRank()) {
-                    shape2.insert(shape2.begin(), t1.getRank() - t2.getRank(), 1);
-                }
-
-
-                assert(t1.getRank() == t2.getRank());
-                // Broadcast to match.
-                for (std::int64_t dim = 0; dim < t1.getRank(); dim++) {
-                    shape1[dim] = std::max(shape1[dim], shape2[dim]);
-                    shape2[dim] = shape1[dim];
-                }
-            }
-
-
-            return mlir::RankedTensorType::get(shape1, e1);
+            return mlir::RankedTensorType::get(shape, e1);
 
         }
     }];

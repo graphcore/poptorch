@@ -646,6 +646,16 @@ def test_transpose(trace_model):
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
+def test_transpose_negative_dims(trace_model):
+    torch.manual_seed(42)
+    x = torch.randn(3, 2, 5, 2)
+    y = torch.randn(2, 2, 5, 3)
+    op = lambda x, y: torch.transpose(x, -1, 0) + y
+
+    op_harness(op, x, y, trace_model=trace_model, test_training=trace_model)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_numpy_T(trace_model):
     torch.manual_seed(42)
     op = lambda x: x.T

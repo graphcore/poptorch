@@ -70,6 +70,12 @@ def Poptorch_transpose: Poptorch_Op<"transpose", [ViewOp]> {
         mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
         llvm::SmallVector<std::int64_t, 4> shape = {t1.getShape().begin(),  t1.getShape().end()};
 
+        if (dim0 < 0) {
+            dim0 += shape.size();
+        }
+        if (dim1 < 0) {
+            dim1 += shape.size();
+        }
         if (dim0 < shape.size() && dim1 < shape.size()) {
             std::swap(shape[dim0], shape[dim1]);
         }

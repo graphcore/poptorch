@@ -36,7 +36,8 @@ std::vector<llvm::StringRef> convert(const std::vector<const char *> &strs) {
 }
 
 std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
-                               const std::vector<int64_t> &rhs) {
+                               const std::vector<int64_t> &rhs,
+                               size_t end_skip) {
   // Ensure lhs dims >= rhs dims or swap and process,
   if (lhs.size() < rhs.size()) {
     return broadcast(rhs, lhs);
@@ -61,7 +62,7 @@ std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
   // Otherwise line up the trailing dimension and process.
   lhs_itr += missing_dims;
 
-  for (size_t dim = missing_dims; dim < lhs.size();
+  for (size_t dim = missing_dims; dim < lhs.size() - end_skip;
        dim++, lhs_itr++, rhs_itr++) {
     size_t lhs_dim = *lhs_itr;
     size_t rhs_dim = *rhs_itr;

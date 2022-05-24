@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <functional>
 
-#include "dialect/Poptorch.hpp"
+#include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/CompilerHelpers.hpp"
 
 #include <poplar/ArrayRef.hpp>
