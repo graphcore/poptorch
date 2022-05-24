@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 namespace c10 {
@@ -41,7 +41,8 @@ struct InplaceGraphInfo {
   // to update the input. If the input tensor is not changed in place, it will
   // be equal to InplaceGraphInfo::no_mapping
   //
-  // Note: these are inputs only, not parameters.
+  // Note: these are all Graph inputs (inputs and parameters) but only inputs
+  // can have a mapping.
   //
   // If the input at graph_input_idx is modified in place:
   //   m[graph_input_idx] = graph_output_idx
@@ -78,6 +79,21 @@ InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
 // inplace op NodeKind
 torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind);
 
+class InplaceInputsTracker {
+public:
+  void addTensor(torch::jit::Value *input);
+  // Find if the given value is an alias for an input, if so remove the alias
+  // from the tracker and return the input it was aliasing. If the given value
+  // doesn't alias an input return nullptr.
+  torch::jit::Value *eraseCurrentAlias(torch::jit::Value *alias);
+  void registerAlias(torch::jit::Value *aliased_input,
+                     torch::jit::Value *alias);
+  InplaceGraphInfo finalizeGraph(torch::jit::Graph &graph, size_t num_anchors,
+                                 bool replicas_needing_broadcast);
+
+private:
+  std::unordered_map<torch::jit::Value *, torch::jit::Value *> _aliases;
+};
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_INPLACE_OPS_H

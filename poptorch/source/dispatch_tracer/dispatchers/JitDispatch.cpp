@@ -38,7 +38,8 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   return tensor;
 }
 
-at::Tensor JITDispatch::addInput(const at::Tensor &cpu_tensor) {
+at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
+                                  bool is_parameter) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
 
   at::Tensor tensor = allocateTensor(
@@ -49,12 +50,17 @@ at::Tensor JITDispatch::addInput(const at::Tensor &cpu_tensor) {
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
   value->inferTypeFrom(tensor);
 
-  logging::trace("[TRACING-2] Adding input: Value {} with cpu ptr {}",
+  logging::trace("[TRACING-2] Adding {}: Value {} with cpu ptr {}",
+                 is_parameter ? "parameter" : "input",
                  static_cast<void *>(value), cpu_tensor.data_ptr());
-
   copyDataFromCpuSource(tensor, cpu_tensor);
+  _inplace_tracker.addTensor(value);
   _mapper.addTensor(tensor, value);
   return tensor;
+}
+
+at::Tensor JITDispatch::addInput(const at::Tensor &cpu_tensor) {
+  return addTensor(cpu_tensor, /* is_parameter= */ false);
 }
 
 at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
@@ -65,7 +71,7 @@ at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
   if (!at::isFloatingType(type)) {
     return addConstant(tensor);
   }
-  return addInput(tensor);
+  return addTensor(tensor, /* is_parameter= */ true);
 }
 
 void JITDispatch::createGraph() {
@@ -271,6 +277,11 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   // be inplace, this could be the 'out' argument of a non-inplace op.
   c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
       getInplaceArgument(*stack, initial_schema);
+  torch::jit::Value *aliased_input = nullptr;
+  if (inplace_tensor) {
+    aliased_input = _inplace_tracker.eraseCurrentAlias(
+        _mapper.getValueForTensor(at::Tensor(inplace_tensor)));
+  }
 
   c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
   const c10::FunctionSchema &schema = op.schema();
@@ -348,6 +359,11 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
     // Get the jit value we are tracking for the output.
     torch::jit::Value *value = _mapper.getValueForTensor(output);
+    // If the modified inplace tensor was an alias for an input then
+    // register the new alias.
+    if (aliased_input != nullptr) {
+      _inplace_tracker.registerAlias(aliased_input, value);
+    }
 
     // Overwrite the inplace tensor with that jit. Now a reference to the
     // inplace tensor correctly points to this outplace value.
@@ -364,6 +380,13 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
   logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",
                  schema.name(), *graph);
+}
+
+InplaceGraphInfo
+JITDispatch::finalizeInplaceGraphInfo(size_t num_anchors,
+                                      bool replicas_needing_broadcast) {
+  return _inplace_tracker.finalizeGraph(*graph, num_anchors,
+                                        replicas_needing_broadcast);
 }
 
 } // namespace poptorch

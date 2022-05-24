@@ -24,6 +24,8 @@ class PoptorchExecutorWrapper;
 
 namespace poptorch {
 
+struct InplaceGraphInfo;
+
 // Toggled by the user in python to choose which backend to target when tracing.
 // CPU and SENTINEL will only be toggled by us.
 enum TracingMode {
@@ -78,6 +80,9 @@ void finalizeGraph();
 // Will implicitly finalizeGraph() once the outputs have been marked.
 void markOutputs(const std::vector<at::Tensor> &outputs,
                  const std::vector<at::Tensor> &data_storage);
+
+InplaceGraphInfo getInplaceGraphInfo(size_t num_anchors,
+                                     bool replicas_needing_broadcast);
 
 // Get the captured JIT graph. In reality is just returning the
 // torch::jit::Graph it's already been compiling during the dispatch process.

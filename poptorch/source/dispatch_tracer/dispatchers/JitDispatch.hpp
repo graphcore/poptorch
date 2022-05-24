@@ -13,6 +13,8 @@
 #include "IDispatch.hpp"
 #include "MlirDispatch.hpp"
 
+#include "poptorch/InplaceOps.hpp"
+
 namespace poptorch {
 
 class JITDispatch final : public IDispatch {
@@ -42,10 +44,16 @@ public:
   void canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                                 c10::Stack &stack, torch::jit::Node **node);
 
+  InplaceGraphInfo finalizeInplaceGraphInfo(size_t num_anchors,
+                                            bool replicas_needing_broadcast);
+
 private:
+  at::Tensor addTensor(const at::Tensor &cpu_tensor, bool is_parameter);
+
   uint64_t _next_output_idx{0};
   // We use the MLIR dispatch for shape inference.
   MLIRDispatch _mlir_dispatch;
+  InplaceInputsTracker _inplace_tracker;
 };
 
 } // namespace poptorch

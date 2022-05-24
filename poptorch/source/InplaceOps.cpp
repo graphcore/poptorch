@@ -259,16 +259,14 @@ InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
   // from PopART to separate the original from additional outputs.
   out.num_normal_outputs = graph.outputs().size() + num_anchors;
   out.num_tensor_outputs = countNumTensorOutputs(graph) + num_anchors;
-  out.input_output_mapping.reserve(num_tensor_inputs);
+  out.input_output_mapping.reserve(collapsed_inputs.size());
 
   // Now process each input and make changes if it is modified in place.
   for (size_t input = 0; input < collapsed_inputs.size(); input++) {
     bool is_parameter = input >= num_tensor_inputs;
     auto mapping = processInput(graph, collapsed_inputs.at(input), is_parameter,
                                 replicas_needing_broadcast);
-    if (!is_parameter) {
-      out.input_output_mapping.push_back(mapping);
-    }
+    out.input_output_mapping.push_back(mapping);
   }
 
   // There may still be inplace ops (which do not affect an input).
@@ -297,6 +295,112 @@ torch::jit::NodeKind outplaceKind(torch::jit::NodeKind kind) {
   }
 
   return new_kind;
+}
+
+void InplaceInputsTracker::addTensor(torch::jit::Value *input) {
+  logging::trace("Tracking tensor %{}", input->debugName());
+
+  bool success = _aliases.insert({input, input}).second;
+  ERROR_ON_MSG(!success, "Value already tracked");
+}
+
+torch::jit::Value *
+InplaceInputsTracker::eraseCurrentAlias(torch::jit::Value *alias) {
+  // Walk through the view ops until we find an input tensor.
+  while (viewOps().count(alias->node()->kind()) != 0) {
+    alias = alias->node()->input(0);
+  }
+
+  auto it = _aliases.find(alias);
+  if (it != _aliases.end()) {
+    auto *real_input = it->second;
+    logging::trace("Deleted alias {} for input %{}", it->first->debugName(),
+                   it->second->debugName());
+    // Remove current alias.
+    _aliases.erase(it);
+    return real_input;
+  }
+  return nullptr;
+}
+
+void InplaceInputsTracker::registerAlias(torch::jit::Value *aliased_input,
+                                         torch::jit::Value *alias) {
+  logging::trace("Registering alias {} for input %{}", alias->debugName(),
+                 aliased_input->debugName());
+  ERROR_ON(!_aliases.insert({alias, aliased_input}).second);
+}
+
+InplaceGraphInfo
+InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
+                                    size_t num_anchors,
+                                    bool replicas_needing_broadcast) {
+  // Make sure poptorch::end_for_loop has the non-changed value as an input.
+  fixForLoopInputs(graph);
+
+  // _aliases[alias] = graph_input -> we want the other way around.
+  std::map<torch::jit::Value *, torch::jit::Value *> input_aliases;
+  for (auto &p : _aliases) {
+    ERROR_ON_MSG(!input_aliases.insert({p.second, p.first}).second,
+                 "More than one alias for graph input ");
+  }
+  size_t num_normal_tensor_outputs = countNumTensorOutputs(graph);
+  InplaceGraphInfo out;
+  out.num_normal_outputs = graph.outputs().size() + num_anchors;
+  out.num_tensor_outputs = num_normal_tensor_outputs + num_anchors;
+
+  std::vector<torch::jit::Value *> collapsed_inputs =
+      collapsedGraphInputHierachy(&graph);
+  out.input_output_mapping.reserve(collapsed_inputs.size());
+  for (auto &graph_input : collapsed_inputs) {
+    auto it = input_aliases.find(graph_input);
+    ERROR_ON(it == input_aliases.end());
+    size_t output_mapping = InplaceGraphInfo::no_mapping;
+    if (it->first == it->second) {
+      // no alias found
+    } else {
+      auto *alias = it->second;
+      if (isParameter(graph_input)) {
+        logging::trace("Alias for parameter %{} -> %{}", it->first->debugName(),
+                       alias->debugName());
+        // This is not supported with replicas needing broadcast
+        ERROR_ON_MSG(
+            replicas_needing_broadcast,
+            "PopTorch does not support broadcasting buffers. If your "
+            "model is able to tolerate buffers becoming out of sync "
+            "between replicas, you can disable buffer broadcasting using "
+            "poptorch.Options.broadcastBuffers(False).");
+
+        auto *new_node =
+            graph.create(symbols::poptorch::update_param_inplace, 1);
+        new_node->addInput(graph_input);
+        new_node->addInput(alias);
+        new_node->insertAfter(alias->node());
+        new_node->output()->setType(alias->type());
+      } else {
+        logging::trace("Alias for parameter %{} -> %{}", it->first->debugName(),
+                       alias->debugName());
+        // Check if the alias is already being returned.
+        for (size_t output = 0; output < graph.outputs().size(); output++) {
+          if (graph.outputs()[output] == alias) {
+            output_mapping = output;
+          }
+        }
+        // If not, add a new output.
+        if (output_mapping == InplaceGraphInfo::no_mapping) {
+          output_mapping = graph.registerOutput(alias);
+
+          // Ensure the overlap flag is set to no overlap (any models wanting
+          // the additional efficiency of overalpped host IO should not use
+          // inplace ops.)
+          auto overlap_symbol =
+              getOverlapSymbol("_for_output", graph.outputs().size() - 1);
+          graph.return_node()->s_(overlap_symbol, "no_overlap");
+        }
+      }
+    }
+    out.input_output_mapping.push_back(output_mapping);
+  }
+  return out;
 }
 
 } // namespace poptorch

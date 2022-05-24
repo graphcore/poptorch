@@ -12,6 +12,7 @@
 #include "CommonHelperFunctions.hpp"
 #include "Tensor.hpp"
 #include "poptorch/DispatchTracer.hpp"
+#include "poptorch/InplaceOps.hpp"
 #include "poptorch/Utils.hpp"
 
 #include "poptorch_err/ExceptionHandling.hpp"
@@ -324,6 +325,19 @@ std::shared_ptr<MLIRExecutable> compileMLIR() {
 }
 
 #endif
+
+InplaceGraphInfo getInplaceGraphInfo(size_t num_anchors,
+                                     bool replicas_needing_broadcast) {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  auto *jit = dynamic_cast<JITDispatch *>(context.activeDispatch());
+  ERROR_ON_MSG(jit == nullptr, "[User Unreachable] Tracer context is null.");
+  return jit->finalizeInplaceGraphInfo(num_anchors, replicas_needing_broadcast);
+#else
+  UNUSED(num_anchors);
+  UNUSED(replicas_needing_broadcast);
+  ERROR("PopTorch must be compiled with -DPOPTORCH_BUILD_MLIR_COMPILER=ON");
+#endif
+}
 
 std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 #if POPTORCH_BUILD_MLIR_COMPILER

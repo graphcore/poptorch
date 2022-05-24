@@ -256,13 +256,14 @@ def test_double_underscore(trace_model):
 
     class Model(nn.Module):
         def forward(self, x, l):
-            return x[x[0][0].int() & l.item()]
+
+            return x[0].int() & l.int()
 
     model = Model()
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
-    inp, l = torch.rand(10, 10), torch.LongTensor([2])
+    inp, l = torch.rand(10, 10), torch.LongTensor([10])
 
     out = model(inp, l)
     popout = poptorch_model(inp, l)

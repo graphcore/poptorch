@@ -1325,11 +1325,15 @@ compileWithManualTracing(const pybind11::dict &options,
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   logging::debug("Compile with manual tracing");
 
-  std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
   SessionOptions parsed_options = parseSessionOptions(options);
 
   AnchorList anchors_list;
   std::vector<Optimizer> optimizers;
+
+  InplaceGraphInfo inplace_info = getInplaceGraphInfo(
+      anchors_list.size(), parsed_options.replicationFactor() > 1 &&
+                               parsed_options.broadcastBuffers());
+  std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
 
   logging::debug("Traced graph:\n{}", *graph);
 
@@ -1338,11 +1342,6 @@ compileWithManualTracing(const pybind11::dict &options,
   // that we have a full graph.
   poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
       graph.get());
-
-  InplaceGraphInfo inplace_info =
-      handleInplaceOpsInGraph(*graph, 0, anchors_list.size(),
-                              parsed_options.replicationFactor() > 1 &&
-                                  parsed_options.broadcastBuffers());
 
   if (graph->outputs().empty()) {
     logging::trace("No outputs, so all nodes cleared");

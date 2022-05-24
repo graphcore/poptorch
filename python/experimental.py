@@ -169,9 +169,8 @@ class _IPUContext:
                                                       tensor_args)
 
             result = self.func(*args, **kwargs)
-            if result is None:
-                result = []
-            ipu.outputs(result)
+            if result is not None:
+                ipu.outputs(result)
         self.ipu = ipu
         return tensor_args
 
