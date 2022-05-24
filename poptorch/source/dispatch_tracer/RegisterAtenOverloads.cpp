@@ -44,6 +44,17 @@ std::string valueToString(const c10::IValue &ivalue) {
     ss << ivalue;
     return ss.str();
   }
+  if (ivalue.isList()) {
+    std::stringstream ss;
+    std::string sep;
+    ss << ivalue.tagKind() << " [";
+    for (const auto &v : ivalue.toList()) {
+      ss << sep << valueToString(v);
+      sep = ", ";
+    }
+    ss << "]";
+    return ss.str();
+  }
   return "<" + ivalue.tagKind() + ">";
 }
 

@@ -281,21 +281,36 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   // The MLIR dispatcher is going to use the shape and type of the inputs to
   // infer the shape and type of the outputs so we need to create dummy MLIR
   // tensors for each input.
-  for (c10::IValue value : *stack) {
-    if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
-      // Sometimes Undefined is used to mark an optional tensor as not set.
-      if (tensor.scalar_type() == at::ScalarType::Undefined) {
-        ERROR_ON_MSG(tensor.numel() != 0,
-                     "[Internal error] Non-empty tensor of type 'Undefined'");
-        continue;
-      }
-      // If the tensor is not tracked by JIT then don't track it in MLIR.
-      // (It's probably a CPU constant)
-      if (_mapper.getValueForTensor(tensor) != nullptr) {
-        _mlir_dispatch.registerEmptyTensor(tensor);
-      }
-    }
+  std::function<void(const c10::IValue &value)> process_value =
+      [&](const c10::IValue &value) {
+        if (value.isList()) {
+          for (const auto &v : value.toList()) {
+            process_value(v);
+          }
+        } else if (value.isTensor()) {
+          const at::Tensor &tensor = value.toTensor();
+          // Sometimes Undefined is used to mark an optional tensor as not set.
+          if (tensor.scalar_type() == at::ScalarType::Undefined) {
+            ERROR_ON_MSG(
+                tensor.numel() != 0,
+                "[Internal error] Non-empty tensor of type 'Undefined'");
+          }
+          // If the tensor is not tracked by JIT then don't track it in MLIR.
+          // (It's probably a CPU constant)
+          if (_mapper.getValueForTensor(tensor) != nullptr) {
+            _mlir_dispatch.registerEmptyTensor(tensor);
+          }
+        } else {
+          // If this assertion is hit then we need to add support for this kind
+          // of value by going through the container and identifying all the
+          // tensors.
+          ERROR_ON_MSG(value.isTuple() || value.isGenericDict(),
+                       "[Internal] Support for container "
+                           << value.tagKind() << " not implemented");
+        }
+      };
+  for (const c10::IValue &value : *stack) {
+    process_value(value);
   }
   _mlir_dispatch.handleOp(op, stack);
   // Fix the fake tensor so it can still work with our canonicalisation
