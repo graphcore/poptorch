@@ -421,10 +421,6 @@
   PopTorchDirectInplace: logicalNot_
   UnusedOutputArguments: {out}
 
-# dropout(Tensor input, float p, bool train) -> Tensor
-- func: dropout
-  PopTorchDirect: dropout
-
 # abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: abs.out
   PopTorchDirect: abs
@@ -567,17 +563,9 @@
   PopTorchDirect: scatter_add_out
   UnusedOutputArguments: {out}
 
-# abs.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: abs.out
-  PopTorchDirect: abs
-  PopTorchDirectInplace: abs_
-  UnusedOutputArguments: {out}
-
-# mean.out(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None, Tensor(a!) out) -> Tensor(a!)
-- func: mean.out
-  PopTorchDirect: reducemean
-  IgnoreArgs: {'dtype'}
-  UnusedOutputArguments: {out}
+# dropout(Tensor input, float p, bool train) -> Tensor
+- func: dropout
+  PopTorchDirect: dropout
 
 
 ##########
