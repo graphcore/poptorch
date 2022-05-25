@@ -35,7 +35,6 @@ target_link_libraries(lower_to_poplar PRIVATE
         poplin
         popnn
         poputil
-        poprithms
         gcl
         snap
         poptorch_logging

@@ -7,12 +7,6 @@
 
 #include "pytorch_bridge/CompilerTypes.hpp"
 
-namespace poprithms {
-namespace logging {
-class ManualTimePartitionLogger;
-} // namespace logging.
-} // namespace poprithms
-
 namespace mlir {
 class ModuleOp;
 class TimingScope;
@@ -35,7 +29,7 @@ public:
 
   // Compile graph by running both PopTorch compiler passes and poplar
   // compilation.
-  void compile(poprithms::logging::ManualTimePartitionLogger &timer);
+  void compile(mlir::TimingScope &timer);
 
   // Run graph on device.
   void execute();

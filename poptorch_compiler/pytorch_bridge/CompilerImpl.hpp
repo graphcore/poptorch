@@ -5,6 +5,7 @@
 #include <mlir/IR/DialectImplementation.h>
 #include <mlir/IR/Location.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/Support/Timing.h>
 
 #include <llvm/ADT/StringSwitch.h>
 #include <mlir/IR/Attributes.h>
@@ -23,11 +24,6 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <poprithms/logging/timepartitionlogger.hpp>
-
-// TODO(T49565): LLVM 13
-// #include <mlir/Support/Timing.h>
 
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
@@ -284,7 +280,13 @@ public:
   // compilation.
   void compile() {
     ERROR_ON(!_executable);
-    _executable.compile(timing_manager);
+    timing_manager.setEnabled(true);
+    if (!root_timer) {
+      root_timer = timing_manager.getRootScope();
+    }
+    _executable.compile(root_timer);
+    root_timer = mlir::TimingScope();
+    timing_manager.setEnabled(false);
   }
 
   // Connect to a poplar stream with a fixed location in memory.
@@ -318,25 +320,19 @@ public:
   std::vector<std::pair<std::string, void *>> output_callbacks;
   std::vector<std::pair<std::string, Buffer>> weight_callbacks;
 
-  poprithms::logging::ManualTimePartitionLogger timing_manager;
   // When a new op is added to the main graph using createOp we check and
   // store whether or not there is an actual handler for this op. (Some ops will
   // have been added with only shape inference and no implementation, in which
   // case we won't be able to lower them later on).
   bool all_ops_can_be_lowered{true};
 
-  // clang-format off
-  // TODO(T49565): In LLVM 13 MLIR provides a really nice timing wrapper
-  // which we can use and it integrates with all our passes.
-
   // A timer for us to record how long it takes to compile each stage.
-  //mlir::DefaultTimingManager timing_manager_
+  mlir::DefaultTimingManager timing_manager;
   // Bit annoying, this shouldn't be needed really.
-  // mlir::TimingScope root_timer;
+  mlir::TimingScope root_timer;
   // A helper to provide a hidden interface to PopTorch to record how long it
   // takes to trace a model.
-  // mlir::TimingScope tracer_timer;
-  // clang-format on
+  mlir::TimingScope tracer_timer;
 
 private:
   // Builder to create ops.

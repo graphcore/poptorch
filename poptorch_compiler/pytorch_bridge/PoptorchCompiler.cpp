@@ -3,6 +3,7 @@
 
 #include <llvm/ADT/SmallVector.h>
 #include <mlir/IR/Operation.h>
+#include <mlir/Support/Timing.h>
 
 #include <iostream>
 #include <utility>
@@ -14,7 +15,11 @@
 namespace poptorch_ir {
 
 PoptorchCompiler::PoptorchCompiler() {}
-PoptorchCompiler::~PoptorchCompiler() {}
+PoptorchCompiler::~PoptorchCompiler() {
+  // The timer crashes on destruction when it's enabled. It looks like it's
+  // failing to print timing info
+  _impl->timing_manager.setEnabled(false);
+}
 
 void PoptorchCompiler::init() {
   _impl = std::make_unique<detail::PoptorchCompilerImpl>();
@@ -78,29 +83,17 @@ void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {
 }
 
 void PoptorchCompiler::startTraceTiming() {
-  _impl->timing_manager.start("PytorchTracingTime");
-
-  // TODO(T49565): Renable in LLVM 13
-  /*
   _impl->timing_manager.setEnabled(true);
-  _impl->root_timer_ = _impl->timing_manager.getRootTimer();
-  _impl->tracer_timer_ = _impl->root_timer.nest("PytorchTracingTime");
-  */
+  _impl->root_timer = _impl->timing_manager.getRootScope();
+  _impl->tracer_timer = _impl->root_timer.nest("PytorchTracingTime");
 }
 
 void PoptorchCompiler::endTraceTiming() {
-  _impl->timing_manager.stop();
-
-  // TODO(T49565): Renable in LLVM 13
-  // We have to manually stop it anyway.
-  // _impl->tracer_timer.stop();
+  // Stop the timer
+  _impl->tracer_timer = mlir::TimingScope();
 }
 
-void PoptorchCompiler::getTimingInfo() {
-  std::cout << _impl->timing_manager.str(0) << std::endl;
-  // TODO(T49565): Renable in LLVM 13
-  // _impl->timing_manager.dumpAsTree();
-}
+void PoptorchCompiler::getTimingInfo() { _impl->timing_manager.dumpAsTree(); }
 
 void PoptorchCompiler::dump() { _impl->dump(); }
 

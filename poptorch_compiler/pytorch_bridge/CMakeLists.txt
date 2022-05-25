@@ -23,7 +23,6 @@ if (POPTORCH_BUILD_MLIR_COMPILER)
     LLVMSupport
 
     lower_to_poplar
-    poprithms
   )
 
   set_property(TARGET poptorch_compiler PROPERTY CXX_STANDARD 17)

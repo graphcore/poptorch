@@ -6,6 +6,7 @@
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
+#include <mlir/Support/Timing.h>
 #include <mlir/Transforms/Passes.h>
 
 #include <utility>
@@ -18,7 +19,6 @@
 #include <poplar/Graph.hpp>
 #include <poplar/IPUModel.hpp>
 #include <poplar/Target.hpp>
-#include <poprithms/logging/timepartitionlogger.hpp>
 
 #include "lower_to_poplar/CompilerHelpers.hpp"
 #include "passes/LowerToPoplar.hpp"
@@ -68,7 +68,7 @@ public:
   PoplarExecutableImpl(mlir::ModuleOp op,
                        std::shared_ptr<model_runtime::Device> device);
 
-  void compile(poprithms::logging::ManualTimePartitionLogger &timer);
+  void compile(mlir::TimingScope &timer);
 
   void execute();
 
@@ -94,11 +94,11 @@ PoplarExecutableImpl::PoplarExecutableImpl(
 
 void PoplarExecutableImpl::execute() { engine->run(Programs::MainGraph); }
 
-void PoplarExecutableImpl::compile(
-    poprithms::logging::ManualTimePartitionLogger &timer) {
+void PoplarExecutableImpl::compile(mlir::TimingScope &timer) {
   mlir::PassManager manager{module.getContext()};
 
-  manager.enableTiming();
+  auto graph_construction = timer.nest("Poplar graph construction");
+  manager.enableTiming(graph_construction);
   // Disable MLIR pass verification as we have our own definition of
   // valid IR state
   manager.enableVerifier(false);
@@ -130,13 +130,12 @@ void PoplarExecutableImpl::compile(
   manager.addPass(poptorch_ir::createRemoveUnusedOperationsPass());
   manager.addPass(poptorch_ir::createLowerToPoplarPass(the_graph, context));
 
-  timer.start("Poplar graph construction");
   if (mlir::succeeded(manager.run(module))) {
-    timer.stop();
-    timer.start("Compiling poplar");
+    graph_construction.stop();
+    auto compile_poplar = timer.nest("Compiling poplar");
     engine = std::make_unique<poplar::Engine>(the_graph, context.programs);
     engine->load(device->device());
-    timer.stop();
+    compile_poplar.stop();
   } else {
     ERROR("One or more passes failed.");
   }
@@ -156,8 +155,7 @@ void PoplarExecutable::connectStream(const std::string &string, void *ptr) {
 
 void PoplarExecutable::execute() { _impl->execute(); }
 
-void PoplarExecutable::compile(
-    poprithms::logging::ManualTimePartitionLogger &timer) {
+void PoplarExecutable::compile(mlir::TimingScope &timer) {
   _impl->compile(timer);
 }
 
