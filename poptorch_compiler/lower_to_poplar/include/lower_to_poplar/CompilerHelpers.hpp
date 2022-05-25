@@ -17,6 +17,11 @@
 #include <poplar/Graph.hpp>
 #include <poplar/Program.hpp>
 
+#include <poplin/codelets.hpp>
+#include <popnn/codelets.hpp>
+#include <popops/codelets.hpp>
+#include <poprand/codelets.hpp>
+
 #include "dialect/PoptorchDialect.hpp"
 
 namespace model_runtime {
@@ -28,12 +33,18 @@ namespace poptorch_ir {
 enum Programs { MainGraph = 0, WeightsToDevice = 1, WeightsToHost = 2 };
 
 struct CompilerContext {
-  explicit CompilerContext(poplar::Graph &g) : graph(g) {}
+  explicit CompilerContext(poplar::Graph &g, poplar::program::Sequence &s)
+      : graph(g), seq(s) {
+    poplin::addCodelets(g);
+    popnn::addCodelets(g);
+    popops::addCodelets(g);
+    poprand::addCodelets(g);
+  }
 
   poplar::Graph &graph;
 
   // The active sequence.
-  poplar::program::Sequence seq;
+  poplar::program::Sequence &seq;
 
   // All poplar programs.
   std::array<poplar::program::Program, 3> programs;

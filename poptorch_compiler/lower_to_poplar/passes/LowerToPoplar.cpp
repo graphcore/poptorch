@@ -14,11 +14,6 @@
 #include <poplar/Graph.hpp>
 #include <poplar/Program.hpp>
 
-#include <poplin/codelets.hpp>
-#include <popnn/codelets.hpp>
-#include <popops/codelets.hpp>
-#include <poprand/codelets.hpp>
-
 #include <popops/Fill.hpp>
 #include <poprand/RandomGen.hpp>
 
@@ -38,25 +33,15 @@ class LowerToPoplar final
 public:
   LowerToPoplar() {}
 
-  LowerToPoplar(poplar::Graph &g, CompilerContext &c)
-      : _graph(&g), _context(&c) {
-    poplin::addCodelets(g);
-    popnn::addCodelets(g);
-    popops::addCodelets(g);
-    poprand::addCodelets(g);
-  }
+  explicit LowerToPoplar(CompilerContext &c) : _context(&c) {}
 
   void runOnOperation() override;
-
-  poplar::Graph &graph() { return *_graph; }
 
 private:
   // Verify operations using MLIR's verifier.
   static void verifyOperations(const mlir::FuncOp &function);
 
-  poplar::Graph *_graph;
-
-  poptorch_ir::CompilerContext *_context;
+  CompilerContext *_context;
 };
 
 // Poplar keeps the size and shape as two distinct concepts.
@@ -99,11 +84,11 @@ void LowerToPoplar::runOnOperation() {
 
     // For the read/write subfunctions do the same.
     for (mlir::FuncOp subfunc : function.getOps<mlir::FuncOp>()) {
-      Programs program = poptorch_ir::Programs::WeightsToDevice;
+      Programs program = Programs::WeightsToDevice;
       if (subfunc.getName() == "WeightsToDevice") {
-        program = poptorch_ir::Programs::WeightsToDevice;
+        program = Programs::WeightsToDevice;
       } else if (subfunc.getName() == "WeightsToHost") {
-        program = poptorch_ir::Programs::WeightsToHost;
+        program = Programs::WeightsToHost;
       }
 
       _context->seq = poplar::program::Sequence();
@@ -237,8 +222,8 @@ poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
 }
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createLowerToPoplarPass(poplar::Graph &graph, CompilerContext &context) {
-  return std::make_unique<LowerToPoplar>(graph, context);
+createLowerToPoplarPass(CompilerContext &context) {
+  return std::make_unique<LowerToPoplar>(context);
 }
 
 } // namespace poptorch_ir

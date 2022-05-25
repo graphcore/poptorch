@@ -74,7 +74,9 @@ public:
 
   std::shared_ptr<model_runtime::Device> device;
 
-  poplar::Graph the_graph;
+  poplar::Graph graph;
+
+  poplar::program::Sequence seq;
 
   mlir::ModuleOp module;
 
@@ -89,8 +91,8 @@ public:
 
 PoplarExecutableImpl::PoplarExecutableImpl(
     mlir::ModuleOp op, std::shared_ptr<model_runtime::Device> d)
-    : device(std::move(d)), the_graph(device->device().getTarget()), module(op),
-      context(the_graph) {}
+    : device(std::move(d)), graph(device->device().getTarget()), module(op),
+      context(graph, seq) {}
 
 void PoplarExecutableImpl::execute() { engine->run(Programs::MainGraph); }
 
@@ -127,13 +129,13 @@ void PoplarExecutableImpl::compile(mlir::TimingScope &timer) {
   // TODO(T61603) Figure out why MLIR's DCE pass doesn't do the same as our
   // RemoveUnusedOperationsPass.
   // manager.addPass(mlir::createSymbolDCEPass());
-  manager.addPass(poptorch_ir::createRemoveUnusedOperationsPass());
-  manager.addPass(poptorch_ir::createLowerToPoplarPass(the_graph, context));
+  manager.addPass(createRemoveUnusedOperationsPass());
+  manager.addPass(createLowerToPoplarPass(context));
 
   if (mlir::succeeded(manager.run(module))) {
     graph_construction.stop();
     auto compile_poplar = timer.nest("Compiling poplar");
-    engine = std::make_unique<poplar::Engine>(the_graph, context.programs);
+    engine = std::make_unique<poplar::Engine>(context.graph, context.programs);
     engine->load(device->device());
     compile_poplar.stop();
   } else {
@@ -160,11 +162,11 @@ void PoplarExecutable::compile(mlir::TimingScope &timer) {
 }
 
 void PoplarExecutable::weightsToDevice() {
-  _impl->engine->run(poptorch_ir::Programs::WeightsToDevice);
+  _impl->engine->run(Programs::WeightsToDevice);
 }
 
 void PoplarExecutable::weightsToHost() {
-  _impl->engine->run(poptorch_ir::Programs::WeightsToHost);
+  _impl->engine->run(Programs::WeightsToHost);
 }
 
 PoplarExecutable::PoplarExecutable(mlir::ModuleOp module) {

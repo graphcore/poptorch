@@ -18,7 +18,7 @@ namespace poptorch_ir {
 class CompilerContext;
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createLowerToPoplarPass(poplar::Graph &graph, CompilerContext &context);
+createLowerToPoplarPass(CompilerContext &context);
 
 } // namespace poptorch_ir
 

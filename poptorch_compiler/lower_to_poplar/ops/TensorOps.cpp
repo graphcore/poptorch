@@ -32,9 +32,9 @@ void fill_::lowerToPoplar(CompilerContext &context) {
 
 void cast::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->self());
-  poplar::Tensor out = popops::cast(
-      context.graph, in,
-      poptorch_ir::CompilerContext::poplarTypeOf(this->dtype()), context.seq);
+  poplar::Tensor out =
+      popops::cast(context.graph, in,
+                   CompilerContext::poplarTypeOf(this->dtype()), context.seq);
   context.addTensor(this->result(), out);
 }
 
