@@ -27,10 +27,20 @@ constexpr TensorId tensor_error_id = std::numeric_limits<TensorId>::max();
 // The tensor is none (e.g. optional parameter/return) and this is not an error
 constexpr TensorId none_id = std::numeric_limits<TensorId>::max() - 1;
 
+enum class RequiresGradType {
+  OR_INPUTS, // OR together all the input tensor requires_grad values
+  FALSE      // always false
+};
+
+struct ODSTensorResult {
+  std::vector<TensorId> tensor_ids;
+  std::vector<RequiresGradType> requires_grad_types;
+};
+
 // When returning an MLIR op, each return could be compulsory, optional or
 // variadic tensor under the MLIR Operation Definition Specification (ODS).
 // Using a vector for each return allows each return to be optional or variadic.
-using ODSTensorResults = std::vector<std::vector<TensorId>>;
+using ODSTensorResults = std::vector<ODSTensorResult>;
 
 enum class Type : std::uint8_t {
   BOOL,

@@ -59,7 +59,8 @@ attr_types = {
 }
 
 tensor_types = {
-    "Poptorch_tensor": "TENSOR",
+    "Poptorch_tensor": ("TENSOR", "OR_INPUTS"),
+    "Poptorch_tensor_no_grad": ("TENSOR", "FALSE"),
 }
 
 # Is a bit easier to work with if we convert the JSON into the old macro format even if we don't end up saving that to disk.
@@ -86,7 +87,12 @@ class ValueType:
         try:
             return attr_types[self._type_str]
         except KeyError:
-            return tensor_types[self._type_str]
+            return tensor_types[self._type_str][0]
+
+    def requires_grad_type(self):
+        if self._type_str not in tensor_types:
+            return None
+        return tensor_types.get(self._type_str)[1]
 
 
 class OptionalValueType(ValueType):
@@ -327,8 +333,11 @@ for op_name in poptorch_ops:
         cppFunction += "for(mlir::Value value : tmp.getODSResults("
         cppFunction += str(arg_num) + ")) {\n"
         cppFunction += "  _impl->value_map.push_back(value);\n"
-        cppFunction += "  results.back()."
+        cppFunction += "  results.back().tensor_ids."
         cppFunction += "push_back(_impl->value_map.size() - 1);\n"
+        cppFunction += "  results.back().requires_grad_types."
+        cppFunction += "push_back(poptorch_ir::RequiresGradType::{});\n".format(
+            arg.requires_grad_type())
         cppFunction += "}\n\n"
 
     cppFunction += "return results;\n"

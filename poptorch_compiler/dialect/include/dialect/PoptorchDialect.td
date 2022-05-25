@@ -55,6 +55,8 @@ def valid_tensor : StaticShapeTensorOf<[valid_ints, valid_uints, valid_float]>;
 // Any valid tensor type.
 def Poptorch_tensor : AnyTypeOf<[valid_tensor]>;
 
+def Poptorch_tensor_no_grad : AnyTypeOf<[valid_tensor]>;
+
 def Poptorch_tensorlist : Variadic<Poptorch_tensor>;
 
 #endif // POPTORCH_IR_DIALECT

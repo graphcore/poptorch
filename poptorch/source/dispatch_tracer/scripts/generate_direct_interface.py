@@ -97,6 +97,7 @@ def add_outplace_op(function,
     function_decl += scope + "\t// Push the new outputs onto the stack\n"
     function_decl += scope + "\tstd::vector<poptorch_ir::OptionalTensorId> "
     function_decl += "t_ids;\n"
+    function_decl += scope + "\tstd::vector<bool> requires_grad;\n"
     need_t_id = False
 
     outputs_code = ""
@@ -112,10 +113,13 @@ def add_outplace_op(function,
 
         # We will get a list of tensor IDs, which could be zero for optional
         # one ore more.
+        outputs_code += scope
+        outputs_code += "\tt_ids = mlir_output.at(" + str(
+            index) + ").tensor_ids;\n"
+        outputs_code += scope
+        outputs_code += "\trequires_grad = requiresGrad(mlir_output.at(" + str(
+            index) + ").requires_grad_types, requires_grad_or);\n"
         if not is_list:
-            outputs_code += scope
-            outputs_code += "\tt_ids = mlir_output.at(" + str(index) + ");\n"
-
             outputs_code += scope
             outputs_code += "\tt_id = getSingleOptionalTensorId(t_ids);\n"
             need_t_id = True
@@ -149,7 +153,7 @@ def add_outplace_op(function,
             else:
                 outputs_code += scope
                 outputs_code += "\tstack.push_back(makeEmptyOutputTensor("
-                outputs_code += "t_id, requires_grad));\n"
+                outputs_code += "t_id, requires_grad.at(0)));\n"
 
     if need_t_id:
         function_decl += scope + "\tpoptorch_ir::TensorId t_id;\n"
@@ -283,7 +287,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
 
             # Update the requires grad stuff.
             need_requires_grad = True
-            function_decl += "\t\trequires_grad |= " + loop_placeholder
+            function_decl += "\t\trequires_grad_or |= " + loop_placeholder
             function_decl += ".toTensor().requires_grad();\n\n"
 
             # end loop
@@ -311,7 +315,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
             function_decl += "\t[[maybe_unused]] poptorch_ir::TensorId " + arg[
                 0] + " = findTensor(" + arg[0] + "_pytorch);\n"
             need_requires_grad = True
-            function_decl += "\trequires_grad |= " + arg[
+            function_decl += "\trequires_grad_or |= " + arg[
                 0] + "_pytorch.requires_grad();\n\n"
 
             # All args should be [Name, type] but tensors with additional info will be [Name, Type, Id, inplace, view]
@@ -335,7 +339,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
         arg_index += 1
 
     if need_requires_grad:
-        function_decl = "\tbool requires_grad = false;\n" + function_decl
+        function_decl = "\tbool requires_grad_or = false;\n" + function_decl
 
     # Remove the comma
     parameters = parameters[:-1]

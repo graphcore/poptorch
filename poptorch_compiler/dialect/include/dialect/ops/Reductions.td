@@ -313,9 +313,9 @@ def Poptorch_embedding_bag : Poptorch_NotImplementedOp<"embedding_bag", []> {
                          BoolAttr:$include_last_offset,
                          I64Attr:$padding_idx);
     let results = (outs Poptorch_tensor:$output,
-                        Poptorch_tensor:$offset2bag,
-                        Poptorch_tensor:$bag_size,
-                        Poptorch_tensor:$max_indices);
+                        Poptorch_tensor_no_grad:$offset2bag,
+                        Poptorch_tensor_no_grad:$bag_size,
+                        Poptorch_tensor_no_grad:$max_indices);
 
     let builders = [OpBuilder<(ins "mlir::Value":$weight,
                                       "mlir::Value":$indices,

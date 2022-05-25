@@ -253,7 +253,7 @@ void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
   poptorch_ir::TensorId id =
       _compiler.empty_tensor(tensor.sizes().vec(), toCompilerType(tensor))
           .at(0)
-          .at(0);
+          .tensor_ids.at(0);
   _mapper.addTensor(tensor, id);
 }
 
@@ -373,7 +373,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
                          wrapped_value);
           tmp[i] = wrapped_value;
         }
-        val = _compiler.tensorconstant_float(tmp).at(0).at(0);
+        val = _compiler.tensorconstant_float(tmp).at(0).tensor_ids.at(0);
         break;
       }
       case c10::ScalarType::Long: {
@@ -392,7 +392,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
                      "outside the representable range.");
           tmp[i] = wrapped_value;
         }
-        val = _compiler.tensorconstant_int(tmp).at(0).at(0);
+        val = _compiler.tensorconstant_int(tmp).at(0).tensor_ids.at(0);
         break;
       }
       default:
@@ -457,6 +457,22 @@ at::Tensor MLIRDispatch::outputInplaceReshape_squeeze_dim_(
   return original_input;
 }
 
+std::vector<bool> MLIRDispatch::requiresGrad(
+    const std::vector<poptorch_ir::RequiresGradType> &requires_grad_types,
+    bool requires_grad_or) {
+  std::vector<bool> result(requires_grad_types.size());
+  for (size_t i = 0; i < requires_grad_types.size(); i++) {
+    switch (requires_grad_types[i]) {
+    case poptorch_ir::RequiresGradType::OR_INPUTS:
+      result[i] = requires_grad_or;
+      break;
+    case poptorch_ir::RequiresGradType::FALSE:
+      result[i] = false;
+      break;
+    }
+  }
+  return result;
+}
 at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
                                                bool requires_grad) {
   // If it's a none or error, return an undefined tensor. Some functions may
@@ -479,11 +495,12 @@ at::Tensor MLIRDispatch::makeEmptyOutputTensor(poptorch_ir::TensorId output_id,
 
 std::vector<at::Tensor> MLIRDispatch::makeEmptyOutputTensorList(
     const std::vector<poptorch_ir::OptionalTensorId> &output_ids,
-    bool requires_grad) {
+    const std::vector<bool> &requires_grad) {
   std::vector<at::Tensor> output;
   output.reserve(output_ids.size());
-  for (const auto &output_id : output_ids) {
-    output.push_back(makeEmptyOutputTensor(output_id, requires_grad));
+  for (size_t i = 0; i < output_ids.size(); i++) {
+    output.push_back(
+        makeEmptyOutputTensor(output_ids.at(i), requires_grad.at(i)));
   }
   return output;
 }

@@ -72,12 +72,20 @@ public:
                                                poptorch_ir::TensorId self,
                                                int dim);
 
+  // Compute whether grad is required based on a list of requires_grad
+  // determination types.  The argument requires_grad_or should be true if any
+  // of the input tensors to the op had requires_grad=true (this will be used
+  // if requires_grad_types[i] == OR_INPUTS).
+  static std::vector<bool> requiresGrad(
+      const std::vector<poptorch_ir::RequiresGradType> &requires_grad_types,
+      bool requires_grad_or);
+
   at::Tensor makeEmptyOutputTensor(poptorch_ir::OptionalTensorId output_id,
                                    bool requires_grad);
 
   std::vector<at::Tensor> makeEmptyOutputTensorList(
       const std::vector<poptorch_ir::OptionalTensorId> &output_id,
-      bool requires_grad);
+      const std::vector<bool> &requires_grad);
 
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
