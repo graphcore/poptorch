@@ -339,11 +339,18 @@ def test_binary_cross_entropy_backward(reduction, num_dims, weight):
 
 
 @pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("num_dims", [1, 2])
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
-def test_binary_cross_entropy_with_logits_forward(reduction):
+def test_binary_cross_entropy_with_logits_forward(num_dims, reduction):
     torch.manual_seed(42)
-    input1 = torch.randn([4])
-    input2 = torch.Tensor([1, 0, 0, 1])
+
+    if num_dims == 1:
+        input1 = torch.randn([4])
+        input2 = torch.Tensor([1, 0, 0, 1])
+
+    if num_dims == 2:
+        input1 = torch.randn([3, 2])
+        input2 = torch.Tensor([[1, 0], [0, 1], [1, 1]])
 
     def bce_logit(t1, t2):
         return F.binary_cross_entropy_with_logits(t1, t2, reduction=reduction)
@@ -357,11 +364,17 @@ def test_binary_cross_entropy_with_logits_forward(reduction):
 
 
 @pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("num_dims", [1, 2])
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
-def test_binary_cross_entropy_with_logits_backward(reduction):
+def test_binary_cross_entropy_with_logits_backward(reduction, num_dims):
     torch.manual_seed(42)
-    input1 = torch.nn.parameter.Parameter(torch.randn([4]))
-    input2 = torch.Tensor([1, 0, 0, 1])
+    if num_dims == 1:
+        input1 = torch.nn.parameter.Parameter(torch.randn([4]))
+        input2 = torch.Tensor([1, 0, 0, 1])
+
+    if num_dims == 2:
+        input1 = torch.nn.parameter.Parameter(torch.randn([3, 2]))
+        input2 = torch.Tensor([[1, 0], [0, 1], [1, 1]])
 
     def bce_logit_backward(t1, t2):
         loss = F.binary_cross_entropy_with_logits(t1, t2, reduction=reduction)

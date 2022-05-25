@@ -291,11 +291,10 @@ void binary_cross_entropy_with_logits::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor out = bce(context, input, target);
 
   if (reduction != TorchReduction::NONE) {
-    out = popops::reduce(context.graph, out, {0}, {popops::Operation::ADD},
-                         context.seq);
+    out = reduceToScalar(out, context);
     if (reduction == TorchReduction::MEAN) {
       auto total_elements =
-          createConstant(context, input.elementType(), {}, target.shape()[0]);
+          createConstant(context, input.elementType(), {}, input.numElements());
       popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, out,
                          total_elements, context.seq);
     }
@@ -320,7 +319,7 @@ void binary_cross_entropy_with_logits_backward::lowerToPoplar(
                   target, context.seq);
   if (reduction == TorchReduction::MEAN) {
     auto total_elements =
-        createConstant(context, input.elementType(), {}, target.shape()[0]);
+        createConstant(context, input.elementType(), {}, target.numElements());
     popops::mapInPlace(context.graph, popops::expr::BinaryOpType::DIVIDE, grad,
                        total_elements, context.seq);
   }
