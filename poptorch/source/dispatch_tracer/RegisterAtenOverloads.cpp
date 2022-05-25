@@ -498,10 +498,12 @@ TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
 #include "RegisterOptionalAtenOps.cpp.inc"
 
 // TODO(T59880) rename AutogradXLA -> AutogradIPU
+// These intercepts are only for ops where we want to override torch's
+// autograd behaviour, since the AutogradXLA key has a higher dispatch
+// priority than the XLA key. Registration here is not required for
+// regular backward ops
 TORCH_LIBRARY_IMPL(aten, AutogradXLA, m) {
   m.impl("detach", PTC(poptorch::detach));
-  m.impl("binary_cross_entropy_with_logits_backward",
-         PTC_BOXED(poptorch::fallback));
 }
 
 // TODO(T59880) rename XLA -> IPU

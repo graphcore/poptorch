@@ -572,19 +572,22 @@
 # Linalg
 ##########
 
-
-# convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride,
-#             int[] padding, int[] dilation, bool transposed,
-#             int[] output_padding, int groups) -> Tensor
-- func: convolution
-  PopTorchDirect: conv
-
 # convolution_overrideable(Tensor input, Tensor weight, Tensor? bias,
 #                          int[] stride, int[] padding, int[] dilation,
 #                          bool transposed, int[] output_padding,
 #                          int groups) -> Tensor
 - func: convolution_overrideable
   PopTorchDirect: conv
+
+# aten::convolution_backward_overrideable(Tensor grad_output, Tensor input,
+#                                         Tensor weight, int[] stride,
+#                                         int[] padding, int[] dilation,
+#                                         bool transposed, int[] output_padding,
+#                                         int groups, bool[3] output_mask) ->
+#                                         (Tensor grad_input, Tensor grad_weight,
+#                                          Tensor grad_bias)
+- func: convolution_backward_overrideable
+  PopTorchDirect: conv_backward
 
 # bmm(Tensor self, Tensor mat2) -> (Tensor)
 # Batch matrix-matrix multiplication

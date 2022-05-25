@@ -7,10 +7,9 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
 
   m.impl("empty.memory_format", PTC(poptorch::emptyMemoryFormat));
   m.impl("empty_strided", PTC(poptorch::emptyStrided));
-  m.impl("detach", PTC(poptorch::detach));
 
-  m.impl("convolution", PTC_BOXED(poptorch::fallback));
   m.impl("convolution_overrideable", PTC_BOXED(poptorch::fallback));
+  m.impl("convolution_backward_overrideable", PTC_BOXED(poptorch::fallback));
   m.impl("transpose.int", PTC_BOXED(poptorch::fallback));
   m.impl("layer_norm", PTC_BOXED(poptorch::fallback));
   m.impl("expand", PTC_BOXED(poptorch::fallback));
@@ -61,4 +60,5 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
 
   m.impl("constant_pad_nd", PTC_BOXED(poptorch::fallback));
   m.impl("binary_cross_entropy_with_logits", PTC_BOXED(poptorch::fallback));
+  m.impl("binary_cross_entropy_with_logits_backward", PTC_BOXED(poptorch::fallback));
 }
