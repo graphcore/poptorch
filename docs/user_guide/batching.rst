@@ -52,12 +52,6 @@ executing and returns to host the data will be ready for the IPU to pull in agai
   :emphasize-lines: 10
   :linenos:
 
-.. warning:: :py:class:`~poptorch.AsynchronousDataAccessor` makes use of the Python
-  ``multiprocessing`` module's `spawn` start method. Consequently, the entry point of
-  a program that uses it must be guarded by a ``if __name__ == '__main__':`` block
-  to avoid endless recursion. The dataset used must also be picklable. For more
-  information, please see https://docs.python.org/3/library/multiprocessing.html#the-spawn-and-forkserver-start-methods.
-
 .. warning:: Tensors being iterated over using an
   :py:class:`~poptorch.AsynchronousDataAccessor` use shared memory. You must clone
   tensors at each iteration if you wish to keep their references outside of each

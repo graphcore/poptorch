@@ -430,12 +430,6 @@ class AsynchronousDataAccessor:
     the worker thread will be filling the unready elements of the ring
     buffer.
 
-    .. important:: In order to avoid hanging issues related to ``OpenMP`` and
-        ``fork()`` the ``AsynchronousDataAccessor`` uses the ``spawn`` start
-        method which means your dataset must be serializable by ``pickle``.
-        For more information see
-        https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
-
     .. note:: When using a ``torch.utils.data.Dataset`` with ``rebatched_size``
         the accessor will default to ``drop_last=True``, to change that
         behaviour wrap the dataset into a
@@ -450,7 +444,7 @@ class AsynchronousDataAccessor:
             load_indefinitely: bool = True,
             early_preload: bool = False,
             sharing_strategy: 'poptorch.SharingStrategy' = SharingStrategy.
-            FileSystem,
+            Fork,
             rebatched_size: Optional[int] = None):
         """
         :param dataset: The dataset to pull data from, this can be any Python
@@ -465,11 +459,13 @@ class AsynchronousDataAccessor:
             If False, wait for an iterator to be created before loading data.
         :param sharing_strategy:
             Method to use to pass the dataset object when the child process
-            is spawned.
+            is created.
 
             * `SharedMemory` is fast but might be quite limited in size.
             * `FileSystem` will serialise the dataset to file and reload it
               which will be slower.
+            * `Fork` new processes: no data sharing required but might cause
+              problems with some third party libraries.
 
         :param rebatched_size: If not None: return N batched tensors from
             the dataset per iteration. (The passed dataset must have a

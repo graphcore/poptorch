@@ -45,13 +45,18 @@ class DataLoaderMode(enum.IntEnum):
 
 
 class SharingStrategy(enum.IntEnum):
-    """Strategy to use to pass objects when spawning new processes.
+    """Strategy to use to pass objects when creating new processes.
 
-    - ``SharedMemory``: Fast but limited availability.
-    - ``FileSystem``: Slower but larger than memory.
+    - ``SharedMemory``: Spawn new processes and share data using shared memory:
+                        Fast but limited availability.
+    - ``FileSystem``: Spawn new processes and shared data using the file
+                      system: slower but larger than memory.
+    - ``Fork``: Fork new processes: no data sharing required but might cause
+                problems with some third party libraries.
     """
     SharedMemory = 0
     FileSystem = 1
+    Fork = 2
 
 
 class OutputMode(enum.IntEnum):

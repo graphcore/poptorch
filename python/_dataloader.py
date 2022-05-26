@@ -193,7 +193,10 @@ class _AsynchronousWorkerProcess:
         # actual fetch so we just use this to return the initial buffers
         # in shared memory which will be used for the actual read/write
         # in the hot loop.
-        ctx = multiprocessing.get_context('spawn')
+        if self._sharing_strategy == enums.SharingStrategy.Fork:
+            ctx = multiprocessing.get_context('fork')
+        else:
+            ctx = multiprocessing.get_context('spawn')
         read_data_pipe, write_data_pipe = ctx.Pipe(duplex=False)
 
         # If the worker exits before the parent process is done

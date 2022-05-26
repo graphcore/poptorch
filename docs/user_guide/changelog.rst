@@ -16,6 +16,8 @@ New features
 API changes
 -----------
 
+- Data loader: default process creation strategy for worker process changed from "spawn" to "fork".
+
 Bug Fixes
 ---------
 
