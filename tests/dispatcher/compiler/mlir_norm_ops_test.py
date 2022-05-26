@@ -72,3 +72,55 @@ def test_group_norm():
     ipu_result = IPUContext(norm, model=norm)(t)
 
     helpers.assert_allclose(actual=ipu_result, expected=torch_out)
+
+
+@pytest.mark.mlirSupportRequired
+def test_group_norm_backward():
+    torch.manual_seed(42)
+    kernel_size = 3
+    num_groups = 4
+    C = 12
+
+    input_shape = [3, C, 5]
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+            self.conv = torch.nn.Conv1d(C, C, kernel_size)
+            self.norm = nn.GroupNorm(num_groups, C)
+
+        def forward(self, x, target):
+            out = self.conv(x)
+            out = self.norm(out)
+            loss = torch.nn.functional.mse_loss(out, target)
+
+            return out, loss
+
+    model = Model()
+    cpu_model = copy.deepcopy(model)
+
+    t = torch.rand(input_shape)
+    target = torch.rand(
+        [input_shape[0], input_shape[1], input_shape[2] - kernel_size + 1])
+
+    def grad(model, t, target):
+        _, loss = model(t, target)
+        loss.backward()
+
+        model.conv.weight.retain_grad()
+        model.conv.bias.retain_grad()
+
+        return (loss, model.conv.weight.grad, model.conv.bias.grad,
+                model.norm.weight.grad, model.norm.bias.grad)
+
+    # Run on IPU.
+    ipu_result = IPUContext(grad, model=model)(model, t, target)
+
+    # Run pytorch native on CPU.
+    cpu_out = grad(cpu_model, t, target)
+
+    assert len(ipu_result) == len(cpu_out)
+
+    for idx, cpu_out_exp in enumerate(cpu_out):
+        helpers.assert_allclose(actual=ipu_result[idx], expected=cpu_out_exp)
