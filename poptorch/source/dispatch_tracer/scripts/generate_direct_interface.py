@@ -152,8 +152,21 @@ def add_outplace_op(function,
                 outputs_code += "t_ids, requires_grad));\n"
             else:
                 outputs_code += scope
-                outputs_code += "\tstack.push_back(makeEmptyOutputTensor("
+                outputs_code += "\tif(t_id == poptorch_ir::none_id) {\n"
+
+                outputs_code += scope
+                outputs_code += "\t\tstack.push_back(makeEmptyOutputTensor("
+                outputs_code += "poptorch_ir::none_id, false));\n"
+
+                outputs_code += scope
+                outputs_code += "\t} else {\n"
+
+                outputs_code += scope
+                outputs_code += "\t\tstack.push_back(makeEmptyOutputTensor("
                 outputs_code += "t_id, requires_grad.at(0)));\n"
+
+                outputs_code += scope
+                outputs_code += "\t} \n"
 
     if need_t_id:
         function_decl += scope + "\tpoptorch_ir::TensorId t_id;\n"
