@@ -2,6 +2,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
 import unittest.mock
+import re
 import torch
 import pytest
 import poptorch
@@ -267,24 +268,58 @@ def test_conv3D(op, padding_mode, training, trace_model):
                                   atol=0.1)
 
 
+def merge_dicts(x, y):
+    z = x.copy()
+    z.update(y)
+    return z
+
+
 # The test is reliant on an IPU model with limited memory, so force the small model
-@unittest.mock.patch.dict("os.environ", helpers.forceSmallModel())
+@helpers.printCapfdOnExit
+@unittest.mock.patch.dict("os.environ",
+                          merge_dicts(helpers.forceSmallModel(),
+                                      {"POPLIBS_LOG_LEVEL": "DEBUG"}))
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_available_memory(trace_model):
-    torch.manual_seed(42)
-    input = torch.randn(1, 4, 10, 10)
+def test_available_memory(capfd, trace_model):
+    seen_length = 0
 
-    model = torch.nn.Conv2d(4, 1576, 10, stride=1)
+    def get_mem_for_conv(op):
+        nonlocal seen_length
 
-    # Test that the small IPU model runs out of memory without AMP
-    with pytest.raises(poptorch.Error,
-                       match="receives more data than it has total memory"):
-        execute_and_check_wrapper(trace_model, model, input)
+        torch.manual_seed(42)
+        input = torch.randn(1, 4, 10, 10)
+
+        model = helpers.ModelWithWeights(
+            op,
+            input.shape,
+            loss_fn=torch.nn.L1Loss(reduction='mean'),
+            out_fn=lambda x: (x, torch.zeros_like(x)))
+
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        poptorch.inferenceModel(model, options).compile((input, ))
+
+        _, log = capfd.readouterr()
+
+        m = re.search(
+            r"Planning convolution with a per-tile memory limit of (\d+)", log)
+
+        assert m
+
+        return int(m.group(1))
+
+    model = torch.nn.Conv2d(4, 16, 10, stride=1)
+    default_mem_for_conv = get_mem_for_conv(model)
 
     model.register_forward_hook(lambda _1, _2, conv: poptorch.
                                 set_available_memory(conv, 0.5))
-    # Test that AMP fixes the OOM error
-    execute_and_check_wrapper(trace_model, model, input)
+
+    adjusted_mem_for_conv = get_mem_for_conv(model)
+
+    # The default value for available_memory should be more than 0.5 meaning
+    # the default memory available for the convolution should be more than
+    # after we adjusted the available memory
+    assert default_mem_for_conv > adjusted_mem_for_conv
 
 
 @pytest.mark.parametrize("mode", poptorch.MatMulSerializationMode)
