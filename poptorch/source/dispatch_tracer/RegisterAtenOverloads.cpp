@@ -93,7 +93,12 @@ struct GlobalTracerContext {
 
   // A simple guard to stop us from redispatching when we are already in a
   // dispatch context.
-  bool dispatch_on;
+  bool dispatch_on{false};
+
+  // A state used to determine if the new tensors we receive from the dispatcher
+  // are inputs or parameters.
+  // TODO(T61576) Find a better way to identify parameters and buffers.
+  bool moving_parameters{false};
 
   // Return the passed filename if it doesn't match any of the registered
   // exclusions, else an empty c10::optional.
@@ -194,7 +199,6 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
       if (isParameter(self)) {
         self = context.activeDispatch()->addParameter(downCastIfNeeded(src));
         // Make sure the parameter flag is preserved.
-        setIsParameter(self, true);
         logging::trace("copy_ parameter CPU -> IPU, new self {}", str(self));
       } else {
         if (context.graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
@@ -204,7 +208,6 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
         }
         logging::trace("copy_ input CPU -> IPU, new self {}", str(self));
         // Make sure the parameter flag is preserved.
-        setIsParameter(self, false);
       }
     } else {
       // TODO(T59880) rename is_xla() -> is_ipu()
@@ -231,6 +234,10 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
 
 } // namespace
 
+void startParametersMove() { context.moving_parameters = true; }
+
+void endParametersMove() { context.moving_parameters = false; }
+
 // Turn on.
 void startDispatch() { context.dispatch_on = true; }
 
@@ -249,6 +256,14 @@ void destroyDispatcher() {
     endDispatch();
   }
   context.resetActiveDispatch(nullptr);
+}
+
+void setParameterName(const at::Tensor &tensor, const std::string &name) {
+  context.activeDispatch()->setParameterName(tensor, name);
+}
+
+std::string getParameterName(torch::jit::Value *value) {
+  return context.activeDispatch()->getParameterName(value);
 }
 
 // Returns true if the dispatcher is active.
@@ -418,7 +433,7 @@ emptyBase(at::IntArrayRef size,
     at::Tensor output = context.activeDispatch()->allocateTensor(
         size, dtype, deviceOrDefaultIpu({}), layout, pin_memory, memory_format);
     // TODO(T61576) Find a better way to identify parameters and buffers.
-    setIsParameter(output, device->index() != 0);
+    setIsParameter(output, context.moving_parameters);
 
     logging::trace("[TRACING-2] Intercepting IPU empty_base");
     context.activeDispatch()->registerEmptyTensor(output);

@@ -96,6 +96,11 @@ std::shared_ptr<MLIRExecutable> compileMLIR();
 // If the value is not a parameter or an input, return nullptr.
 void *getDataSource(const at::Tensor &tensor);
 
+void setParameterName(const at::Tensor &tensor, const std::string &name);
+
+// Return the name of a parameter or an empty string if no name was set.
+std::string getParameterName(torch::jit::Value *value);
+
 // Get a pointer to the data source for a given JIT value.
 // The value must be an IPU value.
 // If the value is not a parameter or an input, return nullptr.
@@ -111,6 +116,16 @@ void startDispatch();
 // Stop capturing calls.
 // TODO(T61528): not needed anymore?
 void endDispatch(bool error_occurred = false);
+
+// Called before starting to move parameters between the CPU and the IPU.
+// (This is used to differentiate inputs from parameters / buffers)
+// We expect something like:
+// >>> poptorch_core.startParametersMove()
+// >>> my_model.to("ipu")
+// >>> poptorch_core.endParametersMove()
+// TODO(T61576) Find a better way to identify parameters and buffers.
+void startParametersMove();
+void endParametersMove();
 
 // Return true if the dispatcher is active.
 bool isDispatcherActive();

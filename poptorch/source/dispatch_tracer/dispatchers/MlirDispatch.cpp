@@ -149,6 +149,7 @@ at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
       _compiler.addConstantTensor(poptorch::getCpuData(tensor),
   toCompilerShape(tensor), toCompilerType(tensor), str.c_str(),
   cpu_tensor.data_ptr()); _mapper.addTensor(tensor, value);
+  setIsParameter(tensor, false);
   return tensor;
   */
 }
@@ -168,6 +169,7 @@ at::Tensor MLIRDispatch::addInput(const at::Tensor &cpu_tensor) {
       _compiler.addInput(poptorch::getCpuData(tensor), toCompilerShape(tensor),
                          toCompilerType(tensor), str.c_str());
   _mapper.addTensor(tensor, value);
+  setIsParameter(tensor, false);
   return tensor;
 }
 
@@ -187,6 +189,7 @@ at::Tensor MLIRDispatch::addParameter(const at::Tensor &cpu_tensor) {
       poptorch::getCpuData(tensor), toCompilerShape(tensor),
       toCompilerType(tensor), str.c_str());
   _mapper.addTensor(tensor, value);
+  setIsParameter(tensor, true);
   return tensor;
 }
 

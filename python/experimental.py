@@ -1,4 +1,5 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+import copy
 import functools
 from typing import List, Optional
 
@@ -40,6 +41,10 @@ class IPUScope:
         self._compile_using = compile_using
 
         self._model = model
+        if self._compile_using == enums.Compiler.PopART:
+            # PopART requires some CPU pointers to copy to/from the IPU so
+            # keep a copy of the CPU buffers.
+            self._cpu_model = copy.deepcopy(model)
 
         self._outputs = []
         self._outputs_structure = None
@@ -51,15 +56,18 @@ class IPUScope:
             poptorch_core.TracingMode(self._compile_using), inputs,
             self._options._source_location_excludes)
 
-        # TODO(T61576) Hack: we use the device index to indicate whether a
-        # tensor is an input or a buffer / parameter.
-        # Normally we would call torch.nn.Module.to(device) directly inside
-        # the IPUScope and that would move the parameters / buffers to the
-        # IPU and we could determine if a tensor is a parameter/buffer by
-        # checking the python stacktrace.
-        d = torch.device("xla:1")
         if self._model:
+            # TODO(T61576) We currently use a state machine to determine if
+            # tensors are inputs or parameters.
+            # We need to find a better solution.
+            d = torch.device("xla:0")
+            poptorch_core.startParametersMove()
             self._model.apply(lambda l: l.to(d))
+            poptorch_core.endParametersMove()
+
+            state = self._model.state_dict()
+            poptorch_core.mapParamsToNames(tuple(state.keys()),
+                                           tuple(state.values()))
 
     # Start capturing calls.
     def __enter__(self):
@@ -95,8 +103,13 @@ class IPUScope:
     def __call__(self, *args):
         if self._upload_weights:
             if self._compile_using == enums.Compiler.PopART:
+                if self._cpu_model is not None:
+                    state = self._cpu_model.state_dict()
+                else:
+                    state = {}
                 poptorch_core.copyWeightsToDevice_impl(self._executable,
-                                                       tuple(), tuple())
+                                                       tuple(state.keys()),
+                                                       tuple(state.values()))
             else:
                 self._executable.weightsToDevice()
             self._upload_weights = False

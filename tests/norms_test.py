@@ -19,17 +19,19 @@ batch_norm_params = [
     (nn.BatchNorm1d, False, False, False, True),
     (nn.BatchNorm1d, False, False, False, False),
     (nn.BatchNorm2d, True, True, True, True),
+    (nn.BatchNorm2d, True, True, False, False),
     (nn.BatchNorm3d, False, True, True, True),
 ]
 
 
-@pytest.mark.parametrize("params", batch_norm_params)
+@pytest.mark.parametrize(
+    "batch_norm, affine, running_stats, training, trace_model",
+    batch_norm_params)
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-def test_batchNorm(params):
+def test_batchNorm(batch_norm, affine, running_stats, training, trace_model):
     torch.manual_seed(42)
     C = 4
     input_shape = [3, C, 5]
-    batch_norm, affine, running_stats, training, trace_model = params
     if batch_norm in (nn.BatchNorm2d, nn.BatchNorm3d):
         input_shape.append(6)
     if batch_norm is nn.BatchNorm3d:
@@ -260,11 +262,10 @@ instance_norm_params = [
 ]
 
 
-@pytest.mark.parametrize("params", instance_norm_params)
-def test_instanceNorm(params):
+@pytest.mark.parametrize("instance_norm, d", instance_norm_params)
+def test_instanceNorm(instance_norm, d):
     torch.manual_seed(42)
 
-    instance_norm, d = params
     affine = d % 2 == 1
 
     class Model(nn.Module):

@@ -35,6 +35,7 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
                  static_cast<void *>(value), cpu_tensor.data_ptr());
 
   _mapper.addTensor(tensor, value);
+  setIsParameter(tensor, false);
   return tensor;
 }
 
@@ -56,6 +57,7 @@ at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
   copyDataFromCpuSource(tensor, cpu_tensor);
   _inplace_tracker.addTensor(value);
   _mapper.addTensor(tensor, value);
+  setIsParameter(tensor, is_parameter);
   return tensor;
 }
 
@@ -305,6 +307,8 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
             ERROR_ON_MSG(
                 tensor.numel() != 0,
                 "[Internal error] Non-empty tensor of type 'Undefined'");
+            // No need to register the tensor if it's undefined.
+            return;
           }
           // If the tensor is not tracked by JIT then don't track it in MLIR.
           // (It's probably a CPU constant)

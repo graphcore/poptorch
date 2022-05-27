@@ -18,6 +18,38 @@ ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor,
       mlir(poptorch_ir::tensor_error_id), ipu_tensor_id(ipuTensorId(tensor)),
       is_empty(_is_empty) {}
 
+void ValueMapper::setParameterName(const at::Tensor &t,
+                                   const std::string &name) {
+  uint64_t id = ipuTensorId(t);
+  if (!isParameter(t) && !t.is_floating_point()) {
+    logging::warn("Parameter {}: {} was downgraded to constant because PopART "
+                  "doesn't support non floating point parameters",
+                  name, str(t));
+    return;
+  }
+
+  ERROR_ON_MSG(!isParameter(t), "Not a parameter or a buffer: " << str(t));
+  auto name_it = name_ids_map.find(name);
+  if (name_it != name_ids_map.end()) {
+    ERROR_ON_MSG(name_it->second != id,
+                 "Name " << name << " can't be associated to " << id
+                         << " because it is already associated to "
+                         << name_it->second);
+    return;
+  }
+  auto id_it = ids_name_map.find(id);
+  if (id_it != ids_name_map.end()) {
+    ERROR_ON_MSG(id_it->second != name, "Name for tensor id "
+                                            << id << " can't be set to " << name
+                                            << " because it is already set to "
+                                            << id_it->second);
+    return;
+  }
+
+  name_ids_map.insert({name, id});
+  ids_name_map.insert({id, name});
+}
+
 bool ValueMapper::isDirectAlias(const at::Tensor &t) {
   if (!isIpuTensor(t)) {
     return false;

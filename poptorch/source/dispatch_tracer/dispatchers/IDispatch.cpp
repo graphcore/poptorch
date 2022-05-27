@@ -52,6 +52,26 @@ bool IDispatch::isParameter(torch::jit::Value *value) {
   return poptorch::isParameter(*record->tensor_impl);
 }
 
+void IDispatch::setParameterName(const at::Tensor &tensor,
+                                 const std::string &name) {
+  _mapper.setParameterName(tensor, name);
+}
+
+std::string IDispatch::getParameterName(torch::jit::Value *value) {
+  auto *record = _mapper.rawTensorRecord(value);
+  if (record == nullptr) {
+    logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
+    return "";
+  }
+  ERROR_ON_MSG(!poptorch::isParameter(*record->tensor_impl),
+               "%" << value->debugName() << " is not a Parameter");
+  auto it = _mapper.ids_name_map.find(record->ipu_tensor_id);
+  if (it == _mapper.ids_name_map.end()) {
+    return "";
+  }
+  return it->second;
+}
+
 void IDispatch::replaceValue(torch::jit::Value *v_old,
                              torch::jit::Value *v_new) {
   _mapper.replaceValue(v_old, v_new);

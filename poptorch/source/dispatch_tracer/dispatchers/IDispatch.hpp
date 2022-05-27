@@ -62,6 +62,9 @@ public:
 
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
+  void setParameterName(const at::Tensor &tensor, const std::string &name);
+  std::string getParameterName(torch::jit::Value *val);
+
 protected:
   // We use the value mapper to map between incoming at::Tensors and JIR/MLIR
   // types.

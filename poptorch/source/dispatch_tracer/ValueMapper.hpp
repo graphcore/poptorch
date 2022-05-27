@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <functional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -90,6 +91,10 @@ public:
   // for aliases. We do not expect this to be large.
   std::unordered_map<uint64_t, std::vector<TrackedTensor *>> ipu_ids_map;
 
+  // Mapping between parameter / buffer names and tensor IDs
+  std::unordered_map<std::string, uint64_t> name_ids_map;
+  std::unordered_map<uint64_t, std::string> ids_name_map;
+
   // We also need to map the values to the mlir so we can query the mlir for a
   // given value.
   std::unordered_map<torch::jit::Value *, TrackedTensor *> values_map;
@@ -129,6 +134,8 @@ public:
   void addTensorList(const TensorList &list, torch::jit::Value *val);
 
   torch::jit::Value *getValueForTensorList(const TensorList &list);
+
+  void setParameterName(const at::Tensor &t, const std::string &name);
 
   // Returns true if this is a direct alias and adds it to the approved alias
   // map.

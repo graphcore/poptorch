@@ -945,6 +945,16 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   return lower;
 }
 
+void mapParamsToNames(const pybind11::tuple &names,
+                      const pybind11::tuple &tensors) {
+  ERROR_ON(names.size() != tensors.size());
+  torch::jit::Stack stack = torch::jit::toTraceableStack(tensors);
+  for (uint64_t i = 0; i < names.size(); ++i) {
+    const auto name = names[i].cast<std::string>();
+    const auto tensor = stack[i].toTensor();
+    setParameterName(tensor, name);
+  }
+}
 } // namespace
 
 void copyWeightsToHostImpl(
@@ -1353,6 +1363,11 @@ compileWithManualTracing(const pybind11::dict &options,
   // TODO(T55228): remove after we use our own dispatch key.
   removeDeadImplicitCasts(graph.get());
 
+  logging::trace("Graph right before canonicalization:\n{}", *graph);
+  // Convert any unsupported ATEN nodes in the graph to a popart
+  // representation.
+  poptorch::canonicalize(graph.get());
+
   logging::debug("Graph right before popart:\n{}", *graph);
 
   poptorch::LowerToPopart lower(
@@ -1434,7 +1449,10 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
 
   m.def("startDispatch", PTC(poptorch::startDispatch));
   m.def("endDispatch", PTC(poptorch::endDispatch));
+  m.def("startParametersMove", PTC(poptorch::startParametersMove));
+  m.def("endParametersMove", PTC(poptorch::endParametersMove));
   m.def("createGraph", PTC(poptorch::createGraph));
+  m.def("mapParamsToNames", PTC(poptorch::mapParamsToNames));
   m.def("markOutputs", PTC(poptorch::markOutputs));
   m.def("finalizeGraph", PTC(poptorch::finalizeGraph));
   m.def("compileWithManualTracing", PTC(poptorch::compileWithManualTracing));

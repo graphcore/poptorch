@@ -260,7 +260,11 @@ std::string str(const at::Tensor &tensor) {
     auto device_type = tensor.unsafeGetTensorImpl()->device_type();
     ss << " type " << device_type;
     if (device_type == at::DeviceType::XLA) {
-      ss << " ID " << toIpuTensorImpl(tensor)->tensor_id;
+      auto *ipu_tensor = toIpuTensorImpl(tensor);
+      ss << " ID " << ipu_tensor->tensor_id;
+      if (ipu_tensor->is_parameter) {
+        ss << " is_parameter";
+      }
     }
     ss << " sizes " << tensor.unsafeGetTensorImpl()->sizes();
     ss << " dtype " << tensor.unsafeGetTensorImpl()->dtype();

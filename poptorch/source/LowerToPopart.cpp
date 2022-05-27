@@ -927,7 +927,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   std::function<bool(torch::jit::Value * value)> is_parameter;
   std::function<bool(torch::jit::Value * value)> is_parameter_tensor;
   std::function<void *(torch::jit::Value * value)> get_data_ptr;
-  std::function<std::string(size_t index)> get_parameter_name;
+  std::function<std::string(torch::jit::Value * value)> get_parameter_name;
   std::function<void(torch::jit::Value * value, at::ScalarType & scalar_type,
                      std::vector<int64_t> & dims)>
       get_type_info;
@@ -939,8 +939,11 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     is_parameter = poptorch::isParameter;
     is_parameter_tensor = poptorch::isParameter;
     get_data_ptr = poptorch::getDataSourceForValue;
-    get_parameter_name = [](size_t param_index) {
-      return "Parameter/" + std::to_string(param_index);
+    get_parameter_name = [](torch::jit::Value *value) {
+      auto name = getParameterName(value);
+      ERROR_ON_MSG(name.empty(), "No parameter name available for value %"
+                                     << value->debugName());
+      return name;
     };
     get_type_info = [](torch::jit::Value *value, at::ScalarType &scalar_type,
                        std::vector<int64_t> &dims) {
@@ -948,6 +951,19 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
       scalar_type = *tensor_type->scalarType();
       dims = *tensor_type->sizes().concrete_sizes();
     };
+
+    // Step 0, remove unused parameters
+    // graph_t_inputs is updated but _graph.inputs() will retain unused
+    // parameters
+    std::vector<bool> parameter_used(graph_t_inputs.size(), true);
+    for (size_t i = 0; i < graph_t_inputs.size(); ++i) {
+      auto *value = graph_t_inputs[i];
+      if (value->uses().empty() && is_parameter(value)) {
+        parameter_used.at(i) = false;
+        logging::trace("Skipping unused parameter: %{}", value->debugName());
+      }
+    }
+    maskVector(&graph_t_inputs, parameter_used);
   } else {
     // We're using tracing: the parameters have been provided separately
     // and the graph still needs to be cleaned up.
@@ -1014,10 +1030,6 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
       return tensor.data_ptr();
     };
 
-    get_parameter_name = [&](size_t param_index) {
-      return _parameter_names.at(param_index);
-    };
-
     get_type_info = [=](torch::jit::Value *value, at::ScalarType &scalar_type,
                         std::vector<int64_t> &dims) {
       auto index = index_of_tensor(value);
@@ -1042,9 +1054,22 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     std::string popart_type = typeToPopartStr(scalar_type);
     void *data_ptr = get_data_ptr(value);
     if (is_parameter_tensor(value)) {
-      ERROR_ON(value->uses().empty());
+      ERROR_ON_MSG(value->uses().empty(),
+                   "Parameter %"
+                       << value->debugName()
+                       << " isn't used and therefore should have been removed");
+      ERROR_ON(param_index > _parameter_names.size());
+      // If the parameter names were not populated ahead of time
+      // generate / extract them from the value now.
+      if (param_index == _parameter_names.size()) {
+        ERROR_ON_MSG(!get_parameter_name,
+                     "Name for parameter "
+                         << param_index << " requested but only have "
+                         << _parameter_names.size() << " names.");
+        _parameter_names.push_back(get_parameter_name(value));
+      }
 
-      std::string name = get_parameter_name(param_index);
+      std::string name = _parameter_names.at(param_index);
       auto id = _compiler.addInitializedInputTensor(
           name.c_str(), popart_type.c_str(), dims, data_ptr);
       parameter_values.push_back(value);
