@@ -75,15 +75,15 @@ output_modes = [[poptorch.OutputMode.All, 3, "ALL/1"],
                 [poptorch.OutputMode.Sum, 1, "Sum/1"]]
 
 
-@pytest.mark.parametrize("mode", output_modes)
+@pytest.mark.parametrize("mode, period, expected_str", output_modes)
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_tensor_modes(capfd, mode):
+def test_tensor_modes(capfd, mode, period, expected_str):
     model = Model()
     tensor_name = 'Gradient___model.fc2.bias'
 
     opts = poptorch.Options()
-    opts.anchorTensor('grad_bias', tensor_name, mode[0], mode[1])
+    opts.anchorTensor('grad_bias', tensor_name, mode, period)
     poptorch_model = poptorch.trainingModel(model, opts)
 
     input = torch.rand(10, 10)
@@ -91,4 +91,4 @@ def test_tensor_modes(capfd, mode):
     poptorch_model(input, label)
 
     testlog = helpers.LogChecker(capfd)
-    testlog.assert_contains(tensor_name + ' ' + mode[2])
+    testlog.assert_contains(tensor_name + ' ' + expected_str)

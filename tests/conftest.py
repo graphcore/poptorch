@@ -22,8 +22,9 @@ hw_available = poptorch.ipuHardwareIsAvailable()
 
 
 def pytest_make_parametrize_id(val, argname):
-    if val is None or isinstance(
-            val, (bool, int, str, float, torch.dtype, enum.Enum)):
+    if isinstance(val, enum.Enum):
+        return f"{argname}:{val.name}"
+    if val is None or isinstance(val, (bool, int, str, float, torch.dtype)):
         return f"{argname}:{val}"
     if isinstance(val, type):
         return f"{argname}:{val.__name__}"

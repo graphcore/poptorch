@@ -86,18 +86,18 @@ def test_replicas(trace_model):
     assert_latency_values(poptorch_model)
 
 
-@pytest.mark.parametrize("mode_tuple", [(poptorch.OutputMode.Final, 1),
-                                        (poptorch.OutputMode.All, 1),
-                                        (poptorch.OutputMode.Sum, 1),
-                                        (poptorch.OutputMode.EveryN, 2)])
+@pytest.mark.parametrize("mode, period", [(poptorch.OutputMode.Final, 1),
+                                          (poptorch.OutputMode.All, 1),
+                                          (poptorch.OutputMode.Sum, 1),
+                                          (poptorch.OutputMode.EveryN, 2)])
 @pytest.mark.parametrize("steps", [2, 4])
 @pytest.mark.parametrize("replicas", [1, 2])
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_inference(mode_tuple, steps, replicas, trace_model):
+def test_inference(mode, period, steps, replicas, trace_model):
     model = Model()
     opts = poptorch.Options()
-    opts.outputMode(mode_tuple[0], mode_tuple[1])
+    opts.outputMode(mode, period)
     opts.deviceIterations(steps)
     opts.replicationFactor(replicas)
     opts.Jit.traceModel(trace_model)
@@ -110,29 +110,29 @@ def test_inference(mode_tuple, steps, replicas, trace_model):
     perf = poptorch_model.getPerfCounters()
 
     outsteps = steps * replicas
-    if mode_tuple[0] in [poptorch.OutputMode.Final, poptorch.OutputMode.Sum]:
+    if mode in [poptorch.OutputMode.Final, poptorch.OutputMode.Sum]:
         outsteps = replicas
-    elif mode_tuple[0] is poptorch.OutputMode.EveryN:
-        outsteps = steps // mode_tuple[1] * replicas
+    elif mode is poptorch.OutputMode.EveryN:
+        outsteps = steps // period * replicas
     assert_perf_counter_size(perf, 2, 1, steps * replicas, outsteps)
     assert_latency_values(poptorch_model)
 
 
-@pytest.mark.parametrize("mode_tuple", [(poptorch.OutputMode.Final, 1),
-                                        (poptorch.OutputMode.All, 1),
-                                        (poptorch.OutputMode.Sum, 1),
-                                        (poptorch.OutputMode.EveryN, 2)])
+@pytest.mark.parametrize("mode, period", [(poptorch.OutputMode.Final, 1),
+                                          (poptorch.OutputMode.All, 1),
+                                          (poptorch.OutputMode.Sum, 1),
+                                          (poptorch.OutputMode.EveryN, 2)])
 @pytest.mark.parametrize("steps", [2, 4])
 @pytest.mark.parametrize("accums", [1, 2])
 @pytest.mark.parametrize("replicas", [1, 2])
 @pytest.mark.ipuHardwareRequired
-def test_training(mode_tuple, steps, accums, replicas):
+def test_training(mode, period, steps, accums, replicas):
     torch.manual_seed(42)
     inputs = torch.randn(16, 100)
     targets = torch.randn(16, 100)
 
     opts = poptorch.Options()
-    opts.outputMode(mode_tuple[0], mode_tuple[1])
+    opts.outputMode(mode, period)
     opts.deviceIterations(steps)
     opts.Training.gradientAccumulation(accums)
     opts.replicationFactor(replicas)
@@ -155,10 +155,10 @@ def test_training(mode_tuple, steps, accums, replicas):
     perf = poptorch_model.getPerfCounters()
 
     outsteps = steps * accums * replicas
-    if mode_tuple[0] in [poptorch.OutputMode.Final, poptorch.OutputMode.Sum]:
+    if mode in [poptorch.OutputMode.Final, poptorch.OutputMode.Sum]:
         outsteps = replicas
-    elif mode_tuple[0] is poptorch.OutputMode.EveryN:
-        outsteps = steps // mode_tuple[1] * accums * replicas
+    elif mode is poptorch.OutputMode.EveryN:
+        outsteps = steps // period * accums * replicas
 
     assert_perf_counter_size(perf, 2, 2, steps * accums * replicas, outsteps)
     assert_latency_values(poptorch_model)

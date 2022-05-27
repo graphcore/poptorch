@@ -29,20 +29,20 @@ def test_set_options():
     poptorch.poptorch_core._validateOptions(opts.toDict())
 
 
-@pytest.mark.parametrize("param", [
+@pytest.mark.parametrize("key, value, expected_str", [
     ("asdfasdf", True, r"Unknown .* option .*"),
     ("dotChecks", torch.empty(1, 1), r"Unknown value type .* for option .*"),
     ("asdfasdf", torch.empty(
         1, 1), r"(Unknown .* option .*|Unknown value type .* for option .*)"),
 ])
-def test_invalid_options(param):
+def test_invalid_options(key, value, expected_str):
     # pylint: disable=protected-access
     opts = poptorch.Options()
     opts.outputMode(poptorch.enums.OutputMode.All)
 
-    opts._Popart.set(param[0], param[1])
+    opts._Popart.set(key, value)
 
-    with pytest.raises(poptorch.Error, match=param[2]):
+    with pytest.raises(poptorch.Error, match=expected_str):
         poptorch.poptorch_core._validateOptions(opts.toDict())
 
 
@@ -704,9 +704,11 @@ mean_reduction_strategy_params = [
 ]
 
 
-@pytest.mark.parametrize("params", mean_reduction_strategy_params)
-def test_mean_reduction_strategy_implicit(params):
-    accum_type, training, combined_accum, correct_strategy = params
+@pytest.mark.parametrize(
+    "accum_type, training, combined_accum, correct_strategy",
+    mean_reduction_strategy_params)
+def test_mean_reduction_strategy_implicit(accum_type, training, combined_accum,
+                                          correct_strategy):
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 

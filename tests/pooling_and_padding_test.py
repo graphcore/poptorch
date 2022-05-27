@@ -95,17 +95,14 @@ def test_pool2D(op):
         execute_and_check_wrapper(model, input)
 
 
-@pytest.mark.parametrize("params", adaptive_avg_pool)
-def test_adaptive_avg_pool(params):
+@pytest.mark.parametrize("op, n_output_dims", adaptive_avg_pool)
+def test_adaptive_avg_pool(op, n_output_dims):
     torch.manual_seed(42)
     # AdaptiveAvgPool1d: [1, 2, 4]       -> [1, 2, 2]
     # AdaptiveAvgPool2d: [1, 2, 4, 6]    -> [1, 2, 2, 3]
     # AdaptiveAvgPool3d: [1, 2, 4, 6, 8] -> [1, 2, 2, 3, 4]
     # TODO(T31335): Match PyTorch's implementation so that we can test cases where
     #               input dims are not divisible by corresponding output dims
-
-    op = params[0]
-    n_output_dims = params[1]
 
     shape = [1, 2]
     shape.extend([2 * i + 4 for i in range(n_output_dims)])

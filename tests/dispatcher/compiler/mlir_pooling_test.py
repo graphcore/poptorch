@@ -21,7 +21,7 @@ spatial_dim_map = {
 
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize(
-    "params",
+    "kernel_size, stride, padding, ceil_mode, count_include_pad",
     [
         # op, kernel_size, stride, padding, ceil_mode, count_include_pad
         (3, 2, 0, False, True),
@@ -38,12 +38,11 @@ spatial_dim_map = {
     nn.AvgPool2d,
     nn.AvgPool3d,
 ])
-def test_pool(op, params):
+def test_pool(op, kernel_size, stride, padding, ceil_mode, count_include_pad):
     torch.manual_seed(42)
 
     spatial_dims = spatial_dim_map[op]
 
-    kernel_size, stride, padding, ceil_mode, count_include_pad = params
     extra_args = {}
     if op in (nn.AvgPool1d, nn.AvgPool2d, nn.AvgPool3d):
         extra_args["count_include_pad"] = count_include_pad

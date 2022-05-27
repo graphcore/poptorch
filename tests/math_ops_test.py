@@ -882,27 +882,27 @@ def test_cross_axis(axis, trace_model):
 
 
 @pytest.mark.parametrize(
-    "params",
+    "trace_model, params",
     [
         # trace_model, dims?, unbiased
-        (True, True),
-        (False, False),
-        (True, [2], False),
-        (False, [0, 1], True),
-        (True, [0, 2], False),
+        (True, (True, )),
+        (False, (False, )),
+        (True, ([2], False)),
+        (False, ([0, 1], True)),
+        (True, ([0, 2], False)),
     ])
 @pytest.mark.parametrize(
     "op", [torch.var, torch.var_mean, torch.std, torch.std_mean])
-def test_var_std(op, params):
+def test_var_std(op, trace_model, params):
     torch.manual_seed(42)
 
     x = torch.randn(3, 4, 5)
-    model = lambda x: op(x, *params[1:])
+    model = lambda x: op(x, *params)
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
 
-    op_harness(params[0], model, [x], assert_)
+    op_harness(trace_model, model, [x], assert_)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

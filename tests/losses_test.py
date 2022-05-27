@@ -135,12 +135,10 @@ cross_entropy_params = [
 ]
 
 
-@pytest.mark.parametrize("params", cross_entropy_params)
+@pytest.mark.parametrize("input_shape, reduction", cross_entropy_params)
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_CrossEntropy(params, trace_model):
+def test_CrossEntropy(input_shape, reduction, trace_model):
     torch.manual_seed(42)
-
-    input_shape, reduction = params
 
     input = torch.randn(input_shape)
     label_shape = [input_shape[0]]
@@ -360,33 +358,30 @@ def test_HingeEmbeddingLoss(reduction, trace_model):
 
 torch.manual_seed(42)
 params_bcewithlogits = [
-    {
-        "input": torch.rand(10, 3),  # Inputs
-        "target": torch.empty(10, 3).uniform_(),  # Targets
-        "weight": torch.rand(10, 3),  # Weights
-        "pos_weight": torch.rand(3)  # Pos Weights
-    },
+    (
+        torch.rand(10, 3),  # Inputs
+        torch.empty(10, 3).uniform_(),  # Targets
+        torch.rand(10, 3),  # Weights
+        torch.rand(3)  # Pos Weights
+    ),
     # Numerical stability test
-    {
-        "input": torch.tensor([88.0]),
-        "target": torch.tensor([0.5]),
-        "weight": None,
-        "pos_weight": None
-    }
+    (torch.tensor([88.0]), torch.tensor([0.5]), None, None)
 ]
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("params", params_bcewithlogits)
+@pytest.mark.parametrize("input, target, weight, pos_weight",
+                         params_bcewithlogits)
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_BCEWithLogitsLoss(reduction, params, trace_model):
+def test_BCEWithLogitsLoss(reduction, input, target, weight, pos_weight,
+                           trace_model):
 
     loss_harness(trace_model,
-                 F.binary_cross_entropy_with_logits, [params["input"]],
-                 params["target"],
+                 F.binary_cross_entropy_with_logits, [input],
+                 target,
                  reduction,
-                 weight=params["weight"],
-                 pos_weight=params["pos_weight"])
+                 weight=weight,
+                 pos_weight=pos_weight)
 
 
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
