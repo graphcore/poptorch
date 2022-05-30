@@ -111,34 +111,47 @@ def Poptorch_group_norm : Poptorch_Op<"group_norm",
 //                                  Tensor? running_var, Tensor? save_mean,
 //                                  Tensor? save_invstd, bool train, float eps,
 //                                  bool[3] output_mask) -> (Tensor, Tensor, Tensor)
-def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward", [AttrSizedOperandSegments]> {
+def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward",
+  [AttrSizedOperandSegments, AttrSizedResultSegments]> {
   let arguments = (ins Poptorch_tensor:$grad_out,
                        Poptorch_tensor:$input,
-                       Poptorch_tensor:$weight,
+                       Optional<Poptorch_tensor>:$weight,
                        Optional<Poptorch_tensor>:$running_mean,
                        Optional<Poptorch_tensor>:$running_var,
                        Optional<Poptorch_tensor>:$save_mean,
                        Optional<Poptorch_tensor>:$save_invstd,
                        BoolAttr:$training,
-                       F32Attr:$epsilon);
-  let results = (outs Poptorch_tensor:$grad_input, Poptorch_tensor:$grad_weight, Poptorch_tensor:$grad_bias);
+                       F32Attr:$epsilon,
+                       I64ArrayAttr:$output_mask);
+  let results = (outs Optional<Poptorch_tensor>:$grad_input,
+                      Optional<Poptorch_tensor>:$grad_weight,
+                      Optional<Poptorch_tensor>:$grad_bias);
   let builders = [OpBuilder<(ins "mlir::Value":$grad_out,
-                                    "mlir::Value":$input,
-                                    "mlir::Value":$weight,
-                                    "mlir::Value":$running_mean,
-                                    "mlir::Value":$running_var,
-                                    "mlir::Value":$save_mean,
-                                    "mlir::Value":$save_invstd,
-                                    "bool":$training,
-                                    "float":$epsilon), [{
+                                 "mlir::Value":$input,
+                                 "mlir::Value":$weight,
+                                 "mlir::Value":$running_mean,
+                                 "mlir::Value":$running_var,
+                                 "mlir::Value":$save_mean,
+                                 "mlir::Value":$save_invstd,
+                                 "bool":$training,
+                                 "float":$epsilon,
+                                 "const std::vector<std::int64_t>":$output_mask), [{
     // Weight would ordinarily be optional but we always populate it in the
     // forward pass if it doesn't exist
-    std::vector<mlir::Value> operands = {grad_out, input, weight};
+
+    std::vector<mlir::Value> operands = {grad_out, input};
+
     // These segments represent the optional tensors in the order they appear in the arguments.
     // For each segment, 1 indicates a value has been passed for that argument, otherwise 0
     // indicates a nullopt
     // All operands must have a value: 1 for non optional/variadic
-    std::vector<std::int32_t> segments = {1, 1, 1, 0, 0, 0, 0};
+    std::vector<std::int32_t> segments = {1, 1, 0, 0, 0, 0, 0};
+
+    if(weight) {
+      operands.push_back(weight);
+      segments[2] = 1;
+    }
+
     if (running_mean) {
       ERROR_ON(!running_var);
       operands.push_back(running_mean);
@@ -154,10 +167,34 @@ def Poptorch_batch_norm_backward: Poptorch_Op<"batch_norm_backward", [AttrSizedO
       segments[6] = 1; // save_invstd
     }
     $_state.addOperands(operands);
+
     $_state.addAttribute("training",$_builder.getBoolAttr(training));
     $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
+    $_state.addAttribute("output_mask",
+                         $_builder.getI64ArrayAttr(output_mask));
+
     $_state.addAttribute("operand_segment_sizes", $_builder.getI32VectorAttr(segments));
-    $_state.addTypes({input.getType(), weight.getType(), weight.getType()});
+
+    // These segments represent the optional tensors in the order they
+    // appear in the return values.
+    // For each segment, 1 indicates a value has been returned
+    // otherwise 0 indicates no tensor returned.
+    std::vector<int32_t> output_mask_32(output_mask.begin(), output_mask.end());
+
+    $_state.addAttribute("result_segment_sizes",
+                         $_builder.getI32VectorAttr(output_mask_32));
+
+    std::vector<mlir::Type> returns;
+    if(output_mask[0]) {
+      returns.push_back(input.getType());
+    }
+    for(size_t idx = 1; idx < 3; idx++) {
+      if(output_mask[idx]) {
+        ERROR_ON(!weight);
+        returns.push_back(weight.getType());
+      }
+    }
+    $_state.addTypes(returns);
   }]>];
 }
 

@@ -25,7 +25,7 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
         input_shape.append(6)
     if batch_norm is nn.BatchNorm3d:
         input_shape.append(7)
-    t = torch.randn(input_shape)
+    t = torch.randn(input_shape, requires_grad=True)
 
     ipu_norm = batch_norm(C,
                           affine=affine,
@@ -35,18 +35,17 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
 
     t2 = torch.ones_like(t)
 
-    if affine:
-
-        def cpu_step(norm, x1, x2):
-            out = norm(x1)
-            loss = torch.nn.functional.mse_loss(out, x2)
-            loss.backward()
-            ret = [out, norm.weight.grad, norm.bias.grad]
-            if track_running_stats:
-                ret.append(norm.running_mean)
-            return ret
-    else:
-        cpu_step = lambda norm, x1, _: norm(x1)
+    def cpu_step(norm, x1, x2):
+        x1.retain_grad()
+        out = norm(x1)
+        loss = torch.nn.functional.mse_loss(out, x2)
+        loss.backward()
+        ret = [out, x1.grad]
+        if affine:
+            ret.extend((norm.weight.grad, norm.bias.grad))
+        if track_running_stats:
+            ret.append(norm.running_mean)
+        return ret
 
     ipu_result = IPUContext(cpu_step, model=ipu_norm)(ipu_norm, t, t2)
     cpu_result = cpu_step(cpu_norm, t, t2)

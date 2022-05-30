@@ -861,7 +861,6 @@
 #                                  bool[3] output_mask) -> (Tensor, Tensor, Tensor)
 - func: native_batch_norm_backward
   PopTorchDirect: batch_norm_backward
-  IgnoreArgs: {'output_mask'}
 
 # native_group_norm(Tensor input, Tensor? weight, Tensor? bias, int N, int C,
 #                   int HxW, int group, float eps) -> (Tensor, Tensor, Tensor)

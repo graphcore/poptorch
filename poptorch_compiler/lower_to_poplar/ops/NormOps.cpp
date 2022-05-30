@@ -34,11 +34,12 @@ batchNormalise(CompilerContext &context, const poplar::Tensor &input,
                                    context.seq);
 }
 
-std::tuple<poplar::Tensor, poplar::Tensor, poplar::Tensor> batchNormaliseGrad(
-    CompilerContext &context, const poplar::Tensor &input,
-    const poplar::Tensor &weight, const poplar::Tensor &save_mean,
-    const poplar::Tensor &inv_sd, const poplar::Tensor &grad_out) {
-
+std::tuple<poplar::Tensor, poplar::Tensor, poplar::Tensor>
+batchNormaliseGrad(CompilerContext &context, const poplar::Tensor &input,
+                   const poplar::Tensor &weight,
+                   const poplar::Tensor &save_mean,
+                   const poplar::Tensor &inv_sd, const poplar::Tensor &grad_out,
+                   bool weight_grad) {
   poplar::Tensor input_whitened = popnn::bn::batchNormWhiten(
       context.graph, input, save_mean, inv_sd, context.seq);
 
@@ -47,11 +48,15 @@ std::tuple<poplar::Tensor, poplar::Tensor, poplar::Tensor> batchNormaliseGrad(
       popnn::bn::batchNormGradients(context.graph, input_whitened, grad_out,
                                     inv_sd, weight, context.seq, poplar::FLOAT);
 
-  const auto [grad_weight, grad_bias] = // NOLINT
-      popnn::bn::batchNormParamGradients(context.graph, input_whitened,
-                                         grad_out, context.seq, poplar::FLOAT);
+  if (weight_grad) {
+    const auto [grad_weight, grad_bias] = // NOLINT
+        popnn::bn::batchNormParamGradients(context.graph, input_whitened,
+                                           grad_out, context.seq,
+                                           poplar::FLOAT);
 
-  return std::make_tuple(grad_input, grad_weight, grad_bias);
+    return std::make_tuple(grad_input, grad_weight, grad_bias);
+  }
+  return std::make_tuple(grad_input, poplar::Tensor(), poplar::Tensor());
 }
 
 void batch_norm::lowerToPoplar(CompilerContext &context) {
@@ -129,7 +134,15 @@ void batch_norm::lowerToPoplar(CompilerContext &context) {
 void batch_norm_backward::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor grad_out = context.fromSsa(this->grad_out());
   poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor weight = context.fromSsa(this->weight());
+  poplar::Tensor weight;
+
+  if (this->weight()) {
+    weight = context.fromSsa(this->weight());
+  } else {
+    std::vector<uint64_t> param_shape = {input.shape()[1]};
+    weight = createConstant(context, input.elementType(), param_shape, 1.0f);
+  }
+
   bool training = this->training();
   float epsilon = this->epsilon().convertToFloat();
 
@@ -149,11 +162,20 @@ void batch_norm_backward::lowerToPoplar(CompilerContext &context) {
   }
 
   const auto [grad_input, grad_weight, grad_bias] = // NOLINT
-      batchNormaliseGrad(context, input, weight, mean, inv_std, grad_out);
+      batchNormaliseGrad(context, input, weight, mean, inv_std, grad_out,
+                         this->grad_weight() || this->grad_bias());
 
-  context.addTensor(this->grad_input(), grad_input);
-  context.addTensor(this->grad_weight(), grad_weight);
-  context.addTensor(this->grad_bias(), grad_bias);
+  if (this->grad_input()) {
+    context.addTensor(this->grad_input(), grad_input);
+  }
+
+  if (this->grad_weight()) {
+    context.addTensor(this->grad_weight(), grad_weight);
+  }
+
+  if (this->grad_bias()) {
+    context.addTensor(this->grad_bias(), grad_bias);
+  }
 }
 
 void group_norm::lowerToPoplar(CompilerContext &context) {
