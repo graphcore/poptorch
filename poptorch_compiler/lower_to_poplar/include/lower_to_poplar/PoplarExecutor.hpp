@@ -7,6 +7,12 @@
 
 #include "pytorch_bridge/CompilerTypes.hpp"
 
+namespace poplar {
+class Target;
+class Device;
+class Engine;
+} // namespace poplar
+
 namespace mlir {
 class ModuleOp;
 class TimingScope;
@@ -16,21 +22,26 @@ namespace poptorch_ir {
 
 namespace detail {
 class PoplarExecutableImpl;
-}
+} // namespace detail
 
-class PoplarExecutable {
+class PoplarExecutor;
+
+// Compile graph by running both PopTorch compiler passes and poplar
+// compilation.
+PoplarExecutor compileExecutable(mlir::ModuleOp module,
+                                 const poplar::Target &target,
+                                 mlir::TimingScope &timer);
+
+class PoplarExecutor {
 public:
-  explicit PoplarExecutable(mlir::ModuleOp module);
-  ~PoplarExecutable();
+  explicit PoplarExecutor(std::unique_ptr<poplar::Engine> engine);
+  ~PoplarExecutor();
 
-  PoplarExecutable(PoplarExecutable &&other);
+  PoplarExecutor(PoplarExecutor &&other);
 
   operator bool() const { return static_cast<bool>(_impl); }
 
-  // Compile graph by running both PopTorch compiler passes and poplar
-  // compilation.
-  void compile(mlir::TimingScope &timer);
-
+  void load(const poplar::Device &device);
   // Run graph on device.
   void execute();
 

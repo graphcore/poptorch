@@ -135,7 +135,7 @@ GlobalTracerContext context;
 
 // Poplar doesn't support long, so cast to int if needed.
 // All the downcasts added here must also be handled
-// in MLIRExecutable::execute()
+// in MLIRExecutor::execute()
 at::Tensor downCastIfNeeded(const at::Tensor &t) {
   if (t.scalar_type() == at::ScalarType::Long) {
     return t.to(at::ScalarType::Int);
@@ -331,7 +331,7 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
 // TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
 
-std::shared_ptr<MLIRExecutable> compileMLIR() {
+std::shared_ptr<MLIRExecutor> compileMLIR() {
   auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
   ERROR_ON(mlir == nullptr);
   auto executable = mlir->compile();

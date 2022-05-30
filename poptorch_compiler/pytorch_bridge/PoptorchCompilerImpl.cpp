@@ -1,5 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "CompilerImpl.hpp"
+#include "PoptorchCompilerImpl.hpp"
 
 #include <vector>
 
@@ -64,8 +64,7 @@ bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
     : _builder(mlir::UnknownLoc::get(&context), &context),
-      _the_module(mlir::ModuleOp::create(_builder.getLoc())),
-      _executable(_the_module) {
+      _the_module(mlir::ModuleOp::create(_builder.getLoc())) {
 
   context.getDiagEngine().registerHandler(printDiagnostic);
 

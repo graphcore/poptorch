@@ -278,33 +278,18 @@ public:
 
   // Compile graph by running both PopTorch compiler passes and poplar
   // compilation.
-  void compile() {
-    ERROR_ON(!_executable);
+  poptorch_ir::PoplarExecutor compile(const poplar::Target &target) {
     timing_manager.setEnabled(true);
     if (!root_timer) {
       root_timer = timing_manager.getRootScope();
     }
-    _executable.compile(root_timer);
+
+    poptorch_ir::PoplarExecutor exe =
+        compileExecutable(_the_module, target, root_timer);
+
     root_timer = mlir::TimingScope();
     timing_manager.setEnabled(false);
-  }
-
-  // Connect to a poplar stream with a fixed location in memory.
-  // Each time Poplar copies data to/from the named stream, it will read/write
-  // to/from this memory locaiton.
-  void connectStream(const std::string &string, void *ptr) {
-    ERROR_ON(!_executable);
-    _executable.connectStream(string, ptr);
-  }
-
-  void connectStream(const std::string &string, Buffer buffer) {
-    ERROR_ON(!_executable);
-    _executable.connectStream(string, std::move(buffer));
-  }
-
-  // Return the executable such that it can be moved out this class
-  poptorch_ir::PoplarExecutable &&getExecutable() {
-    return std::move(_executable);
+    return exe;
   }
 
   // We need to maintain some MLIR state.
@@ -349,9 +334,6 @@ private:
 
   // Program to read weights off the chip.
   mlir::FuncOp _read_weights_graph;
-
-  // The executable.
-  poptorch_ir::PoplarExecutable _executable;
 };
 
 } // namespace detail

@@ -19,7 +19,7 @@ struct Value;
 } // namespace torch
 
 namespace poptorch_ir {
-class PoptorchExecutorWrapper;
+class PoplarExecutorWrapper;
 }
 
 namespace poptorch {
@@ -34,9 +34,6 @@ enum TracingMode {
   // Compile via MLIR. Actually uses the JIT path partially under the hood as
   // well.
   MLIR,
-  // Run on CPU and print info about operations. Potentially useful to see what
-  // gets called and the shapes of outputs ect. TODO(T45468): Renable this.
-  CPU,
   // TODO(T45467): We should support running in a sentinel mode where we don't
   // compile anything but can pick up changes. So you would run with MLIR then
   // sentinel on subsequent runs to detect any changes to constants ect in the
@@ -48,19 +45,18 @@ enum TracingMode {
  * When we compile we have two kinds of outputs. JIT or MLIR. JIT just returns
  * the JIT graph to be compiled by a slightly modified compile step in
  * poptorch.cpp. MLIR actually compiles the graph so returns a proper
- * executable which stores all of the state needed to execute the graph.
+ * executor which stores all of the state needed to execute the graph.
  */
-class MLIRExecutable {
+class MLIRExecutor {
 public:
-  explicit MLIRExecutable(
-      std::unique_ptr<poptorch_ir::PoptorchExecutorWrapper> &&);
-  ~MLIRExecutable();
+  explicit MLIRExecutor(std::unique_ptr<poptorch_ir::PoplarExecutorWrapper> &&);
+  ~MLIRExecutor();
   void execute(const std::vector<at::Tensor> &inputs);
   void weightsToDevice();
   void weightsToHost();
 
 private:
-  std::unique_ptr<poptorch_ir::PoptorchExecutorWrapper> _impl;
+  std::unique_ptr<poptorch_ir::PoplarExecutorWrapper> _impl;
 };
 
 // Create a new graph.
@@ -89,8 +85,8 @@ InplaceGraphInfo getInplaceGraphInfo(size_t num_anchors,
 std::shared_ptr<torch::jit::Graph> getTracedGraph();
 
 // Compile MLIR. Is a full roundtrip compile and spits out a runable poplar
-// binary at the end, wrapped by `MLIRExecutable`.
-std::shared_ptr<MLIRExecutable> compileMLIR();
+// binary at the end, wrapped by `MLIRExecutor`.
+std::shared_ptr<MLIRExecutor> compileMLIR();
 
 // Get a pointer to the data source for an IPU input / parameter tensor.
 // If the value is not a parameter or an input, return nullptr.

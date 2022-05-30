@@ -1432,18 +1432,17 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("_validateOptions", PTC(poptorch::parseSessionOptionsVoid));
 
 #if POPTORCH_BUILD_MLIR_COMPILER
-  py::class_<poptorch::MLIRExecutable,
-             std::shared_ptr<poptorch::MLIRExecutable>>(m, "MLIRExecutable")
-      .def("execute", &poptorch::MLIRExecutable::execute)
-      .def("weightsToDevice", &poptorch::MLIRExecutable::weightsToDevice)
-      .def("weightsToHost", &poptorch::MLIRExecutable::weightsToHost);
+  py::class_<poptorch::MLIRExecutor, std::shared_ptr<poptorch::MLIRExecutor>>(
+      m, "MLIRExecutor")
+      .def("execute", &poptorch::MLIRExecutor::execute)
+      .def("weightsToDevice", &poptorch::MLIRExecutor::weightsToDevice)
+      .def("weightsToHost", &poptorch::MLIRExecutor::weightsToHost);
   m.def("compileWithMlir", PTC(poptorch::compileMLIR));
 #endif
 
   py::enum_<poptorch::TracingMode>(m, "TracingMode")
       .value("PopART", poptorch::TracingMode::POPART)
       .value("MLIR", poptorch::TracingMode::MLIR)
-      .value("CPU", poptorch::TracingMode::CPU)
       .value("Sentinel", poptorch::TracingMode::SENTINEL)
       .export_values();
 

@@ -65,22 +65,7 @@ private:
 
 class PoplarExecutableImpl {
 public:
-  PoplarExecutableImpl(mlir::ModuleOp op,
-                       std::shared_ptr<model_runtime::Device> device);
-
-  void compile(mlir::TimingScope &timer);
-
-  void execute();
-
-  std::shared_ptr<model_runtime::Device> device;
-
-  poplar::Graph graph;
-
-  poplar::program::Sequence seq;
-
-  mlir::ModuleOp module;
-
-  CompilerContext context;
+  explicit PoplarExecutableImpl(std::unique_ptr<poplar::Engine> engine);
 
   std::unique_ptr<poplar::Engine> engine;
 
@@ -89,22 +74,64 @@ public:
   std::map<std::string, Buffer> owned_buffers;
 };
 
-PoplarExecutableImpl::PoplarExecutableImpl(
-    mlir::ModuleOp op, std::shared_ptr<model_runtime::Device> d)
-    : device(std::move(d)), graph(device->device().getTarget()), module(op),
-      context(graph, seq) {}
+PoplarExecutableImpl::PoplarExecutableImpl(std::unique_ptr<poplar::Engine> e)
+    : engine(std::move(e)) {}
 
-void PoplarExecutableImpl::execute() { engine->run(Programs::MainGraph); }
+} // namespace detail
 
-void PoplarExecutableImpl::compile(mlir::TimingScope &timer) {
+void PoplarExecutor::load(const poplar::Device &device) {
+  _impl->engine->load(device);
+}
+
+void PoplarExecutor::connectStream(const std::string &string, Buffer ptr) {
+  _impl->owned_buffers.insert_or_assign(string, ptr);
+  _impl->engine->connectStream(string, ptr->data());
+}
+
+void PoplarExecutor::connectStream(const std::string &string, void *ptr) {
+  _impl->owned_buffers.erase(string);
+  _impl->engine->connectStream(string, ptr);
+}
+
+void PoplarExecutor::execute() { _impl->engine->run(Programs::MainGraph); }
+
+void PoplarExecutor::weightsToDevice() {
+  _impl->engine->run(Programs::WeightsToDevice);
+}
+
+void PoplarExecutor::weightsToHost() {
+  _impl->engine->run(Programs::WeightsToHost);
+}
+
+PoplarExecutor::PoplarExecutor(std::unique_ptr<poplar::Engine> engine) {
+  _impl = std::make_unique<detail::PoplarExecutableImpl>(std::move(engine));
+}
+
+PoplarExecutor::PoplarExecutor(PoplarExecutor &&other) {
+  _impl = std::move(other._impl);
+  other._impl = nullptr;
+}
+
+PoplarExecutor::~PoplarExecutor() {}
+
+PoplarExecutor compileExecutable(mlir::ModuleOp module,
+                                 const poplar::Target &target,
+                                 mlir::TimingScope &timer) {
   mlir::PassManager manager{module.getContext()};
+
+  // The graph and sequence need to be stored outside the compiler context
+  // because for PopIT we create a context inside each op handler but we
+  // want them to share the graph and sequence.
+  poplar::Graph graph(target);
+  poplar::program::Sequence seq;
+  CompilerContext context(graph, seq);
 
   auto graph_construction = timer.nest("Poplar graph construction");
   manager.enableTiming(graph_construction);
   // Disable MLIR pass verification as we have our own definition of
   // valid IR state
   manager.enableVerifier(false);
-  LLVMStreamToTrace output;
+  detail::LLVMStreamToTrace output;
 
   // If Poptorch's TRACE logging level is enabled then print the graph
   // in between passes.
@@ -135,49 +162,11 @@ void PoplarExecutableImpl::compile(mlir::TimingScope &timer) {
   if (mlir::succeeded(manager.run(module))) {
     graph_construction.stop();
     auto compile_poplar = timer.nest("Compiling poplar");
-    engine = std::make_unique<poplar::Engine>(context.graph, context.programs);
-    engine->load(device->device());
+    auto engine =
+        std::make_unique<poplar::Engine>(context.graph, context.programs);
     compile_poplar.stop();
-  } else {
-    ERROR("One or more passes failed.");
+    return PoplarExecutor(std::move(engine));
   }
+  ERROR("One or more passes failed.");
 }
-
-} // namespace detail
-
-void PoplarExecutable::connectStream(const std::string &string, Buffer ptr) {
-  _impl->owned_buffers.insert_or_assign(string, ptr);
-  _impl->engine->connectStream(string, ptr->data());
-}
-
-void PoplarExecutable::connectStream(const std::string &string, void *ptr) {
-  _impl->owned_buffers.erase(string);
-  _impl->engine->connectStream(string, ptr);
-}
-
-void PoplarExecutable::execute() { _impl->execute(); }
-
-void PoplarExecutable::compile(mlir::TimingScope &timer) {
-  _impl->compile(timer);
-}
-
-void PoplarExecutable::weightsToDevice() {
-  _impl->engine->run(Programs::WeightsToDevice);
-}
-
-void PoplarExecutable::weightsToHost() {
-  _impl->engine->run(Programs::WeightsToHost);
-}
-
-PoplarExecutable::PoplarExecutable(mlir::ModuleOp module) {
-  _impl = std::make_unique<detail::PoplarExecutableImpl>(module, getDevice());
-}
-
-PoplarExecutable::PoplarExecutable(PoplarExecutable &&other) {
-  _impl = std::move(other._impl);
-  other._impl = nullptr;
-}
-
-PoplarExecutable::~PoplarExecutable() {}
-
 } // namespace poptorch_ir

@@ -8,9 +8,10 @@
 #include <iostream>
 #include <utility>
 
-#include "CompilerImpl.hpp"
-#include "ExecutorImpl.hpp"
+#include "PoptorchCompilerImpl.hpp"
+#include "lower_to_poplar/CompilerHelpers.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
+#include <model_runtime/DeviceManager.hpp>
 
 namespace poptorch_ir {
 
@@ -127,6 +128,28 @@ void PoptorchCompiler::addReturn() {
 
 bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
   return _impl->all_ops_can_be_lowered;
+}
+
+PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
+  auto device = getDevice();
+  auto exe = _impl->compile(device->device().getTarget());
+  exe.load(device->device());
+
+  // Connect up the outputs.
+  for (auto &pair : _impl->output_callbacks) {
+    exe.connectStream(pair.first, pair.second);
+  }
+
+  for (auto &pair : _impl->weight_callbacks) {
+    exe.connectStream("Write-" + pair.first, pair.second);
+    exe.connectStream("Read-" + pair.first, pair.second);
+  }
+
+  PoplarExecutorWrapper executor(std::move(exe),
+                                 std::move(_impl->input_callbacks));
+  _impl->weight_callbacks.clear();
+  // input_callbacks was moved to PoplarExecutor in compile()
+  return executor;
 }
 
 } // namespace poptorch_ir

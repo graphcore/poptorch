@@ -1,5 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "CompilerImpl.hpp"
+#include "PoptorchCompilerImpl.hpp"
 #include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 

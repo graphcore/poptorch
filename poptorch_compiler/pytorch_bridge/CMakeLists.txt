@@ -4,8 +4,8 @@ if (POPTORCH_BUILD_MLIR_COMPILER)
 
   add_library(poptorch_compiler SHARED
     PoptorchCompiler.cpp
-    CompilerImpl.cpp
-    Executor.cpp
+    PoptorchCompilerImpl.cpp
+    PoplarExecutorWrapper.cpp
     Ops.cpp
     PytorchBridgeUtils.cpp
   )

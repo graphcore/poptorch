@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "pytorch_bridge/CompilerTypes.hpp"
-#include "pytorch_bridge/Executor.hpp"
+#include "pytorch_bridge/PoplarExecutorWrapper.hpp"
 
 namespace mlir {
 class RankedTensorType;
@@ -44,7 +44,7 @@ public:
                         const char *);
   void addOutput(TensorId id, void *ptr, const char *);
 
-  PoptorchExecutorWrapper compile();
+  PoplarExecutorWrapper compileAndLoad();
 
   std::vector<std::int64_t> getSize(TensorId id) const;
   Type getType(TensorId id) const;

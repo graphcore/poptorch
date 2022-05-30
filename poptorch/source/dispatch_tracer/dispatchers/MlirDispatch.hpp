@@ -44,7 +44,7 @@ public:
   const at::Tensor &copyInplace(const at::Tensor &self,
                                 const at::Tensor &src) final;
 
-  std::shared_ptr<MLIRExecutable> compile();
+  std::shared_ptr<MLIRExecutor> compile();
 
   poptorch_ir::TensorId findTensor(const at::Tensor &tensor);
 

@@ -35,10 +35,10 @@ enum Programs { MainGraph = 0, WeightsToDevice = 1, WeightsToHost = 2 };
 struct CompilerContext {
   explicit CompilerContext(poplar::Graph &g, poplar::program::Sequence &s)
       : graph(g), seq(s) {
-    poplin::addCodelets(g);
-    popnn::addCodelets(g);
-    popops::addCodelets(g);
-    poprand::addCodelets(g);
+    poplin::addCodelets(graph);
+    popnn::addCodelets(graph);
+    popops::addCodelets(graph);
+    poprand::addCodelets(graph);
   }
 
   poplar::Graph &graph;

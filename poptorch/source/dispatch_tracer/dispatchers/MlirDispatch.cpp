@@ -67,13 +67,13 @@ std::vector<std::int64_t> toCompilerShape(const at::Tensor &tensor) {
 
 } // namespace
 
-MLIRExecutable::MLIRExecutable(
-    std::unique_ptr<poptorch_ir::PoptorchExecutorWrapper> &&other)
+MLIRExecutor::MLIRExecutor(
+    std::unique_ptr<poptorch_ir::PoplarExecutorWrapper> &&other)
     : _impl(std::move(other)) {}
 
-MLIRExecutable::~MLIRExecutable() {}
+MLIRExecutor::~MLIRExecutor() {}
 
-void MLIRExecutable::execute(const std::vector<at::Tensor> &inputs) {
+void MLIRExecutor::execute(const std::vector<at::Tensor> &inputs) {
   try {
     std::vector<void *> ptrs;
     ptrs.resize(inputs.size());
@@ -112,14 +112,14 @@ void MLIRExecutable::execute(const std::vector<at::Tensor> &inputs) {
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-void MLIRExecutable::weightsToDevice() {
+void MLIRExecutor::weightsToDevice() {
   try {
     _impl->weightsToDevice();
   }
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-void MLIRExecutable::weightsToHost() {
+void MLIRExecutor::weightsToHost() {
   try {
     _impl->weightsToHost();
   }
@@ -324,21 +324,21 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
                schema_key << " cannot currently be lowered to Poplar");
 }
 
-std::shared_ptr<MLIRExecutable> MLIRDispatch::compile() {
+std::shared_ptr<MLIRExecutor> MLIRDispatch::compile() {
   // Get the binary from MLIR.
-  poptorch_ir::PoptorchExecutorWrapper executor = _compiler.compile();
+  poptorch_ir::PoplarExecutorWrapper executor = _compiler.compileAndLoad();
 
   // Print out the timing information about how long each stage takes.
   _compiler.getTimingInfo();
 
   // Wrap it in a pointer so it can be carried around without needing to leak
   // too much MLIR into the rest of PopTorch.
-  auto ptr = std::make_unique<poptorch_ir::PoptorchExecutorWrapper>(
-      std::move(executor));
+  auto ptr =
+      std::make_unique<poptorch_ir::PoplarExecutorWrapper>(std::move(executor));
 
   // Wrap this in a executable shared ptr so we can retain it in pytorch
   // independent of the compiler.
-  return std::make_shared<MLIRExecutable>(std::move(ptr));
+  return std::make_shared<MLIRExecutor>(std::move(ptr));
 }
 
 // Resolves a PyTorch tensor to find out what its MLIR representation is.
