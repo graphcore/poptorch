@@ -336,9 +336,6 @@ InplaceGraphInfo
 InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
                                     size_t num_anchors,
                                     bool replicas_needing_broadcast) {
-  // Make sure poptorch::end_for_loop has the non-changed value as an input.
-  fixForLoopInputs(graph);
-
   // _aliases[alias] = graph_input -> we want the other way around.
   std::map<torch::jit::Value *, torch::jit::Value *> input_aliases;
   for (auto &p : _aliases) {
