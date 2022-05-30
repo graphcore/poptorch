@@ -58,7 +58,8 @@ int getNumTilesPerIpu(const std::string &ipu_model_version) {
     num_tiles_per_ipu = 4;
   }
 
-  ERROR_ON_MSG(num_tiles_per_ipu == 0,
+  ERROR_ON_MSG((ipu_model_version.find("ipu:") == std::string::npos) &&
+                   (num_tiles_per_ipu == 0),
                "Invalid IPU model version. Valid versions: ipu1, ipu2.");
   return num_tiles_per_ipu;
 }
