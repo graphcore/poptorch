@@ -12,6 +12,8 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "popart_canonicalization/PopartCanonicalizationUtils.hpp"
+
 #include "poptorch/Utils.hpp"
 
 #include "PoptorchSymbols.hpp"
@@ -370,12 +372,24 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
             "between replicas, you can disable buffer broadcasting using "
             "poptorch.Options.broadcastBuffers(False).");
 
-        auto *new_node =
+        auto *aten_target =
             graph.create(symbols::poptorch::update_param_inplace, 1);
-        new_node->addInput(graph_input);
-        new_node->addInput(alias);
-        new_node->insertAfter(alias->node());
-        new_node->output()->setType(alias->type());
+        aten_target->addInput(graph_input);
+        aten_target->addInput(alias);
+        aten_target->insertAfter(alias->node());
+        aten_target->output()->setType(alias->type());
+
+        // Canonicalise immediately
+        SymbolHandler handler =
+            getHandler(symbols::poptorch::update_param_inplace);
+        ERROR_ON(!handler);
+        auto *new_node = handler(&graph, aten_target);
+        ERROR_ON(new_node == nullptr);
+        // Replace the old node by the canonicalised one.
+        std::unordered_set<torch::jit::Node *> to_delete;
+        to_delete.insert(aten_target);
+        // Clean up any dead nodes.
+        searchAndPossiblyDestroy(to_delete);
       } else {
         logging::trace("Alias for parameter %{} -> %{}", it->first->debugName(),
                        alias->debugName());

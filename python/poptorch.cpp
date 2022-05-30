@@ -1363,13 +1363,6 @@ compileWithManualTracing(const pybind11::dict &options,
   // TODO(T55228): remove after we use our own dispatch key.
   removeDeadImplicitCasts(graph.get());
 
-  logging::trace("Graph right before canonicalization:\n{}", *graph);
-  // Convert any unsupported ATEN nodes in the graph to a popart
-  // representation.
-  poptorch::canonicalize(graph.get());
-
-  logging::debug("Graph right before popart:\n{}", *graph);
-
   poptorch::LowerToPopart lower(
       graph.get(), std::move(inplace_info), false, std::move(optimizers),
       parsed_options, attribute_accessor, callbacks, std::move(anchors_list));

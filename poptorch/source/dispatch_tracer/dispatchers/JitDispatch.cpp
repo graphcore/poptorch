@@ -209,7 +209,8 @@ void JITDispatch::setCurrentCodeLocation(
 void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
                                            c10::Stack &stack,
                                            torch::jit::Node **node) {
-  torch::jit::Node *new_node = canonicalise(schema, *node, *graph, false);
+  torch::jit::Node *new_node =
+      canonicalise(schema, *node, *graph, /* is_allowed_to_fail=*/false);
   *node = new_node;
 
   logging::trace("[TRACING-2][JIT] Post canonicalisation {}", *new_node);
