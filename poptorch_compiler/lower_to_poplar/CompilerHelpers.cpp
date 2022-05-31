@@ -2,11 +2,24 @@
 
 #include <model_runtime/DeviceManager.hpp>
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
+#include <poplin/codelets.hpp>
+#include <popnn/codelets.hpp>
+#include <popops/codelets.hpp>
+#include <poprand/codelets.hpp>
+
+#include "CompilerHelpers.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
 namespace poptorch_ir {
+
+CompilerContext::CompilerContext(poplar::Graph &g, poplar::program::Sequence &s)
+    : graph(g), seq(s) {
+  poplin::addCodelets(graph);
+  popnn::addCodelets(graph);
+  popops::addCodelets(graph);
+  poprand::addCodelets(graph);
+}
 
 poplar::Type elementTypeFromMLIR(mlir::Type elementType) {
   if (elementType.isF16()) {
@@ -41,49 +54,5 @@ poplar::Type elementTypeFromMLIR(mlir::Type elementType) {
   ERROR("Unsupported MLIR type");
 
   return poplar::FLOAT;
-}
-
-namespace {
-bool waitIfIpuIsUnavailable() {
-  bool wait = false;
-  if (const char *env_wait_for_ipu = std::getenv("POPTORCH_WAIT_FOR_IPU")) {
-    wait = std::stoi(env_wait_for_ipu) != 0;
-    poptorch::logging::info(
-        "From POPTORCH_WAIT_FOR_IPU environment variable: If no IPU "
-        "is available: {}",
-        wait ? "Wait" : "Fail & exit");
-  }
-  return wait;
-}
-} // namespace
-
-std::shared_ptr<model_runtime::Device> getDevice() {
-  std::shared_ptr<model_runtime::Device> device;
-  model_runtime::DeviceManager manager;
-
-  bool model_enabled = false;
-
-  // Run on model if the env var is set.
-  if (const char *env_use_model = std::getenv("POPTORCH_IPU_MODEL")) {
-    model_enabled = std::stoi(env_use_model) != 0;
-    if (model_enabled) {
-      device = manager.createIpuModelDevice(1);
-    }
-  }
-  if (const char *env_use_model = std::getenv("POPTORCH_SMALL_IPU_MODEL")) {
-    model_enabled = std::stoi(env_use_model) != 0;
-    if (!device && model_enabled) {
-      device = manager.createSmallIpuModelDevice(1);
-    }
-  }
-  // Run on an actual device.
-  if (!device) {
-    device =
-        manager.getDevice(1, {},
-                          waitIfIpuIsUnavailable() ? model_runtime::WAIT_FOREVER
-                                                   : model_runtime::NO_WAIT);
-  }
-  ERROR_ON_MSG(!device, "Failed to acquire a device");
-  return device;
 }
 } // namespace poptorch_ir

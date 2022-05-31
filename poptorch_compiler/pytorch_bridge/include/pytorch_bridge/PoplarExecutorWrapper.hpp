@@ -15,6 +15,7 @@ class PoplarExecutorWrapperImpl;
 } // namespace detail
 
 class PoplarExecutor;
+
 /*
  * A lightweight wrapper around the compiled poplar objects. Allows for the
  * compiler to return an executor back to PyTorch land which can then be

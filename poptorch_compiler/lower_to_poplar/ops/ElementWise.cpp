@@ -1,10 +1,11 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "lower_to_poplar/CompilerHelpers.hpp"
 #include <popops/ElementWise.hpp>
 
 #include <popops/Expr.hpp>
 #include <popops/ExprOp.hpp>
 #include <popops/ScaledAdd.hpp>
+
+#include "../CompilerHelpers.hpp"
 
 namespace pe = popops::expr;
 

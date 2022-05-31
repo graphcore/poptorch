@@ -315,8 +315,10 @@ public:
 
   // A timer for us to record how long it takes to compile each stage.
   mlir::DefaultTimingManager timing_manager;
-  // Bit annoying, this shouldn't be needed really.
-  mlir::TimingScope root_timer;
+
+  // Wrapped root timer, which does not restart if start is called twice.
+  NonRestartingMlirTimer root_timer;
+
   // A helper to provide a hidden interface to PopTorch to record how long it
   // takes to trace a model.
   mlir::TimingScope tracer_timer;
@@ -343,7 +345,7 @@ public:
   virtual ~MLIRStaticGraphBuilder() = default;
   // Compile graph by running both PopTorch compiler passes and poplar
   // compilation.
-  poptorch_ir::PoplarExecutor compile(const poplar::Target &target);
+  poptorch_ir::PoplarExecutor compile(const PoplarTarget &target);
   void addInput(const Buffer &ptr, const mlir::Value &input,
                 const char *name) override;
   void addParameter(const Buffer &ptr, const mlir::Value &parameter,

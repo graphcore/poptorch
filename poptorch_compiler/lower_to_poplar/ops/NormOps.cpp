@@ -6,8 +6,9 @@
 #include <popops/ElementWise.hpp>
 #include <popops/Expr.hpp>
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
 #include "poptorch_logging/Error.hpp"
+
+#include "../CompilerHelpers.hpp"
 
 namespace pe = popops::expr;
 

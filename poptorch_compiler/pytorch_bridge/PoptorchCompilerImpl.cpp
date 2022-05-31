@@ -63,7 +63,8 @@ bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
 }
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
-    : _builder(mlir::UnknownLoc::get(&context), &context),
+    : root_timer(timing_manager.getRootTimer()),
+      _builder(mlir::UnknownLoc::get(&context), &context),
       _the_module(mlir::ModuleOp::create(_builder.getLoc())) {
 
   context.getDiagEngine().registerHandler(printDiagnostic);
@@ -190,16 +191,16 @@ MLIRStaticGraphBuilder::MLIRStaticGraphBuilder() {
 // Compile graph by running both PopTorch compiler passes and poplar
 // compilation.
 poptorch_ir::PoplarExecutor
-MLIRStaticGraphBuilder::compile(const poplar::Target &target) {
+MLIRStaticGraphBuilder::compile(const PoplarTarget &target) {
+  // Start the timer if it has not been started already
   timing_manager.setEnabled(true);
-  if (!root_timer) {
-    root_timer = timing_manager.getRootScope();
-  }
+  root_timer.start();
 
   poptorch_ir::PoplarExecutor exe =
       compileExecutable(_the_module, target, root_timer);
 
-  root_timer = mlir::TimingScope();
+  // End timing
+  root_timer.stop();
   timing_manager.setEnabled(false);
   return exe;
 }

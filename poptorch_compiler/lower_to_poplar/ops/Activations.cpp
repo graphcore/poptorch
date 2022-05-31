@@ -1,10 +1,12 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "dialect/PoptorchDialect.hpp"
-#include "lower_to_poplar/CompilerHelpers.hpp"
+
 #include <popnn/LogSoftmax.hpp>
 #include <popnn/NonLinearity.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Reduce.hpp>
+
+#include "../CompilerHelpers.hpp"
 
 namespace pe = popops::expr;
 

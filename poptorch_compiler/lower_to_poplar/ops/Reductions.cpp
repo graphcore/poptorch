@@ -6,7 +6,6 @@
 #include <functional>
 
 #include "dialect/PoptorchDialect.hpp"
-#include "lower_to_poplar/CompilerHelpers.hpp"
 
 #include <poplar/ArrayRef.hpp>
 #include <poplar/Graph.hpp>
@@ -20,6 +19,8 @@
 #include <popops/Pad.hpp>
 #include <popops/Reduce.hpp>
 #include <poputil/Broadcast.hpp>
+
+#include "../CompilerHelpers.hpp"
 
 namespace poptorch_ir {
 

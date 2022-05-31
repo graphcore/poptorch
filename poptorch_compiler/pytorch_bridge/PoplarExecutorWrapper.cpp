@@ -1,6 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "pytorch_bridge/PoplarExecutorWrapper.hpp"
 
+#include "pytorch_bridge/PoplarExecutorWrapper.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
 #include "poptorch_logging/Error.hpp"
 

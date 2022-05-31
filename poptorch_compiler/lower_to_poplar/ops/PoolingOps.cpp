@@ -5,7 +5,7 @@
 #include <popnn/Pooling.hpp>
 #include <popops/Pad.hpp>
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
+#include "../CompilerHelpers.hpp"
 #include "poptorch_logging/Error.hpp"
 
 namespace poptorch_ir {

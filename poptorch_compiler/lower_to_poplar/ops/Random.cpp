@@ -3,14 +3,13 @@
 #include <iomanip>
 #include <limits>
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
-
 #include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Fill.hpp>
 #include <popops/TopK.hpp>
 #include <poprand/RandomGen.hpp>
 
+#include "../CompilerHelpers.hpp"
 #include "poptorch_logging/Error.hpp"
 
 namespace {

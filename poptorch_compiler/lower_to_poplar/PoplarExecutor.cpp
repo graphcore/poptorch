@@ -11,7 +11,6 @@
 
 #include <utility>
 
-#include <model_runtime/DeviceManager.hpp>
 #include <passes/CommonPasses.hpp>
 #include <poplar/Device.hpp>
 #include <poplar/DeviceManager.hpp>
@@ -20,7 +19,8 @@
 #include <poplar/IPUModel.hpp>
 #include <poplar/Target.hpp>
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
+#include "../CompilerHelpers.hpp"
+#include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "passes/LowerToPoplar.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -79,8 +79,29 @@ PoplarExecutableImpl::PoplarExecutableImpl(std::unique_ptr<poplar::Engine> e)
 
 } // namespace detail
 
-void PoplarExecutor::load(const poplar::Device &device) {
-  _impl->engine->load(device);
+NonRestartingMlirTimer::NonRestartingMlirTimer(mlir::Timer &&timer)
+    : _running(new bool(false)), _timer(new mlir::Timer(timer)) {}
+
+void NonRestartingMlirTimer::start() {
+  if (!(*_running)) {
+    _timer->start();
+  }
+  *_running = true;
+}
+
+void NonRestartingMlirTimer::stop() {
+  if ((*_running)) {
+    _timer->stop();
+  }
+  *_running = false;
+}
+
+mlir::TimingScope NonRestartingMlirTimer::nestAndScope(const char *name) {
+  return mlir::TimingScope(_timer->nest(name));
+}
+
+void PoplarExecutor::load(const PoplarDevice &device) {
+  _impl->engine->load(device.device());
 }
 
 void PoplarExecutor::connectStream(const std::string &string, Buffer ptr) {
@@ -115,18 +136,18 @@ PoplarExecutor::PoplarExecutor(PoplarExecutor &&other) {
 PoplarExecutor::~PoplarExecutor() {}
 
 PoplarExecutor compileExecutable(mlir::ModuleOp module,
-                                 const poplar::Target &target,
-                                 mlir::TimingScope &timer) {
+                                 const PoplarTarget &target,
+                                 NonRestartingMlirTimer &timer) {
   mlir::PassManager manager{module.getContext()};
 
   // The graph and sequence need to be stored outside the compiler context
   // because for PopIT we create a context inside each op handler but we
   // want them to share the graph and sequence.
-  poplar::Graph graph(target);
+  poplar::Graph graph(target.target());
   poplar::program::Sequence seq;
   CompilerContext context(graph, seq);
 
-  auto graph_construction = timer.nest("Poplar graph construction");
+  auto graph_construction = timer.nestAndScope("Poplar graph construction");
   manager.enableTiming(graph_construction);
   // Disable MLIR pass verification as we have our own definition of
   // valid IR state
@@ -161,7 +182,7 @@ PoplarExecutor compileExecutable(mlir::ModuleOp module,
 
   if (mlir::succeeded(manager.run(module))) {
     graph_construction.stop();
-    auto compile_poplar = timer.nest("Compiling poplar");
+    auto compile_poplar = timer.nestAndScope("Compiling poplar");
     auto engine =
         std::make_unique<poplar::Engine>(context.graph, context.programs);
     compile_poplar.stop();

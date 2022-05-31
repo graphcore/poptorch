@@ -1,5 +1,4 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "lower_to_poplar/CompilerHelpers.hpp"
 #include <poplin/ConvParams.hpp>
 #include <poplin/ConvUtil.hpp>
 #include <poplin/Convolution.hpp>
@@ -8,6 +7,8 @@
 #include <popops/Reduce.hpp>
 #include <popops/ScaledAdd.hpp>
 #include <poputil/Broadcast.hpp>
+
+#include "../CompilerHelpers.hpp"
 
 namespace pe = popops::expr;
 

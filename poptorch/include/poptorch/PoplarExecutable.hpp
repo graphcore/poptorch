@@ -5,9 +5,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <map>
-#include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 

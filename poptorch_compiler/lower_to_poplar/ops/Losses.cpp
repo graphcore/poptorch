@@ -1,6 +1,4 @@
-
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "lower_to_poplar/CompilerHelpers.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
 #include <popnn/NonLinearity.hpp>
 #include <popnn/NonLinearityDef.hpp>
@@ -9,6 +7,8 @@
 #include <popops/Encoding.hpp>
 #include <popops/Reduce.hpp>
 #include <popops/ScaledAdd.hpp>
+
+#include "../CompilerHelpers.hpp"
 
 #include "poptorch_logging/Logging.hpp"
 

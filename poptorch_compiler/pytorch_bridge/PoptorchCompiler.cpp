@@ -1,17 +1,15 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "pytorch_bridge/PoptorchCompiler.hpp"
 
 #include <llvm/ADT/SmallVector.h>
 #include <mlir/IR/Operation.h>
 #include <mlir/Support/Timing.h>
 
-#include <iostream>
 #include <utility>
 
 #include "PoptorchCompilerImpl.hpp"
-#include "lower_to_poplar/CompilerHelpers.hpp"
+#include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
+#include "pytorch_bridge/PoptorchCompiler.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
-#include <model_runtime/DeviceManager.hpp>
 
 namespace poptorch_ir {
 
@@ -77,8 +75,9 @@ void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {
 
 void PoptorchCompiler::startTraceTiming() {
   _impl->timing_manager.setEnabled(true);
-  _impl->root_timer = _impl->timing_manager.getRootScope();
-  _impl->tracer_timer = _impl->root_timer.nest("PytorchTracingTime");
+
+  _impl->root_timer.start();
+  _impl->tracer_timer = _impl->root_timer.nestAndScope("PytorchTracingTime");
 }
 
 void PoptorchCompiler::endTraceTiming() {
@@ -132,25 +131,32 @@ PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
   auto *compiler = dynamic_cast<detail::MLIRStaticGraphBuilder *>(_impl.get());
   ERROR_ON_MSG(compiler == nullptr,
                "[Internal] Only static graph builders can compileAndLoad()");
+  ERROR_ON_MSG(
+      compiler->input_callbacks.empty() && compiler->output_callbacks.empty(),
+      "Either no inputs or outputs were added or compiling a second time.");
 
-  auto device = getDevice();
-  auto exe = compiler->compile(device->device().getTarget());
-  exe.load(device->device());
+  // Obtain the device
+  PoplarDevice device = PoplarDevice::defaultDevice();
+  auto exe = compiler->compile(device.getTarget());
 
-  // Connect up the outputs.
+  exe.load(device);
+
+  // Move across and connect callbacks, clearing them in the process
   for (auto &pair : compiler->output_callbacks) {
     exe.connectStream(pair.first, pair.second);
   }
+  compiler->output_callbacks.clear();
 
   for (auto &pair : compiler->weight_callbacks) {
     exe.connectStream("Write-" + pair.first, pair.second);
-    exe.connectStream("Read-" + pair.first, pair.second);
+    exe.connectStream("Read-" + pair.first, std::move(pair.second));
   }
+  compiler->weight_callbacks.clear();
 
   PoplarExecutorWrapper executor(std::move(exe),
                                  std::move(compiler->input_callbacks));
-  compiler->weight_callbacks.clear();
-  // input_callbacks was moved to PoplarExecutor in compile()
+  compiler->input_callbacks.clear();
+
   return executor;
 }
 

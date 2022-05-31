@@ -8,13 +8,12 @@
 #include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poplar {
-class Target;
-class Device;
 class Engine;
 } // namespace poplar
 
 namespace mlir {
 class ModuleOp;
+class Timer;
 class TimingScope;
 } // namespace mlir
 
@@ -24,13 +23,35 @@ namespace detail {
 class PoplarExecutableImpl;
 } // namespace detail
 
+// A wrapper for MlirTimer which stops it restarting when start is called.
+class NonRestartingMlirTimer {
+public:
+  explicit NonRestartingMlirTimer(mlir::Timer &&timer);
+
+  // Start the timer unless it is running already.
+  void start();
+
+  // Stop the timer (safe to call if it is not running).
+  void stop();
+
+  // Returns a timing scope on a nested timer: this allows for the usual
+  // RAII timing of the nest.
+  mlir::TimingScope nestAndScope(const char *name);
+
+private:
+  std::shared_ptr<bool> _running;
+  std::shared_ptr<mlir::Timer> _timer;
+};
+
 class PoplarExecutor;
+class PoplarTarget;
+class PoplarDevice;
 
 // Compile graph by running both PopTorch compiler passes and poplar
 // compilation.
 PoplarExecutor compileExecutable(mlir::ModuleOp module,
-                                 const poplar::Target &target,
-                                 mlir::TimingScope &timer);
+                                 const PoplarTarget &target,
+                                 NonRestartingMlirTimer &timer);
 
 class PoplarExecutor {
 public:
@@ -41,7 +62,8 @@ public:
 
   operator bool() const { return static_cast<bool>(_impl); }
 
-  void load(const poplar::Device &device);
+  void load(const PoplarDevice &device);
+
   // Run graph on device.
   void execute();
 

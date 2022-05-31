@@ -1,5 +1,6 @@
 add_library(lower_to_poplar STATIC
         CompilerHelpers.cpp
+        PoplarDeviceAndTarget.cpp
         PoplarExecutor.cpp
         ops/Activations.cpp
         ops/ElementWise.cpp

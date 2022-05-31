@@ -7,7 +7,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
+#include "../CompilerHelpers.hpp"
 #include "passes/LowerToPoplar.hpp"
 #include "passes/PassUtils.hpp"
 

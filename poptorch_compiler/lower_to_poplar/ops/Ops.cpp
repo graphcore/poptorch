@@ -1,8 +1,9 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "lower_to_poplar/CompilerHelpers.hpp"
 #include <poplar/Graph.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Reduce.hpp>
+
+#include "../CompilerHelpers.hpp"
 
 namespace poptorch_ir {
 

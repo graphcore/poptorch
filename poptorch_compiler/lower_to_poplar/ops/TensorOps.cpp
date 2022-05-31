@@ -9,7 +9,7 @@
 #include <popops/Zero.hpp>
 #include <poprand/RandomGen.hpp>
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
+#include "../CompilerHelpers.hpp"
 
 namespace poptorch_ir {
 

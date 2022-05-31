@@ -13,33 +13,21 @@
 #include <utility>
 #include <vector>
 
-#include <poplar/DataStream.hpp>
 #include <poplar/Graph.hpp>
 #include <poplar/Program.hpp>
 
-#include <poplin/codelets.hpp>
-#include <popnn/codelets.hpp>
-#include <popops/codelets.hpp>
-#include <poprand/codelets.hpp>
-
 #include "dialect/PoptorchDialect.hpp"
 
-namespace model_runtime {
-class Device;
-}
+namespace poplar {
+class DataStream;
+} // namespace poplar
 
 namespace poptorch_ir {
 
 enum Programs { MainGraph = 0, WeightsToDevice = 1, WeightsToHost = 2 };
 
 struct CompilerContext {
-  explicit CompilerContext(poplar::Graph &g, poplar::program::Sequence &s)
-      : graph(g), seq(s) {
-    poplin::addCodelets(graph);
-    popnn::addCodelets(graph);
-    popops::addCodelets(graph);
-    poprand::addCodelets(graph);
-  }
+  explicit CompilerContext(poplar::Graph &g, poplar::program::Sequence &s);
 
   poplar::Graph &graph;
 
@@ -90,8 +78,6 @@ poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
                                   mlir::Type mlirType);
 
 poplar::Type elementTypeFromMLIR(mlir::Type elementType);
-
-std::shared_ptr<model_runtime::Device> getDevice();
 
 template <typename T>
 std::vector<T> convertFloatArray(const mlir::ArrayAttr &array) {

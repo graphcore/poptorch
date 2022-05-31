@@ -2,9 +2,10 @@
 
 #include <vector>
 
-#include "lower_to_poplar/CompilerHelpers.hpp"
 #include <poplar/Graph.hpp>
 #include <poplar/Tensor.hpp>
+
+#include "../CompilerHelpers.hpp"
 
 namespace poptorch_ir {
 
