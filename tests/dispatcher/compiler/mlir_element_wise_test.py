@@ -59,7 +59,8 @@ binary_test_cases = [
     (torch.tensor([torch.nan, torch.inf, torch.nan,
                    torch.inf]), torch.tensor([torch.nan, torch.inf, 0.0,
                                               0.0])),
-    (torch.randn(3, 3), torch.randn(3, 3))
+    (torch.randn(3, 3), torch.randn(3, 3)),
+    (torch.tensor(1), torch.tensor([2]))
 ]
 
 

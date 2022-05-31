@@ -43,9 +43,6 @@ std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
     return broadcast(rhs, lhs);
   }
 
-  ERROR_ON_MSG(rhs.empty(), "One of the tensor inputs is a scalar. This "
-                            "prevents broadcasting.");
-
   auto lhs_itr = lhs.begin();
   auto rhs_itr = rhs.begin();
 

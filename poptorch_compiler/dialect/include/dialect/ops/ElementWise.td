@@ -129,20 +129,10 @@ class Poptorch_elem_binary<string name>
      }]>
     ];
 
-    // TODO: Will need to match the full shape inference rules.
     let extraClassDeclaration = [{
         static mlir::Type inferType(mlir::Value v1, mlir::Value v2) {
-            // Get the types of the inputs.
-            mlir::Type t1 = v1.getType();
-            mlir::Type t2 = v2.getType();
-
-            // Assume both are tensors for now.
-            mlir::RankedTensorType t1_tensor = t1.cast<mlir::RankedTensorType>();
-            mlir::RankedTensorType t2_tensor = t2.cast<mlir::RankedTensorType>();
-
-            // Get element type out
-            mlir::Type e1 = t1_tensor.getElementType();
-            return mlir::RankedTensorType::get(t1_tensor.getShape(), e1);
+            auto out_shape = broadcast(getShape(v1), getShape(v2));
+            return mlir::RankedTensorType::get(out_shape, getElementType(v1));
         }
     }];
 }
@@ -307,17 +297,8 @@ class Poptorch_NotImplemented_elem_binary<string name> :  Poptorch_NotImplemente
     // TODO: Will need to match the full shape inference rules.
     let extraClassDeclaration = [{
         static mlir::Type inferType(mlir::Value v1, mlir::Value v2) {
-            // Get the types of the inputs.
-            mlir::Type t1 = v1.getType();
-            mlir::Type t2 = v2.getType();
-
-            // Assume both are tensors for now.
-            mlir::RankedTensorType t1_tensor = t1.cast<mlir::RankedTensorType>();
-            mlir::RankedTensorType t2_tensor = t2.cast<mlir::RankedTensorType>();
-
-            // Get element type out
-            mlir::Type e1 = t1_tensor.getElementType();
-            return mlir::RankedTensorType::get(t1_tensor.getShape(), e1);
+            auto out_shape = broadcast(getShape(v1), getShape(v2));
+            return mlir::RankedTensorType::get(out_shape, getElementType(v1));
         }
     }];
 }
@@ -351,8 +332,8 @@ class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
     }];
     let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
         $_state.addOperands({v1, v2});
-        mlir::RankedTensorType rtt = v1.getType().cast<mlir::RankedTensorType>();
-        $_state.addTypes(mlir::RankedTensorType::get(rtt.getShape(), $_builder.getIntegerType(1, false)));
+        auto output_shape = broadcast(getShape(v1), getShape(v2));
+        $_state.addTypes(mlir::RankedTensorType::get(output_shape, $_builder.getIntegerType(1, false)));
      }]>
     ];
 }
