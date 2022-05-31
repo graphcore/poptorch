@@ -46,16 +46,28 @@ def type_out_harness(trace_model, inputs, forward_op,
 ones_zeros = [torch.ones, torch.zeros]
 
 
-# Input dtype always resolves to float32, because it is traced as float32,
+# Tracing: input dtype always resolves to float32, because it is traced as float32,
 # and the input itself is not used standalone.
+#
+# Dispatcher: The dtype will match what was requested.
 @pytest.mark.parametrize("op", ones_zeros)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ones_zeros_default_resolved(op, trace_model):
+    # Just remove the if + skip once the dispatcher is enabled
+    if not trace_model:
+        pytest.skip("TODO(T57195): requires dispatcher to be enabled")
+
     def fw_op(input):
-        return op((2, 3, 4), dtype=input.dtype) + input.to(input.dtype)
+        return op((2, 3, 4), dtype=input.dtype,
+                  device=helpers.outputDevice()) + input.to(input.dtype)
+
+    if trace_model:
+        float16_expected = False
+    else:
+        float16_expected = True
 
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float16),
-                     fw_op, False, False)
+                     fw_op, float16_expected, float16_expected)
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float32),
                      fw_op, True, True)
 
@@ -66,7 +78,8 @@ def test_ones_zeros_default_resolved(op, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ones_zeros_input_resolved_with_input_dtype(op, trace_model):
     def fw_op(input):
-        return op((2, 3, 4), dtype=input.dtype) + input
+        return op((2, 3, 4), dtype=input.dtype,
+                  device=helpers.outputDevice()) + input
 
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float16),
                      fw_op, True, True)
@@ -87,8 +100,13 @@ def test_ones_zeros_input_resolved_with_input_dtype(op, trace_model):
 @pytest.mark.parametrize("op", ones_zeros)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ones_zeros_input_resolved_always_float16(op, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T63330): HalfUpcastToFloat support required")
+
     def fw_op(input):
-        return op((2, 3, 4), dtype=torch.float16) + input
+        return op(
+            (2, 3, 4), dtype=torch.float16,
+            device=helpers.outputDevice()) + input
 
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float16),
                      fw_op, True, True)
@@ -104,7 +122,9 @@ def test_ones_zeros_input_resolved_always_float16(op, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ones_zeros_input_resolved_always_float32(op, trace_model):
     def fw_op(input):
-        return op((2, 3, 4), dtype=torch.float32) + input
+        return op(
+            (2, 3, 4), dtype=torch.float32,
+            device=helpers.outputDevice()) + input
 
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float16),
                      fw_op, False, False)
@@ -115,15 +135,26 @@ def test_ones_zeros_input_resolved_always_float32(op, trace_model):
 ## torch.rand tests ##
 
 
-# The dtype will always resolve to float32 as tracing always happens with
-# float 32 and the input is not captured
+# Tracing: The dtype will always resolve to float32 as tracing always happens with
+# float 32 and the input is not captured.
+#
+# Dispatcher: The dtype will match what was requested.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_rand_default_resolved(trace_model):
+    # Just remove the if + skip once the dispatcher is enabled
+    if not trace_model:
+        pytest.skip("TODO(T57195): requires dispatcher to be enabled")
+
     def fw_op(input):
         return torch.rand(3, 5, 100, dtype=input.dtype)
 
+    if trace_model:
+        float16_expected = False
+    else:
+        float16_expected = True
+
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float16),
-                     fw_op, False, False)
+                     fw_op, float16_expected, float16_expected)
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float32),
                      fw_op, True, True)
 
@@ -140,8 +171,8 @@ def test_rand_default_input_resolved(trace_model):
                      fw_op, True, True)
 
 
-# The type will resolve correctly becaue torch.float16 could not have been
-# from a tensor which could have beeh half/float.
+# The type will resolve correctly because torch.float16 could not have been
+# from a tensor which could have been half/float.
 #
 # Half and half to float:
 # The output will always be float 16.
@@ -150,6 +181,9 @@ def test_rand_default_input_resolved(trace_model):
 # The output will be correct.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_rand_default_input_resolved_always_float16(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T63330): HalfUpcastToFloat support required")
+
     def fw_op(input):
         return torch.rand(3, 5, 100, dtype=torch.float16) + input
 

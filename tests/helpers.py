@@ -359,7 +359,7 @@ class LogChecker:
 # but for IPU devices we need to make sure the output buffers are
 # created on the IPU.
 def outputDevice():
-    if poptorch.isRunningOnIpu():
+    if poptorch.isRunningOnIpu() and poptorch._impl.isDispatchTracing():  # pylint: disable=protected-access
         # TODO(T59880) rename "xla" -> "ipu"
         return "xla"
     return None

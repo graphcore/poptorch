@@ -49,6 +49,7 @@ BUFFERS_CAN_CHANGE = (
 class _SetDefaultDeviceType:
     def __init__(self):
         self.overrides = dict()
+        self.saved_distribution_validate_args = None
 
     def __enter__(self):
         def create_wrapper(f):
@@ -65,13 +66,22 @@ class _SetDefaultDeviceType:
 
         # All the ops with FACTORY_PARAMS in <torch>/tools/pyi/gen_pyi.py
         for name in [
-                "arange", "full", "full_like", "linspace", "logspace",
-                "randint", "range", "tensor", "zeros_like"
+                "arange", "full", "full_like", "linspace", "logspace", "ones",
+                "rand", "randint", "range", "tensor", "zeros", "zeros_like"
         ]:
             func = getattr(torch, name)
 
             self.overrides[name] = func
             setattr(torch, name, create_wrapper(func))
+
+        # Arguments validation forces the tensors to be compared onto the IPU
+        # then the result is sent back to the CPU.
+        # For example:
+        # >>> if self._validate_args:
+        # >>>    assert torch.lt(self.low, self.high).all()
+        self.saved_distribution_validate_args = \
+                torch.distributions.Distribution._validate_args
+        torch.distributions.Distribution.set_default_validate_args(False)
 
         return self
 
@@ -79,6 +89,9 @@ class _SetDefaultDeviceType:
         # Restore the real Torch functions
         for name, real in self.overrides.items():
             setattr(torch, name, real)
+
+        torch.distributions.Distribution.set_default_validate_args(
+            self.saved_distribution_validate_args)
 
 
 # pylint: disable=too-many-public-methods
