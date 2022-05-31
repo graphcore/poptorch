@@ -31,6 +31,44 @@ void relu::lowerToPoplar(CompilerContext &context) {
   context.addTensor(this->result(), out);
 }
 
+void leaky_relu::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  float negative_slope = this->negative_slope().convertToFloat();
+
+  auto expression = pe::Select(pe::Mul(pe::Const(negative_slope), pe::_1),
+                               pe::_1, pe::Lt(pe::_1, pe::Const(0.0f)));
+
+  poplar::Tensor out =
+      popops::map(context.graph, expression, {input1}, context.seq);
+  context.addTensor(this->result(), out);
+}
+
+void leaky_relu_backward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor self = context.fromSsa(this->self());
+  float negative_slope = this->negative_slope().convertToFloat();
+  bool self_is_result = this->self_is_result();
+
+  // This error message is normally raised by PyTorch at the
+  // dispatch function level so we need to raise it ourselves
+  ERROR_ON_MSG(self_is_result && negative_slope < 0.0,
+               "PyTorch: In-place leakyReLu backward calculation is triggered "
+               "with a negative slope which is not supported. "
+               "This is caused by calling in-place forward function with a "
+               "negative slope, "
+               "please call out-of-place version instead. File an issue at "
+               "https://github.com/pytorch/pytorch if you do "
+               "require supporting in-place leakRelu backward calculation with "
+               "negative slope");
+
+  auto expression = pe::Select(pe::Mul(pe::Const(negative_slope), pe::_1),
+                               pe::_1, pe::Lt(pe::_2, pe::Const(0.0f)));
+
+  auto out =
+      popops::map(context.graph, expression, {grad_output, self}, context.seq);
+  context.addTensor(this->grad_input(), out);
+}
+
 void gelu::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor input1 = context.fromSsa(this->in1());
   poplar::Tensor out = popnn::nonLinearity(

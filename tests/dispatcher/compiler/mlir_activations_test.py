@@ -38,11 +38,18 @@ def hardswish_inplace(x):
     return x
 
 
+def leaky_relu_inplace(x):
+    F.leaky_relu(x, inplace=True)
+    return x
+
+
 activation_functions = [
     F.relu, torch.tanh, torch.sigmoid, F.gelu, F.hardsigmoid, F.silu,
-    F.hardswish, relu_inplace, tanh_inplace, sigmoid_inplace, silu_inplace,
-    hardsigmoid_inplace, hardswish_inplace
+    F.hardswish, F.leaky_relu, relu_inplace, tanh_inplace, sigmoid_inplace,
+    silu_inplace, hardsigmoid_inplace, hardswish_inplace, leaky_relu_inplace
 ]
+
+activation_backward_functions = [torch.tanh, torch.sigmoid, F.leaky_relu]
 
 
 @pytest.mark.mlirSupportRequired
@@ -52,18 +59,32 @@ def test_activations(op):
 
     input = torch.randn([2, 10, 4, 2])
 
-    ipu_result = IPUContext(op)(input)
-    cpu_result = op(input)
+    def training_step(x):
+        out = op(x)
+        loss = torch.sum(out)
+        x.retain_grad()
+        loss.backward()
+        return out, x.grad
 
-    assert ipu_result.size() == cpu_result.size()
+    if op in activation_backward_functions:
+        input = torch.nn.parameter.Parameter(input)
+        cpu_step = training_step
+    else:
+        cpu_step = op
+
+    ipu_result = IPUContext(cpu_step)(input)
+    input.grad = None
+
+    cpu_result = cpu_step(input)
 
     tol = [0.01, 1e-3] if op is F.gelu else [1e-4, 1e-7]
 
-    helpers.assert_allclose(expected=cpu_result,
-                            actual=ipu_result,
-                            atol=tol[0],
-                            rtol=tol[1],
-                            equal_nan=True)
+    for cpu, ipu in zip(cpu_result, ipu_result):
+        helpers.assert_allclose(expected=cpu,
+                                actual=ipu,
+                                atol=tol[0],
+                                rtol=tol[1],
+                                equal_nan=True)
 
 
 @pytest.mark.mlirSupportRequired

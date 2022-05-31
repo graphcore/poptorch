@@ -18,6 +18,19 @@ class Poptorch_elem_unary<string name> :  Poptorch_Op<name, [SameOperandsAndResu
     ];
 }
 
+class Poptorch_elem_unary_backward<string name> : Poptorch_Op<name#"_backward", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$grad_output,
+                         Poptorch_tensor:$output);
+    let results = (outs Poptorch_tensor:$grad_input);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$grad_output,
+                                   "mlir::Value":$output),[{
+        $_state.addOperands({grad_output, output});
+        $_state.addTypes(output.getType());
+     }]>
+    ];
+}
+
 def Poptorch_abs: Poptorch_elem_unary<"abs"> {}
 def Poptorch_asin: Poptorch_elem_unary<"asin"> {}
 def Poptorch_bitwiseNot: Poptorch_elem_unary<"bitwiseNot"> {}
@@ -44,6 +57,9 @@ def Poptorch_sqrt: Poptorch_elem_unary<"sqrt"> {}
 def Poptorch_square: Poptorch_elem_unary<"square"> {}
 def Poptorch_sigmoid: Poptorch_elem_unary<"sigmoid"> {}
 def Poptorch_rsqrt: Poptorch_elem_unary<"rsqrt"> {}
+
+def Poptorch_tanh_backward: Poptorch_elem_unary_backward<"tanh"> {}
+def Poptorch_sigmoid_backward: Poptorch_elem_unary_backward<"sigmoid"> {}
 
 def Poptorch_isnan :  Poptorch_Op<"isnan"> {
     let arguments = (ins Poptorch_tensor:$self);

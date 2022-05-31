@@ -69,13 +69,33 @@ def Poptorch_rrelu_with_noise : Poptorch_NotImplementedOp<"rrelu_with_noise", [S
     ];
 }
 
-def Poptorch_leaky_relu_out : Poptorch_NotImplementedOp<"leaky_relu_out", [SameOperandsAndResultShape]> {
+def Poptorch_leaky_relu : Poptorch_Op<"leaky_relu", [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1, F32Attr:$negative_slope);
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$self, "float":$negative_slope),[{
         $_state.addOperands({self});
         $_state.addAttribute("negative_slope",$_builder.getF32FloatAttr(negative_slope));
+
+        $_state.addTypes(self.getType());
+     }]>
+    ];
+}
+
+def Poptorch_leaky_relu_backward : Poptorch_Op<"leaky_relu_backward", [SameOperandsAndResultShape]> {
+    let arguments = (ins Poptorch_tensor:$grad_output,
+                         Poptorch_tensor:$self,
+                         F32Attr:$negative_slope,
+                         BoolAttr:$self_is_result);
+    let results = (outs Poptorch_tensor:$grad_input);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$grad_output,
+                                   "mlir::Value":$self,
+                                   "float":$negative_slope,
+                                   "bool":$self_is_result),[{
+        $_state.addOperands({grad_output, self});
+        $_state.addAttribute("negative_slope", $_builder.getF32FloatAttr(negative_slope));
+        $_state.addAttribute("self_is_result", $_builder.getBoolAttr(self_is_result));
 
         $_state.addTypes(self.getType());
      }]>

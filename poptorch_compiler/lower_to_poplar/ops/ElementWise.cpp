@@ -5,7 +5,10 @@
 #include <popops/ExprOp.hpp>
 #include <popops/ScaledAdd.hpp>
 
+#include <popnn/NonLinearity.hpp>
+
 #include "../CompilerHelpers.hpp"
+
 
 namespace pe = popops::expr;
 
@@ -250,5 +253,25 @@ void clampTensor::lowerToPoplar(CompilerContext &context) {
       popops::map(context.graph, expr, {self, min, max}, context.seq);
 
   context.addTensor(this->result(), out);
+}
+
+void sigmoid_backward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor output = context.fromSsa(this->output());
+
+  poplar::Tensor out = popnn::nonLinearityInputGradient(
+      context.graph, popnn::NonLinearityType::SIGMOID, output, grad_output,
+      context.seq);
+  context.addTensor(this->grad_input(), out);
+}
+
+void tanh_backward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor grad_output = context.fromSsa(this->grad_output());
+  poplar::Tensor output = context.fromSsa(this->output());
+
+  poplar::Tensor out = popnn::nonLinearityInputGradient(
+      context.graph, popnn::NonLinearityType::TANH, output, grad_output,
+      context.seq);
+  context.addTensor(this->grad_input(), out);
 }
 } // namespace poptorch_ir
