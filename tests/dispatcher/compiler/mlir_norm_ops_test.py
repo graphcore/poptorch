@@ -56,26 +56,54 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
 
 
 @pytest.mark.mlirSupportRequired
-def test_group_norm():
+@pytest.mark.parametrize("num_dims", (2, 3, 4))
+@pytest.mark.parametrize("affine", (True, False))
+def test_group_norm(num_dims, affine):
     torch.manual_seed(42)
+
     num_groups = 4
     C = 12
 
-    input_shape = [3, C, 5]
-    norm = nn.GroupNorm(num_groups, C)
+    if num_dims == 2:
+        input_shape = [3, C]
+    if num_dims == 3:
+        input_shape = [3, C, 5]
+    if num_dims == 4:
+        input_shape = [3, C, 5, 4]
 
-    t = torch.rand(input_shape)
-    # Run pytorch native on CPU.
-    torch_out = norm(t)
+    ipu_norm = nn.GroupNorm(num_groups, C)
 
-    # Run on IPU.
-    ipu_result = IPUContext(norm, model=norm)(t)
+    # Ensure the params are not default (0 and 1)
+    if affine:
+        torch.nn.init.uniform_(ipu_norm.weight, 0.1, 2.0)
+        torch.nn.init.uniform_(ipu_norm.bias, -1.0, 1.0)
 
-    helpers.assert_allclose(actual=ipu_result, expected=torch_out)
+    cpu_norm = copy.deepcopy(ipu_norm)
+
+    t = torch.rand(input_shape, requires_grad=True)
+    # Make the mean and stdev varied throughout
+    t = t + torch.randint(0, 5, input_shape)
+
+    t2 = torch.ones_like(t)
+
+    def cpu_step(norm, x1, x2):
+        x1.retain_grad()
+        out = norm(x1)
+        loss = torch.nn.functional.mse_loss(out, x2)
+        loss.backward()
+        ret = [out, x1.grad, norm.weight.grad, norm.bias.grad]
+        return ret
+
+    ipu_result = IPUContext(cpu_step, model=ipu_norm)(ipu_norm, t, t2)
+    cpu_result = cpu_step(cpu_norm, t, t2)
+
+    # Test outputs and gradients
+    for cpu, ipu in zip(cpu_result, ipu_result):
+        helpers.assert_allclose(actual=ipu, expected=cpu, rtol=1e-3, atol=1e-3)
 
 
 @pytest.mark.mlirSupportRequired
-def test_group_norm_backward():
+def test_group_norm_train():
     torch.manual_seed(42)
     kernel_size = 3
     num_groups = 4
@@ -86,7 +114,6 @@ def test_group_norm_backward():
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
-
             self.conv = torch.nn.Conv1d(C, C, kernel_size)
             self.norm = nn.GroupNorm(num_groups, C)
 
@@ -98,9 +125,17 @@ def test_group_norm_backward():
             return out, loss
 
     model = Model()
+
+    torch.nn.init.uniform_(model.norm.weight, 0.1, 2.0)
+    torch.nn.init.uniform_(model.norm.bias, -1.0, 1.0)
+
     cpu_model = copy.deepcopy(model)
 
     t = torch.rand(input_shape)
+
+    # Make the mean and stdev varied throughout
+    t = t + torch.randint(0, 5, input_shape)
+
     target = torch.rand(
         [input_shape[0], input_shape[1], input_shape[2] - kernel_size + 1])
 
