@@ -1,5 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include "../PoptorchStaticInit.hpp"
+#include "../PoptorchSymbols.hpp"
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/ImplicitCasting.hpp"
@@ -228,6 +229,43 @@ torch::jit::Node *groupNormHandler(torch::jit::Graph *graph,
                                   epsilon);
 }
 
+// aten::native_group_norm has a different signature to aten::group_norm
+torch::jit::Node *nativeGroupNormHandler(torch::jit::Graph *graph,
+                                         torch::jit::Node *node) {
+  // aten::native_group_norm(Tensor input, Tensor? weight, Tensor? bias, int N,
+  // int C, int HxW, int group, float eps) -> (Tensor, Tensor, Tensor)
+
+  // Returns are (result, mean, inv_std_dev) which matches PopTorch
+
+  torch::jit::Value *input = node->input(0);
+
+  // Weight to multiply
+  torch::jit::Value *gamma = node->input(1);
+  // Bias to add
+  torch::jit::Value *beta = node->input(2);
+
+  auto num_channels = shapeFromTensor(input)[1];
+  maybeInitializeAffineParamConstants(graph, input, &gamma, &beta,
+                                      {num_channels}, "GroupNorm");
+
+  // N, C and HxW are redundant given that the input size must be known for
+  // IPU, but provide a useful check
+  auto input_shape = shapeFromTensor(input);
+  ERROR_ON(input_shape[0] != constantToLong(node->input(3)->node()));
+  ERROR_ON(input_shape[1] != constantToLong(node->input(4)->node()));
+
+  auto hx_w =
+      std::accumulate(input_shape.begin() + 2, input_shape.end(),
+                      static_cast<int64_t>(1), std::multiplies<int64_t>());
+  ERROR_ON(hx_w != constantToLong(node->input(5)->node()));
+
+  std::int64_t num_groups = constantToLong(node->input(6)->node());
+
+  float epsilon = constantToFloat(node->input(7)->node());
+  return createGroupnormalization(graph, {input, gamma, beta}, num_groups,
+                                  epsilon);
+}
+
 torch::jit::Node *instanceNormHandler(torch::jit::Graph *graph,
                                       torch::jit::Node *node) {
   // aten::instance_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor?
@@ -267,6 +305,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::native_batch_norm, batchNormHandler);
   registerHandler(c10::aten::layer_norm, layerNormHandler);
   registerHandler(c10::aten::group_norm, groupNormHandler);
+  registerHandler(c10::aten::native_group_norm, nativeGroupNormHandler);
   registerHandler(c10::aten::instance_norm, instanceNormHandler);
 }
 

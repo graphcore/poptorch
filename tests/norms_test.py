@@ -209,10 +209,6 @@ def test_layerNormPretrainedWeights(trace_model):
 @pytest.mark.parametrize("dims", {2, 3, 4, 5})
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_groupNorm(dims, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Could not find canonicalisation handler for JIT "
-            "symbol: aten::native_group_norm")
     if dims == 2:
         # TODO(T49073): Match torch 1.10 GroupNorm implementation
         pytest.skip("Numerical differences between PyTorch and PopTorch")
@@ -248,9 +244,6 @@ def test_groupNorm(dims, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_groupNorm_exfail(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): assert not True")
-
     torch.manual_seed(42)
 
     shape = [3, 10]

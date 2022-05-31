@@ -33,8 +33,12 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("all", PTC_BOXED(poptorch::fallback));
   m.impl("any", PTC_BOXED(poptorch::fallback));
 
-  // If we don't intercept these ops, they will be decomposed into
-  // as_strided which is harder to handle.
+// Needed due to "CompositeImplicitAutograd"
+  m.impl("native_group_norm",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+
+// If we don't intercept these ops, they will be decomposed into
+// as_strided which is harder to handle.
   m.impl("slice.Tensor", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze_", PTC_BOXED(poptorch::fallback));

@@ -1141,6 +1141,14 @@
 - func: native_group_norm
   PopTorchDirect: group_norm
 
+# aten::native_group_norm_backward(Tensor grad_out, Tensor input, Tensor mean,
+#                                  Tensor rstd, Tensor? weight, int N, int C,
+#                                  int HxW, int group, bool[3] output_mask)
+#                                  -> (Tensor, Tensor, Tensor)
+- func: native_group_norm_backward
+  PopTorchDirect: group_norm_backward
+
+
 # func: layer_norm(Tensor input, int[] normalized_shape, Tensor? weight=None, Tensor? bias=None, float eps=1e-05, bool cudnn_enable=True) -> Tensor
 - func: layer_norm
   PopTorchDirect: layer_norm
