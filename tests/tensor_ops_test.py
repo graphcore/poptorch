@@ -1012,3 +1012,25 @@ def test_requires_grad_true(capfd, trace_model):
         "Input tensor has requires_grad=True set. " +
         "This tensor will be detached because backward pass via " +
         "inputs is not supported.")
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_arange(trace_model):
+    class ArangeModel(torch.nn.Module):
+        def forward(self, a, b):
+            def f(x, y):
+                return torch.arange(20) + x, y
+
+            return poptorch.for_loop(5, f, [a, b])
+
+    model = ArangeModel()
+    a = torch.randn(20)
+    b = torch.randn(20)
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options)
+    poptorch_out = poptorch_model(a, b)
+
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=[torch.arange(20) * 5 + a, b])

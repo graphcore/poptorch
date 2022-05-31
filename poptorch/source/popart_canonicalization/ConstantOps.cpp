@@ -57,28 +57,35 @@ torch::jit::Node *onesZerosHandler(torch::jit::Graph *graph,
 
 torch::jit::Node *arangeHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
-  // aten::arange(Scalar end, ScalarType dtype, Layout, Device, bool pin_memory)
-  // aten::arange(Scalar start, Scalar end, ScalarType dtype=None, Layout,
-  //              Device, bool pin_memory)
-  // aten::arange(Scalar start, Scalar end, Scalar step, ScalarType dtype,
-  // Layout, Device, bool pin_memory)
-
   std::size_t start;
   std::size_t end;
   std::size_t step;
 
   switch (node->inputs().size()) {
+  // arange.out(Scalar end, *, Tensor(a!) out) -> Tensor(a!)
+  // arange(Scalar end, *, ScalarType? dtype=None, Layout? layout=None,
+  //        Device? device=None, bool? pin_memory=None) -> Tensor
   case 2:
+  case 5:
     start = 0;
     end = constantToLong(node->input(0)->node());
     step = 1;
     break;
-  case 3:
+  // arange.start(Scalar start, Scalar end, *, ScalarType? dtype=None,
+  //              Layout? layout=None, Device? device=None,
+  //              bool? pin_memory=None) -> Tensor
+  case 6:
     start = constantToLong(node->input(0)->node());
     end = constantToLong(node->input(1)->node());
     step = 1;
     break;
+  // arange.start_out(Scalar start, Scalar end, Scalar step=1, *,
+  //                  Tensor(a!) out) -> Tensor(a!)
+  // arange.start_step(Scalar start, Scalar end, Scalar step, *,
+  //                   ScalarType? dtype=None, Layout? layout=None,
+  //                   Device? device=None, bool? pin_memory=None) -> Tensor
   case 4:
+  case 7:
     start = constantToLong(node->input(0)->node());
     end = constantToLong(node->input(1)->node());
     step = constantToLong(node->input(2)->node());
