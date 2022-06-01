@@ -444,7 +444,7 @@ class AsynchronousDataAccessor:
             load_indefinitely: bool = True,
             early_preload: bool = False,
             sharing_strategy: 'poptorch.SharingStrategy' = SharingStrategy.
-            Fork,
+            FileSystem,
             rebatched_size: Optional[int] = None):
         """
         :param dataset: The dataset to pull data from, this can be any Python
