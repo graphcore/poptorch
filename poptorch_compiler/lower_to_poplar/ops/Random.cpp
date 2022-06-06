@@ -8,6 +8,7 @@
 #include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Fill.hpp>
+#include <popops/TopK.hpp>
 #include <poprand/RandomGen.hpp>
 
 #include "poptorch_logging/Error.hpp"
@@ -242,6 +243,36 @@ void bernoulli_out::lowerToPoplar(CompilerContext &context) {
   const poplar::Tensor res =
       popops::cast(context.graph, as_bools, poplar::FLOAT, context.seq);
 
+  context.addTensor(this->result(), res);
+}
+
+void randperm::lowerToPoplar(CompilerContext &context) {
+  const int64_t n = this->n();
+
+  const poplar::Tensor shape =
+      createConstant(context, poplar::LONGLONG, {static_cast<size_t>(n)}, 0);
+
+  if (n == 0) {
+    const poplar::Tensor res =
+        popops::cast(context.graph, shape, poplar::INT, context.seq);
+    context.addTensor(this->result(), res);
+    return;
+  }
+
+  // Avoid slight bias in `uniform` by making sure `maxVal - minVal + 1` is a
+  // power of 2; minimise collisions by maximising the range.
+  const poplar::Tensor uniform =
+      poprand::uniform(context.graph, &context.getRandomSeed(), 0, shape,
+                       poplar::INT, std::numeric_limits<int32_t>::min(),
+                       std::numeric_limits<int32_t>::max(), context.seq);
+
+  const std::pair<poplar::Tensor, poplar::Tensor> topk_res =
+      popops::topKWithPermutation(
+          context.graph, context.seq, uniform,
+          {static_cast<unsigned>(n), true, popops::SortOrder::ASCENDING});
+
+  const poplar::Tensor res =
+      popops::cast(context.graph, topk_res.second, poplar::INT, context.seq);
   context.addTensor(this->result(), res);
 }
 

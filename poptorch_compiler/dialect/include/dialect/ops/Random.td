@@ -176,3 +176,15 @@ def Poptorch_bernoulli_out : Poptorch_Op<"bernoulli_out", [SameOperandsAndResult
         $_state.addTypes(mlir::RankedTensorType::get(self_shape, $_builder.getF32Type()));
   }]>];
 }
+
+def Poptorch_randperm : Poptorch_Op<"randperm", []> {
+  let arguments = (ins I64Attr:$n);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilder<(ins "int64_t":$n), [{
+        $_state.addAttribute("n", $_builder.getI64IntegerAttr(n));
+
+        $_state.addTypes(mlir::RankedTensorType::get({n}, $_builder.getIntegerType(32, true)));
+  }]>];
+}

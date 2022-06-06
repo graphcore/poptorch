@@ -708,6 +708,12 @@
   IgnoreArgs: {'generator'}
   UnusedOutputArguments: {out}
 
+# randperm.generator_out(int n, *, Generator? generator, Tensor(a!) out) -> Tensor(a!)
+- func: randperm.generator_out
+  PopTorchDirect: randperm
+  IgnoreArgs: {'generator'}
+  UnusedOutputArguments: {out}
+
 
 #########
 # Misc

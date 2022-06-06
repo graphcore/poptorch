@@ -49,7 +49,7 @@ def rng_harness(fn, *args, **kwargs):
     if torch.initial_seed() != rng_seed:
         torch.manual_seed(rng_seed)
 
-    # Get the result from the CPU
+    # Get results from CPU & IPU
     cpu_res = fn(*args, **kwargs)
     print(f"From CPU: {cpu_res}")
 
@@ -247,7 +247,8 @@ def test_exponential_(shape):
 # torch.exponential_
 @pytest.mark.mlirSupportRequired
 def test_exponential_inf():
-    # Hopefully 5e7 is enough to generate the boundaries. There isn't enough tile memory to set this much higher
+    # Hopefully 5e7 is enough to generate the boundaries. There isn't enough
+    # tile memory to set this much higher
     def fn():
         return torch.torch.empty((int(5e7)),
                                  device=helpers.outputDevice()).exponential_()
@@ -368,3 +369,61 @@ def test_bernoulli_tensor_out(shape):
         return res
 
     rng_harness(fn, t)(mean)
+
+
+# Need something different to rng_harness for randperm, for custom checking.
+def randperm_harness(fn, n, dtype):
+    res = IPUContext(fn)()
+    print(f"From IPU: {res}")
+
+    # Check correct result dtype
+    desired_dtype = dtype
+    if desired_dtype == torch.int64:
+        desired_dtype = torch.int32
+    if desired_dtype == torch.double:
+        desired_dtype = torch.float
+    assert res.dtype == desired_dtype
+
+    # Check correct values
+    expected_values = list(range(n))
+    for val in res:
+        assert val in expected_values,\
+            f"Result contained a value it shouldn't have ({val})"
+        expected_values.remove(val)
+
+    assert len(expected_values) == 0,\
+        f"Result didn't contain these values it should have: {expected_values}"
+
+
+# torch.randperm
+@pytest.mark.parametrize("n", [0, 1, 5, 10])
+@pytest.mark.parametrize("dtype", [
+    torch.int16, torch.int32, torch.int64, torch.half, torch.float,
+    torch.double
+])
+@pytest.mark.mlirSupportRequired
+def test_randperm(n, dtype):
+    torch.manual_seed(rng_seed)
+
+    def fn():
+        return torch.randperm(n, dtype=dtype, device=helpers.outputDevice())
+
+    randperm_harness(fn, n, dtype)
+
+
+# torch.randperm_out
+@pytest.mark.parametrize("n", [5])
+@pytest.mark.parametrize("dtype", [
+    torch.int16, torch.int32, torch.int64, torch.half, torch.float,
+    torch.double
+])
+@pytest.mark.mlirSupportRequired
+def test_randperm_out(n, dtype):
+    torch.manual_seed(rng_seed)
+
+    def fn():
+        res = torch.empty((n, ), dtype=dtype, device=helpers.outputDevice())
+        torch.randperm(n, out=res)
+        return res
+
+    randperm_harness(fn, n, dtype)
