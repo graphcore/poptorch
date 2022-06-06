@@ -334,8 +334,7 @@ def test_distributed_compile(capfd):
         includes_compilation = False
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_nondeterministic_warning_filter(trace_model):
+def test_nondeterministic_warning_filter():
     # This simple model generates a few jit warnings including the
     # non-deterministic ones that we filter in poptorch.  This test checks that
     # these additional warnings are still emitted.
@@ -357,7 +356,7 @@ def test_nondeterministic_warning_filter(trace_model):
     jit_warns = set(str(w.message) for w in native_warnings)
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(True)
     # compile with poptorch and capture all warnings
     with warnings.catch_warnings(record=True) as filtered_warnings:
         poptorch.inferenceModel(model, options).compile()
@@ -377,6 +376,31 @@ def test_nondeterministic_warning_filter(trace_model):
         assert any([
             f in r for f in expected_filtered_warnings
         ]), f"Compilation generated unexpected warning.\nActual warning: {r}"
+
+
+def test_cpu_output():
+    const1 = torch.tensor([1, 2])
+    const2 = torch.tensor([3, 4])
+
+    class Model(torch.nn.Module):
+        def forward(self):
+            return (const1 + const2, ([const1, const2], [const1,
+                                                         const2]), const2)
+
+    model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+
+    with warnings.catch_warnings(record=True) as filtered_warnings:
+        poptorch.inferenceModel(model, options).compile()
+
+    pop_warns = set(str(w.message) for w in filtered_warnings)
+
+    expected_warning = "Output expected to be on the IPU but is on cpu"
+
+    for r in pop_warns:
+        assert expected_warning in r, (f"Compilation generated unexpected "
+                                       f"warning.\nActual warning: {r}")
 
 
 @pytest.mark.ipuHardwareRequired

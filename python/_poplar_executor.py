@@ -24,7 +24,7 @@ from . import optim
 from . import profiling
 from . import poptorch_core  # type: ignore
 from . import _poptorch_data
-from ._utils import (accessAttributes, reconstructTensorStructure)
+from ._utils import accessAttributes, replaceIpuTensors
 from ._logging import logger
 from .experimental import IPUContext
 from .options import Options, PipelinedExecution, ShardedExecution
@@ -959,7 +959,7 @@ class PoplarExecutor:
         self._assign_backward_error(output)
 
         if self._outputs_structure is not None:
-            return reconstructTensorStructure(self._outputs_structure, output)
+            return replaceIpuTensors(self._outputs_structure, output)
         if len(output) == 0:
             return None
         if len(output) > 1:

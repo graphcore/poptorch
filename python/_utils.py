@@ -61,6 +61,11 @@ def accessAttributes(attribute_id_str):
     return attributes
 
 
+def on_ipu(x):
+    # TODO(T59880) rename xla -> ipu
+    return x.device.type == "xla"
+
+
 def flattenTensorStructure(tensors):
     def flatten(x):
         if isinstance(x, dict):
@@ -86,6 +91,22 @@ def reconstructTensorStructure(outputs_structure, output):
         if isinstance(x, (tuple, list)):
             return type(x)(copy_structure(e, it) for e in x)
         if isinstance(x, torch.Tensor):
+            return next(it)
+        return x
+
+    return copy_structure(outputs_structure, iter(output))
+
+
+# Replace the ipu tensors in the output structure with values from output
+def replaceIpuTensors(outputs_structure, output):
+    # Copy the original structure but replace all the tensors
+    # by values from the passed iterator.
+    def copy_structure(x, it):
+        if isinstance(x, dict):
+            return {k: copy_structure(v, it) for k, v in x.items()}
+        if isinstance(x, (tuple, list)):
+            return type(x)(copy_structure(e, it) for e in x)
+        if isinstance(x, torch.Tensor) and on_ipu(x):
             return next(it)
         return x
 

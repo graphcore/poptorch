@@ -327,11 +327,11 @@ def test_small_int_return(input_type, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_tuple_and_list_constant(trace_model):
-    const1 = torch.tensor([1., 2.])
-    const2 = torch.tensor([3., 4.])
-
     class Model(torch.nn.Module):
         def forward(self):
+            const1 = torch.tensor([1., 2.])
+            const2 = torch.tensor([3., 4.])
+
             return torch.tensor(1), const1 + const2, [const1, const2]
 
     model = Model()
@@ -346,11 +346,11 @@ def test_tuple_and_list_constant(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_tuple_and_list_constant_double_nested(trace_model):
-    const1 = torch.tensor([1., 2.])
-    const2 = torch.tensor([3., 4.])
-
     class Model(torch.nn.Module):
         def forward(self):
+            const1 = torch.tensor([1., 2.])
+            const2 = torch.tensor([3., 4.])
+
             return ([torch.tensor(1)], const1 + const2,
                     ([const1, const2], [const1, const2]), const2)
 

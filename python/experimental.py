@@ -1,11 +1,12 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 import copy
 import functools
+import warnings
 from typing import List, Optional
 
 import torch
 from . import enums, poptorch_core, _impl, accessAttributes
-from ._utils import flattenTensorStructure, reconstructTensorStructure
+from ._utils import flattenTensorStructure, reconstructTensorStructure, on_ipu
 from .options import Options
 
 
@@ -129,26 +130,20 @@ class IPUScope:
         return output
 
     def outputs(self, tensors):
-        def flatten(x):
-            if isinstance(x, (tuple, list)):
-                for e in x:
-                    yield from flatten(e)
-            else:
-                if x.device.type != "xla":
-                    raise ValueError(
-                        "Output expected to be on the IPU but is on %s" %
-                        x.device.type)
-
-                yield x
-
         self._outputs_structure = tensors
-        self._outputs = list(flatten(tensors))
+        self._outputs = list(flattenTensorStructure(tensors))
+
+        for x in self._outputs:
+            if not on_ipu(x):
+                warnings.warn("Output expected to be on the IPU but is on %s" %
+                              x.device.type)
+
         self._outputs = [
-            out.int() if out.dtype == torch.long else out
+            out.int() if out.dtype == torch.long and on_ipu(out) else out
             for out in self._outputs
         ]
         self._outputs = [
-            out.float() if out.dtype == torch.double else out
+            out.float() if out.dtype == torch.double and on_ipu(out) else out
             for out in self._outputs
         ]
         self._outputs = [out.cpu() for out in self._outputs]
