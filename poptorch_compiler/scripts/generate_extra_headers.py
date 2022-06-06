@@ -268,7 +268,7 @@ builder_call_translations = {
 #    [{"def": "Poptorch_tensor", "kind": "def", "printable": "Poptorch_tensor"}, "standard_deviation"]]
 
 #define ARG(Name, Type) Type Name
-#define BODY_ARG(Name) convert(Name, _impl->value_map)
+#define BODY_ARG(Name) convert(Name, *_impl)
 
 for op_name in poptorch_ops:
     #print(op_name)
@@ -309,7 +309,7 @@ for op_name in poptorch_ops:
                 ".has_value() ? std::optional<mlir::Type>(_impl->convertType(*"
                 + arg.name + ")) : std::nullopt")
         else:
-            parameters.append("convert(" + arg.name + ", _impl->value_map)")
+            parameters.append("convert(" + arg.name + ", *_impl)")
 
     func_args_str = ", ".join(func_args)
 
@@ -321,8 +321,8 @@ for op_name in poptorch_ops:
 
     # Create the IR op.
     cppFunction += "auto tmp = _impl->createOp<poptorch_ir::"
-    cppFunction += op_name + ">(poptorch_ir::AddToGraph::MAIN_GRAPH"
-    cppFunction += "".join(", " + x for x in parameters) + ");\n\n"
+    cppFunction += op_name + ">("
+    cppFunction += ", ".join(parameters) + ");\n\n"
 
     # Allow for each return to be optional, normal or variadic.
     cppFunction += "poptorch_ir::ODSTensorResults results;\n"
@@ -332,9 +332,8 @@ for op_name in poptorch_ops:
         cppFunction += "// Each result may be optional or variadic.\n"
         cppFunction += "for(mlir::Value value : tmp.getODSResults("
         cppFunction += str(arg_num) + ")) {\n"
-        cppFunction += "  _impl->value_map.push_back(value);\n"
         cppFunction += "  results.back().tensor_ids."
-        cppFunction += "push_back(_impl->value_map.size() - 1);\n"
+        cppFunction += "push_back(_impl->addValue(value));\n"
         cppFunction += "  results.back().requires_grad_types."
         cppFunction += "push_back(poptorch_ir::RequiresGradType::{});\n".format(
             arg.requires_grad_type())

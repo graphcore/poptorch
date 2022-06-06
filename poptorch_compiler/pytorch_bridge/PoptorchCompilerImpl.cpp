@@ -73,23 +73,10 @@ PoptorchCompilerImpl::PoptorchCompilerImpl()
 
   // We represent our graph as a simple function.
   auto func_type = _builder.getFunctionType({}, llvm::None);
-  _main_graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
-  _the_module.push_back(_main_graph);
+  _main_graph.graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
+  _the_module.push_back(_main_graph.graph);
 
-  // Add an entry block.
-  _main_graph.addEntryBlock();
-
-  // Same for write weights.
-  _write_weights_graph =
-      _builder.create<mlir::FuncOp>("WeightsToDevice", func_type);
-  _main_graph.front().push_back(_write_weights_graph);
-  _write_weights_graph.addEntryBlock();
-
-  // Same for read weights.
-  _read_weights_graph =
-      _builder.create<mlir::FuncOp>("WeightsToHost", func_type);
-  _main_graph.front().push_back(_read_weights_graph);
-  _read_weights_graph.addEntryBlock();
+  resetMainGraph();
 }
 
 mlir::Value PoptorchCompilerImpl::addArgument(mlir::FuncOp func,
@@ -133,6 +120,120 @@ PoptorchCompilerImpl::getTensor(Type type,
   return mlir::RankedTensorType::get(dims, convertType(type));
 }
 
+TensorId PoptorchCompilerImpl::addValue(const mlir::Value &value) {
+  _value_map.push_back(value);
+  return _value_map.size() - 1;
+}
+
+mlir::Value PoptorchCompilerImpl::findValue(TensorId tensor) {
+  return _value_map.at(tensor);
+}
+
+void PoptorchCompilerImpl::updateTensor(TensorId id, mlir::Value new_value) {
+  _value_map[id] = new_value;
+}
+
+void PoptorchCompilerImpl::resetMainGraph() {
+  // Clear the graph
+  _main_graph.graph.eraseBody();
+  // Add an entry block.
+  _main_graph.graph.addEntryBlock();
+
+  _main_graph.all_ops_can_be_lowered = true;
+
+  // Invalidate all the values but do not clear the map:
+  // the tensor IDs are still valid
+  for (uint64_t i = 0; i < _value_map.size(); ++i) {
+    _value_map[i] = mlir::Value();
+  }
+}
+
+bool PoptorchCompilerImpl::allOpsCanBeLoweredToPoplar() const {
+  return _main_graph.all_ops_can_be_lowered;
+}
+
+PoptorchCompilerImpl::Graph
+PoptorchCompilerImpl::createSubGraph(const std::string &name) {
+  Graph sub;
+  auto func_type = _builder.getFunctionType({}, llvm::None);
+  sub.graph = createOp<mlir::FuncOp>(name, func_type);
+  sub.graph.addEntryBlock();
+  return sub;
+}
+
+TensorId MLIREagerBuilder::addValue(const mlir::Value &value) {
+  _tensor_map.push_back(value.getType().cast<mlir::RankedTensorType>());
+  return PoptorchCompilerImpl::addValue(value);
+}
+
+mlir::Value MLIREagerBuilder::findValue(TensorId tensor) {
+  mlir::Value value = PoptorchCompilerImpl::findValue(tensor);
+  // This tensor comes from a previous graph, we need
+  // to add it as an input to the new graph.
+  if (!value) {
+    value = addArgumentToMainGraph(_tensor_map.at(tensor));
+    updateTensor(tensor, value);
+  }
+  return value;
+}
+
+void MLIREagerBuilder::compileRunAndReset() {
+  // TODO(T57253) compile & run.
+  resetMainGraph();
+}
+
+MLIRStaticGraphBuilder::MLIRStaticGraphBuilder() {
+  _write_weights_graph = createSubGraph("WeightsToDevice");
+  _read_weights_graph = createSubGraph("WeightsToHost");
+}
+
+// Compile graph by running both PopTorch compiler passes and poplar
+// compilation.
+poptorch_ir::PoplarExecutor
+MLIRStaticGraphBuilder::compile(const poplar::Target &target) {
+  timing_manager.setEnabled(true);
+  if (!root_timer) {
+    root_timer = timing_manager.getRootScope();
+  }
+
+  poptorch_ir::PoplarExecutor exe =
+      compileExecutable(_the_module, target, root_timer);
+
+  root_timer = mlir::TimingScope();
+  timing_manager.setEnabled(false);
+  return exe;
+}
+
+void MLIRStaticGraphBuilder::addInput(const Buffer &ptr,
+                                      const mlir::Value &input,
+                                      const char *name) {
+  // Add the argument to the function args.
+  createOp<poptorch_ir::copy_from_host>(input, name);
+  input_callbacks.push_back({name, ptr});
+}
+
+void MLIRStaticGraphBuilder::addParameter(const Buffer &ptr,
+                                          const mlir::Value &parameter,
+                                          const char *name) {
+  // Write weights to the graph.
+  createOp<poptorch_ir::copy_from_host>(_write_weights_graph, parameter,
+                                        "Write-" + std::string(name));
+
+  // Read weights from the graph.
+  createOp<poptorch_ir::copy_to_host>(_read_weights_graph, parameter,
+                                      "Read-" + std::string(name));
+
+  weight_callbacks.push_back({name, ptr});
+}
+void MLIRStaticGraphBuilder::addOutput(void *ptr, const mlir::Value &output,
+                                       const char *name) {
+  createOp<poptorch_ir::copy_to_host>(output, name);
+  output_callbacks.push_back({name, ptr});
+}
+void MLIRStaticGraphBuilder::addReturn() {
+  createOp<poptorch_ir::end_graph>(_write_weights_graph);
+  createOp<poptorch_ir::end_graph>(_read_weights_graph);
+}
 } // namespace detail
 
 } // namespace poptorch_ir

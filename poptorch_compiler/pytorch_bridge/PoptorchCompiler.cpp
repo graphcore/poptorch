@@ -16,31 +16,36 @@
 namespace poptorch_ir {
 
 PoptorchCompiler::PoptorchCompiler() {}
+
 PoptorchCompiler::~PoptorchCompiler() {
   // The timer crashes on destruction when it's enabled. It looks like it's
   // failing to print timing info
   _impl->timing_manager.setEnabled(false);
 }
 
-void PoptorchCompiler::init() {
-  _impl = std::make_unique<detail::PoptorchCompilerImpl>();
+void PoptorchCompiler::init(ExecutionType execution_type,
+                            CompilerBackend compiler_backend) {
+  ERROR_ON_MSG(execution_type != ExecutionType::StaticGraph,
+               "Only ExecutionMode::StaticGraph supported for now");
+  ERROR_ON_MSG(compiler_backend != CompilerBackend::Poplar,
+               "Only CompilerBackend::Poplar supported for now");
+  if (execution_type == ExecutionType::StaticGraph &&
+      compiler_backend == CompilerBackend::Poplar) {
+    _impl = std::make_unique<detail::MLIRStaticGraphBuilder>();
+  }
+  ERROR_ON(_impl == nullptr);
 }
 
 TensorId PoptorchCompiler::addInput(const Buffer &ptr,
                                     const std::vector<std::int64_t> &shape,
                                     Type type, const char *name) {
   mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
-
-  // Add the argument to the function args.
+  // Add the argument to the graph args.
   mlir::Value val = _impl->addArgumentToMainGraph(tensor);
 
-  _impl->createOp<poptorch_ir::copy_from_host>(AddToGraph::MAIN_GRAPH, val,
-                                               name);
+  _impl->addInput(ptr, val, name);
 
-  _impl->value_map.push_back(val);
-  _impl->input_callbacks.push_back({name, ptr});
-
-  return _impl->value_map.size() - 1;
+  return _impl->addValue(val);
 }
 
 void PoptorchCompiler::setCurrentPythonCodeLocation(const char *filename,
@@ -57,30 +62,17 @@ TensorId PoptorchCompiler::addParameter(const Buffer &ptr,
                                         Type type, const char *name) {
   mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
 
-  // Add the argument to the function args. Add to the main graph and both
-  // weight copy graphs.
+  // Add the argument to the graph args.
   mlir::Value val = _impl->addArgumentToMainGraph(tensor);
 
-  // Write weights to the graph.
-  _impl->createOp<poptorch_ir::copy_from_host>(AddToGraph::WRITE_WEIGHTS, val,
-                                               "Write-" + std::string(name));
+  _impl->addParameter(ptr, val, name);
 
-  // Read weights from the graph.
-  _impl->createOp<poptorch_ir::copy_to_host>(AddToGraph::READ_WEIGHTS, val,
-                                             "Read-" + std::string(name));
-
-  // Add the main graph reference. Both copies are implicitly updating the main
-  // graph reference.
-  _impl->value_map.push_back(val);
-
-  _impl->weight_callbacks.push_back({name, ptr});
-  return _impl->value_map.size() - 1;
+  return _impl->addValue(val);
 }
 
 void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {
-  mlir::Value val = _impl->value_map[id];
-  _impl->createOp<poptorch_ir::copy_to_host>(AddToGraph::MAIN_GRAPH, val, name);
-  _impl->output_callbacks.push_back({name, ptr});
+  mlir::Value val = _impl->findValue(id);
+  _impl->addOutput(ptr, val, name);
 }
 
 void PoptorchCompiler::startTraceTiming() {
@@ -99,7 +91,7 @@ void PoptorchCompiler::getTimingInfo() { _impl->timing_manager.dumpAsTree(); }
 void PoptorchCompiler::dump() { _impl->dump(); }
 
 bool PoptorchCompiler::isView(poptorch_ir::TensorId id) const {
-  mlir::Operation *op = _impl->value_map[id].getDefiningOp();
+  mlir::Operation *op = _impl->findValue(id).getDefiningOp();
 
   return op->hasTrait<mlir::OpTrait::ViewOp>();
 }
@@ -114,40 +106,50 @@ Type PoptorchCompiler::getType(TensorId id) const {
 
 mlir::RankedTensorType
 PoptorchCompiler::getRankedTensorType(TensorId id) const {
-  mlir::Value val = _impl->value_map[id];
+  mlir::Value val = _impl->findValue(id);
   mlir::Type t1 = val.getType();
   return t1.cast<mlir::RankedTensorType>();
 }
 
 void PoptorchCompiler::addReturn() {
   // Add returns to each of the graphs.
-  _impl->createOp<poptorch_ir::end_graph>(AddToGraph::MAIN_GRAPH);
-  _impl->createOp<poptorch_ir::end_graph>(AddToGraph::WRITE_WEIGHTS);
-  _impl->createOp<poptorch_ir::end_graph>(AddToGraph::READ_WEIGHTS);
+  _impl->createOp<poptorch_ir::end_graph>();
+  _impl->addReturn();
 }
 
 bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
-  return _impl->all_ops_can_be_lowered;
+  return _impl->allOpsCanBeLoweredToPoplar();
+}
+
+void PoptorchCompiler::compileRunAndReset() {
+  auto *compiler = dynamic_cast<detail::MLIREagerBuilder *>(_impl.get());
+  ERROR_ON_MSG(compiler == nullptr,
+               "[Internal] Only eager builders can compileRunAndReset()");
+  compiler->compileRunAndReset();
 }
 
 PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
+  auto *compiler = dynamic_cast<detail::MLIRStaticGraphBuilder *>(_impl.get());
+  ERROR_ON_MSG(compiler == nullptr,
+               "[Internal] Only static graph builders can compileAndLoad()");
+
   auto device = getDevice();
-  auto exe = _impl->compile(device->device().getTarget());
+  auto exe = compiler->compile(device->device().getTarget());
   exe.load(device->device());
 
   // Connect up the outputs.
-  for (auto &pair : _impl->output_callbacks) {
+  for (auto &pair : compiler->output_callbacks) {
     exe.connectStream(pair.first, pair.second);
   }
 
-  for (auto &pair : _impl->weight_callbacks) {
+  for (auto &pair : compiler->weight_callbacks) {
     exe.connectStream("Write-" + pair.first, pair.second);
     exe.connectStream("Read-" + pair.first, pair.second);
   }
 
   PoplarExecutorWrapper executor(std::move(exe),
-                                 std::move(_impl->input_callbacks));
-  _impl->weight_callbacks.clear();
+                                 std::move(compiler->input_callbacks));
+  compiler->weight_callbacks.clear();
   // input_callbacks was moved to PoplarExecutor in compile()
   return executor;
 }

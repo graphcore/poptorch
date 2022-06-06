@@ -32,7 +32,6 @@
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 
 namespace poptorch_ir {
-enum class AddToGraph { MAIN_GRAPH = 0, READ_WEIGHTS, WRITE_WEIGHTS };
 
 namespace detail {
 
@@ -217,9 +216,11 @@ OpTy implicitCastAndCreate(mlir::ImplicitLocOpBuilder &builder,
                                          std::forward_as_tuple(args...)));
 }
 
+// TODO(T57253): rename to IMLIRGraphBuilder?
 class PoptorchCompilerImpl {
 public:
   PoptorchCompilerImpl();
+  virtual ~PoptorchCompilerImpl() = default;
 
   mlir::Type convertType(Type type);
 
@@ -229,8 +230,17 @@ public:
   static mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
 
   mlir::Value addArgumentToMainGraph(mlir::Type argType) {
-    return addArgument(_main_graph, argType);
+    return addArgument(_main_graph.graph, argType);
   }
+
+  virtual void addInput(const Buffer &ptr, const mlir::Value &input,
+                        const char *name) = 0;
+
+  virtual void addParameter(const Buffer &ptr, const mlir::Value &parameter,
+                            const char *name) = 0;
+  virtual void addOutput(void *ptr, const mlir::Value &output,
+                         const char *name) = 0;
+  virtual void addReturn() = 0;
 
   // Print module to stderr
   void dump() { _the_module->dump(); }
@@ -244,72 +254,64 @@ public:
         _builder.getContext(), _builder.getIdentifier(filename), line, col));
   }
 
+  template <typename OpTy, typename... Args> OpTy createOp(Args &&...args) {
+    return createOp<OpTy>(_main_graph, std::forward<Args>(args)...);
+  }
+
+  virtual TensorId addValue(const mlir::Value &value);
+
+  // Can't be const because in some cases it might trigger some graph
+  // modification.
+  virtual mlir::Value findValue(TensorId tensor);
+
+  bool allOpsCanBeLoweredToPoplar() const;
+
+protected:
+  struct Graph {
+    mlir::FuncOp graph;
+    // When a new op is added to the main graph using createOp we check and
+    // store whether or not there is an actual handler for this op. (Some ops
+    // will have been added with only shape inference and no implementation, in
+    // which case we won't be able to lower them later on).
+    bool all_ops_can_be_lowered{true};
+  };
+
+  // Update the MLIR value associated to a tensor id.
+  // This is typically needed when a tensor was created
+  // by a graph and then used by another one: the tensor
+  // would be an op output in the first graph and a graph
+  // input in the second.
+  void updateTensor(TensorId id, mlir::Value new_value);
+  // Remove all the ops in the main graph but do not reset
+  // the tensor IDs. Any valid tensor ID passed to findValue()
+  // will now return an empty Value.
+  void resetMainGraph();
+
+  Graph createSubGraph(const std::string &name);
+
   // Create a new op of class OpTy, possibly casting operands specified by args.
   template <typename OpTy, typename... Args>
-  OpTy createOp(AddToGraph add_to_graph, Args &&...args) {
+  OpTy createOp(Graph &graph, Args &&...args) {
     if constexpr (isImplicitCastingOp<OpTy>()) {
-      ERROR_ON(add_to_graph != AddToGraph::MAIN_GRAPH);
       mlir::Type promote_to = getCastToType<OpTy>(context, args...);
-      OpTy op = implicitCastAndCreate<OpTy>(_builder, _main_graph, promote_to,
+      OpTy op = implicitCastAndCreate<OpTy>(_builder, graph.graph, promote_to,
                                             std::forward<Args>(args)...);
-      _main_graph.front().push_back(op);
+      graph.graph.front().push_back(op);
       return op;
     }
 
     OpTy op = _builder.create<OpTy>(std::forward<Args>(args)...);
 
-    switch (add_to_graph) {
-    case AddToGraph::MAIN_GRAPH:
-      all_ops_can_be_lowered &=
-          !OpTy::template hasTrait<mlir::OpTrait::NotImplementedOp>();
-      _main_graph.front().push_back(op);
-      break;
-    case AddToGraph::READ_WEIGHTS:
-      _read_weights_graph.front().push_back(op);
-      break;
-    case AddToGraph::WRITE_WEIGHTS:
-      _write_weights_graph.front().push_back(op);
-      break;
-    default:
-      ERROR("Invalid value for add_to_graph");
-    }
+    graph.all_ops_can_be_lowered &=
+        !OpTy::template hasTrait<mlir::OpTrait::NotImplementedOp>();
+    graph.graph.front().push_back(op);
     return op;
   }
 
-  // Compile graph by running both PopTorch compiler passes and poplar
-  // compilation.
-  poptorch_ir::PoplarExecutor compile(const poplar::Target &target) {
-    timing_manager.setEnabled(true);
-    if (!root_timer) {
-      root_timer = timing_manager.getRootScope();
-    }
-
-    poptorch_ir::PoplarExecutor exe =
-        compileExecutable(_the_module, target, root_timer);
-
-    root_timer = mlir::TimingScope();
-    timing_manager.setEnabled(false);
-    return exe;
-  }
-
+public:
   // We need to maintain some MLIR state.
-
   // The global context.
   mlir::MLIRContext context;
-
-  // A mapping of SSA values to Poptorch IDs (the index in this vector)
-  std::vector<mlir::Value> value_map;
-
-  // Input and output callbacks to give to poplar.
-  std::vector<std::pair<std::string, Buffer>> input_callbacks;
-  std::vector<std::pair<std::string, void *>> output_callbacks;
-  std::vector<std::pair<std::string, Buffer>> weight_callbacks;
-
-  // When a new op is added to the main graph using createOp we check and
-  // store whether or not there is an actual handler for this op. (Some ops will
-  // have been added with only shape inference and no implementation, in which
-  // case we won't be able to lower them later on).
-  bool all_ops_can_be_lowered{true};
 
   // A timer for us to record how long it takes to compile each stage.
   mlir::DefaultTimingManager timing_manager;
@@ -319,21 +321,61 @@ public:
   // takes to trace a model.
   mlir::TimingScope tracer_timer;
 
+  // Empty the main graph, delete all the values but does not reset the tensor
+  // IDs.
 private:
+  // A mapping of SSA values to Poptorch IDs (the index in this vector)
+  std::vector<mlir::Value> _value_map;
   // Builder to create ops.
   mlir::ImplicitLocOpBuilder _builder;
 
+  // The main graph.
+  Graph _main_graph;
+
+protected: // TODO(T57253): can we keep the module private?
   // The main module which our functions are attached to.
   mlir::ModuleOp _the_module;
+};
 
-  // The main graph.
-  mlir::FuncOp _main_graph;
+class MLIRStaticGraphBuilder : public PoptorchCompilerImpl {
+public:
+  MLIRStaticGraphBuilder();
+  virtual ~MLIRStaticGraphBuilder() = default;
+  // Compile graph by running both PopTorch compiler passes and poplar
+  // compilation.
+  poptorch_ir::PoplarExecutor compile(const poplar::Target &target);
+  void addInput(const Buffer &ptr, const mlir::Value &input,
+                const char *name) override;
+  void addParameter(const Buffer &ptr, const mlir::Value &parameter,
+                    const char *name) override;
+  void addOutput(void *ptr, const mlir::Value &output,
+                 const char *name) override;
+  void addReturn() override;
 
+private:
   // Program to write weights onto the chip.
-  mlir::FuncOp _write_weights_graph;
+  Graph _write_weights_graph;
 
   // Program to read weights off the chip.
-  mlir::FuncOp _read_weights_graph;
+  Graph _read_weights_graph;
+
+public:
+  // Input and output callbacks to give to poplar.
+  std::vector<std::pair<std::string, Buffer>> input_callbacks;
+  std::vector<std::pair<std::string, void *>> output_callbacks;
+  std::vector<std::pair<std::string, Buffer>> weight_callbacks;
+};
+
+class MLIREagerBuilder : public PoptorchCompilerImpl {
+public:
+  virtual ~MLIREagerBuilder() = default;
+
+  TensorId addValue(const mlir::Value &value) override;
+  mlir::Value findValue(TensorId tensor) override;
+  void compileRunAndReset();
+
+private:
+  std::vector<mlir::RankedTensorType> _tensor_map;
 };
 
 } // namespace detail

@@ -10,27 +10,28 @@
 namespace poptorch_ir {
 
 namespace {
-template <typename T> T convert(T a, std::vector<mlir::Value> & /*unused*/) {
+template <typename T>
+T convert(T a, detail::PoptorchCompilerImpl & /*unused*/) {
   return a;
 }
 
 [[maybe_unused]] llvm::SmallVector<mlir::Value, 4>
 convert(const std::vector<poptorch_ir::TensorId> &inputs,
-        std::vector<mlir::Value> &values) {
+        detail::PoptorchCompilerImpl &compiler) {
   llvm::SmallVector<mlir::Value, 4> tmp;
   for (TensorId id : inputs) {
-    tmp.push_back(values[id]);
+    tmp.push_back(compiler.findValue(id));
   }
   return tmp;
 }
 
 mlir::Value convert(poptorch_ir::TensorId input,
-                    std::vector<mlir::Value> &values) {
+                    detail::PoptorchCompilerImpl &compiler) {
   if (input == poptorch_ir::tensor_error_id || input == poptorch_ir::none_id) {
     return {};
   }
 
-  return values[input];
+  return compiler.findValue(input);
 }
 } // namespace
 

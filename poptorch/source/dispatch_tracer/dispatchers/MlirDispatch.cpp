@@ -130,7 +130,8 @@ MLIRDispatch::MLIRDispatch() { this->generateDispatchTable(); }
 
 void MLIRDispatch::initCompiler() {
   // Init our MLIR compiler.
-  _compiler.init();
+  _compiler.init(poptorch_ir::ExecutionType::StaticGraph,
+                 poptorch_ir::CompilerBackend::Poplar);
 }
 
 at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {

@@ -19,7 +19,11 @@ namespace poptorch_ir {
 
 namespace detail {
 class PoptorchCompilerImpl;
-}
+} // namespace detail
+
+enum class ExecutionType { StaticGraph, EagerMode };
+
+enum class CompilerBackend { Poplar, PopIR };
 
 class PoptorchCompiler {
 public:
@@ -32,7 +36,7 @@ public:
 
   void dump();
 
-  void init();
+  void init(ExecutionType execution_type, CompilerBackend compiler_backend);
 
   void setCurrentPythonCodeLocation(const char *filename, std::uint64_t line,
                                     std::uint64_t col);
@@ -44,6 +48,10 @@ public:
                         const char *);
   void addOutput(TensorId id, void *ptr, const char *);
 
+  // Only if ExecutionType::EagerMode is used.
+  void compileRunAndReset();
+
+  // Only if ExecutionType::StaticGraph is used
   PoplarExecutorWrapper compileAndLoad();
 
   std::vector<std::int64_t> getSize(TensorId id) const;
