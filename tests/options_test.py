@@ -394,6 +394,10 @@ def test_tensor_location():
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_running_statistics(capfd, dtype, setting, trace_model):
+    # Just remove the if + skip once the dispatcher is enabled
+    if not trace_model:
+        pytest.skip("TODO(T57195): requires dispatcher to be enabled")
+
     x = torch.randn((16, 16), dtype=dtype)
 
     model = torch.nn.Sequential()
@@ -421,8 +425,11 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
     dtype_str = "Float" if dtype == torch.float or \
         setting is None or setting else "Half"
 
+    device = "cpu" if trace_model else "xla:0"
+
     log.assert_contains(
-        f"%24 : {dtype_str}(16, strides=[1], requires_grad=0, device=cpu)):")
+        f" : {dtype_str}(16, strides=[1], requires_grad=0, device={device}) " +
+        "-> bn.running_var")
 
 
 def test_copying_options():

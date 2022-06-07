@@ -671,7 +671,9 @@ class PoplarExecutor:
 
     @_impl.traceMethod("graphPreprocessing")
     def _preprocessGraphDispatcher(self, in_tensors):
-        return self._preprocessGraphCommon(in_tensors)
+        in_tensors_trace_view = self._preprocessGraphCommon(in_tensors)
+        poptorch_core.processPrecisionOptions(self._options.Precision)
+        return in_tensors_trace_view
 
     def _preprocessGraphCommon(self, in_tensors):
         self._executable_inputs = in_tensors.clone()

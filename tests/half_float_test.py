@@ -100,9 +100,6 @@ def test_ones_zeros_input_resolved_with_input_dtype(op, trace_model):
 @pytest.mark.parametrize("op", ones_zeros)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ones_zeros_input_resolved_always_float16(op, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T63330): HalfUpcastToFloat support required")
-
     def fw_op(input):
         return op(
             (2, 3, 4), dtype=torch.float16,
@@ -181,9 +178,6 @@ def test_rand_default_input_resolved(trace_model):
 # The output will be correct.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_rand_default_input_resolved_always_float16(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T63330): HalfUpcastToFloat support required")
-
     def fw_op(input):
         return torch.rand(3, 5, 100, dtype=torch.float16) + input
 
