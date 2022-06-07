@@ -51,24 +51,29 @@ def Poptorch_print_tensor : Poptorch_Op<"print_tensor", []> {
   let arguments = (ins Poptorch_tensor:$input, StrAttr:$title);
 }
 
-
 def Poptorch_tensorconstant_float : Poptorch_Op<"tensorconstant_float", []> {
-    let arguments = (ins F32ArrayAttr:$data);
+    let arguments = (ins F32ArrayAttr:$data,
+                         I64ArrayAttr:$shape);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilder<(ins "const std::vector<float>&":$data),[{
+    let builders = [OpBuilder<(ins "const std::vector<float>&":$data,
+                                   "const std::vector<std::int64_t>&":$shape),[{
         $_state.addAttribute("data", $_builder.getF32ArrayAttr(data));
-        $_state.addTypes(mlir::RankedTensorType::get(1, $_builder.getF32Type()));
+        $_state.addAttribute("shape", $_builder.getI64ArrayAttr(shape));
+        $_state.addTypes(mlir::RankedTensorType::get(shape, $_builder.getF32Type()));
      }]>];
 }
 
 def Poptorch_tensorconstant_int : Poptorch_Op<"tensorconstant_int", []> {
-    let arguments = (ins I32ArrayAttr:$data);
+    let arguments = (ins I32ArrayAttr:$data,
+                         I64ArrayAttr:$shape);
     let results = (outs Poptorch_tensor:$result);
 
-    let builders = [OpBuilder<(ins "const std::vector<std::int32_t>&":$data),[{
+    let builders = [OpBuilder<(ins "const std::vector<std::int32_t>&":$data,
+                                   "const std::vector<std::int64_t>&":$shape),[{
         $_state.addAttribute("data", $_builder.getI32ArrayAttr(data));
-        $_state.addTypes(mlir::RankedTensorType::get(1, $_builder.getIntegerType(32, true)));
+        $_state.addAttribute("shape", $_builder.getI64ArrayAttr(shape));
+        $_state.addTypes(mlir::RankedTensorType::get(shape, $_builder.getIntegerType(32, true)));
      }]>];
 }
 

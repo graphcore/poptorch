@@ -121,22 +121,19 @@ poplar::Tensor createConstant(CompilerContext &context, poplar::Type type,
                               const std::vector<uint64_t> &shape,
                               const T &value) {
   poplar::Tensor constant = context.graph.addConstant<T>(type, shape, value);
-
-  auto tile_num =
+  const auto tile_num =
       (context.graph_const_count++) % context.graph.getTarget().getNumTiles();
   context.graph.setTileMapping(constant, tile_num);
   return constant;
 }
 
-// TODO(T60724) Not currently used, but will be useful when we add support for
-// constant tensors.
 template <typename T>
 poplar::Tensor createConstantTensor(CompilerContext &context, poplar::Type type,
                                     const std::vector<uint64_t> &shape,
                                     const std::vector<T> &values) {
   poplar::Tensor constant =
       context.graph.addConstant<T>(type, shape, poplar::ArrayRef<T>(values));
-  auto tile_num =
+  const auto tile_num =
       (context.graph_const_count++) % context.graph.getTarget().getNumTiles();
   context.graph.setTileMapping(constant, tile_num);
   return constant;

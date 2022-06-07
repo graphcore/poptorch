@@ -136,22 +136,62 @@ void MLIRDispatch::initCompiler() {
 at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
 
-  ERROR("T60724: not implemented");
-  /* TODO(T60724)
-  at::Tensor tensor = allocateTensor(
-      cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
+  const auto cpu_dtype = cpu_tensor.scalar_type();
 
-  const std::string str = "Input/" + std::to_string(_next_input_idx++);
+  // Convert the CPU tensor's dtype to `int` or `float`, for ease of adding.
+  at::Tensor coerced_cpu_tensor = cpu_tensor;
+  if (c10::isIntegralType(cpu_dtype, true) &&
+      cpu_dtype != c10::ScalarType::Int) {
+    coerced_cpu_tensor = coerced_cpu_tensor.to(c10::ScalarType::Int);
+  } else if (c10::isFloatingType(cpu_dtype) &&
+             cpu_dtype != c10::ScalarType::Float) {
+    coerced_cpu_tensor = coerced_cpu_tensor.to(c10::ScalarType::Float);
+  }
+
+  if (cpu_dtype == c10::ScalarType::Long ||
+      cpu_dtype == c10::ScalarType::Double) {
+    logging::warn("Constant tensor (shape {}) coerced from {} to {}",
+                  cpu_tensor.sizes(), cpu_dtype,
+                  coerced_cpu_tensor.scalar_type());
+  }
+
+  // Create the IPU tensor constant.
+  at::Tensor tensor = allocateTensor(coerced_cpu_tensor.sizes(),
+                                     coerced_cpu_tensor.scalar_type());
+
+  const auto shape = tensor.sizes().vec();
+
+  poptorch_ir::TensorId val;
+  if (coerced_cpu_tensor.scalar_type() == c10::ScalarType::Float) {
+    const auto *data = static_cast<float *>(coerced_cpu_tensor.data_ptr());
+    const std::vector<float> tmp(data, data + coerced_cpu_tensor.numel());
+    val = _compiler.tensorconstant_float(tmp, shape).at(0).tensor_ids.at(0);
+  } else if (coerced_cpu_tensor.scalar_type() == c10::ScalarType::Int) {
+    const auto *data = static_cast<int32_t *>(coerced_cpu_tensor.data_ptr());
+    const std::vector<int32_t> tmp(data, data + coerced_cpu_tensor.numel());
+    val = _compiler.tensorconstant_int(tmp, shape).at(0).tensor_ids.at(0);
+  } else {
+    ERROR("Tensor constants of scalar type " << tensor.scalar_type()
+                                             << " are not supported.");
+  }
+
+  // If we've upcast a smaller dtype, cast it back down.
+  bool should_recast =
+      (c10::isIntegralType(cpu_dtype, true) &&
+       cpu_dtype != c10::ScalarType::Int && cpu_dtype != c10::ScalarType::Long);
+  should_recast |=
+      (c10::isFloatingType(cpu_dtype) && cpu_dtype != c10::ScalarType::Float &&
+       cpu_dtype != c10::ScalarType::Double);
+  if (should_recast) {
+    val = _compiler.cast(val, toCompilerType(cpu_dtype)).at(0).tensor_ids.at(0);
+  }
+
   logging::trace("[TRACING-2] Adding constant: {} with cpu ptr {}",
                  static_cast<void *>(cpu_tensor.unsafeGetTensorImpl()),
                  cpu_tensor.data_ptr());
-  poptorch_ir::TensorId value =
-      _compiler.addConstantTensor(poptorch::getCpuData(tensor),
-  toCompilerShape(tensor), toCompilerType(tensor), str.c_str(),
-  cpu_tensor.data_ptr()); _mapper.addTensor(tensor, value);
-  setIsParameter(tensor, false);
+
+  _mapper.addTensor(tensor, val);
   return tensor;
-  */
 }
 
 at::Tensor MLIRDispatch::addInput(const at::Tensor &cpu_tensor) {
@@ -376,7 +416,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
                          wrapped_value);
           tmp[i] = wrapped_value;
         }
-        val = _compiler.tensorconstant_float(tmp).at(0).tensor_ids.at(0);
+        val = _compiler.tensorconstant_float(tmp, {}).at(0).tensor_ids.at(0);
         break;
       }
       case c10::ScalarType::Long: {
@@ -395,7 +435,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
                      "outside the representable range.");
           tmp[i] = wrapped_value;
         }
-        val = _compiler.tensorconstant_int(tmp).at(0).tensor_ids.at(0);
+        val = _compiler.tensorconstant_int(tmp, {}).at(0).tensor_ids.at(0);
         break;
       }
       default:

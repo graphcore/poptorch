@@ -50,27 +50,25 @@ void zero_::lowerToPoplar(CompilerContext &context) {
 }
 
 void tensorconstant_float::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->result());
+  const std::vector<size_t> shape = convertIntArray<size_t>(this->shape());
+  const std::vector<float> data = convertFloatArray<float>(this->data());
 
-  float as_float = 0.0f;
-  // Right now just support 1 value.
-  for (mlir::Attribute dimension : this->data()) {
-    as_float = dimension.cast<mlir::FloatAttr>().getValueAsDouble();
-  }
-
-  popops::fill(context.graph, input, context.seq, as_float);
-  //  context.graph.setInitialValue(input, as_float);
+  poplar::Tensor new_tensor =
+      (data.size() == 1)
+          ? createConstant(context, poplar::FLOAT, shape, data[0])
+          : createConstantTensor(context, poplar::FLOAT, shape, data);
+  context.addTensor(this->result(), new_tensor);
 }
 
 void tensorconstant_int::lowerToPoplar(CompilerContext &context) {
-  poplar::Tensor input = context.fromSsa(this->result());
+  const std::vector<size_t> shape = convertIntArray<size_t>(this->shape());
+  const std::vector<int> data = convertIntArray<int>(this->data());
 
-  int as_int = 0;
-  // Right now just support 1 value.
-  for (mlir::Attribute dimension : this->data()) {
-    as_int = dimension.cast<mlir::IntegerAttr>().getInt();
-  }
-  popops::fill(context.graph, input, context.seq, as_int);
+  poplar::Tensor new_tensor =
+      (data.size() == 1)
+          ? createConstant(context, poplar::INT, shape, data[0])
+          : createConstantTensor(context, poplar::INT, shape, data);
+  context.addTensor(this->result(), new_tensor);
 }
 
 void concat::lowerToPoplar(CompilerContext &context) {
