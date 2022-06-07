@@ -32,5 +32,7 @@ To run this example you will need to install the Poplar SDK (see the `Getting St
   :end-before: mnist_end
   :emphasize-lines: 12, 15, 17, 20, 35, 96, 99
   :language: python
+  :dedent: 3
   :linenos:
   :lineno-match:
+
