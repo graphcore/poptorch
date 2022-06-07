@@ -209,8 +209,7 @@ def test_ipu_print_tensor(trace_model):
 
 
 # pylint: disable=protected-access
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_half_tracing(trace_model):
+def test_half_tracing():
     def check_param_types(module, dtype):
         for param in module.parameters():
             assert param.dtype == dtype
@@ -223,7 +222,7 @@ def test_half_tracing(trace_model):
     model.add_module('linear2', torch.nn.Linear(10, 10))
 
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(True)
 
     popmodel = poptorch.inferenceModel(model, options)
     popmodel(x)
