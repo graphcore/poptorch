@@ -259,6 +259,11 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       for (size_t i = 0; i < tensor_list.size(); ++i) {
         at::Tensor tensor = tensor_list.at(i);
         val = unpack->output(i);
+        if (_mapper.isHalfTensor(tensor)) {
+          val->inferTypeFrom(tensor.to(at::ScalarType::Half));
+        } else {
+          val->inferTypeFrom(copyAndCoerceType(tensor));
+        }
         _mapper.addTensor(tensor, val);
         logging::trace("[TRACING-2][JIT] Output tensor list element: Tensor "
                        "ptr {}, jit ir %{} {}",

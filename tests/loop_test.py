@@ -172,6 +172,25 @@ def test_loop_weights_use_twice(trace_model):
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
+def test_loop_use_output(trace_model):
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            def body(x):
+                return x + x
+
+            out = poptorch.for_loop(2, body, [x])[0]
+            loss = poptorch.identity_loss(out, reduction='sum')
+            return out, loss
+
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(Model(), options)
+
+    x = torch.ones(1, 4).to(torch.float)
+    inference_model(x)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_loop_training(trace_model):
     class Model(torch.nn.Module):
         def __init__(self):
