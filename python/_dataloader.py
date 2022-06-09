@@ -195,6 +195,8 @@ class _AsynchronousWorkerProcess:
         # in the hot loop.
         if self._sharing_strategy == enums.SharingStrategy.Fork:
             ctx = multiprocessing.get_context('fork')
+        elif self._sharing_strategy == enums.SharingStrategy.ForkServer:
+            ctx = multiprocessing.get_context('forkserver')
         else:
             ctx = multiprocessing.get_context('spawn')
         read_data_pipe, write_data_pipe = ctx.Pipe(duplex=False)

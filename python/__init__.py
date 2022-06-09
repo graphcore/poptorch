@@ -444,7 +444,7 @@ class AsynchronousDataAccessor:
             load_indefinitely: bool = True,
             early_preload: bool = False,
             sharing_strategy: 'poptorch.SharingStrategy' = SharingStrategy.
-            FileSystem,
+            ForkServer,
             rebatched_size: Optional[int] = None):
         """
         :param dataset: The dataset to pull data from, this can be any Python
@@ -465,7 +465,10 @@ class AsynchronousDataAccessor:
             * `FileSystem` will serialise the dataset to file and reload it
               which will be slower.
             * `Fork` new processes: no data sharing required but might cause
-              problems with some third party libraries.
+              problems if worker processes use threading.
+            * `ForkServer` is similar to `Fork` but uses a server process to
+              fork child processes. It is safe to use even if worker processes
+              use threading.
 
         :param rebatched_size: If not None: return N batched tensors from
             the dataset per iteration. (The passed dataset must have a
