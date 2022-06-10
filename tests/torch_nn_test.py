@@ -340,6 +340,11 @@ HALF_EXPECTED_FAILURES = {
     "test_nn_LSTMCell": "Exception: TEXCPT_INVALID_ADDR",
 }
 
+FLOAT_PRECISION_EXCEPTIONS = {
+    "test_nn_GroupNorm_2d_affine_large_feature": (1e-3, 1e-3),
+    "test_nn_GroupNorm_2d_no_affine_large_feature": (1e-3, 1e-3),
+}
+
 HALF_PRECISION_EXCEPTIONS = {
     "test_nn_Conv1d_dilated": (0.05, 1e-3),
     "test_nn_Conv1d_pad2": (0.05, 1e-3),
@@ -463,6 +468,8 @@ def test_pytorch_nn(test_name, use_half, trace_model):
             for i in inputs
         ]
         rtol, atol = HALF_PRECISION_EXCEPTIONS.get(test_name, (0.05, 1e-4))
+    else:
+        rtol, atol = FLOAT_PRECISION_EXCEPTIONS.get(test_name, (None, None))
 
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
