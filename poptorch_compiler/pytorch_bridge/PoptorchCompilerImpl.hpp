@@ -229,19 +229,19 @@ public:
 
   static mlir::Value addArgument(mlir::FuncOp func, mlir::Type argType);
 
-  mlir::Value addArgumentToMainGraph(mlir::Type argType) {
-    return addArgument(_main_graph.graph, argType);
-  }
+  mlir::Value addArgumentToMainGraph(mlir::Type argType);
 
-  virtual void addInput(const Buffer &ptr, const mlir::Value &input,
-                        const char *name) = 0;
-
-  virtual void addParameter(const Buffer &ptr, const mlir::Value &parameter,
+  virtual TensorId addInput(const Buffer &ptr,
+                            const mlir::RankedTensorType &input,
                             const char *name) = 0;
-  virtual void addOutput(void *ptr, const mlir::Value &output,
-                         const char *name) = 0;
+
+  virtual TensorId addParameter(const Buffer &ptr,
+                                const mlir::RankedTensorType &parameter,
+                                const char *name) = 0;
+  virtual void addOutput(void *ptr, TensorId id, const char *name) = 0;
   virtual void addReturn() = 0;
 
+  virtual void onOpAdded() {}
   // Print module to stderr
   void dump() { _the_module->dump(); }
 
@@ -331,10 +331,10 @@ private:
   // Builder to create ops.
   mlir::ImplicitLocOpBuilder _builder;
 
+protected:
   // The main graph.
   Graph _main_graph;
 
-protected: // TODO(T57253): can we keep the module private?
   // The main module which our functions are attached to.
   mlir::ModuleOp _the_module;
 };
@@ -346,12 +346,13 @@ public:
   // Compile graph by running both PopTorch compiler passes and poplar
   // compilation.
   poptorch_ir::PoplarExecutor compile(const PoplarTarget &target);
-  void addInput(const Buffer &ptr, const mlir::Value &input,
-                const char *name) override;
-  void addParameter(const Buffer &ptr, const mlir::Value &parameter,
+  TensorId addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
                     const char *name) override;
-  void addOutput(void *ptr, const mlir::Value &output,
-                 const char *name) override;
+
+  TensorId addParameter(const Buffer &ptr,
+                        const mlir::RankedTensorType &parameter,
+                        const char *name) override;
+  void addOutput(void *ptr, TensorId id, const char *name) override;
   void addReturn() override;
 
 private:
@@ -372,6 +373,15 @@ class MLIREagerBuilder : public PoptorchCompilerImpl {
 public:
   virtual ~MLIREagerBuilder() = default;
 
+  TensorId addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
+                    const char *name) override;
+
+  TensorId addParameter(const Buffer &ptr,
+                        const mlir::RankedTensorType &parameter,
+                        const char *name) override;
+  void addOutput(void *ptr, TensorId id, const char *name) override;
+  void addReturn() override;
+  void onOpAdded() override;
   TensorId addValue(const mlir::Value &value) override;
   mlir::Value findValue(TensorId tensor) override;
   void compileRunAndReset();

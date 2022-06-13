@@ -325,7 +325,7 @@ def Poptorch_fmod : Poptorch_NotImplemented_elem_binary<"fmod"> {}
 def Poptorch_logicalXor: Poptorch_NotImplemented_elem_binary<"logicalXor"> {}
 
 
-class Poptorch_elem_binary_scalar<string name> :  Poptorch_NotImplementedOp<name, []> {
+class Poptorch_elem_binary_scalar_NotImplemented<string name> :  Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
     let results = (outs Poptorch_tensor:$result);
 
@@ -338,7 +338,7 @@ class Poptorch_elem_binary_scalar<string name> :  Poptorch_NotImplementedOp<name
     ];
 }
 
-def Poptorch_pow_Tensor_Scalar_out : Poptorch_elem_binary_scalar<"pow_Tensor_Scalar_out"> {}
+def Poptorch_pow_Tensor_Scalar_out : Poptorch_elem_binary_scalar_NotImplemented<"pow_Tensor_Scalar_out"> {}
 
 class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);

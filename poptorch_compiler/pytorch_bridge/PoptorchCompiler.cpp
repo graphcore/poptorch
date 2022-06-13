@@ -1,4 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include "pytorch_bridge/PoptorchCompiler.hpp"
 
 #include <llvm/ADT/SmallVector.h>
 #include <mlir/IR/Operation.h>
@@ -8,7 +9,6 @@
 
 #include "PoptorchCompilerImpl.hpp"
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
-#include "pytorch_bridge/PoptorchCompiler.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
 
 namespace poptorch_ir {
@@ -16,9 +16,11 @@ namespace poptorch_ir {
 PoptorchCompiler::PoptorchCompiler() {}
 
 PoptorchCompiler::~PoptorchCompiler() {
-  // The timer crashes on destruction when it's enabled. It looks like it's
-  // failing to print timing info
-  _impl->timing_manager.setEnabled(false);
+  if (_impl) {
+    // The timer crashes on destruction when it's enabled. It looks like it's
+    // failing to print timing info
+    _impl->timing_manager.setEnabled(false);
+  }
 }
 
 void PoptorchCompiler::init(ExecutionType execution_type,
@@ -34,16 +36,14 @@ void PoptorchCompiler::init(ExecutionType execution_type,
   ERROR_ON(_impl == nullptr);
 }
 
+void PoptorchCompiler::onOpAdded() { _impl->onOpAdded(); }
+
 TensorId PoptorchCompiler::addInput(const Buffer &ptr,
                                     const std::vector<std::int64_t> &shape,
                                     Type type, const char *name) {
   mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
-  // Add the argument to the graph args.
-  mlir::Value val = _impl->addArgumentToMainGraph(tensor);
 
-  _impl->addInput(ptr, val, name);
-
-  return _impl->addValue(val);
+  return _impl->addInput(ptr, tensor, name);
 }
 
 void PoptorchCompiler::setCurrentPythonCodeLocation(const char *filename,
@@ -60,17 +60,11 @@ TensorId PoptorchCompiler::addParameter(const Buffer &ptr,
                                         Type type, const char *name) {
   mlir::RankedTensorType tensor = _impl->getTensor(type, shape);
 
-  // Add the argument to the graph args.
-  mlir::Value val = _impl->addArgumentToMainGraph(tensor);
-
-  _impl->addParameter(ptr, val, name);
-
-  return _impl->addValue(val);
+  return _impl->addParameter(ptr, tensor, name);
 }
 
 void PoptorchCompiler::addOutput(TensorId id, void *ptr, const char *name) {
-  mlir::Value val = _impl->findValue(id);
-  _impl->addOutput(ptr, val, name);
+  _impl->addOutput(ptr, id, name);
 }
 
 void PoptorchCompiler::startTraceTiming() {

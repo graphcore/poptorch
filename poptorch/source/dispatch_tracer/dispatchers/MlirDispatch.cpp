@@ -128,14 +128,24 @@ void MLIRExecutor::weightsToHost() {
 
 MLIRDispatch::MLIRDispatch() { this->generateDispatchTable(); }
 
-void MLIRDispatch::initCompiler() {
+void MLIRDispatch::initCompiler(bool eager_mode) {
+  _eager_mode = eager_mode;
   // Init our MLIR compiler.
-  _compiler.init(poptorch_ir::ExecutionType::StaticGraph,
-                 poptorch_ir::CompilerBackend::Poplar);
+  if (eager_mode) {
+    _compiler.init(poptorch_ir::ExecutionType::EagerMode,
+                   poptorch_ir::CompilerBackend::Poplar);
+  } else {
+    _compiler.init(poptorch_ir::ExecutionType::StaticGraph,
+                   poptorch_ir::CompilerBackend::Poplar);
+  }
 }
 
 at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
+  if (_eager_mode) {
+    // Everything is considered an input in eager mode.
+    return addInput(cpu_tensor);
+  }
 
   const auto cpu_dtype = cpu_tensor.scalar_type();
 
@@ -363,6 +373,8 @@ void MLIRDispatch::fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const std::string schema_key = handleOp(op, stack);
   ERROR_ON_MSG(!_compiler.allOpsCanBeLoweredToPoplar(),
                schema_key << " cannot currently be lowered to Poplar");
+  // Let the compiler know we added a new op to the graph.
+  _compiler.onOpAdded();
 }
 
 std::shared_ptr<MLIRExecutor> MLIRDispatch::compile() {

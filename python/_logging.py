@@ -132,7 +132,6 @@ def _excepthook(*args):
         print("%s\n%s%s", e[-1], "".join(e), extra_info, file=sys.stderr)
     else:
         logger.critical("%s\n%s%s", e[-1], "".join(e), extra_info)
-    sys.exit(1)
 
 
 _console = logging.StreamHandler()

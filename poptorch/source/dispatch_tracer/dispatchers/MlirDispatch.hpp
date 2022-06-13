@@ -24,7 +24,7 @@ class MLIRDispatch : public IDispatch {
 public:
   MLIRDispatch();
 
-  void initCompiler();
+  void initCompiler(bool eager_mode = false);
   at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
   at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
@@ -123,6 +123,7 @@ private:
   // operation.
   using StackFunctionType = std::function<void(c10::Stack &)>;
   std::unordered_map<std::string, StackFunctionType> _direct_dispatch_lookup;
+  bool _eager_mode{false};
 };
 
 } // namespace poptorch

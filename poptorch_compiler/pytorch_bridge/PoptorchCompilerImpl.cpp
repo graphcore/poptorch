@@ -64,18 +64,12 @@ bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
 
 PoptorchCompilerImpl::PoptorchCompilerImpl()
     : root_timer(timing_manager.getRootTimer()),
-      _builder(mlir::UnknownLoc::get(&context), &context),
-      _the_module(mlir::ModuleOp::create(_builder.getLoc())) {
+      _builder(mlir::UnknownLoc::get(&context), &context) {
 
   context.getDiagEngine().registerHandler(printDiagnostic);
 
   // Load the dialect.
   context.loadDialect<poptorch_ir::PoptorchDialect>();
-
-  // We represent our graph as a simple function.
-  auto func_type = _builder.getFunctionType({}, llvm::None);
-  _main_graph.graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
-  _the_module.push_back(_main_graph.graph);
 
   resetMainGraph();
 }
@@ -87,6 +81,10 @@ mlir::Value PoptorchCompilerImpl::addArgument(mlir::FuncOp func,
   func.insertArgument(insert_pos, argType, {});
 
   return func.getArgument(insert_pos);
+}
+
+mlir::Value PoptorchCompilerImpl::addArgumentToMainGraph(mlir::Type argType) {
+  return addArgument(_main_graph.graph, argType);
 }
 
 mlir::Type PoptorchCompilerImpl::convertType(Type type) {
@@ -135,11 +133,14 @@ void PoptorchCompilerImpl::updateTensor(TensorId id, mlir::Value new_value) {
 }
 
 void PoptorchCompilerImpl::resetMainGraph() {
-  // Clear the graph
-  _main_graph.graph.eraseBody();
+  _the_module = mlir::ModuleOp::create(_builder.getLoc());
+  // We represent our graph as a simple function.
+  auto func_type = _builder.getFunctionType({}, llvm::None);
+  _main_graph.graph = _builder.create<mlir::FuncOp>("MainGraph", func_type);
+  _the_module.push_back(_main_graph.graph);
+
   // Add an entry block.
   _main_graph.graph.addEntryBlock();
-
   _main_graph.all_ops_can_be_lowered = true;
 
   // Invalidate all the values but do not clear the map:
@@ -163,6 +164,7 @@ PoptorchCompilerImpl::createSubGraph(const std::string &name) {
 }
 
 TensorId MLIREagerBuilder::addValue(const mlir::Value &value) {
+  ERROR_ON(!value);
   _tensor_map.push_back(value.getType().cast<mlir::RankedTensorType>());
   return PoptorchCompilerImpl::addValue(value);
 }
@@ -179,8 +181,46 @@ mlir::Value MLIREagerBuilder::findValue(TensorId tensor) {
 }
 
 void MLIREagerBuilder::compileRunAndReset() {
+  root_timer.start();
   // TODO(T57253) compile & run.
   resetMainGraph();
+
+  root_timer.stop();
+  timing_manager.setEnabled(false);
+}
+
+TensorId MLIREagerBuilder::addInput(const Buffer & /*ptr*/,
+                                    const mlir::RankedTensorType &input,
+                                    const char *name) {
+  UNUSED(name);
+  TensorId id = PoptorchCompilerImpl::addValue(mlir::Value());
+  _tensor_map.push_back(input);
+  //_executor.addInput(ptr, input, id);
+
+  return id;
+}
+
+TensorId MLIREagerBuilder::addParameter(const Buffer & /*ptr*/,
+                                        const mlir::RankedTensorType &parameter,
+                                        const char *name) {
+  UNUSED(name);
+  TensorId id = PoptorchCompilerImpl::addValue(mlir::Value());
+  _tensor_map.push_back(parameter);
+  //_executor.addInput(ptr, parameter, id);
+  return id;
+}
+
+void MLIREagerBuilder::addOutput(void * /*ptr*/, TensorId /*id*/,
+                                 const char *name) {
+  UNUSED(name);
+  compileRunAndReset();
+  //_executor.readOutput(id, ptr);
+}
+
+void MLIREagerBuilder::onOpAdded() { compileRunAndReset(); }
+
+void MLIREagerBuilder::addReturn() {
+  ERROR("Only static graphs have a return");
 }
 
 MLIRStaticGraphBuilder::MLIRStaticGraphBuilder() {
@@ -205,36 +245,49 @@ MLIRStaticGraphBuilder::compile(const PoplarTarget &target) {
   return exe;
 }
 
-void MLIRStaticGraphBuilder::addInput(const Buffer &ptr,
-                                      const mlir::Value &input,
-                                      const char *name) {
+TensorId MLIRStaticGraphBuilder::addInput(const Buffer &ptr,
+                                          const mlir::RankedTensorType &input,
+                                          const char *name) {
+  // Add the argument to the graph args.
+  mlir::Value val = addArgumentToMainGraph(input);
+
   // Add the argument to the function args.
-  createOp<poptorch_ir::copy_from_host>(input, name);
+  createOp<poptorch_ir::copy_from_host>(val, name);
   input_callbacks.push_back({name, ptr});
+  return addValue(val);
 }
 
-void MLIRStaticGraphBuilder::addParameter(const Buffer &ptr,
-                                          const mlir::Value &parameter,
-                                          const char *name) {
+TensorId
+MLIRStaticGraphBuilder::addParameter(const Buffer &ptr,
+                                     const mlir::RankedTensorType &parameter,
+                                     const char *name) {
+  // Add the argument to the graph args.
+  mlir::Value val = addArgumentToMainGraph(parameter);
+
   // Write weights to the graph.
-  createOp<poptorch_ir::copy_from_host>(_write_weights_graph, parameter,
+  createOp<poptorch_ir::copy_from_host>(_write_weights_graph, val,
                                         "Write-" + std::string(name));
 
   // Read weights from the graph.
-  createOp<poptorch_ir::copy_to_host>(_read_weights_graph, parameter,
+  createOp<poptorch_ir::copy_to_host>(_read_weights_graph, val,
                                       "Read-" + std::string(name));
 
   weight_callbacks.push_back({name, ptr});
+  return addValue(val);
 }
-void MLIRStaticGraphBuilder::addOutput(void *ptr, const mlir::Value &output,
+
+void MLIRStaticGraphBuilder::addOutput(void *ptr, TensorId id,
                                        const char *name) {
+  mlir::Value output = findValue(id);
   createOp<poptorch_ir::copy_to_host>(output, name);
   output_callbacks.push_back({name, ptr});
 }
+
 void MLIRStaticGraphBuilder::addReturn() {
   createOp<poptorch_ir::end_graph>(_write_weights_graph);
   createOp<poptorch_ir::end_graph>(_read_weights_graph);
 }
+
 } // namespace detail
 
 } // namespace poptorch_ir

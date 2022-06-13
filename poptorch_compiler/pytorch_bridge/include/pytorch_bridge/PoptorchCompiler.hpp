@@ -66,6 +66,10 @@ public:
   // Poplar.
   bool allOpsCanBeLoweredToPoplar() const;
 
+  // Called by the dispatcher after it added an op to the graph.
+  // (Can be used by the backend as a trigger for eager execution)
+  void onOpAdded();
+
 // Each tablegen entry will automatically generate a C++ method and impl which
 // can be used by PyTorch. This means Compiler will have a function to add any
 // op using non-pytorch, non-mlir types. Tensors are poptorch_ir::TensorId.

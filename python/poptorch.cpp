@@ -1439,6 +1439,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
       .value("Sentinel", poptorch::TracingMode::SENTINEL)
       .export_values();
 
+  m.def("enableEagerMode", PTC(poptorch::enableEagerMode));
   m.def("startDispatch", PTC(poptorch::startDispatch));
   m.def("endDispatch", PTC(poptorch::endDispatch));
   m.def("startParametersMove", PTC(poptorch::startParametersMove));

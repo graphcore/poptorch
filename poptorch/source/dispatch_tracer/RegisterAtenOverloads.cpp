@@ -241,6 +241,18 @@ void endParametersMove() { context.moving_parameters = false; }
 // Turn on.
 void startDispatch() { context.dispatch_on = true; }
 
+void enableEagerMode() {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  auto dispatcher = std::make_unique<MLIRDispatch>();
+  dispatcher->initCompiler(/*eager_mode =*/true);
+
+  context.resetActiveDispatch(std::move(dispatcher));
+#else
+  ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
+        "use eager mode.");
+#endif
+}
+
 // Turn off.
 void endDispatch(bool error_occurred) {
   context.dispatch_on = false;

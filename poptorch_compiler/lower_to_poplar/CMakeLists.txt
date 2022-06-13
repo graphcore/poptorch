@@ -18,8 +18,8 @@ add_library(lower_to_poplar STATIC
 
 target_include_directories(lower_to_poplar PUBLIC include)
 
-find_package(model_runtime)
-find_package(popef)
+find_package(model_runtime REQUIRED)
+find_package(popef REQUIRED)
 # Poplar requires exceptions and LLVM disables them for efficiency so we can't
 # use the nice MLIR cmake functions here.
 target_link_libraries(lower_to_poplar PRIVATE
