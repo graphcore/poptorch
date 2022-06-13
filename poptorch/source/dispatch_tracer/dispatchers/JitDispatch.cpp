@@ -39,9 +39,24 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   return tensor;
 }
 
+void errorOnZeroSizedTensor(const at::Tensor &tensor) {
+  auto sizes = tensor.sizes();
+  if (std::any_of(sizes.begin(), sizes.end(),
+                  [](auto dim) { return dim == 0; })) {
+    std::stringstream err;
+    err << "Zero-sized tensors are unsupported (Got shape [";
+    for (std::size_t i = 0; i < sizes.size() - 1; i++) {
+      err << sizes[i] << ", ";
+    }
+    err << sizes[sizes.size() - 1] << "]).";
+    ERROR(err.str());
+  }
+}
+
 at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
                                   bool is_parameter) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
+  errorOnZeroSizedTensor(cpu_tensor);
 
   at::Tensor tensor = allocateTensor(
       cpu_tensor.sizes(), c10::typeMetaToScalarType(cpu_tensor.dtype()));
