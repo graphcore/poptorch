@@ -79,6 +79,17 @@ poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
 
 poplar::Type elementTypeFromMLIR(mlir::Type elementType);
 
+std::string toString(const std::vector<std::size_t> &shape,
+                     const poplar::Type &type);
+
+// Poplar keeps the size and shape as two distinct concepts.
+struct PoplarTypePair {
+  poplar::Type element_type;
+  std::vector<std::size_t> shape;
+};
+
+PoplarTypePair processType(mlir::Type mlirType);
+
 template <typename T>
 std::vector<T> convertFloatArray(const mlir::ArrayAttr &array) {
   std::vector<T> output;
@@ -123,6 +134,16 @@ poplar::Tensor createConstantTensor(CompilerContext &context, poplar::Type type,
       (context.graph_const_count++) % context.graph.getTarget().getNumTiles();
   context.graph.setTileMapping(constant, tile_num);
   return constant;
+}
+
+// Convert any MLIR object to string.
+template <typename T> std::string mlirToStr(const T &obj) {
+  std::string str;
+  {
+    llvm::raw_string_ostream ostream(str);
+    ostream << obj;
+  }
+  return str;
 }
 
 } // namespace poptorch_ir

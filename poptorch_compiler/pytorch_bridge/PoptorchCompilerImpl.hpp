@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "dialect/PoptorchDialect.hpp"
+#include "lower_to_poplar/NonRestartingMlirTimer.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"

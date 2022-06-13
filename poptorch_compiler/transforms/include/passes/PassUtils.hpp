@@ -21,15 +21,6 @@ template <class T> std::string mlirOpToStr(T &op) {
   return str;
 }
 
-// Convert any MLIR object to string.
-template <typename T> std::string mlirToStr(const T &obj) {
-  std::string str;
-  {
-    llvm::raw_string_ostream ostream(str);
-    ostream << obj;
-  }
-  return str;
-}
 } // namespace poptorch_ir
 
 #endif // POPTORCH_TRANSFORMS_PASS_UTILS_HPP_

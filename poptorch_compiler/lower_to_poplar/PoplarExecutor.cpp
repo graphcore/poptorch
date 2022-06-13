@@ -2,66 +2,28 @@
 
 #include "lower_to_poplar/PoplarExecutor.hpp"
 
-#include <mlir/IR/BuiltinOps.h>
-#include <mlir/IR/MLIRContext.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/Timing.h>
-#include <mlir/Transforms/Passes.h>
 
 #include <utility>
 
-#include <passes/CommonPasses.hpp>
 #include <poplar/Device.hpp>
-#include <poplar/DeviceManager.hpp>
 #include <poplar/Engine.hpp>
 #include <poplar/Graph.hpp>
-#include <poplar/IPUModel.hpp>
 #include <poplar/Target.hpp>
 
-#include "../CompilerHelpers.hpp"
+#include "CompilerHelpers.hpp"
+#include "lower_to_poplar/IMlirGraphConverter.hpp"
+#include "lower_to_poplar/NonRestartingMlirTimer.hpp"
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
+#include "passes/CommonPasses.hpp"
 #include "passes/LowerToPoplar.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
-#include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch_ir {
 namespace detail {
-
-namespace {
-
-// Implementation of LLVM's ostream which prints
-// to poptorch::logging::trace
-class LLVMStreamToTrace : public llvm::raw_ostream {
-public:
-  LLVMStreamToTrace() {
-    // Don't buffer otherwise the calls might be printed out of order:
-    // for example if the LLVM stream is used to print the graph before
-    // and after passes but the pass prints messages using poptorch::logging.
-    SetUnbuffered();
-  }
-  void write_impl(const char *ptr, size_t size) override {
-    for (size_t i = 0; i < size; ++i, ++ptr) {
-      // If we have an entire line: print it.
-      if (*ptr == '\n') {
-        poptorch::logging::trace("{}", _buf);
-        _buf.clear();
-      } else {
-        _buf += *ptr;
-      }
-    }
-    _pos += size;
-  }
-
-  uint64_t current_pos() const override { return _pos; }
-
-private:
-  uint64_t _pos;
-  std::string _buf;
-};
-
-} // namespace
 
 class PoplarExecutableImpl {
 public:
@@ -79,26 +41,22 @@ PoplarExecutableImpl::PoplarExecutableImpl(std::unique_ptr<poplar::Engine> e)
 
 } // namespace detail
 
-NonRestartingMlirTimer::NonRestartingMlirTimer(mlir::Timer &&timer)
-    : _running(new bool(false)), _timer(new mlir::Timer(timer)) {}
+namespace {
+class MlirToPoplarConverter final : public IMlirGraphConverter {
+public:
+  explicit MlirToPoplarConverter(CompilerContext &context)
+      : _context(context) {}
 
-void NonRestartingMlirTimer::start() {
-  if (!(*_running)) {
-    _timer->start();
+protected:
+  void addCustomPasses(mlir::PassManager &manager) override {
+    manager.addPass(createLowerToPoplarPass(_context));
   }
-  *_running = true;
-}
 
-void NonRestartingMlirTimer::stop() {
-  if ((*_running)) {
-    _timer->stop();
-  }
-  *_running = false;
-}
+private:
+  CompilerContext &_context;
+};
 
-mlir::TimingScope NonRestartingMlirTimer::nestAndScope(const char *name) {
-  return mlir::TimingScope(_timer->nest(name));
-}
+} // namespace
 
 void PoplarExecutor::load(const PoplarDevice &device) {
   _impl->engine->load(device.device());
@@ -138,8 +96,6 @@ PoplarExecutor::~PoplarExecutor() {}
 PoplarExecutor compileExecutable(mlir::ModuleOp module,
                                  const PoplarTarget &target,
                                  NonRestartingMlirTimer &timer) {
-  mlir::PassManager manager{module.getContext()};
-
   // The graph and sequence need to be stored outside the compiler context
   // because for PopIT we create a context inside each op handler but we
   // want them to share the graph and sequence.
@@ -147,47 +103,13 @@ PoplarExecutor compileExecutable(mlir::ModuleOp module,
   poplar::program::Sequence seq;
   CompilerContext context(graph, seq);
 
-  auto graph_construction = timer.nestAndScope("Poplar graph construction");
-  manager.enableTiming(graph_construction);
-  // Disable MLIR pass verification as we have our own definition of
-  // valid IR state
-  manager.enableVerifier(false);
-  detail::LLVMStreamToTrace output;
+  MlirToPoplarConverter converter(context);
+  converter.convertGraph(module, timer);
 
-  // If Poptorch's TRACE logging level is enabled then print the graph
-  // in between passes.
-  if (poptorch::logging::shouldLog(poptorch::logging::Level::Trace)) {
-    // LLVM's printing doesn't work if multi-threading is enabled.
-    module.getContext()->disableMultithreading();
-    mlir::OpPrintingFlags flags{};
-    // enableDebugInfo = add location() at the end of each line.
-    // pretty = true -> Print the actual filename:line:col rather than loc0,
-    // loc1, etc which are IDs in the mlir::SourceManager.
-    flags.enableDebugInfo(/* prettyForm=*/true);
-    manager.enableIRPrinting([](mlir::Pass * /*unused*/,
-                                mlir::Operation * /*unused*/) { return true; },
-                             [](mlir::Pass * /*unused*/,
-                                mlir::Operation * /*unused*/) { return true; },
-                             /*printModuleScope =*/true,
-                             /* printAfterOnlyOnChange =*/true,
-                             /* printAfterOnlyOnFailure =*/true, output, flags);
-  }
-
-  manager.addPass(mlir::createCanonicalizerPass());
-  // TODO(T61603) Figure out why MLIR's DCE pass doesn't do the same as our
-  // RemoveUnusedOperationsPass.
-  // manager.addPass(mlir::createSymbolDCEPass());
-  manager.addPass(createRemoveUnusedOperationsPass());
-  manager.addPass(createLowerToPoplarPass(context));
-
-  if (mlir::succeeded(manager.run(module))) {
-    graph_construction.stop();
-    auto compile_poplar = timer.nestAndScope("Compiling poplar");
-    auto engine =
-        std::make_unique<poplar::Engine>(context.graph, context.programs);
-    compile_poplar.stop();
-    return PoplarExecutor(std::move(engine));
-  }
-  ERROR("One or more passes failed.");
+  auto compile_poplar = timer.nestAndScope("Compiling poplar");
+  auto engine =
+      std::make_unique<poplar::Engine>(context.graph, context.programs);
+  compile_poplar.stop();
+  return PoplarExecutor(std::move(engine));
 }
 } // namespace poptorch_ir

@@ -9,10 +9,6 @@ template <typename T> class OperationPass;
 class ModuleOp;
 } // namespace mlir
 
-namespace poplar {
-class Graph;
-} // namespace poplar
-
 namespace poptorch_ir {
 
 class CompilerContext;

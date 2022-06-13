@@ -11,6 +11,16 @@ namespace detail {
 
 namespace {
 
+// Convert any MLIR object to string.
+template <typename T> std::string mlirToStr(const T &obj) {
+  std::string str;
+  {
+    llvm::raw_string_ostream ostream(str);
+    ostream << obj;
+  }
+  return str;
+}
+
 mlir::LogicalResult printDiagnostic(mlir::Diagnostic &d) {
   poptorch::logging::Level lvl;
   switch (d.getSeverity()) {

@@ -1,4 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include "passes/LowerToPoplar.hpp"
+
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -8,7 +10,6 @@
 #include "mlir/Pass/PassManager.h"
 
 #include "../CompilerHelpers.hpp"
-#include "passes/LowerToPoplar.hpp"
 #include "passes/PassUtils.hpp"
 
 #include <poplar/Graph.hpp>
@@ -44,35 +45,16 @@ private:
   CompilerContext *_context;
 };
 
-// Poplar keeps the size and shape as two distinct concepts.
-struct PoplarTypePair {
-  poplar::Type element_type;
-  std::vector<std::size_t> shape;
-};
-
-PoplarTypePair processType(mlir::Type mlirType) {
-  // Turn it into a ranked tensor.
-  mlir::RankedTensorType tensor_type = mlirType.cast<mlir::RankedTensorType>();
-  mlir::Type element_type = tensor_type.getElementType();
-
-  // Extract the element type of the tensor.
-  poplar::Type type = elementTypeFromMLIR(element_type);
-
-  // Convert the dimensions into something poplar understands.
-  std::vector<std::size_t> dims;
-  for (int64_t dim : tensor_type.getShape()) {
-    dims.push_back(dim);
-  }
-
-  return {type, dims};
-}
-
 void LowerToPoplar::runOnOperation() {
   mlir::ModuleOp module = this->getOperation();
 
   poptorch::logging::info("Graph lowered to poplar:\n{}", mlirOpToStr(module));
 
+  bool first_function = true;
   for (mlir::FuncOp function : module.getOps<mlir::FuncOp>()) {
+    ERROR_ON_MSG(!first_function, "More than one function in the module");
+    first_function = false;
+
     verifyOperations(function);
     _context->seq = poplar::program::Sequence();
 
@@ -134,92 +116,7 @@ void LowerToPoplar::verifyOperations(const mlir::FuncOp &function) {
     }
   }
 }
-
-std::string toString(const std::vector<std::size_t> &shape,
-                     const poplar::Type &type) {
-  std::stringstream ss;
-  ss << type << "[";
-  std::string sep{};
-  for (const auto &s : shape) {
-    ss << sep << s;
-    sep = ", ";
-  }
-  ss << "]";
-  return ss.str();
-}
 } // namespace
-
-void CompilerContext::addTensor(const mlir::Value &value,
-                                const poplar::Tensor &tensor,
-                                bool update_if_present) {
-  auto mlir_type = processType(value.getType());
-  std::string mlir_shape = toString(mlir_type.shape, mlir_type.element_type);
-  std::string poplar_shape = toString(tensor.shape(), tensor.elementType());
-  ERROR_ON_MSG(mlir_shape != poplar_shape,
-               "The shape of the Poplar tensor "
-                   << poplar_shape
-                   << " doesn't match the shape of the MLIR tensor it's "
-                      "associated with: "
-                   << mlir_shape << " for " << mlirToStr(value));
-
-  if (update_if_present) {
-    _tensors[value] = tensor;
-  } else {
-    auto res = _tensors.insert({value, tensor});
-    ERROR_ON_MSG(!res.second,
-                 "[Internal] Tensor already present for " << mlirToStr(value));
-  }
-}
-
-// Get the poplar tensor which corresponds to a specific value of MLIR.
-poplar::Tensor CompilerContext::fromSsa(mlir::Value value) {
-  auto itr = _tensors.find(value);
-  if (itr != _tensors.end()) {
-    return itr->second;
-  }
-
-  const PoplarTypePair tensor_type = processType(value.getType());
-
-  // Actually add the tensor to the graph.
-  poplar::Tensor tensor =
-      this->graph.addVariable(tensor_type.element_type, tensor_type.shape,
-                              poplar::VariableMappingMethod::LINEAR);
-
-  addTensor(value, tensor);
-  return tensor;
-}
-
-std::vector<poplar::Tensor>
-CompilerContext::fromSsa(mlir::ValueRange value_range) {
-  std::vector<poplar::Tensor> poplar_tensors;
-
-  for (mlir::Value value : value_range) {
-    poplar_tensors.push_back(fromSsa(value));
-  }
-
-  return poplar_tensors;
-}
-
-poplar::Tensor &CompilerContext::getRandomSeed() {
-  // NOTE: This mechanism is a temporary workaround while TODO(T51096) remains
-  //       unresolved, to handle loading, saving & restoring of the seed.
-  if (!_randomSeed) {
-    _randomSeed = graph.addVariable(poplar::UNSIGNED_INT, {2},
-                                    poplar::VariableMappingMethod::LINEAR);
-    popops::fill(graph, *_randomSeed, seq, 42);
-  }
-
-  return *_randomSeed;
-}
-
-poplar::Type CompilerContext::poplarTypeOf(mlir::Type elementType) {
-  return elementTypeFromMLIR(elementType);
-}
-
-poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
-                                  mlir::Type mlirType) {
-  return src.reshape(processType(mlirType).shape);
-}
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
 createLowerToPoplarPass(CompilerContext &context) {

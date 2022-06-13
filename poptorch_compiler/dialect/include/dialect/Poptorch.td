@@ -40,6 +40,12 @@ def Poptorch_copy_to_host: Poptorch_StreamCopy<"copy_to_host"> {
     let summary = "Copy tensor to host.";
 }
 
+def Poptorch_output_tensor: Poptorch_AbstractOp<"output_tensor", []> {
+    let arguments = (ins Poptorch_tensor:$tensor, I64Attr:$tensorId);
+    let assemblyFormat = [{`(` $tensor `,` $tensorId`)` `(`type($tensor)`)` attr-dict }];
+    let summary = "Mark a tensor as being an output.";
+}
+
 #endif // POPTORCH_OPS
 
 
