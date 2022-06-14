@@ -38,6 +38,7 @@ public:
   PoplarTarget getTarget() const;
 
   const poplar::Device &device() const;
+  poplar::Device &device();
 
   // Return the default device, taking into account environment variables
   static PoplarDevice defaultDevice();

@@ -2,7 +2,7 @@
 
 import torch
 from poptorch import *  # pylint: disable=wildcard-import
-import poptorch_core
+from . import poptorch_core
 
 # Hack so that print() works: Torch's print does a lot of slicing
 # and select on the tensor before moving it to the CPU.

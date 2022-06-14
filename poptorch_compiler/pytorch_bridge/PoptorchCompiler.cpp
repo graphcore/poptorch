@@ -25,13 +25,16 @@ PoptorchCompiler::~PoptorchCompiler() {
 
 void PoptorchCompiler::init(ExecutionType execution_type,
                             CompilerBackend compiler_backend) {
-  ERROR_ON_MSG(execution_type != ExecutionType::StaticGraph,
-               "Only ExecutionMode::StaticGraph supported for now");
   ERROR_ON_MSG(compiler_backend != CompilerBackend::Poplar,
                "Only CompilerBackend::Poplar supported for now");
-  if (execution_type == ExecutionType::StaticGraph &&
-      compiler_backend == CompilerBackend::Poplar) {
-    _impl = std::make_unique<detail::MLIRStaticGraphBuilder>();
+
+  if (compiler_backend == CompilerBackend::Poplar) {
+    if (execution_type == ExecutionType::StaticGraph) {
+      _impl = std::make_unique<detail::MLIRStaticGraphBuilder>();
+    } else if (execution_type == ExecutionType::EagerMode) {
+      PoplarDevice device = PoplarDevice::defaultDevice();
+      _impl = std::make_unique<detail::MLIREagerBuilder>(device);
+    }
   }
   ERROR_ON(_impl == nullptr);
 }

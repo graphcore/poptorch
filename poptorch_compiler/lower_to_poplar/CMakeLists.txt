@@ -4,6 +4,7 @@ add_library(lower_to_poplar STATIC
         NonRestartingMlirTimer.cpp
         PoplarDeviceAndTarget.cpp
         PoplarExecutor.cpp
+        PopitExecutor.cpp
         ops/Activations.cpp
         ops/ElementWise.cpp
         ops/Linalg.cpp
@@ -15,6 +16,7 @@ add_library(lower_to_poplar STATIC
         ops/Reductions.cpp
         ops/Reshapes.cpp
         ops/TensorOps.cpp
+        passes/LowerToPopit.cpp
         passes/LowerToPoplar.cpp)
 
 
@@ -22,6 +24,7 @@ target_include_directories(lower_to_poplar PUBLIC include)
 
 find_package(model_runtime REQUIRED)
 find_package(popef REQUIRED)
+find_package(popit REQUIRED)
 
 # Poplar requires exceptions and LLVM disables them for efficiency so we can't
 # use the nice MLIR cmake functions here.
@@ -33,6 +36,7 @@ target_link_libraries(lower_to_poplar PRIVATE
 
         model_runtime
         popef
+        popit::popit
         poplar
         popops
         poprand

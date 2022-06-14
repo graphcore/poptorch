@@ -1,6 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "PoptorchCompilerImpl.hpp"
 
+#include <deque>
 #include <vector>
 
 #include "passes/PassUtils.hpp"
@@ -160,6 +161,17 @@ void PoptorchCompilerImpl::resetMainGraph() {
   }
 }
 
+llvm::DenseMap<mlir::Value, TensorId> PoptorchCompilerImpl::getValueMappings() {
+  llvm::DenseMap<mlir::Value, TensorId> mappings;
+  for (std::uint64_t i = 0; i < _value_map.size(); ++i) {
+    if (_value_map.at(i)) {
+      ERROR_ON_MSG(!mappings.try_emplace(_value_map.at(i), i).second,
+                   "Value mapped to more than one TensorId");
+    }
+  }
+  return mappings;
+}
+
 bool PoptorchCompilerImpl::allOpsCanBeLoweredToPoplar() const {
   return _main_graph.all_ops_can_be_lowered;
 }
@@ -172,6 +184,8 @@ PoptorchCompilerImpl::createSubGraph(const std::string &name) {
   sub.graph.addEntryBlock();
   return sub;
 }
+
+MLIREagerBuilder::MLIREagerBuilder(PoplarDevice &device) : _executor(device) {}
 
 TensorId MLIREagerBuilder::addValue(const mlir::Value &value) {
   ERROR_ON(!value);
@@ -192,39 +206,64 @@ mlir::Value MLIREagerBuilder::findValue(TensorId tensor) {
 
 void MLIREagerBuilder::compileRunAndReset() {
   root_timer.start();
-  // TODO(T57253) compile & run.
+
+  auto mappings = getValueMappings();
+
+  std::deque<mlir::Value> outputs;
+  // Find all the outputs of all the ops as graph outputs
+  _main_graph.graph.walk([&](mlir::Operation *op) {
+    if (!op->hasTrait<PoplarImplInterface::Trait>()) {
+      return;
+    }
+    for (auto result : op->getResults()) {
+      outputs.push_back(result);
+    }
+  });
+
+  // Add them all as graph outputs
+  for (auto &output : outputs) {
+    auto it = mappings.find(output);
+    if (it == mappings.end()) {
+      poptorch::logging::trace(
+          "No tensor ID mapping for {}: not marking as output",
+          mlirToStr(output));
+    } else {
+      createOp<poptorch_ir::output_tensor>(output, it->second);
+    }
+  }
+
+  _executor.compileAndRun(_the_module, root_timer, mappings);
   resetMainGraph();
 
   root_timer.stop();
   timing_manager.setEnabled(false);
 }
 
-TensorId MLIREagerBuilder::addInput(const Buffer & /*ptr*/,
+TensorId MLIREagerBuilder::addInput(const Buffer &ptr,
                                     const mlir::RankedTensorType &input,
                                     const char *name) {
   UNUSED(name);
   TensorId id = PoptorchCompilerImpl::addValue(mlir::Value());
   _tensor_map.push_back(input);
-  //_executor.addInput(ptr, input, id);
+  _executor.addInput(ptr, input, id);
 
   return id;
 }
 
-TensorId MLIREagerBuilder::addParameter(const Buffer & /*ptr*/,
+TensorId MLIREagerBuilder::addParameter(const Buffer &ptr,
                                         const mlir::RankedTensorType &parameter,
                                         const char *name) {
   UNUSED(name);
   TensorId id = PoptorchCompilerImpl::addValue(mlir::Value());
   _tensor_map.push_back(parameter);
-  //_executor.addInput(ptr, parameter, id);
+  _executor.addInput(ptr, parameter, id);
   return id;
 }
 
-void MLIREagerBuilder::addOutput(void * /*ptr*/, TensorId /*id*/,
-                                 const char *name) {
+void MLIREagerBuilder::addOutput(void *ptr, TensorId id, const char *name) {
   UNUSED(name);
   compileRunAndReset();
-  //_executor.readOutput(id, ptr);
+  _executor.readOutput(id, ptr);
 }
 
 void MLIREagerBuilder::onOpAdded() { compileRunAndReset(); }

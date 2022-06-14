@@ -70,6 +70,8 @@ PoplarDevice::~PoplarDevice() = default;
 
 const poplar::Device &PoplarDevice::device() const { return _device->device(); }
 
+poplar::Device &PoplarDevice::device() { return _device->device(); }
+
 PoplarDevice PoplarDevice::defaultDevice() {
   return PoplarDevice(getDefaultDevice());
 }

@@ -27,6 +27,7 @@
 
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/NonRestartingMlirTimer.hpp"
+#include "lower_to_poplar/PopitExecutor.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -309,6 +310,8 @@ protected:
     return op;
   }
 
+  llvm::DenseMap<mlir::Value, TensorId> getValueMappings();
+
 public:
   // We need to maintain some MLIR state.
   // The global context.
@@ -372,6 +375,7 @@ public:
 
 class MLIREagerBuilder : public PoptorchCompilerImpl {
 public:
+  explicit MLIREagerBuilder(PoplarDevice &device);
   virtual ~MLIREagerBuilder() = default;
 
   TensorId addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
@@ -389,6 +393,7 @@ public:
 
 private:
   std::vector<mlir::RankedTensorType> _tensor_map;
+  PopitExecutor _executor;
 };
 
 } // namespace detail
