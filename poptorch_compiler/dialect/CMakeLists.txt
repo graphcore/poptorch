@@ -15,6 +15,7 @@ include_directories(PRIVATE
 
 add_mlir_dialect_library(poptorch_dialect
     PoptorchDialect.cpp
+    ops/NormOpsHelpers.cpp
   DEPENDS
     MLIRPoptorchIncGen
     MLIRPoptorchInterfacesIncGen

@@ -104,6 +104,48 @@ def Poptorch_group_norm : Poptorch_Op<"group_norm",
   }]>];
 }
 
+// aten::native_layer_norm(Tensor input, int[] normalized_shape, Tensor? weight,
+// Tensor? bias, float eps) -> (Tensor, Tensor, Tensor)
+def Poptorch_layer_norm : Poptorch_Op<"layer_norm",
+                                       [AttrSizedOperandSegments]> {
+  let arguments = (ins Poptorch_tensor:$input,
+                   I64ArrayAttr:$normalized_shape,
+                   Optional<Poptorch_tensor>:$weight,
+                   Optional<Poptorch_tensor>:$bias,
+                   F32Attr:$epsilon);
+  let results = (outs Poptorch_tensor:$result, Poptorch_tensor:$mean,
+                      Poptorch_tensor:$rstd);
+  let builders = [OpBuilder<(ins "mlir::Value":$input,
+                                    "const std::vector<std::int64_t>&":$normalized_shape,
+                                    "mlir::Value":$weight,
+                                    "mlir::Value":$bias,
+                                    "float":$epsilon), [{
+    std::vector<mlir::Value> operands = {input};
+
+    // These segments represent the optional tensors in the order they appear in the arguments.
+    // For each segment, 1 indicates a value has been passed for that argument, otherwise 0
+    // indicates a nullopt
+    // All operands must have a value: 1 for non optional/variadic
+    std::vector<std::int32_t> segments = {1, 0, 0};
+
+    auto [m_dim, n_dim, stat_shape] = checkAndGetLayerNormDimsOperandsAndSegs(
+      operands, segments, input, normalized_shape, weight, bias);
+    $_state.addOperands(operands);
+
+    $_state.addAttribute("normalized_shape",$_builder.getI64ArrayAttr(normalized_shape));
+    $_state.addAttribute("stat_shape",$_builder.getI64ArrayAttr(stat_shape));
+    $_state.addAttribute("m_dim",$_builder.getI64IntegerAttr(m_dim));
+    $_state.addAttribute("n_dim",$_builder.getI64IntegerAttr(n_dim));
+    $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
+    $_state.addAttribute("operand_segment_sizes",
+      $_builder.getI32VectorAttr(segments));
+
+    auto stat_type = mlir::RankedTensorType::get(
+          stat_shape, input.getType().cast<mlir::RankedTensorType>().getElementType());
+    $_state.addTypes({input.getType(), stat_type, stat_type});
+  }]>];
+}
+
 // aten::native_batch_norm_backward(Tensor grad_out, Tensor input,
 //                                  Tensor? weight, Tensor? running_mean,
 //                                  Tensor? running_var, Tensor? save_mean,
@@ -268,21 +310,75 @@ def Poptorch_group_norm_backward: Poptorch_Op<"group_norm_backward",
   }]>];
 }
 
-def Poptorch_layer_norm : Poptorch_NotImplementedOp<"layer_norm", [AttrSizedOperandSegments]> {
-  let arguments = (ins Poptorch_tensor:$input,
-                        I64ArrayAttr:$normalized_shape,
-                        Optional<Poptorch_tensor>:$weight,
-                        Optional<Poptorch_tensor>:$bias,
-                        F32Attr:$epsilon);
-  let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilder<(ins "mlir::Value":$input,
-                                    "const std::vector<std::int64_t>&":$normalized_shape,
-                                    "mlir::Value":$weight,
-                                    "mlir::Value":$bias,
-                                    "float":$epsilon), [{
-    $_state.addOperands({input, weight, bias});
+// aten::native_layer_norm_backward(Tensor grad_out, Tensor input,
+//                                  int[] normalized_shape, Tensor mean,
+//                                  Tensor rstd, Tensor? weight, Tensor? bias,
+//                                  bool[3] output_mask) -> (Tensor, Tensor, Tensor)
+def Poptorch_layer_norm_backward: Poptorch_Op<"layer_norm_backward",
+                                               [AttrSizedOperandSegments,
+                                                AttrSizedResultSegments]> {
+  let arguments = (ins Poptorch_tensor:$grad_out,
+                       Poptorch_tensor:$input,
+                       I64ArrayAttr:$normalized_shape,
+                       Poptorch_tensor:$mean,
+                       Poptorch_tensor:$rstd,
+                       Optional<Poptorch_tensor>:$weight,
+                       Optional<Poptorch_tensor>:$bias,
+                       I64ArrayAttr:$output_mask);
+  let results = (outs Optional<Poptorch_tensor>:$grad_input,
+                      Optional<Poptorch_tensor>:$grad_weight,
+                      Optional<Poptorch_tensor>:$grad_bias);
+  let builders = [OpBuilder<(ins "mlir::Value":$grad_out,
+                                 "mlir::Value":$input,
+                                 "const std::vector<std::int64_t>&":$normalized_shape,
+                                 "mlir::Value":$mean,
+                                 "mlir::Value":$rstd,
+                                 "mlir::Value":$weight,
+                                 "mlir::Value":$bias,
+                                 "const std::vector<std::int64_t>":$output_mask), [{
+    std::vector<mlir::Value> operands = {grad_out, input, mean, rstd};
+
+    // These segments represent the optional tensors in the order they appear in the arguments.
+    // For each segment, 1 indicates a value has been passed for that argument, otherwise 0
+    // indicates a nullopt
+    // All operands must have a value: 1 for non optional/variadic
+    std::vector<std::int32_t> segments = {1, 1, 1, 1, 0, 0};
+
+    auto [m_dim, n_dim, stat_shape] = checkAndGetLayerNormDimsOperandsAndSegs(
+      operands, segments, input, normalized_shape, weight, bias);
+
+    $_state.addOperands(operands);
+    $_state.addAttribute("operand_segment_sizes", $_builder.getI32VectorAttr(segments));
+
     $_state.addAttribute("normalized_shape",$_builder.getI64ArrayAttr(normalized_shape));
-    $_state.addAttribute("epsilon",$_builder.getF32FloatAttr(epsilon));
-    $_state.addTypes(input.getType());
-  }]>];
+    $_state.addAttribute("stat_shape",$_builder.getI64ArrayAttr(stat_shape));
+    $_state.addAttribute("m_dim",$_builder.getI64IntegerAttr(m_dim));
+    $_state.addAttribute("n_dim",$_builder.getI64IntegerAttr(n_dim));
+    $_state.addAttribute("output_mask",
+                          $_builder.getI64ArrayAttr(output_mask));
+
+    // These segments represent the optional tensors in the order they
+    // appear in the return values.
+    // For each segment, 1 indicates a value has been returned
+    // otherwise 0 indicates no tensor returned.
+    std::vector<int32_t> output_mask_32(output_mask.begin(), output_mask.end());
+
+    $_state.addAttribute("result_segment_sizes",
+                         $_builder.getI32VectorAttr(output_mask_32));
+
+    std::vector<mlir::Type> returns;
+    if(output_mask[0]) {
+      returns.push_back(input.getType());
+    }
+    if(output_mask[1]) {
+      ERROR_ON(!weight);
+      returns.push_back(weight.getType());
+    }
+    if(output_mask[2]) {
+      ERROR_ON(!bias);
+      returns.push_back(bias.getType());
+    }
+    $_state.addTypes(returns);
+}]>];
+
 }
