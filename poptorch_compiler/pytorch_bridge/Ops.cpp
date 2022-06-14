@@ -1,5 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "PoptorchCompilerImpl.hpp"
+#include "IMLIRCompiler.hpp"
 #include "poptorch_logging/Logging.hpp"
 #include "pytorch_bridge/PoptorchCompiler.hpp"
 
@@ -10,14 +10,13 @@
 namespace poptorch_ir {
 
 namespace {
-template <typename T>
-T convert(T a, detail::PoptorchCompilerImpl & /*unused*/) {
+template <typename T> T convert(T a, detail::IMLIRCompiler & /*unused*/) {
   return a;
 }
 
 [[maybe_unused]] llvm::SmallVector<mlir::Value, 4>
 convert(const std::vector<poptorch_ir::TensorId> &inputs,
-        detail::PoptorchCompilerImpl &compiler) {
+        detail::IMLIRCompiler &compiler) {
   llvm::SmallVector<mlir::Value, 4> tmp;
   for (TensorId id : inputs) {
     tmp.push_back(compiler.findValue(id));
@@ -26,7 +25,7 @@ convert(const std::vector<poptorch_ir::TensorId> &inputs,
 }
 
 mlir::Value convert(poptorch_ir::TensorId input,
-                    detail::PoptorchCompilerImpl &compiler) {
+                    detail::IMLIRCompiler &compiler) {
   if (input == poptorch_ir::tensor_error_id || input == poptorch_ir::none_id) {
     return {};
   }

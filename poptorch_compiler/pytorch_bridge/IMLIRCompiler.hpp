@@ -1,23 +1,12 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#ifndef POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_IMPL_HPP_
-#define POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_IMPL_HPP_
-
-#include <mlir/IR/DialectImplementation.h>
-#include <mlir/IR/Location.h>
-#include <mlir/IR/MLIRContext.h>
-#include <mlir/Support/Timing.h>
-
-#include <llvm/ADT/StringSwitch.h>
-#include <mlir/IR/Attributes.h>
-#include <mlir/IR/BuiltinTypes.h>
-#include <mlir/IR/ImplicitLocOpBuilder.h>
-#include <mlir/IR/TypeSupport.h>
-#include <mlir/IR/Types.h>
-
-#include <llvm/ADT/DenseMap.h>
-#include <mlir/IR/Value.h>
+#ifndef POPTORCH_COMPILER_PYTORCH_BRIDGE_IMLIR_COMPILER_HPP_
+#define POPTORCH_COMPILER_PYTORCH_BRIDGE_IMLIR_COMPILER_HPP_
 
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/ImplicitLocOpBuilder.h>
+#include <mlir/IR/Types.h>
+#include <mlir/IR/Value.h>
+#include <mlir/Support/Timing.h>
 
 #include <algorithm>
 #include <string>
@@ -27,15 +16,21 @@
 
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
-#include "lower_to_poplar/PopitExecutor.hpp"
-#include "lower_to_poplar/PoplarExecutor.hpp"
-#include "poptorch_logging/Error.hpp"
-#include "poptorch_logging/Logging.hpp"
-#include "pytorch_bridge/PoptorchCompiler.hpp"
+#include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch_ir {
 
 namespace detail {
+
+// Convert any MLIR object to string.
+template <typename T> std::string mlirToStr(const T &obj) {
+  std::string str;
+  {
+    llvm::raw_string_ostream ostream(str);
+    ostream << obj;
+  }
+  return str;
+}
 
 // Returns the element type of an MLIR value.
 mlir::Type getElementType(const mlir::Value &value);
@@ -218,11 +213,10 @@ OpTy implicitCastAndCreate(mlir::ImplicitLocOpBuilder &builder,
                                          std::forward_as_tuple(args...)));
 }
 
-// TODO(T57253): rename to IMLIRGraphBuilder?
-class PoptorchCompilerImpl {
+class IMLIRCompiler {
 public:
-  PoptorchCompilerImpl();
-  virtual ~PoptorchCompilerImpl() = default;
+  IMLIRCompiler();
+  virtual ~IMLIRCompiler() = default;
 
   mlir::Type convertType(Type type);
 
@@ -343,61 +337,8 @@ protected:
   mlir::ModuleOp _the_module;
 };
 
-class MLIRStaticGraphBuilder : public PoptorchCompilerImpl {
-public:
-  MLIRStaticGraphBuilder();
-  virtual ~MLIRStaticGraphBuilder() = default;
-  // Compile graph by running both PopTorch compiler passes and poplar
-  // compilation.
-  poptorch_ir::PoplarExecutor compile(const PoplarTarget &target);
-  TensorId addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
-                    const char *name) override;
-
-  TensorId addParameter(const Buffer &ptr,
-                        const mlir::RankedTensorType &parameter,
-                        const char *name) override;
-  void addOutput(void *ptr, TensorId id, const char *name) override;
-  void addReturn() override;
-
-private:
-  // Program to write weights onto the chip.
-  Graph _write_weights_graph;
-
-  // Program to read weights off the chip.
-  Graph _read_weights_graph;
-
-public:
-  // Input and output callbacks to give to poplar.
-  std::vector<std::pair<std::string, Buffer>> input_callbacks;
-  std::vector<std::pair<std::string, void *>> output_callbacks;
-  std::vector<std::pair<std::string, Buffer>> weight_callbacks;
-};
-
-class MLIREagerBuilder : public PoptorchCompilerImpl {
-public:
-  explicit MLIREagerBuilder(PoplarDevice &device);
-  virtual ~MLIREagerBuilder() = default;
-
-  TensorId addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
-                    const char *name) override;
-
-  TensorId addParameter(const Buffer &ptr,
-                        const mlir::RankedTensorType &parameter,
-                        const char *name) override;
-  void addOutput(void *ptr, TensorId id, const char *name) override;
-  void addReturn() override;
-  void onOpAdded() override;
-  TensorId addValue(const mlir::Value &value) override;
-  mlir::Value findValue(TensorId tensor) override;
-  void compileRunAndReset();
-
-private:
-  std::vector<mlir::RankedTensorType> _tensor_map;
-  PopitExecutor _executor;
-};
-
 } // namespace detail
 
 } // namespace poptorch_ir
 
-#endif // POPTORCH_COMPILER_PYTORCH_BRIDGE_COMPILER_IMPL_HPP_
+#endif // POPTORCH_COMPILER_PYTORCH_BRIDGE_IMLIR_COMPILER_HPP_

@@ -7,9 +7,12 @@
 
 #include <utility>
 
-#include "PoptorchCompilerImpl.hpp"
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
+
+#include "IMLIRCompiler.hpp"
+#include "MLIREagerCompiler.hpp"
+#include "MLIRStaticGraphCompiler.hpp"
 
 namespace poptorch_ir {
 
@@ -30,10 +33,10 @@ void PoptorchCompiler::init(ExecutionType execution_type,
 
   if (compiler_backend == CompilerBackend::Poplar) {
     if (execution_type == ExecutionType::StaticGraph) {
-      _impl = std::make_unique<detail::MLIRStaticGraphBuilder>();
+      _impl = std::make_unique<detail::MLIRStaticGraphCompiler>();
     } else if (execution_type == ExecutionType::EagerMode) {
       PoplarDevice device = PoplarDevice::defaultDevice();
-      _impl = std::make_unique<detail::MLIREagerBuilder>(device);
+      _impl = std::make_unique<detail::MLIREagerCompiler>(device);
     }
   }
   ERROR_ON(_impl == nullptr);
@@ -118,14 +121,14 @@ bool PoptorchCompiler::allOpsCanBeLoweredToPoplar() const {
 }
 
 void PoptorchCompiler::compileRunAndReset() {
-  auto *compiler = dynamic_cast<detail::MLIREagerBuilder *>(_impl.get());
+  auto *compiler = dynamic_cast<detail::MLIREagerCompiler *>(_impl.get());
   ERROR_ON_MSG(compiler == nullptr,
                "[Internal] Only eager builders can compileRunAndReset()");
   compiler->compileRunAndReset();
 }
 
 PoplarExecutorWrapper PoptorchCompiler::compileAndLoad() {
-  auto *compiler = dynamic_cast<detail::MLIRStaticGraphBuilder *>(_impl.get());
+  auto *compiler = dynamic_cast<detail::MLIRStaticGraphCompiler *>(_impl.get());
   ERROR_ON_MSG(compiler == nullptr,
                "[Internal] Only static graph builders can compileAndLoad()");
   ERROR_ON_MSG(

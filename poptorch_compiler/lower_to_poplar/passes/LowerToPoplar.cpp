@@ -1,5 +1,7 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "passes/LowerToPoplar.hpp"
+#include "LowerToPoplar.hpp"
+
+#include <string>
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -14,7 +16,6 @@
 
 #include <poplar/Graph.hpp>
 #include <poplar/Program.hpp>
-
 #include <popops/Fill.hpp>
 #include <poprand/RandomGen.hpp>
 

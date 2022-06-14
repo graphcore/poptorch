@@ -18,7 +18,7 @@ class Operation;
 namespace poptorch_ir {
 
 namespace detail {
-class PoptorchCompilerImpl;
+class IMLIRCompiler;
 } // namespace detail
 
 enum class ExecutionType { StaticGraph, EagerMode };
@@ -80,7 +80,7 @@ public:
 private:
   mlir::RankedTensorType getRankedTensorType(TensorId id) const;
 
-  std::unique_ptr<detail::PoptorchCompilerImpl> _impl;
+  std::unique_ptr<detail::IMLIRCompiler> _impl;
 };
 
 } // namespace poptorch_ir
