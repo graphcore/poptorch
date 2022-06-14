@@ -113,8 +113,7 @@ std::stack<torch::jit::Node *> start_for_loop_nodes;
  * for loops. If they have a tensor which comes from the subgraph
  * above we must add a specific input entry op to the graph for that op.
  */
-void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node,
-                       bool training) {
+void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node) {
   logging::LogContext ctx_func("annotateSubgraphs Processing");
   // Subgraph start to all nodes contained directly within that subgraph.
   std::stack<Subgraph> subgraph_nodes;
@@ -131,8 +130,6 @@ void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node,
     const torch::jit::Symbol kind = node->kind();
 
     if (kind == symbols::poptorch::start_for_loop) {
-      ERROR_ON_MSG(training,
-                   "poptorch.for_loop() is only supported in inference.");
       // Start tracking the new subgraph.
       subgraph_nodes.push(Subgraph());
 
@@ -206,9 +203,7 @@ void annotateSubgraphsDispatch(torch::jit::Graph *graph,
     }
 
     if (start_for_loop_nodes.size() == 1) {
-      // TODO(T51159): Add support for dispatch tracing + training.
-      // Currently we just pass training = false to annotateSubgraphs.
-      annotateSubgraphs(graph, start_node, /*training=*/false);
+      annotateSubgraphs(graph, start_node);
     }
 
     start_for_loop_nodes.pop();

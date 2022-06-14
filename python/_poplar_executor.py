@@ -128,8 +128,6 @@ class PoplarExecutor:
         options.Precision.autocast_policy.apply(self._user_model, options)
 
         if training:
-            # TODO(T51159): Add support for dispatch tracing + training.
-            assert options.Jit.trace_model, "training not supported for now"
             self._attribute_tracker = \
                     _optimizer_attributes.OptimizerAttrTracker(
                         options)
@@ -571,7 +569,9 @@ class PoplarExecutor:
             ctx = IPUContext(model,
                              compiler=enums.Compiler.PopART,
                              model=model,
-                             options=self._options)
+                             options=self._options,
+                             training=self._training,
+                             dict_optimizer=self._dict_optimizer)
             ctx.compile(*in_tensors.asTuple())
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
         self._error_on_buffer_parameter_address_change(buff_param_addresses)

@@ -900,7 +900,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
 
   printGraphBeforeHalfFloatResolution(*graph);
 
-  poptorch::annotateSubgraphs(graph.get(), graph->nodes().front(), training);
+  poptorch::annotateSubgraphs(graph.get(), graph->nodes().front());
 
   poptorch::resolveHalfOrFloat(graph.get());
 
@@ -1331,14 +1331,15 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
 
 std::shared_ptr<poptorch::PoplarExecutable>
 compileWithManualTracing(const pybind11::dict &options,
-                         const py::function &attribute_accessor) {
+                         const py::function &attribute_accessor,
+                         bool is_training, const py::dict &opt_dict) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   logging::debug("Compile with manual tracing");
 
   SessionOptions parsed_options = parseSessionOptions(options);
 
   AnchorList anchors_list;
-  std::vector<Optimizer> optimizers;
+  std::vector<Optimizer> optimizers = parseOptimizers(opt_dict);
 
   InplaceGraphInfo inplace_info = getInplaceGraphInfo(
       anchors_list.size(), parsed_options.replicationFactor() > 1 &&
@@ -1364,7 +1365,7 @@ compileWithManualTracing(const pybind11::dict &options,
   removeDeadImplicitCasts(graph.get());
 
   poptorch::LowerToPopart lower(
-      graph.get(), std::move(inplace_info), false, std::move(optimizers),
+      graph.get(), std::move(inplace_info), is_training, std::move(optimizers),
       parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
 
   lower.lower(nullptr);

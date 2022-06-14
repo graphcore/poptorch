@@ -39,8 +39,7 @@ void canonicalizeLists(torch::jit::Graph *graph);
  */
 void warnOnUnsupportedAten(torch::jit::Graph *graph);
 
-void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node,
-                       bool training);
+void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node);
 
 void annotateSubgraphsDispatch(torch::jit::Graph *graph,
                                torch::jit::Node *node);

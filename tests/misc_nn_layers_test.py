@@ -502,11 +502,8 @@ def test_fold_with_padding(stride_x, stride_y):
     op_harness(op, [unfolded])
 
 
-@pytest.mark.parametrize("trace_model, dim", [
-    (True, 0),
-    (False, 1),
-    (True, None),
-])
+@pytest.mark.parametrize("dim", [0, 1, None])
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_weight_norm(trace_model, dim):
     torch.manual_seed(42)
 

@@ -1384,6 +1384,9 @@ void Compiler::clearAttribute(const char *attribute, const char *key) {
 poptorch::TensorId
 Compiler::endForLoop(std::int32_t trip_count, std::int64_t num_outputs,
                      const std::vector<poptorch::TensorId> &inputs) {
+  ERROR_ON_MSG(_impl->is_training,
+               "poptorch.for_loop() is only supported in inference.");
+
   popart::Builder *body = _impl->active_builder;
 
   // Switch back to main graph.

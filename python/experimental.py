@@ -15,6 +15,8 @@ class IPUScope:
                  inputs: List['torch.Tensor'],
                  model: Optional['torch.nn.Module'] = None,
                  options: Optional['poptorch.Options'] = None,
+                 training: bool = False,
+                 dict_optimizer: Optional[dict] = None,
                  compile_using=enums.Compiler.PopART):
 
         if not isinstance(inputs, (list, tuple)):
@@ -39,13 +41,19 @@ class IPUScope:
         if self._options.defaultOutputMode():
             self._options = self._options.outputMode(enums.OutputMode.All)
 
+        self._training = training
+        self._dict_optimizer = {} if dict_optimizer is None else dict_optimizer
+
         self._compile_using = compile_using
 
         self._model = model
-        if self._compile_using == enums.Compiler.PopART:
+        if self._compile_using == enums.Compiler.PopART and model:
             # PopART requires some CPU pointers to copy to/from the IPU so
             # keep a copy of the CPU buffers.
-            self._cpu_model = copy.deepcopy(model)
+            self._cpu_model_state = copy.deepcopy(model.state_dict())
+        else:
+            # Note: this only used when compiling with PopART
+            self._cpu_model_state = {}
 
         self._outputs = []
         self._outputs_structure = None
@@ -95,7 +103,8 @@ class IPUScope:
         if self._compile_using == enums.Compiler.PopART:
             # Compile the captured graph using PopART.
             self._executable = poptorch_core.compileWithManualTracing(
-                self._options.toDict(), accessAttributes)
+                self._options.toDict(), accessAttributes, self._training,
+                self._dict_optimizer)
         else:
             # Compile the captured graph using MLIR.
             self._executable = poptorch_core.compileWithMLIR()
@@ -104,13 +113,9 @@ class IPUScope:
     def __call__(self, *args):
         if self._upload_weights:
             if self._compile_using == enums.Compiler.PopART:
-                if self._cpu_model is not None:
-                    state = self._cpu_model.state_dict()
-                else:
-                    state = {}
-                poptorch_core.copyWeightsToDevice_impl(self._executable,
-                                                       tuple(state.keys()),
-                                                       tuple(state.values()))
+                poptorch_core.copyWeightsToDevice_impl(
+                    self._executable, tuple(self._cpu_model_state.keys()),
+                    tuple(self._cpu_model_state.values()))
             else:
                 self._executable.weightsToDevice()
             self._upload_weights = False
@@ -155,12 +160,15 @@ class IPUScope:
 #               call after compilation so that changes to wrapped values
 #               can be picked up
 class _IPUContext:
-    def __init__(self, func, compiler, options, model):
+    def __init__(self, func, compiler, options, training, dict_optimizer,
+                 model):
         functools.update_wrapper(self, func)
         self.func = func
         self.ipu = None
         self.compiler = compiler
         self.options = options
+        self.training = training
+        self.dict_optimizer = dict_optimizer
         self.model = model
 
     def compile(self, *args, **kwargs):
@@ -168,6 +176,8 @@ class _IPUContext:
         with IPUScope(tensor_args,
                       model=self.model,
                       options=self.options,
+                      training=self.training,
+                      dict_optimizer=self.dict_optimizer,
                       compile_using=self.compiler) as ipu:
             d = torch.device("xla:0")
             # Move all the inputs to the IPU
@@ -219,16 +229,23 @@ def IPUContext(func=None,
                *,
                compiler=enums.Compiler.MLIR,
                options: Optional['poptorch.Options'] = None,
+               training: bool = False,
+               dict_optimizer: Optional[dict] = None,
                model: Optional['torch.nn.Module'] = None):
+    if dict_optimizer is None:
+        dict_optimizer = {}
+
     # If our decorator is passed any explicit keyword arguments, "func"
     # will be None so we need to return a new decorator with the keyword
     # arguments hardcoded in
     if func is None:
 
         def wrapper(f):
-            return _IPUContext(f, compiler, options, model)
+            return _IPUContext(f, compiler, options, training, dict_optimizer,
+                               model)
 
         return wrapper
     # Otherwise the decorator has no extra args: just pass the
     # default arguments
-    return _IPUContext(func, compiler, options, model)
+    return _IPUContext(func, compiler, options, training, dict_optimizer,
+                       model)
