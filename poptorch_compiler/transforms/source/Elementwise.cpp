@@ -3,7 +3,7 @@
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Support/LogicalResult.h>
 
-#include "dialect/Poptorch.hpp"
+#include "dialect/PoptorchDialect.hpp"
 
 namespace poptorch_ir {
 

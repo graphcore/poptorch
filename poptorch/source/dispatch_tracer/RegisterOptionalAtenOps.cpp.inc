@@ -11,7 +11,6 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("convolution_overrideable", PTC_BOXED(poptorch::fallback));
   m.impl("convolution_backward_overrideable", PTC_BOXED(poptorch::fallback));
   m.impl("transpose.int", PTC_BOXED(poptorch::fallback));
-  m.impl("layer_norm", PTC_BOXED(poptorch::fallback));
   m.impl("expand", PTC_BOXED(poptorch::fallback));
   m.impl("gather", PTC_BOXED(poptorch::fallback));
   m.impl("dropout", PTC_BOXED(poptorch::fallback));
@@ -36,8 +35,10 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   // Intercept alias to circumvent issues accessing tensor storage directly
   m.impl("alias", PTC_BOXED(poptorch::fallback));
 
- // Needed due to "CompositeImplicitAutograd"
+  // Needed due to "CompositeImplicitAutograd"
   m.impl("native_group_norm",
+         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("native_layer_norm",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
 // If we don't intercept these ops, they will be decomposed into

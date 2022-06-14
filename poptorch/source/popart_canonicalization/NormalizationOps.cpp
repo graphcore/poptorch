@@ -158,6 +158,10 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
   // aten::layer_norm(Tensor input,int[] normalized_shape, Tensor? weight,
   //                Tensor? bias, float eps, bool cudnn_enable) -> Tensor
 
+  // aten::native_layer_norm(Tensor input, int[] normalized_shape,
+  // Tensor? weight, Tensor? bias, float eps) -> (Tensor, Tensor, Tensor)
+  // NB return tensors match PopART
+
   // Tensor to normalise.
   torch::jit::Value *input = node->input(0);
 
@@ -190,7 +194,11 @@ torch::jit::Node *layerNormHandler(torch::jit::Graph *graph,
 
   // Pytorch normalizes across arbitrary number of dimensions from the end.
   // We flatten into a [M, N] array and normalize the N.
-  std::vector<std::int64_t> output_shape = shapeFromTensor(node->output());
+
+  // (In the event of using native_layer_norm, there will be three outputs.
+  // Use only the first.)
+  std::vector<std::int64_t> output_shape = shapeFromTensor(node->output(0));
+
   std::vector<std::int64_t> input_shape = shapeFromTensor(input);
   const std::int64_t axis = input_shape.size() - normalized_shape.size();
 
@@ -304,6 +312,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::batch_norm, batchNormHandler);
   registerHandler(c10::aten::native_batch_norm, batchNormHandler);
   registerHandler(c10::aten::layer_norm, layerNormHandler);
+  registerHandler(c10::aten::native_layer_norm, layerNormHandler);
   registerHandler(c10::aten::group_norm, groupNormHandler);
   registerHandler(c10::aten::native_group_norm, nativeGroupNormHandler);
   registerHandler(c10::aten::instance_norm, instanceNormHandler);

@@ -1201,10 +1201,14 @@
   PopTorchDirect: group_norm_backward
 
 
-# func: layer_norm(Tensor input, int[] normalized_shape, Tensor? weight=None, Tensor? bias=None, float eps=1e-05, bool cudnn_enable=True) -> Tensor
-- func: layer_norm
+# aten::native_layer_norm(Tensor input, int[] normalized_shape, Tensor? weight, Tensor? bias, float eps) -> (Tensor, Tensor, Tensor)
+- func: native_layer_norm
   PopTorchDirect: layer_norm
-  IgnoreArgs: {cudnn_enable}
+
+# aten::native_layer_norm_backward(Tensor grad_out, Tensor input, int[] normalized_shape, Tensor mean, Tensor rstd, Tensor? weight, Tensor? bias, bool[3] output_mask) -> (Tensor, Tensor, Tensor)
+- func: native_layer_norm_backward
+  PopTorchDirect: layer_norm_backward
+
 
 #
 # Losses

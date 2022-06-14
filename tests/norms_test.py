@@ -116,8 +116,6 @@ def test_batchNorm_eval_during_training(trace_model):
 @pytest.mark.parametrize("norm_dim", range(4))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_layerNorm(norm_dim, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
     torch.manual_seed(42)
 
     elementwise_affine = norm_dim % 2 == 1

@@ -39,6 +39,7 @@ extern c10::Symbol argsort;                     // NOLINT
 extern c10::Symbol minimum;                     // NOLINT
 extern c10::Symbol maximum;                     // NOLINT
 extern c10::Symbol native_group_norm;           // NOLINT
+extern c10::Symbol native_layer_norm;           // NOLINT
 
 } // namespace c10::aten
 

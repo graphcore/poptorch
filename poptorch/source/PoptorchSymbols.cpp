@@ -40,6 +40,7 @@ c10::Symbol argsort;                     // NOLINT
 c10::Symbol minimum;                     // NOLINT
 c10::Symbol maximum;                     // NOLINT
 c10::Symbol native_group_norm;           // NOLINT
+c10::Symbol native_layer_norm;           // NOLINT
 
 // clang-format off
 __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
@@ -78,6 +79,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, minimum);
   SYMBOL_INIT(aten, maximum);
   SYMBOL_INIT(aten, native_group_norm);
+  SYMBOL_INIT(aten, native_layer_norm);
 }
 
 } // namespace c10::aten

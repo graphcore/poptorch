@@ -2,6 +2,7 @@
 #include <poplar/Graph.hpp>
 #include <popnn/BatchNorm.hpp>
 #include <popnn/GroupNorm.hpp>
+#include <popnn/LayerNorm.hpp>
 #include <popops/Cast.hpp>
 #include <popops/ElementWise.hpp>
 #include <popops/Expr.hpp>
@@ -303,6 +304,127 @@ void group_norm_backward::lowerToPoplar(CompilerContext &context) {
     context.addTensor(this->grad_weight(), grad_weight);
   }
 
+  if (this->grad_bias()) {
+    context.addTensor(this->grad_bias(), grad_bias);
+  }
+}
+
+void layer_norm::lowerToPoplar(CompilerContext &context) {
+  float epsilon = this->epsilon().convertToFloat();
+
+  // Hard wire to stable for now
+  const bool stable_algo = true;
+
+  poplar::Tensor input = context.fromSsa(this->input());
+  size_t m_dim =
+      (*this)->getAttr("m_dim").cast<::mlir::IntegerAttr>().getUInt();
+  size_t n_dim =
+      (*this)->getAttr("n_dim").cast<::mlir::IntegerAttr>().getUInt();
+
+  poplar::Tensor input_reshaped = input.reshape({m_dim, n_dim});
+
+  // The parameter shape must be flattened for Poplar
+  const std::vector<uint64_t> param_shape{n_dim};
+
+  poplar::Tensor weight;
+  poplar::Tensor bias;
+  if (this->weight() && this->bias()) {
+    weight = context.fromSsa(this->weight()).reshape(param_shape);
+    bias = context.fromSsa(this->bias()).reshape(param_shape);
+  } else {
+    weight = createConstant(context, poplar::FLOAT, param_shape, 1.0f);
+    bias = createConstant(context, poplar::FLOAT, param_shape, 0.0f);
+  }
+
+  // Calculate the mean and the inverse standard deviation
+  poplar::Tensor mean;
+  poplar::Tensor inv_std_dev;
+
+  std::tie(mean, inv_std_dev) = popnn::ln::layerNormStatistics(
+      context.graph, input_reshaped, epsilon, context.seq, false, stable_algo,
+      poplar::FLOAT);
+
+  // Calculate the normalization
+  auto result = popnn::ln::layerNormalise(context.graph, input_reshaped, weight,
+                                          bias, mean, inv_std_dev, context.seq);
+
+  // PyTorch's mean has a different shape than popnn's
+  auto stat_shape = convertIntArray<size_t>(
+      (*this)->getAttr("stat_shape").cast<::mlir::ArrayAttr>());
+  mean = mean.reshape(stat_shape);
+  inv_std_dev = inv_std_dev.reshape(stat_shape);
+
+  // Reshape all outputs to what pytorch expects
+  auto result_correct_shape = result.first.reshape(input.shape());
+
+  context.addTensor(this->result(), result_correct_shape);
+  context.addTensor(this->mean(), mean);
+  context.addTensor(this->rstd(), inv_std_dev);
+}
+
+void layer_norm_backward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  size_t m_dim =
+      (*this)->getAttr("m_dim").cast<::mlir::IntegerAttr>().getUInt();
+  size_t n_dim =
+      (*this)->getAttr("n_dim").cast<::mlir::IntegerAttr>().getUInt();
+
+  poplar::Tensor input_reshaped = input.reshape({m_dim, n_dim});
+  poplar::Tensor grad_out = context.fromSsa(this->grad_out());
+
+  // popnn expects flattened mean/std
+  poplar::Tensor mean = context.fromSsa(this->mean());
+  mean = mean.flatten();
+
+  poplar::Tensor rstd = context.fromSsa(this->rstd());
+  rstd = rstd.flatten();
+
+  const std::vector<uint64_t> param_shape{n_dim};
+  poplar::Tensor weight;
+  poplar::Tensor bias;
+  if (this->weight() && this->bias()) {
+    weight = context.fromSsa(this->weight()).reshape(param_shape);
+    bias = context.fromSsa(this->bias()).reshape(param_shape);
+  } else {
+    weight = createConstant(context, poplar::FLOAT, param_shape, 1.0f);
+    bias = createConstant(context, poplar::FLOAT, param_shape, 0.0f);
+  }
+
+  // Hardwire to correct and slightly slower.
+  const bool fast_math_group_norm = false;
+
+  poplar::OptionFlags flags{{"groupNormStridedChannelGrouping",
+                             fast_math_group_norm ? "true" : "false"}};
+
+  poplar::Tensor input_whitened = popnn::ln::layerNormWhiten(
+      context.graph, input_reshaped, mean, rstd, context.seq, {}, flags);
+
+  // Rehape grad_out to match
+  poplar::Tensor grad_out_reshaped = grad_out.reshape({m_dim, n_dim});
+
+  // Calcuate the input on the gradient
+  poplar::Tensor grad_input = popnn::ln::layerNormGradients(
+      context.graph, input_whitened, grad_out_reshaped, rstd, weight,
+      context.seq, poplar::FLOAT, {}, flags);
+  grad_input = grad_input.reshape(input.shape());
+
+  // Calculate other weights if required
+  poplar::Tensor grad_weight;
+  poplar::Tensor grad_bias;
+  if (this->grad_weight() || this->grad_bias()) {
+    std::tie(grad_weight, grad_bias) = popnn::ln::layerNormParamGradients(
+        context.graph, input_whitened, grad_out_reshaped, context.seq,
+        poplar::FLOAT, {}, flags);
+    grad_weight = grad_weight.reshape(context.fromSsa(this->weight()).shape());
+    grad_bias = grad_bias.reshape(context.fromSsa(this->bias()).shape());
+  }
+
+  if (this->grad_input()) {
+    context.addTensor(this->grad_input(), grad_input);
+  }
+  if (this->grad_weight()) {
+    context.addTensor(this->grad_weight(), grad_weight);
+  }
   if (this->grad_bias()) {
     context.addTensor(this->grad_bias(), grad_bias);
   }
