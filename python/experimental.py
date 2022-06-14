@@ -98,7 +98,7 @@ class IPUScope:
                 self._options.toDict(), accessAttributes)
         else:
             # Compile the captured graph using MLIR.
-            self._executable = poptorch_core.compileWithMlir()
+            self._executable = poptorch_core.compileWithMLIR()
         return True
 
     def __call__(self, *args):

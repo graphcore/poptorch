@@ -49,7 +49,7 @@ See CompilerDispatchTable.cpp for all the calls. The API with MLIR is generated 
 | dispatchers | Folder containing the backend specific dispatch code. |
 | Tracer.hpp | Abstract backend definition. |
 | JitDispatch.hpp/cpp | Contains the implementation of the JIT backend. |
-| MlirDispatch.hpp/cpp | Contains the implementation of the MLIR backend. |
+| MLIRDispatch.hpp/cpp | Contains the implementation of the MLIR backend. |
 | CompilerDispatchTable.cpp | Dispatch table used by MLIR backend |
 
 See MLIR section for details on DirectlySupportedOps/PopartAPISupportedOps.

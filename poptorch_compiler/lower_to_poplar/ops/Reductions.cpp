@@ -152,7 +152,7 @@ void reducemean::lowerToPoplar(CompilerContext &context) {
   popops::mulInPlace(context.graph, output_tensor, ratio, context.seq);
 
   // In case keep_dim = True
-  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+  output_tensor = reshapeToMLIRShape(output_tensor, this->result().getType());
 
   context.addTensor(this->result(), output_tensor);
 }
@@ -179,7 +179,7 @@ void std_correction::lowerToPoplar(CompilerContext &context) {
 
   // In case keep_dim = True
   var_output.variance =
-      reshapeToMlirShape(var_output.variance, this->result().getType());
+      reshapeToMLIRShape(var_output.variance, this->result().getType());
 
   context.addTensor(this->result(), var_output.variance);
 }
@@ -200,7 +200,7 @@ void var_correction::lowerToPoplar(CompilerContext &context) {
 
   // In case keep_dim = True
   var_output.variance =
-      reshapeToMlirShape(var_output.variance, this->result().getType());
+      reshapeToMLIRShape(var_output.variance, this->result().getType());
 
   context.addTensor(this->result(), var_output.variance);
 }
@@ -225,9 +225,9 @@ void std_mean_correction::lowerToPoplar(CompilerContext &context) {
   }
 
   // In case keep_dim = True
-  var_output.mean = reshapeToMlirShape(var_output.mean, this->mean().getType());
+  var_output.mean = reshapeToMLIRShape(var_output.mean, this->mean().getType());
   var_output.variance =
-      reshapeToMlirShape(var_output.variance, this->result().getType());
+      reshapeToMLIRShape(var_output.variance, this->result().getType());
 
   context.addTensor(this->result(), var_output.variance);
   context.addTensor(this->mean(), var_output.mean);
@@ -248,9 +248,9 @@ void var_mean_correction::lowerToPoplar(CompilerContext &context) {
                                            this->correction().getValue() != 0);
 
   // In case keep_dim = True
-  var_output.mean = reshapeToMlirShape(var_output.mean, this->mean().getType());
+  var_output.mean = reshapeToMLIRShape(var_output.mean, this->mean().getType());
   var_output.variance =
-      reshapeToMlirShape(var_output.variance, this->result().getType());
+      reshapeToMLIRShape(var_output.variance, this->result().getType());
 
   context.addTensor(this->result(), var_output.variance);
   context.addTensor(this->mean(), var_output.mean);
@@ -268,7 +268,7 @@ void reducesum::lowerToPoplar(CompilerContext &context) {
                                        popops::Operation::ADD, out_type);
 
   // In case keep_dim = True
-  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+  output_tensor = reshapeToMLIRShape(output_tensor, this->result().getType());
 
   context.addTensor(this->result(), output_tensor);
 }
@@ -300,7 +300,7 @@ void prod_dim::lowerToPoplar(CompilerContext &context) {
                                        popops::Operation::MUL, out_type);
 
   // In case keep_dim = True
-  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+  output_tensor = reshapeToMLIRShape(output_tensor, this->result().getType());
 
   context.addTensor(this->result(), output_tensor);
 }
@@ -334,7 +334,7 @@ void all_out::lowerToPoplar(CompilerContext &context) {
                       popops::Operation::LOGICAL_AND, out_type);
 
   // In case keep_dim = True
-  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+  output_tensor = reshapeToMLIRShape(output_tensor, this->result().getType());
 
   context.addTensor(this->result(), output_tensor);
 }
@@ -366,7 +366,7 @@ void any_out::lowerToPoplar(CompilerContext &context) {
                                        popops::Operation::LOGICAL_OR, out_type);
 
   // In case keep_dim = True
-  output_tensor = reshapeToMlirShape(output_tensor, this->result().getType());
+  output_tensor = reshapeToMLIRShape(output_tensor, this->result().getType());
 
   context.addTensor(this->result(), output_tensor);
 }

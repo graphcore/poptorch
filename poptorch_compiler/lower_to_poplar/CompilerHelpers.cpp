@@ -101,7 +101,7 @@ std::shared_ptr<model_runtime::Device> getDevice() {
   return device;
 }
 
-poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
+poplar::Tensor reshapeToMLIRShape(const poplar::Tensor &src,
                                   mlir::Type mlirType) {
   return src.reshape(processType(mlirType).shape);
 }

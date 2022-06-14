@@ -11,10 +11,10 @@ class TimingScope;
 
 namespace poptorch_ir {
 
-// A wrapper for MlirTimer which stops it restarting when start is called.
-class NonRestartingMlirTimer {
+// A wrapper for mlir::Timer which stops it restarting when start is called.
+class NonRestartingMLIRTimer {
 public:
-  explicit NonRestartingMlirTimer(mlir::Timer &&timer);
+  explicit NonRestartingMLIRTimer(mlir::Timer &&timer);
 
   // Start the timer unless it is running already.
   void start();

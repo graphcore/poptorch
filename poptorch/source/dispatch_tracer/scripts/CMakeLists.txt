@@ -1,9 +1,9 @@
 
 add_custom_command(
   OUTPUT
-    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirInterface.cpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirInterface.hpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirDispatch.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRDispatch.inc
   COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
      # The file containing the list of operations we are creating an interface for.
      --ops-to-generate "${CMAKE_CURRENT_SOURCE_DIR}/AtenOpSupport.yml"
@@ -12,13 +12,13 @@ add_custom_command(
      --pytorch-base-native-function "${CMAKE_CURRENT_SOURCE_DIR}/native_functions/native_functions.1.${TORCH_MINOR_VERSION}.yml"
 
      # The file to generate into.
-     --gen-cpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirInterface.cpp.inc"
+     --gen-cpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.cpp.inc"
 
       # We create a header file for the methods as well.
-     --gen-hpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirInterface.hpp.inc"
+     --gen-hpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.hpp.inc"
 
       # Finally a helper to create a lookup map which maps the Aten symbol onto the function.
-     --gen-lookup "${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirDispatch.inc"
+     --gen-lookup "${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRDispatch.inc"
 
       # Namespace for these symbols
      --namespace aten
@@ -30,21 +30,21 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT
-    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirInterface.cpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirInterface.hpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirDispatch.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRDispatch.inc
   COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
      # The file containing the list of operations we are creating an interface for.
      --ops-to-generate "${CMAKE_CURRENT_SOURCE_DIR}/PoptorchOpSupport.yml"
 
      # The file to generate into.
-     --gen-cpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirInterface.cpp.inc"
+     --gen-cpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.cpp.inc"
 
       # We create a header file for the methods as well.
-     --gen-hpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirInterface.hpp.inc"
+     --gen-hpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.hpp.inc"
 
       # Finally a helper to create a lookup map which maps the poptorch symbol onto the function.
-     --gen-lookup "${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirDispatch.inc"
+     --gen-lookup "${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRDispatch.inc"
 
       # Namespace for these symbols
      --namespace poptorch
@@ -56,12 +56,12 @@ add_custom_command(
 
 add_custom_target(generate_supported_ops_interface
   DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirInterface.cpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirInterface.hpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMlirDispatch.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirInterface.cpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirInterface.hpp.inc
-    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMlirDispatch.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRDispatch.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRDispatch.inc
 )
 
 add_library(generated_supported_ops_interface INTERFACE)

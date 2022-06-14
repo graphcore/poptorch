@@ -393,7 +393,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
     return function_decl
 
 
-class DirectMlirGenerator:
+class DirectMLIRGenerator:
     def __init__(self, header_file, cpp_file, lookup_file, namespace):
 
         # The files to output the results into.

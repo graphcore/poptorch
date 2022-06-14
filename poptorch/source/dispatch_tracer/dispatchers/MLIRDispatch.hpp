@@ -89,8 +89,8 @@ public:
 
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
-#include "AtenToMlirInterface.hpp.inc"
-#include "PoptorchToMlirInterface.hpp.inc"
+#include "AtenToMLIRInterface.hpp.inc"
+#include "PoptorchToMLIRInterface.hpp.inc"
 
 protected:
   // Returns the only tensor ID in the vector, if it exists, or

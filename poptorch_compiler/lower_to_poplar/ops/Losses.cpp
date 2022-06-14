@@ -142,7 +142,7 @@ void nll_loss::lowerToPoplar(CompilerContext &context) {
 
   // MLIR might be [] and Poplar [1] so for consistency reshape the Poplar
   // tensor to match the MLIR one.
-  out = reshapeToMlirShape(out, this->result().getType());
+  out = reshapeToMLIRShape(out, this->result().getType());
 
   context.addTensor(result(), out);
   context.addTensor(total_weight(), total_elements);

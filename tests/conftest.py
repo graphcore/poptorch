@@ -17,7 +17,7 @@ def cleanup():
 
 # Documentation about markers: https://docs.pytest.org/en/6.2.x/example/markers.html
 
-mlir_available = poptorch.hasMlirSupportOnPlatform()
+mlir_available = poptorch.hasMLIRSupportOnPlatform()
 hw_available = poptorch.ipuHardwareIsAvailable()
 
 

@@ -1,7 +1,7 @@
 add_library(lower_to_poplar STATIC
         CompilerHelpers.cpp
-        IMlirGraphConverter.cpp
-        NonRestartingMlirTimer.cpp
+        IMLIRGraphConverter.cpp
+        NonRestartingMLIRTimer.cpp
         PoplarDeviceAndTarget.cpp
         PoplarExecutor.cpp
         PopitExecutor.cpp

@@ -19,13 +19,13 @@ namespace poptorch_ir {
 
 class PoplarDevice;
 class PopitContext;
-class NonRestartingMlirTimer;
+class NonRestartingMLIRTimer;
 
 class PopitExecutor {
 public:
   explicit PopitExecutor(PoplarDevice &device);
 
-  void compileAndRun(mlir::ModuleOp module, NonRestartingMlirTimer &timer,
+  void compileAndRun(mlir::ModuleOp module, NonRestartingMLIRTimer &timer,
                      const llvm::DenseMap<mlir::Value, TensorId> &mappings);
   void addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
                 TensorId id);

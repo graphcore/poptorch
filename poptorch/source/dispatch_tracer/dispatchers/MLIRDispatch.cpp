@@ -1,5 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "MlirDispatch.hpp"
+#include "MLIRDispatch.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -12,7 +12,7 @@
 
 #include "../../PoptorchSymbols.hpp"
 #include "../../popart_canonicalization/PopartCanonicalizationUtils.hpp"
-#include "MlirDispatchUtils.hpp"
+#include "MLIRDispatchUtils.hpp"
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/PopartCanonicalization.hpp"
@@ -360,9 +360,9 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
   // (i.e. builders defined in tablegen), and repopulates the stack.
 
   // The handler will be found in the compiler dispatch table.
-  // See CompilerDispatchTable.cpp, {Aten|Poptorch}ToMlirDispatch.inc,
-  // {Aten|Poptorch}ToMlirInterface.hpp.inc and
-  // {Aten|Poptorch}ToMlirInterface.cpp.inc
+  // See CompilerDispatchTable.cpp, {Aten|Poptorch}ToMLIRDispatch.inc,
+  // {Aten|Poptorch}ToMLIRInterface.hpp.inc and
+  // {Aten|Poptorch}ToMLIRInterface.cpp.inc
   mlir_handle->second(*stack);
   return schema_key;
 }
@@ -702,7 +702,7 @@ inline std::optional<double> toOptionalDouble(c10::IValue &value) {
   ERROR("Unsupported value type " << value.type()->str() << " in `toDouble`");
 }
 
-#include "AtenToMlirInterface.cpp.inc"
-#include "PoptorchToMlirInterface.cpp.inc"
+#include "AtenToMLIRInterface.cpp.inc"
+#include "PoptorchToMLIRInterface.cpp.inc"
 
 } // namespace poptorch

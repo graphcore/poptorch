@@ -1,5 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include "MlirDispatchUtils.hpp"
+#include "MLIRDispatchUtils.hpp"
 
 #include "poptorch_logging/Error.hpp"
 

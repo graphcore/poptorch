@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
-#include "lower_to_poplar/IMlirGraphConverter.hpp"
+#include "lower_to_poplar/IMLIRGraphConverter.hpp"
 
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/MLIRContext.h>
@@ -12,7 +12,7 @@
 #include <poplar/Target.hpp>
 
 #include "CompilerHelpers.hpp"
-#include "lower_to_poplar/NonRestartingMlirTimer.hpp"
+#include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
 #include "passes/CommonPasses.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -50,8 +50,8 @@ private:
 };
 } // namespace
 
-void IMlirGraphConverter::convertGraph(mlir::ModuleOp &module,
-                                       NonRestartingMlirTimer &timer) {
+void IMLIRGraphConverter::convertGraph(mlir::ModuleOp &module,
+                                       NonRestartingMLIRTimer &timer) {
   mlir::PassManager manager{module.getContext()};
 
   auto graph_construction = timer.nestAndScope("Poplar graph construction");

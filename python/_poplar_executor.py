@@ -1519,5 +1519,5 @@ class PoplarExecutor:
         raise _impl.createPoptorchError("Unsupported input type or condition.")
 
 
-def hasMlirSupportOnPlatform():
+def hasMLIRSupportOnPlatform():
     return poptorch_core.mlirIsSupportedOnPlatform()

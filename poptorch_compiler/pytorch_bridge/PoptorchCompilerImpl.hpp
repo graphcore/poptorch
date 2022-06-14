@@ -26,7 +26,7 @@
 #include <vector>
 
 #include "dialect/PoptorchDialect.hpp"
-#include "lower_to_poplar/NonRestartingMlirTimer.hpp"
+#include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
 #include "lower_to_poplar/PopitExecutor.hpp"
 #include "lower_to_poplar/PoplarExecutor.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -321,7 +321,7 @@ public:
   mlir::DefaultTimingManager timing_manager;
 
   // Wrapped root timer, which does not restart if start is called twice.
-  NonRestartingMlirTimer root_timer;
+  NonRestartingMLIRTimer root_timer;
 
   // A helper to provide a hidden interface to PopTorch to record how long it
   // takes to trace a model.

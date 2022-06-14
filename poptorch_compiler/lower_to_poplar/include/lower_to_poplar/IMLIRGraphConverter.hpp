@@ -15,13 +15,13 @@ class Target;
 namespace poptorch_ir {
 
 class CompilerContext;
-class NonRestartingMlirTimer;
+class NonRestartingMLIRTimer;
 
-class IMlirGraphConverter {
+class IMLIRGraphConverter {
 public:
-  ~IMlirGraphConverter() = default;
+  ~IMLIRGraphConverter() = default;
   // Populate the Poplar Graph & Sequence in the context.
-  void convertGraph(mlir::ModuleOp &module, NonRestartingMlirTimer &timer);
+  void convertGraph(mlir::ModuleOp &module, NonRestartingMLIRTimer &timer);
 
 protected:
   virtual void addCustomPasses(mlir::PassManager &manager) = 0;

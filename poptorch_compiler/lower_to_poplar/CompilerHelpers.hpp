@@ -74,7 +74,7 @@ private:
   std::optional<poplar::Tensor> _randomSeed;
 };
 
-poplar::Tensor reshapeToMlirShape(const poplar::Tensor &src,
+poplar::Tensor reshapeToMLIRShape(const poplar::Tensor &src,
                                   mlir::Type mlirType);
 
 poplar::Type elementTypeFromMLIR(mlir::Type elementType);

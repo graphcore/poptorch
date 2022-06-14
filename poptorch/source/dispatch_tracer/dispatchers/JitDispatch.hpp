@@ -11,7 +11,7 @@
 
 #include "../ValueMapper.hpp"
 #include "IDispatch.hpp"
-#include "MlirDispatch.hpp"
+#include "MLIRDispatch.hpp"
 
 #include "poptorch/InplaceOps.hpp"
 

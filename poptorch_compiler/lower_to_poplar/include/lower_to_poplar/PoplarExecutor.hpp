@@ -21,7 +21,7 @@ namespace detail {
 class PoplarExecutableImpl;
 } // namespace detail
 
-class NonRestartingMlirTimer;
+class NonRestartingMLIRTimer;
 
 class PoplarExecutor;
 class PoplarTarget;
@@ -31,7 +31,7 @@ class PoplarDevice;
 // compilation.
 PoplarExecutor compileExecutable(mlir::ModuleOp module,
                                  const PoplarTarget &target,
-                                 NonRestartingMlirTimer &timer);
+                                 NonRestartingMLIRTimer &timer);
 
 class PoplarExecutor {
 public:

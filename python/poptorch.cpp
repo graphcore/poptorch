@@ -1430,7 +1430,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
       .def("execute", &poptorch::MLIRExecutor::execute)
       .def("weightsToDevice", &poptorch::MLIRExecutor::weightsToDevice)
       .def("weightsToHost", &poptorch::MLIRExecutor::weightsToHost);
-  m.def("compileWithMlir", PTC(poptorch::compileMLIR));
+  m.def("compileWithMLIR", PTC(poptorch::compileMLIR));
 #endif
 
   py::enum_<poptorch::TracingMode>(m, "TracingMode")

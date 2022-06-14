@@ -20,8 +20,8 @@
 
 #include "CompilerHelpers.hpp"
 #include "PopitContext.hpp"
-#include "lower_to_poplar/IMlirGraphConverter.hpp"
-#include "lower_to_poplar/NonRestartingMlirTimer.hpp"
+#include "lower_to_poplar/IMLIRGraphConverter.hpp"
+#include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "passes/LowerToPopit.hpp"
 #include "poptorch_logging/Error.hpp"
@@ -30,9 +30,9 @@
 namespace poptorch_ir {
 
 namespace {
-class MlirToPopitConverter final : public IMlirGraphConverter {
+class MLIRToPopitConverter final : public IMLIRGraphConverter {
 public:
-  explicit MlirToPopitConverter(PopitContext &popit) : _context(popit) {}
+  explicit MLIRToPopitConverter(PopitContext &popit) : _context(popit) {}
 
 protected:
   void addCustomPasses(mlir::PassManager &manager) override {
@@ -102,7 +102,7 @@ void PopitExecutor::readOutput(TensorId id, void *ptr) {
 void PopitExecutor::freeTensor(TensorId id) { _context->tensors.erase(id); }
 
 void PopitExecutor::compileAndRun(
-    mlir::ModuleOp module, NonRestartingMlirTimer &timer,
+    mlir::ModuleOp module, NonRestartingMLIRTimer &timer,
     const llvm::DenseMap<mlir::Value, TensorId> &mappings) {
 
   if (!containsPoplarOps(module)) {
@@ -112,7 +112,7 @@ void PopitExecutor::compileAndRun(
 
   auto compile_popit = timer.nestAndScope("Compiling popit");
 
-  MlirToPopitConverter converter(*_context);
+  MLIRToPopitConverter converter(*_context);
   converter.convertGraph(module, timer);
   compile_popit.stop();
 
@@ -123,7 +123,7 @@ void PopitExecutor::compileAndRun(
   inputs.reserve(_context->inputs.size());
   for (auto &input : _context->inputs) {
     auto it = mappings.find(input);
-    // This can only happen if a pass in MlirToPopitConverter replaces one of
+    // This can only happen if a pass in MLIRToPopitConverter replaces one of
     // the graph inputs. We can't support this because we've got no way to map
     // the new graph input to a Torch tensor.
     ERROR_ON_MSG(it == mappings.end(),

@@ -14,8 +14,8 @@
 #include <poplar/Target.hpp>
 
 #include "CompilerHelpers.hpp"
-#include "lower_to_poplar/IMlirGraphConverter.hpp"
-#include "lower_to_poplar/NonRestartingMlirTimer.hpp"
+#include "lower_to_poplar/IMLIRGraphConverter.hpp"
+#include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
 #include "passes/CommonPasses.hpp"
 #include "passes/LowerToPoplar.hpp"
@@ -42,9 +42,9 @@ PoplarExecutableImpl::PoplarExecutableImpl(std::unique_ptr<poplar::Engine> e)
 } // namespace detail
 
 namespace {
-class MlirToPoplarConverter final : public IMlirGraphConverter {
+class MLIRToPoplarConverter final : public IMLIRGraphConverter {
 public:
-  explicit MlirToPoplarConverter(CompilerContext &context)
+  explicit MLIRToPoplarConverter(CompilerContext &context)
       : _context(context) {}
 
 protected:
@@ -95,7 +95,7 @@ PoplarExecutor::~PoplarExecutor() {}
 
 PoplarExecutor compileExecutable(mlir::ModuleOp module,
                                  const PoplarTarget &target,
-                                 NonRestartingMlirTimer &timer) {
+                                 NonRestartingMLIRTimer &timer) {
   // The graph and sequence need to be stored outside the compiler context
   // because for PopIT we create a context inside each op handler but we
   // want them to share the graph and sequence.
@@ -103,7 +103,7 @@ PoplarExecutor compileExecutable(mlir::ModuleOp module,
   poplar::program::Sequence seq;
   CompilerContext context(graph, seq);
 
-  MlirToPoplarConverter converter(context);
+  MLIRToPoplarConverter converter(context);
   converter.convertGraph(module, timer);
 
   auto compile_poplar = timer.nestAndScope("Compiling poplar");

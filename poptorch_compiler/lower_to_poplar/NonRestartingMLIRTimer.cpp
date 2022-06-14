@@ -1,28 +1,28 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
-#include "lower_to_poplar/NonRestartingMlirTimer.hpp"
+#include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
 
 #include <mlir/Support/Timing.h>
 
 namespace poptorch_ir {
 
-NonRestartingMlirTimer::NonRestartingMlirTimer(mlir::Timer &&timer)
+NonRestartingMLIRTimer::NonRestartingMLIRTimer(mlir::Timer &&timer)
     : _running(new bool(false)), _timer(new mlir::Timer(timer)) {}
 
-void NonRestartingMlirTimer::start() {
+void NonRestartingMLIRTimer::start() {
   if (!(*_running)) {
     _timer->start();
   }
   *_running = true;
 }
 
-void NonRestartingMlirTimer::stop() {
+void NonRestartingMLIRTimer::stop() {
   if ((*_running)) {
     _timer->stop();
   }
   *_running = false;
 }
 
-mlir::TimingScope NonRestartingMlirTimer::nestAndScope(const char *name) {
+mlir::TimingScope NonRestartingMLIRTimer::nestAndScope(const char *name) {
   return mlir::TimingScope(_timer->nest(name));
 }
 

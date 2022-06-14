@@ -9,7 +9,7 @@ add_subdirectory(scripts)
 
 # This can be built without the MLIR component.
 if (POPTORCH_BUILD_MLIR_COMPILER)
-  set(MLIR_SOURCE_FILE "dispatchers/MlirDispatch.cpp")
+  set(MLIR_SOURCE_FILE "dispatchers/MLIRDispatch.cpp")
 endif()
 
 
@@ -18,7 +18,7 @@ add_library(dispatch_tracer STATIC
         CommonHelperFunctions.cpp
         dispatchers/IDispatch.cpp
         dispatchers/JitDispatch.cpp
-        dispatchers/MlirDispatchUtils.cpp
+        dispatchers/MLIRDispatchUtils.cpp
 
         # The mlir dispatcher or null.
         ${MLIR_SOURCE_FILE}

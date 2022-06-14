@@ -24,7 +24,7 @@
 
 #if POPTORCH_BUILD_MLIR_COMPILER
 #include "dispatchers/JitDispatch.hpp"
-#include "dispatchers/MlirDispatch.hpp"
+#include "dispatchers/MLIRDispatch.hpp"
 #endif
 
 namespace poptorch {

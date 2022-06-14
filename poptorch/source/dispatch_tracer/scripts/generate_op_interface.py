@@ -2,7 +2,7 @@
 import argparse
 import yaml
 
-from generate_direct_interface import DirectMlirGenerator
+from generate_direct_interface import DirectMLIRGenerator
 
 parser = argparse.ArgumentParser(description='Convert macro file to tablegen')
 
@@ -55,7 +55,7 @@ if parse_args.pytorch_base_native_function is not None:
             continue
         ops_to_generate_dict[function_name]['native_func'] = function['func']
 
-direct_gen = DirectMlirGenerator(parse_args.gen_hpp_file_path,
+direct_gen = DirectMLIRGenerator(parse_args.gen_hpp_file_path,
                                  parse_args.gen_cpp_file_path,
                                  parse_args.gen_lookup, parse_args.namespace)
 

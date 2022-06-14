@@ -138,7 +138,7 @@ void select::lowerToPoplar(CompilerContext &context) {
   // removed, this is handled properly in the MLIR shape
   // inference so just resize to the MLIR shape instead of
   // duplicating the logic.
-  res = reshapeToMlirShape(res, this->result().getType());
+  res = reshapeToMLIRShape(res, this->result().getType());
 
   context.addTensor(this->result(), res);
 }
