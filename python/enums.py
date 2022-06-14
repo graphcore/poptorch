@@ -52,15 +52,11 @@ class SharingStrategy(enum.IntEnum):
     - ``FileSystem``: Spawn new processes and shared data using the file
                       system: slower but larger than memory.
     - ``Fork``: Fork new processes: no data sharing required but might cause
-                problems if worker processes use threading.
-    - ``ForkServer``: Similar to fork but a server process is used to fork child
-                      processes instead. This server process is single-threaded
-                      so there are no issues if worker processes use threading.
+                problems with some third party libraries.
     """
     SharedMemory = 0
     FileSystem = 1
     Fork = 2
-    ForkServer = 3
 
 
 class OutputMode(enum.IntEnum):
