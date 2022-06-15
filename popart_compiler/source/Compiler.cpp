@@ -880,6 +880,16 @@ void Compiler::loadEngineAndConnectStreams() {
                        "Number of inputs does not match");
           ERROR_ON_MSG(number_of_outputs != output_sizes.size(),
                        "Number of outputs does not match");
+          ERROR_ON_MSG(inputs == nullptr,
+                       "CPU function callback given null inputs");
+          ERROR_ON_MSG(outputs == nullptr,
+                       "CPU function callback given null outputs");
+          ERROR_ON_MSG(number_of_inputs != cb_data.input_pointers.size(),
+                       "Number of inputs does not match cb data (got "
+                           << cb_data.input_pointers.size() << ")");
+          ERROR_ON_MSG(number_of_outputs != cb_data.output_pointers.size(),
+                       "Number of outputs does not match cb data (got "
+                           << cb_data.output_pointers.size() << ")");
           for (std::size_t input = 0; input < number_of_inputs; ++input) {
             // Copy from IPU into the waiting pytorch tensor on host.
             std::memcpy(reinterpret_cast<char *>(cb_data.input_pointers[input]),

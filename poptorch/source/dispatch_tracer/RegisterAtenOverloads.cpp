@@ -279,7 +279,13 @@ std::string getParameterName(torch::jit::Value *value) {
 }
 
 // Returns true if the dispatcher is active.
-bool isDispatcherActive() { return context.hasActiveDispatch(); }
+bool isDispatcherActive() {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  return context.hasActiveDispatch();
+#else
+  return false;
+#endif
+}
 
 // Take the inputs to the graph and turn them into our IR graph
 // inputs/parameters.

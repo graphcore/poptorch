@@ -120,9 +120,9 @@ def test_CPU_matmul(trace_model):
         def __init__(self):
             super().__init__()
 
-            self.matmul = torch.nn.Linear(20, 30)
+            self.matmul = [torch.nn.Linear(20, 30)]
 
-            self.cpu = poptorch.CPU(self.matmul.forward, "MatMulOnCPU")
+            self.cpu = poptorch.CPU(self.matmul[0], "MatMulOnCPU")
 
         def forward(self, input):
             return self.cpu(input)
@@ -136,7 +136,7 @@ def test_CPU_matmul(trace_model):
     out = inference_model(input)
 
     helpers.assert_allclose(actual=out,
-                            expected=model.matmul(input),
+                            expected=model.matmul[0](input),
                             equal_nan=True)
 
 
@@ -150,6 +150,7 @@ def test_CPU_multiple_calls(trace_model):
             self.cpu = poptorch.CPU(self.foo, "MyCPUOp")
 
         def foo(self, x):
+            assert x.device.type == "cpu", x.device.type
             return x * 2.0
 
         def forward(self, x):

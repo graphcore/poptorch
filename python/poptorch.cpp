@@ -154,10 +154,7 @@ void callCpuOp(const c10::List<at::Tensor> &inputs, const std::string &name) {
   UNUSED(name);
 }
 
-c10::List<at::Tensor> endCPUOp(c10::List<at::Tensor> output) {
-  UNUSED(output);
-  return output;
-}
+c10::List<at::Tensor> endCpuOp(c10::List<at::Tensor> output) { return output; }
 
 void setAttribute(const std::string &attribute, const std::string &key,
                   const std::string &value) {
@@ -235,7 +232,7 @@ static auto registry =
         .op("poptorch::begin_autocast", &nullOp)
         .op("poptorch::suppress_autocast", &nullOp)
         .op("poptorch::restore_autocast", &nullOp)
-        .op("poptorch::end_cpu_op", &endCPUOp)
+        .op("poptorch::end_cpu_op", &endCpuOp)
         .op("poptorch::call_cpu_op", &callCpuOp)
         .op("poptorch::set_attribute", setAttribute)
         .op("poptorch::clear_attribute", &clearAttribute);
@@ -1354,6 +1351,10 @@ compileWithManualTracing(const pybind11::dict &options,
   poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
       graph.get());
 
+  // Collapse any `begin_cpu ... end_cpu` sequences into a single node, with the
+  // correct inputs & outputs.
+  poptorch::cpuOffloadingCleanup(graph.get());
+
   if (graph->outputs().empty()) {
     logging::trace("No outputs, so all nodes cleared");
     for (auto it = graph->nodes().rbegin(); it != graph->nodes().rend(); it++) {
@@ -1364,11 +1365,19 @@ compileWithManualTracing(const pybind11::dict &options,
   // TODO(T55228): remove after we use our own dispatch key.
   removeDeadImplicitCasts(graph.get());
 
+  // Prepare CPU op callbacks, by allocating the CPU tensors where the
+  // inputs/outputs will be stored. We have to do this at the last possible
+  // moment due to tracing.
+  initCallbackBuffers();
+
   poptorch::LowerToPopart lower(
       graph.get(), std::move(inplace_info), is_training, std::move(optimizers),
       parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
 
   lower.lower(nullptr);
+
+  // Clear the callbacks after compilation.
+  callbacks.clear();
 
   // We need to keep the dispatcher alive until after the passes because
   // some of them call isDispatcherActive() and until after the lowering
@@ -1442,6 +1451,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
 
   m.def("enableEagerMode", PTC(poptorch::enableEagerMode));
   m.def("startDispatch", PTC(poptorch::startDispatch));
+  m.def("isDispatcherActive", PTC(poptorch::isDispatcherActive));
   m.def("endDispatch", PTC(poptorch::endDispatch));
   m.def("startParametersMove", PTC(poptorch::startParametersMove));
   m.def("endParametersMove", PTC(poptorch::endParametersMove));

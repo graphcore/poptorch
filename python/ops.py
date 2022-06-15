@@ -708,7 +708,14 @@ class CPU:
         """
         self._layer_to_call = layer_to_call
 
+        if isinstance(self._layer_to_call, torch.nn.Module):
+            self._layer_to_call.requires_grad_(False)
+
         self._ID = ID
+
+        self.in_shapes = None
+        self.out_shapes = None
+
         self.inputs = None
         self.outputs = None
 
@@ -722,13 +729,12 @@ class CPU:
         else:
             self.outputs[0].copy_(outs)
 
-    def createPersistentData(self, input, outputs):
-        """Implementation detail."""
-        self.inputs = input
-        self.outputs = [output.clone().contiguous() for output in outputs]
-
     def registerPersistentData(self):
         """Implementation detail."""
+
+        self.inputs = [torch.zeros(i, device='cpu') for i in self.in_shapes]
+        self.outputs = [torch.zeros(o, device='cpu') for o in self.out_shapes]
+
         poptorch_core.registerBuffersWithCallback(self._ID, self.inputs,
                                                   self.outputs)
 
@@ -737,19 +743,32 @@ class CPU:
         # Mark all subsquent ops as happening on the host.
         torch.ops.poptorch.call_cpu_op([*input], self._ID)
 
-        # Keep the trace happy by actually calling the layer.
-        outputs = self._layer_to_call(*input)
+        if poptorch_core.isDispatcherActive():
+            cpu_input = [torch.zeros_like(i, device="cpu") for i in input]
+        else:
+            cpu_input = input
+
+        # Keep the trace happy & get output shapes by actually calling the
+        # layer.
+        cpu_outputs = self._layer_to_call(*cpu_input)
 
         # Did we originally just output a single tensor?
         originally_single_tensor = False
 
         # Slight fixup for single tensor outputs.
-        if not isinstance(outputs, (list, tuple)):
+        if not isinstance(cpu_outputs, (list, tuple)):
             originally_single_tensor = True
-            outputs = [outputs]
+            cpu_outputs = [cpu_outputs]
 
-        # Move the outputs and inputs into a permanent buffer.
-        self.createPersistentData(input, outputs)
+        # Record metadata for our inputs & outputs, to later allocate in
+        # permanent buffers.
+        self.in_shapes = [i.shape for i in input]
+        self.out_shapes = [o.shape for o in cpu_outputs]
+
+        if poptorch_core.isDispatcherActive():
+            outputs = [torch.zeros_like(o, device="xla") for o in cpu_outputs]
+        else:
+            outputs = cpu_outputs
 
         # End CPU host execution and show the JIT what the output looks like.
         outputs = torch.ops.poptorch.end_cpu_op(outputs)

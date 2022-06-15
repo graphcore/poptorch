@@ -49,6 +49,12 @@ void cpuOffloadingCleanup(torch::jit::Graph *graph) {
           "Trying to enter CPU from another CPU op! CPU ops must not overlap.");
       cpu_ops_found++;
       cpu_op_in_scope = node;
+    } else if (kind == symbols::poptorch::canonicalised_cpu_call) {
+      ERROR_ON_MSG(
+          cpu_op_in_scope != nullptr,
+          "Trying to enter CPU from another CPU op! CPU ops must not overlap.");
+      cpu_ops_found++;
+      cpu_op_in_scope = node;
     } else if (kind == symbols::poptorch::end_cpu_op) {
       to_delete.insert(node);
 
