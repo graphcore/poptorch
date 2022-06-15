@@ -1,6 +1,7 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
 import io
+import signal
 import sys
 import os
 import tempfile
@@ -163,10 +164,17 @@ class _AsynchronousWorkerProcess:
         return self._process.exitcode
 
     def join(self):
-        self._process.join(timeout=5)
-        # In case it didn't exit cleanly: terminate() it
-        self._process.terminate()
-        self._process.join()
+        self._process.join(timeout=10)
+        # If the asynchronous worker process is blocked waiting for the dataset
+        # to process the next batch it will not be able to respond to host
+        # command handler's shutdown_now command. We try stopping it by sending
+        # a SIGINT signal first and choose SIGTERM as the last resort.
+        if self.isAlive():
+            os.kill(self._process.pid, signal.SIGINT)
+            self._process.join(timeout=10)
+        if self.isAlive():
+            self._process.terminate()
+            self._process.join()
 
     def start(self):
         # The dataset might not fit in shared memory: so use the file system instead.
@@ -195,6 +203,8 @@ class _AsynchronousWorkerProcess:
         # in the hot loop.
         if self._sharing_strategy == enums.SharingStrategy.Fork:
             ctx = multiprocessing.get_context('fork')
+        elif self._sharing_strategy == enums.SharingStrategy.ForkServer:
+            ctx = multiprocessing.get_context('forkserver')
         else:
             ctx = multiprocessing.get_context('spawn')
         read_data_pipe, write_data_pipe = ctx.Pipe(duplex=False)
