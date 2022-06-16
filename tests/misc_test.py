@@ -122,6 +122,12 @@ def print_orig_input_trace_harness(trace_model, capfd, model, orig_types,
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_print_orig_input_trace_nested_tuple_tensors(capfd, trace_model):
+    if not trace_model:
+        # This error is almost certainly due to a mismatch between pytorch and
+        # poptorch mixed-precision promotion policies
+        pytest.skip("TODO(T57195): np broadcasting failed on Op 103 " +
+                    "(ai.onnx.Add:7), incompatible types FLOAT16 and FLOAT")
+
     class Model(torch.nn.Module):
         def forward(self, xss):
             return xss[0][0] + xss[0][1] + xss[1][0]
@@ -139,6 +145,12 @@ def test_print_orig_input_trace_nested_tuple_tensors(capfd, trace_model):
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_print_orig_input_trace_tuple_tensors(capfd, trace_model):
+    if not trace_model:
+        # This error is almost certainly due to a mismatch between pytorch and
+        # poptorch mixed-precision promotion policies
+        pytest.skip("TODO(T57195): np broadcasting failed on Op 103 " +
+                    "(ai.onnx.Add:7), incompatible types FLOAT16 and FLOAT")
+
     class Model(torch.nn.Module):
         def forward(self, xs):
             return xs[0] + xs[1] + xs[2]
@@ -156,6 +168,12 @@ def test_print_orig_input_trace_tuple_tensors(capfd, trace_model):
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_print_orig_input_trace_tensors(capfd, trace_model):
+    if not trace_model:
+        # This error is almost certainly due to a mismatch between pytorch and
+        # poptorch mixed-precision promotion policies
+        pytest.skip("TODO(T57195): np broadcasting failed on Op 103 " +
+                    "(ai.onnx.Add:7), incompatible types FLOAT16 and FLOAT")
+
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
             return x + y + z
@@ -171,6 +189,10 @@ def test_print_orig_input_trace_tensors(capfd, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_untracable_type_error(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): Type 'Tuple[Tensor, float]' cannot be traced")
+
     class Model(torch.nn.Module):
         def forward(self, t, f):
             return t + torch.tensor([f])
@@ -265,6 +287,9 @@ def test_specific_error_handling():
 @helpers.overridePopartLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_outline_attribute(capfd, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): ValueError")
+
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()

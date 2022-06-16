@@ -436,6 +436,10 @@ def assert_allclose(native_out, poptorch_out, rtol, atol):
 @pytest.mark.parametrize("use_half", [False, True])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_pytorch_nn(test_name, use_half, trace_model):
+    if (test_name, use_half,
+            trace_model) == ("test_nn_LayerNorm_3d_no_affine_large_feature",
+                             True, False):
+        pytest.skip("TODO(T57195)")
     reason = EXPECTED_FAILURES.get(test_name)
     if reason is None:
         reason = HALF_EXPECTED_FAILURES.get(

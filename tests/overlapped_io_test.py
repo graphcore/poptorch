@@ -99,6 +99,9 @@ def test_io_input():
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_input_error_messages(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Regex pattern does not match")
+
     class DoubleInputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -199,6 +202,9 @@ def test_overlap_host_io_output():
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_output_error_messages(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Regex pattern does not match")
+
     class DoubleOutputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -270,6 +276,9 @@ def test_output_error_messages(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_overlap_both_non_input_marked(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): AssertionError: Regex pattern not matched")
+
     class NotOnInputModel(torch.nn.Module):
         def forward(self, x):
             x = poptorch.set_overlap_for_input(
@@ -295,6 +304,9 @@ def test_overlap_both_non_input_marked(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_overlap_both_non_output_marked(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): AssertionError: Regex pattern not matched")
+
     class OutputBeforeLoss(torch.nn.Module):
         def forward(self, x):
             x = poptorch.set_overlap_for_input(

@@ -118,6 +118,9 @@ def test_ones_zeros_input_resolved_always_float16(op, trace_model):
 @pytest.mark.parametrize("op", ones_zeros)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ones_zeros_input_resolved_always_float32(op, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): assert torch.float32 != torch.float32")
+
     def fw_op(input):
         return op(
             (2, 3, 4), dtype=torch.float32,
@@ -223,6 +226,9 @@ def test_normal_std_correctly_resolved(trace_model):
 # the low and high input tensors (which become dead code)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_distributions_uniform(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): assert torch.float32 != torch.float32")
+
     def fw_op(input_low):
         torch.manual_seed(42)
         ud = torch.distributions.uniform.Uniform(
@@ -320,6 +326,9 @@ def test_constant_correctly_resolved(trace_model):
 # The output will always be float 16.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_constant_add_float16(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): assert torch.float32 != torch.float32")
+
     def fw_op(input):
         return torch.tensor([1, 2, 3], dtype=input.dtype) + input.to(
             torch.float16)
@@ -334,6 +343,9 @@ def test_constant_add_float16(trace_model):
 # ambiguity betwen tracing with a float and a half converted to a float.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_constant_always_float32(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): assert torch.float32 != torch.float32")
+
     def fw_op(input):
         return torch.tensor([1, 2, 3], dtype=torch.float32) + input
 

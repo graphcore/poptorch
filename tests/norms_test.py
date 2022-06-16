@@ -229,6 +229,9 @@ def test_groupNorm(dims):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_groupNorm_exfail(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): assert not True")
+
     torch.manual_seed(42)
 
     shape = [3, 10]

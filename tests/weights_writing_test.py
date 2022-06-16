@@ -81,6 +81,7 @@ def test_training_and_inference(use_half, trace_model):
 
 
 @pytest.mark.parametrize("use_half", [True, False])
+@pytest.mark.mlirSupportRequired
 def test_training_inference_parameters(use_half):
     torch.manual_seed(42)
 

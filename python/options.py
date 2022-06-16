@@ -67,7 +67,6 @@ class _JitOptions(_options_impl.OptionsDict):
             * True: use `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_
             * False: use Torch's dispatcher to trace the graph.
        """
-        trace_model = True
         self.set(trace_model=trace_model)
         return self
 

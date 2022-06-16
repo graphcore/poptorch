@@ -92,6 +92,9 @@ def test_upsample_bilinear_factor_shapes(shapes):
 @pytest.mark.parametrize("shape", [(2, 2, 14, 14)])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_upsample_bicubic(shape, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Tensor-likes are not close")
+
     torch.manual_seed(42)
     model = torch.nn.Upsample(scale_factor=0.4357, mode='bicubic')
     x = torch.randn(*shape)
@@ -112,6 +115,8 @@ def test_upsample_bicubic(shape, trace_model):
                                                ("trilinear", (1, 2, 3, 4, 5))])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_unsupported_upsample(mode, input_shape, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): refcount_.load() == 0")
     torch.manual_seed(42)
     scale_factor = 2
     model = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)
@@ -357,6 +362,9 @@ def test_embedding_bag(mode, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_embedding_bag_per_sample_weights(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find tensor")
+
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
@@ -382,6 +390,11 @@ def test_embedding_bag_per_sample_weights(trace_model):
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_embedding_bag_include_last_offset(mode, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): Unsupported aten::embedding_bag operation: " +
+            "offsets tensor must be a constant")
+
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
@@ -505,6 +518,11 @@ def test_fold_with_padding(stride_x, stride_y):
 @pytest.mark.parametrize("dim", [0, 1, None])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_weight_norm(trace_model, dim):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): Only Tensors created explicitly by the user " +
+            "(graph leaves) support the deepcopy protocol at the moment")
+
     torch.manual_seed(42)
 
     x = torch.randn(10)

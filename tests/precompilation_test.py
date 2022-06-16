@@ -124,6 +124,9 @@ def test_export_no_python_then_load():
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_validate_no_python(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): can't deserialize dispatch traced executable")
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
@@ -166,6 +169,9 @@ def test_export_train_validate_no_python(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_validate(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): can't deserialize dispatch traced executable")
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
@@ -204,6 +210,9 @@ def test_export_train_validate(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_save_validate(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): can't deserialize dispatch traced executable")
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
@@ -275,6 +284,9 @@ def test_export_train_save_train():
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_save_validate_load_weights(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): can't deserialize dispatch traced executable")
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")

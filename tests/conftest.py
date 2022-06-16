@@ -43,6 +43,12 @@ def pytest_configure(config):
 
 
 def pytest_runtest_setup(item):
+    if hasattr(item, 'callspec'):
+        trace_model = item.callspec.params.get("trace_model")
+        if trace_model is not None and not trace_model:
+            if not mlir_available:
+                pytest.skip("No MLIR support on this platform.")
+
     if any(item.iter_markers("mlirSupportRequired")):
         if not mlir_available:
             pytest.skip("No MLIR support on this platform.")

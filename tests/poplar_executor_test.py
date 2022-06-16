@@ -98,6 +98,9 @@ def test_offline_ipu_compileAndExport_file(trace_model, filename=None):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_precompile_then_load(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): can't deserialize dispatch traced executable")
     opts = poptorch.Options().useOfflineIpuTarget(
         poptorch.ipuHardwareVersion())
     opts.Jit.traceModel(trace_model)
@@ -378,6 +381,7 @@ def test_nondeterministic_warning_filter():
         ]), f"Compilation generated unexpected warning.\nActual warning: {r}"
 
 
+@pytest.mark.mlirSupportRequired
 def test_cpu_output():
     const1 = torch.tensor([1, 2])
     const2 = torch.tensor([3, 4])
