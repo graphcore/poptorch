@@ -269,6 +269,9 @@ class LogChecker:
     def createIterator(self):
         return LogIterator(self._lines)
 
+    def assert_isEmpty(self):
+        assert not self._log, f"Expected an empty log but got {self._log}"
+
     def assert_contains(self, *strings):
         """Assert there is a line in the log matching all the strings provided
         """

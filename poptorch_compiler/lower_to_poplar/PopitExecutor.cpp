@@ -76,11 +76,14 @@ PopitContext::~PopitContext() {
 
 PopitExecutor::PopitExecutor(PoplarDevice &device)
     : _context(std::make_unique<PopitContext>()) {
-  const poplar::Target &target = device.device().getTarget();
+  _context->device = device;
+  _context->target = device.getTarget();
+
   _context->session =
       std::unique_ptr<popitSession_t, decltype(&popitDestroySession)>(
-          popitCreateSession(&target), &popitDestroySession);
-  popitConnect(_context->session.get(), &device.device());
+          popitCreateSession(&_context->target.target()),
+          [](popitSession *s) { popitDestroySession(s); });
+  popitConnect(_context->session.get(), &_context->device.device());
 }
 
 PopitExecutor::~PopitExecutor() {}

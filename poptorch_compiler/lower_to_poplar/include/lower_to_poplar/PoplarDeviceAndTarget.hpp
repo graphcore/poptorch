@@ -16,6 +16,7 @@ class Target;
 namespace poptorch_ir {
 class PoplarTarget {
 public:
+  PoplarTarget() = default;
   explicit PoplarTarget(const poplar::Target &target);
   ~PoplarTarget();
 
@@ -23,7 +24,7 @@ public:
 
 private:
   // Access the target via model_runtime::Device to avoid cloning
-  std::unique_ptr<poplar::Target> _target;
+  std::shared_ptr<poplar::Target> _target;
 };
 
 // NB It is safe to lose the sole instances of this while the IPU is still in
@@ -32,6 +33,7 @@ private:
 // clone of the device.
 class PoplarDevice {
 public:
+  PoplarDevice() = default;
   explicit PoplarDevice(std::shared_ptr<model_runtime::Device> device);
   ~PoplarDevice();
 

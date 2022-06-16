@@ -61,6 +61,13 @@ poptorch_core.setCustomCodeletsPath(
     pkg_resources.resource_filename("poptorch", ""))
 
 
+@atexit.register
+def poptorchCleanUp():
+    logger.debug("poptorch unload: cleaning up resources")
+    poptorch_core.destroyDispatcher()
+    logger.debug("poptorch unloaded")
+
+
 def load(filename: str,
          edit_opts_fn: Optional[Callable[['poptorch.Options'], None]] = None
          ) -> 'poptorch.PoplarExecutor':

@@ -264,10 +264,13 @@ void endDispatch(bool error_occurred) {
 }
 
 void destroyDispatcher() {
+// TODO(T49566) We don't build this on Centos
+#if POPTORCH_BUILD_MLIR_COMPILER
   if (context.isDispatchOn()) {
     endDispatch();
   }
   context.resetActiveDispatch(nullptr);
+#endif
 }
 
 void setParameterName(const at::Tensor &tensor, const std::string &name) {

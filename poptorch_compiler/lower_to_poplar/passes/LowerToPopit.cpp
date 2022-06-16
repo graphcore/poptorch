@@ -81,30 +81,36 @@ void LowerToPopit::runOnOperation() {
       _context->output_ids.push_back(output.tensorIdAttr().getInt());
     });
 
+    _context->function = function;
+    // This lambda will actually be called by popitCall, so we need to make
+    // sure it doesn't depend on "this" as this object will not exist anymore
+    // and it will segfault.
+    PopitContext *ctx = _context;
     auto popit_fn =
-        [&](poplar::Graph &graph, std::vector<poplar::Tensor> &tensors,
+        [ctx](
+            poplar::Graph &graph, std::vector<poplar::Tensor> &tensors,
             poplar::program::Sequence &program) -> std::vector<poplar::Tensor> {
       CompilerContext context(graph, program);
 
       // Add all the graph inputs to the context.
-      ERROR_ON_MSG(_context->inputs.size() != tensors.size(),
+      ERROR_ON_MSG(ctx->inputs.size() != tensors.size(),
                    "Number of inputs mismatch");
       for (std::uint64_t i = 0; i < tensors.size(); i++) {
-        context.addTensor(_context->inputs.at(i), tensors.at(i));
+        context.addTensor(ctx->inputs.at(i), tensors.at(i));
       }
 
       // Walk over all functions with a poplar impl.
-      function.walk(
+      ctx->function.walk(
           [&](PoplarImplInterface impl) { impl.lowerToPoplar(context); });
 
       // All the tensors that were written to are outputs.
       std::vector<poplar::Tensor> outputs;
-      outputs.reserve(_context->output_ids.size());
-      _context->output_ids.clear();
-      _context->output_ids.reserve(_context->outputs.size());
-      function.walk([&](poptorch_ir::output_tensor output) {
+      outputs.reserve(ctx->output_ids.size());
+      ctx->output_ids.clear();
+      ctx->output_ids.reserve(ctx->outputs.size());
+      ctx->function.walk([&](poptorch_ir::output_tensor output) {
         outputs.push_back(context.fromSsa(output.tensor()));
-        _context->output_ids.push_back(output.tensorIdAttr().getInt());
+        ctx->output_ids.push_back(output.tensorIdAttr().getInt());
       });
 
       return outputs;
