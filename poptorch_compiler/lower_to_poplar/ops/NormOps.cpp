@@ -199,8 +199,7 @@ void group_norm::lowerToPoplar(CompilerContext &context) {
                       static_cast<size_t>(1), std::multiplies<size_t>());
   ERROR_ON(hx_w != this->HxW());
 
-  const std::vector<uint64_t> param_shape = {input_shape.at(1)};
-
+  const std::vector<uint64_t> param_shape = {num_groups};
   if (this->weight() && this->bias()) {
     weight = context.fromSsa(this->weight());
     bias = context.fromSsa(this->bias());
@@ -229,83 +228,10 @@ void group_norm::lowerToPoplar(CompilerContext &context) {
       popnn::gn::groupNormalise(context.graph, input, weight, bias, mean,
                                 inv_std_dev, context.seq, {}, flags);
 
-  // PyTorch's mean has a different shape than popnn's
-  mean = mean.reshape({input_shape.at(0), num_groups});
-  inv_std_dev = inv_std_dev.reshape({input_shape.at(0), num_groups});
-
   // Return the result
   context.addTensor(this->result(), result.first);
   context.addTensor(this->mean(), mean);
   context.addTensor(this->rstd(), inv_std_dev);
-}
-
-void group_norm_backward::lowerToPoplar(CompilerContext &context) {
-  uint64_t num_groups = this->group();
-
-  poplar::Tensor input = context.fromSsa(this->input());
-  poplar::Tensor grad_out = context.fromSsa(this->grad_out());
-
-  // popnn expects flattened mean/std
-  poplar::Tensor mean = context.fromSsa(this->mean());
-  mean = mean.flatten();
-
-  poplar::Tensor rstd = context.fromSsa(this->rstd());
-  rstd = rstd.flatten();
-
-  poplar::Tensor weight;
-
-  // Check that the redundant N, C and HxW match input dimensions
-  auto input_shape = input.shape();
-  ERROR_ON(input_shape.at(0) != this->N());
-  ERROR_ON(input_shape.at(1) != this->C());
-  auto hx_w =
-      std::accumulate(input_shape.begin() + 2, input_shape.end(),
-                      static_cast<size_t>(1), std::multiplies<size_t>());
-  ERROR_ON(hx_w != this->HxW());
-
-  const std::vector<uint64_t> param_shape = {num_groups};
-
-  if (this->weight()) {
-    weight = context.fromSsa(this->weight());
-  } else {
-    weight = createConstant(context, poplar::FLOAT, param_shape, 1.0f);
-  }
-
-  // Hardwire to correct and slightly slower.
-  const bool fast_math_group_norm = false;
-
-  poplar::OptionFlags flags{{"groupNormStridedChannelGrouping",
-                             fast_math_group_norm ? "true" : "false"}};
-
-  poplar::Tensor input_whitened = popnn::gn::groupNormWhiten(
-      context.graph, input, mean, rstd, context.seq, {}, flags);
-
-  // Compute the delta for the operand
-  poplar::Tensor grad_input = popnn::gn::groupNormGradients(
-      context.graph, input_whitened, grad_out, rstd, weight, context.seq,
-      poplar::FLOAT, {}, flags);
-
-  // Compute the deltas for scaled and offset
-  poplar::Tensor grad_weight;
-  poplar::Tensor grad_bias;
-
-  if (this->grad_weight() || this->grad_bias()) {
-    std::tie(grad_weight, grad_bias) = popnn::gn::groupNormParamGradients(
-        context.graph, input_whitened, grad_out, context.seq, poplar::FLOAT, {},
-        flags);
-  }
-
-  if (this->grad_input()) {
-    context.addTensor(this->grad_input(), grad_input);
-  }
-
-  if (this->grad_weight()) {
-    context.addTensor(this->grad_weight(), grad_weight);
-  }
-
-  if (this->grad_bias()) {
-    context.addTensor(this->grad_bias(), grad_bias);
-  }
 }
 
 } // namespace poptorch_ir

@@ -32,10 +32,6 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("all", PTC_BOXED(poptorch::fallback));
   m.impl("any", PTC_BOXED(poptorch::fallback));
 
-// Needed due to "CompositeImplicitAutograd"
-  m.impl("native_group_norm",
-         torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
-
   // If we don't intercept this op, it will be decomposed to as_strided
   // which is harder to handle.
   m.impl("slice.Tensor", PTC_BOXED(poptorch::fallback));
