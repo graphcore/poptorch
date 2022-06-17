@@ -1424,7 +1424,7 @@ def test_write_ipu_state(optim, incomplete_state):
         assert deleted_state[0] not in s1["ipu_state"]
 
     # Use the model and check the two states have been merged.
-    training_model(input)
+    training_model((input, ))
 
     s1 = optimizer.state_dict()
 
@@ -1618,7 +1618,7 @@ def test_setOptimizer_frozen_options_ok():
     training_model = poptorch.trainingModel(model,
                                             optimizer=optimizer,
                                             options=opts)
-    training_model.compile(next(iter(data)))
+    training_model.compile(tuple(next(iter(data))))
     assert training_model.options.Training.meanAccumulationAndReplicationReductionStrategy == poptorch.MeanReductionStrategy.Running  # pylint: disable=line-too-long
 
     optimizer.param_groups[0]['lr'] = 0.01
@@ -1641,7 +1641,7 @@ def test_setOptimizer_frozen_options_broken():
     training_model = poptorch.trainingModel(model,
                                             optimizer=optimizer,
                                             options=opts)
-    training_model.compile(next(iter(data)))
+    training_model.compile(tuple(next(iter(data))))
     assert training_model.options.Training.meanAccumulationAndReplicationReductionStrategy == poptorch.MeanReductionStrategy.Post  # pylint: disable=line-too-long
 
     optimizer.param_groups[0]['lr'] = 0.01

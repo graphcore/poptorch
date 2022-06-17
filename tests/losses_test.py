@@ -79,7 +79,7 @@ def test_L1Loss(reduction, trace_model):
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
     for i in range(0, 1000):
-        out, loss = poptorch_model(input)
+        out, loss = poptorch_model((input, ))
 
         # Model needs to adjust the LR in the middle to converge
         if i == 500:
@@ -117,7 +117,7 @@ def test_MSELoss(reduction, trace_model):
     assert not torch.allclose(original, target, rtol=1e-02, atol=1e-02)
 
     for _ in range(0, 1000):
-        out, loss = poptorch_model(input)
+        out, loss = poptorch_model((input, ))
 
     # Check we have trained the "model"
     assert loss < 0.001
@@ -151,7 +151,7 @@ def test_CrossEntropy(input_shape, reduction, trace_model):
                                                     label, reduction)
 
     for _ in range(0, 100):
-        out, loss = poptorch_model(input)
+        out, loss = poptorch_model((input, ))
 
     # Check we have trained the "model"
     assert loss < original_loss
@@ -219,7 +219,7 @@ def test_NLLLoss(reduction, trace_model):
                                                     op)
 
     for _ in range(0, 100):
-        out, loss = poptorch_model(input)
+        out, loss = poptorch_model((input, ))
 
     # Check we have trained the "model"
     assert loss < original_loss
@@ -243,7 +243,7 @@ def test_NLLLoss2d(reduction, trace_model):
                                                     [x], y, reduction, op)
 
     for _ in range(0, 100):
-        out, loss = poptorch_model(x)
+        out, loss = poptorch_model((x, ))
 
     # Check we have trained the "model"
     assert loss < original_loss
@@ -267,10 +267,10 @@ def test_BCE(reduction, trace_model):
                                                     op=torch.sigmoid)
 
     # Make sure the first run doesn't already pass the test.
-    _, original_loss = poptorch_model(input)
+    _, original_loss = poptorch_model((input, ))
 
     for _ in range(0, 2500):
-        out, loss = poptorch_model(input)
+        out, loss = poptorch_model((input, ))
 
     # # Check we have trained the "model"
     assert loss < original_loss

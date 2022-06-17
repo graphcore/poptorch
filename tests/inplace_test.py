@@ -14,9 +14,9 @@ def test_inplace_add(trace_model):
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
-                x[0] += 1
+                x[0] += 4
             elif isinstance(x, (dict)):
-                x['input'] += 1
+                x['input'] += 3
             else:
                 x += 1
 
@@ -31,11 +31,22 @@ def test_inplace_add(trace_model):
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == 3.0
 
-    list_in = (torch.Tensor([1.0]), )
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == 2.0
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == 3.0
+    if trace_model:
+        # Tracing doesn't support lists as inputs, and tuples
+        # can't be modified in-place.
+        return
+
+    # We're changing the  input type: must recompile
+    poptorch_model.destroy()
+    list_in = [torch.Tensor([1.0])]
+    cpu_in = [torch.Tensor([1.0])]
+    model = Model()
+    for i in range(2):
+        print(f"Run {i}")
+        cpu_out = model(cpu_in)
+        poptorch_out = poptorch_model(list_in)
+        assert cpu_out == poptorch_out
+        assert list_in == cpu_in
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -60,9 +71,9 @@ def test_inplace_sub(trace_model):
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
-                x[0] -= 1
+                x[0] -= 3
             elif isinstance(x, (dict)):
-                x['input'] -= 1
+                x['input'] -= 2
             else:
                 x -= 1
 
@@ -77,11 +88,22 @@ def test_inplace_sub(trace_model):
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == -1.0
 
-    list_in = (torch.Tensor([1.0]), )
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == 0.0
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == -1.0
+    if trace_model:
+        # Tracing doesn't support lists as inputs, and tuples
+        # can't be modified in-place.
+        return
+
+    # We're changing the  input type: must recompile
+    poptorch_model.destroy()
+    list_in = [torch.Tensor([1.0])]
+    cpu_in = [torch.Tensor([1.0])]
+    model = Model()
+    for i in range(2):
+        print(f"Run {i}")
+        cpu_out = model(cpu_in)
+        poptorch_out = poptorch_model(list_in)
+        assert cpu_out == poptorch_out
+        assert list_in == cpu_in
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -89,9 +111,9 @@ def test_inplace_div(trace_model):
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
-                x[0] /= 2
+                x[0] /= 4
             elif isinstance(x, (dict)):
-                x['input'] /= 2
+                x['input'] /= 3
             else:
                 x /= 2
 
@@ -106,11 +128,22 @@ def test_inplace_div(trace_model):
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == 0.25
 
-    list_in = (torch.Tensor([1.0]), )
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == 0.5
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == 0.25
+    if trace_model:
+        # Tracing doesn't support lists as inputs, and tuples
+        # can't be modified in-place.
+        return
+
+    # We're changing the  input type: must recompile
+    poptorch_model.destroy()
+    list_in = [torch.Tensor([1.0])]
+    cpu_in = [torch.Tensor([1.0])]
+    model = Model()
+    for i in range(2):
+        print(f"Run {i}")
+        cpu_out = model(cpu_in)
+        poptorch_out = poptorch_model(list_in)
+        assert cpu_out == poptorch_out
+        assert list_in == cpu_in
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -118,9 +151,9 @@ def test_inplace_mul(trace_model):
     class Model(nn.Module):
         def forward(self, x):
             if isinstance(x, (tuple, list)):
-                x[0] *= 2
+                x[0] *= 4
             elif isinstance(x, (dict)):
-                x['input'] *= 2
+                x['input'] *= 3
             else:
                 x *= 2
 
@@ -135,11 +168,22 @@ def test_inplace_mul(trace_model):
     assert poptorch_model(torch.Tensor([1.0])) is None
     assert tensor_in == 4.0
 
-    list_in = (torch.Tensor([1.0]), )
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == 2.0
-    assert poptorch_model(list_in) is None
-    assert list_in[0] == 4.0
+    if trace_model:
+        # Tracing doesn't support lists as inputs, and tuples
+        # can't be modified in-place.
+        return
+
+    # We're changing the  input type: must recompile
+    poptorch_model.destroy()
+    list_in = [torch.Tensor([1.0])]
+    cpu_in = [torch.Tensor([1.0])]
+    model = Model()
+    for i in range(2):
+        print(f"Run {i}")
+        cpu_out = model(cpu_in)
+        poptorch_out = poptorch_model(list_in)
+        assert cpu_out == poptorch_out
+        assert list_in == cpu_in
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

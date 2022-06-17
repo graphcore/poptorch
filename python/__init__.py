@@ -63,9 +63,7 @@ poptorch_core.setCustomCodeletsPath(
 
 @atexit.register
 def poptorchCleanUp():
-    logger.debug("poptorch unload: cleaning up resources")
     poptorch_core.destroyDispatcher()
-    logger.debug("poptorch unloaded")
 
 
 def load(filename: str,

@@ -172,7 +172,8 @@ class PoplarExecutor:
         self._options = options
         # The args parser needs to be initilialised before the model gets wrapped
         # otherwise we will not be able to retrieve the real arguments list
-        self._args_parser = _args_parser.ArgsParser(model)
+        self._args_parser = _args_parser.ArgsParser(
+            model, self._options.Jit.trace_model)
         # Inputs used to compile the executable
         self._executable_inputs = None
         self._anchor_memory = {}
@@ -572,7 +573,7 @@ class PoplarExecutor:
                              options=self._options,
                              training=self._training,
                              dict_optimizer=self._dict_optimizer)
-            ctx.compile(*in_tensors.asTuple())
+            ctx.compile(*in_tensors.args)
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
         self._error_on_buffer_parameter_address_change(buff_param_addresses)
 
@@ -920,18 +921,14 @@ class PoplarExecutor:
                     self._host_weights_version = \
                             self._user_model._host_weights_version
 
-        assert in_tensors.first_none == self._executable_inputs.first_none, (
-            "Number of arguments mismatch: "
-            f"{self._executable_inputs.first_none_arg} "
-            f"arguments used to compile the model and "
-            f"{in_tensors.first_none} provided this time")
+        self._executable_inputs.validateInputs(in_tensors)
 
         # Update the optimizer state on the IPU if needed.
         self._write_optim_state_dict_if_needed()
         # Execute the poplar executable with the full size (batch * device interations)
         with self._profiling.tracepoint("modelExecution"):
             output = poptorch_core.execute(self._executable,
-                                           in_tensors.asTuple())
+                                           in_tensors.asPackedFlatTuple())
 
         # Any anchored tensors will be returned at the end of the list
         # Pop them out and populate the anchor memory
@@ -1290,7 +1287,7 @@ class PoplarExecutor:
         # From this point, if in_tensors_trace_view changes in value, the input
         # is modified in-place. To discover this, take a deep copy of the
         # inputs.
-        in_tensors_trace_view_tuple = in_tensors_trace_view.asTuple()
+        in_tensors_trace_view_tuple = in_tensors_trace_view.args
         in_tensors_backup = None
         try:
             in_tensors_backup = copy.deepcopy(in_tensors_trace_view_tuple)

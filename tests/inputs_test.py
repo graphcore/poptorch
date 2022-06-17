@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import re
 import torch
 import torch.nn as nn
 import pytest
@@ -32,6 +33,8 @@ def test_simple_tuple(use_half, trace_model):
         t1 = t1.half()
         t2 = t2.half()
     assert inference_model((t1, t2)).float() == 3.0
+    # Run more than once
+    assert inference_model((t1, t2)).float() == 3.0
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -52,17 +55,52 @@ def test_type_change(trace_model):
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
     assert inference_model((t1, t2)).float() == 3.0
+    # Run more than once
+    assert inference_model((t1, t2)).float() == 3.0
 
     t1 = torch.tensor([1])
     t2 = torch.tensor([2])
-    error_msg = ("One or more input data types have changed since the first " +
-                 "model run. You will need to call \"destroy\" on the model " +
-                 "before running with different input data types.")
+    error_msg = (".*expected torch.float32 but got torch.int64.*")
     with pytest.raises(poptorch.Error, match=error_msg):
         assert inference_model((t1, t2)).float() == 3
 
     inference_model.destroy()
     assert inference_model((t1, t2)).float() == 3
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_shape_change(trace_model):
+    class SimpleAdder(nn.Module):
+        def forward(self, t):
+            assert isinstance(t, tuple)
+            (x, y) = t
+            assert isinstance(x, torch.Tensor)
+            assert isinstance(y, torch.Tensor)
+            return x + y
+
+    model = SimpleAdder()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    inference_model = poptorch.inferenceModel(model, options)
+
+    t1 = torch.tensor([1.])
+    t2 = torch.tensor([2.])
+    assert inference_model((t1, t2)).float() == 3.0
+    # Run more than once
+    assert inference_model((t1, t2)).float() == 3.0
+
+    t1 = torch.tensor([1., 1.])
+    t2 = torch.tensor([2., 2.])
+    error_msg = ("expected torch.Size([1]) but got torch.Size([2])")
+    with pytest.raises(poptorch.Error, match=re.escape(error_msg)):
+        assert inference_model((t1, t2)).float() == 3
+
+    inference_model.destroy()
+    native_out = model((t1, t2))
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = inference_model((t1, t2))
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -71,6 +109,9 @@ def test_type_change(trace_model):
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")
 def test_nested_tuples_and_lists(capfd, use_half, thing_to_test, trace_model):
+    if trace_model and thing_to_test in ["List", "Mixed"]:
+        pytest.skip("Tracing doesn't support lists, only tuples")
+
     class SimpleAdder(nn.Module):
         def forward(self, tpl1, t2, tpl34567):
             (t1, ) = tpl1
@@ -111,17 +152,20 @@ def test_nested_tuples_and_lists(capfd, use_half, thing_to_test, trace_model):
         t6 = t6.half()
         t7 = t7.half()
 
-    if thing_to_test == "List":
-        assert inference_model([
-            t1,
-        ], t2, [t3, [t4, t5], [t6, t7]]).float() == 28.0
-    elif thing_to_test == "Tuple":
-        assert inference_model((t1, ), t2,
-                               (t3, (t4, t5), (t6, t7))).float() == 28.0
-    else:
-        assert inference_model([
-            t1,
-        ], t2, [t3, (t4, t5), [t6, t7]]).float() == 28.0
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        if thing_to_test == "List":
+            assert inference_model([
+                t1,
+            ], t2, [t3, [t4, t5], [t6, t7]]).float() == 28.0
+        elif thing_to_test == "Tuple":
+            assert inference_model((t1, ), t2,
+                                   (t3, (t4, t5), (t6, t7))).float() == 28.0
+        else:
+            assert inference_model([
+                t1,
+            ], t2, [t3, (t4, t5), [t6, t7]]).float() == 28.0
 
     # Ensure that a tuple element's type is not changed except after the
     # "host_side_cast"
@@ -163,6 +207,44 @@ def test_optional_inputs(use_half, trace_model):
     assert inference_model(t1, t2).float() == 1.0
     assert inference_model(t1, t2, t4=t4).float() == 9.0
     assert inference_model(t4=t4, t1=t1, t2=t2).float() == 9.0
+
+
+@pytest.mark.mlirSupportRequired
+def test_non_tensor_inputs_dispatch():
+    class Model(nn.Module):
+        def forward(
+                self,
+                t1,
+                scalar=2,
+                t2_opt=None,
+        ):
+            if t2_opt is not None:
+                return t2_opt * scalar + t1 * scalar
+            return t1 * scalar
+
+    model = Model()
+    options = poptorch.Options()
+    # jit.trace() cannot support this.
+    options.Jit.traceModel(False)
+
+    t1 = torch.tensor([3.])
+    ipu = poptorch.inferenceModel(model, options)(t1)
+    cpu = model(t1)
+    helpers.assert_allclose(expected=cpu, actual=ipu)
+
+    scalar = 4
+    ipu = poptorch.inferenceModel(model, options)(t1, scalar)
+    cpu = model(t1, scalar)
+    helpers.assert_allclose(expected=cpu, actual=ipu)
+
+    t2 = torch.tensor([5.])
+    ipu = poptorch.inferenceModel(model, options)(t1, scalar, t2)
+    cpu = model(t1, scalar, t2)
+    helpers.assert_allclose(expected=cpu, actual=ipu)
+
+    ipu = poptorch.inferenceModel(model, options)(t1, t2_opt=t2)
+    cpu = model(**{"t1": t1, "t2_opt": t2})
+    helpers.assert_allclose(expected=cpu, actual=ipu)
 
 
 @pytest.mark.parametrize("use_half", [True, False])
@@ -213,7 +295,10 @@ def test_unused_tuple(trace_model):
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
     z = (torch.tensor([1.]), torch.tensor([1.]))
-    inference_model(t1, t2, z)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        inference_model(t1, t2, z)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -305,8 +390,11 @@ def test_none_input_pass_one_kwarg(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z, t=None)
-    poptorch_out = poptorch_model(x, y, z, t=None)
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(x, y, z, t=None)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -317,8 +405,11 @@ def test_none_input_pass_two_kwarg(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z=None, t=None)
-    poptorch_out = poptorch_model(x, y, z=None, t=None)
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(x, y, z=None, t=None)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -329,19 +420,36 @@ def test_none_input_pass_skip_one_kwarg(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z=None)
-    poptorch_out = poptorch_model(x, y, z=None)
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(x, y, z=None)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_none_input_fail_non_default_kwarg(trace_model):
+def test_none_input_trace_fail_non_default_kwarg():
     model = Model()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(AssertionError):
         poptorch_model(x, y=None)
+
+
+@pytest.mark.mlirSupportRequired
+def test_none_input_trace_dispatch_non_default_kwarg():
+    model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    native_out = model(x, y=None)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(x, y=None)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -352,8 +460,11 @@ def test_none_input_pass_last_arg(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, z, None)
-    poptorch_out = poptorch_model(x, y, z, None)
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(x, y, z, None)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -364,23 +475,39 @@ def test_none_input_pass_two_arg(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options)
 
     native_out = model(x, y, None, None)
-    poptorch_out = poptorch_model(x, y, None, None)
-    helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(x, y, None, None)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_none_input_fail_non_default_arg(trace_model):
+@pytest.mark.mlirSupportRequired
+def test_none_input_dispatch_non_default_arg():
     model = Model()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(False)
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    native_out = model(x, None, None, None)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(x, None, None, None)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+def test_none_input_trace_fail_non_default_arg():
+    model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(AssertionError):
         poptorch_model(x, None, None, None)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_none_input_fail(trace_model):
+def test_none_input_fail():
     class Model(torch.nn.Module):
         def forward(self, x=None, y=ones):
             if x is None:
@@ -391,7 +518,7 @@ def test_none_input_fail(trace_model):
 
     model = Model()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(model, options)
 
     with pytest.raises(AssertionError):
