@@ -211,10 +211,13 @@ def test_untracable_type_error(trace_model):
         poptorch_model(x, 5.6)
 
 
-def test_torch_backward_error():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_torch_backward_error(trace_model):
     x = torch.Tensor([5.0])
     model = helpers.ModelWithWeights(lambda x: x, x.shape)
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     poptorch_out, poptorch_loss = poptorch_model((x, ))
 
     error_message = (

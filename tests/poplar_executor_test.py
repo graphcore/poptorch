@@ -171,7 +171,8 @@ def test_inference_attributes(trace_model):
     assert poptorch_model.attr == "MyAttr"
 
 
-def test_training_attributes():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_training_attributes(trace_model):
     def custom_loss(output, target):
         # Mean squared error with a scale
         loss = output - target
@@ -195,7 +196,9 @@ def test_training_attributes():
     model = Model("MyAttr")
     input = torch.tensor([1.0, 2.0, 3.0])
     target = torch.tensor([30.0, 40.0, 50.0])
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     poptorch_model(input, target)
 
@@ -205,7 +208,8 @@ def test_training_attributes():
 
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("use_half", [False])
-def test_explicit_destroy(use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_explicit_destroy(use_half, trace_model):
     class ExampleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -237,6 +241,7 @@ def test_explicit_destroy(use_half):
             return out
 
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
     # Both models will use the same IPU device.
     opts.useIpuId(1)
 
@@ -262,7 +267,7 @@ def test_explicit_destroy(use_half):
     inference_model(input)
 
 
-def _compile_model_offline(cache, pid, num_processes):
+def _compile_model_offline(trace_model, cache, pid, num_processes):
     poptorch.setLogLevel("DEBUG")  # Force debug logging in worker process
     opts = poptorch.Options().useOfflineIpuTarget()
     opts.enableExecutableCaching(cache)
@@ -270,6 +275,7 @@ def _compile_model_offline(cache, pid, num_processes):
     opts.showCompilationProgressBar(False)
     opts.deviceIterations(10)
     opts.Distributed.configureProcessId(pid, num_processes)
+    opts.Jit.traceModel(trace_model)
 
     class ModelWithLoss(torch.nn.Module):
         def __init__(self):
@@ -297,7 +303,8 @@ def _compile_model_offline(cache, pid, num_processes):
 # Force-disable the IPU model
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
 @helpers.printCapfdOnExit
-def test_distributed_compile(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_distributed_compile(capfd, trace_model):
 
     num_processes = 6
     with tempfile.TemporaryDirectory() as tmp:
@@ -306,7 +313,7 @@ def test_distributed_compile(capfd):
         ctx = mp.get_context('spawn')
         processes = [
             ctx.Process(target=_compile_model_offline,
-                        args=(cache, pid, num_processes))
+                        args=(trace_model, cache, pid, num_processes))
             for pid in range(num_processes)
         ]
         for p in processes:
@@ -472,7 +479,13 @@ def test_get_cycles_no_hw(trace_model):
 
 
 @pytest.mark.parametrize("rewrap_executor", [True, False])
-def test_rewrap_model(rewrap_executor):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_rewrap_model(rewrap_executor, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
+            "in main graph tensors")
+
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -488,6 +501,7 @@ def test_rewrap_model(rewrap_executor):
     model = Model()
 
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
 
     # Normal running
     torch.nn.init.ones_(model.fc.weight)

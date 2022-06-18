@@ -30,12 +30,13 @@ input_feature_shapes = [
 ]
 
 
-def op_harness(op, inputs, inference_test_fn=None):
+def op_harness(trace_model, op, inputs, inference_test_fn=None):
     if inference_test_fn is None:
         inference_test_fn = lambda native_out, poptorch_out: helpers.assert_allclose(
             expected=native_out, actual=poptorch_out)
 
     opts = poptorch.Options().randomSeed(42)
+    opts.Jit.traceModel(trace_model)
     model = helpers.ModelWithWeights(op, inputs[0].shape)
 
     # Run on CPU.
@@ -55,38 +56,46 @@ def op_harness(op, inputs, inference_test_fn=None):
 @pytest.mark.parametrize("scale_factor", [2, 3.5, 5.00001, 5.12498])
 @pytest.mark.parametrize("input_shape", [(1, 2, 8), (2, 2, 2, 8),
                                          (2, 3, 4, 2, 8)])
-def test_upsample_nearest(scale_factor, input_shape):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_upsample_nearest(scale_factor, input_shape, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): AssertionError: Tensor-likes are not close")
     torch.manual_seed(42)
     op = torch.nn.Upsample(scale_factor=scale_factor, mode="nearest")
     x = torch.randn(*input_shape)
-    op_harness(op, [x])
+    op_harness(trace_model, op, [x])
 
 
-def test_downsample_nearest():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_downsample_nearest(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): AssertionError: Tensor-likes are not close")
     torch.manual_seed(42)
     # test case from T44610
     op = torch.nn.Upsample(scale_factor=0.435714, mode="nearest")
     x = torch.randn(1, 2, 14, 14)
-    op_harness(op, [x])
+    op_harness(trace_model, op, [x])
 
 
 # TODO(T43375): replace scale factor 5 with 3.5
 @pytest.mark.parametrize("scale_factor", [2, 5])
 @pytest.mark.parametrize("input_shape", [(1, 2, 3, 4), (2, 2, 2, 8)])
-def test_upsample_bilinear_factor(scale_factor, input_shape):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_upsample_bilinear_factor(scale_factor, input_shape, trace_model):
     torch.manual_seed(42)
     op = torch.nn.Upsample(scale_factor=scale_factor, mode="bilinear")
     x = torch.randn(*input_shape)
-    op_harness(op, [x])
+    op_harness(trace_model, op, [x])
 
 
 @pytest.mark.parametrize("shapes", [[(1, 2, 3, 4),
                                      (6, 8)], [(2, 2, 2, 8), (7, 28)]])
-def test_upsample_bilinear_factor_shapes(shapes):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_upsample_bilinear_factor_shapes(shapes, trace_model):
     torch.manual_seed(42)
     op = torch.nn.Upsample(size=shapes[1], mode="bilinear")
     x = torch.randn(*shapes[0])
-    op_harness(op, [x])
+    op_harness(trace_model, op, [x])
 
 
 @pytest.mark.parametrize("shape", [(2, 2, 14, 14)])
@@ -151,21 +160,25 @@ def test_linear(trace_model):
 
 @pytest.mark.parametrize("include_bias", include_bias)
 @pytest.mark.parametrize("input_feature_shapes", input_feature_shapes)
-def test_bilinear(include_bias, input_feature_shapes):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_bilinear(include_bias, input_feature_shapes, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): AssertionError: Tensor-likes are not close")
     torch.manual_seed(42)
     op = torch.nn.Bilinear(20, 30, 40, bias=include_bias)
     shape1 = input_feature_shapes['x1']
     shape2 = input_feature_shapes['x2']
     x1 = torch.randn(8, *shape1, 20)
     x2 = torch.randn(8, *shape2, 30)
-    op_harness(op, [x1, x2])
+    op_harness(trace_model, op, [x1, x2])
 
 
-def test_identity():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_identity(trace_model):
     torch.manual_seed(42)
     op = torch.nn.Identity(20, 30, 40)
     x = torch.randn(128, 20)
-    op_harness(op, [x])
+    op_harness(trace_model, op, [x])
 
 
 dropout_ops = [torch.nn.Dropout, torch.nn.Dropout2d, torch.nn.Dropout3d]
@@ -194,7 +207,12 @@ def test_dropout_inference(dropout_op, trace_model):
 
 
 @pytest.mark.parametrize("dropout_op", dropout_ops)
-def test_dropout_eval_during_training(dropout_op):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dropout_eval_during_training(dropout_op, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
+            "in main graph tensors")
     torch.manual_seed(42)
     dropout = dropout_op()
     dropout.eval()
@@ -209,6 +227,7 @@ def test_dropout_eval_during_training(dropout_op):
     # Create a poptorch training model with a fixed random seed for deterministic runs
     # Note that the loss is irrelevant and ignored.
     opts = poptorch.Options().randomSeed(8)
+    opts.Jit.traceModel(trace_model)
 
     class ModelWithLoss(torch.nn.Module):
         def __init__(self):
@@ -232,7 +251,8 @@ def test_dropout_eval_during_training(dropout_op):
 
 
 @pytest.mark.ipuHardwareRequired
-def test_dropout_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dropout_training(trace_model):
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout(drop_ratio)
 
@@ -248,11 +268,15 @@ def test_dropout_training():
                                 rtol=0.01,
                                 atol=0.01)
 
-    op_harness(dropout_op, [x], check_ratio)
+    op_harness(trace_model, dropout_op, [x], check_ratio)
 
 
 @pytest.mark.ipuHardwareRequired
-def test_dropout2d_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dropout2d_training(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::bernoulli")
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout2d(drop_ratio)
 
@@ -271,11 +295,15 @@ def test_dropout2d_training():
                                 rtol=0.01,
                                 atol=0.01)
 
-    op_harness(dropout_op, [x], check_ratio)
+    op_harness(trace_model, dropout_op, [x], check_ratio)
 
 
 @pytest.mark.ipuHardwareRequired
-def test_dropout3d_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dropout3d_training(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::bernoulli")
     drop_ratio = 0.6
     dropout_op = torch.nn.Dropout3d(drop_ratio)
 
@@ -294,7 +322,7 @@ def test_dropout3d_training():
                                 rtol=0.01,
                                 atol=0.01)
 
-    op_harness(dropout_op, [x], check_ratio)
+    op_harness(trace_model, dropout_op, [x], check_ratio)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -316,7 +344,12 @@ def test_embedding(trace_model):
 
 
 # pylint: disable=unsubscriptable-object
-def test_embedding_padding_idx():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_embedding_padding_idx(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): ValueError: not enough values to unpack "
+                    "(expected 2, got 1)")
+
     class TestEmbedding(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -337,6 +370,7 @@ def test_embedding_padding_idx():
 
     options = poptorch.Options()
     options.anchorTensor("grad_embedding", "Gradient___model.embedding.weight")
+    options.Jit.traceModel(trace_model)
     pop_model = poptorch.trainingModel(TestEmbedding(), options=options)
     pop_y, pop_loss = pop_model(x)
     pop_grad = pop_model.getAnchoredTensor("grad_embedding")
@@ -422,19 +456,24 @@ def test_embedding_bag_include_last_offset(mode, trace_model):
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
-def test_pixel_shuffle():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_pixel_shuffle(trace_model):
     torch.manual_seed(42)
     op = torch.nn.PixelShuffle(3)
     x = torch.randn(2, 18, 4, 4)
-    op_harness(op, [x])
+    op_harness(trace_model, op, [x])
 
 
 @pytest.mark.parametrize("params", [(2, 2, 1, 1, 1, 1), (3, 2, 1, 1, 1, 1),
                                     (2, 4, 1, 1, 1, 1), (2, 2, 2, 1, 1, 1),
                                     (2, 2, 1, 3, 1, 1), (2, 2, 1, 1, 3, 1),
                                     (2, 2, 1, 1, 1, 4)])
+@pytest.mark.parametrize("trace_model", [True, False])
 # Tests aten::im2col
-def test_unfold(params):
+def test_unfold(params, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::im2col")
     (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
      stride_y) = params
     padding = 2
@@ -457,7 +496,7 @@ def test_unfold(params):
 
     inputs = [torch.rand(1, 1, y_in, x_in)]
 
-    op_harness(combined, inputs)
+    op_harness(trace_model, combined, inputs)
 
 
 @pytest.mark.parametrize("params", [(2, 2, 1, 1, 1, 1), (3, 2, 1, 1, 1, 1),
@@ -465,7 +504,11 @@ def test_unfold(params):
                                     (2, 2, 1, 3, 1, 1), (2, 2, 1, 1, 3, 1),
                                     (2, 2, 1, 1, 1, 3)])
 # Tests aten::col2im
-def test_fold(params):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_fold(params, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::col2im")
     (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
      stride_y) = params
 
@@ -485,13 +528,17 @@ def test_fold(params):
     unfold_args["output_size"] = orig_input.shape[2:]
 
     op = torch.nn.Fold(**unfold_args)
-    op_harness(op, [unfolded])
+    op_harness(trace_model, op, [unfolded])
 
 
 # Tests aten::col2im with padding
 @pytest.mark.parametrize("stride_x", [1, 3])
 @pytest.mark.parametrize("stride_y", [1, 3])
-def test_fold_with_padding(stride_x, stride_y):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_fold_with_padding(stride_x, stride_y, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::col2im")
     torch.manual_seed(42)
 
     orig_input = torch.rand(2, 2, 11, 13)
@@ -512,7 +559,7 @@ def test_fold_with_padding(stride_x, stride_y):
     unfold_args["output_size"] = orig_input.shape[2:]
 
     op = torch.nn.Fold(**unfold_args)
-    op_harness(op, [unfolded])
+    op_harness(trace_model, op, [unfolded])
 
 
 @pytest.mark.parametrize("dim", [0, 1, None])

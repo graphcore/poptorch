@@ -8,7 +8,8 @@ import poptorch
 import helpers
 
 
-def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn, step):
+def slice_test_harness(trace_model, tensor_x, tensor_y, start_fn, end_fn,
+                       step):
     op = lambda x, y: x[start_fn(x):end_fn(x):step] + y
 
     model = helpers.ModelWithWeights(op, tensor_x.shape)
@@ -17,7 +18,9 @@ def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn, step):
     native_out, _ = model((tensor_x, tensor_y))
 
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     poptorch_out, _ = poptorch_model((tensor_x, tensor_y))
 
     # Inference test - check outputs
@@ -28,19 +31,26 @@ def slice_test_harness(tensor_x, tensor_y, start_fn, end_fn, step):
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_slice_idx_size_of(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_slice_idx_size_of(step, trace_model):
     def start_fn(tensor_in):
         return tensor_in.shape[0] // 2
 
     def end_fn(tensor_in):
         return tensor_in.shape[0] - 1
 
-    slice_test_harness(torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+    slice_test_harness(trace_model,
+                       torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                        torch.tensor([3.0]), start_fn, end_fn, step)
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_slice_with_sum(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_slice_with_sum(step, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler aten::div.out_mode")
+
     def start_fn(tensor_in):
         del tensor_in
         return torch.sum(torch.tensor([1, 2, 3])) // 3 - 2
@@ -49,12 +59,18 @@ def test_slice_with_sum(step):
         del tensor_in
         return torch.sum(torch.tensor([1, 2, 3])) // 3 + 1
 
-    slice_test_harness(torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+    slice_test_harness(trace_model,
+                       torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                        torch.tensor([-3.0]), start_fn, end_fn, step)
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_slice_with_branch(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_slice_with_branch(step, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler aten::div.out_mode")
+
     def start_fn(tensor_in):
         del tensor_in
         a = torch.sum(torch.tensor([1, 2, 3])) // 3 - 2
@@ -67,7 +83,8 @@ def test_slice_with_branch(step):
         b = torch.sum(torch.tensor([3, 4, 5])) // 3 + 1
         return a - 1 + b
 
-    slice_test_harness(torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+    slice_test_harness(trace_model,
+                       torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                        torch.tensor([-3.0]), start_fn, end_fn, step)
 
 
@@ -78,6 +95,8 @@ def dynamic_slice_harness(trace_model,
                           end_fn,
                           step,
                           test_training=False):
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     if test_training:
         # TODO(T62094) PopART doesn't currently support dynamic slices in training.
         # Once it works, switch back test_training to True by default.
@@ -88,7 +107,7 @@ def dynamic_slice_harness(trace_model,
         native_out, _ = model((tensor_in, extra_in))
 
         # Run on IPU.
-        poptorch_model = poptorch.trainingModel(model)
+        poptorch_model = poptorch.trainingModel(model, options)
         poptorch_out, _ = poptorch_model((tensor_in, extra_in))
 
         # Training test - check weights changed
@@ -101,8 +120,6 @@ def dynamic_slice_harness(trace_model,
         native_out = model(tensor_in, extra_in)
 
         # Run on IPU.
-        options = poptorch.Options()
-        options.Jit.traceModel(trace_model)
         poptorch_model = poptorch.inferenceModel(model, options)
         # Make sure the model is compiled using different tensor values
         # otherwise there is no way to tell if the values are compiled
@@ -197,7 +214,8 @@ def test_dynamic_slice_two_dims(step, trace_model):
 
 
 @pytest.mark.parametrize("step", [1, 2, 3])
-def test_dynamic_slice_two_dims_twice_sliced(step):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_dynamic_slice_two_dims_twice_sliced(step, trace_model):
     start_dim_one = torch.tensor([1])
     start_dim_two = torch.tensor([0])
 
@@ -215,7 +233,9 @@ def test_dynamic_slice_two_dims_twice_sliced(step):
     native_out, _ = model((tensor_in, ))
 
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     poptorch_out, _ = poptorch_model((tensor_in, ))
 
     # Inference test - check outputs
@@ -372,7 +392,8 @@ def test_dynamic_slice_one_dim_mix_up_float(trace_model):
 
 @pytest.mark.parametrize("dim", [0, 1, 2])
 @pytest.mark.parametrize("use_half", [True, False])
-def test_unbind(dim, use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_unbind(dim, use_half, trace_model):
     if use_half:
         # Test correct implicit casting
         def op(x):
@@ -391,7 +412,9 @@ def test_unbind(dim, use_half):
         # pylint: disable=protected-access
         model._weights_before = model.lin.weight.detach().clone()
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     native_out, _ = model((x, ))
     poptorch_out, _ = poptorch_model((x, ))

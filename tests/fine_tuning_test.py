@@ -3,13 +3,14 @@
 import copy
 import os  # pylint: disable=unused-import
 import unittest.mock
+import pytest
 import torch
 import torchvision.models as models
 import helpers
 import poptorch
 
 
-def fine_tuning_harness(imagenet_model):
+def fine_tuning_harness(imagenet_model, trace_model):
     torch.manual_seed(42)
 
     num_classes = 2
@@ -48,7 +49,11 @@ def fine_tuning_harness(imagenet_model):
     # Fine tune.
     optim = torch.optim.SGD(model.base_model.fc.parameters(), lr=0.001)
 
-    poptorch_model = poptorch.trainingModel(model, optimizer=optim)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model,
+                                            optimizer=optim,
+                                            options=options)
 
     for _ in range(num_epochs):
         _ = poptorch_model(data, target)
@@ -63,5 +68,10 @@ def fine_tuning_harness(imagenet_model):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-def test_resnet18():
-    fine_tuning_harness(models.resnet18)
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_resnet18(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
+    fine_tuning_harness(models.resnet18, trace_model)

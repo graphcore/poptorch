@@ -32,7 +32,8 @@ activation_functions = [
 
 
 @pytest.mark.parametrize("op", activation_functions)
-def test_activations(op):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_activations(op, trace_model):
     torch.manual_seed(42)
 
     input = torch.randn([2, 20])
@@ -46,7 +47,9 @@ def test_activations(op):
     native_out, _ = model((input, ))
 
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     poptorch_out, _ = poptorch_model((input, ))
 
     tol = [0.01, 1e-3] if op is nn.GELU else [1e-4, 1e-7]
@@ -65,7 +68,8 @@ def test_activations(op):
 
 
 @pytest.mark.parametrize("dim", range(5))
-def test_glu(dim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_glu(dim, trace_model):
     torch.manual_seed(42)
     N, C, M, K, L = 2, 4, 6, 8, 10
 
@@ -76,7 +80,9 @@ def test_glu(dim):
     native_out, _ = model((input, ))
 
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     poptorch_out, _ = poptorch_model((input, ))
 
     # Inference test - check outputs
@@ -112,8 +118,11 @@ def test_activation_numerics(op, trace_model):
 @pytest.mark.filterwarnings("ignore:Trace had nondeterministic nodes")
 @pytest.mark.filterwarnings("ignore:Output nr 1. of the traced function")
 @pytest.mark.filterwarnings("ignore:Output nr 2. of the traced function")
-def test_rrelu_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_rrelu_training(trace_model):
     opts = poptorch.Options().randomSeed(0)
+    opts.Jit.traceModel(trace_model)
+
     input = torch.randn([3000])
 
     model = helpers.ModelWithWeights(nn.RReLU(), input.shape)

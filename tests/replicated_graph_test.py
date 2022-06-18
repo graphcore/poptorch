@@ -7,12 +7,18 @@ import poptorch
 
 
 @pytest.mark.ipuHardwareRequired
-def test_weight_update_replicas(process_id=0, num_processes=1):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_weight_update_replicas(trace_model, process_id=0, num_processes=1):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): Could not find loss tensor '' in main graph tensors"
+        )
     localReplicationFactor = 2
 
     opts = poptorch.Options()
     opts.replicationFactor(localReplicationFactor)
     opts.Distributed.configureProcessId(process_id, num_processes)
+    opts.Jit.traceModel(trace_model)
 
     replicationFactor = localReplicationFactor * opts.Distributed.numProcesses
 
@@ -99,11 +105,13 @@ def test_weight_update_replicas(process_id=0, num_processes=1):
 
 
 @pytest.mark.ipuHardwareRequired
-def test_too_many_ipus():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_too_many_ipus(trace_model):
     localReplicationFactor = 128
 
     opts = poptorch.Options()
     opts.replicationFactor(localReplicationFactor)
+    opts.Jit.traceModel(trace_model)
 
     class Model(torch.nn.Module):
         def __init__(self):

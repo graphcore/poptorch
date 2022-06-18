@@ -66,7 +66,12 @@ def test_batchNorm(batch_norm, affine, running_stats, training, trace_model):
         poptorch_model.assert_weights_changed()
 
 
-def test_batchNorm_eval_during_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_batchNorm_eval_during_training(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -93,7 +98,9 @@ def test_batchNorm_eval_during_training():
     # Run pytorch native on CPU.
     native_out, _ = model(input, target)
     # Run on IPU.
-    ipu_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipu_model = poptorch.trainingModel(model, options=options)
     poptorch_out, _ = ipu_model(input, target)
     # TODO: T38684
     # Implicit copy only happens when we touch the params so copy explicitly.
@@ -107,7 +114,10 @@ def test_batchNorm_eval_during_training():
 
 
 @pytest.mark.parametrize("norm_dim", range(4))
-def test_layerNorm(norm_dim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_layerNorm(norm_dim, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): Segfault")
     torch.manual_seed(42)
 
     elementwise_affine = norm_dim % 2 == 1
@@ -121,7 +131,9 @@ def test_layerNorm(norm_dim):
     # Run pytorch native on CPU.
     native_out, _ = model((input, ))
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     # Run on IPU.
     poptorch_out, _ = poptorch_model((input, ))
 
@@ -195,7 +207,12 @@ def test_layerNormPretrainedWeights(trace_model):
 
 
 @pytest.mark.parametrize("dims", {2, 3, 4, 5})
-def test_groupNorm(dims):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_groupNorm(dims, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): Could not find canonicalisation handler for JIT "
+            "symbol: aten::native_group_norm")
     if dims == 2:
         # TODO(T49073): Match torch 1.10 GroupNorm implementation
         pytest.skip("Numerical differences between PyTorch and PopTorch")
@@ -217,7 +234,9 @@ def test_groupNorm(dims):
     native_out, _ = model((input, ))
 
     # Run on IPU.
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     poptorch_out, _ = poptorch_model((input, ))
 
     # Inference test - check outputs
@@ -266,7 +285,12 @@ instance_norm_params = [
 
 
 @pytest.mark.parametrize("instance_norm, d", instance_norm_params)
-def test_instanceNorm(instance_norm, d):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_instanceNorm(instance_norm, d, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     torch.manual_seed(42)
 
     affine = d % 2 == 1
@@ -289,7 +313,11 @@ def test_instanceNorm(instance_norm, d):
     for _ in range(3):
         model = Model()
         opt = optim.AdamW(model.parameters(), lr=0.01)
-        poptorch_model = poptorch.trainingModel(model, optimizer=opt)
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        poptorch_model = poptorch.trainingModel(model,
+                                                options=options,
+                                                optimizer=opt)
 
         shape = [5, 6]
         shape.extend([2 for _ in range(d)])
@@ -311,7 +339,12 @@ def test_instanceNorm(instance_norm, d):
                                 expected=label)
 
 
-def test_batchnorm_statistics():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_batchnorm_statistics(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     torch.manual_seed(42)
 
     input_data = [torch.randn([4, 4, 3, 3]) for _ in range(10)]
@@ -335,6 +368,7 @@ def test_batchnorm_statistics():
     model1.train()
     optimizer = optim.SGD(model1.parameters(), lr=0.0)
     model_opts = poptorch.Options()
+    model_opts.Jit.traceModel(trace_model)
     training_model = poptorch.trainingModel(model1,
                                             model_opts,
                                             optimizer=optimizer)

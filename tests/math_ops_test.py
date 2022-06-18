@@ -22,6 +22,8 @@ def op_harness(trace_model,
     if not is_unary:
         assert len(inputs) == 2
 
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     if test_training and not op in non_differentiable_ops:
         model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn)
 
@@ -33,7 +35,9 @@ def op_harness(trace_model,
         optim = torch.optim.AdamW(model.parameters(), lr=0.1)
 
         # Run on IPU.
-        poptorch_model = poptorch.trainingModel(model, optimizer=optim)
+        poptorch_model = poptorch.trainingModel(model,
+                                                options=options,
+                                                optimizer=optim)
         poptorch_out, _ = poptorch_model(tuple(inputs))
 
         # Training test - check weights have changed
@@ -56,8 +60,6 @@ def op_harness(trace_model,
         native_out = model(*inputs)
 
         # Run on IPU.
-        options = poptorch.Options()
-        options.Jit.traceModel(trace_model)
         poptorch_model = poptorch.inferenceModel(model, options)
         poptorch_out = poptorch_model(*inputs)
 
@@ -111,6 +113,13 @@ unary_ops_float = [
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_unary_ops_float(op, trace_model):
     torch.manual_seed(42)
+    if not trace_model and op in [
+            torch.acos, torch.acosh, torch.asin, torch.asinh, torch.atan,
+            torch.atanh, torch.cos, torch.cosh, torch.erf, torch.erfc,
+            torch.expm1, torch.frac, torch.log10, torch.log1p, torch.log2,
+            torch.rsqrt, torch.reciprocal, torch.sin, torch.sinh, torch.tan
+    ]:
+        pytest.skip("TODO(T51159): No shape inference handler")
 
     input = torch.randn([1, 2, 10, 10])
 
@@ -206,6 +215,10 @@ def test_clamp(args, trace_model):
 @pytest.mark.parametrize("args", clamp_inputs)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_clamp_(args, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
+            "is being used in an in-place operation.")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -224,6 +237,14 @@ def test_clamp_(args, trace_model):
     [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_clamp_min_max(op, trace_model):
+    if not trace_model and op in [torch.clamp_max_, torch.clamp_min_]:
+        pytest.skip(
+            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
+            "is being used in an in-place operation.")
+    if not trace_model and op in [torch.clamp_max, torch.clamp_min]:
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::clamp_max.out / aten::clamp_min.out")
+
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -286,6 +307,12 @@ binary_ops_float = [
 @pytest.mark.parametrize("op", binary_ops_float)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_binary_ops_float(op, trace_model):
+    if not trace_model and op == torch.atan2:
+        pytest.skip("TODO(T51159): No shape inference handler")
+    if not trace_model and op == torch.amin:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::amin.out")
+
     torch.manual_seed(42)
 
     input1 = torch.randn([1, 2, 5, 1]) * 100.0
@@ -531,6 +558,18 @@ reduction_ops_api2 = [
 @pytest.mark.parametrize("op", reduction_ops_api1)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_reduction_ops_float(op, trace_model):
+    if not trace_model and op in [torch.amin]:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::amin.out")
+    if not trace_model and op in [torch.amax]:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::amax.out")
+    if not trace_model and op in [torch.median]:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::median")
+    if not trace_model and op in [torch.norm]:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::resize_")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -554,6 +593,18 @@ def test_reduction_ops_float(op, trace_model):
 @pytest.mark.parametrize("keepdim", [False, True])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
+    if not trace_model and op in [torch.amin]:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::amin.out")
+    if not trace_model and op in [torch.amax, torch.logsumexp]:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::amax.out")
+    if not trace_model and op in [torch.median]:
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::median.dim_values")
+    if not trace_model and op in [torch.norm]:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::resize_")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -593,6 +644,12 @@ def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
 @pytest.mark.parametrize("keepdim", [False, True])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_minmax_tuple_out(op, dim, keepdim, trace_model):
+    if not trace_model and op == torch.max:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::max.dim")
+    if not trace_model and op == torch.min:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::min.dim")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -622,6 +679,9 @@ norm_pvals = ['fro', float('inf'), float('-inf'), 1, 1.0, 2, 2.0, 3, 3.0]
 @pytest.mark.parametrize("p", norm_pvals)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_norm_p_values(p, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): No shape inference handler for aten::resize_")
     torch.manual_seed(42)
     input = torch.randn([1, 2, 10, 10])
 
@@ -706,6 +766,11 @@ comparison_unity = [torch.max, torch.min]
 @pytest.mark.parametrize("op", comparison_unity)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_compare_unity_operations(op, trace_model):
+    if not trace_model and op == torch.max:
+        pytest.skip("TODO(T51159): No shape inference handler for aten::max")
+    if not trace_model and op == torch.min:
+        pytest.skip("TODO(T51159): No shape inference handler for aten::min")
+
     torch.manual_seed(42)
     input = torch.randn([1, 2, 10, 10])
 
@@ -848,6 +913,8 @@ cross_shapes = [(3, 4, 5, 6), (4, 3, 5, 6), (4, 5, 3, 6), (4, 5, 6, 3),
 @pytest.mark.parametrize("shape", cross_shapes)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_cross_shape(shape, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): No shape inference handler for aten::cross")
     torch.manual_seed(42)
 
     x = torch.randn(shape)
@@ -862,6 +929,8 @@ def test_cross_shape(shape, trace_model):
 @pytest.mark.parametrize("axis", range(0, 4))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_cross_axis(axis, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): No shape inference handler for aten::cross")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):

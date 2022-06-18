@@ -9,7 +9,12 @@ import helpers
 
 @pytest.mark.parametrize("nonlinearity", ['tanh', 'relu'])
 @pytest.mark.parametrize("batch_first", [True, False])
-def test_rnn(nonlinearity, batch_first):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_rnn(nonlinearity, batch_first, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     torch.manual_seed(42)
     num_batches = 10
     sequence_length = 5
@@ -34,7 +39,9 @@ def test_rnn(nonlinearity, batch_first):
         batch_first=batch_first,
     )
     model = helpers.ModelWithWeights(rnn, inputs[0].shape, lambda x: x[0])
-    ipu_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipu_model = poptorch.trainingModel(model, options=options)
 
     for input in inputs:
         (out_cpu, h_cpu), _ = model((input, h))

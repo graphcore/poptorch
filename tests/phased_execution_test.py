@@ -293,7 +293,10 @@ class LogChecker(helpers.LogChecker):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_2x2_parallel_phased_execution_inline(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_2x2_parallel_phased_execution_inline(capfd, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): Segfault")
     N = 3
     size = 10
 
@@ -336,6 +339,7 @@ def test_2x2_parallel_phased_execution_inline(capfd):
 
     model = Model()
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
 
     phases = []
     phases = [f"{n}" for n in range(2 * N)]
@@ -349,7 +353,10 @@ def test_2x2_parallel_phased_execution_inline(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_2x2_parallel_phased_execution_opts(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_2x2_parallel_phased_execution_opts(capfd, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): Segfault")
     N = 3
     size = 10
 
@@ -389,6 +396,7 @@ def test_2x2_parallel_phased_execution_opts(capfd):
     target = torch.rand(size, 1)
     model = Model()
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
     phases = []
     # Alternate between 0-2 and 1-3
     for n in range(N):
@@ -410,7 +418,10 @@ def test_2x2_parallel_phased_execution_opts(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_2x2_parallel_phased_execution_small_opts(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_2x2_parallel_phased_execution_small_opts(capfd, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): Segfault")
     size = 10
 
     class Model(torch.nn.Module):
@@ -470,6 +481,7 @@ def test_2x2_parallel_phased_execution_small_opts(capfd):
     target = torch.rand(size, 1)
     model = Model()
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
     strategy = poptorch.ParallelPhasedExecution(
         [poptorch.Stage("0"), poptorch.Stage("1")],
         [poptorch.Stage("2", "4"),

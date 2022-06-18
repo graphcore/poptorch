@@ -532,7 +532,8 @@ def test_CTCLoss(blank, reduction, trace_model, zero_infinity):
 
 
 @pytest.mark.parametrize("reduction", ("mean", "sum"))
-def test_identity_with_linear_out_returned(reduction):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_identity_with_linear_out_returned(reduction, trace_model):
     torch.manual_seed(42)
 
     el_in = 2
@@ -552,7 +553,9 @@ def test_identity_with_linear_out_returned(reduction):
     model = Model()
     native_loss, native_out = model(x)
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     poptorch_loss, poptorch_out = poptorch_model(x)
 
     helpers.assert_allclose(actual=poptorch_loss, expected=native_loss)

@@ -36,6 +36,7 @@ def test_attach_detach(trace_model):
     model = Model()
 
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
     # Ensure that both models use the same IPU
     opts.useIpuId(1)
     training = poptorch.trainingModel(model, options=opts)

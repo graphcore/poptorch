@@ -22,9 +22,12 @@ class Model(torch.nn.Module):
         return out
 
 
-def test_tensor_names():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_tensor_names(trace_model):
     model = Model()
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     input = torch.rand(10, 10)
     label = torch.rand(10, 10)
 
@@ -39,12 +42,16 @@ def test_tensor_names():
     assert any([t.startswith('scaledLearningRate') for t in tensors])
 
 
-def test_tensor_values():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_tensor_values(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): pop from empty list")
     model = Model()
 
     opts = poptorch.Options()
     opts.anchorTensor('grad_bias', 'Gradient___model.fc2.bias')
     opts.anchorTensor('update_weight', 'UpdatedVar___model.fc2.weight')
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, opts)
 
     input = torch.rand(10, 10)
@@ -78,12 +85,18 @@ output_modes = [[poptorch.OutputMode.All, 3, "ALL/1"],
 @pytest.mark.parametrize("mode, period, expected_str", output_modes)
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_tensor_modes(capfd, mode, period, expected_str):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_tensor_modes(capfd, mode, period, expected_str, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): poptorch/_utils.py:110: StopIteration "
+                    "(in copy_structure)")
     model = Model()
     tensor_name = 'Gradient___model.fc2.bias'
 
     opts = poptorch.Options()
     opts.anchorTensor('grad_bias', tensor_name, mode, period)
+    opts.Jit.traceModel(trace_model)
+
     poptorch_model = poptorch.trainingModel(model, opts)
 
     input = torch.rand(10, 10)

@@ -9,7 +9,12 @@ import helpers
 
 @pytest.mark.parametrize("bias", [True, False])
 @pytest.mark.parametrize("batch_first", [True, False])
-def test_gru(bias, batch_first):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_gru(bias, batch_first, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     length = 1
     batches = 3
     input_size = 5
@@ -32,8 +37,10 @@ def test_gru(bias, batch_first):
 
     out_fn = lambda x: x[0]
     model = helpers.ModelWithWeights(op, inp.shape, out_fn)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
 
-    poptorch_model = poptorch.trainingModel(model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     (native_out, native_hn), _ = model((inp, h0))
     (poptorch_out, poptorch_hn), _ = poptorch_model((inp, h0))

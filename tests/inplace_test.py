@@ -345,7 +345,8 @@ def test_half_buffer_inplace(trace_model):
                                                   dtype=torch.float16))
 
 
-def test_float_to_half_buffer_inplace_with_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_float_to_half_buffer_inplace_with_training(trace_model):
     torch.manual_seed(42)
 
     # pylint: disable=attribute-defined-outside-init
@@ -366,7 +367,9 @@ def test_float_to_half_buffer_inplace_with_training():
             return out, self.loss(out, x)
 
     model = Model().train().half()
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options)
 
     x = torch.rand(5, 5).half()
     native_out, native_loss = model(x)

@@ -349,8 +349,14 @@ std::string MLIRDispatch::handleOp(const c10::OperatorHandle &op,
 
   // First we check if we have a direct mapping onto MLIR.
   auto mlir_handle = _direct_dispatch_lookup.find(schema_key);
-  ERROR_ON_MSG(mlir_handle == _direct_dispatch_lookup.end(),
-               "No shape inference handler for " << schema_key);
+  if (mlir_handle == _direct_dispatch_lookup.end()) {
+    std::string s = "No shape inference handler for " + schema_key;
+    // In some cases Torch will crash during the exception handling
+    // so print the error message on the error channel before throwing
+    // the exception.
+    logging::err("{}", s);
+    ERROR(s);
+  }
   logging::trace("[TRACING-2] Handling {} via MLIR", schema_key);
 
   /*

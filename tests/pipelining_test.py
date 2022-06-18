@@ -71,12 +71,15 @@ def test_api_inline(capfd, trace_model):
 
 
 @helpers.overridePoptorchLogLevel("DEBUG")
-def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted):
+@pytest.mark.parametrize("trace_model", [True, False])
+def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted,
+                                      trace_model):
     # pylint: disable=protected-access
     dev_its = 2
     grad_accum = 3
 
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
     opts.deviceIterations(dev_its)
     opts.Training.gradientAccumulation(grad_accum)
     opts._Popart.set("autoRecomputation", 3)  # All forward pipeline stages.
@@ -103,7 +106,12 @@ def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted):
                                  "should be stashed")
 
 
-def test_recomputation_checkpoint_tensor():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_recomputation_checkpoint_tensor(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
+            "in main graph tensors")
     size = 3
 
     class Model(torch.nn.Module):
@@ -126,10 +134,15 @@ def test_recomputation_checkpoint_tensor():
                 x = x * 2
                 return x, torch.nn.functional.l1_loss(x, target)
 
-    run_recomputation_checkpoint_test(size, Model, 2)
+    run_recomputation_checkpoint_test(size, Model, 2, trace_model)
 
 
-def test_recomputation_checkpoint_tensor_two_inputs():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_recomputation_checkpoint_tensor_two_inputs(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
+            "in main graph tensors")
     size = 3
 
     class Model(torch.nn.Module):
@@ -158,10 +171,15 @@ def test_recomputation_checkpoint_tensor_two_inputs():
                 x = x * 2
                 return x, torch.nn.functional.l1_loss(x, target)
 
-    run_recomputation_checkpoint_test(size, Model, 3)
+    run_recomputation_checkpoint_test(size, Model, 3, trace_model)
 
 
-def test_recomputation_checkpoint_tensor_tuple_inputs():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_recomputation_checkpoint_tensor_tuple_inputs(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
+            "in main graph tensors")
     size = 3
 
     class Model(torch.nn.Module):
@@ -190,7 +208,7 @@ def test_recomputation_checkpoint_tensor_tuple_inputs():
                 x = x * 2
                 return x, torch.nn.functional.l1_loss(x, target)
 
-    run_recomputation_checkpoint_test(size, Model, 3)
+    run_recomputation_checkpoint_test(size, Model, 3, trace_model)
 
 
 @helpers.printCapfdOnExit

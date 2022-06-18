@@ -24,9 +24,11 @@ params_einsum = [
 ]
 
 
-def op_harness(op, *inputs, assert_fn=None, out_fn=None):
+def op_harness(trace_model, op, *inputs, assert_fn=None, out_fn=None):
     model = helpers.ModelWithWeights(op, inputs[0].shape, out_fn=out_fn)
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     # Run on CPU
     native_out, _ = model(inputs)
@@ -53,15 +55,17 @@ def op_harness(op, *inputs, assert_fn=None, out_fn=None):
 
 @pytest.mark.parametrize("params", params_einsum)
 @pytest.mark.parametrize("implicit_rhs", {True, False})
-def test_einsum(params, implicit_rhs):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_einsum(params, implicit_rhs, trace_model):
 
     eq = params[0].split('->')[0] if implicit_rhs else params[0]
 
     op = lambda *xs: torch.einsum(eq, *xs)
-    op_harness(op, *params[1])
+    op_harness(trace_model, op, *params[1])
 
 
-def test_einsum_chained():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_einsum_chained(trace_model):
     torch.manual_seed(42)
 
     def op(x, y, z):
@@ -76,10 +80,11 @@ def test_einsum_chained():
                                 rtol=1e-3,
                                 atol=1e-3)
 
-    op_harness(op, *inputs, assert_fn=assert_fn)
+    op_harness(trace_model, op, *inputs, assert_fn=assert_fn)
 
 
-def test_einsum_transpose():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_einsum_transpose(trace_model):
     torch.manual_seed(42)
 
     def op(x):
@@ -93,31 +98,34 @@ def test_einsum_transpose():
                                 rtol=1e-3,
                                 atol=1e-3)
 
-    op_harness(op, *inputs, assert_fn=assert_fn)
+    op_harness(trace_model, op, *inputs, assert_fn=assert_fn)
 
 
 @pytest.mark.parametrize("arr_lengths",
                          ([3], [3, 3], [2, 4], [3, 2, 4], [5, 2, 3, 4]))
-def test_meshgrid(arr_lengths):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_meshgrid(arr_lengths, trace_model):
     torch.manual_seed(42)
 
     inputs = [torch.randn(arr_length) for arr_length in arr_lengths]
 
-    op_harness(torch.meshgrid, *inputs, out_fn=lambda x: x[0])
+    op_harness(trace_model, torch.meshgrid, *inputs, out_fn=lambda x: x[0])
 
 
 @pytest.mark.parametrize("arr_lengths",
                          ([3], [3, 3], [2, 4], [3, 2, 4], [5, 2, 3, 4]))
-def test_cartesian_prod(arr_lengths):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_cartesian_prod(arr_lengths, trace_model):
     torch.manual_seed(42)
 
     inputs = [torch.randn(arr_length) for arr_length in arr_lengths]
 
-    op_harness(torch.cartesian_prod, *inputs)
+    op_harness(trace_model, torch.cartesian_prod, *inputs)
 
 
 @pytest.mark.parametrize("dims", (2, ([2], [0]), ([2, 3], [0, 1])))
-def test_tensordot(dims):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_tensordot(dims, trace_model):
     torch.manual_seed(42)
 
     op = lambda a, b: torch.tensordot(a, b, dims)
@@ -125,12 +133,18 @@ def test_tensordot(dims):
     x = torch.randn(2, 3, 5, 4)
     y = torch.randn(5, 4, 1)
 
-    op_harness(op, x, y)
+    op_harness(trace_model, op, x, y)
 
 
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("dim", range(-3, 3))
-def test_scatter_add(inplace, dim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_scatter_add(inplace, dim, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
+            "for index")
+
     class Model(torch.nn.Module):
         def __init__(self, dim, dim_size):
             super().__init__()
@@ -153,7 +167,7 @@ def test_scatter_add(inplace, dim):
     dim_size = x.shape[dim] // 2
     index = torch.randint_like(x, high=dim_size).long()
 
-    op_harness(Model(dim, dim_size), x, index)
+    op_harness(trace_model, Model(dim, dim_size), x, index)
 
 
 @helpers.printCapfdOnExit

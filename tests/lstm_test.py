@@ -141,7 +141,8 @@ def test_lstm_batched_batch_first(trace_model):
     helpers.assert_allclose(expected=out, actual=ipuOut)
 
 
-def test_lstm_fc():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lstm_fc(trace_model):
     torch.manual_seed(42)
 
     batch_size = 2
@@ -153,7 +154,9 @@ def test_lstm_fc():
     out_fn = lambda x: x[0]
     model = helpers.ModelWithWeights(op, input.shape, out_fn)
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     (native_out, (native_hn, native_cn)), _ = model((input, ))
     (poptorch_out, (poptorch_hn, poptorch_cn)), _ = poptorch_model((input, ))

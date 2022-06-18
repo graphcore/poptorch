@@ -69,7 +69,12 @@ def get_model(num_mat_muls,
 
 
 @pytest.mark.ipuHardwareRequired
-def test_io_input():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_io_input(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): Could not find canonicalisation handler for "
+            "JIT symbol: poptorch::set_overlap_for_input")
     num_mat_muls = 20
     model = get_model(num_mat_muls,
                       poptorch.OverlapMode.OverlapAccumulationLoop,
@@ -85,6 +90,7 @@ def test_io_input():
     opts.TensorLocations.numIOTiles(32)
 
     opts.Training.gradientAccumulation(num_grad_accumulations)
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     total_batch_size = num_grad_accumulations * num_device_iterations
@@ -170,7 +176,12 @@ def test_input_error_messages(trace_model):
 
 
 @pytest.mark.ipuHardwareRequired
-def test_overlap_host_io_output():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_overlap_host_io_output(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): Could not find canonicalisation handler for "
+            "JIT symbol: poptorch::set_overlap_for_input")
     num_mat_muls = 20
     model = get_model(num_mat_muls, poptorch.OverlapMode.NoOverlap,
                       poptorch.OverlapMode.NoOverlap,
@@ -188,6 +199,7 @@ def test_overlap_host_io_output():
     opts.TensorLocations.numIOTiles(32)
 
     opts.Training.gradientAccumulation(num_grad_accumulations)
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     total_batch_size = num_grad_accumulations * num_device_iterations

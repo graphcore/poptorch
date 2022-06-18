@@ -62,7 +62,7 @@ def _compileAndExport(filename,
 
 
 @pytest.mark.ipuHardwareRequired
-# TODO(T51159) Support dispatch tracing + serialized executables
+# TODO(T64293) Support dispatch tracing + serialized executables
 #@pytest.mark.parametrize("trace_model", [True, False])
 def test_export_then_load_live_model(trace_model=True):
     with tempfile.TemporaryDirectory() as tmp:
@@ -106,7 +106,8 @@ def test_export_then_load_setIpu():
 
 
 @pytest.mark.ipuHardwareRequired
-def test_export_no_python_then_load():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_export_no_python_then_load(trace_model):
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
         input, target = _compileAndExport(filename, export_model=False)
@@ -115,6 +116,7 @@ def test_export_no_python_then_load():
         model = ExampleModelWithLoss()
 
         opts = poptorch.Options()
+        opts.Jit.traceModel(trace_model)
         poptorch_model = poptorch.trainingModel(model, opts)
         poptorch_model.loadExecutable(filename)
 
@@ -137,12 +139,12 @@ def test_export_train_validate_no_python(trace_model):
                           trace_model=trace_model)
 
         model = ExampleModelWithLoss()
-        training_model = poptorch.trainingModel(model)
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        training_model = poptorch.trainingModel(model, options=options)
         training_model.loadExecutable(train_filename)
 
         model.eval()
-        options = poptorch.Options()
-        options.Jit.traceModel(trace_model)
         validation_model = poptorch.inferenceModel(model, options)
         validation_model.loadExecutable(valid_filename)
 

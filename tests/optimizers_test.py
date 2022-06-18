@@ -102,10 +102,15 @@ class OptimizerTestModel:
 
 
 @pytest.mark.parametrize("opt", all_optimizers)
-def test_optimizer(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer(opt, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): assert tensor(3.1870) < tensor(3.1870)")
     torch.manual_seed(42)
 
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     # "Train" with learning rate of zero and check the loss remains the same.
     if opt == poptorch.optim.SGD:
@@ -139,9 +144,12 @@ def test_optimizer(opt):
 
 @pytest.mark.parametrize(
     "opt", {optim.SGD, optim.AdamW, poptorch.optim.SGD, poptorch.optim.AdamW})
-def test_sgd_IR(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_sgd_IR(opt, trace_model):
     torch.manual_seed(42)
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     # "Train" with learning rate of zero and check the loss remains the same.
     if opt == poptorch.optim.SGD:
@@ -182,15 +190,18 @@ def test_sgd_IR(opt):
 @pytest.mark.parametrize("first_order_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("second_order_type", (torch.float16, torch.float))
 @helpers.overridePoptorchLogLevel("DEBUG")
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_adam_accum_type(capfd, opt, accum_type, first_order_type,
-                         second_order_type):
+                         second_order_type, trace_model):
     def torchTypeToStr(dt):
         t = str(dt)
         assert t in ["torch.float32", "torch.float16"]
         return t.split(".")[1]
 
     torch.manual_seed(42)
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     # "Train" with learning rate of zero and check the loss remains the same.
     optimizer = opt(model.parameters(),
@@ -211,14 +222,17 @@ def test_adam_accum_type(capfd, opt, accum_type, first_order_type,
 @pytest.mark.parametrize("accum_type", (torch.float16, torch.float))
 @pytest.mark.parametrize("velocity_accum_type", (torch.float16, torch.float))
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_sgd_accum_type(capfd, accum_type, velocity_accum_type):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_sgd_accum_type(capfd, accum_type, velocity_accum_type, trace_model):
     def torchTypeToStr(dt):
         t = str(dt)
         assert t in ["torch.float32", "torch.float16"]
         return t.split(".")[1]
 
     torch.manual_seed(42)
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     # "Train" with learning rate of zero and check the loss remains the same.
     optimizer = poptorch.optim.SGD(model.parameters(),
@@ -235,10 +249,13 @@ def test_sgd_accum_type(capfd, accum_type, velocity_accum_type):
 
 
 @pytest.mark.parametrize("use_combined_accum", (True, False))
-def test_velocity_scaling_copy(use_combined_accum):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_velocity_scaling_copy(use_combined_accum, trace_model):
     torch.manual_seed(42)
 
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     # "Train" with learning rate of zero and check the loss remains the same.
     optimizer = poptorch.optim.SGD(
@@ -265,10 +282,15 @@ def test_velocity_scaling_copy(use_combined_accum):
         #poptorch.optim.Adam, poptorch.optim.AdamW, AdamWNoBias,
         #poptorch.optim.RMSprop, poptorch.optim.LAMB, LAMBNoBias
     })
-def test_optimizer_groups(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer_groups(opt, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): AssertionError: results mismatch")
     torch.manual_seed(42)
 
-    model = OptimizerTestModel(num_groups=2)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(num_groups=2, options=options)
 
     # Parameter is a soft copy by default oddly.
     weight1 = model.model.base_model[0].weight.clone()
@@ -352,10 +374,15 @@ def test_optimizer_groups(opt):
     assert torch.argmax(out) == model.label
 
 
-def test_optimizer_groups_none_args():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer_groups_none_args(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): AssertionError: results mismatch")
     torch.manual_seed(42)
 
-    model = OptimizerTestModel(num_groups=2)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(num_groups=2, options=options)
 
     # Parameter is a soft copy by default oddly.
     weight1 = model.model.base_model[0].weight.clone()
@@ -389,8 +416,11 @@ def test_optimizer_groups_none_args():
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_optimizer_SGD_separate_velocity_scale_matched(capfd):
-    model = OptimizerTestModel()
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer_SGD_separate_velocity_scale_matched(capfd, trace_model):
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     optimizer = poptorch.optim.SGD(model.parameters(),
                                    loss_scaling=2.0,
@@ -402,9 +432,12 @@ def test_optimizer_SGD_separate_velocity_scale_matched(capfd):
     testlog.assert_contains("lossScaling=2", "defaultVelocityScaling=2")
 
 
-def test_optimizer_SGD_nesterov():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer_SGD_nesterov(trace_model):
     torch.manual_seed(42)
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     with pytest.raises(ValueError,
                        match="Nesterov momentum is currently not supported"):
@@ -417,10 +450,13 @@ def test_optimizer_SGD_nesterov():
 
 
 @pytest.mark.parametrize("opt", poptorch_optimizers)
-def test_optimizer_const(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer_const(opt, trace_model):
     torch.manual_seed(42)
 
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     # Initialise the optimiser with the default loss_scaling value
     if opt == poptorch.optim.SGD:
@@ -440,10 +476,13 @@ def test_optimizer_const(opt):
 
 
 @pytest.mark.parametrize("opt", poptorch_optimizers)
-def test_optimizer_mark_as_variable(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer_mark_as_variable(opt, trace_model):
     torch.manual_seed(42)
 
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
     # Initialise the optimiser with the default loss_scaling value
     if opt == poptorch.optim.SGD:
         optimizer = opt(model.parameters(), lr=1.0, use_combined_accum=False)
@@ -460,9 +499,12 @@ def test_optimizer_mark_as_variable(opt):
 
 
 @pytest.mark.parametrize("opt", {poptorch.optim.LAMB, LAMBNoBias})
-def test_lamb_max_weight_norm(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_lamb_max_weight_norm(opt, trace_model):
     torch.manual_seed(42)
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
 
     optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=100.0)
     model.setOptimizer(optimizer)
@@ -477,7 +519,7 @@ def test_lamb_max_weight_norm(opt):
     assert torch.argmax(out, dim=1) == model.label
 
     # Run from scratch with max_weight_norm disabled.
-    model = OptimizerTestModel()
+    model = OptimizerTestModel(options=options)
     optimizer = opt(model.parameters(), lr=0.01, max_weight_norm=None)
 
     # Train model again
@@ -494,8 +536,11 @@ def test_lamb_max_weight_norm(opt):
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("use_combined_accum", (True, False))
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_variable_groups(capfd, use_combined_accum):
-    model = OptimizerTestModel(num_groups=2)
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_variable_groups(capfd, use_combined_accum, trace_model):
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(num_groups=2, options=options)
 
     # Make sure all groups have the default values, and the values are not (const)
     params = [{
@@ -598,7 +643,8 @@ def test_variable_groups(capfd, use_combined_accum):
 ))
 @helpers.overridePoptorchLogLevel("DEBUG")
 # pylint: disable=too-many-statements
-def test_variable_default(opt, capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_variable_default(opt, capfd, trace_model):
     def toCamelCase(string):
         """Convert a snake case string (Pytorch) to camel case (Popart)"""
         words = string.split("_")
@@ -646,7 +692,9 @@ def test_variable_default(opt, capfd):
     attrs = list(opt_args.keys())
 
     # Test the torch Optimizer: check all the attributes are set to constant by default
-    model = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(options=options)
     optimizer = pytorch_opt(model.parameters(), lr=1.0, **opt_args)
     model.setOptimizer(optimizer)
     model.run()
@@ -705,7 +753,7 @@ def test_variable_default(opt, capfd):
 
     # Test the poptorch Optimizer: check all the manually set attributes are set to variable by default
     # Create a new model as the optimizers would otherwise mismatch
-    model = OptimizerTestModel()
+    model = OptimizerTestModel(options=options)
 
     if poptorch_opt == poptorch.optim.SGD:
         optimizer = poptorch_opt(model.parameters(),
@@ -777,7 +825,8 @@ def test_variable_default(opt, capfd):
 
 @pytest.mark.parametrize(
     "reduction", (poptorch.ReductionType.Sum, poptorch.ReductionType.Mean))
-def test_gradient_accum(reduction):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_gradient_accum(reduction, trace_model):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -797,6 +846,7 @@ def test_gradient_accum(reduction):
     opts = poptorch.Options()
     opts.Training.gradientAccumulation(accum)
     opts.Training.accumulationAndReplicationReductionType(reduction)
+    opts.Jit.traceModel(trace_model)
 
     model = Model()
 
@@ -816,7 +866,8 @@ def test_gradient_accum(reduction):
 
 @pytest.mark.parametrize(
     "reduction", (poptorch.ReductionType.Sum, poptorch.ReductionType.Mean))
-def test_gradient_accum_new_api(reduction):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_gradient_accum_new_api(reduction, trace_model):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -836,6 +887,7 @@ def test_gradient_accum_new_api(reduction):
     opts = poptorch.Options()
     opts.Training.gradientAccumulation(accum)
     opts.Training.accumulationAndReplicationReductionType(reduction)
+    opts.Jit.traceModel(trace_model)
 
     model = Model()
 
@@ -857,8 +909,11 @@ def test_gradient_accum_new_api(reduction):
 @pytest.mark.parametrize("use_combined_accum", (True, False))
 @helpers.overridePoptorchLogLevel("WARN"
                                   )  # We only want warnings for this test
-def test_extra_attributes(capfd, use_combined_accum):
-    model = OptimizerTestModel(num_groups=2)
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_extra_attributes(capfd, use_combined_accum, trace_model):
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(num_groups=2, options=options)
 
     # Make sure all groups have the default values, and the values are not (const)
     params = [{
@@ -929,8 +984,11 @@ def test_extra_attributes2(capfd, use_combined_accum):
 @pytest.mark.parametrize("use_combined_accum", (True, False))
 @helpers.overridePoptorchLogLevel("WARN"
                                   )  # We only want warnings for this test
-def test_extra_attributes3(capfd, use_combined_accum):
-    model = OptimizerTestModel(num_groups=2)
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_extra_attributes3(capfd, use_combined_accum, trace_model):
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model = OptimizerTestModel(num_groups=2, options=options)
     # Make sure all groups have the default values, and the values are not (const)
     params = [{
         "params": model.model.base_model[0].parameters()
@@ -967,7 +1025,8 @@ def test_extra_attributes3(capfd, use_combined_accum):
 
 
 @pytest.mark.parametrize("use_tf_variant", [True, False])
-def test_rmsprop_tf_variant(use_tf_variant):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_rmsprop_tf_variant(use_tf_variant, trace_model):
     torch.manual_seed(0)
     # Make sure the TF flag is propagated correctly by comparing the
     # results of TF and non-TF versions.
@@ -976,7 +1035,9 @@ def test_rmsprop_tf_variant(use_tf_variant):
     input = torch.randn(1, 10)
     label = torch.randint(0, 10, [1])
 
-    model_pt = OptimizerTestModel()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    model_pt = OptimizerTestModel(options=options)
     model_pt.model.base_model.weight = torch.nn.Parameter(
         weight.detach().clone())
     model_pt.model.base_model.bias = torch.nn.Parameter(bias.detach().clone())
@@ -985,7 +1046,7 @@ def test_rmsprop_tf_variant(use_tf_variant):
     optimizer_pt = poptorch.optim.RMSprop(model_pt.parameters(), lr=0.02)
     model_pt.setOptimizer(optimizer_pt)
 
-    model_tf = OptimizerTestModel()
+    model_tf = OptimizerTestModel(options=options)
     model_tf.model.base_model.weight = torch.nn.Parameter(
         weight.detach().clone())
     model_tf.model.base_model.bias = torch.nn.Parameter(bias.detach().clone())
@@ -1019,25 +1080,28 @@ def test_rmsprop_tf_variant(use_tf_variant):
 
 
 @pytest.mark.parametrize("opt", all_optimizers)
-def test_optimizer_results(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_optimizer_results(opt, trace_model):
     torch.manual_seed(42)
 
     class Stepper:
-        def __init__(self, model, lr, optimizer):
+        def __init__(self, model, lr, optimizer, trace_model):
             self.lr = lr
             self.setup_cpu(model, optimizer)
-            self.setup_ipu(model, optimizer)
+            self.setup_ipu(model, optimizer, trace_model)
             self.check_parameters()
 
         def setup_cpu(self, model, optimizer):
             self.cpu_model = copy.deepcopy(model)
             self.optimizer = optimizer(self.cpu_model.parameters(), lr=self.lr)
 
-        def setup_ipu(self, model, optimizer):
+        def setup_ipu(self, model, optimizer, trace_model):
             self.ipu_model = copy.deepcopy(model)
             ipu_optimizer = optimizer(self.ipu_model.parameters(), lr=self.lr)
+            options = poptorch.Options()
+            options.Jit.traceModel(trace_model)
             self.training_model = poptorch.trainingModel(
-                self.ipu_model, optimizer=ipu_optimizer)
+                self.ipu_model, options=options, optimizer=ipu_optimizer)
 
         def check_parameters(self):
             for cpu, ipu in zip(self.cpu_model.named_parameters(),
@@ -1068,7 +1132,8 @@ def test_optimizer_results(opt):
 
     stepper = Stepper(helpers.ModelWithWeights(torch.nn.LogSoftmax(), X.shape),
                       lr=lr,
-                      optimizer=opt)
+                      optimizer=opt,
+                      trace_model=trace_model)
 
     for i in range(num_steps):
         cpu_loss[i] = stepper.cpu_step((X, ))
@@ -1086,16 +1151,17 @@ def test_optimizer_results(opt):
                                  (optim.Adam, poptorch.optim.Adam),
                                  (optim.AdamW, poptorch.optim.AdamW)],
                          ids=['SGD', 'Adam', 'AdamW'])
-def test_gradient_clipping(opt):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_gradient_clipping(opt, trace_model):
     torch.manual_seed(42)
     max_norm = 0.001
 
     class Stepper:
-        def __init__(self, model, lr, optimizer):
+        def __init__(self, model, lr, optimizer, trace_model):
             self.lr = lr
             self.original_model = model
             self.setup_torch(model, optimizer[0])
-            self.setup_poptorch(model, optimizer[1])
+            self.setup_poptorch(model, optimizer[1], trace_model)
             self.check_parameters()
 
         def setup_torch(self, model, optimizer):
@@ -1103,13 +1169,15 @@ def test_gradient_clipping(opt):
             self.optimizer = optimizer(self.torch_model.parameters(),
                                        lr=self.lr)
 
-        def setup_poptorch(self, model, optimizer):
+        def setup_poptorch(self, model, optimizer, trace_model):
             self.ipu_model = copy.deepcopy(model)
             ipu_optimizer = optimizer(self.ipu_model.parameters(),
                                       lr=self.lr,
                                       max_grad_norm=max_norm)
+            options = poptorch.Options()
+            options.Jit.traceModel(trace_model)
             self.training_model = poptorch.trainingModel(
-                self.ipu_model, optimizer=ipu_optimizer)
+                self.ipu_model, options=options, optimizer=ipu_optimizer)
 
         def check_parameters(self):
             for expected, actual in zip(
@@ -1148,7 +1216,8 @@ def test_gradient_clipping(opt):
 
     stepper = Stepper(helpers.ModelWithWeights(torch.nn.LogSoftmax(), X.shape),
                       lr=lr,
-                      optimizer=opt)
+                      optimizer=opt,
+                      trace_model=trace_model)
 
     for i in range(num_steps):
         torch_loss[i] = stepper.torch_step((X, ))
@@ -1163,10 +1232,15 @@ def test_gradient_clipping(opt):
 
 
 # TODO(T53152): remove this test.
-def test_gradient_clipping_with_pipelining():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_gradient_clipping_with_pipelining(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::nll_loss2d_forward")
     torch.manual_seed(0)
     opts = poptorch.Options()
     opts.Training.gradientAccumulation(3)
+    opts.Jit.traceModel(trace_model)
 
     class Model(torch.nn.Module):
         def __init__(self):
@@ -1196,7 +1270,14 @@ def test_gradient_clipping_with_pipelining():
 
 
 @pytest.mark.parametrize("optim", poptorch_optimizers)
-def test_read_ipu_state(optim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_read_ipu_state(optim, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): AssertionError: assert "
+                    "'learningRate___specific___model.lin.bias' in "
+                    "dict_keys(['adamGradientScaling___default___FLOAT', "
+                    "'learningRate___default___FLOAT', 'lossScaling_FLOAT', "
+                    "'weightDecay___default___FLOAT'")
     torch.manual_seed(42)
     input = torch.randn(3)
     # A simple model with weights and a loss function
@@ -1210,7 +1291,11 @@ def test_read_ipu_state(optim):
                       lr=lr,
                       weight_decay=wd,
                       loss_scaling=ls)
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     # Before the model is compiled, the state_dict should be empty
     state = optimizer.state_dict()
@@ -1285,13 +1370,18 @@ def test_read_ipu_state(optim):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_read_ipu_state_cached(caplog, capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_read_ipu_state_cached(caplog, capfd, trace_model):
     input = torch.ones(3)
     # A simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     optimizer = poptorch.optim.SGD(model.parameters(), lr=0.0)
 
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     training_model.compile((input, ))
     # Compilation should trigger an optimiser state IPU->host copy
@@ -1309,7 +1399,8 @@ def test_read_ipu_state_cached(caplog, capfd):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableAllModels())
-def test_read_ipu_state_offline():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_read_ipu_state_offline(trace_model):
     input = torch.ones(3)
     # A simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
@@ -1317,6 +1408,7 @@ def test_read_ipu_state_offline():
 
     opts = poptorch.Options()
     opts.useOfflineIpuTarget()
+    opts.Jit.traceModel(trace_model)
     training_model = poptorch.trainingModel(model, opts, optimizer=optimizer)
 
     training_model.compile((input, ))
@@ -1327,13 +1419,18 @@ def test_read_ipu_state_offline():
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("optim", [poptorch.optim.SGD, torch.optim.SGD])
-def test_read_ipu_state_on_detach(caplog, capfd, optim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_read_ipu_state_on_detach(caplog, capfd, optim, trace_model):
     input = torch.ones(3)
     # A simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     optimizer = optim(model.parameters(), lr=0.0)
 
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     training_model.compile((input, ))
     training_model.detachFromDevice()
@@ -1370,7 +1467,8 @@ def test_read_ipu_state_on_detach(caplog, capfd, optim):
 
 @pytest.mark.parametrize("optim", poptorch_optimizers)
 @pytest.mark.parametrize("incomplete_state", [True, False])
-def test_write_ipu_state(optim, incomplete_state):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_write_ipu_state(optim, incomplete_state, trace_model):
     torch.manual_seed(42)
     input = torch.randn(3)
     # A simple model with weights and a loss function
@@ -1382,7 +1480,11 @@ def test_write_ipu_state(optim, incomplete_state):
     optimizer.variable_attrs._variable_attributes = copy.deepcopy(  # pylint: disable=protected-access
         optimizer.variable_attrs._allowed_attributes)  # pylint: disable=protected-access
 
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     # Compiling should populate the state_dict
     training_model.compile((input, ))
@@ -1463,11 +1565,16 @@ def test_write_ipu_state_from_cpu():
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_write_ipu_state_before_override(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_write_ipu_state_before_override(capfd, trace_model):
     input = torch.ones(2)
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     optimizer = poptorch.optim.Adam(model.parameters())
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     # Compile and run the model, get the state dict
     training_model((input, ))
@@ -1481,7 +1588,9 @@ def test_write_ipu_state_before_override(capfd):
     new_optimizer.load_state_dict(s1)
 
     # Compile a new model with the new loaded optimiser
-    new_training_model = poptorch.trainingModel(model, optimizer=new_optimizer)
+    new_training_model = poptorch.trainingModel(model,
+                                                options=options,
+                                                optimizer=new_optimizer)
     new_training_model.compile((input, ))
 
     # The state read back should match the initial state
@@ -1496,13 +1605,18 @@ def test_write_ipu_state_before_override(capfd):
 
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
-def test_LR_scheduler(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_LR_scheduler(capfd, trace_model):
     input = torch.ones(2)
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     optimizer = poptorch.optim.Adam(model.parameters(), lr=1.0)
     # Halve the LR after each training step
     scheduler = ExponentialLR(optimizer, 0.5)
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     # Compile and run the model
     training_model((input, ))
@@ -1550,13 +1664,22 @@ def test_LR_scheduler(capfd):
     log.findNext("Writing optimiser state tensors from host to IPU memory")
 
 
-def test_write_ipu_state_from_checkpoint():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_write_ipu_state_from_checkpoint(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): KeyError: 'learningRate___specific___model.lin.bias'"
+        )
     input = torch.ones(2)
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     optimizer = poptorch.optim.Adam(model.parameters(), lr=1.0)
     # Halve the LR after each training step
     scheduler = ExponentialLR(optimizer, 0.5)
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     # Compile and run the model
     training_model((input, ))
@@ -1600,11 +1723,13 @@ def test_write_ipu_state_from_checkpoint():
         helpers.assert_allclose(actual=poptorch_lr, expected=torch_lr)
 
 
-def test_setOptimizer_frozen_options_ok():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_setOptimizer_frozen_options_ok(trace_model):
     input = torch.ones(2)
     opts = poptorch.Options()
     opts.Training.setMeanAccumulationAndReplicationReductionStrategy(
         poptorch.MeanReductionStrategy.Post)
+    opts.Jit.traceModel(trace_model)
 
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     # This will freeze the options
@@ -1625,11 +1750,13 @@ def test_setOptimizer_frozen_options_ok():
     training_model.setOptimizer(optimizer)
 
 
-def test_setOptimizer_frozen_options_broken():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_setOptimizer_frozen_options_broken(trace_model):
     input = torch.ones(2)
     opts = poptorch.Options()
     opts.Training.setMeanAccumulationAndReplicationReductionStrategy(
         poptorch.MeanReductionStrategy.Post)
+    opts.Jit.traceModel(trace_model)
 
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     # This will freeze the options

@@ -53,10 +53,6 @@ ones_zeros = [torch.ones, torch.zeros]
 @pytest.mark.parametrize("op", ones_zeros)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ones_zeros_default_resolved(op, trace_model):
-    # Just remove the if + skip once the dispatcher is enabled
-    if not trace_model:
-        pytest.skip("TODO(T57195): requires dispatcher to be enabled")
-
     def fw_op(input):
         return op((2, 3, 4), dtype=input.dtype,
                   device=helpers.outputDevice()) + input.to(input.dtype)
@@ -141,10 +137,6 @@ def test_ones_zeros_input_resolved_always_float32(op, trace_model):
 # Dispatcher: The dtype will match what was requested.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_rand_default_resolved(trace_model):
-    # Just remove the if + skip once the dispatcher is enabled
-    if not trace_model:
-        pytest.skip("TODO(T57195): requires dispatcher to be enabled")
-
     def fw_op(input):
         return torch.rand(3, 5, 100, dtype=input.dtype)
 
@@ -377,7 +369,8 @@ def test_float16_activations_float32_weights(trace_model):
     assert pop_out.dtype == torch.half
 
 
-def test_master_weight_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_master_weight_training(trace_model):
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -392,7 +385,9 @@ def test_master_weight_training():
             return out, loss
 
     model = Model()
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     target = torch.randn(10)
     input = torch.randn(10).half()
@@ -413,7 +408,13 @@ def test_master_weight_training():
                             atol=1e-02)
 
 
-def test_bigger_model_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_bigger_model_training(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): 'popart_exception': np broadcasting failed on "
+            "Op 118 (ai.onnx.Add:7), incompatible types FLOAT16 and FLOAT "
+            "(shapes [10] and [10])")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -432,7 +433,9 @@ def test_bigger_model_training():
             return out, loss
 
     model = Model()
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     target = torch.randn(10)
     input = torch.randn(10).half()

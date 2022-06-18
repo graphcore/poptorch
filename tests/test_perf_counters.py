@@ -126,7 +126,8 @@ def test_inference(mode, period, steps, replicas, trace_model):
 @pytest.mark.parametrize("accums", [1, 2])
 @pytest.mark.parametrize("replicas", [1, 2])
 @pytest.mark.ipuHardwareRequired
-def test_training(mode, period, steps, accums, replicas):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_training(mode, period, steps, accums, replicas, trace_model):
     torch.manual_seed(42)
     inputs = torch.randn(16, 100)
     targets = torch.randn(16, 100)
@@ -136,6 +137,7 @@ def test_training(mode, period, steps, accums, replicas):
     opts.deviceIterations(steps)
     opts.Training.gradientAccumulation(accums)
     opts.replicationFactor(replicas)
+    opts.Jit.traceModel(trace_model)
 
     class Model(torch.nn.Module):
         def __init__(self):

@@ -149,6 +149,7 @@ def test_access_parameters(use_half, trace_model):
 
     # Run on IPU batch size 1 * 10 popart batches.
     opts = poptorch.Options().deviceIterations(10)
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     original_weights = str(model.linear.weight)
@@ -199,7 +200,12 @@ class DummyTrainingModel(torch.nn.Module):
         return self.loss(x, target)
 
 
-def test_torch_save():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_torch_save(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     torch.manual_seed(42)
 
     # create a dummy model
@@ -212,7 +218,11 @@ def test_torch_save():
     pre_train_weights = copy.deepcopy(model.state_dict()['conv.weight'])
 
     # wrap it in a trainingModel
-    training_model = poptorch.trainingModel(model, optimizer=optimizer)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model,
+                                            options=options,
+                                            optimizer=optimizer)
 
     # run on dummy data for one iteration
     input = torch.randn(5, 16, 10, 10)
@@ -243,7 +253,11 @@ def test_torch_save():
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.ipuHardwareRequired
-def test_seed_precompilation(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_seed_precompilation(capfd, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): Not supported: can't deserialize dispatch "
+                    "traced executable.")
     # create a dummy model
     model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
 
@@ -252,6 +266,7 @@ def test_seed_precompilation(capfd):
 
     opts = poptorch.Options().randomSeed(42)
     opts.useOfflineIpuTarget(poptorch.ipuHardwareVersion())
+    opts.Jit.traceModel(trace_model)
     training_model = poptorch.trainingModel(model,
                                             options=opts,
                                             optimizer=optimizer)
@@ -294,7 +309,11 @@ def test_seed_precompilation(capfd):
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.ipuHardwareRequired
-def test_save_everything(capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_save_everything(capfd, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): Not supported: can't deserialize dispatch "
+                    "traced executable.")
     # create a dummy model
     model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
 
@@ -302,6 +321,7 @@ def test_save_everything(capfd):
     optimizer = poptorch.optim.SGD(model.parameters(), lr=0.01)
 
     opts = poptorch.Options().randomSeed(42)
+    opts.Jit.traceModel(trace_model)
     training_model = poptorch.trainingModel(model,
                                             options=opts,
                                             optimizer=optimizer)
@@ -411,12 +431,15 @@ def train_and_check_weight_sharing_ipu_cpu(model, training_model, input,
             "No implicit copy needed to access the parameters after inference"
 
 
-def test_weights_sharing_ipu_cpu():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_weights_sharing_ipu_cpu(trace_model):
     torch.manual_seed(42)
 
     model = ModelWithLoss(torch.nn.MSELoss())
 
-    training_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model, options=options)
 
     training_model.deviceToHostCounter = 0
     realMethod = training_model.copyWeightsToHost
@@ -522,7 +545,9 @@ def test_weights_sharing_ipus(trace_model):
 
     model = ModelWithLoss(torch.nn.MSELoss())
 
-    training_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    training_model = poptorch.trainingModel(model, options)
 
     training_model.deviceToHostCounter = 0
     realMethod = training_model.copyWeightsToHost
@@ -535,8 +560,6 @@ def test_weights_sharing_ipus(trace_model):
         deviceToHostWrapper, training_model)
 
     # Same model as above, they will share weights (in 'model') which once training is finished can be copied back.
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
     target = torch.randn(10)
     input = torch.randn(10)
@@ -666,12 +689,15 @@ def test_implicit_first_time_copy_negative(trace_model):
     assert not torch.allclose(poptorch_out, target, rtol=1e-02, atol=1e-02)
 
 
-def test_weight_overwrite_trained_weight():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_weight_overwrite_trained_weight(trace_model):
     torch.manual_seed(42)
 
     model = ModelWithLoss(torch.nn.MSELoss())
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     target = torch.randn(10)
     input = torch.randn(10)
@@ -707,7 +733,8 @@ def test_weight_overwrite_trained_weight():
 
 
 @pytest.mark.parametrize("use_half", [True, False])
-def test_access_scalar_parameter(use_half):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_access_scalar_parameter(use_half, trace_model):
     class ExampleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -745,7 +772,9 @@ def test_access_scalar_parameter(use_half):
         model.half()
         input = input.half()
         target = target.half()
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
     original_bias = str(poptorch_model.model.model.bias)
 
     for _ in range(10):
@@ -760,12 +789,16 @@ def test_access_scalar_parameter(use_half):
 
 
 @pytest.mark.parametrize("reverse_equal_call", [True, False])
-def test_copy_on_torch_equal(reverse_equal_call):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_copy_on_torch_equal(reverse_equal_call, trace_model):
     torch.manual_seed(42)
 
     model = ModelWithLoss(torch.nn.MSELoss())
 
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model,
+                                            options=options,
                                             optimizer=torch.optim.SGD(
                                                 model.parameters(), lr=0.01))
 
@@ -783,12 +816,16 @@ def test_copy_on_torch_equal(reverse_equal_call):
         assert not torch.equal(weight_at_start, model.linear.weight)
 
 
-def test_copy_after_compile():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_copy_after_compile(trace_model):
     torch.manual_seed(42)
 
     model = ModelWithLoss(torch.nn.MSELoss())
 
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model,
+                                            options=options,
                                             optimizer=torch.optim.SGD(
                                                 model.parameters(), lr=0.01))
 
@@ -822,12 +859,12 @@ def test_torch_save_unwrapped(trace_model):
             return out, loss
 
     model = Model()
-    # Only training models instrument the model so we can't use poptporch.inferenceModel
-    poptorch.trainingModel(model)
-
-    # An inference model sharing its user model with a training model will be instrumented though.
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
+    # Only training models instrument the model so we can't use poptporch.inferenceModel
+    poptorch.trainingModel(model, options)
+
+    # An inference model sharing its user model with a training model will be instrumented though.
     poptorch.inferenceModel(model, options)
 
     with tempfile.TemporaryDirectory() as tmp:

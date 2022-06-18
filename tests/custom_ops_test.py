@@ -50,7 +50,8 @@ def test_inference(trace_model):
     helpers.assert_allclose(actual=out[1], expected=expected[1])
 
 
-def test_training():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_training(trace_model):
     def custom_loss(model_out, labels):
         l1 = torch.nn.functional.nll_loss(model_out[0], labels)
         # Popart errors if this is unused.
@@ -86,7 +87,9 @@ def test_training():
 
     y = torch.full([1], 42, dtype=torch.long)
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     for _ in range(0, 100):
         x = torch.rand((1, 100))
@@ -96,7 +99,8 @@ def test_training():
 
 
 # Check that the custom op not only trains but also propagates the gradient backwards.
-def test_training_both_sides():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_training_both_sides(trace_model):
     def custom_loss(model_out, labels):
         l1 = torch.nn.functional.nll_loss(model_out[0], labels)
         # Popart errors if this is unused.
@@ -135,7 +139,9 @@ def test_training_both_sides():
 
     weights_before = model.ln1.weight.clone()
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     for _ in range(0, 100):
         x = torch.rand((1, 100))

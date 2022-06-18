@@ -268,7 +268,13 @@ def test_popart_partials(capfd, dtype, ptype, trace_model):
 ])
 @helpers.overridePoptorchLogLevel("DEBUG")
 @helpers.printCapfdOnExit
-def test_automatic_loss_scaling(capfd, optim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_automatic_loss_scaling(capfd, optim, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): 'popart_exception': np broadcasting failed on "
+            "Op 109 (ai.onnx.Pow:7), incompatible types FLOAT16 and FLOAT "
+            "(shapes [5] and [])")
     input = torch.ones(5)
     # Just a simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
@@ -277,6 +283,7 @@ def test_automatic_loss_scaling(capfd, optim):
     model.half()
     opts = poptorch.Options()
     opts.Training.setAutomaticLossScaling(True)
+    opts.Jit.traceModel(trace_model)
 
     # The lr value doesn't matter here, we just want to ensure the option is set
     if optim == poptorch.optim.SGD:
@@ -497,7 +504,8 @@ def test_copying_options():
     assert opts.Jit.trace_model == deep_copy.Jit.trace_model
 
 
-def test_preserving_options_intact():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_preserving_options_intact(trace_model):
     class ExampleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -522,6 +530,7 @@ def test_preserving_options_intact():
 
     model = ExampleModelWithLoss()
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
     training = poptorch.trainingModel(model, opts)
     inference = poptorch.inferenceModel(model, opts)
 
@@ -714,14 +723,16 @@ mean_reduction_strategy_params = [
 @pytest.mark.parametrize(
     "accum_type, training, combined_accum, correct_strategy",
     mean_reduction_strategy_params)
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_mean_reduction_strategy_implicit(accum_type, training, combined_accum,
-                                          correct_strategy):
+                                          correct_strategy, trace_model):
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 
     # A simple adder model just to test the correct strategy is set
     model = helpers.ModelWithWeights(lambda x, y: x + y, t1.shape)
     options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     optimizer = poptorch.optim.SGD(model.parameters(),
                                    lr=0.01,
                                    accum_type=accum_type,
@@ -738,7 +749,8 @@ def test_mean_reduction_strategy_implicit(accum_type, training, combined_accum,
         "meanAccumulationAndReplicationReductionStrategy") == correct_strategy)
 
 
-def test_mean_reduction_strategy_explicit():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_mean_reduction_strategy_explicit(trace_model):
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 
@@ -746,6 +758,7 @@ def test_mean_reduction_strategy_explicit():
     model = helpers.ModelWithWeights(lambda x, y: x + y, t1.shape)
 
     options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     options.Training.setMeanAccumulationAndReplicationReductionStrategy(
         MeanReductionStrategy.Running)
     poptorch_model = poptorch.trainingModel(model, options)
@@ -774,12 +787,14 @@ def test_num_io_tiles():
 
 
 # pylint: disable=protected-access
-def test_options_change_after_use():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_options_change_after_use(trace_model):
     model = helpers.ModelWithWeights(torch.nn.Linear(10, 10),
                                      torch.Size((5, 10)),
                                      loss_fn=torch.nn.CrossEntropyLoss())
 
     opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     with pytest.raises(Exception):

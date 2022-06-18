@@ -40,7 +40,12 @@ def test_constant_buffer_repeat(trace_model):
     assert poptorch_model(torch.tensor([2])) == 15
 
 
-def test_buffer_implicit_copy():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_buffer_implicit_copy(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     momentum = 0.1
 
     class Model(torch.nn.Module):
@@ -58,7 +63,10 @@ def test_buffer_implicit_copy():
     input = torch.ones([4, 10], dtype=torch.float32)
     target = torch.ones([4, 10], dtype=torch.float32) + 1
 
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     poptorch_model(input, target)
     helpers.assert_allclose(actual=model.bn.running_mean,
@@ -148,7 +156,13 @@ class BufferUpdatingModel(torch.nn.Module):
 
 @pytest.mark.parametrize("device_iterations", [1, 3, 5])
 @pytest.mark.parametrize("gradient_accumulation", [1, 3, 5])
-def test_buffer_update_with_param(device_iterations, gradient_accumulation):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_buffer_update_with_param(device_iterations, gradient_accumulation,
+                                  trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     model = BufferUpdatingModel()
     model.conv.weight.data = torch.ones_like(model.conv.weight.data)
     model.conv.bias.data = torch.ones_like(model.conv.bias.data)
@@ -188,6 +202,7 @@ def test_buffer_update_with_param(device_iterations, gradient_accumulation):
     opts = poptorch.Options()
     opts.deviceIterations(device_iterations)
     opts.Training.gradientAccumulation(gradient_accumulation)
+    opts.Jit.traceModel(trace_model)
 
     dummy_input = torch.ones(
         [2 * device_iterations * gradient_accumulation, 2, 2, 2])
@@ -208,11 +223,18 @@ def test_buffer_update_with_param(device_iterations, gradient_accumulation):
                             actual=poptorch_model.test_buff)
 
 
-def test_failing_on_replicas():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_failing_on_replicas(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
     model = BufferUpdatingModel()
 
     opts = poptorch.Options()
     opts.replicationFactor(2)
+    opts.Jit.traceModel(trace_model)
+
     poptorch_model = poptorch.trainingModel(model,
                                             optimizer=torch.optim.SGD(
                                                 model.parameters(), lr=0.1),

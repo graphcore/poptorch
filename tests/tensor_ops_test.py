@@ -34,13 +34,15 @@ def zeros_and_ones_harness(model, dtype, is_like, trace_model):
         inputs.append(torch.empty(3, 5, 1))
     inputs = tuple(inputs)
 
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     if test_training:
         out_fn = lambda out: out[0]
         model = helpers.ModelWithWeights(model, inputs[0].shape, out_fn=out_fn)
         # We need to copy the model to use the original weights for native comparison
         model_copy = copy.deepcopy(model)
         # Run on IPU.
-        poptorch_model = poptorch.trainingModel(model)
+        poptorch_model = poptorch.trainingModel(model, options)
         poptorch_out, _ = poptorch_model(inputs)
         if dtype is torch.float16:
             # Promote CPU model and input
@@ -51,8 +53,6 @@ def zeros_and_ones_harness(model, dtype, is_like, trace_model):
         native_out, _ = model_copy(inputs)
     else:
         native_out = model(*inputs)
-        options = poptorch.Options()
-        options.Jit.traceModel(trace_model)
         poptorch_model = poptorch.inferenceModel(model, options)
         poptorch_out = poptorch_model(*inputs)
 
@@ -170,6 +170,8 @@ def op_harness(op,
                                         actual=poptorch_out)
 
     op_raises_exception = False
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     if test_training:
         # Set a fixed seed for the weights of the model
         torch.manual_seed(42)
@@ -194,7 +196,7 @@ def op_harness(op,
                 native_out, tuple) and native_out[0] == "error"
 
         # Run on IPU.
-        poptorch_model = poptorch.trainingModel(model)
+        poptorch_model = poptorch.trainingModel(model, options=options)
         poptorch_out, ipu_raises = exception_catcher(
             poptorch_model, inputs, can_raise_exception=op_raises_exception)
 
@@ -220,8 +222,6 @@ def op_harness(op,
             op_raises_exception = isinstance(
                 native_out, tuple) and native_out[0] == "error"
 
-        options = poptorch.Options()
-        options.Jit.traceModel(trace_model)
         poptorch_model = poptorch.inferenceModel(model, options)
         # Run on IPU.
         poptorch_out, ipu_raises = exception_catcher(
@@ -378,7 +378,11 @@ def test_cat(dim, trace_model, dtypes):
 @pytest.mark.parametrize("dim", [0, 1])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_cat_transpose(dim, trace_model):
-    """This combination of ops without ImplicitCasting causes the code to crash out."""
+    """This combination of ops without ImplicitCasting causes the code
+    to crash out."""
+    if not trace_model:
+        pytest.skip("TODO(T51159): Only Tensors of floating point and complex "
+                    "dtype can require gradients")
     torch.manual_seed(42)
     floatTensor = torch.randn(2, 3).to(dtype=torch.float)
     intTensor = torch.randn(2, 3).to(dtype=torch.int)
@@ -459,6 +463,8 @@ def fast_gather_last_dim(data, idx):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_fastgather_3dim(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): INTERNAL ASSERT FAILED")
     torch.manual_seed(42)
     shape = (9, 11, 6)
     input = torch.randn(shape)
@@ -490,6 +496,8 @@ def test_fastgather_3dim(trace_model):
 @pytest.mark.parametrize("larger_index", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gather_3dim(dim, larger_index, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): gather(): Expected dtype int64 for index")
     torch.manual_seed(42)
     shape = (9, 11, 6)
     input = torch.randn(shape)
@@ -512,6 +520,8 @@ def test_gather_3dim(dim, larger_index, trace_model):
 @pytest.mark.parametrize("larger_index", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gather_4dim(dim, larger_index, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): gather(): Expected dtype int64 for index")
     torch.manual_seed(42)
     shape = (5, 8, 6, 7)
     input = torch.randn(shape)
@@ -534,6 +544,8 @@ def test_gather_4dim(dim, larger_index, trace_model):
 @pytest.mark.parametrize("larger_index", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gather_5dim(dim, larger_index, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): gather(): Expected dtype int64 for index")
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)
@@ -555,6 +567,10 @@ def test_gather_5dim(dim, larger_index, trace_model):
 @pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_scatter(dim, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
+            "for index")
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)
@@ -568,6 +584,10 @@ def test_scatter(dim, trace_model):
 @pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_scatter_(dim, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
+            "is being used in an in-place operation.")
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)
@@ -581,6 +601,10 @@ def test_scatter_(dim, trace_model):
 @pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_scatter_scalar(dim, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
+            "is being used in an in-place operation.")
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)
@@ -622,6 +646,10 @@ def test_split_singleton(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_squeeze(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): InternalError: aten::as_strided should have been "
+            "intercepted earlier.")
     torch.manual_seed(42)
     x = torch.randn(1, 1, 5, 1, 10, 1)
 
@@ -687,6 +715,9 @@ def test_expand(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_expand_preserve_dim(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): Invalid tensor shape: dimension 1 is negative (-1)")
     torch.manual_seed(42)
     x = torch.randn(1, 1, 100)
     op = lambda x: x.expand(2, -1, -1)
@@ -811,6 +842,10 @@ def test_stack(input_shapes, dim, trace_model):
                          [[1], [3], [2, 1], [2, 3], [1, 1, 1], [3, 2, 4]])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_repeat(input_shapes, dims, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
 
     if len(dims) < len(input_shapes):
         pytest.skip(
@@ -825,7 +860,13 @@ def test_repeat(input_shapes, dims, trace_model):
     op_harness(op, a, trace_model=trace_model)
 
 
-def test_repeat_training_input():
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_repeat_training_input(trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T51159): NotImplementedError: Cannot access storage of "
+            "IpuTensorImpl")
+
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -841,7 +882,9 @@ def test_repeat_training_input():
     input = torch.randn((10, 1, 1))
 
     model = Model()
-    poptorch_model = poptorch.trainingModel(model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.trainingModel(model, options=options)
 
     native_out, _ = model(input)
     poptorch_out, _ = poptorch_model(input)
@@ -938,6 +981,8 @@ def test_copy_(input_shapes, dtype, trace_model):
                                          (1, 3)])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_roll(shifts, dims, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): No shape inference handler for aten::roll")
     torch.manual_seed(0)
     op = lambda x: x.roll(shifts, dims)
     x = torch.randn((2, 3, 4))
@@ -947,6 +992,8 @@ def test_roll(shifts, dims, trace_model):
 @pytest.mark.parametrize("dims", [0, 1, -1])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_flip(dims, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): No shape inference handler for aten::flip")
     torch.manual_seed(0)
     op = lambda x: x.flip(dims)
     x = torch.randn((2, 3))
@@ -955,7 +1002,10 @@ def test_flip(dims, trace_model):
 
 @pytest.mark.parametrize("with_clone", [True, False])
 @pytest.mark.parametrize("with_detach", [True, False])
-def test_detach_and_clone(with_clone, with_detach):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_detach_and_clone(with_clone, with_detach, trace_model):
+    if not trace_model and with_detach:
+        pytest.skip("TODO(T51159): assert tensor(False)")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -977,7 +1027,10 @@ def test_detach_and_clone(with_clone, with_detach):
             return out, loss
 
     model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model,
+                                            options=options,
                                             optimizer=torch.optim.SGD(
                                                 model.parameters(), lr=0.01))
 
