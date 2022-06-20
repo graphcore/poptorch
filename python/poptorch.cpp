@@ -942,6 +942,65 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   return lower;
 }
 
+poptorch::LowerToPopart
+lowerToPopartFromDispatch(const pybind11::dict &options,
+                          const py::function &attribute_accessor,
+                          bool is_training, const py::dict &opt_dict) {
+  SessionOptions parsed_options = parseSessionOptions(options);
+
+  AnchorList anchors_list;
+  std::vector<Optimizer> optimizers = parseOptimizers(opt_dict);
+
+  InplaceGraphInfo inplace_info = getInplaceGraphInfo(
+      anchors_list.size(), parsed_options.replicationFactor() > 1 &&
+                               parsed_options.broadcastBuffers());
+  std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
+
+  logging::debug("Traced graph:\n{}", *graph);
+
+  // Make sure all constants are correctly categorised as either
+  // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
+  // that we have a full graph.
+  poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
+      graph.get());
+
+  // Collapse any `begin_cpu ... end_cpu` sequences into a single node, with the
+  // correct inputs & outputs.
+  poptorch::cpuOffloadingCleanup(graph.get());
+
+  if (graph->outputs().empty()) {
+    logging::trace("No outputs, so all nodes cleared");
+    for (auto it = graph->nodes().rbegin(); it != graph->nodes().rend(); it++) {
+      it.destroyCurrent();
+    }
+  }
+
+  // TODO(T55228): remove after we use our own dispatch key.
+  removeDeadImplicitCasts(graph.get());
+
+  // Prepare CPU op callbacks, by allocating the CPU tensors where the
+  // inputs/outputs will be stored. We have to do this at the last possible
+  // moment due to tracing.
+  initCallbackBuffers();
+
+  poptorch::LowerToPopart lower(
+      graph.get(), std::move(inplace_info), is_training, std::move(optimizers),
+      parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
+
+  lower.lower(nullptr);
+
+  // Clear the callbacks after compilation.
+  callbacks.clear();
+
+  // We need to keep the dispatcher alive until after the passes because
+  // some of them call isDispatcherActive() and until after the lowering
+  // because the dispatcher is used to retrieve data pointers associated
+  // with jit::Value for inputs and parameters.
+  destroyDispatcher();
+
+  return lower;
+}
+
 void mapParamsToNames(const pybind11::tuple &names,
                       const pybind11::tuple &tensors) {
   ERROR_ON(names.size() != tensors.size());
@@ -1327,63 +1386,22 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
 }
 
 std::shared_ptr<poptorch::PoplarExecutable>
+processDispatchAndImportExecutable(const pybind11::dict &options,
+                                   const py::function &attribute_accessor,
+                                   bool is_training, const py::dict &opt_dict,
+                                   const std::string &import_filename) {
+  auto lower = lowerToPopartFromDispatch(options, attribute_accessor,
+                                         is_training, opt_dict);
+  return lower.loadExecutableFromFile(import_filename);
+}
+std::shared_ptr<poptorch::PoplarExecutable>
 compileWithManualTracing(const pybind11::dict &options,
                          const py::function &attribute_accessor,
                          bool is_training, const py::dict &opt_dict) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   logging::debug("Compile with manual tracing");
-
-  SessionOptions parsed_options = parseSessionOptions(options);
-
-  AnchorList anchors_list;
-  std::vector<Optimizer> optimizers = parseOptimizers(opt_dict);
-
-  InplaceGraphInfo inplace_info = getInplaceGraphInfo(
-      anchors_list.size(), parsed_options.replicationFactor() > 1 &&
-                               parsed_options.broadcastBuffers());
-  std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
-
-  logging::debug("Traced graph:\n{}", *graph);
-
-  // Make sure all constants are correctly categorised as either
-  // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
-  // that we have a full graph.
-  poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
-      graph.get());
-
-  // Collapse any `begin_cpu ... end_cpu` sequences into a single node, with the
-  // correct inputs & outputs.
-  poptorch::cpuOffloadingCleanup(graph.get());
-
-  if (graph->outputs().empty()) {
-    logging::trace("No outputs, so all nodes cleared");
-    for (auto it = graph->nodes().rbegin(); it != graph->nodes().rend(); it++) {
-      it.destroyCurrent();
-    }
-  }
-
-  // TODO(T55228): remove after we use our own dispatch key.
-  removeDeadImplicitCasts(graph.get());
-
-  // Prepare CPU op callbacks, by allocating the CPU tensors where the
-  // inputs/outputs will be stored. We have to do this at the last possible
-  // moment due to tracing.
-  initCallbackBuffers();
-
-  poptorch::LowerToPopart lower(
-      graph.get(), std::move(inplace_info), is_training, std::move(optimizers),
-      parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
-
-  lower.lower(nullptr);
-
-  // Clear the callbacks after compilation.
-  callbacks.clear();
-
-  // We need to keep the dispatcher alive until after the passes because
-  // some of them call isDispatcherActive() and until after the lowering
-  // because the dispatcher is used to retrieve data pointers associated
-  // with jit::Value for inputs and parameters.
-  destroyDispatcher();
+  auto lower = lowerToPopartFromDispatch(options, attribute_accessor,
+                                         is_training, opt_dict);
 
   return lower.compile();
 }
@@ -1461,6 +1479,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("markOutputs", PTC(poptorch::markOutputs));
   m.def("finalizeGraph", PTC(poptorch::finalizeGraph));
   m.def("compileWithManualTracing", PTC(poptorch::compileWithManualTracing));
+  m.def("processDispatchAndImportExecutable",
+        PTC(poptorch::processDispatchAndImportExecutable));
   m.def("_throwTestError", PTC(poptorch::throwTestError));
 
   poptorch::initialiseExceptionHandling(m);

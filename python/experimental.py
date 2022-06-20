@@ -17,7 +17,8 @@ class IPUScope:
                  options: Optional['poptorch.Options'] = None,
                  training: bool = False,
                  dict_optimizer: Optional[dict] = None,
-                 compile_using=enums.Compiler.PopART):
+                 compile_using=enums.Compiler.PopART,
+                 skip_compilation=False):
 
         if not isinstance(inputs, (list, tuple)):
             raise ValueError("You can only pass a list or tuple as the " +
@@ -58,6 +59,7 @@ class IPUScope:
         self._outputs = []
         self._outputs_structure = None
         self._upload_weights = True
+        self._skip_compilation = skip_compilation
 
         # Create the graph. Futured captured calls will be written into this
         # graph behind the scenes.
@@ -99,6 +101,9 @@ class IPUScope:
         if exc_type is not None:
             return False
 
+        if self._skip_compilation:
+            return True
+
         # Compile for IPU.
         if self._compile_using == enums.Compiler.PopART:
             # Compile the captured graph using PopART.
@@ -109,6 +114,16 @@ class IPUScope:
             # Compile the captured graph using MLIR.
             self._executable = poptorch_core.compileWithMLIR()
         return True
+
+    def loadExecutable(self, filename):
+        if self._compile_using == enums.Compiler.PopART:
+            # Compile the captured graph using PopART.
+            self._executable = poptorch_core.processDispatchAndImportExecutable(
+                self._options.toDict(), accessAttributes, self._training,
+                self._dict_optimizer, filename)
+        else:
+            raise _impl.createPoptorchError("Not supported: can't deserialize "
+                                            "MLIR executables")
 
     def __call__(self, *args):
         if self._upload_weights:
@@ -172,13 +187,20 @@ class _IPUContext:
         self.model = model
 
     def compile(self, *args, **kwargs):
+        return self._compileOrLoadExecutable(args, kwargs)
+
+    def loadExecutable(self, filename, *args, **kwargs):
+        return self._compileOrLoadExecutable(args, kwargs, filename)
+
+    def _compileOrLoadExecutable(self, args, kwargs, filename=None):
         tensor_args = flattenTensorStructure((args, kwargs))
         with IPUScope(tensor_args,
                       model=self.model,
                       options=self.options,
                       training=self.training,
                       dict_optimizer=self.dict_optimizer,
-                      compile_using=self.compiler) as ipu:
+                      compile_using=self.compiler,
+                      skip_compilation=filename is not None) as ipu:
             d = torch.device("xla:0")
             # Move all the inputs to the IPU
             tensor_args = [t.to(d) for t in tensor_args]
@@ -189,6 +211,10 @@ class _IPUContext:
             result = self.func(*args, **kwargs)
             if result is not None:
                 ipu.outputs(result)
+
+        if filename is not None:
+            ipu.loadExecutable(filename)
+
         self.ipu = ipu
         return tensor_args
 

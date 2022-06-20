@@ -557,7 +557,7 @@ class PoplarExecutor:
             self._update_optimizer_if_needed()
             self._write_optim_state_dict_if_needed()
 
-    def _compileWithDispatch(self, in_tensors):
+    def _compileWithDispatch(self, in_tensors, executable_filename=None):
         # Store buffer and parameter memory addresses to make sure that these do
         # not change during dispatching (which would give wrong results in a Jit
         # trace)
@@ -573,7 +573,10 @@ class PoplarExecutor:
                              options=self._options,
                              training=self._training,
                              dict_optimizer=self._dict_optimizer)
-            ctx.compile(*in_tensors.args)
+            if executable_filename is not None:
+                ctx.loadExecutable(executable_filename, *in_tensors.args)
+            else:
+                ctx.compile(*in_tensors.args)
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
         self._error_on_buffer_parameter_address_change(buff_param_addresses)
 
@@ -741,9 +744,11 @@ class PoplarExecutor:
                     poptorch_core.processTraceAndImportExecutable(
                         *trace_args, filename)
         else:
-            # TODO(T51159) Support dispatch tracing + serialized executables
-            raise _impl.createPoptorchError("Not supported: can't deserialize "
-                                            " dispatch traced executable.")
+            in_tensors_trace_view = self._preprocessGraphDispatcher(
+                data.executable_inputs)
+            self._executable = self._compileWithDispatch(
+                in_tensors_trace_view, executable_filename=filename)
+
         self._is_attached = self.isAttachedToDevice()
 
         if self._is_attached:
