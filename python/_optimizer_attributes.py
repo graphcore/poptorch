@@ -21,7 +21,9 @@ class OptimizerAttrTracker:
         self.type = "Unknown"
 
     def setType(self, optimizer_type):
-        assert isinstance(optimizer_type, _OptimizerType)
+        assert isinstance(optimizer_type, _OptimizerType), \
+            "Unsupported optimizer type. Types supported %s" % \
+            ', '.join(str(t) for t in _OptimizerType)
         self.type = optimizer_type.name
 
     def enableChecks(self):
@@ -54,9 +56,9 @@ def convertOptimizerToDict(optimizer, attr_tracker, options, is_compiled):
     optimizer_type = _toPoptorchOptimizer(optimizer)
     attr_tracker.setType(optimizer_type)
 
-    assert optimizer_type is not None, ("Unsupported optimizer type. "
-                                        "Types supported %s") % str(
-                                            list(_OptimizerType))
+    assert optimizer_type is not None, \
+        "Unsupported optimizer type. Types supported %s" % \
+        ', '.join(str(t) for t in _OptimizerType)
     opt_class = _toPoptorchClass(optimizer_type)
 
     num_groups = len(optimizer.param_groups)
@@ -303,6 +305,18 @@ def _toPoptorchClass(optimizer_type):
 
 # pylint: disable=too-many-return-statements
 def _toPoptorchOptimizer(optimizer):
+    # If an optimizer has anything other than torch.optim.Optimizer or
+    # poptorch.optim.Optimizer as its parent classes, it may be an attempt to
+    # implement a custom optimizer through subclassing
+    if torch.optim.Optimizer not in optimizer.__class__.__bases__ and \
+            optim.Optimizer not in optimizer.__class__.__bases__:
+        logger.warning(
+            "Optimizer `%s` subclassed from classes in poptorch.optim or "
+            "torch.optim are unlikely to behave as intended. Poptorch does "
+            "not run Python optimizer code directly; but instead uses IPU "
+            "native optimisers implemented in PopART.",
+            type(optimizer).__name__)
+
     if isinstance(optimizer, torch.optim.SGD):
         use_combined_accum = getattr(optimizer, "use_combined_accum", False)
         if use_combined_accum:

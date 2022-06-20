@@ -1772,3 +1772,29 @@ def test_setOptimizer_frozen_options_broken(trace_model):
     optimizer.accum_type = torch.half
     with pytest.raises(ValueError, match="is already compiled"):
         training_model.setOptimizer(optimizer)
+
+
+@helpers.printCapfdOnExit
+@pytest.mark.parametrize("opt", all_optimizers)
+@pytest.mark.parametrize("subclassed", [True, False])
+def test_optimizer_warnings(capfd, opt, subclassed):
+    # The NoBias classes defined in this file are subclasses and
+    # should be warned about, so skip the 'not subclassed' case for these
+    if 'NoBias' in str(opt) and not subclassed:
+        pytest.skip()
+
+    if subclassed:
+
+        class SubclassedOpt(opt):
+            pass
+
+        opt = SubclassedOpt
+
+    model = OptimizerTestModel()
+    model.setOptimizer(opt(model.parameters(), lr=0.01))
+    expected_warning = "Poptorch does not run Python optimizer code directly"
+    testlog = helpers.LogChecker(capfd)
+    if subclassed:
+        testlog.assert_contains(expected_warning)
+    else:
+        testlog.assert_not_contains(expected_warning)

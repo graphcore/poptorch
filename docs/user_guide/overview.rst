@@ -650,6 +650,10 @@ In addition, PopTorch has features to support float16 models, such as loss scali
 
 .. important:: You must call :py:func:`~poptorch.PoplarExecutor.setOptimizer` to apply the new optimizer values to the model.
 
+.. warning:: PopTorch does not directly use the Python implementation of the optimizers. Built-in implementations are used in their place.
+   This means that you cannot currently use custom optimizers. Subclassing a built-in optimizer will generate a warning. Any custom behaviour
+   in a custom optimizer is unlikely to take effect, other than simply setting the existing attributes.
+
 Loss scaling
 ------------
 

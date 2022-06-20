@@ -132,6 +132,10 @@ One important thing to note about using optimizers in PopTorch is that the optim
 As such, any change made to the optimizer outside of the model must be followed by a call to :py:meth:`poptorch_model.setOptimizer <poptorch.PoplarExecutor.setOptimizer>`,
 passing in the updated optimizer.
 
+.. warning:: PopTorch does not directly use the Python implementation of the optimizers. Built-in implementations are used in their place.
+   This means that you cannot currently use custom optimizers. Subclassing a built-in optimizer will generate a warning. Any custom behaviour
+   in a custom optimizer is unlikely to take effect, other than simply setting the existing attributes.
+
 +-------------------------------------------------+
 | PyTorch                                         |
 +-------------------------------------------------+
