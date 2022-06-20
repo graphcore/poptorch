@@ -1047,7 +1047,7 @@ use with your PyTorch code.
 Make the op available to PyTorch
 --------------------------------
 
-After you have compiled the C++ implementation of the custom op, you can can load
+After you have compiled the C++ implementation of the custom op, you can load
 the library file, and call the op from your PyTorch program, using the
 :py:class:`poptorch.custom_op` class.
 
