@@ -311,6 +311,27 @@ class FourBlockModel(torch.nn.Module):
         return out
 
 
+class FourBlockModelNoScope(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lin1 = torch.nn.Linear(1, 1)
+        self.lin2 = torch.nn.Linear(1, 1)
+        self.lin3 = torch.nn.Linear(1, 1)
+        self.lin4 = torch.nn.Linear(1, 1)
+
+    def forward(self, x):
+        poptorch.Block.start("B1", ipu_id=0)
+        out = self.lin1(x)
+        poptorch.Block.start("B2", ipu_id=1)
+        out = self.lin2(out)
+        poptorch.Block.start("B3", ipu_id=2)
+        out = self.lin3(out)
+        poptorch.Block.start("B4", ipu_id=3)
+        out = self.lin4(out)
+
+        return out
+
+
 @pytest.mark.parametrize("num_grad_accums", (4, 5, 7))
 @pytest.mark.parametrize("device_iterations", (1, 2))
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -355,8 +376,9 @@ def test_gradient_accumulation_pipelined_training(num_grad_accums,
 
 
 @pytest.mark.parametrize("pipelined", [True, False])
-def test_gradient_accumulation_inference(pipelined):
-    model = FourBlockModel()
+@pytest.mark.parametrize("Model", [FourBlockModel, FourBlockModelNoScope])
+def test_gradient_accumulation_inference(pipelined, Model):
+    model = Model()
     opts = poptorch.Options()
 
     if pipelined:
@@ -384,8 +406,9 @@ def test_gradient_accumulation_inference(pipelined):
 
 @pytest.mark.parametrize("pipelined", [True, False])
 @pytest.mark.parametrize("device_iterations", (2, 4))
-def test_device_iterations_inference(pipelined, device_iterations):
-    model = FourBlockModel()
+@pytest.mark.parametrize("Model", [FourBlockModel, FourBlockModelNoScope])
+def test_device_iterations_inference(pipelined, device_iterations, Model):
+    model = Model()
     opts = poptorch.Options()
 
     if pipelined:
