@@ -20,6 +20,20 @@ namespace poptorch {
 
 namespace {
 
+bool isGenericListOfTensors(c10::IValue &value) {
+  if (!value.isList()) {
+    return false;
+  }
+  bool not_empty = false;
+  for (c10::IValue list_value : value.toList()) {
+    if (!list_value.isTensor()) {
+      return false;
+    }
+    not_empty = true;
+  }
+  return not_empty;
+}
+
 torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
                                                   torch::jit::Graph &graph,
                                                   ValueMapper &mapper) {
@@ -60,12 +74,22 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
     return val;
   }
 
-  if (value.isTensorList()) {
+  // If a generic list only contains tensors then it is a tensor
+  // list and we handle both the same way.
+  if (value.isTensorList() || isGenericListOfTensors(value)) {
     // Handle tensor lists.
     std::vector<torch::jit::Value *> list_values;
-    for (c10::IValue list_value : value.toTensorVector()) {
-      list_values.push_back(
-          insertValueIntoGraphAndTrackIt(list_value, graph, mapper));
+    if (value.isTensorList()) {
+      for (c10::IValue list_value : value.toTensorVector()) {
+        list_values.push_back(
+            insertValueIntoGraphAndTrackIt(list_value, graph, mapper));
+      }
+    } else {
+      for (c10::IValue list_value : value.toList()) {
+        list_values.push_back(
+            insertValueIntoGraphAndTrackIt(list_value, graph, mapper));
+      }
+      logging::warn("Generic List of tensors! {}", value.tagKind());
     }
 
     // We assume all lists with the same jit values are the same list in python.
