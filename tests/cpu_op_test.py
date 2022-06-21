@@ -9,10 +9,6 @@ import helpers
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_simple_CPU(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Couldn't find a registered operation for node")
-
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -49,10 +45,6 @@ def test_simple_CPU(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_simple_CPU_multiple_outputs(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Couldn't find a registered operation for node")
-
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -92,10 +84,6 @@ def test_simple_CPU_multiple_outputs(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_CPU_reduce(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Couldn't find a registered operation for node")
-
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -126,10 +114,6 @@ def test_CPU_reduce(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_CPU_matmul(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Couldn't find a registered operation for node")
-
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -158,9 +142,6 @@ def test_CPU_matmul(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_CPU_multiple_calls(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Couldn't find a registered operation for node")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
@@ -192,10 +173,6 @@ def test_CPU_multiple_calls(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_CPU_multiple_calls_multiple_classes(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Couldn't find a registered operation for node")
-
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
