@@ -124,7 +124,8 @@ index_indices = ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index(op, idxs, trace_model):
     if not trace_model:
-        pytest.skip("TODO(T51159): Unsupported value kind: GenericList")
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::index.Tensor")
     index_harness(trace_model, op, idxs, False)
 
 
