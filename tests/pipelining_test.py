@@ -42,18 +42,31 @@ def test_missing_block(trace_model):
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_api_inline(capfd, trace_model):
+@pytest.mark.parametrize("use_scope", [True, False])
+def test_api_inline(capfd, trace_model, use_scope):
     if not trace_model:
         pytest.skip("TODO(T57195): AssertionError")
 
-    class Model(torch.nn.Module):
-        def forward(self, x):
-            poptorch.Block.useAutoId()
-            with poptorch.Block(ipu_id=0):
+    if use_scope:
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                poptorch.Block.useAutoId()
+                with poptorch.Block(ipu_id=0):
+                    x = x * 4
+                with poptorch.Block(ipu_id=1):
+                    x = x * 2
+                return x
+    else:
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                poptorch.Block.useAutoId()
+                poptorch.Block.start(ipu_id=0)
                 x = x * 4
-            with poptorch.Block(ipu_id=1):
+                poptorch.Block.start(ipu_id=1)
                 x = x * 2
-            return x
+                return x
 
     m = Model()
 

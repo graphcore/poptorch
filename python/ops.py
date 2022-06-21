@@ -378,6 +378,11 @@ class Block(torch.nn.Module):
         if Block._stages_manager is not None:
             Block._stages_manager.resetAutoId()
 
+    @staticmethod
+    def start(user_id: Optional[str] = None, ipu_id: Optional[int] = None):
+        if Block._stages_manager is not None:
+            Block._stages_manager.beginStage(user_id, ipu_id)
+
     def __init__(self,
                  user_id: Optional[str] = None,
                  ipu_id: Optional[int] = None):
@@ -398,8 +403,7 @@ class Block(torch.nn.Module):
         self._ipu_id = ipu_id
 
     def __enter__(self):
-        if Block._stages_manager is not None:
-            Block._stages_manager.beginStage(self._user_id, self._ipu_id)
+        Block.start(self._user_id, self._ipu_id)
 
     def __exit__(self, type, value, traceback):
         _end_ipu_block()
