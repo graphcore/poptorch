@@ -496,8 +496,6 @@ def test_fastgather_3dim(trace_model):
 @pytest.mark.parametrize("larger_index", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gather_3dim(dim, larger_index, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): gather(): Expected dtype int64 for index")
     torch.manual_seed(42)
     shape = (9, 11, 6)
     input = torch.randn(shape)
@@ -520,8 +518,6 @@ def test_gather_3dim(dim, larger_index, trace_model):
 @pytest.mark.parametrize("larger_index", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gather_4dim(dim, larger_index, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): gather(): Expected dtype int64 for index")
     torch.manual_seed(42)
     shape = (5, 8, 6, 7)
     input = torch.randn(shape)
@@ -544,8 +540,6 @@ def test_gather_4dim(dim, larger_index, trace_model):
 @pytest.mark.parametrize("larger_index", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gather_5dim(dim, larger_index, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): gather(): Expected dtype int64 for index")
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)

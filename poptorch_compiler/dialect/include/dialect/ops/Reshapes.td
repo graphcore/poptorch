@@ -235,6 +235,41 @@ def Poptorch_squeeze_dim_: Poptorch_Op<"squeeze_dim_", [ViewOp]> {
     ];
 }
 
+// gather(Tensor self, int dim, Tensor index, *, bool sparse_grad=False) -> Tensor(a!)
+def Poptorch_gather: Poptorch_NotImplementedOp<"gather", [ViewOp]> {
+    let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index, DefaultValuedAttr<BoolAttr,"false">:$sparse_grad);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim, "mlir::Value":$index, "bool":$sparse_grad),[{
+        ERROR_ON_MSG(sparse_grad, "gather: sparse_grad=True not supported");
+
+        $_state.addOperands({self, index});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+
+        mlir::RankedTensorType t1 = self.getType().cast<mlir::RankedTensorType>();
+        auto index_shape = index.getType().cast<mlir::RankedTensorType>().getShape();
+        mlir::Type e1 = t1.getElementType();
+        auto shape = t1.getShape();
+        if (dim < 0) {
+            dim += shape.size();
+        }
+        // From Torch's documentation:
+        // input and index must have the same number of dimensions.
+        // It is also required that index.size(d) <= input.size(d) for all
+        // dimensions d != dim.
+        // out will have the same shape as index.
+        // Note that input and index do not broadcast against each other.
+        ERROR_ON_MSG(shape.size() != index_shape.size(),"self and index must "
+            "have the same number of dimensions");
+        for(auto d = 0u; d < shape.size(); d++){
+          ERROR_ON_MSG(d != dim && index_shape[d] > shape[d], "index.size("
+              <<d<<") > input.size("<<d<<") ("<<index_shape[d]<<" > "<<shape[d]<<")");
+        }
+        $_state.addTypes(mlir::RankedTensorType::get(index_shape, e1));
+     }]>
+    ];
+}
+
 // select.int(Tensor(a) self, int dim, int index) -> Tensor(a)
 def Poptorch_select : Poptorch_Op<"select", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$self,
