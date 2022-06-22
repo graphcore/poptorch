@@ -165,6 +165,9 @@ bool AutocastPolicy::decision(const torch::jit::Node *node,
   if (mixed_precision) {
     switch (halfFloatCastingBehavior()) {
     case HalfFloatCasting::FloatDowncastToHalf:
+    // Autocasting is only called when the dispatcher is disabled, so Default
+    // corresponds to FloatDowncastToHalf.
+    case HalfFloatCasting::Default:
       *type = at::ScalarType::Half;
       break;
     case HalfFloatCasting::HalfUpcastToFloat:

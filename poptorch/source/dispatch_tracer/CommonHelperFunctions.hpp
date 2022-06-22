@@ -37,8 +37,8 @@ c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &initial_op,
 // is not truly inplace, e.g. it returns the 'out' argument in the schema
 // op(Tensor self, Tensor(a!) out) -> (Tensor(a!)) even when 'self' and 'out'
 // are not the same tensor.
-c10::intrusive_ptr<at::TensorImpl>
-getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema);
+std::optional<at::Tensor> getInplaceArgument(const c10::Stack &stack,
+                                             const c10::FunctionSchema &schema);
 
 // Using the schema definition as a guide look up all the correct
 // torch::jit::Values in the stack and create a jit node with the correct
@@ -47,8 +47,7 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
                                   c10::Stack *stack, torch::jit::Graph &graph,
                                   ValueMapper &mapper);
 
-void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack,
-                   ValueMapper &mapper);
+void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack);
 
 // Run our canonicaliser passes for the aten_target over the graph.
 torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,

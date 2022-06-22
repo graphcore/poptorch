@@ -182,10 +182,6 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   logging::trace("[TRACING-2][JIT] copyInplace: self tensor new jit ir %{}",
                  self_tracked->jit->debugName());
 
-  if (_mapper.isHalfTensor(src)) {
-    _mapper.markHalfTensor(self);
-  }
-
   return self;
 }
 
@@ -249,11 +245,7 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
     if (value.isTensor()) {
       at::Tensor tensor = value.toTensor();
 
-      if (_mapper.isHalfTensor(tensor)) {
-        val->inferTypeFrom(tensor.to(at::ScalarType::Half));
-      } else {
-        val->inferTypeFrom(copyAndCoerceType(tensor));
-      }
+      val->inferTypeFrom(copyAndCoerceType(tensor));
       _mapper.addTensor(tensor, val);
 
       logging::trace(
@@ -274,11 +266,7 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       for (size_t i = 0; i < tensor_list.size(); ++i) {
         at::Tensor tensor = tensor_list.at(i);
         val = unpack->output(i);
-        if (_mapper.isHalfTensor(tensor)) {
-          val->inferTypeFrom(tensor.to(at::ScalarType::Half));
-        } else {
-          val->inferTypeFrom(copyAndCoerceType(tensor));
-        }
+        val->inferTypeFrom(copyAndCoerceType(tensor));
         _mapper.addTensor(tensor, val);
         logging::trace("[TRACING-2][JIT] Output tensor list element: Tensor "
                        "ptr {}, jit ir %{} {}",
@@ -298,12 +286,12 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   const c10::FunctionSchema &initial_schema = initial_op.schema();
   // Run through the schema to find out if one of the operators is supposed to
   // be inplace, this could be the 'out' argument of a non-inplace op.
-  c10::intrusive_ptr<at::TensorImpl> inplace_tensor =
+  std::optional<at::Tensor> inplace_tensor =
       getInplaceArgument(*stack, initial_schema);
   torch::jit::Value *aliased_input = nullptr;
   if (inplace_tensor) {
     aliased_input = _inplace_tracker.eraseCurrentAlias(
-        _mapper.getValueForTensor(at::Tensor(inplace_tensor)));
+        _mapper.getValueForTensor(*inplace_tensor));
   }
 
   c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
@@ -311,6 +299,30 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, *graph, _mapper);
+
+  if (inplace_tensor) {
+    // For inplace ops, cast all input tensors to the same type as the output
+    // tensor.
+    auto output_type = inplace_tensor->scalar_type();
+    bool output_float = c10::isFloatingType(output_type);
+    for (size_t i = 0; i < stack->size(); i++) {
+      const c10::IValue &sv = (*stack)[i];
+      if (!sv.isTensor()) {
+        continue;
+      }
+      const at::Tensor &tensor = sv.toTensor();
+      auto input_type = tensor.scalar_type();
+      bool input_float = c10::isFloatingType(input_type);
+      if (input_type == at::ScalarType::Undefined ||
+          input_type == output_type || input_float != output_float ||
+          !canCast(input_type, output_type)) {
+        continue;
+      }
+      torch::jit::Value *jv = node->input(i);
+      auto *cast = createCast(graph.get(), jv, output_type);
+      node->replaceInputWith(jv, cast->output());
+    }
+  }
 
   // The MLIR dispatcher is going to use the shape and type of the inputs to
   // infer the shape and type of the outputs so we need to create dummy MLIR
@@ -351,7 +363,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   _mlir_dispatch.handleOp(op, stack);
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
-  fixNodeOutput(node, *stack, _mapper);
+  fixNodeOutput(node, *stack);
   logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *node);
 
   // Run our normal canonicalisation passes on it.
@@ -379,7 +391,6 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   // Switcheroo the output so the inplace tensor reference is now pointing to
   // the output.
   if (inplace_tensor) {
-    at::Tensor inplace{inplace_tensor};
     at::Tensor output = stack->at(0).toTensor();
 
     // Get the jit value we are tracking for the output.
@@ -392,15 +403,13 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
     // Overwrite the inplace tensor with that jit. Now a reference to the
     // inplace tensor correctly points to this outplace value.
-    ValueMapper::TrackedTensor *record = _mapper.rawTensorRecord(inplace);
+    ValueMapper::TrackedTensor *record =
+        _mapper.rawTensorRecord(*inplace_tensor);
     ERROR_ON_MSG(
         !record,
         "[TRACING-2][JIT] Inplace op is not tracking inplace argument");
     record->jit = value;
     record->is_empty = false;
-    if (_mapper.isHalfTensor(output)) {
-      _mapper.markHalfTensor(inplace);
-    }
   }
 
   logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",

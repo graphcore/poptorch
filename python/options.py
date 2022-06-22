@@ -89,8 +89,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
             autocast_enabled=True,
             autocast_policy=autocasting.default,
             autocast_policy_dict=autocasting.default._dict(),  # pylint: disable=protected-access
-            half_float_casting=enums.HalfFloatCastingBehavior.
-            FloatDowncastToHalf,
+            half_float_casting=enums.HalfFloatCastingBehavior.Default,
             running_statistics_always_float=True)
 
     def autocastEnabled(self, autocast_enabled: bool
@@ -129,13 +128,22 @@ class _PrecisionOptions(_options_impl.OptionsDict):
         """ Changes the casting behaviour for ops involving a float16 (half) and
             a float32
 
-        The default option, ``FloatDowncastToHalf``, allows parameters (weights)
-        to be stored as and updated as float32 but cast to float16 when used in
-        an operation with a float16 input. The benefit of this is higher
-        efficiency and reduced memory footprint without the same loss of
-        precision of parameters during the optimiser update step. However, you
-        can change the behaviour to match PyTorch using option
-        ``HalfUpcastToFloat``.
+        The default option, ``Default``, is interpreted differently depending
+        whether tracing is enabled or not.
+
+        With tracing disabled, mixed precision casting always follows PyTorch's
+        scheme, wherein all parameters are upcast to the type of the highest
+        precision input. The exception to this is inplace ops, which cast
+        to the precision of the output. This behaviour can also be specified
+        explicitly using ``HalfUpcastToFloat``.
+
+        With tracing enabled, ``Default`` will cause mixed precision ops to
+        downcast their inputs to float16. This behaviour can also be obtained
+        with the explicit setting ``FloatDowncastToHalf``. The alternative is
+        to set the option as ``HalfUpcastToFloat``, which will give the PyTorch
+        default behaviour outlined above.
+
+        ``FloatDowncastToHalf`` is only valid with tracing enabled.
 
         :param half_float_casting:
             * ``FloatDowncastToHalf``:  Any op with operands (inputs) which are
@@ -144,13 +152,16 @@ class _PrecisionOptions(_options_impl.OptionsDict):
             * ``HalfUpcastToFloat``: Implicit casting will follow PyTorch's
               rules, promoting float16 (half) inputs to float32 if another input
               is float32.
+            * ``Default``: Interpreted as ``FloatDowncastToHalf`` if tracing is
+              enabled, or ``HalfUpcastToFloat`` if tracing is disabled.
         """
 
         if not isinstance(half_float_casting, enums.HalfFloatCastingBehavior):
             raise ValueError(
                 "halfFloatCasting must be set to "
                 "poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf or "
-                "poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat")
+                "poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat or "
+                "poptorch.Default")
 
         self.set(half_float_casting=half_float_casting)
         return self

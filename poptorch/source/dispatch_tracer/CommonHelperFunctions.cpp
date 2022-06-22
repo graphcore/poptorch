@@ -184,7 +184,7 @@ c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
   return op;
 }
 
-c10::intrusive_ptr<at::TensorImpl>
+std::optional<at::Tensor>
 getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema) {
   logging::trace("[TRACING-2][JIT] Looking for inplace argument in schema {}",
                  schema);
@@ -208,13 +208,13 @@ getInplaceArgument(const c10::Stack &stack, const c10::FunctionSchema &schema) {
             "[TRACING-2][JIT] Found inplace argument, tensor ptr {}, tensor {}",
             reinterpret_cast<void *>(tensor.unsafeGetTensorImpl()),
             toString(tensor));
-        return tensor.getIntrusivePtr();
+        return tensor;
       }
     }
   }
 
   // Assigned null in constructor.
-  return {};
+  return std::nullopt;
 }
 
 torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
@@ -242,8 +242,7 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
   return createAtenTarget(graph, schema, inputs, stack, mapper);
 }
 
-void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack,
-                   ValueMapper &mapper) {
+void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack) {
   std::uint32_t index = 0;
   for (c10::IValue value : stack) {
     // Add any missing outputs. They frequently return scalars which we just
@@ -260,9 +259,6 @@ void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack,
         continue;
       }
 
-      if (mapper.isHalfTensor(tensor)) {
-        tensor = tensor.toType(at::ScalarType::Half);
-      }
       torch::jit::Value *val = node->output(index);
       val->inferTypeFrom(tensor);
     } else if (value.isTensorList()) {

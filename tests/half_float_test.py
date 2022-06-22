@@ -30,10 +30,11 @@ def type_out_harness(trace_model, inputs, forward_op,
     opts = poptorch.Options()
     opts.Jit.traceModel(trace_model)
 
-    opts.Precision.halfFloatCasting(
-        poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)
-    assert_same_type(inputs, model, opts,
-                     expect_same_type_float_downcast_to_half)
+    if trace_model:
+        opts.Precision.halfFloatCasting(
+            poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)
+        assert_same_type(inputs, model, opts,
+                         expect_same_type_float_downcast_to_half)
 
     opts = opts.clone()
     opts.Precision.halfFloatCasting(
@@ -123,7 +124,7 @@ def test_ones_zeros_input_resolved_always_float32(op, trace_model):
             device=helpers.outputDevice()) + input
 
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float16),
-                     fw_op, False, False)
+                     fw_op, False, not trace_model)
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float32),
                      fw_op, True, True)
 
@@ -228,7 +229,7 @@ def test_distributions_uniform(trace_model):
         return ud.sample((10, 10, 1000))
 
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float16),
-                     fw_op, False, False)
+                     fw_op, False, not trace_model)
     type_out_harness(trace_model, torch.tensor([1], dtype=torch.float32),
                      fw_op, True, True)
 
@@ -328,7 +329,7 @@ def test_constant_add_float16(trace_model):
     type_out_harness(trace_model, torch.tensor([3, 4, 8], dtype=torch.float16),
                      fw_op, True, True)
     type_out_harness(trace_model, torch.tensor([3, 4, 8], dtype=torch.float32),
-                     fw_op, False, False)
+                     fw_op, False, not trace_model)
 
 
 # The type will resolve to the input rather than float32 because of the
@@ -342,7 +343,7 @@ def test_constant_always_float32(trace_model):
         return torch.tensor([1, 2, 3], dtype=torch.float32) + input
 
     type_out_harness(trace_model, torch.tensor([3, 4, 8], dtype=torch.float16),
-                     fw_op, False, False)
+                     fw_op, False, not trace_model)
     type_out_harness(trace_model, torch.tensor([3, 4, 8], dtype=torch.float32),
                      fw_op, True, True)
 
@@ -364,6 +365,20 @@ def test_float16_activations_float32_weights(trace_model):
     assert pop_out.dtype == torch.float
 
     # Float 16 act, float 32 weights
+    pop_model = poptorch.inferenceModel(model, options)
+    pop_out = pop_model(input.half())
+    assert pop_out.dtype == torch.half
+
+    # Float 32 act, float 16 weights
+    model.half()
+    pop_model = poptorch.inferenceModel(model, options)
+    pop_out = pop_model(input)
+    if trace_model:
+        assert pop_out.dtype == torch.half
+    else:
+        assert pop_out.dtype == torch.float
+
+    # Float 16 act, float 16 weights
     pop_model = poptorch.inferenceModel(model, options)
     pop_out = pop_model(input.half())
     assert pop_out.dtype == torch.half

@@ -366,13 +366,6 @@ HALF_PRECISION_EXCEPTIONS = {
     "test_nn_KLDivLoss_with_target_no_reduce": (0.05, 1e-2),
 }
 
-USE_HALF_PROMOTION = [
-    "test_nn_KLDivLoss_with_target_no_reduce",
-    "test_nn_KLDivLoss_no_reduce_log_target",
-    "test_nn_MultiLabelSoftMarginLoss_no_reduce",
-    "test_nn_MultiLabelSoftMarginLoss_weights_no_reduce"
-]
-
 # pylint: enable=line-too-long
 # yapf: enable
 
@@ -481,9 +474,6 @@ def test_pytorch_nn(test_name, use_half, trace_model):
 
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
-    if not trace_model and test_name in USE_HALF_PROMOTION:
-        options.Precision.halfFloatCasting(
-            poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
     poptorch_model = poptorch.inferenceModel(model, options)
     poptorch_out = poptorch_model(*inputs)
 
