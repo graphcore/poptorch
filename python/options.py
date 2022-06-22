@@ -804,7 +804,7 @@ class _IExecutionStrategy:
     def stage(self, block_id):
         """Return the :py:class:`poptorch.Stage` the given block is belongs to.
 
-        :param str block_id: A block id.
+        :param str block_id: A block ID.
         """
         assert block_id in self._block_map, f"Unknown block {block_id}"
         return self._block_map[block_id]
@@ -832,7 +832,7 @@ class Phase:
             blocks ``user_id``.
 
         If one or more strings are passed they will be interpreted as
-        :py:class:`Block` ids representing a single :py:class:`Stage`.
+        :py:class:`Block` IDs representing a single :py:class:`Stage`.
 
         Within a ``Phase``, the stages will be executed in parallel.
 
@@ -850,7 +850,7 @@ class Phase:
         else:
             assert all([isinstance(elt, str) for elt in arg
                         ]), ("All arguments must either "
-                             "be block ids (strings) or Stages: " +
+                             "be block IDs (strings) or Stages: " +
                              str([type(elt) for elt in arg]))
             self.stages = [Stage(*arg)]
 
@@ -873,14 +873,14 @@ class PipelinedExecution(_IExecutionStrategy):
     def __init__(self, *args):
         """Pipeline the execution of the graph partitions.
         These partitions can be:
-        :py:class:`Stages<poptorch.Stage>`, :py:class:`Stages<poptorch.Block>`
-        or :py:class:`Stages<poptorch.BeginBlock>`.
-        If none of these are passed, :py:class:`poptorch.AutoStage` strategy
-        can be passed instead to decide how the stages ids are created.
-        By default, `poptorch.AutoStage.SameAsIpu` is used: The stage id
+        a :py:class:`Stage<poptorch.Stage>`, a :py:class:`Block<poptorch.Block>`
+        or a :py:class:`BeginBlock<poptorch.BeginBlock>`.
+        If none of these are passed, an :py:class:`poptorch.AutoStage` strategy
+        can be passed instead to decide how the stage IDs are created.
+        By default, `poptorch.AutoStage.SameAsIpu` is used: The stage ID
         will be set to the selected IPU number.
         This implies that each unique :py:class:`Block<poptorch.Block>` or
-        :py:class:`Block<poptorch.BeginBlock>` in the graph must have
+        :py:class:`BeginBlock<poptorch.BeginBlock>` in the graph must have
         their `ipu_id` explicitly set when using `AutoStage`.
 
         Example 1: Blocks `user_id` are known, IPUs are inferred.
@@ -916,7 +916,7 @@ class PipelinedExecution(_IExecutionStrategy):
         ...     layer3()
         >>> with poptorch.Block(ipu_id=3):
         ...     layer4()
-        >>> # Automatically create a 4 stages pipeline matching the Blocks `ipu_id`.
+        >>> # Automatically create a 4-stage pipeline matching the block `ipu_id`.
         >>> opts.setExecutionStrategy(poptorch.PipelinedExecution())
         >>> # Note: poptorch.PipelinedExecution()
         >>> # is the default execution strategy when blocks are defined.
@@ -929,13 +929,13 @@ class PipelinedExecution(_IExecutionStrategy):
         ...     layer2()
         >>> with poptorch.Block(ipu_id=0):
         ...     layer3()
-        >>> # Automatically create a 3 stages pipeline forcing the stages
-        >>> # ids to be incremental.
+        >>> # Automatically create a 3-stage pipeline forcing the stage
+        >>> # IDs to be incremental.
         >>> opts.setExecutionStrategy(poptorch.PipelinedExecution(
         ...                           poptorch.AutoStage.AutoIncrement))
 
         :param args: Either a :py:class:`poptorch.AutoStage` strategy or an
-            explicit list of stages or block ids.
+            explicit list of stages or block IDs.
         :type args: poptorch.AutoStage, [str], [poptorch.Stage]
 
         """
@@ -989,7 +989,7 @@ class PipelinedExecution(_IExecutionStrategy):
 
 class ShardedExecution(PipelinedExecution):
     """Will shard the execution of the passed Stages or if no stage is passed
-    will consider each unique Block ipu_id encountered during tracing as a
+    will consider each unique Block `ipu_id` encountered during tracing as a
     different stage.
 
     >>> with poptorch.Block(ipu_id=0):
@@ -1003,7 +1003,7 @@ class ShardedExecution(PipelinedExecution):
     >>> opts.setExecutionStrategy(poptorch.ShardedExecution())
 
     :param args: Either a :py:class:`poptorch.AutoStage` strategy or an
-        explicit list of stages or block ids.
+        explicit list of stages or block IDs.
     :type args: poptorch.AutoStage, [str], [poptorch.Stage]
 
     """
@@ -1023,7 +1023,7 @@ class _IPhasedExecution(_IExecutionStrategy):
 
             - a list of :py:class:`poptorch.Phase`
             - a list of list of :py:class:`poptorch.Stage`
-            - a list of list of :py:class:`poptorch.Block` ids (Each list of
+            - a list of list of :py:class:`poptorch.Block` IDs (Each list of
               blocks will be considered as a single :py:class:`poptorch.Stage` )
         :type phases: [:py:class:`poptorch.Phase`],
             [[:py:class:`poptorch.Stage`]], [[str]]
@@ -1430,7 +1430,7 @@ class Options(_options_impl.OptionsDict):
         * embedding lookups
         * indexing operations
 
-        Parameter should be a dictionary of IPU ids and float values between 0
+        Parameter should be a dictionary of IPU IDs and float values between 0
         and 1. (for example, ``{"IPU0": 0.5}``)
 
         The floating point value has the same meaning and effect as documented
