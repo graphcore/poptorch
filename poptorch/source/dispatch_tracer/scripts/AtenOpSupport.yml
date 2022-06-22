@@ -220,6 +220,11 @@
 - func: unsqueeze
   PopTorchDirect: unsqueeze
 
+# func: gather.out(Tensor self, int dim, Tensor index, *, bool sparse_grad=False, Tensor(a!) out) -> Tensor(a!)
+- func: gather
+  PopTorchDirect: gather
+  UnusedOutputArguments: {out}
+
 # func: constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> Tensor
 - func: constant_pad_nd
   PopTorchDirect: constant_pad_nd

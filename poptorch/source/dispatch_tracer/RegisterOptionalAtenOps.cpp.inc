@@ -13,6 +13,7 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("transpose.int", PTC_BOXED(poptorch::fallback));
   m.impl("layer_norm", PTC_BOXED(poptorch::fallback));
   m.impl("expand", PTC_BOXED(poptorch::fallback));
+  m.impl("gather", PTC_BOXED(poptorch::fallback));
   m.impl("dropout", PTC_BOXED(poptorch::fallback));
   m.impl("avg_pool2d.out", PTC_BOXED(poptorch::fallback));
   m.impl("avg_pool3d.out", PTC_BOXED(poptorch::fallback));
