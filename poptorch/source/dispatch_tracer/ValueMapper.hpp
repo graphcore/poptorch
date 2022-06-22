@@ -99,12 +99,6 @@ public:
   // given value.
   std::unordered_map<torch::jit::Value *, TrackedTensor *> values_map;
 
-  // List of tensors which are actually half-valued from our point of view,
-  // but which are floats in PyTorch land because the CPU can't handle half
-  // typed values.
-  std::unordered_set<at::TensorImpl *>
-      half_tensors; // TODO(T61602) remove? no boxed CPU execution anymore.
-
   // Map each prim::ListConstruct to a corresponding jit output value.
   std::unordered_map<TensorList, torch::jit::Value *, TensorListHash>
       tensor_lists;
@@ -126,10 +120,6 @@ public:
 
   void addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
                  bool is_empty = false);
-
-  void markHalfTensor(const at::Tensor &t);
-
-  bool isHalfTensor(const at::Tensor &t);
 
   void addTensorList(const TensorList &list, torch::jit::Value *val);
 

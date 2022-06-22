@@ -1,4 +1,5 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <ATen/native/TypeProperties.h>
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <memory>
@@ -7,6 +8,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/DispatchTracer.hpp"
 #include "poptorch/ImplicitCasting.hpp"
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
@@ -18,7 +20,7 @@ namespace poptorch {
 namespace {
 
 HalfFloatCasting &getHalfFloatCastingBehavior() {
-  static HalfFloatCasting behavior = HalfFloatCasting::FloatDowncastToHalf;
+  static HalfFloatCasting behavior = HalfFloatCasting::Default;
 
   return behavior;
 }
@@ -71,13 +73,17 @@ bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
 }
 
 c10::ScalarType promoteTypes(c10::ScalarType t1, c10::ScalarType t2) {
-  if (halfFloatCastingBehavior() == HalfFloatCasting::FloatDowncastToHalf) {
+  ERROR_ON_MSG(isDispatcherActive(),
+               "promoteTypes() shouldn't be called in the dispatcher");
+  auto hf_behavior = halfFloatCastingBehavior();
+  if (hf_behavior == HalfFloatCasting::FloatDowncastToHalf ||
+      hf_behavior == HalfFloatCasting::Default) {
     if ((t1 == c10::ScalarType::Half && t2 == c10::ScalarType::Float) ||
         (t1 == c10::ScalarType::Float && t2 == c10::ScalarType::Half)) {
       return c10::ScalarType::Half;
     }
   } else {
-    ERROR_ON(halfFloatCastingBehavior() != HalfFloatCasting::HalfUpcastToFloat);
+    ERROR_ON(hf_behavior != HalfFloatCasting::HalfUpcastToFloat);
   }
 
   auto type = c10::promoteTypes(t1, t2);
@@ -115,6 +121,38 @@ c10::ScalarType highestTypeOf(const std::vector<c10::ScalarType> &types) {
   }
 
   return new_type;
+}
+
+c10::ScalarType inferExpectedTypeDispatch(
+    const torch::jit::ArrayRef<torch::jit::Value *> &inputs,
+    const ImplicitCast implicit_cast) {
+  // Work out the types of all inputs
+  at::native::ResultTypeState state = {};
+
+  unsigned int input_num = 0;
+  for (auto *input : inputs) {
+    logging::LogContext ctx(std::string("processing input ") +
+                            std::to_string(input_num));
+
+    if (!skipInput(implicit_cast, input_num) &&
+        input->type()->kind() != c10::TypeKind::NoneType) {
+      auto tensor_type = input->type()->expect<c10::TensorType>();
+      ERROR_ON(!tensor_type->scalarType());
+
+      auto osizes = tensor_type->sizes().concrete_sizes();
+      std::vector<int64_t> sizes;
+      if (osizes) {
+        sizes = *osizes;
+      }
+      state = at::native::update_result_type_state(
+          at::native::empty_cpu(c10::IntArrayRef(sizes.data(), sizes.size()),
+                                tensor_type->scalarType()),
+          state);
+    }
+    input_num++;
+  }
+
+  return at::native::result_type(state);
 }
 
 c10::ScalarType
@@ -210,7 +248,17 @@ torch::jit::Value *addCast(torch::jit::Value *input,
 std::vector<torch::jit::Value *>
 implicitCastInputs(torch::jit::ArrayRef<torch::jit::Value *> *inputs,
                    const ImplicitCast implicit_cast) {
-  auto expected_type = inferExpectedType(*inputs, implicit_cast);
+  c10::ScalarType expected_type;
+  // The dispatcher version of mixed-precision type inference simply delegates
+  // to PyTorch's own routines, so that we always match their decisions.
+  // We have legacy behavior in tracing which requires a lot of complicated
+  // computation for type resolution, so we split here. All the legacy code can
+  // be removed when tracing is removed.
+  if (isDispatcherActive()) {
+    expected_type = inferExpectedTypeDispatch(*inputs, implicit_cast);
+  } else {
+    expected_type = inferExpectedType(*inputs, implicit_cast);
+  }
 
   std::vector<torch::jit::Value *> new_inputs;
 

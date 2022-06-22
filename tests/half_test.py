@@ -25,18 +25,23 @@ def test_half_float_default_option(trace_model):
     t2 = torch.tensor([2.]).float()
 
     outHalf = inference_model(t1, t2)
-    assert outHalf.dtype == torch.half
+    if trace_model:
+        assert outHalf.dtype == torch.half
+    else:
+        assert outHalf.dtype == torch.float
 
     # Refresh and try the other way
     model = SimpleAdder()
     inference_model = poptorch.inferenceModel(model, options)
 
     outHalf = inference_model(t2, t1)
-    assert outHalf.dtype == torch.half
+    if trace_model:
+        assert outHalf.dtype == torch.half
+    else:
+        assert outHalf.dtype == torch.float
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_half_float_downcast_option(trace_model):
+def test_half_float_downcast_option():
     class SimpleAdder(torch.nn.Module):
         def forward(self, x, y):
             return x + y
@@ -45,7 +50,7 @@ def test_half_float_downcast_option(trace_model):
     opts = poptorch.Options()
     opts.Precision.halfFloatCasting(
         poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf)
-    opts.Jit.traceModel(trace_model)
+    opts.Jit.traceModel(True)
     inference_model = poptorch.inferenceModel(model, opts)
 
     t1 = torch.tensor([1.]).half()
@@ -57,7 +62,7 @@ def test_half_float_downcast_option(trace_model):
     # Refresh and try the other way
     model = SimpleAdder()
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(True)
     inference_model = poptorch.inferenceModel(model, options)
 
     outHalf = inference_model(t2, t1)
@@ -309,6 +314,9 @@ def test_buffers(trace_model):
     poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf
 ])
 def test_half_casts_outplace(trace_model, casting):
+    if (not trace_model and
+            casting == poptorch.HalfFloatCastingBehavior.FloatDowncastToHalf):
+        pytest.skip("Illegal combination of trace and casting settings")
     torch.manual_seed(42)
     opts = poptorch.Options()
     opts.Jit.traceModel(trace_model)

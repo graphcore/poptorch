@@ -670,13 +670,13 @@ class PoplarExecutor:
             return tensor
 
         in_tensors_trace_view.forEach(possiblyConvertFromHalf)
-        poptorch_core.processPrecisionOptions(self._options.Precision)
+        poptorch_core.processPrecisionOptions(self._options.Precision, False)
         return in_tensors_trace_view, has_converted_any_half
 
     @_impl.traceMethod("graphPreprocessing")
     def _preprocessGraphDispatcher(self, in_tensors):
         in_tensors_trace_view = self._preprocessGraphCommon(in_tensors)
-        poptorch_core.processPrecisionOptions(self._options.Precision)
+        poptorch_core.processPrecisionOptions(self._options.Precision, True)
         return in_tensors_trace_view
 
     def _preprocessGraphCommon(self, in_tensors):

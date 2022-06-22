@@ -196,7 +196,7 @@ def test_many_implicit_cast_equals(input_1_type, input_2_type, trace_model):
                 or input_2_type in (torch.float32, torch.float64)):
             # This will return a different result between the IPU model and
             # hardware so assume it runs on hardware if available.
-            depends = poptorch.ipuHardwareIsAvailable()
+            depends = poptorch.ipuHardwareIsAvailable() and trace_model
 
     if (input_1_type in (torch.float32, torch.float64)
             and input_2_type in (torch.float32, torch.float64)):

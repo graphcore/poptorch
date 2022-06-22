@@ -199,14 +199,6 @@ c10::optional<bool> ValueMapper::tensorIsEmpty(const at::Tensor &t) {
   return itr->second.is_empty;
 }
 
-void ValueMapper::markHalfTensor(const at::Tensor &t) {
-  half_tensors.insert(t.unsafeGetTensorImpl());
-}
-
-bool ValueMapper::isHalfTensor(const at::Tensor &t) {
-  return half_tensors.find(t.unsafeGetTensorImpl()) != std::end(half_tensors);
-}
-
 void ValueMapper::addTensorList(const TensorList &list,
                                 torch::jit::Value *val) {
   logging::trace("Adding tensor list to value mapper, JIT ir: {}",

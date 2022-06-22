@@ -1295,7 +1295,7 @@ getTimestamps(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   return {input, input_complete, output, output_complete};
 }
 
-void processPrecisionOptions(py::handle h) {
+void processPrecisionOptions(py::handle h, bool dispatcher) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   auto values_dict = h.attr("_values").cast<py::dict>();
 
@@ -1307,8 +1307,14 @@ void processPrecisionOptions(py::handle h) {
   setAutocastPromote(policy["promote"].cast<std::vector<std::string>>());
   setAutocastDemote(policy["demote"].cast<std::vector<std::string>>());
 
-  poptorch::setHalfFloatCastingBehavior(static_cast<HalfFloatCasting>(
-      values_dict["half_float_casting"].cast<uint64_t>()));
+  auto hf_casting = static_cast<HalfFloatCasting>(
+      values_dict["half_float_casting"].cast<uint64_t>());
+
+  ERROR_ON_MSG(
+      dispatcher && hf_casting == HalfFloatCasting::FloatDowncastToHalf,
+      "FloatDowncastToHalf is deprecated and not supported in the dispatcher");
+
+  poptorch::setHalfFloatCastingBehavior(hf_casting);
 
   poptorch::setRunningStatisticsAlwaysFloat(
       values_dict["running_statistics_always_float"].cast<bool>());

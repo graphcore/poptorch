@@ -97,11 +97,14 @@ class HalfFloatCastingBehavior(enum.IntEnum):
     - ``FloatDowncastToHalf``: Any op with operands (inputs) which are a
         mix of float32 and float16 (half) will cast all operands to half.
     - ``HalfUpcastToFloat``: Implicit casting will follow PyTorch's rules,
-            promoting float16 (half) inputs to float32 if another input is
-            float32.
+        promoting float16 (half) inputs to float32 if another input is float32.
+    - ``Default``: This is ``FloatDowncastToHalf`` for tracing, and
+        ``HalfUpcastToFloat`` for the dispatcher, which only supports following
+        PyTorch's casting rules.
     """
     FloatDowncastToHalf = 0
     HalfUpcastToFloat = 1
+    Default = 2
 
 
 class ReductionType(enum.IntEnum):
