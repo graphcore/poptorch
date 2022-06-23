@@ -330,3 +330,45 @@ def Poptorch_masked_fill_Scalar : Poptorch_NotImplementedOp<"masked_fill_Scalar"
     $_state.addTypes(mlir::RankedTensorType::get(broadcast(tensor.getShape(), mask_tensor.getShape()), tensor.getElementType()));
   }]>];
 }
+
+def Poptorch_flip : Poptorch_NotImplementedOp<"flip", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dims);
+  let results = (outs Poptorch_tensor:$out);
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$self, "const std::vector<std::int64_t>&":$dims), [{
+      $_state.addOperands(self);
+      $_state.addAttribute("dims", $_builder.getI64ArrayAttr(dims));
+
+      $_state.addTypes(self.getType());
+    }]>
+  ];
+}
+
+def Poptorch_roll : Poptorch_NotImplementedOp<"roll", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$shifts, I64ArrayAttr:$dims);
+  let results = (outs Poptorch_tensor:$out);
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$self,
+               "const std::vector<std::int64_t>&":$shifts,
+               "const std::vector<std::int64_t>&":$dims), [{
+      $_state.addOperands(self);
+      $_state.addAttribute("shifts", $_builder.getI64ArrayAttr(shifts));
+      $_state.addAttribute("dims", $_builder.getI64ArrayAttr(dims));
+
+      $_state.addTypes(self.getType());
+    }]>
+  ];
+}
+
+def Poptorch_resize_ : Poptorch_NotImplementedOp<"resize_", []> {
+  let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$size);
+  let results = (outs Poptorch_tensor:$out);
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$self,
+                   "const std::vector<std::int64_t>&":$size), [{
+      $_state.addOperands(self);
+      $_state.addAttribute("size", $_builder.getI64ArrayAttr(size));
+      $_state.addTypes(mlir::RankedTensorType::get(size, getElementType(self)));
+    }]>
+  ];
+}

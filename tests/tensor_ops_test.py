@@ -975,19 +975,15 @@ def test_copy_(input_shapes, dtype, trace_model):
                                          (1, 3)])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_roll(shifts, dims, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for aten::roll")
     torch.manual_seed(0)
     op = lambda x: x.roll(shifts, dims)
     x = torch.randn((2, 3, 4))
-    op_harness(op, x, trace_model=trace_model)
+    op_harness(op, x, fuzzy_errors=True, trace_model=trace_model)
 
 
 @pytest.mark.parametrize("dims", [0, 1, -1])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_flip(dims, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for aten::flip")
     torch.manual_seed(0)
     op = lambda x: x.flip(dims)
     x = torch.randn((2, 3))

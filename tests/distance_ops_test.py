@@ -38,9 +38,6 @@ def test_pairwise_distance(norm, trace_model):
 @pytest.mark.parametrize("dim", {0, 1})
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_cosine_similarity(dim, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): No shape inference handler for aten::clamp_min.out")
     torch.manual_seed(42)
 
     size = [10, 5]

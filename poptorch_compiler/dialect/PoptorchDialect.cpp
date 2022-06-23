@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <unordered_set>
 #include <vector>
 
 #include "poptorch_logging/Error.hpp"

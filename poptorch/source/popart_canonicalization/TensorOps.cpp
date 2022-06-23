@@ -128,7 +128,12 @@ torch::jit::Node *rollHandler(torch::jit::Graph *graph,
                   (current_dim >= 0)) ||
                      ((static_cast<size_t>(-current_dim) > number_of_dims) &&
                       (current_dim < 0)),
-                 "Dimension out of range in the roll op.");
+                 "Dimension out of range at index "
+                     << i << " (expected to be in range of ["
+                     << -static_cast<std::int64_t>(number_of_dims) << ", "
+                     << number_of_dims - 1 << "], but got " << current_dim
+                     << ") in the roll op.");
+
     current_dim = (current_dim + number_of_dims) % number_of_dims;
 
     auto current_dim_size = input_shape.at(current_dim);
