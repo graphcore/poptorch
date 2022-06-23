@@ -49,7 +49,7 @@ def test_slice_idx_size_of(step, trace_model):
 def test_slice_with_sum(step, trace_model):
     if not trace_model:
         pytest.skip(
-            "TODO(T51159): No shape inference handler aten::div.out_mode")
+            "TODO(T51159): np broadcasting failed on 'Op 117 (ai.onnx.Add:7)'")
 
     def start_fn(tensor_in):
         del tensor_in
@@ -69,7 +69,7 @@ def test_slice_with_sum(step, trace_model):
 def test_slice_with_branch(step, trace_model):
     if not trace_model:
         pytest.skip(
-            "TODO(T51159): No shape inference handler aten::div.out_mode")
+            "TODO(T51159): np broadcasting failed on 'Op 131 (ai.onnx.Add:7)'")
 
     def start_fn(tensor_in):
         del tensor_in

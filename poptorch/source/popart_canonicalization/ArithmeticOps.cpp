@@ -49,13 +49,13 @@ torch::jit::Node *fracHandler(torch::jit::Graph *graph,
   // Frac(x) = x - trunc(x)
 
   // Drop the exponent by casting to int and back.
-  torch::jit::Node *to_int = createCast(graph, node->input(), c10::kInt);
+  torch::jit::Node *to_int = createCast(graph, node->input(0), c10::kInt);
 
   torch::jit::Node *trunc = createCast(
       graph, to_int->output(),
-      *node->input()->type()->expect<c10::TensorType>()->scalarType());
+      *node->input(0)->type()->expect<c10::TensorType>()->scalarType());
 
-  return createSub(graph, {node->input(), trunc->output()});
+  return createSub(graph, {node->input(0), trunc->output()});
 }
 
 torch::jit::Node *floorDivideHandler(torch::jit::Graph *graph,

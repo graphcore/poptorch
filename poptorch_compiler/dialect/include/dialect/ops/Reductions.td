@@ -398,3 +398,75 @@ class Poptorch_prefix_sum<string name> : Poptorch_Op<name, []> {
 }
 
 def Poptorch_cumsum_out : Poptorch_prefix_sum<"cumsum_out"> {}
+
+class Poptorch_minmax_dim<string name> : Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, BoolAttr:$keepdim);
+    let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim, 
+                    "bool":$keepdim), [{
+            $_state.addOperands(self);
+            $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+            $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+            const auto input_shape = getShape(self);
+            llvm::SmallVector<std::int64_t, 4> out_shape{input_shape.begin(),
+                                                         input_shape.end()};
+
+            dim = convertToPositiveDim(dim, out_shape.size());
+
+            if (keepdim) {
+                out_shape[dim] = 1;
+            } else {
+                out_shape.erase(out_shape.begin() + dim);
+            }
+            
+            const auto out_type = mlir::RankedTensorType::get(
+                out_shape, getElementType(self));
+            const auto out_indices_type = mlir::RankedTensorType::get(
+                out_shape, $_builder.getIntegerType(32 /*width*/, true /*signed*/));
+            
+            $_state.addTypes({out_type, out_indices_type});
+        }]>
+    ];
+}
+
+def Poptorch_max_dim : Poptorch_minmax_dim<"max_dim"> {}
+def Poptorch_min_dim : Poptorch_minmax_dim<"min_dim"> {}
+
+class Poptorch_aminmax<string name> : Poptorch_NotImplementedOp<name, []> {
+    let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dim, BoolAttr:$keepdim);
+    let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$self, "const std::vector<std::int64_t>&":$dim, 
+                    "bool":$keepdim), [{
+            $_state.addOperands(self);
+            $_state.addAttribute("dim", $_builder.getI64ArrayAttr(dim));
+            $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+            const auto input_shape = getShape(self);
+            llvm::SmallVector<std::int64_t, 4> out_shape{input_shape.begin(),
+                                                         input_shape.end()};
+
+            std::unordered_set<std::int64_t> dimSet{dim.begin(), dim.end()};
+            for (auto d : dimSet) {
+                d = convertToPositiveDim(d, out_shape.size());
+                if (keepdim) {
+                    out_shape[d] = 1;
+                } else {
+                    out_shape.erase(out_shape.begin() + d);
+                }
+            }
+            
+            const auto out_type = mlir::RankedTensorType::get(
+                out_shape, getElementType(self));
+            const auto out_indices_type = mlir::RankedTensorType::get(
+                out_shape, $_builder.getIntegerType(32 /*width*/, true /*signed*/));
+            
+            $_state.addTypes({out_type, out_indices_type});
+        }]>
+    ];
+}
+
+def Poptorch_amax : Poptorch_aminmax<"amax"> {}
+def Poptorch_amin : Poptorch_aminmax<"amin"> {}

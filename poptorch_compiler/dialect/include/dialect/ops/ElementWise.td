@@ -91,6 +91,20 @@ class Poptorch_NotImplemented_elem_unary<string name> :  Poptorch_NotImplemented
 
 def Poptorch_round_out: Poptorch_NotImplemented_elem_unary<"round_out"> {}
 def Poptorch_trunc: Poptorch_NotImplemented_elem_unary<"trunc"> {}
+def Poptorch_max : Poptorch_NotImplemented_elem_unary<"max"> {}
+def Poptorch_min : Poptorch_NotImplemented_elem_unary<"min"> {}
+def Poptorch_acos : Poptorch_NotImplemented_elem_unary<"acos"> {}
+def Poptorch_acosh : Poptorch_NotImplemented_elem_unary<"acosh"> {}
+def Poptorch_asinh : Poptorch_NotImplemented_elem_unary<"asinh"> {}
+def Poptorch_atan : Poptorch_NotImplemented_elem_unary<"atan"> {}
+def Poptorch_atanh : Poptorch_NotImplemented_elem_unary<"atanh"> {}
+def Poptorch_cosh : Poptorch_NotImplemented_elem_unary<"cosh"> {}
+def Poptorch_erfc : Poptorch_NotImplemented_elem_unary<"erfc"> {}
+def Poptorch_frac : Poptorch_NotImplemented_elem_unary<"frac"> {}
+def Poptorch_log10 : Poptorch_NotImplemented_elem_unary<"log10"> {}
+def Poptorch_log2 : Poptorch_NotImplemented_elem_unary<"log2"> {}
+def Poptorch_reciprocal : Poptorch_NotImplemented_elem_unary<"reciprocal"> {}
+def Poptorch_sinh : Poptorch_NotImplemented_elem_unary<"sinh"> {}
 
 class Poptorch_elem_unary_in_place<string name> :  Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$in1);
@@ -161,8 +175,8 @@ def Poptorch_bitwiseXnor: Poptorch_elem_binary<"bitwiseXnor"> {}
 def Poptorch_div: Poptorch_elem_binary<"div"> {}
 def Poptorch_logicalAnd: Poptorch_elem_binary<"logicalAnd"> {}
 def Poptorch_logicalOr: Poptorch_elem_binary<"logicalOr"> {}
-def Poptorch_max: Poptorch_elem_binary<"max"> {}
-def Poptorch_min: Poptorch_elem_binary<"min"> {}
+def Poptorch_maximum: Poptorch_elem_binary<"maximum"> {}
+def Poptorch_minimum: Poptorch_elem_binary<"minimum"> {}
 def Poptorch_neq: Poptorch_elem_binary<"neq"> {}
 def Poptorch_pow: Poptorch_elem_binary<"pow"> {}
 def Poptorch_rem: Poptorch_elem_binary<"rem"> {}
@@ -170,6 +184,30 @@ def Poptorch_shiftLeft: Poptorch_elem_binary<"shiftleft"> {}
 def Poptorch_shiftRight: Poptorch_elem_binary<"shiftright"> {}
 def Poptorch_shiftRightSignExtend: Poptorch_elem_binary<"shiftrightsignextend"> {}
 
+def Poptorch_div_mode: Poptorch_NotImplementedOp<"div_mode",
+        [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
+    let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$other,
+                     OptionalAttr<StrAttr>:$rounding_mode);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$other,
+                   "const std::optional<std::string>&":$rounding_mode), [{
+            $_state.addOperands({self, other});
+
+            if (rounding_mode.has_value())
+                $_state.addAttribute("rounding_mode",
+                                     $_builder.getStringAttr(*rounding_mode));
+
+            $_state.addTypes(inferType(self, other));
+        }]>
+    ];
+    let extraClassDeclaration = [{
+        static mlir::Type inferType(mlir::Value v1, mlir::Value v2) {
+            auto out_shape = broadcast(getShape(v1), getShape(v2));
+            return mlir::RankedTensorType::get(out_shape, getElementType(v1));
+        }
+    }];
+}
 
 
 class Poptorch_elem_binary_with_alpha<string name> :  Poptorch_elem_binary<name> {
@@ -217,8 +255,8 @@ def Poptorch_lteq_: Poptorch_elem_binary_in_place<"lteq_"> {}
 def Poptorch_logicalAnd_: Poptorch_elem_binary_in_place<"logicalAnd_"> {}
 def Poptorch_logicalOr_: Poptorch_elem_binary_in_place<"logicalOr_"> {}
 def Poptorch_lt_: Poptorch_elem_binary_in_place<"lt_"> {}
-def Poptorch_max_: Poptorch_elem_binary_in_place<"max_"> {}
-def Poptorch_min_: Poptorch_elem_binary_in_place<"min_"> {}
+def Poptorch_maximum_: Poptorch_elem_binary_in_place<"maximum_"> {}
+def Poptorch_minimum_: Poptorch_elem_binary_in_place<"minimum_"> {}
 def Poptorch_neq_: Poptorch_elem_binary_in_place<"neq_"> {}
 def Poptorch_pow_: Poptorch_elem_binary_in_place<"pow_"> {}
 def Poptorch_rem_: Poptorch_elem_binary_in_place<"rem_"> {}
@@ -434,6 +472,25 @@ def Poptorch_clampTensor: Poptorch_Op<"clampTensor", [AttrSizedOperandSegments]>
     }]>
   ];
 }
+
+class Poptorch_clamp_common<string name>: Poptorch_NotImplementedOp<name, []> {
+  // defining input arguments
+  let arguments = (ins Poptorch_tensor:$self,
+                       Poptorch_tensor:$other);
+  // defining output arguments
+  let results = (outs Poptorch_tensor:$result);
+
+  // builders allow us to tell MIR the types
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$other), [{
+      $_state.addOperands({self, other});
+      $_state.addTypes(self.getType());
+    }]>
+  ];
+}
+
+def Poptorch_clamp_min: Poptorch_clamp_common<"clamp_min"> {}
+def Poptorch_clamp_max: Poptorch_clamp_common<"clamp_max"> {}
 
 def Poptorch_threshold_out: Poptorch_NotImplementedOp<"threshold_out", []> {
   let arguments = (ins Poptorch_tensor:$self,

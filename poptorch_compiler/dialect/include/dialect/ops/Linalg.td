@@ -217,3 +217,34 @@ def Poptorch_norm_out : Poptorch_NotImplementedOp<"norm_out", []> {
      }]>
     ];
 }
+
+// func: cross(Tensor self, Tensor other, int? dim=None, *) -> Tensor(a!)
+def Poptorch_cross : Poptorch_NotImplementedOp<"cross", []> {
+    let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$other,
+                     OptionalAttr<I64Attr>:$dim);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$other, 
+                   "std::optional<std::int64_t>":$dim), [{
+            $_state.addOperands({self, other});
+
+            const auto out_shape = broadcast(getShape(self), getShape(other));
+
+            if (dim.has_value()) {
+                dim = convertToPositiveDim(*dim, out_shape.size());
+                ERROR_ON_MSG(out_shape[*dim] != 3,
+                    "Dimension length for cross must be 3.");
+            } else {
+                auto it = std::find(out_shape.begin(), out_shape.end(), 3);
+
+                ERROR_ON_MSG(it == out_shape.end(),
+                    "At least one dimension of the broadcast shape must be equal to 3.");
+
+                dim = std::distance(out_shape.begin(), it);
+            }
+            $_state.addAttribute("dim", $_builder.getI64IntegerAttr(*dim));
+
+            $_state.addTypes(mlir::RankedTensorType::get(out_shape, getElementType(self)));
+        }]>
+    ];
+}

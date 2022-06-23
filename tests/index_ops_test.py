@@ -132,8 +132,8 @@ def test_index(op, idxs, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_on_max_indices(trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): No shape inference handler for aten::max.dim")
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::index.Tensor")
 
     def op(x):
         _, argmax_tensor = torch.max(x, dim=1)

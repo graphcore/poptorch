@@ -1234,9 +1234,6 @@ def test_gradient_clipping(opt, trace_model):
 # TODO(T53152): remove this test.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gradient_clipping_with_pipelining(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::nll_loss2d_forward")
     torch.manual_seed(0)
     opts = poptorch.Options()
     opts.Training.gradientAccumulation(3)
