@@ -510,6 +510,9 @@ Hence, all IPUs will be occupied after a "warm-up" period.
 At the end of processing, a "cool-down" period is required to aggregate the results and apply weight
 updates.
 
+Although you only define the :py:class:`~poptorch.Phase` for forward passes,
+the corresponding phases for backward passes are also created.
+
 .. _sharded_execution:
 
 Sharded execution
@@ -562,7 +565,7 @@ features in common:
 * Stages inside each :py:class:`~poptorch.Phase` can run in parallel.
 
 Although you only define the :py:class:`~poptorch.Phase` for forward passes,
-the corresponding phases for backward passes are created correspondingly.
+the corresponding phases for backward passes are also created.
 The order of phased execution for backward passes won't change
 but you can decide whether a phase is shared by both
 forward and backward passes. In other words, you decide whether to avoid
