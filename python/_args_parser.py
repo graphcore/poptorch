@@ -11,15 +11,42 @@ from . import _utils
 
 class ArgsParser:
     class Args:
-        def __init__(self, tracing, varnames):
-            self.args = []
+        def __init__(self, tracing):
+            self._args = []
+            self._arg_names = []
+            self._kwargs = {}
             self.first_none = None
             self._tracing = tracing
-            self._varnames = varnames
+
+        @property
+        def args(self):
+            return self._args
+
+        @property
+        def arg_names(self):
+            return self._arg_names
+
+        @property
+        def kwargs(self):
+            return self._kwargs
+
+        def appendArg(self, arg, name):
+            self._args.append(arg)
+            self._arg_names.append(name)
+
+        def setNamedArg(self, name, arg):
+            self._kwargs[name] = arg
+
+        def popArg(self):
+            self._args.pop()
+            self._arg_names.pop()
 
         def clone(self):
-            clone = ArgsParser.Args(self._tracing, self._varnames)
-            clone.args = copy.copy(self.args)
+            # pylint: disable=protected-access
+            clone = ArgsParser.Args(self._tracing)
+            clone._args = copy.copy(self._args)
+            clone._arg_names = copy.copy(self._arg_names)
+            clone._kwargs = copy.copy(self._kwargs)
             clone.first_none = self.first_none
             return clone
 
@@ -49,11 +76,11 @@ class ArgsParser:
 
             if len(inputs.args) != len(self.args):
                 raise _impl.createPoptorchError(
-                    "Number of arguments mismatch: expected "
+                    "Number of positional arguments mismatch: expected "
                     f"{len(self.args)} arguments but got "
                     f"{len(inputs.args)}.{end}")
 
-            def validate(name, compiled, input):
+            def validate(name, compiled, input, are_named_args=False):
                 ctype = type(compiled)
                 itype = type(input)
                 if ctype != itype:
@@ -69,6 +96,29 @@ class ArgsParser:
                             f"expected {clen} elements but got {ilen}.{end}")
                     for i, c in enumerate(compiled):
                         validate(name + f"[{i}]", c, input[i])
+                elif isinstance(compiled, dict):
+                    expected = set(compiled.keys())
+                    provided = set(input.keys())
+                    if expected != provided:
+                        extra = provided - expected
+                        details = []
+                        if extra:
+                            details.append("Unexpected arguments: " +
+                                           ", ".join(sorted(extra)))
+                        missing = expected - provided
+                        if missing:
+                            details.append("Missing arguments: " +
+                                           ", ".join(sorted(missing)))
+                        raise _impl.createPoptorchError(
+                            f"Keys mismatch for {name}: "
+                            f"{'. '.join(details)}.{end}")
+                    for k, v in compiled.items():
+                        if are_named_args:
+                            n = k
+                        else:
+                            n = f"{name}[{k}]"
+                        validate(n, v, input[k])
+
                 elif isinstance(compiled, torch.Tensor):
                     if compiled.dtype != input.dtype:
                         raise _impl.createPoptorchError(
@@ -90,7 +140,12 @@ class ArgsParser:
                             f"expected {compiled} but got {input}.{end}")
 
             for i, arg in enumerate(self.args):
-                validate(self._varnames[i], arg, inputs.args[i])
+                validate(self.arg_names[i], arg, inputs.args[i])
+
+            validate("named arguments",
+                     self.kwargs,
+                     inputs.kwargs,
+                     are_named_args=True)
 
         def _forEachMatched(self, data, condition, doOnTrue, conditionMatches):
             if isinstance(data, (tuple, list)):
@@ -109,12 +164,15 @@ class ArgsParser:
 
         def forEachMatchedAtLeastOnce(self, condition, doOnTrue=None):
             matches = [False]
-            self.args = self._forEachMatched(self.args, condition, doOnTrue,
-                                             matches)
+            self._args = self._forEachMatched(self._args, condition, doOnTrue,
+                                              matches)
+            self._kwargs = self._forEachMatched(self._kwargs, condition,
+                                                doOnTrue, matches)
             return matches[0]
 
         def forEach(self, fn):
-            self.args = self._forEach(self.args, fn)
+            self._args = self._forEach(self._args, fn)
+            self._kwargs = self._forEach(self._kwargs, fn)
 
         def asTuple(self):
             # Lists are hard to parse in the C++ because their size is not
@@ -124,12 +182,17 @@ class ArgsParser:
                     return tuple([convert(d) for d in input])
                 return input
 
-            return tuple([convert(a) for a in self.args])
+            # Unreachable: asTuple() is only used by the tracer and
+            # kwargs are not compatible with tracing.
+            assert not self._kwargs
+            return tuple([convert(a) for a in self._args])
 
         def asPackedFlatTuple(self):
             # Remove all the non torch.tensor types and flatten
             # any data structure.
-            return tuple(_utils.flattenTensorStructure(self.args))
+            return tuple(
+                _utils.flattenTensorStructure(self._args) +
+                _utils.flattenTensorStructure(self._kwargs))
 
     def __init__(self, model, tracing=True):
         # Combine args and kwargs:
@@ -138,12 +201,19 @@ class ArgsParser:
         else:
             sig = inspect.signature(model.forward)
 
+        self._var_kinds = [p.kind for p in sig.parameters.values()]
         self._has_variadic_arguments = any([
-            p.kind in [p.VAR_POSITIONAL, p.VAR_KEYWORD]
-            for p in sig.parameters.values()
+            kind in [
+                inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD
+            ] for kind in self._var_kinds
         ])
         self._varnames = list(sig.parameters.keys())
-        self._defaults = [p.default for p in sig.parameters.values()]
+        self._defaults = {
+            name: p.default
+            for name, p in sig.parameters.items()
+            if p.default != inspect.Parameter.empty
+        }
+
         self._warned_not_contiguous_input = False
         self._tracing = tracing
 
@@ -152,34 +222,61 @@ class ArgsParser:
            tensors or tuples/lists of tensors. Will convert list to tuples
            as we can't natively support lists in the JIT.
         """
-        in_tensors = ArgsParser.Args(self._tracing, self._varnames)
+        in_tensors = ArgsParser.Args(self._tracing)
         assert self._has_variadic_arguments or len(args) + len(kwargs) <= len(
             self._varnames), ("Too many arguments provided: expected %s (%d) "
                               "but got %d") % (self._varnames,
                                                len(self._varnames),
                                                len(args) + len(kwargs))
-        first_optional = len(self._varnames) - len(self._defaults)
         none_passed = []
-
         # Make sure all the arguments provided are allowed.
-        for k in kwargs.keys():
-            assert k in self._varnames, (
-                f"{k} is not a valid parameter."
-                f"Allowed values are {self._varnames}")
+        if not self._has_variadic_arguments:
+            for k in kwargs.keys():
+                assert k in self._varnames, (
+                    f"{k} is not a valid parameter."
+                    f"Allowed values are {self._varnames}")
 
+        variadic_pos_set = False
         for i, name in enumerate(self._varnames):
-            if i < len(args):
-                has_list = self._errorOnDictReturnTrueIfList(args[i], name, [])
+            is_variadic_pos = self._var_kinds[
+                i] == inspect.Parameter.VAR_POSITIONAL
+            is_variadic_keyword = self._var_kinds[
+                i] == inspect.Parameter.VAR_KEYWORD
 
-                # Non fast path for compilation, fast path for executing.
-                if not fast_path:
-                    if has_list:
-                        logger.warning(
-                            "Lists as inputs only have partial support, they "
-                            "can be accessed but full Python functionality is "
-                            "not enabled. Consider changing input to tuple.")
+            if is_variadic_keyword:
+                # A variadic keyword argument will consume all the remaining
+                # kwargs
+                used_names = self._varnames[:i]
+                for k, v in kwargs.items():
+                    if k not in used_names:
+                        in_tensors.setNamedArg(k, v)
+            elif i < len(args) or is_variadic_pos:
+                # If it's a variadic parameter: consume all the remaining args
+                # otherwise consume only one.
+                if is_variadic_pos:
+                    variadic_pos_set = True
+                    a = args[i:]
+                    # Clear args: all the arguments have been consumed
+                    args = []
+                else:
+                    a = [args[i]]
+                for idx, arg in enumerate(a):
+                    if is_variadic_pos:
+                        arg_name = f"*{name}[{idx}]"
+                    else:
+                        arg_name = name
 
-                in_tensors.args.append(args[i])
+                    has_list = self._errorOnDictReturnTrueIfList(arg, name, [])
+                    # Non fast path for compilation, fast path for executing.
+                    if not fast_path:
+                        if has_list:
+                            logger.warning(
+                                "Lists as inputs only have partial support, "
+                                "they can be accessed but full Python "
+                                "functionality is not enabled. Consider "
+                                "changing input to tuple.")
+
+                    in_tensors.appendArg(arg, arg_name)
 
                 assert name not in kwargs, ("Parameter %s was passed more "
                                             "than once") % name
@@ -198,11 +295,16 @@ class ArgsParser:
                             "Lists as inputs only have partial support, they "
                             "can be accessed but full Python functionality is "
                             "not enabled. Consider changing input to tuple.")
-                in_tensors.args.append(kwargs[name])
+                # Everything after a variadic positional argument must be named
+                if variadic_pos_set:
+                    in_tensors.setNamedArg(name, kwargs[name])
+                else:
+                    in_tensors.appendArg(kwargs[name], name)
             else:
-                assert i >= first_optional, ("Mandatory parameter %s "
-                                             "missing") % name
-                value = self._defaults[i - first_optional]
+                if name not in self._defaults:
+                    raise _impl.createPoptorchError("Mandatory parameter "
+                                                    f"{name} missing")
+                value = self._defaults[name]
                 # We only need to keep track of None values when tracing because
                 # torch.jit.trace() can't handle them.
                 if value is None and self._tracing:
@@ -210,7 +312,11 @@ class ArgsParser:
                         in_tensors.first_none = i
                     none_passed.append("%s (%d)" % (name, i))
                 if not none_passed:
-                    in_tensors.args.append(value)
+                    # Everything after a variadic positional argument must be named
+                    if variadic_pos_set:
+                        in_tensors.setNamedArg(name, value)
+                    else:
+                        in_tensors.appendArg(value, name)
 
         if in_tensors.forEachMatchedAtLeastOnce(
                 condition=lambda t: isinstance(t, torch.Tensor
@@ -236,16 +342,18 @@ class ArgsParser:
         for i in reversed(range(len(in_tensors.args))):
             if in_tensors.args[i] is not None:
                 break
-            if self._defaults[i] is not None:
+            if self._defaults.get(in_tensors.arg_names[i],
+                                  "no default") is not None:
                 break
-            in_tensors.args.pop()
+            in_tensors.popArg()
             if in_tensors.first_none == i:
                 in_tensors.first_none = None
 
         # assert we are not passing None parameters to avoid a cryptic error
-        assert None not in in_tensors.args, \
-            "'None' may not be passed as explicit model argument. It may " + \
-            "only be used as default initialiser"
+        if None in in_tensors.args:
+            raise _impl.createPoptorchError(
+                "'None' may not be passed as explicit model argument. It may "
+                "only be used as default initialiser")
 
         return in_tensors
 

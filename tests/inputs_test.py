@@ -371,15 +371,15 @@ t = torch.randn(5, 5)
 
 
 class Model(torch.nn.Module):
-    def forward(self, x, y=ones, z=None, t=None):
+    def forward(self, x, y=None, z=None, t=None):
         r = x
         if y is not None:
-            r = torch.add(r, y)
+            r = torch.add(r, y) * 3
         if z is not None:
-            r = torch.add(r, z)
+            r = torch.add(r, z) * 4
         if t is not None:
-            r = torch.add(r, t)
-        return torch.tanh(x)
+            r = torch.add(r, t) * 5
+        return torch.tanh(r)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -428,12 +428,16 @@ def test_none_input_pass_skip_one_kwarg(trace_model):
 
 
 def test_none_input_trace_fail_non_default_kwarg():
+    class Model(torch.nn.Module):
+        def forward(self, x, y=torch.ones(2, 2)):
+            return x + y
+
     model = Model()
     options = poptorch.Options()
     options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(poptorch.Error, match="'None' may not be passed"):
         poptorch_model(x, y=None)
 
 
@@ -483,28 +487,187 @@ def test_none_input_pass_two_arg(trace_model):
 
 
 @pytest.mark.mlirSupportRequired
-def test_none_input_dispatch_non_default_arg():
-    model = Model()
+@pytest.mark.parametrize("args", [(x, None, None, None), (x, ), (x, None)])
+@pytest.mark.parametrize("fwd_args", [True, False])
+def test_none_input_dispatch_non_default_arg_tuples(args, fwd_args):
+    class ModelWrapper(Model):
+        def forward(self, *args, **kwargs):  # pylint: disable=signature-differs
+            return super().forward(*args, **kwargs)
+
+    if fwd_args:
+        model = ModelWrapper()
+    else:
+        model = Model()
     options = poptorch.Options()
     options.Jit.traceModel(False)
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    native_out = model(x, None, None, None)
+    native_out = model(*args)
     # Run more than once
     for i in range(2):
         print(f"Run {i}")
-        poptorch_out = poptorch_model(x, None, None, None)
+        poptorch_out = poptorch_model(*args)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("args", [{
+    "x": x,
+    "t": t
+}, {
+    "z": z,
+    "t": None,
+    "x": x
+}])
+@pytest.mark.parametrize("fwd_args", [True, False])
+def test_none_input_dispatch_non_default_arg_dict(args, fwd_args):
+    class ModelWrapper(Model):
+        def forward(self, *args, **kwargs):  # pylint: disable=signature-differs
+            return super().forward(*args, **kwargs)
+
+    if fwd_args:
+        model = ModelWrapper()
+    else:
+        model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    native_out = model(**args)
+    # Run more than once
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(**args)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("fwd_args", [True, False])
+def test_none_input_dispatch_args_kwargs(fwd_args):
+    class Model(torch.nn.Module):
+        def forward(self, a, b, *c, y=None, z=None, t=None, u=3, v="op", **w):
+            r = len(v) * b + a * len(w)
+            for i, x in enumerate(c):
+                r += (i + 1) * x
+            if y is not None:
+                r = torch.add(r, y) * 3
+            if z is not None:
+                r = torch.add(r, z) * 4
+            if t is not None:
+                r = torch.add(r, t) * 5
+            return u * r
+
+    class ModelWrapper(Model):
+        def forward(self, *args, **kwargs):
+            return super().forward(*args, **kwargs)
+
+    if fwd_args:
+        model = ModelWrapper()
+    else:
+        model = Model()
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    a = 2
+    b = torch.randn(2, 2)
+    c = torch.randn(2, 2)
+    d = torch.randn(2, 2)
+    e = torch.randn(2, 2)
+    t = torch.randn(2, 2)
+    x = torch.randn(2, 2)
+    m = torch.randn(2, 2)
+    z = torch.randn(2, 2)
+
+    native_out = model(a, b, c, d, e, t=t, x=x, m=m, z=z)
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(a, b, c, d, e, t=t, x=x, m=m, z=z)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    if fwd_args:
+        expected = "Missing arguments: z."
+    else:
+        expected = "Type mismatch for z: expected .*Tensor.* but got .*None"
+    with pytest.raises(poptorch.Error, match=expected):
+        poptorch_out = poptorch_model(a, b, c, d, e, t=t, x=x, m=m)
+
+    with pytest.raises(poptorch.Error, match="Missing arguments: m."):
+        poptorch_out = poptorch_model(a, b, c, d, e, t=t, x=x, z=z)
+
+    poptorch_model.destroy()
+    native_out = model(a, b, c, d, e, t=t, x=x, m=m, z=z, u=5, v="foobar")
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(a,
+                                      b,
+                                      c,
+                                      d,
+                                      e,
+                                      t=t,
+                                      x=x,
+                                      m=m,
+                                      z=z,
+                                      u=5,
+                                      v="foobar")
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+    with pytest.raises(poptorch.Error,
+                       match="mismatch for u: expected 5 but got 3"):
+        poptorch_out = poptorch_model(a,
+                                      b,
+                                      c,
+                                      d,
+                                      e,
+                                      t=t,
+                                      x=x,
+                                      m=m,
+                                      z=z,
+                                      u=3,
+                                      v="foobar")
+
+    with pytest.raises(
+            poptorch.Error,
+            match=("Number of positional arguments mismatch: expected"
+                   " 5 arguments but got 4")):
+        poptorch_model(a, b, c, e, t=t, x=x, m=m, z=z, u=5, v="foobar")
+
+    with pytest.raises(
+            poptorch.Error,
+            match=("Number of positional arguments mismatch: expected "
+                   "5 arguments but got 2")):
+        poptorch_model(a, b, t=t, x=x, m=m, z=z, u=5, v="foobar")
+
+    poptorch_model.destroy()
+    if fwd_args:
+        error_type = TypeError
+        error = "missing 1 required positional argument: 'b'"
+    else:
+        error_type = poptorch.Error
+        error = "Mandatory parameter b missing"
+
+    with pytest.raises(error_type, match=error):
+        poptorch_model(a)
+
+    native_out = model(a, b)
+    for i in range(2):
+        print(f"Run {i}")
+        poptorch_out = poptorch_model(a, b)
         helpers.assert_allclose(expected=native_out, actual=poptorch_out)
 
 
 def test_none_input_trace_fail_non_default_arg():
+    class Model(torch.nn.Module):
+        def forward(self, x, y=torch.ones(2, 2)):
+            return x + y
+
     model = Model()
     options = poptorch.Options()
     options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    with pytest.raises(AssertionError):
-        poptorch_model(x, None, None, None)
+    with pytest.raises(poptorch.Error, match="'None' may not be passed"):
+        poptorch_model(x, None)
 
 
 def test_none_input_fail():
@@ -521,7 +684,7 @@ def test_none_input_fail():
     options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(poptorch.Error, match="'None' may not be passed"):
         poptorch_model(x, None)
 
 

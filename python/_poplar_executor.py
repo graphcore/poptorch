@@ -574,9 +574,10 @@ class PoplarExecutor:
                              training=self._training,
                              dict_optimizer=self._dict_optimizer)
             if executable_filename is not None:
-                ctx.loadExecutable(executable_filename, *in_tensors.args)
+                ctx.loadExecutable(executable_filename, *in_tensors.args,
+                                   **in_tensors.kwargs)
             else:
-                ctx.compile(*in_tensors.args)
+                ctx.compile(*in_tensors.args, **in_tensors.kwargs)
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
         self._error_on_buffer_parameter_address_change(buff_param_addresses)
 
