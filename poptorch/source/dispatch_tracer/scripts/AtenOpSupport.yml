@@ -712,6 +712,11 @@
   PopTorchDirect: exponential_
   IgnoreArgs: {'generator'}
 
+# bernoulli(Tensor self, *, Generator? generator=None) -> Tensor
+- func: bernoulli
+  PopTorchDirect: bernoulli
+  IgnoreArgs: {'generator'}
+
 # bernoulli_.float(Tensor(a!) self, float p=0.5, *, Generator? generator=None) -> Tensor(a!)
 - func: bernoulli_.float
   PopTorchDirect: bernoulli__float

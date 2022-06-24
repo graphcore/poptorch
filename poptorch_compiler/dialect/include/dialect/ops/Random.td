@@ -127,6 +127,20 @@ def Poptorch_exponential_ : Poptorch_Op<"exponential_", [SameOperandsAndResultSh
   }]>];
 }
 
+def Poptorch_bernoulli : Poptorch_NotImplementedOp<"bernoulli", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$input);
+
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilder<(ins "mlir::Value":$input), [{
+        $_state.addOperands({input});
+
+        auto input_shape = getShape(input);
+
+        $_state.addTypes(mlir::RankedTensorType::get(input_shape, $_builder.getF32Type()));
+  }]>];
+}
+
 def Poptorch_bernoulli__float : Poptorch_Op<"bernoulli__float", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$input,
                        F32Attr:$prob);

@@ -185,9 +185,6 @@ def test_normal_tensor_std(trace_model):
 @pytest.mark.parametrize("t", [torch.float, torch.half])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bernoulli(t, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): No shape inference handler for aten::bernoulli")
     prob = torch.full(size=(3, 5, 100), dtype=t, fill_value=0.5)
     stat_funs = [torch.min, torch.max, torch.mean]
     rng_harness(trace_model,
@@ -202,9 +199,6 @@ def test_bernoulli(t, trace_model):
 @pytest.mark.parametrize("p", [0.0, 1.0])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bernoulli_limits(p, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): No shape inference handler for aten::bernoulli")
     prob = torch.full(size=(3, 5, 1000), fill_value=p)
     func = lambda x: torch.all(x == p)
     func.__name__ = f"torch.all(x == {p})"
@@ -215,10 +209,6 @@ def test_bernoulli_limits(p, trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bernoulli_(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): No shape inference handler for aten::bernoulli")
-
     def rng_op(x):
         return x.bernoulli_(p=0.5)
 
@@ -231,10 +221,6 @@ def test_bernoulli_(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_distributions_bernoulli(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): No shape inference handler for aten::bernoulli")
-
     def rng_op(x):
         bd = torch.distributions.Bernoulli(0.5)
         return bd.sample(x.size())
