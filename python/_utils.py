@@ -69,8 +69,8 @@ def on_ipu(x):
 def flattenTensorStructure(tensors):
     def flatten(x):
         if isinstance(x, dict):
-            for t in x.values():
-                yield from flatten(t)
+            for k in sorted(x.keys()):
+                yield from flatten(x[k])
         elif isinstance(x, (list, tuple)):
             for t in x:
                 yield from flatten(t)
@@ -87,7 +87,7 @@ def reconstructTensorStructure(outputs_structure, output):
     # by values from the passed iterator.
     def copy_structure(x, it):
         if isinstance(x, dict):
-            return {k: copy_structure(v, it) for k, v in x.items()}
+            return {k: copy_structure(x[k], it) for k in sorted(x.keys())}
         if isinstance(x, (tuple, list)):
             return type(x)(copy_structure(e, it) for e in x)
         if isinstance(x, torch.Tensor):
