@@ -20,12 +20,12 @@ v2.6 (Poplar SDK 2.6)
 New features
 ------------
 
-- Improve performance of ``torch.gather`` in some cases where the index tensor has come from an ``expand`` or ``expand_as``.
-- Improve error message when trying to apply bitwise ops to unsupported scalar types.
-- Add support for upsample bicubic mode.
-- Add support for ``zero_infinity`` in ``torch.nn.CTCLoss``.
-- Add experimental support for Torch's dispatcher as an alternative to ``torch.jit.trace()`` (See ``opts.JIT.traceModel(False)``).
-- Improve performance by compiling built-in custom ops at install time.
+- Improved performance of ``torch.gather`` in some cases where the index tensor has come from an ``expand`` or ``expand_as``.
+- Improved error message when trying to apply bitwise ops to unsupported scalar types.
+- Support for upsample bicubic mode.
+- Support for ``zero_infinity`` in ``torch.nn.CTCLoss``.
+- Experimental support for Torch's dispatcher as an alternative to ``torch.jit.trace()`` (see ref:`dispatcher-support`).
+- Improved performance by compiling built-in custom ops at install time.
 
 API changes
 -----------
@@ -35,10 +35,10 @@ API changes
 Bug Fixes
 ---------
 
-- Fix remaining in-place operations on slices
-- Fix einsum transpose error
-- Fix floating point exception in ``torch.Tensor.exponential_`` and ``torch.distributions.Exponential``
-- Improve support for ``torch.int16`` tensors.
+- Fixed remaining in-place operations on slices
+- Fixed einsum transpose error
+- Fixed floating point exception in ``torch.Tensor.exponential_`` and ``torch.distributions.Exponential``
+- Improved support for ``torch.int16`` tensors.
 
 v2.5 (Poplar SDK 2.5)
 =====================

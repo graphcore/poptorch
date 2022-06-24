@@ -59,9 +59,11 @@ class _JitOptions(_options_impl.OptionsDict):
 
     def traceModel(self, trace_model: bool) -> "poptorch.options._JitOptions":
         """
-        Controls whether to use PyTorch's tracing or an alternative.
+        Controls whether to use PyTorch's JIT tracing or the dispatcher
+        to build the PopTorch graph.
 
-        Currently unused and deadlocked to torch.jit.trace.
+        The support for the dispatcher is still experimental, therefore
+        by default PopTorch will use torch.jit.trace().
 
         :param bool trace_model:
             * True: use `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_
