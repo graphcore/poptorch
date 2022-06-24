@@ -54,6 +54,7 @@ New features
   * torch.std
   * torch.var_mean
   * torch.std_mean
+
 - Also save the random number generator's state and the seed when saving a model.
 
 - Support for ``col2im`` (used by torch.nn.Fold).

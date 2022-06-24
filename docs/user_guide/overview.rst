@@ -1286,6 +1286,7 @@ Environment variables
 Logging level
 -------------
 PopTorch uses the following levels of logging:
+
   * ``OFF``: No logging
   * ``ERR``: Errors only
   * ``WARN``: Warnings and errors only
