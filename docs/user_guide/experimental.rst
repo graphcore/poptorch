@@ -45,11 +45,12 @@ Dispatcher support
 By default PopTorch uses `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_ to build a static graph representation of a torch.nn.Module.
 
 However, this approach suffers from several limitations:
+
 * Only tensors can be passed as arguments.
 * The traced model will run on the CPU as part of the tracing process.
 
   * This is expensive for large batch sizes.
-  * This means we need to add workarounds to trace types which are not supported on the CPU, for example FP16 (See ref:`float_16_op_support` for more details).
+  * This means we need to add workarounds to trace types which are not supported on the CPU, for example float 16 (See ref:`float_16_op_support` for more details).
 
 * Source code location is not supported: most of the instructions will point at torch.nn.module.py rather than user code.
 

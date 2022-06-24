@@ -49,6 +49,7 @@ Indexing, slicing, joining and mutating ops
 In PyTorch, slicing a tensor is accessing a subset of the tensor by providing the start and end indices, such as ``tensor[1:5]``.
 
 With a PopTorch model, you may take a slice of a tensor only if one of two conditions are met:
+
 * The start and end are constants, or can be resolved to be constants (for example, a function of the shape of a tensor which does not change between runs).
 * The start and end of the slice are related by a constant, for example ``tensor[x:x+5]``. Please note that this will produce different results to PyTorch if the end value exceeds the length of the tensor: PyTorch will output a smaller size tensor but PopTorch will allow the slice to wrap round to the start of the relevant dimension.
 
@@ -407,6 +408,7 @@ Creation functions
 ------------------
 
 The following functions are affected:
+
 * torch.ones
 * torch.rand
 * torch.zeros
@@ -446,6 +448,7 @@ Normalization
 Some normalization layers require the computation of running statistics - mean and variance. These tensors will be computed as float32 even though the inputs to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy.
 
 The following operators are affected:
+
 * ``torch.nn.BatchNorm1d``
 * ``torch.nn.BatchNorm2d``
 * ``torch.nn.BatchNorm3d``
