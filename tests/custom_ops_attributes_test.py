@@ -280,6 +280,10 @@ def test_float_combined_attributes(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_int_two_attributes(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): intermittent failure: Cannot get scalar "
+                    "type from input 0 as it does not exist")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
