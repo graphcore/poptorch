@@ -93,6 +93,7 @@ def Poptorch_round_out: Poptorch_NotImplemented_elem_unary<"round_out"> {}
 def Poptorch_trunc: Poptorch_NotImplemented_elem_unary<"trunc"> {}
 def Poptorch_max : Poptorch_NotImplemented_elem_unary<"max"> {}
 def Poptorch_min : Poptorch_NotImplemented_elem_unary<"min"> {}
+def Poptorch_median : Poptorch_NotImplemented_elem_unary<"median"> {}
 def Poptorch_acos : Poptorch_NotImplemented_elem_unary<"acos"> {}
 def Poptorch_acosh : Poptorch_NotImplemented_elem_unary<"acosh"> {}
 def Poptorch_asinh : Poptorch_NotImplemented_elem_unary<"asinh"> {}

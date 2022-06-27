@@ -399,7 +399,7 @@ class Poptorch_prefix_sum<string name> : Poptorch_Op<name, []> {
 
 def Poptorch_cumsum_out : Poptorch_prefix_sum<"cumsum_out"> {}
 
-class Poptorch_minmax_dim<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_single_dim_reduction<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
     let builders = [
@@ -431,10 +431,12 @@ class Poptorch_minmax_dim<string name> : Poptorch_NotImplementedOp<name, []> {
     ];
 }
 
-def Poptorch_max_dim : Poptorch_minmax_dim<"max_dim"> {}
-def Poptorch_min_dim : Poptorch_minmax_dim<"min_dim"> {}
+def Poptorch_max_dim : Poptorch_single_dim_reduction<"max_dim"> {}
+def Poptorch_min_dim : Poptorch_single_dim_reduction<"min_dim"> {}
+def Poptorch_median_dim_values
+    : Poptorch_single_dim_reduction<"median_dim_values"> {}
 
-class Poptorch_aminmax<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_multi_dim_reduction<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dim, BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
     let builders = [
@@ -468,5 +470,5 @@ class Poptorch_aminmax<string name> : Poptorch_NotImplementedOp<name, []> {
     ];
 }
 
-def Poptorch_amax : Poptorch_aminmax<"amax"> {}
-def Poptorch_amin : Poptorch_aminmax<"amin"> {}
+def Poptorch_amax : Poptorch_multi_dim_reduction<"amax"> {}
+def Poptorch_amin : Poptorch_multi_dim_reduction<"amin"> {}

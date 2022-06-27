@@ -542,9 +542,6 @@ reduction_ops_api2 = [
 @pytest.mark.parametrize("op", reduction_ops_api1)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_reduction_ops_float(op, trace_model):
-    if not trace_model and op in [torch.median]:
-        pytest.skip(
-            "TODO(T51159): No shape inference handler for aten::median")
     if not trace_model and op in [torch.norm]:
         pytest.skip(
             "TODO(T51159): Could not find canonicalisation handler for JIT "
@@ -572,9 +569,6 @@ def test_reduction_ops_float(op, trace_model):
 @pytest.mark.parametrize("keepdim", [False, True])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
-    if not trace_model and op in [torch.median]:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::median.dim_values")
     if not trace_model and op in [torch.norm]:
         pytest.skip(
             "TODO(T51159): Could not find canonicalisation handler for JIT "
