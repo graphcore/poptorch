@@ -43,6 +43,12 @@
 namespace poptorch {
 namespace {
 
+template <typename Func> class CallOnExit : Func {
+public:
+  explicit CallOnExit(Func f) : Func(std::move(f)) {}
+  ~CallOnExit() { std::invoke(*static_cast<Func *>(this)); }
+};
+
 // Keep a static map to gather up all the cpu calls.
 CPUCallbackMap callbacks;
 
@@ -749,6 +755,17 @@ poptorch::LowerToPopart
 lowerToPopartFromDispatch(const pybind11::dict &options,
                           const py::function &attribute_accessor,
                           bool is_training, const py::dict &opt_dict) {
+  auto cleanup = CallOnExit([] {
+    // Clear the callbacks after compilation.
+    callbacks.clear();
+
+    // We need to keep the dispatcher alive until after the passes because
+    // some of them call isCompilingWithDispatcher() and until after the
+    // lowering because the dispatcher is used to retrieve data pointers
+    // associated with jit::Value for inputs and parameters.
+    destroyDispatcher();
+  });
+
   SessionOptions parsed_options = parseSessionOptions(options);
 
   AnchorList anchors_list;
@@ -793,15 +810,6 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
       parsed_options, attribute_accessor, callbacks, std::move(anchors_list));
 
   lower.lower(nullptr);
-
-  // Clear the callbacks after compilation.
-  callbacks.clear();
-
-  // We need to keep the dispatcher alive until after the passes because
-  // some of them call isCompilingWithDispatcher() and until after the lowering
-  // because the dispatcher is used to retrieve data pointers associated with
-  // jit::Value for inputs and parameters.
-  destroyDispatcher();
 
   return lower;
 }
