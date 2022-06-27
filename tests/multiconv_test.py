@@ -161,9 +161,6 @@ def test_multiconv_layers(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_invalid_multiconv_nested(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Did not raise poptorch_core.Error")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -186,9 +183,6 @@ def test_invalid_multiconv_nested(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_invalid_multiconv_empty(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Did not raise poptorch_core.Error")
-
     class Model(torch.nn.Module):
         def forward(self, x):
             with poptorch.MultiConv():
