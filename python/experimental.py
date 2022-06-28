@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import torch
 from . import enums, poptorch_core, _impl, accessAttributes
-from ._utils import flattenTensorStructure, reconstructTensorStructure, on_ipu
+from ._utils import flattenTensorStructure, reconstructTensorStructure, isOnIpu
 from .options import Options
 
 
@@ -154,16 +154,16 @@ class IPUScope:
         self._outputs = list(flattenTensorStructure(tensors))
 
         for x in self._outputs:
-            if not on_ipu(x):
+            if not isOnIpu(x):
                 warnings.warn("Output expected to be on the IPU but is on %s" %
                               x.device.type)
 
         self._outputs = [
-            out.int() if out.dtype == torch.long and on_ipu(out) else out
+            out.int() if out.dtype == torch.long and isOnIpu(out) else out
             for out in self._outputs
         ]
         self._outputs = [
-            out.float() if out.dtype == torch.double and on_ipu(out) else out
+            out.float() if out.dtype == torch.double and isOnIpu(out) else out
             for out in self._outputs
         ]
         self._outputs = [out.cpu() for out in self._outputs]

@@ -61,7 +61,7 @@ def accessAttributes(attribute_id_str):
     return attributes
 
 
-def on_ipu(x):
+def isOnIpu(x):
     # TODO(T59880) rename xla -> ipu
     return x.device.type == "xla"
 
@@ -106,7 +106,7 @@ def replaceIpuTensors(outputs_structure, output):
             return {k: copy_structure(v, it) for k, v in x.items()}
         if isinstance(x, (tuple, list)):
             return type(x)(copy_structure(e, it) for e in x)
-        if isinstance(x, torch.Tensor) and on_ipu(x):
+        if isinstance(x, torch.Tensor) and isOnIpu(x):
             return next(it)
         return x
 
