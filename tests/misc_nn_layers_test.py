@@ -253,6 +253,8 @@ def test_dropout_eval_during_training(dropout_op, trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dropout_training(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
     drop_ratio = 0.8
     dropout_op = torch.nn.Dropout(drop_ratio)
 

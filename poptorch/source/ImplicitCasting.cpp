@@ -73,7 +73,7 @@ bool skipInput(const ImplicitCast implicit_cast, const unsigned int input_num) {
 }
 
 c10::ScalarType promoteTypes(c10::ScalarType t1, c10::ScalarType t2) {
-  ERROR_ON_MSG(isDispatcherActive(),
+  ERROR_ON_MSG(isCompilingWithDispatcher(),
                "promoteTypes() shouldn't be called in the dispatcher");
   auto hf_behavior = halfFloatCastingBehavior();
   if (hf_behavior == HalfFloatCasting::FloatDowncastToHalf ||
@@ -254,7 +254,7 @@ implicitCastInputs(torch::jit::ArrayRef<torch::jit::Value *> *inputs,
   // We have legacy behavior in tracing which requires a lot of complicated
   // computation for type resolution, so we split here. All the legacy code can
   // be removed when tracing is removed.
-  if (isDispatcherActive()) {
+  if (isCompilingWithDispatcher()) {
     expected_type = inferExpectedTypeDispatch(*inputs, implicit_cast);
   } else {
     expected_type = inferExpectedType(*inputs, implicit_cast);

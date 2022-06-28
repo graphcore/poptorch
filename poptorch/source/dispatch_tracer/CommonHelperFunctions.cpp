@@ -319,6 +319,11 @@ torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
       // Clean up any dead nodes.
       searchAndPossiblyDestroy(to_delete);
     }
+  } else if (schema.getNamespace().has_value() &&
+             *schema.getNamespace() == "poptorch") {
+    // Ignore for now -- `poptorch::` nodes are handled during
+    // `canonicalizeLate`, and later at the lowering stage.
+    new_node = aten_target;
   } else {
     // In the JIT path we are not allowed to fail as we only have the
     // canonicaliser to rely on. In the MLIR path we have our own 1:1 handlers
@@ -348,7 +353,7 @@ std::string toString(const at::Tensor &t) {
 
 void replaceAllUsesWith(torch::jit::Value *target,
                         torch::jit::Value *replacement) {
-  if (isDispatcherActive()) {
+  if (isCompilingWithDispatcher()) {
     replacements[target] = replacement;
   }
   target->replaceAllUsesWith(replacement);
@@ -357,7 +362,7 @@ void replaceAllUsesWith(torch::jit::Value *target,
 void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
                                  torch::jit::Value *target,
                                  torch::jit::Value *replacement) {
-  if (isDispatcherActive()) {
+  if (isCompilingWithDispatcher()) {
     replacements[target] = replacement;
   }
   target->replaceAllUsesAfterNodeWith(node, replacement);

@@ -268,9 +268,6 @@ def test_specific_error_handling():
 @helpers.overridePopartLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_outline_attribute(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): ValueError")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -292,9 +289,9 @@ def test_outline_attribute(capfd, trace_model):
 
     testlog = helpers.LogChecker(capfd)
 
-    get_regex = lambda op_name: (f'Op "{op_name}/GroupNormalization", '
+    get_regex = lambda op_name: (f'Op "{op_name}/.+", '
                                  r"[0-9]+ of type ai\.graphcore\."
-                                 "GroupNormalization:1"
+                                 ".+:1"
                                  r"(?:\n.+)+"
                                  f"{op_name}"
                                  r".+(?:\n.+)+"

@@ -103,7 +103,7 @@ def add_outplace_op(function,
     outputs_code = ""
     # Handle each of the outputs.
     for index, output in enumerate(outputs):
-        if output == "void":
+        if output == "":  # `ie. -> ()`
             continue
         # Capture all metadata related to each of the output tensors.
         output_info = canonicalise_tensor(output)

@@ -1,6 +1,7 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 #pragma once
 #include <torch/csrc/Exceptions.h>
+#include <torch/library.h>
 
 #include <exception>
 #include <functional>

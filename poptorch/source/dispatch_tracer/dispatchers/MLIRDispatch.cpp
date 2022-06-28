@@ -478,8 +478,7 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
       // tracking a huge map of tensors and their views.
       val = _mapper.getMLIRForTensor(tensor);
     } else {
-      ERROR("\tCould not find tensor " << tensor.unsafeGetTensorImpl() << ", "
-                                       << toString(tensor) << std::endl);
+      ERROR("\tCould not find tensor " << str(tensor) << std::endl);
     }
   }
 

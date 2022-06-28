@@ -113,7 +113,7 @@ void setNodeOutputsTypes(torch::jit::Node *node,
       }
 
       if (resolved_output_type == at::ScalarType::Float &&
-          !isDispatcherActive()) {
+          !isCompilingWithDispatcher()) {
         // Due to tracing not supporting Float16, the original type could be
         // either half or float 16.
         resolved_output_type = HALF_OR_FLOAT;

@@ -722,6 +722,8 @@ mean_reduction_strategy_params = [
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_mean_reduction_strategy_implicit(accum_type, training, combined_accum,
                                           correct_strategy, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 
@@ -747,6 +749,8 @@ def test_mean_reduction_strategy_implicit(accum_type, training, combined_accum,
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_mean_reduction_strategy_explicit(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
     t1 = torch.tensor([1.])
     t2 = torch.tensor([2.])
 

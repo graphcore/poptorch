@@ -8,11 +8,11 @@
    PopTorchDirect: nop
 
  - func: begin_ipu_block
-   native_func: begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> void
+   native_func: begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()
    PopTorchDirect: begin_ipu_block
 
  - func: end_ipu_block
-   native_func: end_ipu_block() -> void
+   native_func: end_ipu_block() -> ()
    PopTorchDirect: end_ipu_block
 
  - func: internal_cast
@@ -32,15 +32,15 @@
    PopTorchDirect: identity_loss
 
  - func: start_for_loop
-   native_func: start_for_loop(Tensor[] inputs) -> void
+   native_func: start_for_loop(Tensor[] inputs) -> ()
    PopTorchDirect: start_for_loop
 
  - func: end_for_loop
-   native_func: end_for_loop(Tensor(a!)[] outputs, Tensor[] inputs, int trip_count) -> Tensor(a!)[]
+   native_func: end_for_loop(Tensor(a!)[] outputs, Tensor[] inputs, int trip_count, Tensor(a!)[] example_outputs) -> Tensor(a!)[]
    PopTorchDirect: end_for_loop
 
  - func: optimizer_group
-   native_func: optimizer_group(int group, Tensor[] inputs) -> void
+   native_func: optimizer_group(int group, Tensor[] inputs) -> ()
    PopTorchDirect: optimizer_group
 
  - func: set_matmul_serialization
@@ -64,31 +64,31 @@
    PopTorchDirect: set_available_memory
 
  - func: begin_multi_conv
-   native_func: begin_multi_conv() -> void
+   native_func: begin_multi_conv() -> ()
    PopTorchDirect: begin_multi_conv
 
  - func: end_multi_conv
-   native_func: end_multi_conv(float[]? available_memory_proportions, int[]? partials_types, int? plan_type, int? per_conv_reserved_tiles, float? cycle_back_off, int[]? enableConvDithering) -> void
+   native_func: end_multi_conv(float[]? available_memory_proportions, int[]? partials_types, int? plan_type, int? per_conv_reserved_tiles, float? cycle_back_off, int[]? enableConvDithering) -> ()
    PopTorchDirect: end_multi_conv
 
  - func: push_name_scope
-   native_func: push_name_scope(str name) -> void
+   native_func: push_name_scope(str name) -> ()
    PopTorchDirect: push_name_scope
 
  - func: pop_name_scope
-   native_func: pop_name_scope() -> void
+   native_func: pop_name_scope() -> ()
    PopTorchDirect: pop_name_scope
 
  - func: begin_autocast
-   native_func: begin_autocast() -> void
+   native_func: begin_autocast() -> ()
    PopTorchDirect: begin_autocast
 
  - func: suppress_autocast
-   native_func: suppress_autocast() -> void
+   native_func: suppress_autocast() -> ()
    PopTorchDirect: suppress_autocast
 
  - func: restore_autocast
-   native_func: restore_autocast() -> void
+   native_func: restore_autocast() -> ()
    PopTorchDirect: restore_autocast
 
  - func: end_cpu_op
@@ -96,13 +96,13 @@
    PopTorchDirect: end_cpu_op
 
  - func: call_cpu_op
-   native_func: call_cpu_op(Tensor[] inputs, str name) -> void
+   native_func: call_cpu_op(Tensor[] inputs, str name) -> ()
    PopTorchDirect: call_cpu_op
 
  - func: set_attribute
-   native_func: set_attribute(str attribute, str key, str value) -> void
+   native_func: set_attribute(str attribute, str key, str value) -> ()
    PopTorchDirect: set_attribute
 
  - func: clear_attribute
-   native_func: clear_attribute(str attribute, str key) -> void
+   native_func: clear_attribute(str attribute, str key) -> ()
    PopTorchDirect: clear_attribute

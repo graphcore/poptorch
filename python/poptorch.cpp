@@ -40,203 +40,6 @@
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
-void beginIpuBlock(int64_t stage_id, int64_t phase_id, int64_t ipu_id) {
-  UNUSED(stage_id);
-  UNUSED(phase_id);
-  UNUSED(ipu_id);
-}
-
-at::Tensor castOp(at::Tensor tensor, std::string &&type) {
-  UNUSED(type);
-
-  // If the type to cast to is f16 then we need to cast to f32. The reason being
-  // is that by default we will just ignore the type, however this will only
-  // work if the original type was f32.
-
-  // Consider:
-  /* MyTensor = MyTensor.as(INT8)
-
-     MyTensor = MyTensor.half() # Convert to half.
-
-     out = conv(MyTensor) # This would be an illegal INT8 convolution.
-  */
-  if (type == "FLOAT16" || type == "FLOAT32") {
-    return tensor.to(at::ScalarType::Float);
-  }
-  return tensor;
-}
-
-at::Tensor setAvailableMemory(at::Tensor t, double mem) {
-  UNUSED(mem);
-  return t;
-}
-
-at::Tensor ipuPrintTensor(const at::Tensor &t, std::string &&title) {
-  UNUSED(title);
-  return t.clone();
-}
-
-at::Tensor setMatMulSerialization(at::Tensor matmul, std::string mode, // NOLINT
-                                  int64_t factor, bool keep_precision) {
-  UNUSED(mode);
-  UNUSED(factor);
-  UNUSED(keep_precision);
-  return matmul;
-}
-
-at::Tensor setOverlapForInput(at::Tensor t, const std::string &mode) {
-  UNUSED(mode);
-  return t;
-}
-
-at::Tensor setOverlapForOutput(at::Tensor t, const std::string &mode) {
-  UNUSED(mode);
-  return t;
-}
-
-at::Tensor identityOp(const at::Tensor &t) { return t.clone(); }
-
-at::Tensor identityLoss(const at::Tensor &t, int64_t reduction) {
-  constexpr int64_t sum = 0;
-  constexpr int64_t mean = 1;
-  constexpr int64_t none = 2;
-
-  if (reduction == sum) {
-    return at::sum(t);
-  }
-
-  if (reduction == mean) {
-    return at::mean(t);
-  }
-
-  ERROR_ON(reduction != none);
-  return t.clone();
-}
-
-c10::List<at::Tensor>
-customOperation(c10::List<at::Tensor> inputs,          // NOLINT
-                std::string name, std::string domain,  // NOLINT
-                int64_t version, int64_t num_outputs,  // NOLINT
-                c10::List<at::Tensor> example_outputs, // NOLINT
-                std::string attributes_map_id) {       // NOLINT
-  UNUSED(inputs);
-  UNUSED(name);
-  UNUSED(domain);
-  UNUSED(version);
-  UNUSED(num_outputs);
-  UNUSED(attributes_map_id);
-
-  return example_outputs;
-}
-
-c10::List<at::Tensor> ctcBeamSearchDecoder(const at::Tensor &log_probs,
-                                           const at::Tensor &lengths,
-                                           int64_t blank, int64_t width,
-                                           int64_t top_paths) {
-  UNUSED(lengths);
-  UNUSED(blank);
-  UNUSED(width);
-
-  ERROR_ON_MSG(log_probs.sizes().size() != 3,
-               "Incorrect shape for first input to CTC beam search decoder.");
-  unsigned input_len = log_probs.sizes()[0];
-  unsigned batch_size = log_probs.sizes()[1];
-
-  at::Tensor path_probs = at::zeros({batch_size, top_paths});
-  at::Tensor path_lens = at::zeros({batch_size, top_paths});
-  at::Tensor decoded_paths = at::zeros({batch_size, top_paths, input_len});
-
-  return c10::List<at::Tensor>({path_probs, path_lens, decoded_paths});
-}
-
-void callCpuOp(const c10::List<at::Tensor> &inputs, const std::string &name) {
-  UNUSED(inputs);
-  UNUSED(name);
-}
-
-c10::List<at::Tensor> endCpuOp(c10::List<at::Tensor> output) { return output; }
-
-void setAttribute(const std::string &attribute, const std::string &key,
-                  const std::string &value) {
-  UNUSED(attribute);
-  UNUSED(key);
-  UNUSED(value);
-}
-
-void clearAttribute(const std::string &attribute, const std::string &key) {
-  UNUSED(attribute);
-  UNUSED(key);
-}
-
-void startForLoop(c10::List<at::Tensor> inputs) { // NOLINT
-  UNUSED(inputs);
-}
-
-c10::List<at::Tensor>
-endForLoop(c10::List<at::Tensor> outputs,               // NOLINT
-           c10::List<at::Tensor> inputs, int64_t count, // NOLINT
-           c10::List<at::Tensor> example_outputs) {     // NOLINT
-  UNUSED(count);
-  UNUSED(outputs);
-  UNUSED(inputs);
-  return example_outputs;
-}
-
-void optimizerGroup(int64_t group, c10::List<at::Tensor> &&inputs) {
-  UNUSED(group);
-  UNUSED(inputs);
-}
-
-void endMultiConv(
-    c10::optional<c10::List<double>> &&available_memory_proportions,
-    c10::optional<c10::List<int64_t>> &&partials_types,
-    c10::optional<int64_t> &&plan_type,
-    c10::optional<int64_t> &&per_conv_reserved_tiles,
-    c10::optional<double> &&cycle_back_off,
-    c10::optional<c10::List<int64_t>> &&enableConvDithering) {
-  UNUSED(available_memory_proportions);
-  UNUSED(partials_types);
-  UNUSED(plan_type);
-  UNUSED(per_conv_reserved_tiles);
-  UNUSED(cycle_back_off);
-  UNUSED(enableConvDithering);
-}
-
-void pushNameScope(const std::string &&name) { UNUSED(name); }
-
-// Many operations just appear as having no return or inputs but our passes use
-// them to derive user intent. They can just use this implementation.
-void nullOp() {}
-
-static auto registry =
-    torch::RegisterOperators("poptorch::begin_ipu_block", &beginIpuBlock)
-        .op("poptorch::end_ipu_block", &nullOp)
-        .op("poptorch::ipu_print_tensor", &ipuPrintTensor)
-        .op("poptorch::internal_cast", &castOp)
-        .op("poptorch::nop", &identityOp)
-        .op("poptorch::custom_operation", &customOperation)
-        .op("poptorch::ctc_beam_search_decoder", &ctcBeamSearchDecoder)
-        .op("poptorch::identity_loss", &identityLoss)
-        .op("poptorch::start_for_loop", &startForLoop)
-        .op("poptorch::end_for_loop", &endForLoop)
-        .op("poptorch::optimizer_group", &optimizerGroup)
-        .op("poptorch::set_matmul_serialization", &setMatMulSerialization)
-        .op("poptorch::set_overlap_for_input", &setOverlapForInput)
-        .op("poptorch::set_overlap_for_output", &setOverlapForOutput)
-        .op("poptorch::recomputation_checkpoint", &identityOp)
-        .op("poptorch::set_available_memory", &setAvailableMemory)
-        .op("poptorch::begin_multi_conv", &nullOp)
-        .op("poptorch::end_multi_conv", &endMultiConv)
-        .op("poptorch::push_name_scope", &pushNameScope)
-        .op("poptorch::pop_name_scope", &nullOp)
-        .op("poptorch::begin_autocast", &nullOp)
-        .op("poptorch::suppress_autocast", &nullOp)
-        .op("poptorch::restore_autocast", &nullOp)
-        .op("poptorch::end_cpu_op", &endCpuOp)
-        .op("poptorch::call_cpu_op", &callCpuOp)
-        .op("poptorch::set_attribute", setAttribute)
-        .op("poptorch::clear_attribute", &clearAttribute);
-
 namespace poptorch {
 namespace {
 
@@ -978,6 +781,8 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
   // TODO(T55228): remove after we use our own dispatch key.
   removeDeadImplicitCasts(graph.get());
 
+  canonicalizeLate(graph.get());
+
   // Prepare CPU op callbacks, by allocating the CPU tensors where the
   // inputs/outputs will be stored. We have to do this at the last possible
   // moment due to tracing.
@@ -993,9 +798,9 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
   callbacks.clear();
 
   // We need to keep the dispatcher alive until after the passes because
-  // some of them call isDispatcherActive() and until after the lowering
-  // because the dispatcher is used to retrieve data pointers associated
-  // with jit::Value for inputs and parameters.
+  // some of them call isCompilingWithDispatcher() and until after the lowering
+  // because the dispatcher is used to retrieve data pointers associated with
+  // jit::Value for inputs and parameters.
   destroyDispatcher();
 
   return lower;
@@ -1408,7 +1213,6 @@ compileWithManualTracing(const pybind11::dict &options,
   logging::debug("Compile with manual tracing");
   auto lower = lowerToPopartFromDispatch(options, attribute_accessor,
                                          is_training, opt_dict);
-
   return lower.compile();
 }
 
@@ -1476,7 +1280,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("enableEagerMode", PTC(poptorch::enableEagerMode));
   m.def("destroyDispatcher", PTC(poptorch::destroyDispatcher));
   m.def("startDispatch", PTC(poptorch::startDispatch));
-  m.def("isDispatcherActive", PTC(poptorch::isDispatcherActive));
+  m.def("isCompilingWithDispatcher", PTC(poptorch::isCompilingWithDispatcher));
   m.def("endDispatch", PTC(poptorch::endDispatch));
   m.def("startParametersMove", PTC(poptorch::startParametersMove));
   m.def("endParametersMove", PTC(poptorch::endParametersMove));

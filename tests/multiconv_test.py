@@ -32,9 +32,6 @@ def assert_contains_multiconv(poptorch_model, expected_num=1):
 @pytest.mark.parametrize("num_layers", [1, 2, 3])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_multiconv_basic(num_layers, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Wrong number of MultiConv ops")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -97,8 +94,6 @@ def multiconv_harness(multiconv, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_multiconv_options_broadcast(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Wrong number of MultiConv ops")
     multiconv = (
         poptorch.MultiConv().availableMemoryProportions(0.8).partialsTypes(
             torch.float).planType(
@@ -110,8 +105,6 @@ def test_multiconv_options_broadcast(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_multiconv_options_per_conv(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Wrong number of MultiConv ops")
     partials_types = [torch.float, torch.float]
     multiconv = (poptorch.MultiConv().availableMemoryProportions(
         (0.8, 0.7)).partialsTypes(partials_types).planType(
@@ -123,9 +116,6 @@ def test_multiconv_options_per_conv(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_multiconv_layers(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Wrong number of MultiConv ops")
-
     class Network(nn.Module):
         def __init__(self):
             super().__init__()

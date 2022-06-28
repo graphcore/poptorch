@@ -747,7 +747,7 @@ class CPU:
         # Mark all subsquent ops as happening on the host.
         torch.ops.poptorch.call_cpu_op([*input], self._ID)
 
-        if poptorch_core.isDispatcherActive():
+        if poptorch_core.isCompilingWithDispatcher():
             cpu_input = [torch.zeros_like(i, device="cpu") for i in input]
         else:
             cpu_input = input
@@ -769,7 +769,7 @@ class CPU:
         self.in_shapes = [i.shape for i in input]
         self.out_shapes = [o.shape for o in cpu_outputs]
 
-        if poptorch_core.isDispatcherActive():
+        if poptorch_core.isCompilingWithDispatcher():
             outputs = [torch.zeros_like(o, device="xla") for o in cpu_outputs]
         else:
             outputs = cpu_outputs
