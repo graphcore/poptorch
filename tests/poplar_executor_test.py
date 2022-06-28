@@ -393,7 +393,7 @@ def test_nondeterministic_warning_filter():
 
 
 @pytest.mark.mlirSupportRequired
-def test_cpu_output():
+def test_dispatcher_cpu_output():
     const1 = torch.tensor([1, 2])
     const2 = torch.tensor([3, 4])
 
