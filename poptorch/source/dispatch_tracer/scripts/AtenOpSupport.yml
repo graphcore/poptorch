@@ -302,6 +302,24 @@
   PopTorchDirect: upsample_linear1d_out
   UnusedOutputArguments: {out}
 
+# func: im2col(Tensor self, int[2] kernel_size, int[2] dilation, int[2] padding, int[2] stride, *) -> Tensor(a!)
+- func: im2col
+  PopTorchDirect: im2col
+
+# func: im2col.out(Tensor self, int[2] kernel_size, int[2] dilation, int[2] padding, int[2] stride, *, Tensor(a!) out) -> Tensor(a!)
+- func: im2col.out
+  PopTorchDirect: im2col
+  UnusedOutputArguments: {out}
+
+# func: col2im(Tensor self, int[2] output_size, int[2] kernel_size, int[2] dilation, int[2] padding, int[2] stride) -> Tensor
+- func: col2im
+  PopTorchDirect: col2im
+
+# func: col2im.out(Tensor self, int[2] output_size, int[2] kernel_size, int[2] dilation, int[2] padding, int[2] stride, *, Tensor(a!) out) -> Tensor(a!)
+- func: col2im.out
+  PopTorchDirect: col2im
+  UnusedOutputArguments: {out}
+
 ################
 # Element wise
 ################
