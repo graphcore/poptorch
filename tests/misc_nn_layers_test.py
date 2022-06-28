@@ -471,9 +471,6 @@ def test_pixel_shuffle(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 # Tests aten::im2col
 def test_unfold(params, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): No shape inference handler for aten::im2col")
     (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
      stride_y) = params
     padding = 2
@@ -506,9 +503,6 @@ def test_unfold(params, trace_model):
 # Tests aten::col2im
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_fold(params, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): No shape inference handler for aten::col2im")
     (kernel_size_x, kernel_size_y, dilation_x, dilation_y, stride_x,
      stride_y) = params
 
@@ -536,9 +530,6 @@ def test_fold(params, trace_model):
 @pytest.mark.parametrize("stride_y", [1, 3])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_fold_with_padding(stride_x, stride_y, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): No shape inference handler for aten::col2im")
     torch.manual_seed(42)
 
     orig_input = torch.rand(2, 2, 11, 13)

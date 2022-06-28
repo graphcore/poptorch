@@ -785,3 +785,133 @@ def Poptorch_upsample_nearest3d_vec : Poptorch_upsample<"upsample_nearest3d_vec"
         $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
     }]>];
 }
+
+def Poptorch_im2col : Poptorch_upsample<"im2col"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$kernel_size,
+                         I64ArrayAttr:$dilation,
+                         I64ArrayAttr:$padding,
+                         I64ArrayAttr:$stride);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$self,
+                   "const std::vector<std::int64_t>&":$kernel_size,
+                   "const std::vector<std::int64_t>&":$dilation,
+                   "const std::vector<std::int64_t>&":$padding,
+                   "const std::vector<std::int64_t>&":$stride), [{
+            $_state.addOperands(self);
+
+            $_state.addAttribute("kernel_size",
+                                 $_builder.getI64ArrayAttr(kernel_size));
+            $_state.addAttribute("dilation",
+                                 $_builder.getI64ArrayAttr(dilation));
+            $_state.addAttribute("padding",
+                                 $_builder.getI64ArrayAttr(padding));
+            $_state.addAttribute("stride", $_builder.getI64ArrayAttr(stride));
+            
+            auto input_shape = getShape(self);
+            ERROR_ON_MSG(input_shape.size() != 3 && input_shape.size() != 4,
+                         "Input must have 3 or 4 dimensions.");
+            if (input_shape.size() == 3) {
+                input_shape.insert(input_shape.begin(), 1);
+            }
+
+            ERROR_ON_MSG(kernel_size.size() != 2,
+                         "kernel_size must have 2 elements.");
+            ERROR_ON_MSG(dilation.size() != 2,
+                         "dilation must have 2 elements.");
+            ERROR_ON_MSG(padding.size() != 2, "padding must have 2 elements.");
+            ERROR_ON_MSG(stride.size() != 2, "stride must have 2 elements.");
+
+            // Parameters
+            std::int64_t kernel_height = kernel_size[0];
+            std::int64_t kernel_width = kernel_size[1];
+            std::int64_t dilation_height = dilation[0];
+            std::int64_t dilation_width = dilation[1];
+            std::int64_t padding_height = padding[0];
+            std::int64_t padding_width = padding[1];
+            std::int64_t stride_height = stride[0];
+            std::int64_t stride_width = stride[1];
+
+            // Derived from the input shape
+            std::int64_t batch_size = input_shape[0];
+            std::int64_t n_input_plane = input_shape[1];
+            std::int64_t input_height = input_shape[2];
+            std::int64_t input_width = input_shape[3];
+
+            std::int64_t n_output_plane = n_input_plane * kernel_width *
+                                            kernel_height;
+            
+            int64_t output_height = (input_height + 2 * padding_height -
+                           (dilation_height * (kernel_height - 1) + 1)) /
+                            stride_height + 1;
+            int64_t output_width = (input_width + 2 * padding_width -
+                                    (dilation_width * (kernel_width - 1) + 1)) /
+                                    stride_width + 1;
+            std::int64_t output_length = output_height * output_width;
+
+            llvm::SmallVector<std::int64_t, 3> shape{batch_size, n_output_plane,
+                                                     output_length};
+            $_state.addTypes(mlir::RankedTensorType::get(shape,
+                                                         getElementType(self)));
+        }]>
+    ];
+}
+
+def Poptorch_col2im : Poptorch_upsample<"col2im"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$output_size,
+                         I64ArrayAttr:$kernel_size,
+                         I64ArrayAttr:$dilation,
+                         I64ArrayAttr:$padding,
+                         I64ArrayAttr:$stride);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$self,
+                   "const std::vector<std::int64_t>&":$output_size,
+                   "const std::vector<std::int64_t>&":$kernel_size,
+                   "const std::vector<std::int64_t>&":$dilation,
+                   "const std::vector<std::int64_t>&":$padding,
+                   "const std::vector<std::int64_t>&":$stride), [{
+            $_state.addOperands(self);
+            
+            $_state.addAttribute("output_size",
+                                 $_builder.getI64ArrayAttr(output_size));
+            $_state.addAttribute("kernel_size",
+                                 $_builder.getI64ArrayAttr(kernel_size));
+            $_state.addAttribute("dilation",
+                                 $_builder.getI64ArrayAttr(dilation));
+            $_state.addAttribute("padding", $_builder.getI64ArrayAttr(padding));
+            $_state.addAttribute("stride", $_builder.getI64ArrayAttr(stride));
+
+            auto input_shape = getShape(self);
+            ERROR_ON_MSG(input_shape.size() != 3,
+                         "Input must have 3 dimensions.");
+
+            ERROR_ON_MSG(output_size.size() != 2,
+                         "output_size must have 2 elements.");
+            ERROR_ON_MSG(kernel_size.size() != 2,
+                         "kernel_size must have 2 elements.");
+
+            // Parameters
+            std::int64_t output_height = output_size[0];
+            std::int64_t output_width = output_size[1];
+            std::int64_t kernel_height = kernel_size[0];
+            std::int64_t kernel_width = kernel_size[1];
+
+            // Derived from the input shape
+            std::int64_t batch_size = input_shape[0];
+            std::int64_t n_input_plane = input_shape[1];
+
+            std::int64_t n_output_plane = n_input_plane / (kernel_width *
+                                            kernel_height);
+            
+            std::int64_t output_length = output_height * output_width;
+
+            llvm::SmallVector<std::int64_t, 4> shape{batch_size, n_output_plane,
+                                                     output_height, output_width};
+            $_state.addTypes(mlir::RankedTensorType::get(shape,
+                                                         getElementType(self)));
+        }]>
+    ];
+}
