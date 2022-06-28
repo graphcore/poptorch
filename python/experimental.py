@@ -192,6 +192,7 @@ class _IPUContext:
     def loadExecutable(self, filename, *args, **kwargs):
         return self._compileOrLoadExecutable(args, kwargs, filename)
 
+    @_impl.destroyDispatcherOnExit
     def _compileOrLoadExecutable(self, args, kwargs, filename=None):
         tensor_args = flattenTensorStructure((args, kwargs))
         with IPUScope(tensor_args,

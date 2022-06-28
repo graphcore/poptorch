@@ -564,6 +564,11 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
     const py::dict &optimizer_dict, const py::function &attribute_accessor,
     const bool added_dummy_output, const py::list &anchors,
     const py::dict &model_parameters) {
+
+  auto cleanup = CallOnExit([] {
+    // Clear the callbacks after compilation.
+    callbacks.clear();
+  });
   const char *poptorch_passes = "poptorchPasses";
   const char *lower_to_popart = "lowerToPopart";
   poptorch::logging::Tracepoint::begin(poptorch_passes);
@@ -742,9 +747,6 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
       attribute_accessor, callbacks, std::move(anchors_list));
   lower.lower(&input_tensors);
 
-  // Clear the callbacks after compilation.
-  callbacks.clear();
-
   poptorch::setAvailableMemoryOnGraphFinalized();
 
   poptorch::logging::Tracepoint::end(lower_to_popart);
@@ -758,12 +760,6 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
   auto cleanup = CallOnExit([] {
     // Clear the callbacks after compilation.
     callbacks.clear();
-
-    // We need to keep the dispatcher alive until after the passes because
-    // some of them call isCompilingWithDispatcher() and until after the
-    // lowering because the dispatcher is used to retrieve data pointers
-    // associated with jit::Value for inputs and parameters.
-    destroyDispatcher();
   });
 
   SessionOptions parsed_options = parseSessionOptions(options);
