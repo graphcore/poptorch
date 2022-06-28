@@ -21,6 +21,34 @@
 
 namespace poptorch {
 
+std::string truncateGraphString(torch::jit::Graph &graph) {
+  static const int num_lines_max = [=]() {
+    if (const char *graph_len = std::getenv("POPTORCH_MAX_GRAPH_LEN")) {
+      const int n = std::stoi(graph_len);
+      logging::trace("POPTORCH_MAX_GRAPH_LEN={}", n);
+      return n;
+    }
+    const int n = 10;
+    logging::trace("POPTORCH_MAX_GRAPH_LEN not set, defaulting to {}", n);
+    return n;
+  }();
+
+  std::string s = graph.toString();
+  if (num_lines_max <= 0 || s.empty()) {
+    return s;
+  }
+  size_t start = s.size();
+  for (int i = 0; i < num_lines_max; i++) {
+    start = s.rfind('\n', start - 1);
+    if (start == std::string::npos) {
+      // Didn't find another new line: print everything.
+      return s;
+    }
+  }
+  // Start after the last line return.
+  return "[...truncated...]" + s.substr(start);
+}
+
 at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
 
@@ -412,8 +440,10 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     record->is_empty = false;
   }
 
-  logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",
-                 schema.name(), *graph);
+  if (logging::shouldLog(logging::Level::Trace)) {
+    logging::trace("[TRACING-2][JIT] Graph after interception of {}=\n{}\n",
+                   schema.name(), truncateGraphString(*graph));
+  }
 }
 
 InplaceGraphInfo

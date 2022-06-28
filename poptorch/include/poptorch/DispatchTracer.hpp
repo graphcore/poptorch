@@ -68,15 +68,6 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
 // Trying to add ops after this call is undefined behaviour.
 void finalizeGraph();
 
-// Mark the outputs of the graph. |outputs| are the outputs as seen in the
-// graph, i.e, the tensors as seen/used by the user. `data_storage` are clones
-// of them which we should copy the output into. This is to give us a persistent
-// return location.
-//
-// Will implicitly finalizeGraph() once the outputs have been marked.
-void markOutputs(const std::vector<at::Tensor> &outputs,
-                 const std::vector<at::Tensor> &data_storage);
-
 InplaceGraphInfo getInplaceGraphInfo(size_t num_anchors,
                                      bool replicas_needing_broadcast);
 
