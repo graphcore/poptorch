@@ -248,6 +248,9 @@ void canonicalizeLate(torch::jit::Graph *graph) {
       node->s_(c10::Symbol::attr("key"), key);
     } else if (kind == symbols::poptorch::set_matmul_serialization) {
       callbacks.emplace_back(reorderMatmulSeralisationIfRequired(node));
+    } else if (kind == symbols::poptorch::set_available_memory) {
+      callbacks.emplace_back(
+          [node]() { moveSetAvailableMemoryIfRequired(node); });
     }
   }
 

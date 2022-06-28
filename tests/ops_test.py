@@ -68,9 +68,6 @@ def test_name_scope(trace_model):
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_available_memory_last_op(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): ValueError")
-
     class Model(torch.nn.Module):
         def forward(self, x):
             x = torch.matmul(x, x)
@@ -98,9 +95,6 @@ def test_available_memory_last_op(capfd, trace_model):
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_available_memory_linear(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
-
     class LinModel(torch.nn.Module):
         def __init__(self):
             super().__init__()

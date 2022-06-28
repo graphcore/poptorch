@@ -6,6 +6,7 @@
 
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
 #include "PoptorchSymbols.hpp"
@@ -59,6 +60,9 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
   new_node->setSourceRange(current_source_location);
   setNodeOutputsTypes(new_node, implicit_cast, output_type);
   graph->insertNode(new_node);
+
+  setAvailableMemoryAddPossibleInputOp(new_node);
+
   return new_node;
 }
 
