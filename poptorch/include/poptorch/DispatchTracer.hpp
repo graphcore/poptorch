@@ -117,7 +117,7 @@ void endDispatch(bool error_occurred = false);
 void startParametersMove();
 void endParametersMove();
 
-// Return true if we should be compilin with the dispatcher.
+// Return true if we should be compiling with the dispatcher.
 bool isCompilingWithDispatcher();
 
 // Destroy the active dispatcher object.

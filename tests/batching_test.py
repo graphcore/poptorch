@@ -33,8 +33,6 @@ def test_inferenceBatching(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_trainingBatching(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
     torch.manual_seed(4424242)
 
     # 10 Batches of 10.
@@ -84,8 +82,6 @@ def test_trainingBatching(trace_model):
 @pytest.mark.parametrize("mode", list(poptorch.OutputMode))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inferenceOutputModes(mode, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
     torch.manual_seed(42)
 
     model = torch.nn.Linear(6, 20)
@@ -138,9 +134,6 @@ def test_inferenceOutputModes(mode, trace_model):
 @pytest.mark.parametrize("mode", list(poptorch.OutputMode))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_trainingOutputModes(mode, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     torch.manual_seed(42)
 
     # 1000 Batches of 10.

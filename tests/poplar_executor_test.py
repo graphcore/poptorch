@@ -173,9 +173,6 @@ def test_inference_attributes(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_training_attributes(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     def custom_loss(output, target):
         # Mean squared error with a scale
         loss = output - target
@@ -213,9 +210,6 @@ def test_training_attributes(trace_model):
 @pytest.mark.parametrize("use_half", [False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_explicit_destroy(use_half, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     class ExampleModel(torch.nn.Module):
         def __init__(self):
             super().__init__()

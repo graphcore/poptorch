@@ -12,8 +12,6 @@ import poptorch
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_attach_detach(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
     torch.manual_seed(42)
 
     target = torch.randint(0, 10, [1])
@@ -91,9 +89,6 @@ def test_attach_detach(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_attach_detach_accuracy(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     class TrainingModelWithLoss(torch.nn.Module):
         def __init__(self):
             super().__init__()

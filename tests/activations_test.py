@@ -34,8 +34,6 @@ activation_functions = [
 @pytest.mark.parametrize("op", activation_functions)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_activations(op, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
     torch.manual_seed(42)
 
     input = torch.randn([2, 20])
@@ -72,8 +70,6 @@ def test_activations(op, trace_model):
 @pytest.mark.parametrize("dim", range(5))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_glu(dim, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
     torch.manual_seed(42)
     N, C, M, K, L = 2, 4, 6, 8, 10
 
@@ -124,8 +120,6 @@ def test_activation_numerics(op, trace_model):
 @pytest.mark.filterwarnings("ignore:Output nr 2. of the traced function")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_rrelu_training(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
     opts = poptorch.Options().randomSeed(0)
     opts.Jit.traceModel(trace_model)
 

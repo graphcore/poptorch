@@ -52,9 +52,6 @@ def test_inference(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_training(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     def custom_loss(model_out, labels):
         l1 = torch.nn.functional.nll_loss(model_out[0], labels)
         # Popart errors if this is unused.
@@ -104,9 +101,6 @@ def test_training(trace_model):
 # Check that the custom op not only trains but also propagates the gradient backwards.
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_training_both_sides(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     def custom_loss(model_out, labels):
         l1 = torch.nn.functional.nll_loss(model_out[0], labels)
         # Popart errors if this is unused.

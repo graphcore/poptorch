@@ -143,9 +143,6 @@ def test_lstm_batched_batch_first(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_lstm_fc(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     torch.manual_seed(42)
 
     batch_size = 2

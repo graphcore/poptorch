@@ -40,9 +40,6 @@ def inference_process(event, trace_model):
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_attach_detach_wait_for_ipu(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     torch.manual_seed(42)
 
     target = torch.randint(0, 10, [1])

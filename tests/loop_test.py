@@ -192,9 +192,6 @@ def test_loop_use_output(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_loop_training(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
