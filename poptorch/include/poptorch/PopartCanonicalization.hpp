@@ -72,14 +72,15 @@ void removeScatterAddIndexExpansion(torch::jit::Graph *graph);
 // efficient if the expanded indices tensor is just a long series of slices.
 void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph);
 
-// Adds the op as the possible true input op to set_available_memory. Some ops
-// are composed of multiple ops, and their return values might not be an op that
-// accepts set_available_memory.
+// Adds the op as the possible true input op to set_available_memory if it is
+// of a valid kind.
+// Some ops are composed of multiple ops, and their return values might not be
+// an op that accepts set_available_memory.
 void setAvailableMemoryAddPossibleInputOp(torch::jit::Node *node);
 
 // Ensure that the input to the given set_available_memory op is the one that
-// supports set_available_memory.
-void setAvailableMemoryFixupInput(torch::jit::Node *node);
+// supports set_available_memory, if it's not move it to the right place.
+void moveSetAvailableMemoryIfRequired(torch::jit::Node *node);
 void setAvailableMemoryOnGraphFinalized();
 } // namespace poptorch
 

@@ -574,9 +574,16 @@ class PoplarExecutor:
                 # We need to remap those to IPU tensors.
                 # IPUContext moved 'model' to the IPU, therefore we need to join the two maps and
                 # then remap the parameters from the optimizer.
+                # From:
+                #
                 # cpu_tensors[name] = cpu_data_ptr
                 # ipu_tensors[name] = ipu_tensor
-                # cpu_to_opu[cpu_data_ptr] = ipu_tensor
+                #
+                # we build:
+                #
+                # cpu_to_ipu[cpu_data_ptr] = ipu_tensor
+                #
+                # And then remap all the tensors from group["params"]
                 cpu_tensors = {
                     **buff_param_addresses[0],
                     **buff_param_addresses[1]

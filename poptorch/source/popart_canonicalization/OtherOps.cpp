@@ -195,13 +195,6 @@ torch::jit::Node *scatterAddHandler(torch::jit::Graph *graph,
 
   auto *sr = createScatterreduce(graph, {src, index}, axissize, axis, 0);
   auto *add = createAdd(graph, {output, sr->output()});
-  // Fix up any set_available_memory calls to point to the scatterreduce
-  for (const auto &use : node->output()->uses()) {
-    if (use.user->kind() == symbols::poptorch::set_available_memory) {
-      use.user->replaceInputWith(node->output(), sr->output());
-    }
-  }
-  setAvailableMemoryAddPossibleInputOp(sr);
   return add;
 }
 
@@ -263,7 +256,6 @@ torch::jit::Node *setAvailableMemoryHandler(torch::jit::Graph *graph,
   auto *y = node->input(1);
   auto t0 = constantToFloat(y->node());
   auto *new_node = createSetAvailableMemory(graph, x, t0);
-  setAvailableMemoryFixupInput(new_node);
   return new_node;
 }
 } // namespace

@@ -776,7 +776,7 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
                                parsed_options.broadcastBuffers());
   std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
 
-  logging::debug("Traced graph:\n{}", *graph);
+  logging::trace("Traced graph:\n{}", *graph);
 
   // Make sure all constants are correctly categorised as either
   // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
@@ -805,6 +805,7 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
   // moment due to tracing.
   initCallbackBuffers();
 
+  logging::debug("Graph right before popart:\n{}", *graph);
   poptorch::LowerToPopart lower(
       graph.get(), std::move(inplace_info), is_training, std::move(optimizers),
       parsed_options, attribute_accessor, callbacks, std::move(anchors_list));

@@ -247,9 +247,8 @@ InplaceGraphInfo handleInplaceOpsInGraph(torch::jit::Graph &graph,
                                          size_t num_parameters,
                                          size_t num_anchors,
                                          bool replicas_needing_broadcast) {
-  // TODO(D67666): enable once D67666 has landed.
-  // ERROR_ON_MSG(isCompilingWithDispatcher(),"[Internal] This function should
-  // only be called for traced graphs");
+  ERROR_ON_MSG(isCompilingWithDispatcher(), "[Internal] This function should "
+                                            "only be called for traced graphs");
   InplaceGraphInfo out;
   std::vector<torch::jit::Value *> collapsed_inputs =
       collapsedGraphInputHierachy(&graph);

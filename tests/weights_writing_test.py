@@ -255,9 +255,6 @@ def test_torch_save(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_seed_precompilation(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Not supported: can't deserialize dispatch "
-                    "traced executable.")
     # create a dummy model
     model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
 
@@ -311,9 +308,6 @@ def test_seed_precompilation(capfd, trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_save_everything(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Not supported: can't deserialize dispatch "
-                    "traced executable.")
     # create a dummy model
     model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
 
