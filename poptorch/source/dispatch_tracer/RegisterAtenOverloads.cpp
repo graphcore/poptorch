@@ -414,19 +414,6 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 #endif
 }
 
-// Record these tensors as being the outputs of the graph.
-// NOTE never called
-void markOutputs(const std::vector<at::Tensor> &outputs,
-                 const std::vector<at::Tensor> &data_storage) {
-  context.activeDispatch()->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
-  ERROR_ON(outputs.size() != data_storage.size());
-  for (size_t i = 0; i < outputs.size(); ++i) {
-    context.activeDispatch()->addOutput(outputs.at(i), data_storage.at(i));
-  }
-  context.activeDispatch()->finalizeGraph();
-}
-
 void finalizeGraph() { context.activeDispatch()->finalizeGraph(); }
 
 void *getDataSource(const at::Tensor &tensor) {
