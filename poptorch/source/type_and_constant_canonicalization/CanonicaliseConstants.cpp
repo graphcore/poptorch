@@ -100,7 +100,7 @@ UseOfNode getUseOfNode(torch::jit::Node *n,
 void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
                                const at::Tensor &t) {
   ERROR_ON(n->kind() != c10::prim::Constant);
-  bool is_dispatcher_active = isDispatcherActive();
+  bool is_dispatcher_active = isCompilingWithDispatcher();
   torch::jit::WithInsertPoint insert_point(n);
 
   poptorch::UseOfNode use_of_node;

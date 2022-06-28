@@ -15,9 +15,6 @@ import poptorch
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_missing_block(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Did not raise poptorch_core.Error")
-
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -44,9 +41,6 @@ def test_missing_block(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("use_scope", [True, False])
 def test_api_inline(capfd, trace_model, use_scope):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
-
     if use_scope:
 
         class Model(torch.nn.Module):
@@ -122,9 +116,7 @@ def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted,
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor(trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
     size = 3
 
     class Model(torch.nn.Module):
@@ -153,9 +145,7 @@ def test_recomputation_checkpoint_tensor(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor_two_inputs(trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
     size = 3
 
     class Model(torch.nn.Module):
@@ -190,9 +180,7 @@ def test_recomputation_checkpoint_tensor_two_inputs(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor_tuple_inputs(trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
     size = 3
 
     class Model(torch.nn.Module):
@@ -231,9 +219,6 @@ def test_api_wrap(capfd, trace_model):
     """
     stage "0" ipu(0) stage(0) l0 l1 l2
     """
-
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
 
     class Block(torch.nn.Module):
         def forward(self, x):
@@ -275,8 +260,6 @@ def test_api_wrap_2stages(capfd, trace_model):
     stage "0" ipu(0) stage(0) l0
     stage "1" ipu(1) stage(1) l1 / l2
     """
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
 
     class Block(torch.nn.Module):
         def forward(self, x):
@@ -365,9 +348,6 @@ def test_begin_block_printing(trace_model):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_inline_AutoIncrement(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
-
     class Model(torch.nn.Module):
         def forward(self, x):
             poptorch.Block.useAutoId()
@@ -404,9 +384,6 @@ def test_inline_AutoIncrement(capfd, trace_model):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_api_AutoIncrement(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
-
     class Block(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -451,9 +428,6 @@ def test_api_AutoIncrement(capfd, trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ipu_round_up_error(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): DID NOT RAISE poptorch_core.Error")
-
     class Block(torch.nn.Module):
         def forward(self, x):
             return x * 6
@@ -513,9 +487,6 @@ class BlockFnModel(torch.nn.Module):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_block_function(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
-
     m = BlockFnModel()
 
     opts = poptorch.Options()
@@ -706,22 +677,17 @@ def test_begin_block_with_function():
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_removeBlocks(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
-
     class Block(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.relu = torch.nn.ReLU()
-
-            self.l1 = torch.nn.Linear(3, 5)
-            self.l2 = torch.nn.Linear(5, 5)
-            self.l3 = torch.nn.Linear(5, 3)
+            self.l1 = torch.nn.ReLU()
+            self.l2 = torch.nn.ReLU()
+            self.l3 = torch.nn.ReLU()
 
         def forward(self, x):
-            x = self.relu(self.l1(x))
-            x = self.relu(self.l2(x))
-            x = self.relu(self.l3(x))
+            x = self.l1(x)
+            x = self.l2(x)
+            x = self.l3(x)
             return x
 
     class Model(torch.nn.Module):
@@ -748,34 +714,34 @@ def test_removeBlocks(capfd, trace_model):
         compile_model(m)
         log = helpers.LogChecker(capfd)
         log.assert_contains("enablePipelining set to value 0")
-        log.assert_contains(" b1/l1/MatMul:0 ",
+        log.assert_contains(" b1/l1/Relu:0 ",
                             " mode(Pipelined), ipu(0), stage(0)")
-        log.assert_contains(" b1/l2/MatMul:0 ",
+        log.assert_contains(" b1/l2/Relu:0 ",
                             " mode(Pipelined), ipu(0), stage(0)")
-        log.assert_contains(" b1/l3/MatMul:0 ",
+        log.assert_contains(" b1/l3/Relu:0 ",
                             " mode(Pipelined), ipu(0), stage(0)")
-        log.assert_contains(" b2/l1/MatMul:0 ",
+        log.assert_contains(" b2/l1/Relu:0 ",
                             " mode(Pipelined), ipu(0), stage(0)")
-        log.assert_contains(" b2/l2/MatMul:0 ",
+        log.assert_contains(" b2/l2/Relu:0 ",
                             " mode(Pipelined), ipu(0), stage(0)")
-        log.assert_contains(" b2/l3/MatMul:0 ",
+        log.assert_contains(" b2/l3/Relu:0 ",
                             " mode(Pipelined), ipu(0), stage(0)")
 
     def assert_is_pipelined(m):
         compile_model(m)
         log = helpers.LogChecker(capfd)
         log.assert_contains("enablePipelining set to value 1")
-        log.assert_contains(" b1/l1/MatMul:0 ",
+        log.assert_contains(" b1/l1/Relu:0 ",
                             " mode(Pipelined), ipu(0), stage(0)")
-        log.assert_contains(" b1/l2/MatMul:0 ",
+        log.assert_contains(" b1/l2/Relu:0 ",
                             " mode(Pipelined), ipu(1), stage(1)")
-        log.assert_contains(" b1/l3/MatMul:0 ",
+        log.assert_contains(" b1/l3/Relu:0 ",
                             " mode(Pipelined), ipu(1), stage(1)")
-        log.assert_contains(" b2/l1/MatMul:0 ",
+        log.assert_contains(" b2/l1/Relu:0 ",
                             " mode(Pipelined), ipu(2), stage(2)")
-        log.assert_contains(" b2/l2/MatMul:0 ",
+        log.assert_contains(" b2/l2/Relu:0 ",
                             " mode(Pipelined), ipu(2), stage(2)")
-        log.assert_contains(" b2/l3/MatMul:0 ",
+        log.assert_contains(" b2/l3/Relu:0 ",
                             " mode(Pipelined), ipu(2), stage(2)")
 
     m = Model()

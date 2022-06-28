@@ -27,7 +27,7 @@ def Poptorch_nop : Poptorch_NotImplementedOp<"nop", []> {
     ];
 }
 
-// begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> void
+// begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()
 def Poptorch_begin_ipu_block : Poptorch_NotImplementedOp<"begin_ipu_block", []> {
   let arguments = (ins I64Attr:$stage_id,
                        I64Attr:$phase_id,
@@ -42,7 +42,7 @@ def Poptorch_begin_ipu_block : Poptorch_NotImplementedOp<"begin_ipu_block", []> 
     ];
 }
 
-// end_ipu_block() -> void
+// end_ipu_block() -> ()
 def Poptorch_end_ipu_block : Poptorch_NotImplementedOp<"end_ipu_block", []> {
 }
 
@@ -124,27 +124,45 @@ def Poptorch_identity_loss : Poptorch_NotImplementedOp<"identity_loss", []> {
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$x,
                                     "int64_t":$reduction), [{
-          $_state.addOperands({x});
-          $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
-          $_state.addTypes({x.getType()});
+      $_state.addOperands({x});
+      $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
+
+      constexpr int64_t sum = 0;
+      constexpr int64_t mean = 1;
+      constexpr int64_t none = 2;
+
+      switch (reduction) {
+      case sum:
+      case mean:
+        $_state.addTypes({mlir::RankedTensorType::get({}, getElementType(x))});
+        return;
+      case none:
+        $_state.addTypes({x.getType()});
+        return;
+      default:
+        ERROR("reduction must be sum (0), mean (1) or none (2)");
+      }
      }]>
     ];
 }
 
-// start_for_loop(Tensor[] inputs) -> void
+// start_for_loop(Tensor[] inputs) -> ()
 def Poptorch_start_for_loop : Poptorch_NotImplementedOp<"start_for_loop", []> {
   let arguments = (ins Poptorch_tensorlist:$inputs);
 }
 
-// end_for_loop(Tensor(a!)[] outputs, Tensor[] inputs, int trip_count) -> Tensor(a!)[]
+// end_for_loop(Tensor(a!)[] outputs, Tensor[] inputs, int trip_count, Tensor(a!)[] example_outputs) -> Tensor(a!)[]
 def Poptorch_end_for_loop : Poptorch_NotImplementedOp<"end_for_loop", [AttrSizedOperandSegments]> {
   let arguments = (ins Poptorch_tensorlist:$outputs,
                        Poptorch_tensorlist:$inputs,
-                       I64Attr:$trip_count);
+                       I64Attr:$trip_count,
+                       Poptorch_tensorlist:$example_outputs);
   let results = (outs Poptorch_tensorlist:$result);
   let builders = [OpBuilder<(ins "mlir::ValueRange":$outputs,
-                                    "mlir::ValueRange":$inputs,
-                                    "int64_t":$trip_count), [{
+                                 "mlir::ValueRange":$inputs,
+                                 "int64_t":$trip_count,
+                                 "mlir::ValueRange":$example_outputs), [{
+          UNUSED(example_outputs);
           std::vector<mlir::Value> operands(std::begin(inputs), std::end(inputs));
           operands.insert(std::end(operands), std::begin(outputs), std::end(outputs));
           $_state.addOperands(operands);
@@ -158,7 +176,7 @@ def Poptorch_end_for_loop : Poptorch_NotImplementedOp<"end_for_loop", [AttrSized
     ];
 }
 
-// optimizer_group(int group, Tensor[] inputs) -> void
+// optimizer_group(int group, Tensor[] inputs) -> ()
 def Poptorch_optimizer_group : Poptorch_NotImplementedOp<"optimizer_group", []> {
   let arguments = (ins I64Attr:$group,
                        Poptorch_tensorlist:$inputs);
@@ -243,11 +261,11 @@ def Poptorch_set_available_memory : Poptorch_NotImplementedOp<"set_available_mem
     ];
 }
 
-// begin_multi_conv() -> void
+// begin_multi_conv() -> ()
 def Poptorch_begin_multi_conv : Poptorch_NotImplementedOp<"begin_multi_conv", []> {
 }
 
-// end_multi_conv(float[]? available_memory_proportions, int[]? partials_types, int? plan_type, int? per_conv_reserved_tiles, float? cycle_back_off, int[]? enableConvDithering) -> void
+// end_multi_conv(float[]? available_memory_proportions, int[]? partials_types, int? plan_type, int? per_conv_reserved_tiles, float? cycle_back_off, int[]? enableConvDithering) -> ()
 def Poptorch_end_multi_conv : Poptorch_NotImplementedOp<"end_multi_conv", []> {
   let arguments = (ins OptionalAttr<F32ArrayAttr>:$available_memory_proportions,
                        OptionalAttr<I64ArrayAttr>:$partials_types,
@@ -283,24 +301,24 @@ def Poptorch_end_multi_conv : Poptorch_NotImplementedOp<"end_multi_conv", []> {
     ];
 }
 
-// push_name_scope(str name) -> void
+// push_name_scope(str name) -> ()
 def Poptorch_push_name_scope : Poptorch_NotImplementedOp<"push_name_scope", []> {
   let arguments = (ins StrAttr:$name);
 }
 
-// pop_name_scope() -> void
+// pop_name_scope() -> ()
 def Poptorch_pop_name_scope : Poptorch_NotImplementedOp<"pop_name_scope", []> {
 }
 
-// begin_autocast() -> void
+// begin_autocast() -> ()
 def Poptorch_begin_autocast : Poptorch_NotImplementedOp<"begin_autocast", []> {
 }
 
-// suppress_autocast() -> void
+// suppress_autocast() -> ()
 def Poptorch_suppress_autocast : Poptorch_NotImplementedOp<"suppress_autocast", []> {
 }
 
-// restore_autocast() -> void
+// restore_autocast() -> ()
 def Poptorch_restore_autocast : Poptorch_NotImplementedOp<"restore_autocast", []> {
 }
 
@@ -319,20 +337,20 @@ def Poptorch_end_cpu_op : Poptorch_NotImplementedOp<"end_cpu_op", []> {
     ];
 }
 
-// call_cpu_op(Tensor[] inputs, str name) -> void
+// call_cpu_op(Tensor[] inputs, str name) -> ()
 def Poptorch_call_cpu_op : Poptorch_NotImplementedOp<"call_cpu_op", []> {
   let arguments = (ins Poptorch_tensorlist:$inputs,
                        StrAttr:$name);
 }
 
-// set_attribute(str attribute, str key, str value) -> void
+// set_attribute(str attribute, str key, str value) -> ()
 def Poptorch_set_attribute : Poptorch_NotImplementedOp<"set_attribute", []> {
   let arguments = (ins StrAttr:$attribute,
                        StrAttr:$key,
                        StrAttr:$value);
 }
 
-// clear_attribute(str attribute, str key) -> void
+// clear_attribute(str attribute, str key) -> ()
 def Poptorch_clear_attribute : Poptorch_NotImplementedOp<"clear_attribute", []> {
   let arguments = (ins StrAttr:$attribute,
                        StrAttr:$key);

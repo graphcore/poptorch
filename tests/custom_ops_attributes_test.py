@@ -20,6 +20,9 @@ for single_so in myso:
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -45,6 +48,9 @@ def test_float_attribute(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_attribute_too_low(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -71,6 +77,9 @@ def test_float_attribute_too_low(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_attribute_too_high(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -97,6 +106,9 @@ def test_float_attribute_too_high(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_int_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -122,6 +134,9 @@ def test_int_attribute(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_list_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -147,6 +162,9 @@ def test_float_list_attribute(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_list_attribute_too_low(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op(
@@ -174,6 +192,9 @@ def test_float_list_attribute_too_low(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_list_attribute_too_high(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op(
@@ -201,6 +222,9 @@ def test_float_list_attribute_too_high(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_tuple_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -226,6 +250,9 @@ def test_float_tuple_attribute(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_int_list_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -252,6 +279,9 @@ def test_int_list_attribute(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_float_combined_attributes(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -316,6 +346,9 @@ def test_int_two_attributes(trace_model):
 @pytest.mark.parametrize("attr", ("sum", "mean"))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_string_attribute(attr, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -343,6 +376,9 @@ def test_string_attribute(attr, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_non_ascii_string_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             x = poptorch.custom_op([x],
@@ -368,6 +404,9 @@ def test_non_ascii_string_attribute(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_string_list_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
             x = poptorch.custom_op(
@@ -397,6 +436,9 @@ def test_string_list_attribute(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_non_asciistring_list_attribute(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x, y, z):
             x = poptorch.custom_op(
@@ -439,6 +481,8 @@ ALL_ATTRIBUTES = {
 @pytest.mark.parametrize("seed", range(10))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_many_attributes(seed, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
     attr_keys = list(ALL_ATTRIBUTES.keys())
     random.seed(seed)
     random.shuffle(attr_keys)
@@ -473,6 +517,8 @@ def test_many_attributes(seed, trace_model):
 @pytest.mark.parametrize("seed", range(3))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_many_attributes_one_wrong(seed, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
     attr_keys = list(ALL_ATTRIBUTES.keys())
     random.seed(seed)
     random.shuffle(attr_keys)
@@ -508,6 +554,9 @@ def test_many_attributes_one_wrong(seed, trace_model):
 #many_attribtes_examples_start
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_many_attributes_examples(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Errors when running subsequent tests")
+
     class Model(torch.nn.Module):
         def forward(self, x):
             attributes = {

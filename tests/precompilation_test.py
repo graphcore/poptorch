@@ -85,6 +85,9 @@ def test_export_then_load_live_model(trace_model=True):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_then_load(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
+
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
         input, target = _compileAndExport(filename, trace_model=trace_model)
@@ -96,6 +99,9 @@ def test_export_then_load(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_then_load_setIpu(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
+
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
         input, target = _compileAndExport(filename, trace_model=trace_model)
@@ -110,6 +116,9 @@ def test_export_then_load_setIpu(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_no_python_then_load(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
+
     with tempfile.TemporaryDirectory() as tmp:
         filename = os.path.join(tmp, "model.poptorch")
         input, target = _compileAndExport(filename,
@@ -130,6 +139,9 @@ def test_export_no_python_then_load(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_validate_no_python(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
+
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
@@ -217,6 +229,9 @@ def test_export_train_validate(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_save_validate(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
+
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
@@ -254,6 +269,9 @@ def test_export_train_save_validate(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_save_train(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
+
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         weights_filename = os.path.join(tmp, "weights.poptorch")
@@ -291,6 +309,9 @@ def test_export_train_save_train(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_save_validate_load_weights(trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T57195): Could not find cpu tensor")
+
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")

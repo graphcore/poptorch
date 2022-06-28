@@ -32,16 +32,6 @@ from .optim import Optimizer
 
 NO_EXECUTABLE_ERR = "Model has not been compiled or has been destroyed."
 
-# Some modules will still work even if the buffer address changes during tracing
-BUFFERS_CAN_CHANGE = (
-    torch.nn.BatchNorm1d,
-    torch.nn.modules.batchnorm.BatchNorm1d,
-    torch.nn.BatchNorm2d,
-    torch.nn.modules.batchnorm.BatchNorm2d,
-    torch.nn.BatchNorm3d,
-    torch.nn.modules.batchnorm.BatchNorm3d,
-)
-
 
 # Hacky way to make sure tensors end up on the IPU rather than the CPU by default.
 # Note: this is only needed for backward compatibility with tracing but we will
@@ -132,11 +122,13 @@ class PoplarExecutor:
                     _optimizer_attributes.OptimizerAttrTracker(
                         options)
             if options.defaultOutputMode():
-                # In training it makes sense to see only the last result, by default.
+                # In training it makes sense to see only the last result, by
+                # default.
                 options.outputMode(enums.OutputMode.Final)
             if not optimizer:
                 optimizer = optim.SGD(self._user_model.parameters(), lr=0.01)
-            model = _impl.OptimizerWrapper(model, optimizer)
+            if options.Jit.trace_model:
+                model = _impl.OptimizerWrapper(model, optimizer)
         else:
             if options.defaultOutputMode():
                 # In inference it makes sense to see all the results, by default.
@@ -563,6 +555,10 @@ class PoplarExecutor:
         # trace)
         buff_param_addresses = self._buffer_parameter_addresses()
 
+        module_namescope = _impl.NameScopeHook(
+            self._user_model
+        ) if self.options._module_namescope_enabled else None  # pylint: disable=protected-access
+
         with _SetDefaultDeviceType():
             # The IPUContext is going to move the model to the IPU so create a copy
             # to make sure we don't modify the user's model.
@@ -573,6 +569,27 @@ class PoplarExecutor:
                              options=self._options,
                              training=self._training,
                              dict_optimizer=self._dict_optimizer)
+            if self._optimizer:
+                # The optimizer was created using the CPU model, therefore it points at CPU tensors.
+                # We need to remap those to IPU tensors.
+                # IPUContext moved 'model' to the IPU, therefore we need to join the two maps and
+                # then remap the parameters from the optimizer.
+                # cpu_tensors[name] = cpu_data_ptr
+                # ipu_tensors[name] = ipu_tensor
+                # cpu_to_opu[cpu_data_ptr] = ipu_tensor
+                cpu_tensors = {
+                    **buff_param_addresses[0],
+                    **buff_param_addresses[1]
+                }
+                ipu_tensors = _impl.getBufferAndParameterTensors(model)
+                cpu_to_ipu = {
+                    cpu_tensors[n]: ipu
+                    for n, ipu in ipu_tensors.items()
+                }
+                for index, group in enumerate(self._optimizer.param_groups):
+                    torch.ops.poptorch.optimizer_group(index, [
+                        cpu_to_ipu[cpu.data_ptr()] for cpu in group["params"]
+                    ])
             if executable_filename is not None:
                 ctx.loadExecutable(executable_filename, *in_tensors.args,
                                    **in_tensors.kwargs)
@@ -580,6 +597,9 @@ class PoplarExecutor:
                 ctx.compile(*in_tensors.args, **in_tensors.kwargs)
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
         self._error_on_buffer_parameter_address_change(buff_param_addresses)
+
+        if module_namescope:
+            module_namescope.remove()
 
         return ctx.ipu._executable  # pylint: disable=protected-access
 
@@ -1229,21 +1249,17 @@ class PoplarExecutor:
     def _buffer_parameter_addresses(self):
         # Obtains dictionaries of the data ptr addresses of every buffer
         # and parameter
+        buffer_addr = {}
+        param_addr = {}
 
-        buffer_addresses = {}
-        for module_name, module in self._model.named_modules():
-            if isinstance(module, BUFFERS_CAN_CHANGE):
-                continue
+        def fn(name, buff):
+            if isinstance(buff, torch.nn.Parameter):
+                param_addr[name] = buff.data_ptr()
+            else:
+                buffer_addr[name] = buff.data_ptr()
 
-            for name, buff in module.named_buffers(prefix=module_name,
-                                                   recurse=False):
-                buffer_addresses[name] = buff.data_ptr()
-
-        parameter_addresses = {}
-        for name, param in self._model.named_parameters():
-            parameter_addresses[name] = param.data_ptr()
-
-        return buffer_addresses, parameter_addresses
+        _impl.forEachParameterAndBuffer(self._model, fn)
+        return buffer_addr, param_addr
 
     def _error_on_buffer_parameter_address_change(self, old_addresses):
         new_addresses = self._buffer_parameter_addresses()

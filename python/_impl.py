@@ -22,6 +22,16 @@ _is_ipu_context = False
 # a graph.
 _dispatch_tracing = False
 
+# Some modules will still work even if the buffer address changes during tracing
+BUFFERS_CAN_CHANGE = (
+    torch.nn.BatchNorm1d,
+    torch.nn.modules.batchnorm.BatchNorm1d,
+    torch.nn.BatchNorm2d,
+    torch.nn.modules.batchnorm.BatchNorm2d,
+    torch.nn.BatchNorm3d,
+    torch.nn.modules.batchnorm.BatchNorm3d,
+)
+
 
 class NameScopeHook:
     """ Create a name scope for each operator present in the module.
@@ -261,3 +271,26 @@ def traceMethod(label):
         return wrapper
 
     return decorator
+
+
+def forEachParameterAndBuffer(model, fn):
+    for module_name, module in model.named_modules():
+        if isinstance(module, BUFFERS_CAN_CHANGE):
+            continue
+
+        for name, buff in module.named_buffers(prefix=module_name,
+                                               recurse=False):
+            fn(name, buff)
+
+    for name, param in model.named_parameters():
+        fn(name, param)
+
+
+def getBufferAndParameterTensors(model):
+    tensors = {}
+
+    def fn(name, buff):
+        tensors[name] = buff
+
+    forEachParameterAndBuffer(model, fn)
+    return tensors

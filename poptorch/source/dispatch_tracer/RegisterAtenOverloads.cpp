@@ -1,4 +1,5 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include <ATen/core/List.h>
 #include <ATen/native/CPUFallback.h>
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
@@ -281,10 +282,23 @@ std::string getParameterName(torch::jit::Value *value) {
   return context.activeDispatch()->getParameterName(value);
 }
 
-// Returns true if the dispatcher is active.
-bool isDispatcherActive() {
+// Returns true if the current compilation is being handled using a dispatcher.
+//
+// This is needed because in some cases, we don't want calls to be dispatched to
+// us, but still want to maintain information about the dispatcher.
+bool isCompilingWithDispatcher() {
 #if POPTORCH_BUILD_MLIR_COMPILER
   return context.hasActiveDispatch();
+#else
+  return false;
+#endif
+}
+
+// Returns true if the dispatcher is currently 'on', and should intercept calls
+// to us.
+bool isDispatcherOn() {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  return context.isDispatchOn();
 #else
   return false;
 #endif
@@ -401,6 +415,7 @@ std::shared_ptr<torch::jit::Graph> getTracedGraph() {
 }
 
 // Record these tensors as being the outputs of the graph.
+// NOTE never called
 void markOutputs(const std::vector<at::Tensor> &outputs,
                  const std::vector<at::Tensor> &data_storage) {
   context.activeDispatch()->setCurrentCodeLocation(
@@ -556,33 +571,299 @@ TORCH_LIBRARY_IMPL(aten, AutogradXLA, m) {
   m.impl("detach", PTC(poptorch::detach));
 }
 
-// TODO(T59880) rename XLA -> IPU
-TORCH_LIBRARY_IMPL(poptorch, XLA, m) {
-  m.impl("ipu_print_tensor", PTC_BOXED(poptorch::fallback));
-  m.impl("nop", PTC_BOXED(poptorch::fallback));
-  m.impl("begin_ipu_block", PTC_BOXED(poptorch::fallback));
-  m.impl("end_ipu_block", PTC_BOXED(poptorch::fallback));
-  m.impl("internal_cast", PTC_BOXED(poptorch::fallback));
-  m.impl("custom_operation", PTC_BOXED(poptorch::fallback));
-  m.impl("ctc_beam_search_decoder", PTC_BOXED(poptorch::fallback));
-  m.impl("identity_loss", PTC_BOXED(poptorch::fallback));
-  m.impl("start_for_loop", PTC_BOXED(poptorch::fallback));
-  m.impl("end_for_loop", PTC_BOXED(poptorch::fallback));
-  m.impl("optimizer_group", PTC_BOXED(poptorch::fallback));
-  m.impl("set_matmul_serialization", PTC_BOXED(poptorch::fallback));
-  m.impl("set_overlap_for_input", PTC_BOXED(poptorch::fallback));
-  m.impl("set_overlap_for_output", PTC_BOXED(poptorch::fallback));
-  m.impl("recomputation_checkpoint", PTC_BOXED(poptorch::fallback));
-  m.impl("set_available_memory", PTC_BOXED(poptorch::fallback));
-  m.impl("begin_multi_conv", PTC_BOXED(poptorch::fallback));
-  m.impl("end_multi_conv", PTC_BOXED(poptorch::fallback));
-  m.impl("push_name_scope", PTC_BOXED(poptorch::fallback));
-  m.impl("pop_name_scope", PTC_BOXED(poptorch::fallback));
-  m.impl("begin_autocast", PTC_BOXED(poptorch::fallback));
-  m.impl("suppress_autocast", PTC_BOXED(poptorch::fallback));
-  m.impl("restore_autocast", PTC_BOXED(poptorch::fallback));
-  m.impl("end_cpu_op", PTC_BOXED(poptorch::fallback));
-  m.impl("call_cpu_op", PTC_BOXED(poptorch::fallback));
-  m.impl("set_attribute", PTC_BOXED(poptorch::fallback));
-  m.impl("clear_attribute", PTC_BOXED(poptorch::fallback));
+void popArgumentsFromStack(const c10::OperatorHandle &op, c10::Stack *stack) {
+  ERROR_ON(op.schema().arguments().size() > stack->size());
+  stack->erase(std::prev(stack->end(), op.schema().arguments().size()),
+               stack->end());
 }
+
+void pushResultsToStack(c10::Stack *stack,
+                        std::vector<c10::IValue> const &results) {
+  stack->insert(stack->end(), results.begin(), results.end());
+}
+
+// Pop op's arguments from the stack, and (if given) push any results to the
+// back.
+void updateStack(const c10::OperatorHandle &op, c10::Stack *stack,
+                 const std::vector<c10::IValue> &results = {}) {
+  popArgumentsFromStack(op, stack);
+  if (!results.empty()) {
+    pushResultsToStack(stack, results);
+  }
+}
+
+// Get an argument from the given stack.
+c10::IValue getNthArgument(const c10::OperatorHandle &op, c10::Stack *stack,
+                           size_t n) {
+  ERROR_ON(op.schema().arguments().size() > stack->size());
+  return stack->at((stack->size() - op.schema().arguments().size()) + n);
+}
+
+void opReturningFirstArgument(const c10::OperatorHandle &op,
+                              c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+  } else {
+    auto const front = getNthArgument(op, stack, 0);
+    updateStack(op, stack, {front});
+  }
+}
+
+void opWithNoReturn(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+  } else {
+    updateStack(op, stack);
+  }
+}
+
+void callCpuOp(const c10::OperatorHandle &op, c10::Stack *stack) {
+  opWithNoReturn(op, stack);
+
+  if (poptorch::isDispatcherOn()) {
+    poptorch::endDispatch();
+  }
+}
+
+void endCpuOp(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isCompilingWithDispatcher()) {
+    poptorch::startDispatch();
+  }
+
+  opReturningFirstArgument(op, stack);
+}
+
+// at::Tensor castOp(at::Tensor tensor, std::string type)
+void castOp(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+    return;
+  }
+
+  auto type = getNthArgument(op, stack, 1).toString()->string();
+  auto tensor = getNthArgument(op, stack, 0).toTensor();
+
+  // If the type to cast to is f16 then we need to cast to f32. The reason being
+  // is that by default we will just ignore the type, however this will only
+  // work if the original type was f32.
+
+  // Consider:
+  /* MyTensor = MyTensor.as(INT8)
+
+    MyTensor = MyTensor.half() # Convert to half.
+
+    out = conv(MyTensor) # This would be an illegal INT8 convolution.
+  */
+  if (type == "FLOAT16" || type == "FLOAT32") {
+    updateStack(op, stack, {tensor.to(at::ScalarType::Float)});
+  } else {
+    updateStack(op, stack, {tensor});
+  }
+}
+
+// c10::List<at::Tensor>
+// customOperation(c10::List<at::Tensor> inputs,
+//                 std::string name, std::string domain,
+//                 int64_t version, int64_t num_outputs,
+//                 c10::List<at::Tensor> example_outputs,
+//                 std::string attributes_map_id) {
+//   return example_outputs;
+//  }
+void customOperation(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+    return;
+  }
+
+  auto out = getNthArgument(op, stack, 5);
+  updateStack(op, stack, {out});
+}
+
+// c10::List<at::Tensor> ctcBeamSearchDecoder(const at::Tensor &log_probs,
+//                                            const at::Tensor &lengths,
+//                                            int64_t blank, int64_t width,
+//                                            int64_t top_paths)
+void ctcBeamSearchDecoder(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+    return;
+  }
+
+  auto log_probs = getNthArgument(op, stack, 0).toTensor();
+  auto top_paths = getNthArgument(op, stack, 3).toInt();
+  ERROR_ON_MSG(log_probs.sizes().size() != 3,
+               "Incorrect shape for first input to CTC beam search decoder.");
+  unsigned input_len = log_probs.sizes()[0];
+  unsigned batch_size = log_probs.sizes()[1];
+
+  at::Tensor path_probs = at::zeros({batch_size, top_paths});
+  at::Tensor path_lens = at::zeros({batch_size, top_paths});
+  at::Tensor decoded_paths = at::zeros({batch_size, top_paths, input_len});
+
+  updateStack(op, stack,
+              {c10::List<at::Tensor>({path_probs, path_lens, decoded_paths})});
+}
+
+// at::Tensor identityLoss(const at::Tensor &t, int64_t reduction)
+void identityLoss(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+    return;
+  }
+
+  auto t = getNthArgument(op, stack, 0).toTensor();
+  auto reduction = getNthArgument(op, stack, 1).toInt();
+  constexpr int64_t sum = 0;
+  constexpr int64_t mean = 1;
+  constexpr int64_t none = 2;
+
+  popArgumentsFromStack(op, stack);
+  switch (reduction) {
+  case sum:
+    pushResultsToStack(stack, {at::sum(t)});
+    return;
+  case mean:
+    pushResultsToStack(stack, {at::mean(t)});
+    return;
+  case none:
+    pushResultsToStack(stack, {t.clone()});
+    return;
+  default:
+    ERROR("reduction must be sum (0), mean (1) or none (2)");
+  }
+}
+
+// c10::List<at::Tensor>
+// endForLoop(c10::List<at::Tensor> outputs,
+//            c10::List<at::Tensor> inputs, int64_t count,
+//            c10::List<at::Tensor> example_outputs) {
+//   return example_outputs;
+// }
+void endForLoop(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+    return;
+  }
+
+  auto out = getNthArgument(op, stack, 3);
+  updateStack(op, stack, {out});
+}
+
+// TODO(T64770) This method is the old way of registering custom functions. The
+// new way would look like this:
+//
+// TORCH_LIBRARY(poptorch, m) {
+//  m.def("begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()",
+//        PTC_BOXED(opWithNoReturn));
+//  // ...
+// }
+//
+// Unfortunately, with this the trace doesn't pick up on functions that don't
+// take a tensor as an input and output a tensor meaning that several of our ops
+// don't appear in the traced graph.
+static auto registry =
+    torch::RegisterOperators()
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::begin_ipu_block(int stage_id, int phase_id, "
+                        "int ipu_id) -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::end_ipu_block() -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::ipu_print_tensor(Tensor self, str? title) "
+                        "-> Tensor")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema(
+                    "poptorch::internal_cast(Tensor self, str dtype) -> Tensor")
+                .catchAllKernel<PTC(castOp)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::nop(Tensor self) -> Tensor")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::custom_operation(Tensor[] inputs, str name, "
+                        "str domain, int domain_version, int num_outputs, "
+                        "Tensor(a!)[] outputs, str attributes) -> Tensor(a!)[]")
+                .catchAllKernel<PTC(customOperation)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::ctc_beam_search_decoder(Tensor probs, "
+                        "Tensor lengths, int blank, int beam_width, int "
+                        "top_paths) -> Tensor[]")
+                .catchAllKernel<PTC(ctcBeamSearchDecoder)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::identity_loss(Tensor x, int reduction) -> "
+                        "Tensor")
+                .catchAllKernel<PTC(identityLoss)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::start_for_loop(Tensor[] inputs) -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::end_for_loop(Tensor[] outputs, Tensor[] "
+                        "inputs, int trip_count, Tensor(a!)[] example_outputs) "
+                        "-> Tensor(a!)[]")
+                .catchAllKernel<PTC(endForLoop)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::optimizer_group(int group, Tensor[] inputs) "
+                        "-> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::set_matmul_serialization(Tensor matmul, str "
+                        "mode, int factor, bool keep_precision) -> Tensor")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::set_overlap_for_input(Tensor t, str mode) "
+                        "-> Tensor")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::set_overlap_for_output(Tensor t, str mode) "
+                        "-> Tensor")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema(
+                    "poptorch::recomputation_checkpoint(Tensor self) -> Tensor")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::set_available_memory(Tensor t, float mem) "
+                        "-> Tensor")
+                .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::begin_multi_conv() -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema(
+                    "poptorch::end_multi_conv(float[]? "
+                    "available_memory_proportions, int[]? partials_types, int? "
+                    "plan_type, int? per_conv_reserved_tiles, float? "
+                    "cycle_back_off, int[]? enableConvDithering) -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::push_name_scope(str name) -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::pop_name_scope() -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::begin_autocast() -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::suppress_autocast() -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::restore_autocast() -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::end_cpu_op(Tensor[] output) -> Tensor[]")
+                .catchAllKernel<PTC(endCpuOp)>())
+        .op(torch::RegisterOperators::options()
+                .schema(
+                    "poptorch::call_cpu_op(Tensor[] inputs, str name) -> ()")
+                .catchAllKernel<PTC(callCpuOp)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::set_attribute(str attribute, str key, str "
+                        "value) -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>())
+        .op(torch::RegisterOperators::options()
+                .schema(
+                    "poptorch::clear_attribute(str attribute, str key) -> ()")
+                .catchAllKernel<PTC(opWithNoReturn)>());
