@@ -128,8 +128,6 @@ def test_inference(mode, period, steps, replicas, trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_training(mode, period, steps, accums, replicas, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find cpu tensor")
     torch.manual_seed(42)
     inputs = torch.randn(16, 100)
     targets = torch.randn(16, 100)
