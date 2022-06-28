@@ -145,6 +145,25 @@ class OptimizerWrapper(torch.nn.Module):
         return out
 
 
+def destroyDispatcherOnExit(func):
+    """Function decorator to always destroy the dispatcher at
+    the end of the wrapped function."""
+
+    @contextmanager
+    def onExit():
+        # enter
+        yield
+        # exit
+        poptorch_core.destroyDispatcher()
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with onExit():
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
 @contextmanager
 def distributedCacheLock(model, opts):
     """In a distributed environment we only want the model to be compiled once.
