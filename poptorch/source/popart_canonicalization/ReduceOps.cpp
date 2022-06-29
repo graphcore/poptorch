@@ -278,6 +278,12 @@ torch::jit::Node *tensorNormHandler(torch::jit::Graph *graph,
     axes = constantToLongVec(node->input(2)->node());
     keepdim = constantToLong(node->input(3)->node());
     auto shape = shapeFromTensor(input);
+    // Empty axes array means reduce over all axes in PyTorch, but means
+    // do nothing in PopART
+    if (axes.empty()) {
+      axes.resize(shape.size());
+      std::iota(std::begin(axes), std::end(axes), 0);
+    }
     // If we're reducing over singleton dims and keeping them, the
     // behaviour of PopART reduce ops is to do nothing, but PyTorch will
     // still take the absolute value of the tensor, so we need to

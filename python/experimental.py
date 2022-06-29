@@ -1,5 +1,4 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
-import copy
 import functools
 import warnings
 from typing import List, Optional
@@ -48,13 +47,8 @@ class IPUScope:
         self._compile_using = compile_using
 
         self._model = model
-        if self._compile_using == enums.Compiler.PopART and model:
-            # PopART requires some CPU pointers to copy to/from the IPU so
-            # keep a copy of the CPU buffers.
-            self._cpu_model_state = copy.deepcopy(model.state_dict())
-        else:
-            # Note: this only used when compiling with PopART
-            self._cpu_model_state = {}
+        self._cpu_params = {}
+        self._cpu_buffers = {}
 
         self._outputs = []
         self._outputs_structure = None
@@ -67,7 +61,13 @@ class IPUScope:
             poptorch_core.TracingMode(self._compile_using), inputs,
             self._options._source_location_excludes)
 
+    # Start capturing calls.
+    def __enter__(self):
+        # Move the model parameters to the ipu and take a copy to load the originals back once this has finished
         if self._model:
+            self._cpu_params = dict(self._model.named_parameters())
+            self._cpu_buffers = dict(self._model.named_buffers())
+
             # TODO(T61576) We currently use a state machine to determine if
             # tensors are inputs or parameters.
             # We need to find a better solution.
@@ -76,12 +76,16 @@ class IPUScope:
             self._model.apply(lambda l: l.to(d))
             poptorch_core.endParametersMove()
 
-            state = self._model.state_dict()
-            poptorch_core.mapParamsToNames(tuple(state.keys()),
-                                           tuple(state.values()))
+            params = dict(self._model.named_parameters())
 
-    # Start capturing calls.
-    def __enter__(self):
+            poptorch_core.mapParamsToNames(tuple(params.keys()),
+                                           tuple(params.values()))
+
+            buffers = dict(self._model.named_buffers())
+
+            poptorch_core.mapParamsToNames(tuple(buffers.keys()),
+                                           tuple(buffers.values()))
+
         poptorch_core.startDispatch()
         _impl.setDispatchTracing(True)
         _impl.setIpuContext(True)
@@ -95,6 +99,24 @@ class IPUScope:
         _impl.setDispatchTracing(False)
         # Turn off the dispatcher.
         poptorch_core.endDispatch(exc_type is not None)
+
+        # Reload the cpu model state
+        if self._model:
+
+            def get_model_and_name(n):
+                m = self._model
+                name = n
+                sn = n.rpartition(".")
+                if sn[1] == ".":
+                    m = m.get_submodule(sn[0])
+                    name = sn[2]
+                return m, name
+
+            for k in self._cpu_params:
+                self._cpu_params[k].__class__ = torch.nn.Parameter
+                setattr(*get_model_and_name(k), self._cpu_params[k])
+            for k in self._cpu_buffers:
+                setattr(*get_model_and_name(k), self._cpu_buffers[k])
 
         # Dispatch stopped because of an exception: don't try to compile
         # the graph.
@@ -128,9 +150,10 @@ class IPUScope:
     def __call__(self, *args):
         if self._upload_weights:
             if self._compile_using == enums.Compiler.PopART:
-                poptorch_core.copyWeightsToDevice_impl(
-                    self._executable, tuple(self._cpu_model_state.keys()),
-                    tuple(self._cpu_model_state.values()))
+                state = {**self._cpu_params, **self._cpu_buffers}
+                poptorch_core.copyWeightsToDevice_impl(self._executable,
+                                                       tuple(state.keys()),
+                                                       tuple(state.values()))
             else:
                 self._executable.weightsToDevice()
             self._upload_weights = False
