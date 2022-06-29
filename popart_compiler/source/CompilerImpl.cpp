@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <chrono>
 #include <memory>
+#include <vector>
 
 #include <popart/adam.hpp>
 #include <popart/adaptive.hpp>
@@ -19,10 +20,14 @@
 #include <popart/sgd.hpp>
 #include <popart/tensorinfo.hpp>
 #include <popart/tensors.hpp>
+#include <poprithms/ndarray/unfold.hpp>
+#include <poptorch_logging/Error.hpp>
 
+#include "popart_compiler/Compiler.hpp"
 #include "popart_compiler/CompilerImpl.hpp"
 #include "popart_compiler/CompilerOptions.hpp"
 #include "popart_compiler/MultiConvBuilder.hpp"
+#include "popart_compiler/PopartEnums.hpp"
 #include "popart_compiler/Utils.hpp"
 
 namespace poptorch {
@@ -514,7 +519,7 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
   UNUSED(tensors);
   auto ai_onnx = active_builder->aiOnnxOpset10();
 
-  return ai_onnx.constant(*constant.getPopartData());
+  return ai_onnx.constant(constant.getPopartData());
 }
 
 poptorch::TensorId CompilerImpl::hostSideTensorConstant(
@@ -899,6 +904,120 @@ CompilerImpl::zerosOrOnes(const std::vector<popart::TensorId> &tensors,
     return tensorConstant(tensors, popart_const);
   }
   ERROR("Unsupported type " << dtype);
+}
+
+popart::TensorId
+CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
+                     int64_t dimension, int64_t size, int64_t step) {
+  // Implements the TUnfoldHelper interface in Poprithms using ONNX operations.
+  struct PoptorchUnfoldHelper {
+    struct InternalState {
+      CompilerImpl *parent;
+      popart::Builder *builder;
+      popart::TensorId tensor;
+
+      popart::TensorId scalarConstI64(int64_t val) const {
+        PopartConstant val_const(PopartType::INT64, &val, {});
+        return parent->tensorConstant({}, val_const);
+      }
+
+      popart::TensorId shapeAsTensor(const std::vector<uint64_t> &shape) const {
+        std::vector<int64_t> new_shape(shape.begin(), shape.end());
+        PopartConstant shape_const(PopartType::INT64, new_shape.data(),
+                                   {static_cast<int64_t>(new_shape.size())});
+        return parent->tensorConstant({}, shape_const);
+      }
+
+      InternalState transform(popart::TensorId &&new_id) const {
+        InternalState new_state(*this);
+        new_state.tensor = std::move(new_id);
+        parent->setExecutionStrategyAttributes({new_state.tensor});
+        return new_state;
+      }
+    };
+
+    static InternalState slice(const InternalState &state, uint64_t dim,
+                               uint64_t start, uint64_t end) {
+      auto dims = state.scalarConstI64(dim);
+      auto starts = state.scalarConstI64(start);
+      auto ends = state.scalarConstI64(end);
+
+      return state.transform(state.builder->aiOnnxOpset10().slice(
+          {state.tensor, starts, ends, dims}));
+    }
+
+    static InternalState broadcast(const InternalState &state, uint64_t N,
+                                   uint64_t dim) {
+      auto new_shape = shape(state);
+      ERROR_ON(new_shape[dim] != 1);
+      new_shape[dim] *= N;
+      auto shape_tensor = state.shapeAsTensor(new_shape);
+
+      return state.transform(
+          state.builder->aiOnnxOpset10().expand({state.tensor, shape_tensor}));
+    }
+
+    static InternalState reshape(const InternalState &state,
+                                 const std::vector<uint64_t> &shape) {
+      auto shape_tensor = state.shapeAsTensor(shape);
+
+      return state.transform(
+          state.builder->aiOnnxOpset10().reshape({state.tensor, shape_tensor}));
+    }
+
+    static InternalState concat(const std::vector<InternalState> &states,
+                                uint64_t axis) {
+      ERROR_ON(states.empty());
+
+      std::vector<popart::TensorId> tensor_ids;
+      tensor_ids.reserve(states.size());
+      for (const auto &tensor : states) {
+        tensor_ids.push_back(tensor.tensor);
+      }
+
+      const auto &first = states.front();
+      return first.transform(first.builder->aiOnnxOpset10().concat(
+          tensor_ids, static_cast<int64_t>(axis)));
+    }
+
+    static InternalState dimShuffle(const InternalState &state,
+                                    const std::vector<uint64_t> &permutation) {
+      std::vector<int64_t> permutation_ints(permutation.begin(),
+                                            permutation.end());
+      state.builder->setAttribute("perm", permutation_ints);
+      auto new_tensor = state.transform(
+          state.builder->aiOnnxOpset10().transpose({state.tensor}));
+      state.builder->clearAttribute("perm");
+      return new_tensor;
+    }
+
+    static uint64_t dim(const InternalState &state, uint64_t axis) {
+      return state.builder->getTensorShape(state.tensor)[axis];
+    }
+
+    static uint64_t rank_u64(const InternalState &state) { // NOLINT
+      return static_cast<uint64_t>(
+          state.builder->getTensorShape(state.tensor).size());
+    }
+
+    static std::vector<uint64_t> shape(const InternalState &state) {
+      const auto &&my_shape = state.builder->getTensorShape(state.tensor);
+      return std::vector<uint64_t>(my_shape.begin(), my_shape.end());
+    }
+  };
+
+  ERROR_ON(dimension < 0);
+  ERROR_ON(size < 0);
+  ERROR_ON(step < 0);
+  ERROR_ON(tensors.size() != 1);
+  const auto &first = tensors.front();
+
+  using T = PoptorchUnfoldHelper::InternalState;
+  using H = PoptorchUnfoldHelper;
+
+  return poprithms::ndarray::Unfolder<T, H>::unfold(
+             {this, active_builder, first}, dimension, size, step)
+      .tensor;
 }
 
 const HostSideConstant &

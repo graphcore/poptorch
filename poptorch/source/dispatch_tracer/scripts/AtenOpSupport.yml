@@ -331,6 +331,10 @@
   PopTorchDirect: col2im
   UnusedOutputArguments: {out}
 
+# func: unfold(Tensor(a) self, int dimension, int size, int step) -> Tensor(a)
+- func: unfold
+  PopTorchDirect: unfold
+
 ################
 # Element wise
 ################

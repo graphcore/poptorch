@@ -1046,3 +1046,32 @@ def Poptorch_col2im : Poptorch_upsample<"col2im"> {
         }]>
     ];
 }
+
+def Poptorch_unfold : Poptorch_upsample<"unfold"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64Attr:$dimension,
+                         I64Attr:$size,
+                         I64Attr:$step);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "std::int64_t":$dimension,
+                                   "std::int64_t":$size,
+                                   "std::int64_t":$step), [{
+        $_state.addOperands(self);
+
+        const auto input_shape = getShape(self);
+        dimension = convertToPositiveDim(dimension, input_shape.size());
+
+        $_state.addAttribute("dimension",
+                             $_builder.getI64IntegerAttr(dimension));
+        $_state.addAttribute("size", $_builder.getI64IntegerAttr(size));
+        $_state.addAttribute("step", $_builder.getI64IntegerAttr(step));
+
+        auto output_shape = input_shape;
+        output_shape[dimension] = (output_shape[dimension] - size) / step + 1;
+        output_shape.push_back(size);
+
+        $_state.addTypes(mlir::RankedTensorType::get(output_shape,
+                                                     getElementType(self)));
+    }]>];
+}

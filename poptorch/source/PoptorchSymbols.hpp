@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #ifndef SOURCE_POPTORCH_SYMBOLS_H
 #define SOURCE_POPTORCH_SYMBOLS_H
+#include <ATen/core/interned_strings.h>
 #include <torch/csrc/jit/ir/ir.h>
 
 // Create all the C10 symbols.
@@ -102,6 +103,8 @@ extern c10::Symbol canonicalised_cpu_call;
 extern c10::Symbol ctc_beam_search_decoder;
 extern c10::Symbol set_attribute;
 extern c10::Symbol clear_attribute;
+
+extern c10::Symbol unfold;
 } // namespace symbols::poptorch
 
 // Return the attribute symbol refering to having overlap for a given input

@@ -189,6 +189,10 @@ createOptimizerGroup(torch::jit::Graph *graph, std::uint64_t group,
 torch::jit::Node *createRecomputationCheckpoint(torch::jit::Graph *graph,
                                                 torch::jit::Value *value);
 
+torch::jit::Node *createUnfold(torch::jit::Graph *graph,
+                               torch::jit::Value *value, int64_t dimension,
+                               int64_t size, int64_t step);
+
 torch::jit::Node *
 createRandomNormal(torch::jit::Graph *graph,
                    const std::vector<torch::jit::Value *> &possible_inputs,

@@ -299,6 +299,9 @@ public:
                                const std::vector<int64_t> &shape,
                                const std::string &dtype, bool zeros);
 
+  popart::TensorId unfold(const std::vector<popart::TensorId> &tensors,
+                          int64_t dimension, int64_t size, int64_t step);
+
   void addMultiConvPart(const std::vector<popart::TensorId> &tensors,
                         const std::vector<int64_t> &dilations,
                         const std::vector<int64_t> &kernel_shape,

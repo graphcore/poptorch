@@ -1063,3 +1063,16 @@ def test_arange(trace_model):
 
     helpers.assert_allclose(actual=poptorch_out,
                             expected=[torch.arange(20) * 5 + a, b])
+
+
+@pytest.mark.parametrize("input_shape,dim,size,step",
+                         [((7, ), 0, 2, 1), ((7, ), 0, 2, 2),
+                          ((10, ), 0, 2, 2), ((10, ), 0, 2, 1),
+                          ((5, 5), 0, 2, 2), ((5, 5), 1, 2, 2),
+                          ((3, 2, 1), 0, 2, 2), ((10, 10, 10), 1, 5, 2)])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_unfold(input_shape, dim, size, step, trace_model):
+    torch.manual_seed(0)
+    op = lambda x: x.unfold(dim, size, step)
+    x = torch.randn(input_shape)
+    op_harness(op, x, trace_model=trace_model)

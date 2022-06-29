@@ -207,7 +207,7 @@ public:
 
   ~PopartConstant(); // Required for opaque pointer
 
-  const popart::ConstVoidData *getPopartData() const { return _data.get(); }
+  const popart::ConstVoidData &getPopartData() const { return *_data; }
 
 private:
   // Use an opaque pointer to avoid the need for popart headers

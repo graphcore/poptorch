@@ -125,7 +125,12 @@ template <> struct HandleOutput<popart::TensorId> {
     }
 
     _impl->ids.push_back(in);
-    _impl->setExecutionStrategyAttributes({in});
+    if (!_impl->active_builder->nodeHasAttribute(
+            popart::sPipelineStageAttribute, {in}) &&
+        !_impl->active_builder->nodeHasAttribute(
+            popart::sExecutionPhaseAttribute, {in})) {
+      _impl->setExecutionStrategyAttributes({in});
+    }
 
     if (loss) {
       _impl->loss = in;

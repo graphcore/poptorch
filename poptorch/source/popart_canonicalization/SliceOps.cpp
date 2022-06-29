@@ -405,12 +405,25 @@ torch::jit::Node *narrowHandler(torch::jit::Graph *graph,
   return sliceCommon(graph, node, input, dim, start_node, end_node, 1);
 }
 
+torch::jit::Node *unfoldHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  auto *input = node->input(0);
+  const auto input_type = input->type()->expect<c10::TensorType>();
+
+  const auto dimension = handleDimensionParam(node->input(1), input_type);
+  const auto size = constantToInt(node->input(2)->node());
+  const auto step = constantToInt(node->input(3)->node());
+
+  return createUnfold(graph, input, dimension, size, step);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::slice, sliceHandler);
   registerHandler(c10::aten::unbind, unbindHandler);
   registerHandler(c10::aten::narrow, narrowHandler);
+  registerHandler(c10::aten::unfold, unfoldHandler);
 }
 
 } // namespace poptorch

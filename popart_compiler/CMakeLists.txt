@@ -23,7 +23,8 @@ target_link_libraries(popart_compiler PRIVATE
                                       popef
                                       popart-only
                                       poptorch_logging
-                                      poptorch_exception_info)
+                                      poptorch_exception_info
+                                      poprithms)
 
 target_include_directories(popart_compiler
                            PUBLIC

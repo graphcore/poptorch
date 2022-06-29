@@ -554,6 +554,19 @@ torch::jit::Node *createRecomputationCheckpoint(torch::jit::Graph *graph,
                              OutputType::AsFirstInput);
 }
 
+torch::jit::Node *createUnfold(torch::jit::Graph *graph,
+                               torch::jit::Value *value, int64_t dimension,
+                               int64_t size, int64_t step) {
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::unfold, {value},
+                          ImplicitCast::None, OutputType::AsFirstInput);
+  new_node->i_(c10::Symbol::fromQualString("attr::dimension"), dimension);
+  new_node->i_(c10::Symbol::fromQualString("attr::size"), size);
+  new_node->i_(c10::Symbol::fromQualString("attr::step"), step);
+
+  return new_node;
+}
+
 torch::jit::Node *createMultiConvPart(torch::jit::Graph *graph,
                                       torch::jit::Node *conv_node) {
   ERROR_ON_MSG(conv_node->kind() != symbols::popart::conv,
