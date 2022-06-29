@@ -157,6 +157,8 @@ def op_harness(op,
                 raise
             native_out = ("error", e)
             op_raises_exception = True
+            assert not poptorch.poptorch_core.isCompilingWithDispatcher(), (
+                "[Internal] Clean up failed: dispatcher still active")
         return native_out, op_raises_exception
 
     if assert_fn is None:
@@ -440,7 +442,6 @@ def test_cat_chunk_slice_multiple_slices(trace_model):
     op_harness(op, x, mems, test_training=False, trace_model=trace_model)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
 def fast_gather_last_dim(data, idx):
     assert poptorch.ipuHardwareIsAvailable(), \
            "Hardware IPU needed to compile this FastGatherLastDim custom op"
