@@ -281,8 +281,7 @@ class PoplarExecutor:
                     return super().__torch_function__(func, types, args,
                                                       kwargs)
 
-            for p in self._user_model.parameters():
-                p.__class__ = PoptorchParameter
+            self.PoptorchParameter = PoptorchParameter
 
             class PoptorchBuffer(torch.Tensor):
                 def __getattribute__(self, name):
@@ -298,11 +297,8 @@ class PoplarExecutor:
                     return super().__torch_function__(func, types, args,
                                                       kwargs)
 
-            for b in self._user_model.buffers():
-                if b.__class__ != torch.Tensor:
-                    raise _impl.createPoptorchError(
-                        "All buffers must be an instance of " + "torch.Tensor")
-                b.__class__ = PoptorchBuffer
+            self.PoptorchBuffer = PoptorchBuffer
+            self._install_state_hooks()
 
             # __getattr__ and __getattribute__ are attributes, not methods,
             # unfortunately we cannot just replace them in the model object: we
@@ -317,6 +313,15 @@ class PoplarExecutor:
             _impl.registerWrapperType(PoptorchModel)
             _impl.registerWrapperType(PoptorchParameter)
             _impl.registerWrapperType(PoptorchBuffer)
+
+    def _install_state_hooks(self):
+        for p in self._user_model.parameters():
+            p.__class__ = self.PoptorchParameter
+        for b in self._user_model.buffers():
+            if b.__class__ != torch.Tensor:
+                raise _impl.createPoptorchError(
+                    "All buffers must be an instance of torch.Tensor")
+            b.__class__ = self.PoptorchBuffer
 
     def _update_optimizer_if_needed(self):
         if not self.isCompiled():
@@ -562,10 +567,9 @@ class PoplarExecutor:
         with _SetDefaultDeviceType():
             # The IPUContext is going to move the model to the IPU so create a copy
             # to make sure we don't modify the user's model.
-            model = copy.deepcopy(self._model)
-            ctx = IPUContext(model,
+            ctx = IPUContext(self._model,
                              compiler=enums.Compiler.PopART,
-                             model=model,
+                             model=self._model,
                              options=self._options,
                              training=self._training,
                              dict_optimizer=self._dict_optimizer)
@@ -588,7 +592,7 @@ class PoplarExecutor:
                     **buff_param_addresses[0],
                     **buff_param_addresses[1]
                 }
-                ipu_tensors = _impl.getBufferAndParameterTensors(model)
+                ipu_tensors = _impl.getBufferAndParameterTensors(self._model)
                 cpu_to_ipu = {
                     cpu_tensors[n]: ipu
                     for n, ipu in ipu_tensors.items()
@@ -604,6 +608,8 @@ class PoplarExecutor:
                 ctx.compile(*in_tensors.args, **in_tensors.kwargs)
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
         self._error_on_buffer_parameter_address_change(buff_param_addresses)
+        if self._training:
+            self._install_state_hooks()
 
         if module_namescope:
             module_namescope.remove()

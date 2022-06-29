@@ -556,10 +556,6 @@ def test_fold_with_padding(stride_x, stride_y, trace_model):
 @pytest.mark.parametrize("dim", [0, 1, None])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_weight_norm(trace_model, dim):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Only Tensors created explicitly by the user " +
-            "(graph leaves) support the deepcopy protocol at the moment")
 
     torch.manual_seed(42)
 
@@ -594,17 +590,21 @@ def test_weight_norm(trace_model, dim):
     tensor_names = poptorch_model.getTensorNames()
     decomposed_tensors = ["weight_v", "weight_g"]
 
+    # The dispatcher doesn't use OptimizerWrapper, so this prefix doesn't
+    # appear.
+    prefix = "model." if trace_model else ""
+
     # Check that both decomposed tensors exist in the graph
-    assert all(f"model.lin.{t}" in tensor_names for t in decomposed_tensors)
+    assert all(f"{prefix}lin.{t}" in tensor_names for t in decomposed_tensors)
     # Check that they also exist in the backward graph
-    assert all(f"UpdatedVar___model.lin.{t}" in tensor_names
+    assert all(f"UpdatedVar___{prefix}lin.{t}" in tensor_names
                for t in decomposed_tensors)
 
     # Ensure that the original weight tensor does NOT exist -
     # autograd should be performed with respect to the decomposed tensors
     # only
-    assert "model.lin.weight" not in tensor_names
-    assert "UpdatedVar___model.lin.weight" not in tensor_names
+    assert f"{prefix}lin.weight" not in tensor_names
+    assert f"UpdatedVar___{prefix}lin.weight" not in tensor_names
 
     n = 3
     # Run a few more times to ensure that the decomposed weights are being
