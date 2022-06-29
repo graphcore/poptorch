@@ -42,6 +42,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/PoolingOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/PopartCanonicalizationUtils.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/PoptorchHandlers.gen.cpp"
+  "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/PyGTorchScatterOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/RandomSamplingOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ReduceOps.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/popart_canonicalization/ReshapeOps.cpp"
@@ -73,7 +74,7 @@ set(POPTORCH_CORE_SOURCES
   "${PROJECT_SOURCE_DIR}/poptorch/source/type_and_constant_canonicalization/MakeConstantIntParams.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/Utils.cpp"
   "${PROJECT_SOURCE_DIR}/poptorch/source/ErrorOnUnsupportedAten.cpp"
-  )
+)
 
 # Same as pybind11_add_module but without stripping the symbols and setting the visibility to hidden.
 # Source: https://pybind11.readthedocs.io/en/stable/compiling.html#advanced-interface-library-targets

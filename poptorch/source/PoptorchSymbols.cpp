@@ -80,6 +80,22 @@ static void initializeAtenSymbols() {
 
 } // namespace c10::aten
 
+namespace torch_scatter {
+
+c10::Symbol scatter_max; // NOLINT
+c10::Symbol scatter_min; // NOLINT
+
+// clang-format off
+  __attribute__((constructor(SYMBOL_INIT_PRIORITY)))
+  static void initializeTorchScatterSymbols() {
+  // clang-format on
+  poptorch::logging::trace("Initializing torch_scatter symbols");
+  SYMBOL_INIT(torch_scatter, scatter_max);
+  SYMBOL_INIT(torch_scatter, scatter_min);
+}
+
+} // namespace torch_scatter
+
 namespace poptorch {
 namespace symbols {
 

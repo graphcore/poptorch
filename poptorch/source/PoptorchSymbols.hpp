@@ -108,4 +108,10 @@ c10::Symbol getOverlapSymbol(const char *suffix, unsigned int num);
 
 } // namespace poptorch
 
+// Define symbols used by PyG torch_scatter library
+namespace torch_scatter {
+extern c10::Symbol scatter_max;
+extern c10::Symbol scatter_min;
+} // namespace torch_scatter
+
 #endif // SOURCE_POPTORCH_SYMBOLS_H

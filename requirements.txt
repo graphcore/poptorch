@@ -18,3 +18,7 @@ transformers==4.12.2
 typing-extensions==4.1.1
 # Use old version for wheel.pep425tags support (new versions removed it).
 wheel<0.35
+
+# Add torch-scatter used in PyTorch Geometric
+--find-links https://data.pyg.org/whl/torch-1.10.0+cpu.html
+torch-scatter==2.0.9
