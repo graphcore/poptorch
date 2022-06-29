@@ -72,6 +72,9 @@ def execute_and_check_wrapper(trace_model, op, input, check_shape_only=False):
 @pytest.mark.parametrize("op", pool_2D)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_pool2D(op, trace_model):
+    if not trace_model:
+        pytest.skip("TODO(T51159): intermittent hangs in the CI near the "
+                    "end of the compilation")
 
     torch.manual_seed(42)
 
