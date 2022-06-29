@@ -149,16 +149,16 @@ def destroyDispatcherOnExit(func):
     """Function decorator to always destroy the dispatcher at
     the end of the wrapped function."""
 
-    @contextmanager
-    def onExit():
-        # enter
-        yield
-        # exit
-        poptorch_core.destroyDispatcher()
+    class OnExit():
+        def __enter__(self):
+            pass
+
+        def __exit__(self, exc_type, value, traceback):
+            poptorch_core.destroyDispatcher()
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        with onExit():
+        with OnExit():
             return func(*args, **kwargs)
 
     return wrapper

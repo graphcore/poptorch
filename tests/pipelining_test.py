@@ -34,6 +34,8 @@ def test_missing_block(trace_model):
     m = poptorch.inferenceModel(m, opts)
     with pytest.raises(poptorch.Error, match="No active Block"):
         m.compile(torch.randn(2, 5))
+    assert not poptorch.poptorch_core.isCompilingWithDispatcher(), (
+        "[Internal] Clean up failed: dispatcher still active")
 
 
 @helpers.printCapfdOnExit
