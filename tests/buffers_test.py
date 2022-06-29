@@ -79,9 +79,6 @@ def test_buffer_implicit_copy(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_error_on_remove_buffer(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Did not raise poptorch_core.Error")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -107,9 +104,6 @@ def test_error_on_remove_buffer(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_error_on_redefine_buffer(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError: Regex pattern not matched")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()

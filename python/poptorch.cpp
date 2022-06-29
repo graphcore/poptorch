@@ -1306,6 +1306,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("processDispatchAndImportExecutable",
         PTC(poptorch::processDispatchAndImportExecutable));
   m.def("_throwTestError", PTC(poptorch::throwTestError));
+  m.def("getIpuTensorId", PTC(poptorch::getIpuTensorId));
 
   poptorch::initialiseExceptionHandling(m);
 

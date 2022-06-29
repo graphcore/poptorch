@@ -2,6 +2,7 @@
 #ifndef INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_
 #define INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -135,6 +136,8 @@ void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
                                  torch::jit::Value *replacement);
 
 void replaceValueDispatcher(torch::jit::Value *v_old, torch::jit::Value *v_new);
+
+std::uint64_t getIpuTensorId(const at::Tensor &tensor);
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_DISPATCH_TRACER_HPP_

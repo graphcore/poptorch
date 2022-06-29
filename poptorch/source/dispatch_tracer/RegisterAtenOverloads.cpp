@@ -515,6 +515,12 @@ void replaceValueDispatcher(torch::jit::Value *v_old,
   }
   context.activeDispatch()->replaceValue(v_old, v_new);
 }
+
+std::uint64_t getIpuTensorId(const at::Tensor &tensor) {
+  ERROR_ON_MSG(!isIpuTensor(tensor),
+               "You may only call getIpuTensorId on an IPU tensor");
+  return ipuTensorId(tensor);
+}
 } // namespace poptorch
 
 /*

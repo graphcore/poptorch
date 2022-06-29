@@ -13,6 +13,7 @@ import torch
 # Do not import any poptorch.* here: it will break the poptorch module
 from ._logging import logger
 from . import poptorch_core
+from ._utils import isOnIpu, getIpuTensorId
 
 # A flag to tell the user if the current target is IPU. This is to allow
 # divergent IPU/CPU codepaths within one model.
@@ -313,3 +314,68 @@ def getBufferAndParameterTensors(model):
 
     forEachParameterAndBuffer(model, fn)
     return tensors
+
+
+def getBufferAndParameterAddresses(model):
+    # Obtains dictionaries of the data ptr addresses of every buffer
+    # and parameter
+
+    def tensor_info(x):
+        if isOnIpu(x):
+            return x.device, getIpuTensorId(x)
+        return x.device, x.data_ptr()
+
+    buffer_addresses = {}
+    for module_name, module in model.named_modules():
+        if isinstance(module, BUFFERS_CAN_CHANGE):
+            continue
+
+        for name, buff in module.named_buffers(prefix=module_name,
+                                               recurse=False):
+            buffer_addresses[name] = tensor_info(buff)
+
+    parameter_addresses = {}
+    for name, param in model.named_parameters():
+        parameter_addresses[name] = tensor_info(param)
+
+    return buffer_addresses, parameter_addresses
+
+
+def errorOnBufferOrParameterAddressChanges(old_addresses, new_addresses):
+    # Do the buffers first then parameters
+    order = ["Buffer", "Parameter"]
+    for idx, dic in enumerate(old_addresses):
+        for name, address in dic.items():
+            if name not in new_addresses[idx]:
+                err_msg = (order[idx] + " " + name + " is removed from " +
+                           "the model when calling the forward method.")
+
+                raise createPoptorchError(err_msg)
+
+            if address != new_addresses[idx][name]:
+                err_msg = (
+                    order[idx] + " " + name + " is reassigned " +
+                    "within the model when calling the forward " +
+                    "method. This is not supported. Consider using self." +
+                    name + ".copy_(src)" +
+                    " to copy data from a source tensor, where src is " +
+                    "the name of the source tensor.")
+                raise createPoptorchError(err_msg)
+
+
+# Wrapper to make sure that the buffers and parameters do not change during
+# tracing (which would give wrong results in a Jit trace)
+class CheckBuffersAndParamsScope:
+    def __init__(self, model: 'torch.nn.Module'):
+        self._model = model
+        self._old_addresses = {}
+
+    def __enter__(self):
+        if self._model:
+            self._old_addresses = getBufferAndParameterAddresses(self._model)
+
+    def __exit__(self, exc_type, value, traceback):
+        if self._model:
+            new_addresses = getBufferAndParameterAddresses(self._model)
+            errorOnBufferOrParameterAddressChanges(self._old_addresses,
+                                                   new_addresses)

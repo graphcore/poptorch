@@ -7,6 +7,7 @@ import json
 
 import torch
 
+from . import poptorch_core  # type: ignore
 from ._logging import logger
 from .ops import ATTR_PREFIX
 
@@ -111,3 +112,7 @@ def replaceIpuTensors(outputs_structure, output):
         return x
 
     return copy_structure(outputs_structure, iter(output))
+
+
+def getIpuTensorId(x: torch.Tensor):
+    return poptorch_core.getIpuTensorId(x)

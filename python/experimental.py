@@ -61,6 +61,8 @@ class IPUScope:
             poptorch_core.TracingMode(self._compile_using), inputs,
             self._options._source_location_excludes)
 
+        self._old_addresses = {}
+
     # Start capturing calls.
     def __enter__(self):
         # Move the model parameters to the ipu and take a copy to load the originals back once this has finished
@@ -86,6 +88,9 @@ class IPUScope:
             poptorch_core.mapParamsToNames(tuple(buffers.keys()),
                                            tuple(buffers.values()))
 
+            self._old_addresses = _impl.getBufferAndParameterAddresses(
+                self._model)
+
         poptorch_core.startDispatch()
         _impl.setDispatchTracing(True)
         _impl.setIpuContext(True)
@@ -102,6 +107,9 @@ class IPUScope:
 
         # Reload the cpu model state
         if self._model:
+            # Get the buffer and parameter addresses after the model has ran
+            # but before resetting the model back to the cpu
+            new_addresses = _impl.getBufferAndParameterAddresses(self._model)
 
             def get_model_and_name(n):
                 m = self._model
@@ -117,6 +125,14 @@ class IPUScope:
                 setattr(*get_model_and_name(k), self._cpu_params[k])
             for k in self._cpu_buffers:
                 setattr(*get_model_and_name(k), self._cpu_buffers[k])
+
+            # Check that the buffer and parameter addresses haven't been changed
+            # in the model
+            # Note: this is done after resetting the model back to the cpu so
+            # that errors thrown by this don't stop the model being in a valid
+            # state
+            _impl.errorOnBufferOrParameterAddressChanges(
+                self._old_addresses, new_addresses)
 
         # Dispatch stopped because of an exception: don't try to compile
         # the graph.

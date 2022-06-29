@@ -44,7 +44,7 @@ from .enums import *
 from .ops import *
 from .options import *
 from ._impl import isRunningOnIpu, createPoptorchError
-from ._utils import accessAttributes
+from ._utils import accessAttributes, getIpuTensorId
 from ._poplar_executor import PoplarExecutor, hasMLIRSupportOnPlatform
 from ._printing import *
 from . import optim

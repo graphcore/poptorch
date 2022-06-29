@@ -555,10 +555,10 @@ class PoplarExecutor:
             self._write_optim_state_dict_if_needed()
 
     def _compileWithDispatch(self, in_tensors, executable_filename=None):
-        # Store buffer and parameter memory addresses to make sure that these do
-        # not change during dispatching (which would give wrong results in a Jit
-        # trace)
-        buff_param_addresses = self._buffer_parameter_addresses()
+        # Store cpu buffer and parameter memory addresses for use when moving
+        # the optimizer to the ipu
+        buff_param_addresses = _impl.getBufferAndParameterAddresses(
+            self._model)
 
         module_namescope = _impl.NameScopeHook(
             self._user_model
@@ -594,7 +594,7 @@ class PoplarExecutor:
                 }
                 ipu_tensors = _impl.getBufferAndParameterTensors(self._model)
                 cpu_to_ipu = {
-                    cpu_tensors[n]: ipu
+                    cpu_tensors[n][1]: ipu
                     for n, ipu in ipu_tensors.items()
                 }
                 for index, group in enumerate(self._optimizer.param_groups):
@@ -607,7 +607,6 @@ class PoplarExecutor:
             else:
                 ctx.compile(*in_tensors.args, **in_tensors.kwargs)
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
-        self._error_on_buffer_parameter_address_change(buff_param_addresses)
         if self._training:
             self._install_state_hooks()
 
@@ -1259,44 +1258,6 @@ class PoplarExecutor:
 
         return traced
 
-    def _buffer_parameter_addresses(self):
-        # Obtains dictionaries of the data ptr addresses of every buffer
-        # and parameter
-        buffer_addr = {}
-        param_addr = {}
-
-        def fn(name, buff):
-            if isinstance(buff, torch.nn.Parameter):
-                param_addr[name] = buff.data_ptr()
-            else:
-                buffer_addr[name] = buff.data_ptr()
-
-        _impl.forEachParameterAndBuffer(self._model, fn)
-        return buffer_addr, param_addr
-
-    def _error_on_buffer_parameter_address_change(self, old_addresses):
-        new_addresses = self._buffer_parameter_addresses()
-
-        # Do the buffers first then paramters
-        order = ["Buffer", "Parameter"]
-        for idx, dic in enumerate(old_addresses):
-            for name, address in dic.items():
-                if name not in new_addresses[idx]:
-                    err_msg = (order[idx] + " " + name + " is removed from " +
-                               "the model when calling the forward method.")
-
-                    raise _impl.createPoptorchError(err_msg)
-
-                if address != new_addresses[idx][name]:
-                    err_msg = (
-                        order[idx] + " " + name + " is reassigned " +
-                        "within the model when calling the forward " +
-                        "method. This is not supported. Consider using self." +
-                        name + ".copy_(src)" +
-                        " to copy data from a source tensor, where src is " +
-                        "the name of the source tensor.")
-                    raise _impl.createPoptorchError(err_msg)
-
     @_impl.traceMethod("tracingModel")
     def _trace_model_and_get_compile_args(self, in_tensors,
                                           in_tensors_trace_view,
@@ -1369,23 +1330,17 @@ class PoplarExecutor:
 
         added_dummy_output = False
 
-        # Store buffer and parameter memory addresses to make sure that these do
-        # not change during tracing (which would give wrong results in a Jit
-        # trace)
-        buff_param_addresses = self._buffer_parameter_addresses()
-
-        try:
-            self._trace = self._trace_with_warning_filter(
-                in_tensors_trace_view_tuple)
-        except RuntimeError as e:
-            if "didn't return any values" in str(e):
-                self._trace = self._getTraceNoOutput(
+        with _impl.CheckBuffersAndParamsScope(self.model):
+            try:
+                self._trace = self._trace_with_warning_filter(
                     in_tensors_trace_view_tuple)
-                added_dummy_output = True
-            else:
-                raise e
-
-        self._error_on_buffer_parameter_address_change(buff_param_addresses)
+            except RuntimeError as e:
+                if "didn't return any values" in str(e):
+                    self._trace = self._getTraceNoOutput(
+                        in_tensors_trace_view_tuple)
+                    added_dummy_output = True
+                else:
+                    raise e
 
         # Restore methods to their old meanings.
         torch.Tensor.half = old_half
