@@ -58,8 +58,6 @@ def op_harness(trace_model, op, inputs, inference_test_fn=None):
                                          (2, 3, 4, 2, 8)])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_upsample_nearest(scale_factor, input_shape, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): AssertionError: Tensor-likes are not close")
     torch.manual_seed(42)
     op = torch.nn.Upsample(scale_factor=scale_factor, mode="nearest")
     x = torch.randn(*input_shape)
@@ -68,8 +66,6 @@ def test_upsample_nearest(scale_factor, input_shape, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_downsample_nearest(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): AssertionError: Tensor-likes are not close")
     torch.manual_seed(42)
     # test case from T44610
     op = torch.nn.Upsample(scale_factor=0.435714, mode="nearest")
@@ -101,9 +97,6 @@ def test_upsample_bilinear_factor_shapes(shapes, trace_model):
 @pytest.mark.parametrize("shape", [(2, 2, 14, 14)])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_upsample_bicubic(shape, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Tensor-likes are not close")
-
     torch.manual_seed(42)
     model = torch.nn.Upsample(scale_factor=0.4357, mode='bicubic')
     x = torch.randn(*shape)

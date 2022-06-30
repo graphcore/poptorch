@@ -757,6 +757,21 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   //
   // aten::upsample_nearest3d(Tensor self, int[] output_size, float? scales_d,
   // float? scales_h, float? scales_w) -> Tensor
+
+  // upsample_nearest1d.vec(Tensor input, int[]? output_size,
+  // float[]? scale_factors)
+  //
+  // upsample_nearest2d.vec(Tensor input, int[]? output_size,
+  // float[]? scale_factors) -> Tensor
+  //
+  // upsample_nearest3d.vec(Tensor input, int[]? output_size,
+  // float[]? scale_factors) -> Tensor
+
+  // upsample_bicubic2d(Tensor self, int[2] output_size, bool align_corners,
+  // float? scales_h=None, float? scales_w=None) -> Tensor
+
+  // upsample_bicubic2d.vec(Tensor input, int[]? output_size,
+  // bool align_corners, float[]? scale_factors) -> Tensor
   //
   // Not supported by Popart yet:
   //
@@ -766,9 +781,17 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   // aten::upsample_trilinear3d(Tensor self, int[] output_size, bool
   // align_corners, float? scales_d, float? scales_h, float? scales_w) -> Tensor
 
+  auto num_inputs = node->inputs().size();
   torch::jit::Value *input = node->input(0);
   torch::jit::Value *output_size = node->input(1);
-  torch::jit::Value *output_scale = node->input(2);
+  bool is_bicubic = node->kind() == c10::aten::upsample_bicubic2d;
+  size_t scales_idx = 2;
+
+  if (is_bicubic) {
+    auto align_corners = constantToBool(node->input(2)->node());
+    ERROR_ON_MSG(align_corners, "Only support align_corners=False.");
+    scales_idx++;
+  }
 
   auto output_rank = shapeFromTensor(node->output()).size();
   auto input_shape = shapeFromTensor(input);
@@ -781,61 +804,35 @@ torch::jit::Node *upsampleHandler(torch::jit::Graph *graph,
   // Omit the leading batch and channel dims for computing the scale
   std::vector<double> scales{1.0, 1.0};
 
-  if (!isNone(output_size)) {
+  if (num_inputs > scales_idx) {
+    torch::jit::Value *scale1 = node->input(scales_idx);
+    // Handling individual constants?
+    if (isTensorConstant(scale1->node())) {
+      for (size_t i = 0; i < input_rank - 2; i++) {
+        scales.push_back(constantToFloat(node->input(scales_idx + i)->node()));
+      }
+    } else {
+      // Otherwise it's upsample_bicubic2d.vec, just copy the vector of scales
+      auto scale_list = handleTensorList(scale1->node());
+      if (!scale_list.empty()) {
+        for (auto *s : scale_list) {
+          scales.push_back(constantToFloat(s->node()));
+        }
+      }
+    }
+  }
+  if (scales.size() == 2) {
     auto output_shape = handleTensorList(output_size->node());
     for (size_t dim = 2; dim < input_rank; ++dim) {
       scales.push_back(constantToFloat(output_shape[dim - 2]->node()) /
                        input_shape[dim]);
     }
-  } else {
-    for (auto *s : handleTensorList(output_scale->node())) {
-      scales.push_back(constantToFloat(s->node()));
-    }
   }
 
   torch::jit::Node *scales_node = createConstantFloatLike(
       graph, input, scales, {static_cast<std::int64_t>(scales.size())});
-  return createResize(graph, {input, scales_node->output()}, "nearest");
-}
-
-torch::jit::Node *upsampleBicubic2dHandler(torch::jit::Graph *graph,
-                                           torch::jit::Node *node) {
-  // upsample_bicubic2d(Tensor self, int[2] output_size, bool align_corners,
-  // float? scales_h=None, float? scales_w=None) -> Tensor
-
-  torch::jit::Value *input = node->input(0);
-  torch::jit::Value *output_size = node->input(1);
-  torch::jit::Value *output_scale = node->input(3);
-
-  auto align_corners = constantToBool(node->input(2)->node());
-  ERROR_ON_MSG(align_corners, "Only support align_corners=False.");
-
-  auto output_rank = shapeFromTensor(node->output()).size();
-  auto input_shape = shapeFromTensor(input);
-  auto input_rank = input_shape.size();
-
-  ERROR_ON_MSG(output_rank != input_rank,
-               "Input / output rank mismatch: " << input_rank
-                                                << " != " << output_rank);
-
-  // Omit the leading batch and channel dims for computing the scale
-  std::vector<double> scales{1.0, 1.0};
-
-  if (!isNone(output_size)) {
-    auto output_shape = handleTensorList(output_size->node());
-    for (size_t dim = 2; dim < input_rank; ++dim) {
-      scales.push_back(constantToFloat(output_shape[dim - 2]->node()) /
-                       input_shape[dim]);
-    }
-  } else {
-    for (auto *s : handleTensorList(output_scale->node())) {
-      scales.push_back(constantToFloat(s->node()));
-    }
-  }
-
-  torch::jit::Node *scales_node = createConstantFloatLike(
-      graph, input, scales, {static_cast<std::int64_t>(scales.size())});
-  return createResize(graph, {input, scales_node->output()}, "cubic");
+  const std::string resize_type = is_bicubic ? "cubic" : "nearest";
+  return createResize(graph, {input, scales_node->output()}, resize_type);
 }
 
 torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
@@ -961,7 +958,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::upsample_linear1d, unsupportedUpsampleHandler);
   registerHandler(c10::aten::upsample_bilinear2d, upsampleBilinear2dHandler);
   registerHandler(c10::aten::upsample_trilinear3d, unsupportedUpsampleHandler);
-  registerHandler(c10::aten::upsample_bicubic2d, upsampleBicubic2dHandler);
+  registerHandler(c10::aten::upsample_bicubic2d, upsampleHandler);
   registerHandler(c10::aten::squeeze, reshapeHandler);
   registerHandler(c10::aten::as_strided, asStridedHandler);
   registerHandler(c10::aten::stack, stackHandler);
