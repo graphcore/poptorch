@@ -1126,8 +1126,18 @@ void processPrecisionOptions(py::handle h, bool dispatcher) {
 
   poptorch::setHalfFloatCastingBehavior(hf_casting);
 
-  poptorch::setRunningStatisticsAlwaysFloat(
-      values_dict["running_statistics_always_float"].cast<bool>());
+  bool running_statistics_always_float;
+  if (!values_dict.contains("running_statistics_always_float")) {
+    running_statistics_always_float = !dispatcher;
+  } else {
+    running_statistics_always_float =
+        values_dict["running_statistics_always_float"].cast<bool>();
+  }
+  ERROR_ON_MSG(dispatcher && running_statistics_always_float,
+               "runningStatisticsAlwaysFloat is deprecated and not supported "
+               "in the dispatcher. Simply cast the running statistics tensors "
+               "to float at the pytorch level.");
+  poptorch::setRunningStatisticsAlwaysFloat(running_statistics_always_float);
 }
 
 bool pyIsGraphNondeterministic(py::handle h) {

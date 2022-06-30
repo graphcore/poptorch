@@ -91,8 +91,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
             autocast_enabled=True,
             autocast_policy=autocasting.default,
             autocast_policy_dict=autocasting.default._dict(),  # pylint: disable=protected-access
-            half_float_casting=enums.HalfFloatCastingBehavior.Default,
-            running_statistics_always_float=True)
+            half_float_casting=enums.HalfFloatCastingBehavior.Default)
 
     def autocastEnabled(self, autocast_enabled: bool
                         ) -> "poptorch.options._PrecisionOptions":
@@ -191,7 +190,7 @@ class _PrecisionOptions(_options_impl.OptionsDict):
             raise ValueError(
                 "runningStatisticsAlwaysFloat needs to be set to a bool")
 
-        self.set(running_statistics_always_float=value)
+        self.createOrSet(running_statistics_always_float=value)
         return self
 
     def enableFloatingPointExceptions(

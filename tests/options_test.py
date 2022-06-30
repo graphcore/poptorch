@@ -415,10 +415,17 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
         opts.Precision.runningStatisticsAlwaysFloat(setting)
     opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, opts)
+
+    if not trace_model and setting:
+        err_msg = "runningStatisticsAlwaysFloat is deprecated"
+        with pytest.raises(poptorch.Error, match=err_msg):
+            poptorch_model(x)
+        return
+
     poptorch_model(x)
 
     log = helpers.LogChecker(capfd)
-    if setting is None or setting:
+    if (trace_model and setting is None) or setting:
         log.assert_contains(
             "poptorch.Options set runningStatisticsAlwaysFloat to true")
     else:
@@ -426,12 +433,41 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
             "poptorch.Options set runningStatisticsAlwaysFloat to false")
 
     dtype_str = "Float" if dtype == torch.float or \
-        setting is None or setting else "Half"
+        (trace_model and setting is None) or setting else "Half"
 
     device = "cpu" if trace_model else "xla:0"
 
     log.assert_contains(
         f" : {dtype_str}(16, strides=[1], requires_grad=0, device={device}) " +
+        "-> bn.running_var")
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+@pytest.mark.mlirSupportRequired
+def test_running_statistics_dispatch(capfd):
+    x = torch.randn((16, 16), dtype=torch.half)
+
+    model = torch.nn.Sequential()
+    model.add_module('lin', torch.nn.Linear(16, 16))
+    model.add_module('bn', torch.nn.BatchNorm1d(16))
+
+    model.half()
+
+    model.bn.running_mean = model.bn.running_mean.to(torch.float)
+    model.bn.running_var = model.bn.running_var.to(torch.float)
+
+    opts = poptorch.Options()
+    opts.Jit.traceModel(False)
+    poptorch_model = poptorch.inferenceModel(model, opts)
+    poptorch_model(x)
+
+    log = helpers.LogChecker(capfd)
+    log.assert_contains(
+        "poptorch.Options set runningStatisticsAlwaysFloat to false")
+
+    log.assert_contains(
+        " : Float(16, strides=[1], requires_grad=0, device=xla:0) " +
         "-> bn.running_var")
 
 
