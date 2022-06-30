@@ -338,9 +338,6 @@ class FourBlockModelNoScope(torch.nn.Module):
 def test_gradient_accumulation_pipelined_training(num_grad_accums,
                                                   device_iterations,
                                                   trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): DID NOT RAISE")
-
     class TrainingFourBlockModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
