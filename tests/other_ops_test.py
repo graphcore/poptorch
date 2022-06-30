@@ -189,6 +189,7 @@ def test_2d_scatter_add_with_index_expansion(capfd, expand_as):
     model = Model()
     poptorch_model = poptorch.inferenceModel(model)
 
+    torch.manual_seed(0)
     index = torch.randint(0, 5, (6, 1), dtype=torch.long)
     src = torch.rand((6, 3))
 

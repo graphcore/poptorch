@@ -2,19 +2,25 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
 # Tests for PyG torch_scatter ops integration with PopTorch
+from functools import partial
 import torch
 import pytest
-from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std
+from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add
 
 import poptorch
-from helpers import assert_allequal
+from helpers import assert_allequal, LogChecker, printCapfdOnExit, overridePoptorchLogLevel
 
 
-def torch_scatter_harness(trace_model, module, src, index):
+def torch_scatter_harness(trace_model, func, src, index):
+    class Model(torch.nn.Module):
+        def forward(self, src, index):
+            return func(src, index)
+
+    model = Model()
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.inferenceModel(module, options=options)
-    native_out = module(src, index)
+    poptorch_model = poptorch.inferenceModel(model, options=options)
+    native_out = func(src, index)
     ipu_out = poptorch_model(src, index)
     assert_allequal(actual=ipu_out, expected=native_out)
 
@@ -25,13 +31,10 @@ def test_scatter(trace_model, reduce):
     if not trace_model:
         pytest.skip("TODO(T65186): Various failures with the dispatcher.")
 
-    class Model(torch.nn.Module):
-        def forward(self, src, index):
-            return scatter(src=src, index=index, reduce=reduce, dim=0)
-
+    func = partial(scatter, reduce=reduce)
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
-    torch_scatter_harness(trace_model, Model(), src, index)
+    torch_scatter_harness(trace_model, func, src, index)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -41,10 +44,17 @@ def test_composites(trace_model, func):
     if not trace_model:
         pytest.skip("TODO(T65186): Various failures with the dispatcher.")
 
-    class Model(torch.nn.Module):
-        def forward(self, src, index):
-            return func(src=src, index=index, dim=0)
-
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
-    torch_scatter_harness(trace_model, Model(), src, index)
+    torch_scatter_harness(trace_model, func, src, index)
+
+
+@printCapfdOnExit
+@overridePoptorchLogLevel("TRACE")
+def test_scatter_add_zeros_optimized(capfd):
+    src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
+    index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
+    torch_scatter_harness(True, scatter_add, src, index)
+
+    it = LogChecker(capfd).createIterator()
+    it.findNext("Removing zeros output to scatter_add")
