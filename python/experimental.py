@@ -65,17 +65,22 @@ class IPUScope:
 
     # Start capturing calls.
     def __enter__(self):
-        # Move the model parameters to the ipu and take a copy to load the originals back once this has finished
+        # Move the model parameters to the ipu and take a copy to load the
+        # originals back once this has finished
         if self._model:
             self._cpu_params = dict(self._model.named_parameters())
             self._cpu_buffers = dict(self._model.named_buffers())
+
+            # We need to remove the PoptorchBuffer and PoptorchParam annotations
+            # before compiling the model
+            _impl.unwrapModelIfNecessary(self._model)
 
             # TODO(T61576) We currently use a state machine to determine if
             # tensors are inputs or parameters.
             # We need to find a better solution.
             d = torch.device("xla:0")
             poptorch_core.startParametersMove()
-            self._model.apply(lambda l: l.to(d))
+            self._model.to(d)
             poptorch_core.endParametersMove()
 
             params = dict(self._model.named_parameters())
@@ -125,6 +130,9 @@ class IPUScope:
                 setattr(*get_model_and_name(k), self._cpu_params[k])
             for k in self._cpu_buffers:
                 setattr(*get_model_and_name(k), self._cpu_buffers[k])
+
+            # Re-install the Poptorch annotations for buffers and parameters
+            _impl.rewrapModelIfNecessary(self._model)
 
             # Check that the buffer and parameter addresses haven't been changed
             # in the model

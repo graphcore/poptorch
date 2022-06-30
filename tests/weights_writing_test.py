@@ -868,8 +868,8 @@ def test_torch_save_unwrapped(trace_model):
         # Ensure the state dictionaries returned by the training and inference models don't contain any PopTorch wrapper.
         with unittest.mock.patch.object(
                 poptorch._impl,  # pylint: disable=protected-access
-                "_pickleRestoreWrapperIfPossible",
-                wraps=poptorch._impl._pickleRestoreWrapperIfPossible  # pylint: disable=protected-access
+                "_restoreWrapperIfNecessary",
+                wraps=poptorch._impl._restoreWrapperIfNecessary  # pylint: disable=protected-access
         ) as restore_fn:
             torch.load(torch_file)
             restore_fn.assert_not_called()

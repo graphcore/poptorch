@@ -5,6 +5,7 @@ import copy
 import copyreg
 import fcntl
 import hashlib
+import itertools
 import os
 from functools import partial, wraps
 from typing import Dict, Any
@@ -228,7 +229,7 @@ def distributedCacheLock(model, opts):
 # The pickle handlers are called in two cases: when an object is copied
 # (i.e copy.copy(obj)) or when an object is pickled / serialised.
 # In both cases the object is first dumped using pickleUnwrapModel and then
-# in the copy case _pickleRestoreWrapperIfPossible() is called immediately after
+# in the copy case _restoreWrapperIfNecessary() is called immediately after
 # to create the new object.
 #
 # The _wrapper_registry keeps track of the mapping between user model, parameter,
@@ -246,7 +247,7 @@ _wrapper_registry: Dict[int, Any] = {}
 _wrapper_types = []
 
 
-def _pickleRestoreWrapperIfPossible(obj):
+def _restoreWrapperIfNecessary(obj):
     wrapperType = _wrapper_registry.get(id(obj))
     if wrapperType:
         obj.__class__ = wrapperType
@@ -260,7 +261,7 @@ def _pickleUnwrapObject(obj):
     other = copy.copy(obj)
     _wrapper_registry[id(other)] = wrapperType
     obj.__class__ = wrapperType
-    return _pickleRestoreWrapperIfPossible, (other, )
+    return _restoreWrapperIfNecessary, (other, )
 
 
 def registerWrapperType(wrapper_type):
@@ -304,6 +305,20 @@ def forEachParameterAndBuffer(model, fn):
 
     for name, param in model.named_parameters():
         fn(name, param)
+
+
+def unwrapModelIfNecessary(model: torch.nn.Module):
+    # Removes the PoptorchParameter and PoptorchBuffer annotations in the model
+
+    for buff in itertools.chain(model.buffers(), model.parameters()):
+        unwrapIfWrapped(buff)
+
+
+def rewrapModelIfNecessary(model: torch.nn.Module):
+    # Restores the PoptorchParameter and PoptorchBuffer annotations in the model
+
+    for buff in itertools.chain(model.buffers(), model.parameters()):
+        _restoreWrapperIfNecessary(buff)
 
 
 def getBufferAndParameterTensors(model):
