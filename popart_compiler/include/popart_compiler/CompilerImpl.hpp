@@ -346,7 +346,8 @@ public:
 
   bool isHostSideConstant(poptorch::TensorId id) const;
 
-  std::shared_ptr<popart::DeviceInfo> createDevice();
+  /* must_attach is a special case for on_demand devices */
+  std::shared_ptr<popart::DeviceInfo> createDevice(bool must_attach = false);
   bool waitIfUnavailable() const;
   void attachToDevice();
   void detachFromDevice();

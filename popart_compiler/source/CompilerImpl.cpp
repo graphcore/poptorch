@@ -528,8 +528,18 @@ poptorch::TensorId CompilerImpl::hostSideTensorConstant(
   return ids.size() - 1;
 }
 
-std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
-  ERROR_ON_MSG(_device, "device already created");
+std::shared_ptr<popart::DeviceInfo>
+CompilerImpl::createDevice(bool must_attach) {
+  auto connection_type = options.connection_type;
+  if (must_attach) {
+    ERROR_ON_MSG(
+        connection_type == popart::DeviceConnectionType::Never,
+        "[Internal] must_attach incompatible with connection type Never");
+    connection_type = popart::DeviceConnectionType::Always;
+    _device = nullptr;
+  } else {
+    ERROR_ON_MSG(_device, "device already created");
+  }
   updateUseModelConfig();
   ERROR_ON(used_ipus.empty());
 
@@ -555,7 +565,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
     int num_tiles_per_ipu = getNumTilesPerIpu(env_ipu_model_version);
     model_options["tilesPerIPU"] = std::to_string(num_tiles_per_ipu);
 
-    ERROR_ON_MSG(options.connection_type == popart::DeviceConnectionType::Never,
+    ERROR_ON_MSG(connection_type == popart::DeviceConnectionType::Never,
                  "ConnectionType.Never / poptorch.Options.useOfflineIpuTarget "
                  "not supported for the IPU model");
     _device = popart::DeviceManager::createDeviceManager().createIpuModelDevice(
@@ -563,14 +573,14 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
     // Acquired HW devices will be attached if the used connection type is
     // Always but createIpuModelDevice() doesn't take a connection type
     // so we manually attach to the device if the connection type is needed.
-    if (options.connection_type == popart::DeviceConnectionType::Always) {
+    if (connection_type == popart::DeviceConnectionType::Always) {
       ERROR_ON_MSG(!_device->attach(), "Internal error: attach can't fail for "
                                        "model devices");
     }
     logging::debug("Instantiated device, running on IPU model with {} tiles.",
                    num_tiles_per_ipu);
   } else {
-    if (options.connection_type == popart::DeviceConnectionType::Never) {
+    if (connection_type == popart::DeviceConnectionType::Never) {
       // Offline compilation path: create an offline device regardless of what's
       // present on the system.
       ERROR_ON_MSG(options_set.count("ipu_id"),
@@ -622,10 +632,9 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
       do {
         // Regular IPU hardware target
         if (options_set.count("ipu_id") == 0u) {
-          _device =
-              popart::DeviceManager::createDeviceManager()
-                  .tryAcquireAvailableDevice(num_ipus, 0, options.sync_pattern,
-                                             options.connection_type);
+          _device = popart::DeviceManager::createDeviceManager()
+                        .tryAcquireAvailableDevice(
+                            num_ipus, 0, options.sync_pattern, connection_type);
           ERROR_ON_MSG(!_device && !waitIfUnavailable(),
                        "Failed to acquire " << num_ipus << " IPU(s)"
                                             << this->checkSystemConfig());
@@ -636,8 +645,7 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
         } else {
           _device =
               popart::DeviceManager::createDeviceManager().tryAcquireDeviceById(
-                  options.ipu_id, options.sync_pattern,
-                  options.connection_type);
+                  options.ipu_id, options.sync_pattern, connection_type);
           ERROR_ON_MSG(!_device && !waitIfUnavailable(),
                        "Failed to acquire device Id " << options.ipu_id
                                                       << checkSystemConfig());
@@ -664,6 +672,9 @@ std::shared_ptr<popart::DeviceInfo> CompilerImpl::createDevice() {
         }
       } while (!_device && waitForAWhile());
     }
+  }
+  if (_device->isAttached()) {
+    logging::trace("Attached to device {}", _device->getId());
   }
   return _device;
 }
@@ -965,23 +976,18 @@ void CompilerImpl::attachToDevice() {
     return;
   }
 
-  logging::debug("Begin attaching to device {}", _device->getId());
-  popart::popx::Devicex &device = session->getDevice();
-  auto *device_info = device.getDeviceInfo();
-  ERROR_ON_MSG(!device_info, "Cannot find a valid device");
-  ERROR_ON_MSG(device_info != _device.get(), "Device mismatch");
-  ERROR_ON_MSG(device_info->isAttached(),
-               "The device has already been attached");
-  bool has_attached = false;
-  do {
-    has_attached = device_info->attach();
-    ERROR_ON_MSG(!has_attached && !waitIfUnavailable(),
-                 "Failed to acquire device Id " << _device->getId()
-                                                << checkSystemConfig());
-  } while (!has_attached && waitForAWhile());
-  device.loadEngineAndConnectStreams();
+  ERROR_ON_MSG(_device->isAttached(), "Already attached to a device");
 
-  logging::trace("Finished attaching to device {}", _device->getId());
+  // TODO(T21799): PopART onDemand connection will only try to connect to
+  // the first device matching the requested config which means if several
+  // tests only need 1 IPU, they will all wait on IPU 0.
+  // As a workaround we request a new device from PopART and swap the device
+  // in the live session.
+  session->getDevice().setDeviceInfo(createDevice(/*must_attach*/ true));
+
+  ERROR_ON_MSG(!_device, "Cannot find a valid device");
+  ERROR_ON_MSG(!_device->isAttached(), "Still not attached to a device");
+  session->getDevice().loadEngineAndConnectStreams();
 }
 
 std::string CompilerImpl::getPopartIR() const {

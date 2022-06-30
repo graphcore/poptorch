@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+import re
 import math
 import unittest.mock
 import pytest
 import torch
 import poptorch
+import helpers
 
 
 @unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "0"})
@@ -144,3 +146,50 @@ def test_attach_detach_accuracy(trace_model):
     for i in range(len(losses2) - 1):
         assert losses2[i] != losses2[i + 1]
     assert losses2[-1] < 0.1
+
+
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.parametrize("trace_model", [True, False])
+@unittest.mock.patch.dict("os.environ", {"POPTORCH_WAIT_FOR_IPU": "0"})
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_on_demand_attach(capfd, trace_model):
+    model = torch.nn.Linear(1, 2)
+
+    opts = poptorch.Options()
+    opts.connectionType(poptorch.ConnectionType.OnDemand)
+    opts.Jit.traceModel(trace_model)
+
+    m = poptorch.inferenceModel(model, opts)
+
+    input = torch.Tensor([[1.], [-1.]])
+    m(input)
+    log = helpers.LogChecker(capfd).createIterator()
+    # We acquire device 0 to compile. (It's the first device with a matching target)
+    log.findNext(re.escape("Acquired 1 IPU(s): running on device Id 0"))
+    # Make sure we compile before we attach to the device.
+    log.findNext("Finished Poplar compilation")
+    # Device 0 is still free so we'll attach to it.
+    log.findNext("Attached to device 0")
+
+    n = poptorch.inferenceModel(model, opts)
+    n(input)
+    log = helpers.LogChecker(capfd).createIterator()
+    # We acquire device 0 to compile. (It's the first device with a matching target)
+    # Note: acquiring doesn't mean attaching, it's ok if the device is not actually free.
+    log.findNext(re.escape("Acquired 1 IPU(s): running on device Id 0"))
+    # Make sure we compile before we attach to the device.
+    log.findNext("Finished Poplar compilation")
+    # Device 0 is in use by model 'm' so we should automatically get device 1.
+    log.findNext("Attached to device 1")
+
+    opts_always = opts.clone()
+    opts_always.connectionType(poptorch.ConnectionType.Always)
+    o = poptorch.inferenceModel(model, opts_always)
+    o(input)
+    log = helpers.LogChecker(capfd).createIterator()
+    # In Always mode we find a free IPU before the compilation and attach to it immediately.
+    log.findNext(re.escape("Acquired 1 IPU(s): running on device Id 2"))
+    # Devices 0 & 1 are in use so we'll get device 2.
+    log.findNext("Attached to device 2")
+    log.findNext("Finished Poplar compilation")

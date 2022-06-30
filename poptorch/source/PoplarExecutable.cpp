@@ -177,6 +177,9 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors) {
 }
 
 void PoplarExecutable::loadEngineAndConnectStreams() {
+  if (!_compiler.isAttachedToDevice()) {
+    _compiler.attachToDevice();
+  }
   _compiler.loadEngineAndConnectStreams();
 }
 
