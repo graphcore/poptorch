@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+from inspect import currentframe, getframeinfo
+
 import pytest
 import torch
 import torch.nn as nn
@@ -170,17 +172,26 @@ def test_untracable_type_error():
         def forward(self, t, f):
             return t + torch.tensor([f])
 
+    frame = getframeinfo(currentframe())
+    fwd_line = frame.lineno - 3
+
     x = torch.tensor([3.4])
     options = poptorch.Options()
     options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(Model(), options)
 
-    with pytest.raises(
-            TypeError,
-            match=
-            r"All forward function arguments used to compile and run the model "
-            r"must be Tensors or \(possibly nested\) Lists and Tuples of "
-            r"Tensors \(Got types: \[Tensor, float\]\)."):
+    error_message = (
+        r"Cannot trace forward function in .*/misc_test\.py:"
+        r"<class 'misc_test\.test_untracable_type_error\."
+        r"<locals>\.Model'>:" + str(fwd_line) + r" with input types "
+        r"\[Tensor, float\]\. All forward function arguments used"
+        r" to compile and run the model must be Tensors or"
+        r" \(possibly nested\) Lists and Tuples of Tensors\."
+        r" \nTo resolve this error you must either convert any"
+        r" problem arguments to Tensor inputs or define them class"
+        r" attributes\.")
+
+    with pytest.raises(TypeError, match=error_message):
         poptorch_model(x, 5.6)
 
 

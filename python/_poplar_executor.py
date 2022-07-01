@@ -2,6 +2,7 @@
 import collections
 import copy
 import functools
+import inspect
 import itertools
 import os
 import pickle
@@ -1201,11 +1202,23 @@ class PoplarExecutor:
                 match = re.match(pattern, str(e))
                 if match:
                     types = match.group(1)
-                    raise TypeError(
-                        "All forward function arguments used to compile and "
-                        "run the model must be Tensors or (possibly nested) "
-                        f"Lists and Tuples of Tensors (Got types: {types})."
-                    ).with_traceback(e.__traceback__)
+                    forward_func_file_name = inspect.getsourcefile(
+                        self._model.forward)
+                    forward_func_lines = inspect.getsourcelines(
+                        self._model.forward)
+
+                    err_str = f"Cannot trace forward function in"\
+                              f" {forward_func_file_name}:{type(self._model)}"\
+                              f":{forward_func_lines[1]} with input types"\
+                              f" {types}. All forward function arguments used"\
+                              f" to compile and run the model must be Tensors"\
+                              f" or (possibly nested) Lists and Tuples of"\
+                              f" Tensors. \nTo resolve this error you must"\
+                              f" either convert any problem arguments to"\
+                              f" Tensor inputs or define them class"\
+                              f" attributes."
+
+                    raise TypeError(err_str).with_traceback(e.__traceback__)
                 raise e
 
             # pylint: disable=protected-access
