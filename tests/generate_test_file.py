@@ -107,7 +107,7 @@ serial_tests = [
 def add_test(output, test, root_folder, folder, test_id, test_properties):
     output.write(
         f"add_test({test} \"{root_folder}/timeout_handler.py\" \"python3\""
-        f" \"-m\" \"pytest\" \"-s\" \"{folder}/{test}\" "
+        f" \"-m\" \"pytest\" \"-sv\" \"{folder}/{test}\" "
         f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
 
     props_string = " ".join(f"{k} {v}" for k, v in test_properties.items())
