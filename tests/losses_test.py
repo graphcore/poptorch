@@ -19,15 +19,27 @@ def loss_harness(trace_model,
                  op=None,
                  training=True,
                  **kwargs):
+    def moveTo(structure, device):
+        if isinstance(structure, dict):
+            return {k: moveTo(v, device) for k, v in structure.items()}
+        if torch.is_tensor(structure):
+            return structure.to(device)
+        return structure
 
     if len(inputs) == 1:
-        loss_fn = lambda x: loss(x, target, reduction=reduction, **kwargs)
+        loss_fn = lambda x: loss(x,
+                                 target.to(x.device),
+                                 reduction=reduction,
+                                 **moveTo(kwargs, x.device))
 
         if op is None:
             op = lambda x: x
     elif len(inputs) == 2:
-        loss_fn = lambda x, y: loss(
-            x, y, target, reduction=reduction, **kwargs)
+        loss_fn = lambda x, y: loss(x,
+                                    y,
+                                    target.to(x.device),
+                                    reduction=reduction,
+                                    **moveTo(kwargs, x.device))
 
         if op is None:
             op = lambda x, y: (x, y)
@@ -36,7 +48,8 @@ def loss_harness(trace_model,
         assert len(inputs) == 3
         # The only supported loss fn with 3 inputs is TripletMarginLoss
         # which has no "target" per se
-        loss_fn = lambda x, y, z: loss(x, y, z, reduction=reduction, **kwargs)
+        loss_fn = lambda x, y, z: loss(
+            x, y, z, reduction=reduction, **moveTo(kwargs, x.device))
 
         if op is None:
             op = lambda x, y, z: (x, y, z)
@@ -46,7 +59,8 @@ def loss_harness(trace_model,
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(
-        model) if training else poptorch.inferenceModel(model, trace_model)
+        model, options) if training else poptorch.inferenceModel(
+            model, options)
 
     native_out, _ = model(tuple(inputs))
     poptorch_out, poptorch_loss = poptorch_model(tuple(inputs))
@@ -398,6 +412,10 @@ def test_SmoothL1Loss(reduction, trace_model):
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_SoftMarginLoss(reduction, trace_model):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): Could not find canonicalisation handler for "
+            "JIT symbol: aten::resize_")
     torch.manual_seed(42)
 
     input = torch.empty(10).uniform_()
@@ -499,6 +517,10 @@ def test_TripletMarginLoss(p, swap, reduction, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("zero_infinity", [True, False])
 def test_CTCLoss(blank, reduction, trace_model, zero_infinity):
+    if not trace_model:
+        pytest.skip(
+            "TODO(T57195): Could not find canonicalisation handler for "
+            "JIT symbol: aten::_ctc_loss")
 
     T = 10  # Input sequence length
     N = 4  # Batch size

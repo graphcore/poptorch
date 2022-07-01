@@ -202,10 +202,6 @@ def test_dropout_inference(dropout_op, trace_model):
 @pytest.mark.parametrize("dropout_op", dropout_ops)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dropout_eval_during_training(dropout_op, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
     torch.manual_seed(42)
     dropout = dropout_op()
     dropout.eval()

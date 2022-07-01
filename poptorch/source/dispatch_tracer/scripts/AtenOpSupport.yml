@@ -1128,6 +1128,36 @@
 - func: smooth_l1_loss
   PopTorchDirect: smooth_l1_loss
 
+# func: l1_loss.out(Tensor self, Tensor target, int reduction=Mean, *, Tensor(a!) out) -> Tensor(a!)
+- func: l1_loss.out
+  PopTorchDirect: l1_loss
+  UnusedOutputArguments: {out}
+
+# func: cosine_embedding_loss(Tensor input1, Tensor input2, Tensor target, float margin=0.0, int reduction=Mean) -> Tensor
+- func: cosine_embedding_loss
+  PopTorchDirect: cosine_embedding_loss
+
+# func: hinge_embedding_loss(Tensor self, Tensor target, float margin=1.0, int reduction=Mean) -> Tensor
+- func: hinge_embedding_loss
+  PopTorchDirect: hinge_embedding_loss
+
+# func: kl_div(Tensor self, Tensor target, int reduction=Mean, *, bool log_target=False) -> Tensor
+- func: kl_div
+  PopTorchDirect: kl_div
+
+# func: margin_ranking_loss(Tensor input1, Tensor input2, Tensor target, float margin=0.0, int reduction=Mean) -> Tensor
+- func: margin_ranking_loss
+  PopTorchDirect: margin_ranking_loss
+
+# func: poisson_nll_loss(Tensor input, Tensor target, bool log_input, bool full, float eps, int reduction) -> Tensor
+- func: poisson_nll_loss
+  PopTorchDirect: poisson_nll_loss
+
+# func: triplet_margin_loss(Tensor anchor, Tensor positive, Tensor negative, float margin=1.0, float p=2, float eps=1e-06, bool swap=False, int reduction=Mean) -> Tensor
+- func: triplet_margin_loss
+  PopTorchDirect: triplet_margin_loss
+
+
 ###########
 # Pooling
 ###########

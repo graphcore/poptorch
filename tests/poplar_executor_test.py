@@ -482,11 +482,6 @@ def test_get_cycles_no_hw(trace_model):
 @pytest.mark.parametrize("rewrap_executor", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_rewrap_model(rewrap_executor, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()

@@ -118,8 +118,8 @@ def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted,
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T57195): 'popart_exception': Could not find loss"
-                    "tensor '' in main graph tensors")
+        pytest.skip("TODO(T57195): AssertionError: Popart IR should contain a "
+                    "checkpoint")
     size = 3
 
     class Model(torch.nn.Module):
@@ -148,8 +148,8 @@ def test_recomputation_checkpoint_tensor(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor_two_inputs(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T57195): 'popart_exception': Could not find loss"
-                    "tensor '' in main graph tensors")
+        pytest.skip("TODO(T57195): AssertionError: Popart IR should contain a "
+                    "checkpoint")
     size = 3
 
     class Model(torch.nn.Module):
@@ -184,8 +184,8 @@ def test_recomputation_checkpoint_tensor_two_inputs(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor_tuple_inputs(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T57195): 'popart_exception': Could not find loss"
-                    "tensor '' in main graph tensors")
+        pytest.skip("TODO(T57195): AssertionError: Popart IR should contain a "
+                    "checkpoint")
     size = 3
 
     class Model(torch.nn.Module):

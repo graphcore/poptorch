@@ -257,10 +257,6 @@ def run_gradient_accumulation_test(input, target, gradient_accumulations,
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gradient_accumulation_training(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor ''"
-            " in main graph tensors")
     torch.manual_seed(42)
 
     target = torch.randn(4, 10)

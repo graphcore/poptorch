@@ -62,4 +62,14 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("constant_pad_nd", PTC_BOXED(poptorch::fallback));
   m.impl("binary_cross_entropy_with_logits", PTC_BOXED(poptorch::fallback));
   m.impl("binary_cross_entropy_with_logits_backward", PTC_BOXED(poptorch::fallback));
+
+  // Loss functions: these are needed for popart, so that we can mark the loss
+  // tensor (see `IsLoss`); otherwise, the op will get decomposed by PyTorch.
+  m.impl("cosine_embedding_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("hinge_embedding_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("kl_div", PTC_BOXED(poptorch::fallback));
+  m.impl("l1_loss.out", PTC_BOXED(poptorch::fallback));
+  m.impl("margin_ranking_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("poisson_nll_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("triplet_margin_loss", PTC_BOXED(poptorch::fallback));
 }

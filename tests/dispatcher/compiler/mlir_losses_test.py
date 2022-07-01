@@ -401,12 +401,9 @@ def test_binary_cross_entropy_with_logits_backward(reduction, num_dims):
 def test_smooth_l1_loss_forward(reduction, num_dims, beta):
     torch.manual_seed(42)
 
-    if num_dims == 1:
-        input_dims = [5]
-    if num_dims == 2:
-        input_dims = [3, 4]
-    input1 = torch.rand(input_dims)
-    input2 = torch.rand(input_dims)
+    input_shape = tuple(range(3, 3 + num_dims))
+    input1 = torch.rand(input_shape)
+    input2 = torch.rand(input_shape)
 
     def smooth_l1_loss(t1, t2):
         return F.smooth_l1_loss(t1, t2, reduction=reduction, beta=beta)
@@ -416,3 +413,23 @@ def test_smooth_l1_loss_forward(reduction, num_dims, beta):
     err_msg = "smooth_l1_loss cannot currently be lowered to Poplar"
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         IPUContext(smooth_l1_loss)(input1, input2)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
+@pytest.mark.parametrize("num_dims", [1, 2])
+def test_l1_loss_forward(reduction, num_dims):
+    torch.manual_seed(42)
+
+    input_shape = tuple(range(3, 3 + num_dims))
+    input1 = torch.rand(input_shape)
+    input2 = torch.rand(input_shape)
+
+    def l1_loss(t1, t2):
+        return F.l1_loss(t1, t2, reduction=reduction)
+
+    l1_loss(input1, input2)
+
+    err_msg = r"l1_loss(\.out)? cannot currently be lowered to Poplar"
+    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+        IPUContext(l1_loss)(input1, input2)

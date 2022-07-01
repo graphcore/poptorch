@@ -109,10 +109,6 @@ def execute_and_check_wrapper(trace_model,
 @pytest.mark.parametrize("training", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_conv1D(op, padding_mode, training, trace_model):
-    if not trace_model and training:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
     # This combination doesn't exist in upstream Torch:
     # ValueError: Only "zeros" padding mode is supported for ConvTranspose1d
     if (op is torch.nn.ConvTranspose1d and padding_mode != 'zeros'):
@@ -145,10 +141,6 @@ def test_conv1D(op, padding_mode, training, trace_model):
 @pytest.mark.parametrize("training", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_conv2D(op, padding_mode, training, trace_model):
-    if not trace_model and training:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
     if (op is torch.nn.ConvTranspose2d and padding_mode != 'zeros') or \
        padding_mode == 'circular': # TODO(T31811)
         pytest.skip('skipping unsupported padding_mode')
@@ -206,10 +198,6 @@ def test_conv2D(op, padding_mode, training, trace_model):
 @pytest.mark.parametrize("training", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_conv3D(op, padding_mode, training, trace_model):
-    if not trace_model and training:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
     if (op is torch.nn.ConvTranspose3d and padding_mode != 'zeros') or \
        (op is torch.nn.Conv3d and padding_mode == 'reflect') or \
        padding_mode == 'circular': # TODO(T31811)
@@ -431,10 +419,6 @@ def test_available_memory_automatic(trace_model):
 @pytest.mark.parametrize("training", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_cumsum(dim, training, trace_model):
-    if not trace_model and training:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor '' "
-            "in main graph tensors")
     torch.manual_seed(42)
 
     op = lambda x: torch.cumsum(x, dim=dim)

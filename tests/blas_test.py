@@ -107,10 +107,6 @@ def test_bmm(optional_out, trace_model):
 @pytest.mark.parametrize("bias", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_matmul_training(bias, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': Could not find loss tensor ''"
-            " in main graph tensors")
     N, M, K, C = 100, 9, 7, 5
 
     class Net(torch.nn.Module):
