@@ -318,13 +318,15 @@ std::string castToString(py::handle obj) {
   ERROR("Don't know how to convert type " << obj.get_type() << " to string");
 }
 
-void parseAnchors(AnchorList *map, const py::list &list) {
+AnchorList parseAnchors(const py::list &list) {
+  AnchorList map;
   for (auto elem : list) {
     auto anchor = elem.cast<py::list>();
-    Anchor a(anchor[0].cast<std::string>(), anchor[2].cast<std::uint64_t>(),
-             anchor[3].cast<std::uint64_t>());
-    map->push_back(a);
+    map.push_back(Anchor(anchor[0].cast<std::string>(),
+                         anchor[2].cast<std::uint64_t>(),
+                         anchor[3].cast<std::uint64_t>()));
   }
+  return map;
 }
 
 SessionOptions parseSessionOptions(const py::dict &opts) {
@@ -735,8 +737,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   // possible moment due to tracing.
   initCallbackBuffers();
 
-  AnchorList anchors_list;
-  parseAnchors(&anchors_list, anchors);
+  AnchorList anchors_list = parseAnchors(anchors);
 
   poptorch::logging::Tracepoint::end(poptorch_passes);
   poptorch::logging::Tracepoint::begin(lower_to_popart);
@@ -753,10 +754,9 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
   return lower;
 }
 
-poptorch::LowerToPopart
-lowerToPopartFromDispatch(const pybind11::dict &options,
-                          const py::function &attribute_accessor,
-                          bool is_training, const py::dict &opt_dict) {
+poptorch::LowerToPopart lowerToPopartFromDispatch(
+    const pybind11::dict &options, const py::function &attribute_accessor,
+    bool is_training, const py::dict &opt_dict, const py::list &anchors) {
   auto cleanup = CallOnExit([] {
     // Clear the callbacks after compilation.
     callbacks.clear();
@@ -764,7 +764,7 @@ lowerToPopartFromDispatch(const pybind11::dict &options,
 
   SessionOptions parsed_options = parseSessionOptions(options);
 
-  AnchorList anchors_list;
+  AnchorList anchors_list = parseAnchors(anchors);
   std::vector<Optimizer> optimizers = parseOptimizers(opt_dict);
 
   InplaceGraphInfo inplace_info = getInplaceGraphInfo(
@@ -1211,23 +1211,21 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
   return lower.compile();
 }
 
-std::shared_ptr<poptorch::PoplarExecutable>
-processDispatchAndImportExecutable(const pybind11::dict &options,
-                                   const py::function &attribute_accessor,
-                                   bool is_training, const py::dict &opt_dict,
-                                   const std::string &import_filename) {
+std::shared_ptr<poptorch::PoplarExecutable> processDispatchAndImportExecutable(
+    const pybind11::dict &options, const py::function &attribute_accessor,
+    bool is_training, const py::dict &opt_dict, const py::list &anchors,
+    const std::string &import_filename) {
   auto lower = lowerToPopartFromDispatch(options, attribute_accessor,
-                                         is_training, opt_dict);
+                                         is_training, opt_dict, anchors);
   return lower.loadExecutableFromFile(import_filename);
 }
-std::shared_ptr<poptorch::PoplarExecutable>
-compileWithManualTracing(const pybind11::dict &options,
-                         const py::function &attribute_accessor,
-                         bool is_training, const py::dict &opt_dict) {
+std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
+    const pybind11::dict &options, const py::function &attribute_accessor,
+    bool is_training, const py::dict &opt_dict, const py::list &anchors) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
   logging::debug("Compile with manual tracing");
   auto lower = lowerToPopartFromDispatch(options, attribute_accessor,
-                                         is_training, opt_dict);
+                                         is_training, opt_dict, anchors);
   return lower.compile();
 }
 

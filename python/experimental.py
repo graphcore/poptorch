@@ -155,7 +155,8 @@ class IPUScope:
             # Compile the captured graph using PopART.
             self._executable = poptorch_core.compileWithManualTracing(
                 self._options.toDict(), accessAttributes, self._training,
-                self._dict_optimizer)
+                self._dict_optimizer,
+                list(self._options.anchored_tensors.values()))
         else:
             # Compile the captured graph using MLIR.
             self._executable = poptorch_core.compileWithMLIR()
@@ -166,7 +167,8 @@ class IPUScope:
             # Compile the captured graph using PopART.
             self._executable = poptorch_core.processDispatchAndImportExecutable(
                 self._options.toDict(), accessAttributes, self._training,
-                self._dict_optimizer, filename)
+                self._dict_optimizer,
+                list(self._options.anchored_tensors.values()), filename)
         else:
             raise _impl.createPoptorchError("Not supported: can't deserialize "
                                             "MLIR executables")

@@ -44,13 +44,16 @@ def test_tensor_names(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_tensor_values(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): pop from empty list")
     model = Model()
 
+    # The optimizer wrapper in the training model add an extra prefix to the
+    # parameter names
+    model_prefix = 'model.' if trace_model else ''
+
     opts = poptorch.Options()
-    opts.anchorTensor('grad_bias', 'Gradient___model.fc2.bias')
-    opts.anchorTensor('update_weight', 'UpdatedVar___model.fc2.weight')
+    opts.anchorTensor('grad_bias', f'Gradient___{model_prefix}fc2.bias')
+    opts.anchorTensor('update_weight',
+                      f'UpdatedVar___{model_prefix}fc2.weight')
     opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.trainingModel(model, opts)
 
@@ -87,11 +90,12 @@ output_modes = [[poptorch.OutputMode.All, 3, "ALL/1"],
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_tensor_modes(capfd, mode, period, expected_str, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): poptorch/_utils.py:110: StopIteration "
-                    "(in copy_structure)")
+    # The optimizer wrapper in the training model add an extra prefix to the
+    # parameter names
+    model_prefix = 'model.' if trace_model else ''
+
     model = Model()
-    tensor_name = 'Gradient___model.fc2.bias'
+    tensor_name = f'Gradient___{model_prefix}fc2.bias'
 
     opts = poptorch.Options()
     opts.anchorTensor('grad_bias', tensor_name, mode, period)
