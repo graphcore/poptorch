@@ -12,8 +12,9 @@ New features
 - Improved error message when trying to apply bitwise ops to unsupported scalar types.
 - Support for upsample bicubic mode.
 - Support for ``zero_infinity`` in ``torch.nn.CTCLoss``.
-- Experimental support for Torch's dispatcher as an alternative to ``torch.jit.trace()`` (see ref:`dispatcher-support`).
+- Experimental support for Torch's dispatcher as an alternative to ``torch.jit.trace()`` (see :numref:`dispatcher-support`).
 - Improved performance by compiling built-in custom ops at install time.
+
 
 API changes
 -----------
