@@ -796,6 +796,10 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
 
   canonicalizeLate(graph.get());
 
+  if (is_training) {
+    poptorch::removeSurplusIdentityLosses(graph.get());
+  }
+
   // Prepare CPU op callbacks, by allocating the CPU tensors where the
   // inputs/outputs will be stored. We have to do this at the last possible
   // moment due to tracing.

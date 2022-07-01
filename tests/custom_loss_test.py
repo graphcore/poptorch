@@ -12,8 +12,6 @@ import poptorch
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_non_final_loss_reductions(reduction, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
     torch.manual_seed(42)
 
     base_model = torch.nn.Linear(10, 10)
@@ -69,12 +67,19 @@ def test_non_final_loss_reductions(reduction, trace_model):
 
 # Test custom loss by training to targets
 def run_custom_loss_test(loss_fn,
-                         base_model=torch.nn.Linear(10, 10),
-                         input=torch.randn(1, 10),
-                         target=torch.randint(0, 10, [1]),
+                         base_model=None,
+                         input=None,
+                         target=None,
                          test_output_vs_target=True,
                          trace_model=True):
     torch.manual_seed(42)
+
+    if base_model is None:
+        base_model = torch.nn.Linear(10, 10)
+    if input is None:
+        input = torch.randn(1, 10)
+    if target is None:
+        target = torch.randint(0, 10, [1])
 
     class ModelWithLoss(torch.nn.Module):
         def __init__(self):
@@ -129,8 +134,7 @@ def run_custom_loss_test(loss_fn,
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_custom_loss(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
+    torch.manual_seed(42)
 
     class CustomLoss(torch.nn.Module):
         # Mean squared error scaled.
@@ -147,8 +151,7 @@ def test_custom_loss(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_custom_loss_l1(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
+    torch.manual_seed(42)
 
     class CustomLoss(torch.nn.Module):
         # Mean squared error scaled.
@@ -165,8 +168,7 @@ def test_custom_loss_l1(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_custom_loss_nll(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
+    torch.manual_seed(42)
 
     class CustomLoss(torch.nn.Module):
         # Mean squared error scaled.
@@ -200,8 +202,8 @@ def test_custom_loss_nll(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_two_custom_losses(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
+    torch.manual_seed(42)
+
     base_model = torch.nn.Sequential(torch.nn.Linear(10, 10),
                                      torch.nn.LogSoftmax(dim=1))
 
@@ -223,8 +225,8 @@ def test_two_custom_losses(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_two_custom_losses_with_id_wrapper(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
+    torch.manual_seed(42)
+
     base_model = torch.nn.Sequential(torch.nn.Linear(10, 10),
                                      torch.nn.LogSoftmax(dim=1))
 
@@ -243,8 +245,6 @@ def test_two_custom_losses_with_id_wrapper(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_no_loss(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): could not find loss tensor")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):
