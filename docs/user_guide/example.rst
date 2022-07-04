@@ -7,9 +7,9 @@ You can find PyTorch examples and tutorials in the Graphcore GitHub repositories
 
 * `Tutorials repo <https://github.com/graphcore/tutorials>`__ with:
 
-  - `Tutorials <https://github.com/graphcore/tutorials/tree/sdk-release-2.4/tutorials/pytorch>`__
-  - `Examples of PopTorch and IPU features <https://github.com/graphcore/tutorials/tree/sdk-release-2.4/feature_examples/pytorch>`__
-  - `Examples of simple models <https://github.com/graphcore/tutorials/tree/sdk-release-2.4/simple_applications/pytorch>`__
+  - `Tutorials <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/tutorials/pytorch>`__
+  - `Examples of PopTorch and IPU features <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/feature_examples/pytorch>`__
+  - `Examples of simple models <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/simple_applications/pytorch>`__
   - Source code from videos, blogs and other documents
 
 MNIST example
