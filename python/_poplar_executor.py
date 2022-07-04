@@ -555,11 +555,6 @@ class PoplarExecutor:
             self._write_optim_state_dict_if_needed()
 
     def _compileWithDispatch(self, in_tensors, executable_filename=None):
-        # Store cpu buffer and parameter memory addresses for use when moving
-        # the optimizer to the ipu
-        buff_param_addresses = _impl.getBufferAndParameterAddresses(
-            self._model)
-
         module_namescope = _impl.NameScopeHook(
             self._user_model
         ) if self.options._module_namescope_enabled else None  # pylint: disable=protected-access
@@ -572,35 +567,8 @@ class PoplarExecutor:
                              model=self._model,
                              options=self._options,
                              training=self._training,
+                             optimizer=self._optimizer,
                              dict_optimizer=self._dict_optimizer)
-            if self._optimizer:
-                # The optimizer was created using the CPU model, therefore it points at CPU tensors.
-                # We need to remap those to IPU tensors.
-                # IPUContext moved 'model' to the IPU, therefore we need to join the two maps and
-                # then remap the parameters from the optimizer.
-                # From:
-                #
-                # cpu_tensors[name] = cpu_data_ptr
-                # ipu_tensors[name] = ipu_tensor
-                #
-                # we build:
-                #
-                # cpu_to_ipu[cpu_data_ptr] = ipu_tensor
-                #
-                # And then remap all the tensors from group["params"]
-                cpu_tensors = {
-                    **buff_param_addresses[0],
-                    **buff_param_addresses[1]
-                }
-                ipu_tensors = _impl.getBufferAndParameterTensors(self._model)
-                cpu_to_ipu = {
-                    cpu_tensors[n][1]: ipu
-                    for n, ipu in ipu_tensors.items()
-                }
-                for index, group in enumerate(self._optimizer.param_groups):
-                    torch.ops.poptorch.optimizer_group(index, [
-                        cpu_to_ipu[cpu.data_ptr()] for cpu in group["params"]
-                    ])
             if executable_filename is not None:
                 ctx.loadExecutable(executable_filename, *in_tensors.args,
                                    **in_tensors.kwargs)

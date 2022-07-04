@@ -7,6 +7,7 @@ import torch
 from . import enums, poptorch_core, _impl, accessAttributes
 from ._utils import flattenTensorStructure, reconstructTensorStructure, isOnIpu
 from .options import Options
+from .optim import Optimizer
 
 
 class IPUScope:
@@ -16,6 +17,7 @@ class IPUScope:
                  options: Optional['poptorch.Options'] = None,
                  training: bool = False,
                  dict_optimizer: Optional[dict] = None,
+                 optimizer: Optimizer = None,
                  compile_using=enums.Compiler.PopART,
                  skip_compilation=False):
 
@@ -42,6 +44,7 @@ class IPUScope:
             self._options = self._options.outputMode(enums.OutputMode.All)
 
         self._training = training
+        self._optimizer = optimizer
         self._dict_optimizer = {} if dict_optimizer is None else dict_optimizer
 
         self._compile_using = compile_using
@@ -62,6 +65,36 @@ class IPUScope:
             self._options._source_location_excludes)
 
         self._old_addresses = {}
+
+    def register_optimizer_groups(self):
+        # The optimizer was created using the CPU model, therefore it points
+        # at CPU tensors.  We need to remap those to IPU tensors.
+        # IPUContext moved 'model' to the IPU, therefore we need to join the
+        # two maps and then remap the parameters from the optimizer.
+        # From:
+        #
+        # cpu_tensors[name] = cpu_data_ptr
+        # ipu_tensors[name] = ipu_tensor
+        #
+        # we build:
+        #
+        # cpu_to_ipu[cpu_data_ptr] = ipu_tensor
+        #
+        # And then remap all the tensors from group["params"]
+        if self._model and self._optimizer:
+            cpu_tensors = {
+                **self._cpu_buffers,
+                **self._cpu_params,
+            }
+            ipu_tensors = _impl.getBufferAndParameterTensors(self._model)
+            cpu_to_ipu = {
+                cpu_tensors[n].data_ptr(): ipu
+                for n, ipu in ipu_tensors.items()
+            }
+            for index, group in enumerate(self._optimizer.param_groups):
+                torch.ops.poptorch.optimizer_group(
+                    index,
+                    [cpu_to_ipu[cpu.data_ptr()] for cpu in group["params"]])
 
     # Start capturing calls.
     def __enter__(self):
@@ -100,6 +133,9 @@ class IPUScope:
         _impl.setDispatchTracing(True)
         _impl.setIpuContext(True)
         self._options._execution_strategy.onStartTracing()  # pylint: disable=protected-access
+
+        self.register_optimizer_groups()
+
         return self
 
     # Exit the scope. Compile graph and stop capturing call
@@ -224,14 +260,15 @@ class IPUScope:
 #               call after compilation so that changes to wrapped values
 #               can be picked up
 class _IPUContext:
-    def __init__(self, func, compiler, options, training, dict_optimizer,
-                 model):
+    def __init__(self, func, compiler, options, training, optimizer,
+                 dict_optimizer, model):
         functools.update_wrapper(self, func)
         self.func = func
         self.ipu = None
         self.compiler = compiler
         self.options = options
         self.training = training
+        self.optimizer = optimizer
         self.dict_optimizer = dict_optimizer
         self.model = model
 
@@ -248,6 +285,7 @@ class _IPUContext:
                       model=self.model,
                       options=self.options,
                       training=self.training,
+                      optimizer=self.optimizer,
                       dict_optimizer=self.dict_optimizer,
                       compile_using=self.compiler,
                       skip_compilation=filename is not None) as ipu:
@@ -306,6 +344,7 @@ def IPUContext(func=None,
                compiler=enums.Compiler.MLIR,
                options: Optional['poptorch.Options'] = None,
                training: bool = False,
+               optimizer: Optimizer = None,
                dict_optimizer: Optional[dict] = None,
                model: Optional['torch.nn.Module'] = None):
     if dict_optimizer is None:
@@ -317,11 +356,11 @@ def IPUContext(func=None,
     if func is None:
 
         def wrapper(f):
-            return _IPUContext(f, compiler, options, training, dict_optimizer,
-                               model)
+            return _IPUContext(f, compiler, options, training, optimizer,
+                               dict_optimizer, model)
 
         return wrapper
     # Otherwise the decorator has no extra args: just pass the
     # default arguments
-    return _IPUContext(func, compiler, options, training, dict_optimizer,
-                       model)
+    return _IPUContext(func, compiler, options, training, optimizer,
+                       dict_optimizer, model)

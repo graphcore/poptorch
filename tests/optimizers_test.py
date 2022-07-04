@@ -104,8 +104,6 @@ class OptimizerTestModel:
 @pytest.mark.parametrize("opt", all_optimizers)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_optimizer(opt, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): assert tensor(3.1870) < tensor(3.1870)")
     torch.manual_seed(42)
 
     options = poptorch.Options()
@@ -284,8 +282,6 @@ def test_velocity_scaling_copy(use_combined_accum, trace_model):
     })
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_optimizer_groups(opt, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): AssertionError: results mismatch")
     torch.manual_seed(42)
 
     options = poptorch.Options()
@@ -376,8 +372,6 @@ def test_optimizer_groups(opt, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_optimizer_groups_none_args(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): AssertionError: results mismatch")
     torch.manual_seed(42)
 
     options = poptorch.Options()
@@ -1269,12 +1263,6 @@ def test_gradient_clipping_with_pipelining(trace_model):
 @pytest.mark.parametrize("optim", poptorch_optimizers)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_read_ipu_state(optim, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): AssertionError: assert "
-                    "'learningRate___specific___model.lin.bias' in "
-                    "dict_keys(['adamGradientScaling___default___FLOAT', "
-                    "'learningRate___default___FLOAT', 'lossScaling_FLOAT', "
-                    "'weightDecay___default___FLOAT'")
     torch.manual_seed(42)
     input = torch.randn(3)
     # A simple model with weights and a loss function
@@ -1303,17 +1291,19 @@ def test_read_ipu_state(optim, trace_model):
     s0 = optimizer.state_dict()
     assert_is_ipu_optimizer_state(s0, should_be_empty=False)
 
+    model_prefix = 'model.' if trace_model else ''
+
     sgd_param_keys = [
-        "scaledLearningRate0___specific___model.lin.bias",
-        "scaledLearningRate0___specific___model.lin.weight",
-        "weightDecayScaleFactor0___specific___model.lin.bias",
-        "weightDecayScaleFactor0___specific___model.lin.weight"
+        f"scaledLearningRate0___specific___{model_prefix}lin.bias",
+        f"scaledLearningRate0___specific___{model_prefix}lin.weight",
+        f"weightDecayScaleFactor0___specific___{model_prefix}lin.bias",
+        f"weightDecayScaleFactor0___specific___{model_prefix}lin.weight"
     ]
     non_sgd_param_keys = [
-        "learningRate___specific___model.lin.bias",
-        "learningRate___specific___model.lin.weight",
-        "weightDecay___specific___model.lin.bias",
-        "weightDecay___specific___model.lin.weight"
+        f"learningRate___specific___{model_prefix}lin.bias",
+        f"learningRate___specific___{model_prefix}lin.weight",
+        f"weightDecay___specific___{model_prefix}lin.bias",
+        f"weightDecay___specific___{model_prefix}lin.weight"
     ]
 
     # Check that shared keys are present and user provided values are read
@@ -1327,7 +1317,7 @@ def test_read_ipu_state(optim, trace_model):
         wdsf0 = 1 - lr * wd
         helpers.assert_allclose(
             actual=s0["ipu_param"]
-            ["weightDecayScaleFactor0___specific___model.lin.bias"],
+            [f"weightDecayScaleFactor0___specific___{model_prefix}lin.bias"],
             expected=torch.tensor(wdsf0))
 
         # scaledLearningRate0 =
@@ -1335,21 +1325,26 @@ def test_read_ipu_state(optim, trace_model):
         slr0 = lr / ls
         helpers.assert_allclose(
             actual=s0["ipu_param"]
-            ["scaledLearningRate0___specific___model.lin.bias"],
+            [f"scaledLearningRate0___specific___{model_prefix}lin.bias"],
             expected=torch.tensor(slr0))
     else:
         # Only non-SGD optimisers have state tensors
-        state_keys = ["Accl1___model.lin.weight", "Accl1___model.lin.bias"]
+        state_keys = [
+            f"Accl1___{model_prefix}lin.weight",
+            f"Accl1___{model_prefix}lin.bias"
+        ]
         for k in non_sgd_param_keys:
             assert k in s0["ipu_param"].keys()
         for k in state_keys:
             assert k in s0["ipu_state"].keys()
 
         helpers.assert_allclose(
-            actual=s0["ipu_param"]["learningRate___specific___model.lin.bias"],
+            actual=s0["ipu_param"]
+            [f"learningRate___specific___{model_prefix}lin.bias"],
             expected=torch.tensor(lr))
         helpers.assert_allclose(
-            actual=s0["ipu_param"]["weightDecay___specific___model.lin.bias"],
+            actual=s0["ipu_param"]
+            [f"weightDecay___specific___{model_prefix}lin.bias"],
             expected=torch.tensor(wd))
 
         # Run the model, get the updated state dict and check optimiser state tensors have changed
@@ -1663,10 +1658,6 @@ def test_LR_scheduler(capfd, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_write_ipu_state_from_checkpoint(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): KeyError: 'learningRate___specific___model.lin.bias'"
-        )
     input = torch.ones(2)
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
     optimizer = poptorch.optim.Adam(model.parameters(), lr=1.0)
@@ -1686,6 +1677,8 @@ def test_write_ipu_state_from_checkpoint(trace_model):
     # Set the new LR
     training_model.setOptimizer(optimizer)
     s1 = optimizer.state_dict()
+
+    model_prefix = 'model.' if trace_model else ''
 
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "checkpoint.pt")
@@ -1713,7 +1706,7 @@ def test_write_ipu_state_from_checkpoint(trace_model):
         s3 = optimizer.state_dict()
         torch_lr = torch.tensor(s3["param_groups"][0]["lr"])
         poptorch_lr = s3["ipu_param"][
-            "learningRate___specific___model.lin.bias"]
+            f'learningRate___specific___{model_prefix}lin.bias']
         # Ensure the torch LR parameter is correct
         helpers.assert_allclose(actual=torch_lr, expected=torch.tensor(0.5))
         # Ensure the internal LR parameter matches
