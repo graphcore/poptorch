@@ -441,10 +441,6 @@ def test_pytorch_nn(test_name, use_half, trace_model):
     if reason is None:
         reason = HALF_EXPECTED_FAILURES.get(
             test_name) if use_half else FLOAT_EXPECTED_FAILURES.get(test_name)
-    if not trace_model and test_name in [
-            "test_nn_ConvTranspose2d_groups", "test_nn_ConvTranspose3d"
-    ]:
-        reason = "TODO(T62545): Add shape inference for transposed convolutions"
     if reason:
         pytest.skip(reason)
 

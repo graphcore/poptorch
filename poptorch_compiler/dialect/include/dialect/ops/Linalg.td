@@ -17,36 +17,47 @@ def Poptorch_conv : Poptorch_Op<"conv", []> {
                                 "const std::vector<std::int64_t>&":$padding, "const std::vector<std::int64_t>&":$dilation,
                                 "bool": $transposed,
                                 "const std::vector<std::int64_t>&":$output_padding, "std::int64_t":$groups), [{
-        ERROR_ON_MSG(transposed, "transposed=True not implemented"); // TODO(T62545)
         if (bias) {
             $_state.addOperands({input, weights, bias});
         } else {
             $_state.addOperands({input, weights});
         }
-        $_state.addAttribute("stride",$_builder.getI64ArrayAttr(stride));
-        $_state.addAttribute("padding",$_builder.getI64ArrayAttr(padding));
-        $_state.addAttribute("dilation",$_builder.getI64ArrayAttr(dilation));
-        $_state.addAttribute("output_padding",$_builder.getI64ArrayAttr(output_padding));
-        $_state.addAttribute("groups",$_builder.getI64IntegerAttr(groups));
-        $_state.addAttribute("transposed",$_builder.getBoolAttr(transposed));
+        $_state.addAttribute("stride", $_builder.getI64ArrayAttr(stride));
+        $_state.addAttribute("padding", $_builder.getI64ArrayAttr(padding));
+        $_state.addAttribute("dilation", $_builder.getI64ArrayAttr(dilation));
+        $_state.addAttribute("output_padding",
+                             $_builder.getI64ArrayAttr(output_padding));
+        $_state.addAttribute("groups", $_builder.getI64IntegerAttr(groups));
+        $_state.addAttribute("transposed", $_builder.getBoolAttr(transposed));
 
+        const auto weights_shape = getShape(weights);
+        const auto input_shape = getShape(input);
 
-        mlir::RankedTensorType weight_shape = weights.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 4> out_shape{input_shape.begin(),
+                                                     input_shape.end()};
 
-        mlir::RankedTensorType input_shape = input.getType().cast<mlir::RankedTensorType>();
-
-        llvm::SmallVector<std::int64_t, 4> out_shape {input_shape.getShape().begin(), input_shape.getShape().end()};
-
-        // See https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html for deduction rules.
-        out_shape[1] = weight_shape.getShape()[0];
-
-        for (std::size_t i = 0; i < out_shape.size() - 2; ++i) {
-            const std::size_t i_dim = i + 2;
-            out_shape[i_dim] = ((input_shape.getShape()[i_dim] + 2 * padding[i] - dilation[i] * (weight_shape.getShape()[i_dim] -1) - 1) / stride[i]) + 1;
+        // See https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
+        // and https://pytorch.org/docs/stable/generated/torch.nn.ConvTranspose2d.html
+        // for deduction rules.
+        
+        if (transposed) {
+            out_shape[1] = weights_shape[1];
+            for (std::size_t i = 0; i < out_shape.size() - 2; ++i) {
+                const std::size_t i_dim = i + 2;
+                out_shape[i_dim] = (input_shape[i_dim] - 1) * stride[i] - 2 *
+                                   padding[i] + dilation[i] *
+                                   (weights_shape[i_dim] - 1) +
+                                   output_padding[i] + 1;
+            }
+        } else {
+            out_shape[1] = weights_shape[0];
+            for (std::size_t i = 0; i < out_shape.size() - 2; ++i) {
+                const std::size_t i_dim = i + 2;
+                out_shape[i_dim] = ((input_shape[i_dim] + 2 * padding[i] - dilation[i] * (weights_shape[i_dim] -1) - 1) / stride[i]) + 1;
+            }
         }
 
-
-        $_state.addTypes(mlir::RankedTensorType::get(out_shape, input_shape.getElementType()));
+        $_state.addTypes(mlir::RankedTensorType::get(out_shape, getElementType(input)));
   }]>];
 }
 
@@ -78,7 +89,6 @@ def Poptorch_conv_backward : Poptorch_Op<"conv_backward", []> {
                                  "const std::vector<std::int64_t>&":$output_padding,
                                  "std::int64_t":$groups,
                                  "const std::vector<std::int64_t>&":$output_mask), [{
-        ERROR_ON_MSG(transposed, "transposed=True not implemented"); // TODO(T62545)
         $_state.addOperands({grad_output, input, weight});
         $_state.addAttribute("stride",$_builder.getI64ArrayAttr(stride));
         $_state.addAttribute("padding",$_builder.getI64ArrayAttr(padding));
@@ -88,10 +98,12 @@ def Poptorch_conv_backward : Poptorch_Op<"conv_backward", []> {
         $_state.addAttribute("transposed",$_builder.getBoolAttr(transposed));
         $_state.addAttribute("output_mask", $_builder.getI64ArrayAttr(output_mask));
 
-        mlir::RankedTensorType weight_type = weight.getType().cast<mlir::RankedTensorType>();
-        llvm::SmallVector<std::int64_t, 4> bias_shape = {weight_type.getShape()[0]};
+        const auto weight_type = weight.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 1> bias_shape = {weight_type.getShape()[0]};
 
-        $_state.addTypes({input.getType(), weight.getType(), mlir::RankedTensorType::get(bias_shape, weight_type.getElementType())});
+        $_state.addTypes({input.getType(), weight.getType(),
+                          mlir::RankedTensorType::get(bias_shape,
+                                                      weight_type.getElementType())});
   }]>];
 }
 

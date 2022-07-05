@@ -38,11 +38,6 @@ def execute_and_check_wrapper(trace_model,
                               training=True,
                               rtol=0.01,
                               atol=0.01):
-
-    if not trace_model and "ConvTranspose" in op.__class__.__name__:
-        pytest.skip(
-            "TODO(T62545): Add shape inference for transposed convolutions")
-
     if hasattr(op, 'padding_mode') and op.padding_mode != 'zeros':
         pytest.skip("TODO(T25617): PopART does not support PadGradOp when"
                     " mode is not 'constant'")
