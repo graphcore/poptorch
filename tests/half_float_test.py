@@ -413,11 +413,6 @@ def test_master_weight_training(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_bigger_model_training(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': np broadcasting failed on "
-            "Op 118 (ai.onnx.Add:7), incompatible types FLOAT16 and FLOAT "
-            "(shapes [10] and [10])")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):

@@ -270,11 +270,6 @@ def test_popart_partials(capfd, dtype, ptype, trace_model):
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_automatic_loss_scaling(capfd, optim, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): 'popart_exception': np broadcasting failed on "
-            "Op 109 (ai.onnx.Pow:7), incompatible types FLOAT16 and FLOAT "
-            "(shapes [5] and [])")
     input = torch.ones(5)
     # Just a simple model with weights and a loss function
     model = helpers.ModelWithWeights(lambda x: x, input.shape)
