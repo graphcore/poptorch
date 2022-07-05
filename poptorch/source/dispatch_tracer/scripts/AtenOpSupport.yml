@@ -1157,6 +1157,17 @@
 - func: triplet_margin_loss
   PopTorchDirect: triplet_margin_loss
 
+# func: ctc_loss.IntList(Tensor log_probs, Tensor targets, int[] input_lengths, int[] target_lengths, int blank=0, int reduction=Mean, bool zero_infinity=False) -> Tensor
+- func: ctc_loss.IntList
+  PopTorchDirect: ctc_loss_intlist
+
+# Note: The default implementation of .Tensor just calls .IntList, but we still
+# need to catch it as well since input_lengths & target_lengths will be
+# created from values copied to the CPU at trace time, which will be nonsense.
+# func: ctc_loss.Tensor(Tensor log_probs, Tensor targets, Tensor input_lengths, Tensor target_lengths, int blank=0, int reduction=Mean, bool zero_infinity=False) -> Tensor
+- func: ctc_loss.Tensor
+  PopTorchDirect: ctc_loss_tensor
+
 
 ###########
 # Pooling

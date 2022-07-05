@@ -571,8 +571,25 @@ torch::jit::Node *ctcLossHandler(torch::jit::Graph *graph,
                "CTCLoss with reduction=\"none\" is currently not supported");
 
   targets = createCast(graph, {targets}, "UINT32")->output();
-  input_lengths = createCast(graph, {input_lengths}, "UINT32")->output();
-  target_lengths = createCast(graph, {target_lengths}, "UINT32")->output();
+  if (input_lengths->type()->kind() == c10::TypeKind::TensorType) {
+    // aten::ctc_loss.Tensor
+    input_lengths = createCast(graph, {input_lengths}, "UINT32")->output();
+  } else {
+    // aten::ctc_loss.IntList: convert to tensor for popart::_ctcloss
+    const auto values = constantToLongVec(input_lengths->node());
+    const std::int64_t shape = values.size();
+    input_lengths = createConstantInt(graph, values, {shape})->output();
+  }
+
+  if (target_lengths->type()->kind() == c10::TypeKind::TensorType) {
+    // aten::ctc_loss.Tensor
+    target_lengths = createCast(graph, {target_lengths}, "UINT32")->output();
+  } else {
+    // aten::ctc_loss.IntList: convert to tensor for popart::_ctcloss
+    const auto values = constantToLongVec(target_lengths->node());
+    const std::int64_t shape = values.size();
+    target_lengths = createConstantInt(graph, values, {shape})->output();
+  }
 
   reduction = convertReduceToPopart(reduction);
   auto *loss =

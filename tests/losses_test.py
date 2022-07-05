@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import random
+
 import os  # pylint: disable=unused-import
 import unittest.mock
 import torch
@@ -28,7 +30,7 @@ def loss_harness(trace_model,
 
     if len(inputs) == 1:
         loss_fn = lambda x: loss(x,
-                                 target.to(x.device),
+                                 moveTo(target, x.device),
                                  reduction=reduction,
                                  **moveTo(kwargs, x.device))
 
@@ -37,7 +39,7 @@ def loss_harness(trace_model,
     elif len(inputs) == 2:
         loss_fn = lambda x, y: loss(x,
                                     y,
-                                    target.to(x.device),
+                                    moveTo(target, x.device),
                                     reduction=reduction,
                                     **moveTo(kwargs, x.device))
 
@@ -514,14 +516,11 @@ def test_TripletMarginLoss(p, swap, reduction, trace_model):
 
 @pytest.mark.parametrize("blank", {0, 3})
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
-@pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("zero_infinity", [True, False])
-def test_CTCLoss(blank, reduction, trace_model, zero_infinity):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Could not find canonicalisation handler for "
-            "JIT symbol: aten::_ctc_loss")
-
+@pytest.mark.parametrize("lengths_are_tensors", [True, False])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_CTCLoss(blank, reduction, zero_infinity, lengths_are_tensors,
+                 trace_model):
     T = 10  # Input sequence length
     N = 4  # Batch size
     C = 5  # Number of classes
@@ -531,13 +530,17 @@ def test_CTCLoss(blank, reduction, trace_model, zero_infinity):
     torch.manual_seed(42)
 
     # Initialize random batch of input vectors, for *size = (T,N,C)
-    input = torch.randn(T, N, C).log_softmax(2).detach()
-    input_lengths = torch.full(size=(N, ), fill_value=T, dtype=torch.long)
+    input = torch.randn(T, N, C).log_softmax(-1).detach()
 
-    target_lengths = torch.randint(low=S_min,
-                                   high=S,
-                                   size=(N, ),
-                                   dtype=torch.long)
+    if lengths_are_tensors:
+        input_lengths = torch.full(size=(N, ), fill_value=T, dtype=torch.long)
+        target_lengths = torch.randint(low=S_min,
+                                       high=S,
+                                       size=(N, ),
+                                       dtype=torch.long)
+    else:
+        input_lengths = [T] * N
+        target_lengths = [random.randint(S_min, S - 1) for _ in range(N)]
 
     # Initialize random batch of targets (0..C excluding the blank class)
     target = torch.randint(low=0, high=C - 1, size=(N, S), dtype=torch.long)

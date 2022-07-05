@@ -437,10 +437,79 @@ def Poptorch_triplet_margin_loss : Poptorch_not_implemented_simple_reduced_loss<
         mlir::RankedTensorType tensor = anchor.getType().cast<mlir::RankedTensorType>();
         llvm::ArrayRef<std::int64_t> shape;
         if (reduction == 0 && tensor.getShape().size() > 1) {
-            shape = tensor.getShape().take_front();
+          shape = tensor.getShape().take_front();
         }
 
         $_state.addTypes({mlir::RankedTensorType::get(shape, tensor.getElementType())});
+    }]>
+    ];
+}
+
+def Poptorch_ctc_loss_intlist : Poptorch_not_implemented_simple_reduced_loss<"ctc_loss_intlist"> {
+    let arguments = (ins Poptorch_tensor:$log_probs,
+                         Poptorch_tensor:$targets,
+                         I64ArrayAttr:$input_lengths,
+                         I64ArrayAttr:$target_lengths,
+                         I64Attr:$blank,
+                         I64Attr:$reduction,
+                         BoolAttr:$zero_infinity);
+
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilder<(ins "mlir::Value":$log_probs,
+                                   "mlir::Value":$targets,
+                                   "std::vector<std::int64_t>":$input_lengths,
+                                   "std::vector<std::int64_t>":$target_lengths,
+                                   "std::int64_t":$blank,
+                                   "std::int64_t":$reduction,
+                                   "bool":$zero_infinity),[{
+        $_state.addOperands({log_probs, targets});
+        $_state.addAttribute("input_lengths", $_builder.getI64ArrayAttr(input_lengths));
+        $_state.addAttribute("target_lengths", $_builder.getI64ArrayAttr(target_lengths));
+        $_state.addAttribute("blank", $_builder.getI64IntegerAttr(blank));
+        $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
+        $_state.addAttribute("zero_infinity", $_builder.getBoolAttr(zero_infinity));
+
+        llvm::ArrayRef<std::int64_t> shape;
+        if (reduction == 0) {
+          shape = input_lengths;
+        }
+
+        $_state.addTypes({mlir::RankedTensorType::get(shape, getElementType(log_probs))});
+    }]>
+    ];
+}
+
+def Poptorch_ctc_loss_tensor : Poptorch_not_implemented_simple_reduced_loss<"ctc_loss_tensor"> {
+    let arguments = (ins Poptorch_tensor:$log_probs,
+                         Poptorch_tensor:$targets,
+                         Poptorch_tensor:$input_lengths,
+                         Poptorch_tensor:$target_lengths,
+                         I64Attr:$blank,
+                         I64Attr:$reduction,
+                         BoolAttr:$zero_infinity);
+
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilder<(ins "mlir::Value":$log_probs,
+                                   "mlir::Value":$targets,
+                                   "mlir::Value":$input_lengths,
+                                   "mlir::Value":$target_lengths,
+                                   "std::int64_t":$blank,
+                                   "std::int64_t":$reduction,
+                                   "bool":$zero_infinity),[{
+        $_state.addOperands({log_probs, input_lengths, target_lengths, targets});
+        $_state.addAttribute("blank", $_builder.getI64IntegerAttr(blank));
+        $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
+        $_state.addAttribute("zero_infinity", $_builder.getBoolAttr(zero_infinity));
+
+        // If no reduction, get the batch size; from docs, this will be
+        // `log_probs`' second dimension if it's 3D.
+        mlir::RankedTensorType tensor = log_probs.getType().cast<mlir::RankedTensorType>();
+        llvm::SmallVector<std::int64_t, 1> shape;
+        if (reduction == 0 && tensor.getShape().size() == 3) {
+          shape = {tensor.getShape()[1]};
+        }
+
+        $_state.addTypes({mlir::RankedTensorType::get(shape, getElementType(log_probs))});
     }]>
     ];
 }
