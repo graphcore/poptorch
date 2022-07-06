@@ -236,7 +236,7 @@ class IPUScope:
 
     def outputs(self, tensors):
         self._outputs_structure = tensors
-        self._outputs = list(flattenTensorStructure(tensors))
+        self._outputs = flattenTensorStructure(tensors)
 
         for x in self._outputs:
             if not isOnIpu(x):
