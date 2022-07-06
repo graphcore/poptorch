@@ -187,9 +187,6 @@ class BufferUpdatingModel(torch.nn.Module):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_buffer_update_with_param(device_iterations, gradient_accumulation,
                                   trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): 'popart_exception': Could not find loss "
-                    "tensor '' in main graph tensors")
     model = BufferUpdatingModel()
     model.conv.weight.data = torch.ones_like(model.conv.weight.data)
     model.conv.bias.data = torch.ones_like(model.conv.bias.data)

@@ -9,10 +9,6 @@ import poptorch
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_weight_update_replicas(trace_model, process_id=0, num_processes=1):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Could not find loss tensor '' in main graph tensors"
-        )
     localReplicationFactor = 2
 
     opts = poptorch.Options()
