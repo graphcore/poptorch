@@ -66,6 +66,7 @@ def isOnIpu(x):
     return x.device.type == "xla"
 
 
+# Returns the structure `tensors` as a list of its torch.Tensor contents.
 def flattenTensorStructure(tensors):
     def flatten(x):
         if isinstance(x, dict):
@@ -81,33 +82,22 @@ def flattenTensorStructure(tensors):
     return list(flatten(tensors))
 
 
-# Turns a flat 'output' into the same structure as 'outputs_structure'.
-def reconstructTensorStructure(outputs_structure, output):
-    # Copy the original structure but replace all the tensors
-    # by values from the passed iterator.
+# Turns a flat `values` into the same structure as `structure`.
+#
+# Any non-tensor values in `structure` will be copied to the output.
+#
+# filter_fn: Optional function to additionally filter which tensors make it into
+#            the output (eg. could supply `isOnIpu` to only get IPU tensors).
+def reconstructTensorStructure(structure, values, filter_fn=lambda t: True):
+    # Copy the original structure but replace all the tensors by values from the
+    # passed iterator.
     def copy_structure(x, it):
         if isinstance(x, dict):
             return {k: copy_structure(x[k], it) for k in sorted(x.keys())}
         if isinstance(x, (tuple, list)):
             return type(x)(copy_structure(e, it) for e in x)
-        if isinstance(x, torch.Tensor):
+        if isinstance(x, torch.Tensor) and filter_fn(x):
             return next(it)
         return x
 
-    return copy_structure(outputs_structure, iter(output))
-
-
-# Replace the ipu tensors in the output structure with values from output
-def replaceIpuTensors(outputs_structure, output):
-    # Copy the original structure but replace all the tensors
-    # by values from the passed iterator.
-    def copy_structure(x, it):
-        if isinstance(x, dict):
-            return {k: copy_structure(v, it) for k, v in x.items()}
-        if isinstance(x, (tuple, list)):
-            return type(x)(copy_structure(e, it) for e in x)
-        if isinstance(x, torch.Tensor) and isOnIpu(x):
-            return next(it)
-        return x
-
-    return copy_structure(outputs_structure, iter(output))
+    return copy_structure(structure, iter(values))
