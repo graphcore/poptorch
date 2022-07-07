@@ -220,6 +220,10 @@
 - func: unsqueeze
   PopTorchDirect: unsqueeze
 
+# repeat(Tensor self, int[] repeats) -> Tensor
+- func: repeat
+  PopTorchDirect: repeat
+
 # func: gather.out(Tensor self, int dim, Tensor index, *, bool sparse_grad=False, Tensor(a!) out) -> Tensor(a!)
 - func: gather
   PopTorchDirect: gather

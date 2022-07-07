@@ -837,11 +837,6 @@ def test_stack(input_shapes, dim, trace_model):
                          [[1], [3], [2, 1], [2, 3], [1, 1, 1], [3, 2, 4]])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_repeat(input_shapes, dims, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
-
     if len(dims) < len(input_shapes):
         pytest.skip(
             "Number of dimensions of repeat dims can not be smaller than number"
@@ -857,11 +852,6 @@ def test_repeat(input_shapes, dims, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_repeat_training_input(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()

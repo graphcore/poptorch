@@ -388,6 +388,34 @@ def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
 
 }
 
+// repeat(Tensor self, int[] repeats) -> Tensor
+def Poptorch_repeat : Poptorch_NotImplementedOp<"repeat", []> {
+    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$sizes);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilder<(ins "mlir::Value":$value,
+                                   "const std::vector<std::int64_t>&":$sizes),[{
+        $_state.addOperands({value});
+        $_state.addAttribute("sizes", $_builder.getI64ArrayAttr(sizes));
+
+        mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
+        mlir::Type e1 = t1.getElementType();
+        std::vector<int64_t> shape = t1.getShape();
+        std::vector<int64_t> new_shape(std::max(shape.size(), sizes.size()));
+        for (int i=0; i < new_shape.size(); i++) {
+            int64_t ishape = 1;
+            int64_t isize = 1;
+            if (i < shape.size()) {
+                ishape = shape[shape.size() - i - 1];
+            }
+            if (i < sizes.size()) {
+                isize = sizes[sizes.size() - i - 1];
+            }
+            new_shape[new_shape.size() - i - 1] = ishape * isize;
+        }
+        $_state.addTypes(mlir::RankedTensorType::get(new_shape, e1));
+  }]>];
+}
+
 class Poptorch_NotImplemented_padding<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$pad);
     let results = (outs Poptorch_tensor:$result);

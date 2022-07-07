@@ -287,10 +287,6 @@ instance_norm_params = [
 @pytest.mark.parametrize("instance_norm, d", instance_norm_params)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_instanceNorm(instance_norm, d, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
     torch.manual_seed(42)
 
     affine = d % 2 == 1

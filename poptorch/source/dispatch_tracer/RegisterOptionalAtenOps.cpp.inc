@@ -54,6 +54,10 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   // which is harder to handle.
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
 
+  // If we don't intercept this op, it will be call the native implementation
+  // of alias, which will try to access our tensor storage.
+  m.impl("repeat", PTC_BOXED(poptorch::fallback));
+
   // Ideally, we would use the native cpu function but have an equivalent
   // to the "if (self.is_mkldnn()) {" for IPU tensors. But we can instead
   // overwrite and run reshape here.
