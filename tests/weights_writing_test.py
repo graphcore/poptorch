@@ -202,10 +202,6 @@ class DummyTrainingModel(torch.nn.Module):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_torch_save(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
     torch.manual_seed(42)
 
     # create a dummy model

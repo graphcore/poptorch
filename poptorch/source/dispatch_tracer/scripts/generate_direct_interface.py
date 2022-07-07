@@ -129,9 +129,9 @@ def add_outplace_op(function,
         if inplace_reshape:
             # Inplace operations should be inplaced versions of a certain input.
             assert not is_list
-            outputs_code += scope + "\tstack.push_back(outputInplaceReshape_"
-            outputs_code += function + "(t_id, " + named_tensors[tensor_id]
-            outputs_code += "_pytorch, " + parameters + "));\n"
+            outputs_code += scope + "\tstack.push_back(outputInplaceReshape"
+            outputs_code += "(t_id, " + named_tensors[tensor_id]
+            outputs_code += "_pytorch));\n"
         elif is_inplace:
             # Inplace operations should be inplaced versions of a certain input.
             if is_list:

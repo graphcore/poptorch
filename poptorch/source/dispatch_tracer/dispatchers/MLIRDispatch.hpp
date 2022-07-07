@@ -64,13 +64,11 @@ public:
       const std::vector<poptorch_ir::OptionalTensorId> &output_id,
       const std::vector<at::Tensor> &original_input);
 
-  // Handle the special case of squeeze_dim_, which is inplace in PyTorch but
-  // changes the shape of the target tensor.
+  // Handle the special case of ops which are inplace in PyTorch but change
+  // the shape of the target tensor.
   // NOLINTNEXTLINE
-  at::Tensor outputInplaceReshape_squeeze_dim_(poptorch_ir::TensorId output_id,
-                                               const at::Tensor &original_input,
-                                               poptorch_ir::TensorId self,
-                                               int dim);
+  at::Tensor outputInplaceReshape(poptorch_ir::TensorId output_id,
+                                  const at::Tensor &original_input);
 
   // Compute whether grad is required based on a list of requires_grad
   // determination types.  The argument requires_grad_or should be true if any

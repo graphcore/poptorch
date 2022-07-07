@@ -507,11 +507,9 @@ std::vector<at::Tensor> MLIRDispatch::outputIsInplaceOfList(
   return original_input;
 }
 
-at::Tensor MLIRDispatch::outputInplaceReshape_squeeze_dim_(
-    poptorch_ir::TensorId output_id, const at::Tensor &original_input,
-    poptorch_ir::TensorId self, int dim) {
-  UNUSED(self);
-  UNUSED(dim);
+at::Tensor
+MLIRDispatch::outputInplaceReshape(poptorch_ir::TensorId output_id,
+                                   const at::Tensor &original_input) {
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
   original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
   _mapper.addTensor(original_input, output_id);

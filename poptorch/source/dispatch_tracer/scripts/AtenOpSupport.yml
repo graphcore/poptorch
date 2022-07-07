@@ -188,6 +188,10 @@
 - func: transpose.int
   PopTorchDirect: transpose
 
+# transpose_(Tensor(a!) self, int dim0, int dim1) -> Tensor(a!)
+- func: transpose_
+  PopTorchDirectInplaceReshape: transpose
+
 # aten::view(Tensor(a) self, int[] size) -> (Tensor(a))
 # View differs from reshape ordinarily in that reshape may be a view or a copy
 # but view must always be a view. Because there is no concept of striding or

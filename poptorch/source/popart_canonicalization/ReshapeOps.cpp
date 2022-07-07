@@ -947,6 +947,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::contiguous, contiguousHandler);
   registerHandler(c10::aten::permute, permuteHandler);
   registerHandler(c10::aten::transpose, transposeHandler);
+  registerHandler(c10::aten::transpose_, transposeHandler);
   registerHandler(c10::aten::col2im, col2imHandler);
   registerHandler(c10::aten::im2col, im2colHandler);
   registerHandler(c10::aten::numpy_T, numpyTHandler);

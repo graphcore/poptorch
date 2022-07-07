@@ -54,6 +54,10 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   // which is harder to handle.
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
 
+  // If we don't intercept this op, it will be decomposed to as_strided
+  // which is harder to handle.
+  m.impl("transpose_", PTC_BOXED(poptorch::fallback));
+
   // If we don't intercept this op, it will be call the native implementation
   // of alias, which will try to access our tensor storage.
   m.impl("repeat", PTC_BOXED(poptorch::fallback));

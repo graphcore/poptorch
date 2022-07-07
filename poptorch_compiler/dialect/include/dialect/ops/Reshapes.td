@@ -85,7 +85,6 @@ def Poptorch_transpose: Poptorch_Op<"transpose", [ViewOp]> {
     ];
 }
 
-
 def Poptorch_reshape: Poptorch_Op<"reshape", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
     let results = (outs Poptorch_tensor:$result);

@@ -337,10 +337,6 @@ def test_instanceNorm(instance_norm, d, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_batchnorm_statistics(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
     torch.manual_seed(42)
 
     input_data = [torch.randn([4, 4, 3, 3]) for _ in range(10)]

@@ -11,10 +11,6 @@ import helpers
 @pytest.mark.parametrize("batch_first", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_gru(bias, batch_first, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
     length = 1
     batches = 3
     input_size = 5

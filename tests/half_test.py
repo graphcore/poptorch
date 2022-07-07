@@ -99,10 +99,6 @@ def test_half_float_upcast_option(trace_model):
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_resnet(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
     torch.manual_seed(42)
 
     image_input = torch.randn([1, 3, 224, 224]).half()
