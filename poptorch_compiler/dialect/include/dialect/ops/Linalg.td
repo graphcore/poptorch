@@ -81,7 +81,7 @@ def Poptorch_conv_backward : Poptorch_Op<"conv_backward", []> {
                       Poptorch_tensor:$grad_bias);
   let builders = [OpBuilder<(ins "mlir::Value":$grad_output,
                                  "mlir::Value":$input,
-                                 "mlir::Value":$weight, 
+                                 "mlir::Value":$weight,
                                  "const std::vector<std::int64_t>&":$stride,
                                  "const std::vector<std::int64_t>&":$padding,
                                  "const std::vector<std::int64_t>&":$dilation,
@@ -236,7 +236,7 @@ def Poptorch_cross : Poptorch_NotImplementedOp<"cross", []> {
                      OptionalAttr<I64Attr>:$dim);
     let results = (outs Poptorch_tensor:$result);
     let builders = [
-        OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$other, 
+        OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$other,
                    "std::optional<std::int64_t>":$dim), [{
             $_state.addOperands({self, other});
 
@@ -257,6 +257,58 @@ def Poptorch_cross : Poptorch_NotImplementedOp<"cross", []> {
             $_state.addAttribute("dim", $_builder.getI64IntegerAttr(*dim));
 
             $_state.addTypes(mlir::RankedTensorType::get(out_shape, getElementType(self)));
+        }]>
+    ];
+}
+
+// func: bilinear(Tensor input1, Tensor input2, Tensor weight, Tensor? bias=None) -> Tensor
+def Poptorch_bilinear : Poptorch_NotImplementedOp<"bilinear", []> {
+    let arguments = (ins Poptorch_tensor:$input1,
+                         Poptorch_tensor:$input2,
+                         Poptorch_tensor:$weight,
+                         Optional<Poptorch_tensor>:$bias);
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$input1,
+                       "mlir::Value":$input2,
+                       "mlir::Value":$weight,
+                       "mlir::Value":$bias), [{
+            if (bias) {
+              $_state.addOperands({input1, input2, weight, bias});
+            } else {
+              $_state.addOperands({input1, input2, weight});
+            }
+
+            // Get shapes
+            const std::vector<std::int64_t> input1_shape = getShape(input1);
+            const std::vector<std::int64_t> input2_shape = getShape(input2);
+            const std::vector<std::int64_t> weight_shape = getShape(weight);
+
+            // Verify shapes
+            ERROR_ON(input1_shape.empty());
+            ERROR_ON(input2_shape.empty());
+            ERROR_ON_MSG(weight_shape.size() != 3 ||
+                             weight_shape[1] != input1_shape.back() ||
+                             weight_shape[2] != input2_shape.back(),
+                         "Bilinear: weight should be a 3D tensor of "
+                         "(out_features, in1_features, in2_features).");
+
+            const std::vector<std::int64_t> in1_shared_dims(
+                input1_shape.begin(), input1_shape.end() - 1);
+            const std::vector<std::int64_t> in2_shared_dims(
+                input2_shape.begin(), input2_shape.end() - 1);
+
+            ERROR_ON_MSG(in1_shared_dims != in2_shared_dims,
+                         "Bilinear: input shapes should match in all but the "
+                         "last dimension.");
+
+            // Compute output shape
+            // Is same as input shapes, except last dimension is same as first
+            // dimension of weight.
+            std::vector<std::int64_t> out_shape = in1_shared_dims;
+            out_shape.push_back(weight_shape[0]);
+
+            $_state.addTypes(mlir::RankedTensorType::get(out_shape, getElementType(input1)));
         }]>
     ];
 }

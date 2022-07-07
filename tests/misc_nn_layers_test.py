@@ -17,18 +17,6 @@ import poptorch
 
 include_bias = [True, False]
 
-# The inner dimensions used in testing bilinear layers
-input_feature_shapes = [
-    {
-        "x1": (),
-        "x2": ()
-    },
-    {  # ND feature inputs
-        "x1": (4, 5),
-        "x2": (4, 5)
-    }
-]
-
 
 def op_harness(trace_model, op, inputs, inference_test_fn=None):
     if inference_test_fn is None:
@@ -152,17 +140,13 @@ def test_linear(trace_model):
 
 
 @pytest.mark.parametrize("include_bias", include_bias)
-@pytest.mark.parametrize("input_feature_shapes", input_feature_shapes)
+@pytest.mark.parametrize("input_feature_shape", [(), (3, 4)])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_bilinear(include_bias, input_feature_shapes, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): AssertionError: Tensor-likes are not close")
+def test_bilinear(include_bias, input_feature_shape, trace_model):
     torch.manual_seed(42)
-    op = torch.nn.Bilinear(20, 30, 40, bias=include_bias)
-    shape1 = input_feature_shapes['x1']
-    shape2 = input_feature_shapes['x2']
-    x1 = torch.randn(8, *shape1, 20)
-    x2 = torch.randn(8, *shape2, 30)
+    op = torch.nn.Bilinear(10, 20, 30, bias=include_bias)
+    x1 = torch.randn(8, *input_feature_shape, 10)
+    x2 = torch.randn(8, *input_feature_shape, 20)
     op_harness(trace_model, op, [x1, x2])
 
 

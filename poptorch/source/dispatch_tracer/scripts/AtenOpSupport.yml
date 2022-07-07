@@ -664,107 +664,107 @@
   PopTorchDirect: dropout
 
 # func: acos.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: acos.out 
+- func: acos.out
   PopTorchDirect: acos
   UnusedOutputArguments: {out}
 
 # func: acosh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: acosh.out 
+- func: acosh.out
   PopTorchDirect: acosh
   UnusedOutputArguments: {out}
 
 # func: asin.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: asin.out 
+- func: asin.out
   PopTorchDirect: asin
   UnusedOutputArguments: {out}
 
 # func: asinh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: asinh.out 
+- func: asinh.out
   PopTorchDirect: asinh
   UnusedOutputArguments: {out}
 
 # func: atan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: atan.out 
+- func: atan.out
   PopTorchDirect: atan
   UnusedOutputArguments: {out}
 
 # func: atanh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: atanh.out 
+- func: atanh.out
   PopTorchDirect: atanh
   UnusedOutputArguments: {out}
 
 # func: cos.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: cos.out 
+- func: cos.out
   PopTorchDirect: cos
   UnusedOutputArguments: {out}
 
 # func: cosh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: cosh.out 
+- func: cosh.out
   PopTorchDirect: cosh
   UnusedOutputArguments: {out}
 
 # func: erf.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: erf.out 
+- func: erf.out
   PopTorchDirect: erf
   UnusedOutputArguments: {out}
 
 # func: erfc.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: erfc.out 
+- func: erfc.out
   PopTorchDirect: erfc
   UnusedOutputArguments: {out}
 
 # func: expm1.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: expm1.out 
+- func: expm1.out
   PopTorchDirect: expm1
   UnusedOutputArguments: {out}
 
 # func: frac.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: frac.out 
+- func: frac.out
   PopTorchDirect: frac
   UnusedOutputArguments: {out}
 
 # func: log10.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: log10.out 
+- func: log10.out
   PopTorchDirect: log10
   UnusedOutputArguments: {out}
 
 # func: log1p.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: log1p.out 
+- func: log1p.out
   PopTorchDirect: log1p
   UnusedOutputArguments: {out}
 
 # func: log2.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: log2.out 
+- func: log2.out
   PopTorchDirect: log2
   UnusedOutputArguments: {out}
 
 # func: rsqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: rsqrt.out 
+- func: rsqrt.out
   PopTorchDirect: rsqrt
   UnusedOutputArguments: {out}
 
 # func: reciprocal.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: reciprocal.out 
+- func: reciprocal.out
   PopTorchDirect: reciprocal
   UnusedOutputArguments: {out}
 
 # func: sin.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: sin.out 
+- func: sin.out
   PopTorchDirect: sin
   UnusedOutputArguments: {out}
 
 # func: sinh.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: sinh.out 
+- func: sinh.out
   PopTorchDirect: sinh
   UnusedOutputArguments: {out}
 
 # func: tan.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
-- func: tan.out 
+- func: tan.out
   PopTorchDirect: tan
   UnusedOutputArguments: {out}
 
 # func: atan2.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-- func: atan2.out 
+- func: atan2.out
   PopTorchDirect: atan2
   UnusedOutputArguments: {out}
 
@@ -838,6 +838,11 @@
 - func: cross.out
   PopTorchDirect: cross
   UnusedOutputArguments: {out}
+
+# func: bilinear(Tensor input1, Tensor input2, Tensor weight, Tensor? bias=None) -> Tensor
+- func: bilinear
+  PopTorchDirect: bilinear
+
 
 #############
 # Random number generation

@@ -71,6 +71,10 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("binary_cross_entropy_with_logits", PTC_BOXED(poptorch::fallback));
   m.impl("binary_cross_entropy_with_logits_backward", PTC_BOXED(poptorch::fallback));
 
+  // If we don't catch it here, PyTorch will decompose bilinear into an enormous
+  // number of ops, which will result in an all-zeros output.
+  m.impl("bilinear", PTC_BOXED(poptorch::fallback));
+
   // Loss functions: these are needed for popart, so that we can mark the loss
   // tensor (see `IsLoss`); otherwise, the op will get decomposed by PyTorch.
   m.impl("cosine_embedding_loss", PTC_BOXED(poptorch::fallback));
