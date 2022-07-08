@@ -186,53 +186,64 @@ def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
 }
 
 
+class Poptorch_SqueezeOp<string name>: Poptorch_Op<name, [ViewOp]> {
+  let extraClassDeclaration = [{
+      static int64_t processDim(int64_t dim, mlir::Value v) {
+        auto shape = getShape(v);
+        return dim < 0 ? dim + shape.size() : dim;
+      }
+
+      static mlir::Type inferType(mlir::Value v, const std::vector<int64_t> &dims) {
+          auto shape = getShape(v);
+          std::vector<int64_t> out_shape;
+          
+          for (auto i = 0u; i < shape.size(); i++) {
+            auto it = std::find(dims.begin(), dims.end(), i);
+            if (it == dims.end() || shape[i] != 1) {
+              out_shape.push_back(shape[i]);
+            }
+          }
+
+          return mlir::RankedTensorType::get(out_shape, getElementType(v));
+      }
+  }];
+}
+
+class Poptorch_SqueezeAllDimsOp<string name>: Poptorch_SqueezeOp<name> {
+  let arguments = (ins Poptorch_tensor:$input);
+  let results = (outs Poptorch_tensor:$result);
+
+  let builders = [OpBuilder<(ins "mlir::Value":$value),[{
+      $_state.addOperands({value});
+
+      auto dims = getShape(value);
+      std::iota(dims.begin(), dims.end(), 0);
+      $_state.addTypes(inferType(value, dims));
+    }]>
+  ];
+}
+
+def Poptorch_squeeze: Poptorch_SqueezeAllDimsOp<"squeeze">;
+def Poptorch_squeeze_: Poptorch_SqueezeAllDimsOp<"squeeze_">;
+
+class Poptorch_SqueezeDimOp<string name>: Poptorch_SqueezeOp<name> {
+    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
+        $_state.addOperands({value});
+        dim = processDim(dim, value);
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addTypes(inferType(value, {dim}));
+     }]>
+    ];
+}
+
 // squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
-def Poptorch_squeeze_dim: Poptorch_Op<"squeeze_dim", [ViewOp]> {
-    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
-        $_state.addOperands({value});
-        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
-
-        mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
-        mlir::Type e1 = t1.getElementType();
-        auto shape = t1.getShape();
-        if (dim < 0) {
-            dim += shape.size();
-        }
-        std::vector<int64_t> new_shape = shape;
-        if (shape[dim] == 1) {
-            new_shape.erase(new_shape.begin() + dim);
-        }
-        $_state.addTypes(mlir::RankedTensorType::get(new_shape, e1));
-     }]>
-    ];
-}
-
+def Poptorch_squeeze_dim: Poptorch_SqueezeDimOp<"squeeze_dim">;
 // squeeze_.dim(Tensor(a!) self, int dim) -> Tensor(a!)
-def Poptorch_squeeze_dim_: Poptorch_Op<"squeeze_dim_", [ViewOp]> {
-    let arguments = (ins Poptorch_tensor:$input, I64Attr:$dim);
-    let results = (outs Poptorch_tensor:$result);
+def Poptorch_squeeze_dim_: Poptorch_SqueezeDimOp<"squeeze_dim_">;
 
-    let builders = [OpBuilder<(ins "mlir::Value":$value, "std::int64_t":$dim),[{
-        $_state.addOperands({value});
-        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
-
-        mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
-        mlir::Type e1 = t1.getElementType();
-        auto shape = t1.getShape();
-        if (dim < 0) {
-            dim += shape.size();
-        }
-        std::vector<int64_t> new_shape = shape;
-        if (shape[dim] == 1) {
-            new_shape.erase(new_shape.begin() + dim);
-        }
-        $_state.addTypes(mlir::RankedTensorType::get(new_shape, e1));
-     }]>
-    ];
-}
 
 // gather(Tensor self, int dim, Tensor index, *, bool sparse_grad=False) -> Tensor(a!)
 def Poptorch_gather: Poptorch_NotImplementedOp<"gather", [ViewOp]> {

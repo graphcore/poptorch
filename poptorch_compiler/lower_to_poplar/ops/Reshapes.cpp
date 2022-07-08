@@ -21,27 +21,50 @@ void reshape::lowerToPoplar(CompilerContext &context) {
   context.addTensor(result(), in);
 }
 
-void squeeze_dim::lowerToPoplar(CompilerContext &context) {
+void squeezeCommon(poplar::Tensor &tensor,
+                   const std::vector<std::size_t> &dims) {
+  std::vector<std::size_t> squeeze_dims;
+  for (auto dim : dims) {
+    if (tensor.shape()[dim] == 1) {
+      squeeze_dims.push_back(dim);
+    }
+  }
+  tensor = tensor.squeeze(squeeze_dims);
+}
+
+void squeeze::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->input());
 
-  std::int64_t dim = this->dim();
+  std::vector<std::size_t> dims(in.shape().size());
+  std::iota(dims.begin(), dims.end(), 0);
 
-  if (dim < 0) {
-    dim += in.rank();
-  }
-  in = in.squeeze({static_cast<size_t>(dim)});
+  squeezeCommon(in, dims);
+  context.addTensor(result(), in);
+}
+
+void squeeze_::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+
+  std::vector<std::size_t> dims(in.shape().size());
+  std::iota(dims.begin(), dims.end(), 0);
+
+  squeezeCommon(in, dims);
+  context.addTensor(result(), in);
+}
+
+void squeeze_dim::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+  auto dim = this->dim();
+
+  squeezeCommon(in, {dim});
   context.addTensor(result(), in);
 }
 
 void squeeze_dim_::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->input());
+  auto dim = this->dim();
 
-  std::int64_t dim = this->dim();
-
-  if (dim < 0) {
-    dim += in.rank();
-  }
-  in = in.squeeze({static_cast<size_t>(dim)});
+  squeezeCommon(in, {dim});
   context.addTensor(result(), in);
 }
 

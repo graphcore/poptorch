@@ -2,8 +2,8 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 
 import pytest
-
 import torch
+import helpers
 
 from poptorch.experimental import IPUContext
 
@@ -13,6 +13,16 @@ select_param_sets = []
 for d in range(-len(shape), len(shape)):
     for i in range(-shape[d], shape[d]):
         select_param_sets.append((d, i))
+
+
+@pytest.mark.mlirSupportRequired
+def test_squeeze():
+    t = torch.ones(1, 2, 3, 1, 1, 2, 1, 3)
+
+    ipu_result = IPUContext(torch.squeeze)(t)
+    cpu_result = torch.squeeze(t)
+
+    helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
 # torch.select.int

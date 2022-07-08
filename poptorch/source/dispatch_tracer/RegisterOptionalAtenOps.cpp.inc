@@ -33,25 +33,15 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("all", PTC_BOXED(poptorch::fallback));
   m.impl("any", PTC_BOXED(poptorch::fallback));
 
-  // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handle.
+  // If we don't intercept these ops, they will be decomposed into
+  // as_strided which is harder to handle.
   m.impl("slice.Tensor", PTC_BOXED(poptorch::fallback));
-
-  // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handle.
+  m.impl("squeeze", PTC_BOXED(poptorch::fallback));
+  m.impl("squeeze_", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze.dim", PTC_BOXED(poptorch::fallback));
   m.impl("squeeze_.dim", PTC_BOXED(poptorch::fallback));
-
-  // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handle.
   m.impl("unsqueeze", PTC_BOXED(poptorch::fallback));
-
-  // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handle.
   m.impl("permute", PTC_BOXED(poptorch::fallback));
-
-  // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handle.
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
 
   // If we don't intercept this op, it will be decomposed to as_strided

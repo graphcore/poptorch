@@ -204,6 +204,14 @@
 - func: _cat
   PopTorchDirect: concat
 
+# squeeze(Tensor(a) self) -> Tensor(a)
+- func: squeeze
+  PopTorchDirect: squeeze
+
+# squeeze_(Tensor(a!) self) -> Tensor(a!)
+- func: squeeze_
+  PopTorchDirect: squeeze_
+
 # squeeze.dim(Tensor(a) self, int dim) -> Tensor(a)
 - func: squeeze.dim
   PopTorchDirect: squeeze_dim

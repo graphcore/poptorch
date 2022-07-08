@@ -639,16 +639,24 @@ def test_split_singleton(trace_model):
     op_harness(op, x, trace_model=trace_model)
 
 
+@pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_squeeze(trace_model):
-    if not trace_model:
+def test_squeeze(inplace, trace_model):
+    if not trace_model and inplace:
         pytest.skip(
-            "TODO(T51159): InternalError: aten::as_strided should have been "
-            "intercepted earlier.")
+            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
+            "is being used in an in-place operation.")
+
     torch.manual_seed(42)
     x = torch.randn(1, 1, 5, 1, 10, 1)
 
-    op_harness(torch.squeeze, x, trace_model=trace_model)
+    def f(t):
+        if inplace:
+            t.squeeze_()
+            return t
+        return torch.squeeze(t)
+
+    op_harness(f, x, trace_model=trace_model)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
