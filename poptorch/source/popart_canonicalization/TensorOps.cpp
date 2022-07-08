@@ -319,6 +319,11 @@ torch::jit::Node *scatterHandler(torch::jit::Graph *graph,
     src = createExpand(graph, {src, shape})->output();
   }
 
+  ERROR_ON_MSG(node->inputs().size() > 4,
+               "Reductions supplied to torch.scatter are currently "
+               "unsupported; consider using torch.scatter_add for 'add' "
+               "reductions.");
+
   // scatter(input, index, src, dimension(dim, TensorType(input)))
   return createScatter(graph, {input, index, src}, dim);
 }

@@ -649,10 +649,71 @@
   PopTorchDirect: sqrt
   UnusedOutputArguments: {out}
 
+# func: scatter.src_out(Tensor self, int dim, Tensor index, Tensor src, *, Tensor(a!) out) -> Tensor(a!)
+- func: scatter.src_out
+  PopTorchDirect: scatter_src_out
+  UnusedOutputArguments: {out}
+
+# scatter.src(Tensor self, int dim, Tensor index, Tensor src) -> Tensor
+- func: scatter.src
+  PopTorchDirect: scatter_src_out
+
+# scatter_.src(Tensor(a!) self, int dim, Tensor index, Tensor src) -> Tensor(a!)
+- func: scatter_.src
+  PopTorchDirect: scatter_src_out
+
+# func: scatter.value_out(Tensor self, int dim, Tensor index, Scalar value, *, Tensor(a!) out) -> Tensor(a!)
+- func: scatter.value_out
+  PopTorchDirect: scatter_value_out
+  UnusedOutputArguments: {out}
+
+# scatter.value(Tensor self, int dim, Tensor index, Scalar value) -> Tensor
+- func: scatter.value
+  PopTorchDirect: scatter_value_out
+
+# scatter_.value(Tensor(a!) self, int dim, Tensor index, Scalar value) -> Tensor(a!)
+- func: scatter_.value
+  PopTorchDirect: scatter_value_out
+
+# func: scatter.reduce_out(Tensor self, int dim, Tensor index, Tensor src, *, str reduce, Tensor(a!) out) -> Tensor(a!)
+- func: scatter.reduce_out
+  PopTorchDirect: scatter_reduce_out
+  UnusedOutputArguments: {out}
+
+# func: scatter.reduce(Tensor self, int dim, Tensor index, Tensor src, *, str reduce) -> Tensor
+- func: scatter.reduce
+  PopTorchDirect: scatter_reduce_out
+
+# func: scatter_.reduce(Tensor(a!) self, int dim, Tensor index, Tensor src, *, str reduce) -> Tensor(a!)
+- func: scatter_.reduce
+  PopTorchDirect: scatter_reduce_out
+
+# func: scatter.value_reduce_out(Tensor self, int dim, Tensor index, Scalar value, *, str reduce, Tensor(a!) out) -> Tensor(a!)
+- func: scatter.value_reduce_out
+  PopTorchDirect: scatter_value_reduce_out
+  UnusedOutputArguments: {out}
+
+# func: scatter.value_reduce(Tensor self, int dim, Tensor index, Scalar value, *, str reduce) -> Tensor
+- func: scatter.value_reduce
+  PopTorchDirect: scatter_value_reduce_out
+
+# func: scatter_.value_reduce(Tensor(a!) self, int dim, Tensor index, Scalar value, *, str reduce) -> Tensor(a!)
+- func: scatter_.value_reduce
+  PopTorchDirect: scatter_value_reduce_out
+
 # func: scatter_add.out(Tensor self, int dim, Tensor index, Tensor src, *, Tensor(a!) out) -> Tensor(a!)
 - func: scatter_add.out
   PopTorchDirect: scatter_add_out
   UnusedOutputArguments: {out}
+
+# func: scatter_add(Tensor self, int dim, Tensor index, Tensor src) -> Tensor
+- func: scatter_add
+  PopTorchDirect: scatter_add_out
+
+# func: scatter_add_(Tensor(a!) self, int dim, Tensor index, Tensor src) -> Tensor(a!)
+- func: scatter_add_
+  PopTorchDirect: scatter_add_out
+
 
 # dropout(Tensor input, float p, bool train) -> Tensor
 - func: dropout

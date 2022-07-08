@@ -43,9 +43,6 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("unsqueeze", PTC_BOXED(poptorch::fallback));
   m.impl("permute", PTC_BOXED(poptorch::fallback));
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
-
-  // If we don't intercept this op, it will be decomposed to as_strided
-  // which is harder to handle.
   m.impl("transpose_", PTC_BOXED(poptorch::fallback));
 
   // If we don't intercept this op, it will be call the native implementation
@@ -71,4 +68,27 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("margin_ranking_loss", PTC_BOXED(poptorch::fallback));
   m.impl("poisson_nll_loss", PTC_BOXED(poptorch::fallback));
   m.impl("triplet_margin_loss", PTC_BOXED(poptorch::fallback));
+
+  // Scatter: By default, PyTorch's handler will fail if the index tensor isn't
+  // a tensor of int64s (see `scatter_gather_dtype_check` in PyTorch) -- ours
+  // will have been coerced to int32s.
+  m.impl("scatter.src", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter.src_out", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_.src", PTC_BOXED(poptorch::fallback));
+
+  m.impl("scatter.value", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter.value_out", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_.value", PTC_BOXED(poptorch::fallback));
+
+  m.impl("scatter.reduce", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter.reduce_out", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_.reduce", PTC_BOXED(poptorch::fallback));
+
+  m.impl("scatter.value_reduce", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter.value_reduce_out", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_.value_reduce", PTC_BOXED(poptorch::fallback));
+
+  m.impl("scatter_add", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_add.out", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_add_", PTC_BOXED(poptorch::fallback));
 }

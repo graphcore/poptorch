@@ -516,7 +516,7 @@ def Poptorch_threshold_out: Poptorch_NotImplementedOp<"threshold_out", []> {
  * Scatter ops.
  */
 
-class Poptorch_elem_binary_scatter<string name> :  Poptorch_NotImplementedOp<name, []> {
+class Poptorch_elem_binary_scatter<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index, Poptorch_tensor:$src);
     let results = (outs Poptorch_tensor:$result);
 
@@ -528,4 +528,30 @@ class Poptorch_elem_binary_scatter<string name> :  Poptorch_NotImplementedOp<nam
     ];
 }
 
+def Poptorch_scatter_src_out : Poptorch_elem_binary_scatter<"scatter_src_out"> {}
+def Poptorch_scatter_value_out : Poptorch_elem_binary_scatter<"scatter_value_out"> {}
 def Poptorch_scatter_add_out : Poptorch_elem_binary_scatter<"scatter_add_out"> {}
+
+class Poptorch_elem_binary_scatter_reduce<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64Attr:$dim,
+                         Poptorch_tensor:$index,
+                         Poptorch_tensor:$src,
+                         StrAttr:$reduce);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "std::int64_t":$dim,
+                                   "mlir::Value":$index,
+                                   "mlir::Value":$src,
+                                   "std::string":$reduce),[{
+        $_state.addOperands({self, index, src});
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        $_state.addAttribute("reduce", $_builder.getStringAttr(reduce));
+        $_state.addTypes(self.getType());
+      }]>
+    ];
+}
+
+def Poptorch_scatter_reduce_out : Poptorch_elem_binary_scatter_reduce<"scatter_reduce_out"> {}
+def Poptorch_scatter_value_reduce_out : Poptorch_elem_binary_scatter_reduce<"scatter_value_reduce_out"> {}

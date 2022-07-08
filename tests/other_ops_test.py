@@ -140,11 +140,6 @@ def test_tensordot(dims, trace_model):
 @pytest.mark.parametrize("dim", range(-3, 3))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_scatter_add(inplace, dim, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
-            "for index")
-
     class Model(torch.nn.Module):
         def __init__(self, dim, dim_size):
             super().__init__()
@@ -328,9 +323,6 @@ def test_gather_with_index_expansion(capfd, expand_as, params):
 @helpers.overridePoptorchLogLevel("TRACE")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_available_memory_scatter_add(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): scatter(): Expected dtype int64 for index")
-
     class Model(torch.nn.Module):
         def __init__(self, dim, dim_size):
             super().__init__()

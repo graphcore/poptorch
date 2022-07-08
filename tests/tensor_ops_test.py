@@ -559,55 +559,48 @@ def test_gather_5dim(dim, larger_index, trace_model):
     op_harness(op, input, indices, trace_model=trace_model)
 
 
-@pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
+@pytest.mark.parametrize("dim", range(-3, 3))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_scatter(dim, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
-            "for index")
     torch.manual_seed(42)
-    shape = (3, 3, 3, 3, 3)
+    dim_length = 3
+    shape = (dim_length, ) * 3
+
     input = torch.randn(shape)
+    indices = torch.randint(dim_length, shape)
     source = torch.randn(shape)
 
-    indices = torch.randint(0, 3, shape)
     op = lambda inp, idx, src: inp.scatter(dim, idx, src)
     op_harness(op, input, indices, source, trace_model=trace_model)
 
 
-@pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
+@pytest.mark.parametrize("dim", range(-3, 3))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_scatter_(dim, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
-            "for index")
     torch.manual_seed(42)
-    shape = (3, 3, 3, 3, 3)
-    input = torch.randn(shape)
-    source = torch.randn(shape)
+    dim_length = 3
+    shape = (dim_length, ) * 3
 
-    indices = torch.randint(0, 3, shape)
+    input = torch.randn(shape)
+    indices = torch.randint(dim_length, shape)
+    source = torch.randn(shape)
 
     op = lambda inp, idx, src: inp.scatter_(dim, idx, src)
     op_harness(op, input, indices, source, trace_model=trace_model)
 
 
-@pytest.mark.parametrize("dim", [0, 1, 2, 3, 4])
+@pytest.mark.parametrize("dim", range(-3, 3))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_scatter_scalar(dim, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
-            "for index")
     torch.manual_seed(42)
-    shape = (3, 3, 3, 3, 3)
+    dim_length = 3
+    shape = (dim_length, ) * 3
+
     input = torch.randn(shape)
+    indices = torch.randint(dim_length, shape)
     source = 5.0
 
-    indices = torch.randint(0, 3, shape)
-    op = lambda inp, idx, src=source: inp.scatter_(dim, idx, src)
+    op = lambda inp, idx: inp.scatter(dim, idx, source)
     op_harness(op, input, indices, trace_model=trace_model)
 
 
