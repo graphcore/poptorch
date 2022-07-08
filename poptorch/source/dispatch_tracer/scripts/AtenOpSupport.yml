@@ -168,23 +168,6 @@
 - func: expand
   PopTorchDirect: expand
 
-# aten::reshape(Tensor(a) self, int[] shape) -> (Tensor(a))
-# Ideally we would use the native cpu function but have an equivalent
-# to the "if (self.is_mkldnn()) {" for ipu tensors. But we can instead
-# overwrite and run reshape here.
-# NB this may not match CPU implementation but the user is told in the PyTorch
-# documentation, "you should not depend on the copying vs. viewing behavior".
-- func: reshape
-  PopTorchDirect: reshape
-
-# aten::_reshape_alias(Tensor(a) self, int[] size, int[] stride) -> Tensor(a)
-# The purpose of this function in PyTorch is to avoid a costly dispatch to view.
-# However, we can simply handle it as we do "reshape" and ignore the stride
-# (stride is ignored "for now" in as_strided::lowerToPoplar).
-- func: _reshape_alias
-  PopTorchDirect: reshape
-  IgnoreArgs: {'stride'}
-
 - func: transpose.int
   PopTorchDirect: transpose
 
@@ -198,7 +181,7 @@
 # contiguous vs not contiguous tensor in poplar, a rehshape can always be a
 # view.
 - func: view
-  PopTorchDirect: reshape
+  PopTorchDirect: view
 
 # _cat(Tensor[] tensors, int dim=0) -> Tensor(a!)
 - func: _cat

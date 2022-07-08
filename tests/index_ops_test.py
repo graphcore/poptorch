@@ -163,18 +163,16 @@ def test_index_on_max_indices(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put(op, idxs, trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
+        pytest.skip("TODO(T51159): Expected a list element that subtypes "
+                    "'Tensor' but got an element of type 'NoneType'")
     index_harness(trace_model, op, idxs, True)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_scalar(trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::_index_put_impl_")
 
     def op(t, idx, v):
         t[idx, idx] = v.item()
@@ -187,9 +185,8 @@ def test_index_put_scalar(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_broadcastable(trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::_index_put_impl_")
     v = torch.zeros(5)
     # For each row r in t[0, 0], r = [0, 0, 0, 0, 0]
     index_harness(trace_model, index_op1, [[0]], True, v)
@@ -204,9 +201,8 @@ def test_index_put_broadcastable(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_masked_fill(mask_size, dtype, trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::_index_put_impl_")
     torch.manual_seed(42)
     mask_shape = [2, 3, 4, 5][:mask_size]
     mask = (torch.rand(mask_shape) > 0.5).type(dtype)
@@ -223,9 +219,8 @@ def test_index_put_masked_fill(mask_size, dtype, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_masked_assign(mask_size, dtype, trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
+        pytest.skip("TODO(T51159): No shape inference handler for "
+                    "aten::_index_put_impl_")
     torch.manual_seed(42)
     mask_shape = [2, 3, 4, 5][:mask_size]
     mask = (torch.rand(mask_shape) > 0.5).type(dtype)

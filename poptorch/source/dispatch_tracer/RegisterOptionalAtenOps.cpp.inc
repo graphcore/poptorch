@@ -52,11 +52,6 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   // of alias, which will try to access our tensor storage.
   m.impl("repeat", PTC_BOXED(poptorch::fallback));
 
-  // Ideally, we would use the native cpu function but have an equivalent
-  // to the "if (self.is_mkldnn()) {" for IPU tensors. But we can instead
-  // overwrite and run reshape here.
-  m.impl("reshape", PTC_BOXED(poptorch::fallback));
-
   m.impl("constant_pad_nd", PTC_BOXED(poptorch::fallback));
   m.impl("binary_cross_entropy_with_logits", PTC_BOXED(poptorch::fallback));
   m.impl("binary_cross_entropy_with_logits_backward", PTC_BOXED(poptorch::fallback));

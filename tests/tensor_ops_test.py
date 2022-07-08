@@ -581,14 +581,15 @@ def test_scatter(dim, trace_model):
 def test_scatter_(dim, trace_model):
     if not trace_model:
         pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
+            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
+            "for index")
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)
     source = torch.randn(shape)
 
     indices = torch.randint(0, 3, shape)
+
     op = lambda inp, idx, src: inp.scatter_(dim, idx, src)
     op_harness(op, input, indices, source, trace_model=trace_model)
 
@@ -598,8 +599,8 @@ def test_scatter_(dim, trace_model):
 def test_scatter_scalar(dim, trace_model):
     if not trace_model:
         pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
+            "TODO(T51159): RuntimeError: scatter(): Expected dtype int64 "
+            "for index")
     torch.manual_seed(42)
     shape = (3, 3, 3, 3, 3)
     input = torch.randn(shape)

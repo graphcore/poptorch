@@ -85,7 +85,7 @@ def Poptorch_transpose: Poptorch_Op<"transpose", [ViewOp]> {
     ];
 }
 
-def Poptorch_reshape: Poptorch_Op<"reshape", [ViewOp]> {
+def Poptorch_view: Poptorch_Op<"view", [ViewOp]> {
     let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$shape);
     let results = (outs Poptorch_tensor:$result);
 
@@ -110,7 +110,7 @@ def Poptorch_reshape: Poptorch_Op<"reshape", [ViewOp]> {
             } else if(shape[dim_idx] <= 0) {
                 // This should only occur as an internal error.
                 ERROR("invalid shape dimension, " << shape[dim_idx]
-                      << ", in Poptorch_reshape_generic");
+                      << ", in Poptorch_view");
             } else {
                 shape_product *= shape[dim_idx];
             }
@@ -150,7 +150,7 @@ def Poptorch_reshape: Poptorch_Op<"reshape", [ViewOp]> {
             throw std::runtime_error(err.str());
         }
 
-        // Otherwise, the reshape is succesful
+        // Otherwise, the view is succesful
         // Ensure the attribute is the resolved shape (without -1)
         $_state.addAttribute("shape", $_builder.getI64ArrayAttr(shape_out));
 

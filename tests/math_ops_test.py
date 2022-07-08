@@ -208,10 +208,6 @@ def test_clamp(args, trace_model):
 @pytest.mark.parametrize("args", clamp_inputs)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_clamp_(args, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -230,11 +226,6 @@ def test_clamp_(args, trace_model):
     [torch.clamp_min, torch.clamp_min_, torch.clamp_max, torch.clamp_max_])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_clamp_min_max(op, trace_model):
-    if not trace_model and op in [torch.clamp_max_, torch.clamp_min_]:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
-
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])

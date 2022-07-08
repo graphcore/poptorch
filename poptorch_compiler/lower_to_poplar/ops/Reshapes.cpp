@@ -9,7 +9,7 @@
 
 namespace poptorch_ir {
 
-void reshape::lowerToPoplar(CompilerContext &context) {
+void view::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->input());
 
   std::vector<std::size_t> new_shape =

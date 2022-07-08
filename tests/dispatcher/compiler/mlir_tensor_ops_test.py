@@ -155,14 +155,14 @@ def test_reshape_view(op):
 
     # Error conditions shape\'\[1, 7\]\'
     err_msg = (r"\]\' is invalid for input of size 8")
-    with pytest.raises(poptorch.Error, match=err_msg):
+    with pytest.raises((poptorch.Error, RuntimeError), match=err_msg):
         expand_reshape_view_harness((2, 4), (1, 7), op)
 
     err_msg = ("only one dimension can be inferred")
-    with pytest.raises(poptorch.Error, match=err_msg):
+    with pytest.raises((poptorch.Error, RuntimeError), match=err_msg):
         expand_reshape_view_harness((7, 4), (-1, -1), op)
 
-    with pytest.raises(poptorch.Error, match=err_msg):
+    with pytest.raises((poptorch.Error, RuntimeError), match=err_msg):
         expand_reshape_view_harness((3, 4), (-1, -1, 2), op)
 
 
