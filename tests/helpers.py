@@ -6,6 +6,9 @@ import torch
 import poptorch
 import poptorch.poptorch_core as poptorch_core  # type: ignore
 
+# Will be changed by conftest.py if pytest is only collecting tests
+is_running_tests = True
+
 
 def assert_allclose(*,
                     actual=None,

@@ -6,6 +6,7 @@ import gc
 import pytest
 import torch
 import poptorch
+import helpers
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +41,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers",
                             ("ipuHardwareRequired: require IPU hardware to be "
                              "available on the platform"))
+    if config.getoption("collectonly"):
+        helpers.is_running_tests = False
 
 
 def pytest_runtest_setup(item):

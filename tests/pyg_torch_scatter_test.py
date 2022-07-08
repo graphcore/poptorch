@@ -5,10 +5,27 @@
 from functools import partial
 import torch
 import pytest
-from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add
-
+import helpers
 import poptorch
-from helpers import assert_allequal, LogChecker, printCapfdOnExit, overridePoptorchLogLevel
+
+if helpers.is_running_tests:
+    from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add
+else:
+
+    def scatter():
+        pass
+
+    def scatter_log_softmax():
+        pass
+
+    def scatter_softmax():
+        pass
+
+    def scatter_std():
+        pass
+
+    def scatter_add():
+        pass
 
 
 def torch_scatter_harness(trace_model, func, src, index):
@@ -22,7 +39,7 @@ def torch_scatter_harness(trace_model, func, src, index):
     poptorch_model = poptorch.inferenceModel(model, options=options)
     native_out = func(src, index)
     ipu_out = poptorch_model(src, index)
-    assert_allequal(actual=ipu_out, expected=native_out)
+    helpers.assert_allequal(actual=ipu_out, expected=native_out)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -49,12 +66,12 @@ def test_composites(trace_model, func):
     torch_scatter_harness(trace_model, func, src, index)
 
 
-@printCapfdOnExit
-@overridePoptorchLogLevel("TRACE")
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
 def test_scatter_add_zeros_optimized(capfd):
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
     torch_scatter_harness(True, scatter_add, src, index)
 
-    it = LogChecker(capfd).createIterator()
+    it = helpers.LogChecker(capfd).createIterator()
     it.findNext("Removing zeros output to scatter_add")
