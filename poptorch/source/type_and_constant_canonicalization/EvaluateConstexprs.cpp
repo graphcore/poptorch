@@ -44,6 +44,11 @@ void recursivelyMarkInputsForExclusion(torch::jit::Node *node) {
   if (node->kind() == c10::prim::Param) {
     return;
   }
+
+  if (node->hasAttribute(exclude_node_attr) && node->i(exclude_node_attr) > 0) {
+    return;
+  }
+
   markForExclusion(node);
   for (auto *input : node->inputs()) {
     recursivelyMarkInputsForExclusion(input->node());
