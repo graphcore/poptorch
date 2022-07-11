@@ -295,20 +295,16 @@ class LogChecker(helpers.LogChecker):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_2x2_parallel_phased_execution_inline(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
     N = 3
     size = 10
 
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.weights = []
-            for n in range(N * 6):
-                weight = torch.nn.Parameter(torch.rand(size, size),
-                                            requires_grad=True)
-                self.register_parameter(f"w{n}", weight)
-                self.weights.append(weight)
+            self.weights = torch.nn.ParameterList([
+                torch.nn.Parameter(torch.rand(size, size), requires_grad=True)
+                for n in range(N * 6)
+            ])
 
         def forward(self, in0, target=None):
             phase = 0
@@ -355,20 +351,16 @@ def test_2x2_parallel_phased_execution_inline(capfd, trace_model):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_2x2_parallel_phased_execution_opts(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
     N = 3
     size = 10
 
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.weights = []
-            for n in range(N * 6):
-                weight = torch.nn.Parameter(torch.rand(size, size),
-                                            requires_grad=True)
-                self.register_parameter(f"w{n}", weight)
-                self.weights.append(weight)
+            self.weights = torch.nn.ParameterList([
+                torch.nn.Parameter(torch.rand(size, size), requires_grad=True)
+                for n in range(N * 6)
+            ])
 
         def forward(self, in0, target=None):
             phase = 0
@@ -420,19 +412,15 @@ def test_2x2_parallel_phased_execution_opts(capfd, trace_model):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_2x2_parallel_phased_execution_small_opts(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Segfault")
     size = 10
 
     class Model(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.weights = []
-            for n in range(6):
-                weight = torch.nn.Parameter(torch.rand(size, size),
-                                            requires_grad=True)
-                self.register_parameter(f"w{n}", weight)
-                self.weights.append(weight)
+            self.weights = torch.nn.ParameterList([
+                torch.nn.Parameter(torch.rand(size, size), requires_grad=True)
+                for n in range(6)
+            ])
 
         def forward(self, in0, target=None):
             poptorch.Block.useAutoId()
