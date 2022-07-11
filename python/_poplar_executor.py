@@ -593,8 +593,6 @@ class PoplarExecutor:
             else:
                 ctx.compile(*in_tensors.args, **in_tensors.kwargs)
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
-        if self._training:
-            self._install_state_hooks()
 
         return ctx.ipu._executable  # pylint: disable=protected-access
 
