@@ -108,6 +108,8 @@ mlir::Type IMLIRCompiler::convertType(Type type) {
     return _builder.getF16Type();
   case Type::FLOAT:
     return _builder.getF32Type();
+  case Type::NONE:
+    return _builder.getNoneType();
   default:
     llvm::errs() << "Unreachable: Unsupported type.";
     exit(0);

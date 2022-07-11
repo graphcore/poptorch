@@ -523,6 +523,76 @@ class Poptorch_NotImplemented_reflection_padding<string name> : Poptorch_NotImpl
 def Poptorch_reflection_pad1d_out : Poptorch_NotImplemented_reflection_padding<"reflection_pad1d_out"> {}
 def Poptorch_reflection_pad2d : Poptorch_NotImplemented_reflection_padding<"reflection_pad2d"> {}
 
+// See aten/src/ATen/native/TensorAdvancedIndexing.cpp for more details.
+def Poptorch_index_tensor: Poptorch_NotImplementedOp<"index_tensor", []> {
+    let arguments = (ins Poptorch_tensor:$self, Poptorch_tensorlist:$indices);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "mlir::ValueRange":$indices),[{
+
+        auto is_none = [&] (mlir::Value v) {
+          return getElementType(v) == $_builder.getNoneType();
+        };
+
+        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
+        const auto input_shape = tensor.getShape();
+
+        ERROR_ON_MSG(indices.size() > input_shape.size(),
+                     "Cannot index outside the tensor (dims " +
+                     std::to_string(input_shape.size()) + ") with dim (" +
+                     std::to_string(indices.size()) + ")");
+        
+        auto broadcasted_index_shape = std::accumulate(indices.begin(), indices.end(),
+                                                       std::vector<std::int64_t>{},
+                                                       [&] (const auto& acc, const auto &index) {
+            if (is_none(index)) {
+                return acc;
+            }
+            return broadcast(acc, getShape(index));
+        });
+        bool none_after_index = false;
+        bool index_after_none = false;
+        for (auto i = 0u; i < indices.size() - 1; i++) {
+          if (!is_none(indices[i]) && is_none(indices[i + 1])) {
+            none_after_index = true;
+          }
+          if (is_none(indices[i]) && !is_none(indices[i + 1])) {
+            index_after_none = true;
+          }
+        }
+        bool indices_are_separated = none_after_index && index_after_none;
+
+        std::vector<std::int64_t> output_shape;
+        bool indices_written = false;
+        if (indices_are_separated) {
+          std::copy(broadcasted_index_shape.begin(), broadcasted_index_shape.end(),
+                    std::back_inserter(output_shape));
+          indices_written = true;
+        }
+
+        for (auto i = 0u; i < input_shape.size(); i++) {
+          if(i >= indices.size() || is_none(indices[i])){
+            output_shape.push_back(input_shape[i]);
+            continue;
+          }
+          mlir::RankedTensorType index_tensor = indices[i].getType().cast<mlir::RankedTensorType>();
+          ERROR_ON_MSG(!index_tensor.getElementType().isIntOrIndex(),
+                       "index must have integer type");
+          
+          if (!indices_written) {
+            std::copy(broadcasted_index_shape.begin(), broadcasted_index_shape.end(),
+                      std::back_inserter(output_shape));
+            indices_written = true;
+          }
+        }
+
+        $_state.addOperands(self);
+        $_state.addOperands(indices);
+        $_state.addTypes(mlir::RankedTensorType::get(output_shape, tensor.getElementType()));
+    }]>];
+}
+
 def Poptorch_index_select : Poptorch_NotImplementedOp<"index_select", []> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index);
     let results = (outs Poptorch_tensor:$result);

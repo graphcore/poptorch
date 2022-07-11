@@ -403,9 +403,12 @@ std::shared_ptr<MLIRExecutor> MLIRDispatch::compile() {
 // Resolves a PyTorch tensor to find out what its MLIR representation is.
 // Sometimes (i.e when it is a python constant) we will add the missing MLIR.
 poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
-  // Undefined tensors are optional tensors which do not exist.
+  // Undefined tensors are optional tensors which do not exist. Note that
+  // these are not the same as None IValue types. For example, they appear
+  // in lists of optional tensors (Tensor?[]), which must only contain
+  // tensor types.
   if (!tensor.defined()) {
-    return poptorch_ir::tensor_error_id;
+    return poptorch_ir::none_id;
   }
 
   poptorch_ir::TensorId val = _mapper.getMLIRForTensor(tensor);
@@ -577,6 +580,7 @@ poptorch_ir::OptionalTensorId MLIRDispatch::getSingleOptionalTensorId(
 
 // A small collection of helpers to help convert PyTorch ATEN into MLIR.
 
+namespace {
 // Some operations are in the form, op(in1, in2, out!) with `out!` not really
 // being a true operand to the op but instead is the storage location of the
 // output. To handle these cases we check if any of the inputs are part of that
@@ -595,11 +599,11 @@ bool isInplaceOnInput(const at::Tensor &inplaceOutput,
   return false;
 }
 
-inline std::vector<std::int64_t> toIntVector(c10::IValue &value) {
+std::vector<std::int64_t> toIntVector(c10::IValue &value) {
   return value.toIntVector();
 }
 
-inline std::optional<std::vector<std::int64_t>>
+std::optional<std::vector<std::int64_t>>
 toOptionalIntVector(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;
@@ -607,12 +611,12 @@ toOptionalIntVector(c10::IValue &value) {
   return value.toIntVector();
 }
 
-inline std::int64_t toInt(c10::IValue &value) { return value.toInt(); }
+std::int64_t toInt(c10::IValue &value) { return value.toInt(); }
 
 // Use an int vector to avoid the unusual std::vector<bool>: there is also no
 // "toBoolVector method."
 // (PyTorch uses std::array<bool, N> in at least one place for this.)
-inline std::vector<int64_t> toBoolVector(c10::IValue &value) {
+std::vector<int64_t> toBoolVector(c10::IValue &value) {
   auto bool_list = value.toBoolList();
 
   std::vector<int64_t> vec;
@@ -622,16 +626,35 @@ inline std::vector<int64_t> toBoolVector(c10::IValue &value) {
   return vec;
 }
 
-inline bool toBool(c10::IValue &value) { return value.toBool(); }
+std::vector<at::Tensor> toTensorVector(c10::IValue &value,
+                                       const std::string &op) {
+  if (value.isTensorList()) {
+    return value.toTensorVector();
+  }
+  ERROR_ON_MSG(!value.isList(), "Expected TensorList or GenericList for "
+                                    << op << " but got " << value.tagKind());
+  std::vector<at::Tensor> tensors;
+  auto tensor_list = value.toList();
+  tensors.reserve(tensor_list.size());
+  for (c10::IValue v : tensor_list) {
+    ERROR_ON_MSG(!v.isTensor(), "Expected a list of tensors for "
+                                    << op << " but found a " << v.tagKind()
+                                    << " in list");
+    tensors.push_back(v.toTensor());
+  }
+  return tensors;
+}
 
-inline std::optional<std::int64_t> toOptionalInt(c10::IValue &value) {
+bool toBool(c10::IValue &value) { return value.toBool(); }
+
+std::optional<std::int64_t> toOptionalInt(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;
   }
   return value.toInt();
 }
 
-inline double toDouble(c10::IValue &value) {
+double toDouble(c10::IValue &value) {
   if (value.isDouble()) {
     return value.toDouble();
   }
@@ -644,7 +667,7 @@ inline double toDouble(c10::IValue &value) {
   ERROR("Unsupported value type " << value.type()->str() << " in `toDouble`");
 }
 
-inline std::vector<float> toFloatVector(c10::IValue &value) {
+std::vector<float> toFloatVector(c10::IValue &value) {
   if (value.isDoubleList()) {
     auto dv = value.toDoubleVector();
     return std::vector<float>(std::begin(dv), std::end(dv));
@@ -661,8 +684,7 @@ inline std::vector<float> toFloatVector(c10::IValue &value) {
                                   << " in `toDoubleVector`");
 }
 
-inline std::optional<std::vector<float>>
-toOptionalFloatVector(c10::IValue &value) {
+std::optional<std::vector<float>> toOptionalFloatVector(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;
   }
@@ -671,26 +693,25 @@ toOptionalFloatVector(c10::IValue &value) {
 
 const char *toStr(c10::IValue &value) { return value.toStringRef().c_str(); }
 
-inline std::optional<const char *> toOptionalStr(c10::IValue &value) {
+std::optional<const char *> toOptionalStr(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;
   }
   return toStr(value);
 }
 
-inline poptorch_ir::Type toCompilerType(c10::IValue &value) {
+poptorch_ir::Type toCompilerType(c10::IValue &value) {
   return toCompilerType(value.toScalarType());
 }
 
-inline std::optional<poptorch_ir::Type>
-toOptionalCompilerType(c10::IValue &value) {
+std::optional<poptorch_ir::Type> toOptionalCompilerType(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;
   }
   return toCompilerType(value.toScalarType());
 }
 
-inline std::optional<double> toOptionalDouble(c10::IValue &value) {
+std::optional<double> toOptionalDouble(c10::IValue &value) {
   if (value.isNone()) {
     return std::nullopt;
   }
@@ -704,6 +725,8 @@ inline std::optional<double> toOptionalDouble(c10::IValue &value) {
 
   ERROR("Unsupported value type " << value.type()->str() << " in `toDouble`");
 }
+
+} // namespace
 
 #include "AtenToMLIRInterface.cpp.inc"
 #include "PoptorchToMLIRInterface.cpp.inc"

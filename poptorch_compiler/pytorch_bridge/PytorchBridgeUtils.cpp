@@ -35,6 +35,9 @@ Type mlirTypeToCompilerType(mlir::Type type) {
   if (type.isa<mlir::BFloat16Type>()) {
     return Type::BFLOAT16;
   }
+  if (type.isa<mlir::NoneType>()) {
+    return Type::NONE;
+  }
 
   return Type::UNDEFINED;
 }

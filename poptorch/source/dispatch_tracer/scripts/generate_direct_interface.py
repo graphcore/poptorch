@@ -269,12 +269,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
         arg_type = arg[1]
 
         # Handle tensor list e.g "_cat(Tensor[] tensors, int dim=0) -> Tensor"
-        if "Tensor[]" in arg_type:
-            # Error if this is not a list.
-            function_decl += "ERROR_ON_MSG(!" + stack_at_index
-            function_decl += ".isTensorList(), \"Expected list of tensors for"
-            function_decl += " operation: {}\");\n".format(op_target['func'])
-
+        if "Tensor[]" in arg_type or "Tensor?[]" in arg_type:
             # Create the list of torch tensors in case this is being used
             # inplace
             function_decl += "\t[[maybe_unused]] std::vector<at::Tensor> "
@@ -289,14 +284,28 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
 
             # Iterate over the list.
             function_decl += "for (c10::IValue " + loop_placeholder + " : "
-            function_decl += stack_at_index + ".toTensorVector()) {\n"
+            function_decl += "toTensorVector(" + stack_at_index + ", \""
+            function_decl += op_target['func'] + "\")) {\n"
+
+            indent = "\t\t"
+            if "?" in arg_type:
+                function_decl += "\t\tif(!" + loop_placeholder + ".toTensor()"
+                function_decl += ".defined()) {\n"
+                function_decl += "\t\t\t" + arg[0] + "_pytorch.push_back({});\n"
+                function_decl += "\t\t\t" + arg[0] + ".push_back(_compiler."
+                function_decl += "empty_tensor({}, poptorch_ir::Type::NONE)"
+                function_decl += ".at(0).tensor_ids.at(0));\n"
+                function_decl += "\t\t}else{\n"
+                indent = "\t\t\t"
 
             # Add the tensor to the output list
-            function_decl += "\t\t" + arg[0] + "_pytorch.push_back("
+            function_decl += indent + arg[0] + "_pytorch.push_back("
             function_decl += "{}.toTensor() );\n".format(loop_placeholder)
             # Extract the tensor from the list and look it up.
-            function_decl += "\t\t" + arg[0] + ".push_back(findTensor("
+            function_decl += indent + arg[0] + ".push_back(findTensor("
             function_decl += arg[0] + "_pytorch.back()) );\n"
+            if "?" in arg_type:
+                function_decl += "\t\t}\n"
 
             # Update the requires grad stuff.
             need_requires_grad = True

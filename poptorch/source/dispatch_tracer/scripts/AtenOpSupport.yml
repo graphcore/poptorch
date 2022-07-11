@@ -256,6 +256,10 @@
 - func: index_select
   PopTorchDirect: index_select
 
+# func: index.Tensor(Tensor self, Tensor?[] indices) -> Tensor
+- func: index.Tensor
+  PopTorchDirect: index_tensor
+
 # func: permute(Tensor(a) self, int[] dims) -> Tensor(a)
 - func: permute
   PopTorchDirect: permute

@@ -34,6 +34,14 @@ bool isGenericListOfTensors(c10::IValue &value) {
   return not_empty;
 }
 
+bool isListOfOptionalTensors(c10::IValue &value) {
+  if (!value.isList()) {
+    return false;
+  }
+  return value.toList().elementType() ==
+         c10::getTypePtr<c10::optional<at::Tensor>>();
+}
+
 torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
                                                   torch::jit::Graph &graph,
                                                   ValueMapper &mapper) {
@@ -95,7 +103,14 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
     // We assume all lists with the same jit values are the same list in python.
     torch::jit::Value *val = mapper.getValueForTensorList(list_values);
     if (val == nullptr) {
-      auto *list = graph.createList(c10::TensorType::get(), list_values);
+      c10::TypePtr type_ptr;
+      if (value.isTensorList()) {
+        type_ptr = c10::TensorType::get();
+      } else if (isListOfOptionalTensors(value)) {
+        type_ptr = c10::OptionalType::create(c10::TensorType::get());
+      }
+
+      auto *list = graph.createList(type_ptr, list_values);
       graph.insertNode(list);
       val = list->output();
       mapper.addTensorList(list_values, val);

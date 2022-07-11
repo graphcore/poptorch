@@ -71,13 +71,13 @@ def index_op8(t, idx, v=None):
     return t
 
 
-def index_harness(trace_model, op, idxs, is_index_put, v=None, is_mask=False):
+def index_harness(trace_model, op, idx, is_index_put, v=None, is_mask=False):
     torch.manual_seed(42)
     t = torch.randn(2, 3, 4, 5)
     if not is_mask:
-        idxs_tensors = [torch.tensor([i]) for i in idxs]
+        idx_tensor = torch.tensor(idx)
     else:
-        idxs_tensors = [idxs]
+        idx_tensor = idx
     model = helpers.ModelWithWeights(op, t.shape)
     # The LR should be large enough to guarantee weights change
     optim = torch.optim.AdamW(model.parameters(), lr=0.1)
@@ -89,13 +89,13 @@ def index_harness(trace_model, op, idxs, is_index_put, v=None, is_mask=False):
 
     if is_index_put:
         if v is None:
-            v = torch.zeros_like(op(t, *idxs_tensors))
+            v = torch.zeros_like(op(t, idx_tensor))
         # Clone the tensor so that the original is unchanged by the in-place op
-        native_out, _ = model((t.clone(), *idxs_tensors, v))
-        poptorch_out, _ = poptorch_model((t, *idxs_tensors, v))
+        native_out, _ = model((t.clone(), idx_tensor, v))
+        poptorch_out, _ = poptorch_model((t, idx_tensor, v))
     else:
-        native_out, _ = model((t, *idxs_tensors))
-        poptorch_out, _ = poptorch_model((t, *idxs_tensors))
+        native_out, _ = model((t, idx_tensor))
+        poptorch_out, _ = poptorch_model((t, idx_tensor))
 
     # Inference test - check outputs
     helpers.assert_allclose(actual=poptorch_out, expected=native_out)
@@ -116,24 +116,33 @@ index_ops = [
     index_op8,
 ]
 
-index_indices = ([[0]], [[1]], [[0, 1]], [[1, 0]], [[[0, 1], [1, 0]]])
+index_indices = ([0], [[1]], [0, 1], [[1, 0]], [[0, 1], [1, 0]])
 
 
 @pytest.mark.parametrize("idxs", index_indices)
 @pytest.mark.parametrize("op", index_ops)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index(op, idxs, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::index.Tensor")
     index_harness(trace_model, op, idxs, False)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_index_bool_mask_failure(trace_model):
+    with pytest.raises(
+            poptorch.poptorch_core.Error,
+            match=r"Indexing using boolean or byte tensor masks is unsupported "
+            r"because it would produce dynamic output shapes based on "
+            r"the mask values\. The IPU cannot support dynamic output "
+            r"shapes\."):
+        index_harness(trace_model, index_ops[0], [True, False], False)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_on_max_indices(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::index.Tensor")
+        pytest.skip(
+            "TODO(T51159): Couldn't find a registered operation for node "
+            "aten::max")
 
     def op(x):
         _, argmax_tensor = torch.max(x, dim=1)

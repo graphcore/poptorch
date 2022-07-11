@@ -53,6 +53,7 @@ enum class Type : std::uint8_t {
   HALF,
   FLOAT,
   BFLOAT16,
+  NONE,
   UNDEFINED,
 };
 
