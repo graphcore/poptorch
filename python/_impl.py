@@ -8,7 +8,7 @@ import hashlib
 import itertools
 import os
 from functools import partial, wraps
-from typing import Dict, Any
+import weakref
 import torch
 
 # Do not import any poptorch.* here: it will break the poptorch module
@@ -239,27 +239,40 @@ def distributedCacheLock(model, opts):
 # wrapper doesn't contain any attribute so it's just a question of updating
 # the __class__attribute.
 #
-# When an object is loaded from file: the wrapper type doesn't exist anymore
+# When an object is loaded from file: the wrapper type doesn't exist any more
 # therefore we keep the object unwrapped. (It will be wrapped again when passed
 # to poptorch.trainingModel anyway)
-_wrapper_registry: Dict[int, Any] = {}
+_wrapper_registry: weakref.WeakKeyDictionary = {}
 # List of all the wrapper types used by PopTorch.
 _wrapper_types = []
 
 
 def _restoreWrapperIfNecessary(obj):
-    wrapperType = _wrapper_registry.get(id(obj))
+    wrapperType = _wrapper_registry.get(obj)
     if wrapperType:
         obj.__class__ = wrapperType
     return obj
 
 
+def _unwrapIfWrappedAndRegister(obj):
+    global _wrapper_registry
+    if isWrapped(obj):
+        wrapperType = obj.__class__
+        obj.__class__ = obj.__class__.__bases__[0]
+        _wrapper_registry[obj] = wrapperType
+
+
 def _pickleUnwrapObject(obj):
     global _wrapper_registry
     wrapperType = obj.__class__
+    if not wrapperType in _wrapper_types:
+        raise createPoptorchError("Internal Error")
+
+    # We need to unwrap obj before copying it because this is the function
+    # registered for doing copies
     obj.__class__ = obj.__class__.__bases__[0]
     other = copy.copy(obj)
-    _wrapper_registry[id(other)] = wrapperType
+    _wrapper_registry[other] = wrapperType
     obj.__class__ = wrapperType
     return _restoreWrapperIfNecessary, (other, )
 
@@ -311,7 +324,7 @@ def unwrapModelIfNecessary(model: torch.nn.Module):
     # Removes the PoptorchParameter and PoptorchBuffer annotations in the model
 
     for buff in itertools.chain(model.buffers(), model.parameters()):
-        unwrapIfWrapped(buff)
+        _unwrapIfWrappedAndRegister(buff)
 
 
 def rewrapModelIfNecessary(model: torch.nn.Module):

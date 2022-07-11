@@ -212,21 +212,24 @@ class PoplarExecutor:
                     have been updated.
                     Return False if the weights were already up to date.
                     """
-                    if parent():
-                        return parent().copyWeightsToHostIfNeeded()
+                    p = parent()
+                    if p is not None:
+                        return p.copyWeightsToHostIfNeeded()
                     return False
 
                 def destroy(self):
                     """Destroy the model: release the IPUs and the executable.
                     """
-                    if parent():
-                        parent().destroy()
+                    p = parent()
+                    if p is not None:
+                        p.destroy()
 
                 def __getattribute__(self, name):
                     if name == "_host_weights_version":
-                        if not parent():
+                        p = parent()
+                        if p is None:
                             return None
-                        return parent()._host_weights_version
+                        return p._host_weights_version
                     if name in ("_buffers", "_parameters", "forward"):
                         self.copyWeightsToHostIfNeeded()
                     return object.__getattribute__(self, name)
@@ -269,8 +272,9 @@ class PoplarExecutor:
             # situations such as torch.equal(a, b).
             class PoptorchParameter(torch.nn.Parameter):
                 def __getattribute__(self, name):
-                    if parent():
-                        parent().copyWeightsToHostIfNeeded()
+                    p = parent()
+                    if p is not None:
+                        p.copyWeightsToHostIfNeeded()
 
                     return object.__getattribute__(self, name)
 
@@ -285,8 +289,9 @@ class PoplarExecutor:
 
             class PoptorchBuffer(torch.Tensor):
                 def __getattribute__(self, name):
-                    if parent():
-                        parent().copyWeightsToHostIfNeeded()
+                    p = parent()
+                    if p is not None:
+                        p.copyWeightsToHostIfNeeded()
 
                     return super().__getattribute__(name)
 
@@ -318,7 +323,7 @@ class PoplarExecutor:
         for p in self._user_model.parameters():
             p.__class__ = self.PoptorchParameter
         for b in self._user_model.buffers():
-            if b.__class__ != torch.Tensor:
+            if not b.__class__ in (torch.Tensor, self.PoptorchBuffer):
                 raise _impl.createPoptorchError(
                     "All buffers must be an instance of torch.Tensor")
             b.__class__ = self.PoptorchBuffer
