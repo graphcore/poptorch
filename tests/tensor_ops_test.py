@@ -643,11 +643,6 @@ def test_split_singleton(trace_model):
 @pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_squeeze(inplace, trace_model):
-    if not trace_model and inplace:
-        pytest.skip(
-            "TODO(T51159): RuntimeError: a leaf Variable that requires grad "
-            "is being used in an in-place operation.")
-
     torch.manual_seed(42)
     x = torch.randn(1, 1, 5, 1, 10, 1)
 
