@@ -3,7 +3,7 @@ Examples
 
 You can find PyTorch examples and tutorials in the Graphcore GitHub repositories:
 
-* `PopTorch versions of popular machine learning models for training and inference <https://github.com/graphcore/examples/tree/master/applications/pytorch>`__
+* `Examples of popular machine learning models for training and inference <https://github.com/graphcore/examples>`__
 
 * `Tutorials repo <https://github.com/graphcore/tutorials>`__ with:
 
