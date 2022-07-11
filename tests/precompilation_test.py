@@ -130,10 +130,6 @@ def test_export_no_python_then_load(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_validate_no_python(trace_model):
-    if not trace_model:
-        # Note: we have not been able to reproduce this locally
-        pytest.skip("TODO(T51159): Intermittent timeouts in ci")
-
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")
@@ -178,10 +174,6 @@ def test_export_train_validate_no_python(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_export_train_validate(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): intermittent failure: Not a parameter or"
-                    " a buffer: impl_ 0x5647b7fdaa70 type xla "
-                    "ID 6 sizes [10, 10] dtype float")
     with tempfile.TemporaryDirectory() as tmp:
         train_filename = os.path.join(tmp, "train.poptorch")
         valid_filename = os.path.join(tmp, "valid.poptorch")

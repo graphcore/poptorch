@@ -76,10 +76,6 @@ def test_training_then_inference(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_buffer_implicit_copy(trace_model):
-    if not trace_model:
-        # Note: this does not appear to fail locally
-        pytest.skip("TODO:(T51159): Intermittent failures in ci in "
-                    "_install_state_hooks")
     momentum = 0.1
 
     class Model(torch.nn.Module):
