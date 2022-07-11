@@ -7,6 +7,7 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/Timing.h>
 #include <mlir/Transforms/Passes.h>
+#include <mlir/Transforms/ViewOpGraph.h>
 
 #include <poplar/Graph.hpp>
 #include <poplar/Target.hpp>
@@ -80,6 +81,15 @@ void IMLIRGraphConverter::convertGraph(mlir::ModuleOp &module,
                              /* printAfterOnlyOnFailure =*/true, output, flags);
   }
 
+  // fd needs to remain open until manager.run() has been called.
+  std::unique_ptr<llvm::raw_fd_ostream> fd;
+  if (const char *dot_filename = std::getenv("POPTORCH_MLIR_DOT_FILE")) {
+    std::error_code err;
+    fd = std::make_unique<llvm::raw_fd_ostream>(dot_filename, err);
+    ERROR_ON_MSG(err,
+                 "Failed to open " << dot_filename << ": " << err.message());
+    manager.addPass(mlir::createPrintOpGraphPass(*fd));
+  }
   manager.addPass(mlir::createCanonicalizerPass());
   // TODO(T61603) Figure out why MLIR's DCE pass doesn't do the same as our
   // RemoveUnusedOperationsPass.
