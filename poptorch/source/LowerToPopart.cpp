@@ -492,7 +492,7 @@ void LowerToPopartImpl::lowerReturn() {
 
     uint64_t output_num = 0;
     for (auto id : tensors) {
-      auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
+      auto overlap_symbol = getOverlapSymbol("output", output_num);
       ERROR_ON(!_graph.return_node()->hasAttribute(overlap_symbol));
       auto overlap_str = _graph.return_node()->s(overlap_symbol);
 
@@ -1076,7 +1076,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
       parameter_popart_ids.push_back(id);
       param_index++;
     } else {
-      auto overlap_symbol = getOverlapSymbol("_for_input", input_index);
+      auto overlap_symbol = getOverlapSymbol("input", input_index);
       std::string overlap_str("no_overlap");
       if (_graph.param_node()->hasAttribute(overlap_symbol)) {
         overlap_str = _graph.param_node()->s(overlap_symbol);

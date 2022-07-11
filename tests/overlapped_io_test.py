@@ -71,10 +71,6 @@ def get_model(num_mat_muls,
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_io_input(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Could not find canonicalisation handler for "
-            "JIT symbol: poptorch::set_overlap_for_input")
     num_mat_muls = 20
     model = get_model(num_mat_muls,
                       poptorch.OverlapMode.OverlapAccumulationLoop,
@@ -105,9 +101,6 @@ def test_io_input(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_input_error_messages(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Regex pattern does not match")
-
     class DoubleInputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -120,9 +113,10 @@ def test_input_error_messages(trace_model):
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    err_msg = (
-        r"poptorch\.set_overlap_for_input must be the only op applied " +
-        r"to an input\. This is not the case for input x to the model\.")
+    input_label = "x" if trace_model else "1"
+    err_msg = (r"poptorch.set_overlap_for_input must be the only op applied "
+               r"to an input. This is not the case for input " + input_label +
+               r" to the model.")
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
 
@@ -136,8 +130,8 @@ def test_input_error_messages(trace_model):
     model = NotOnInputModel()
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    err_msg = (r"poptorch\.set_overlap_for_input applied on a node which is " +
-               r"not a tensor input to the model\.")
+    err_msg = (r"poptorch.set_overlap_for_input applied on a node which is "
+               r"not a tensor input to the model.")
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
 
@@ -151,10 +145,9 @@ def test_input_error_messages(trace_model):
     model = NormalModel()
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    err_msg = (
-        r"Overlapped IO is not supported with poptorch\.Pipelined" +
-        r"Execution\. If you are using only one IPU, please switch to " +
-        r"poptorch\.ShardedExecution\.")
+    err_msg = (r"Overlapped IO is not supported with poptorch.Pipelined"
+               r"Execution. If you are using only one IPU, please switch to "
+               r"poptorch.ShardedExecution.")
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
 
@@ -163,9 +156,8 @@ def test_input_error_messages(trace_model):
     opts.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options=opts)
 
-    err_msg = (
-        r"No IO tiles allocated\. You must allocate at least 32 IO tiles" +
-        r" using poptorch\.Options\(\)\.TensorLocations\.numIOTiles\.")
+    err_msg = (r"No IO tiles allocated. You must allocate at least 32 IO tiles"
+               r" using poptorch.Options\(\).TensorLocations.numIOTiles.")
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
 
@@ -178,10 +170,6 @@ def test_input_error_messages(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_overlap_host_io_output(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Could not find canonicalisation handler for "
-            "JIT symbol: poptorch::set_overlap_for_input")
     num_mat_muls = 20
     model = get_model(num_mat_muls, poptorch.OverlapMode.NoOverlap,
                       poptorch.OverlapMode.NoOverlap,
@@ -214,9 +202,6 @@ def test_overlap_host_io_output(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_output_error_messages(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Regex pattern does not match")
-
     class DoubleOutputUseModel(torch.nn.Module):
         def forward(self, x):
             y = x + 1
@@ -230,9 +215,9 @@ def test_output_error_messages(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options)
 
     err_msg = (
-        r"poptorch\.set_overlap_for_output cannot be used with a tensor that "
-        + r"is returned twice\. Please check all returned tensors including " +
-        r"those nested in tuples/lists\.")
+        r"poptorch.set_overlap_for_output cannot be used with a tensor that "
+        r"is returned twice. Please check all returned tensors including "
+        r"those nested in tuples/lists.")
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
 
@@ -278,9 +263,8 @@ def test_output_error_messages(trace_model):
     model = NonOutputMarked()
     poptorch_model = poptorch.inferenceModel(model, options=opts)
 
-    err_msg = (
-        r"poptorch\.set_overlap_for_output applied on a node which is " +
-        r"not a tensor output to the model\.")
+    err_msg = (r"poptorch.set_overlap_for_output applied on a node which is "
+               r"not a tensor output to the model.")
 
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
@@ -288,9 +272,6 @@ def test_output_error_messages(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_overlap_both_non_input_marked(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError: Regex pattern not matched")
-
     class NotOnInputModel(torch.nn.Module):
         def forward(self, x):
             x = poptorch.set_overlap_for_input(
@@ -308,17 +289,14 @@ def test_overlap_both_non_input_marked(trace_model):
     model = NotOnInputModel()
     poptorch_model = poptorch.inferenceModel(model, opts)
 
-    err_msg = (r"poptorch\.set_overlap_for_input applied on a node which is " +
-               r"not a tensor input to the model\.")
+    err_msg = (r"poptorch.set_overlap_for_input applied on a node which is "
+               r"not a tensor input to the model.")
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
         poptorch_model(torch.tensor([1.0]))
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_overlap_both_non_output_marked(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError: Regex pattern not matched")
-
     class OutputBeforeLoss(torch.nn.Module):
         def forward(self, x):
             x = poptorch.set_overlap_for_input(
@@ -337,8 +315,7 @@ def test_overlap_both_non_output_marked(trace_model):
 
     inference_model = poptorch.inferenceModel(model, opts)
 
-    err_msg = (
-        r"poptorch\.set_overlap_for_output applied on a node which is " +
-        r"not a tensor output to the model\.")
+    err_msg = (r"poptorch.set_overlap_for_output applied on a node which is "
+               r"not a tensor output to the model.")
     with pytest.raises(poptorch.Error, match=err_msg):
         inference_model(torch.tensor([1.0]))

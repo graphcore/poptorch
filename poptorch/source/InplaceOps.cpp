@@ -231,7 +231,7 @@ size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
       // additional efficiency of overalpped host IO should not use inplace
       // ops).
       auto overlap_symbol =
-          getOverlapSymbol("_for_output", graph.outputs().size() - 1);
+          getOverlapSymbol("output", graph.outputs().size() - 1);
       graph.return_node()->s_(overlap_symbol, "no_overlap");
     }
   }
@@ -403,7 +403,7 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
           // the additional efficiency of overalpped host IO should not use
           // inplace ops.)
           auto overlap_symbol =
-              getOverlapSymbol("_for_output", graph.outputs().size() - 1);
+              getOverlapSymbol("output", graph.outputs().size() - 1);
           graph.return_node()->s_(overlap_symbol, "no_overlap");
         }
       }

@@ -161,12 +161,6 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
                      at::ScalarType::Undefined));
 
   graph->registerOutput(val);
-  // For now, disable overlapping host IO on every output
-  auto overlap_symbol = getOverlapSymbol("_for_output", _next_output_idx);
-  const std::string value_str = "no_overlap";
-  graph->return_node()->s_(overlap_symbol, value_str);
-
-  _next_output_idx++;
 }
 
 void JITDispatch::finalizeGraph() {

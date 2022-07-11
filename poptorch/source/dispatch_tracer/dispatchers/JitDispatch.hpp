@@ -50,7 +50,6 @@ public:
 private:
   at::Tensor addTensor(const at::Tensor &cpu_tensor, bool is_parameter);
 
-  uint64_t _next_output_idx{0};
   // We use the MLIR dispatch for shape inference.
   MLIRDispatch _mlir_dispatch;
   InplaceInputsTracker _inplace_tracker;

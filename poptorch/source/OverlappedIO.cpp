@@ -17,7 +17,7 @@ namespace {
 void attributiseOverlappedInputs(
     torch::jit::Graph *graph,
     std::set<torch::jit::Node *> *to_erase_output_and_delete,
-    std::vector<torch::jit::Node *> *to_delete) {
+    std::vector<torch::jit::Node *> *to_delete, bool verify_only) {
   logging::LogContext ctx("attributiseOverlappedInputs");
 
   int64_t input_num = -1;
@@ -34,8 +34,12 @@ void attributiseOverlappedInputs(
     if ((input_uses.size() == 1) &&
         (user->kind() == poptorch::symbols::poptorch::set_overlap_for_input)) {
       auto *value_node = user->input(1)->node();
-      ERROR_ON(value_node->kind() != c10::prim::Constant);
-      const auto &value_str = value_node->s(c10::attr::value);
+      if (!verify_only) {
+        ERROR_ON(value_node->kind() != c10::prim::Constant);
+        const auto &value_str = value_node->s(c10::attr::value);
+        graph->param_node()->s_(getOverlapSymbol("input", input_num),
+                                value_str);
+      }
       to_delete->push_back(user);
       user->removeInput(1);
 
@@ -44,8 +48,6 @@ void attributiseOverlappedInputs(
         to_erase_output_and_delete->insert(value_node);
       }
 
-      graph->param_node()->s_(getOverlapSymbol("_for_input", input_num),
-                              value_str);
       user->output()->replaceAllUsesWith(input);
       continue;
     }
@@ -95,21 +97,24 @@ void errorOnDoubleReturnOfOutput(torch::jit::Node *node) {
 void attributiseOverlappedOutputs(
     torch::jit::Graph *graph,
     std::set<torch::jit::Node *> *to_erase_output_and_delete,
-    std::vector<torch::jit::Node *> *to_delete) {
+    std::vector<torch::jit::Node *> *to_delete, bool verify_only) {
   logging::LogContext ctx("attributiseOverlappedOutputs");
 
   int64_t output_num = 0;
 
   std::function<void(torch::jit::Node *)> process_node;
   process_node = [&process_node, graph, &output_num, to_erase_output_and_delete,
-                  to_delete](torch::jit::Node *node) {
-    auto overlap_symbol = getOverlapSymbol("_for_output", output_num);
+                  to_delete, verify_only](torch::jit::Node *node) {
+    auto overlap_symbol = getOverlapSymbol("output", output_num);
     if (node->kind() == poptorch::symbols::poptorch::set_overlap_for_output) {
       errorOnDoubleReturnOfOutput(node);
 
       auto *value_node = node->input(1)->node();
-      ERROR_ON(value_node->kind() != c10::prim::Constant);
-      const auto &value_str = value_node->s(c10::attr::value);
+      if (!verify_only) {
+        ERROR_ON(value_node->kind() != c10::prim::Constant);
+        const auto &value_str = value_node->s(c10::attr::value);
+        graph->return_node()->s_(overlap_symbol, value_str);
+      }
       to_delete->push_back(node);
       node->removeInput(1);
 
@@ -118,7 +123,6 @@ void attributiseOverlappedOutputs(
         to_erase_output_and_delete->insert(value_node);
       }
 
-      graph->return_node()->s_(overlap_symbol, value_str);
       node->output()->replaceAllUsesWith(node->input(0));
       output_num++;
     } else if (node->kind() == c10::prim::ListConstruct ||
@@ -141,12 +145,14 @@ void attributiseOverlappedOutputs(
 }
 } // namespace
 
-void attributiseOverlappedIO(torch::jit::Graph *graph) {
+void attributiseOverlappedIO(torch::jit::Graph *graph, bool verify_only) {
   std::set<torch::jit::Node *> to_erase_output_and_delete;
   std::vector<torch::jit::Node *> to_delete;
 
-  attributiseOverlappedInputs(graph, &to_erase_output_and_delete, &to_delete);
-  attributiseOverlappedOutputs(graph, &to_erase_output_and_delete, &to_delete);
+  attributiseOverlappedInputs(graph, &to_erase_output_and_delete, &to_delete,
+                              verify_only);
+  attributiseOverlappedOutputs(graph, &to_erase_output_and_delete, &to_delete,
+                               verify_only);
 
   for (auto *node : to_erase_output_and_delete) {
     node->eraseOutput(0);
@@ -169,6 +175,10 @@ void attributiseOverlappedIO(torch::jit::Graph *graph) {
                  "poptorch.set_overlap_for_output applied on a node which is "
                  "not a tensor output to the model.");
   }
+}
+
+void verifyOverlappedIOForDispatch(torch::jit::Graph *graph) {
+  attributiseOverlappedIO(graph, /*verify_only=*/true);
 }
 
 } // namespace poptorch

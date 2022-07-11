@@ -221,7 +221,7 @@ static void initializePoptorchSymbols() {
 
 c10::Symbol getOverlapSymbol(const char *suffix, unsigned int num) {
   std::stringstream overlap_ss;
-  overlap_ss << "poptorch_overlap" << suffix << num;
+  overlap_ss << "poptorch_overlap_for_" << suffix << num;
   return c10::Symbol::attr(overlap_ss.str());
 }
 

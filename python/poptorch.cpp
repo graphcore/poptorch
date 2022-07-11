@@ -774,6 +774,8 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
 
   logging::trace("Traced graph:\n{}", *graph);
 
+  poptorch::verifyOverlappedIOForDispatch(graph.get());
+
   // Make sure all constants are correctly categorised as either
   // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
   // that we have a full graph.
