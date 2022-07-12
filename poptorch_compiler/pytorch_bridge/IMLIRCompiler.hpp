@@ -99,10 +99,16 @@ void callOnEachElementType(F &&f, const Args &...args) {
 // Returns the type to which the compiler should promote all implicit casting
 // operands
 template <typename OpTy, typename... Args>
-mlir::Type getCastToType(const mlir::MLIRContext & /*new_context*/,
-                         const Args &...args) {
+mlir::Type getCastToType(mlir::MLIRContext &context, const Args &...args) {
+  if (OpTy::template hasTrait<mlir::OpTrait::ImplicitCastToBool>()) {
+    return mlir::IntegerType::get(&context, 1, mlir::IntegerType::Unsigned);
+  }
   // Maintain the highest type
   mlir::Type highest_type;
+
+  if (OpTy::template hasTrait<mlir::OpTrait::ImplicitCastToFloat>()) {
+    highest_type = mlir::FloatType::getF32(&context);
+  }
 
   // Loop on the number of operands, or the maximum number which can be
   // implicitly cast, whichever is higher

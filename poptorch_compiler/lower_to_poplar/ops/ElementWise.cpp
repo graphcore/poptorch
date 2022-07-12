@@ -9,7 +9,6 @@
 
 #include "../CompilerHelpers.hpp"
 
-
 namespace pe = popops::expr;
 
 namespace poptorch_ir {
@@ -109,6 +108,53 @@ void sub_::lowerToPoplar(CompilerContext &context) {
   }
 }
 
+void logicalXor::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor input2 = context.fromSsa(this->in2());
+
+  // Implicit casting is added to the input
+  assert(input1.elementType() == poplar::BOOL);
+  assert(input2.elementType() == poplar::BOOL);
+
+  auto out = popops::map(context.graph, pe::BinaryOpType::NOT_EQUAL, input1,
+                         input2, context.seq);
+
+  context.addTensor(this->result(), out);
+}
+
+void floor_divide::lowerToPoplar(poptorch_ir::CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor input2 = context.fromSsa(this->in2());
+
+  assert(input1.elementType().isFloatingPoint() ==
+         input2.elementType().isFloatingPoint());
+
+  if (input1.elementType().isFloatingPoint()) {
+    auto out = popops::map(context.graph, pe::Trunc(pe::_1 / pe::_2),
+                           {input1, input2}, context.seq);
+    context.addTensor(this->result(), out);
+  } else {
+    auto out = popops::div(context.graph, input1, input2, context.seq);
+    context.addTensor(this->result(), out);
+  }
+}
+
+void remainder::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  poplar::Tensor input2 = context.fromSsa(this->in2());
+
+  // Compute the remainder rounding towards zero and correct it if the sign of
+  // the remainder is negative
+  auto r = pe::Rem(pe::_1, pe::_2);
+  auto zero = pe::Const(0);
+  auto op =
+      pe::Select(r + pe::_2, r, (r != zero) && ((r < zero) != (pe::_2 < zero)));
+
+  poplar::Tensor out =
+      popops::map(context.graph, op, {input1, input2}, context.seq);
+  context.addTensor(this->result(), out);
+}
+
 #define UNARY_OP(name)                                                         \
   void name::lowerToPoplar(CompilerContext &context) {                         \
     poplar::Tensor input1 = context.fromSsa(this->in1());                      \
@@ -123,6 +169,14 @@ void sub_::lowerToPoplar(CompilerContext &context) {
 #include "unary_ops.h.inc"
 
 #undef UNARY_OP
+
+void trunc::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in1 = context.fromSsa(this->in1());
+
+  auto out = popops::map(context.graph, popops::expr::UnaryOpType::TRUNC, in1,
+                         context.seq);
+  context.addTensor(this->result(), out);
+}
 
 void isnan::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor self = context.fromSsa(this->self());

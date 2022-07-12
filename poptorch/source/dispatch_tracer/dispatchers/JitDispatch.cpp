@@ -316,7 +316,7 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
         _mapper.getValueForTensor(*inplace_tensor));
   }
 
-  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher);
+  c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher, *stack);
   const c10::FunctionSchema &schema = op.schema();
 
   // Create a fake IR node for us to target using the schema.

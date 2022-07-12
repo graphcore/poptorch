@@ -60,6 +60,9 @@ attr_types = {
 
 tensor_types = {
     "Poptorch_tensor": ("TENSOR", "OR_INPUTS"),
+    "Poptorch_float_tensor": ("TENSOR", "OR_INPUTS"),
+    "Poptorch_integral_tensor": ("TENSOR", "OR_INPUTS"),
+    "Poptorch_non_boolean_tensor": ("TENSOR", "OR_INPUTS"),
     "Poptorch_tensor_no_grad": ("TENSOR", "FALSE"),
 }
 

@@ -30,6 +30,9 @@ def NotImplementedOp : NativeOpTrait<"NotImplementedOp">;
 class ImplicitCastOperand<int idx>
   : ParamNativeOpTrait<"ImplicitCastOperand", !cast<string>(idx)>;
 
+def ImplicitCastToBool : NativeOpTrait<"ImplicitCastToBool">;
+def ImplicitCastToFloat : NativeOpTrait<"ImplicitCastToFloat">;
+
 // All operations coming through the dispatcher's fallback should inherit
 // from either Poptorch_Op if they can be lowered to Poplar or
 // Poptorch_NotImplementedOp if they cannot.
@@ -43,17 +46,23 @@ class Poptorch_AbstractOp<string mnemonic, list<OpTrait> traits = []> :
         Op<Poptorch_Dialect, mnemonic, traits>;
 
 
-def valid_ints : SignedIntOfWidths<[1, 8, 16, 32]>;
-def valid_uints : UnsignedIntOfWidths<[1, 8, 16, 32]>;
+def valid_ints : SignedIntOfWidths<[8, 16, 32]>;
+def valid_uints : UnsignedIntOfWidths<[8]>;
 def valid_float : FloatOfWidths<[16, 32]>;
 
-def valid_tensor : StaticShapeTensorOf<[valid_ints, valid_uints, valid_float]>;
+def valid_tensor : StaticShapeTensorOf<[UI1, valid_ints, valid_uints, valid_float]>;
+def valid_float_tensor : StaticShapeTensorOf<[valid_float]>;
+def valid_integral_tensor : StaticShapeTensorOf<[UI1, valid_ints, valid_uints]>;
+def valid_non_boolean_tensor : StaticShapeTensorOf<[valid_ints, valid_uints, valid_float]>; 
 
 /*
     We will add in specific types for parameters and buffers later.
 */
 // Any valid tensor type.
 def Poptorch_tensor : AnyTypeOf<[valid_tensor]>;
+def Poptorch_float_tensor : AnyTypeOf<[valid_float_tensor]>;
+def Poptorch_integral_tensor : AnyTypeOf<[valid_integral_tensor]>;
+def Poptorch_non_boolean_tensor : AnyTypeOf<[valid_non_boolean_tensor]>;
 
 def Poptorch_tensor_no_grad : AnyTypeOf<[valid_tensor]>;
 

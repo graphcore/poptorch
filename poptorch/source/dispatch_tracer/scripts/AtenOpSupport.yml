@@ -346,17 +346,19 @@
 
 # func: remainder.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: remainder.Tensor_out
-  PopTorchDirect: remainder_Tensor_out
+  PopTorchDirect: remainder
   UnusedOutputArguments: {out}
 
 # func: round.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: round.out
-  PopTorchDirect: round_out
+  PopTorchDirect: round
+  PopTorchDirectInplace: round_
   UnusedOutputArguments: {out}
 
 # func: fmod.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
 - func: fmod.Tensor_out
-  PopTorchDirect: fmod
+  PopTorchDirect: rem
+  PopTorchDirectInplace: rem_
   UnusedOutputArguments: {out}
 
 # func: floor_divide(Tensor self, Tensor other) -> Tensor
@@ -413,6 +415,12 @@
 # func: log.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: log.out
   PopTorchDirect: log
+  UnusedOutputArguments: {out}
+
+# func: pow.Tensor_Tensor_out(Tensor self, Tensor exponent, *, Tensor(a!) out) -> Tensor(a!)
+- func: pow.Tensor_Tensor_out
+  PopTorchDirect: pow
+  PopTorchDirectInplace: pow_
   UnusedOutputArguments: {out}
 
 # func: pow.Tensor_Scalar_out(Tensor self, Scalar exponent, *, Tensor(a!) out) -> Tensor(a!)
@@ -565,6 +573,12 @@
   PopTorchDirect: threshold_out
   UnusedOutputArguments: {out}
 
+# func: atan2.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+- func: atan2.out
+  PopTorchDirect: atan2
+  PopTorchDirectInplace: atan2_
+  UnusedOutputArguments: {out}
+
 # hardtanh.out(Tensor self, Scalar min_val=-1, Scalar max_val=1, *, Tensor(a!) out) -> Tensor(a!)
 - func: hardtanh.out
   PopTorchDirect: clamp
@@ -647,6 +661,11 @@
 # sqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: sqrt.out
   PopTorchDirect: sqrt
+  UnusedOutputArguments: {out}
+
+# rsqrt.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
+- func: rsqrt.out
+  PopTorchDirect: rsqrt
   UnusedOutputArguments: {out}
 
 # func: scatter.src_out(Tensor self, int dim, Tensor index, Tensor src, *, Tensor(a!) out) -> Tensor(a!)
@@ -1085,7 +1104,7 @@
 # func: zeros_like(Tensor self, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
 - func: zeros_like
   PopTorchDirect: zeros_like
-  IgnoreArgs: {'dtype', 'layout', 'device', 'pin_memory', 'memory_format'}
+  IgnoreArgs: {'layout', 'device', 'pin_memory', 'memory_format'}
 
 # func: full_like(Tensor self, Scalar fill_value, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None, MemoryFormat? memory_format=None) -> Tensor
 - func: full_like

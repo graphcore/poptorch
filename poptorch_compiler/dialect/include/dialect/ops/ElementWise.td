@@ -3,7 +3,8 @@
  * Element wise ops.
  */
 
-class Poptorch_elem_unary<string name> :  Poptorch_Op<name, [SameOperandsAndResultShape]> {
+class Poptorch_elem_unary<string name, list<OpTrait> traits = []> 
+    : Poptorch_Op<name, traits # [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1);
     let results = (outs Poptorch_tensor:$result);
 
@@ -31,32 +32,48 @@ class Poptorch_elem_unary_backward<string name> : Poptorch_Op<name#"_backward", 
     ];
 }
 
-def Poptorch_abs: Poptorch_elem_unary<"abs"> {}
+def Poptorch_abs: Poptorch_elem_unary<"abs"> {
+    let arguments = (ins Poptorch_non_boolean_tensor:$in1);
+}
 def Poptorch_asin: Poptorch_elem_unary<"asin"> {}
-def Poptorch_bitwiseNot: Poptorch_elem_unary<"bitwiseNot"> {}
+def Poptorch_bitwiseNot: Poptorch_elem_unary<"bitwiseNot"> {
+    let arguments = (ins Poptorch_integral_tensor:$in1);
+    let hasCanonicalizeMethod = 1;
+}
 def Poptorch_cbrt: Poptorch_elem_unary<"cbrt"> {}
-def Poptorch_ceil: Poptorch_elem_unary<"ceil"> {}
+def Poptorch_ceil: Poptorch_elem_unary<"ceil"> {
+    let arguments = (ins Poptorch_float_tensor:$in1);
+}
 def Poptorch_cos: Poptorch_elem_unary<"cos"> {}
 def Poptorch_countLeadingZeros: Poptorch_elem_unary<"countLeadingZeros"> {}
 def Poptorch_erf: Poptorch_elem_unary<"erf"> {}
-def Poptorch_exp: Poptorch_elem_unary<"exp"> {}
+def Poptorch_exp: Poptorch_elem_unary<"exp", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_expm1: Poptorch_elem_unary<"expm1"> {}
-def Poptorch_floor: Poptorch_elem_unary<"floor"> {}
+def Poptorch_floor: Poptorch_elem_unary<"floor"> {
+    let arguments = (ins Poptorch_float_tensor:$in1);
+}
 def Poptorch_inv: Poptorch_elem_unary<"inv"> {}
-def Poptorch_log: Poptorch_elem_unary<"log"> {}
+def Poptorch_log: Poptorch_elem_unary<"log", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_log1p: Poptorch_elem_unary<"log1p"> {}
-def Poptorch_logicalNot: Poptorch_elem_unary<"logicalNot"> {}
+def Poptorch_logicalNot: Poptorch_elem_unary<"logicalNot", [ImplicitCastOperand<0>, ImplicitCastToBool]> {}
 def Poptorch_neg: Poptorch_elem_unary<"neg"> {}
 def Poptorch_popcount: Poptorch_elem_unary<"popcount"> {}
-def Poptorch_signum: Poptorch_elem_unary<"signum"> {}
+def Poptorch_signum: Poptorch_elem_unary<"signum"> {
+    let hasCanonicalizeMethod = 1;
+}
 def Poptorch_sin: Poptorch_elem_unary<"sin"> {}
 def Poptorch_tan: Poptorch_elem_unary<"tan"> {}
 def Poptorch_tanh: Poptorch_elem_unary<"tanh"> {}
-def Poptorch_round: Poptorch_elem_unary<"round"> {}
-def Poptorch_sqrt: Poptorch_elem_unary<"sqrt"> {}
+def Poptorch_round: Poptorch_elem_unary<"round"> {
+    let arguments = (ins Poptorch_float_tensor:$in1);
+}
+def Poptorch_trunc: Poptorch_elem_unary<"trunc"> {
+    let arguments = (ins Poptorch_float_tensor:$in1);
+}
+def Poptorch_sqrt: Poptorch_elem_unary<"sqrt", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_rsqrt: Poptorch_elem_unary<"rsqrt", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_square: Poptorch_elem_unary<"square"> {}
 def Poptorch_sigmoid: Poptorch_elem_unary<"sigmoid"> {}
-def Poptorch_rsqrt: Poptorch_elem_unary<"rsqrt"> {}
 
 def Poptorch_tanh_backward: Poptorch_elem_unary_backward<"tanh"> {}
 def Poptorch_sigmoid_backward: Poptorch_elem_unary_backward<"sigmoid"> {}
@@ -64,6 +81,8 @@ def Poptorch_sigmoid_backward: Poptorch_elem_unary_backward<"sigmoid"> {}
 def Poptorch_isnan :  Poptorch_Op<"isnan"> {
     let arguments = (ins Poptorch_tensor:$self);
     let results = (outs Poptorch_tensor:$result);
+
+    let hasCanonicalizeMethod = 1;
 
     let builders = [OpBuilder<(ins "mlir::Value":$self),[{
         $_state.addOperands({self});
@@ -89,8 +108,6 @@ class Poptorch_NotImplemented_elem_unary<string name> :  Poptorch_NotImplemented
     ];
 }
 
-def Poptorch_round_out: Poptorch_NotImplemented_elem_unary<"round_out"> {}
-def Poptorch_trunc: Poptorch_NotImplemented_elem_unary<"trunc"> {}
 def Poptorch_max : Poptorch_NotImplemented_elem_unary<"max"> {}
 def Poptorch_min : Poptorch_NotImplemented_elem_unary<"min"> {}
 def Poptorch_median : Poptorch_NotImplemented_elem_unary<"median"> {}
@@ -145,8 +162,8 @@ def Poptorch_rsqrt_: Poptorch_elem_unary_in_place<"rsqrt_"> {}
 /*
  * Binary ops.
  */
-class Poptorch_elem_binary<string name>
-  : Poptorch_Op<name, [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
+class Poptorch_elem_binary<string name, list<OpTrait> traits = []>
+  : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);
 
@@ -168,19 +185,46 @@ class Poptorch_elem_binary<string name>
     }];
 }
 
-def Poptorch_atan2: Poptorch_elem_binary<"atan2"> {}
-def Poptorch_bitwiseAnd: Poptorch_elem_binary<"bitwiseAnd"> {}
-def Poptorch_bitwiseOr: Poptorch_elem_binary<"bitwiseOr"> {}
-def Poptorch_bitwiseXor: Poptorch_elem_binary<"bitwiseXor"> {}
-def Poptorch_bitwiseXnor: Poptorch_elem_binary<"bitwiseXnor"> {}
-def Poptorch_div: Poptorch_elem_binary<"div"> {}
-def Poptorch_logicalAnd: Poptorch_elem_binary<"logicalAnd"> {}
-def Poptorch_logicalOr: Poptorch_elem_binary<"logicalOr"> {}
-def Poptorch_maximum: Poptorch_elem_binary<"maximum"> {}
-def Poptorch_minimum: Poptorch_elem_binary<"minimum"> {}
-def Poptorch_neq: Poptorch_elem_binary<"neq"> {}
-def Poptorch_pow: Poptorch_elem_binary<"pow"> {}
-def Poptorch_rem: Poptorch_elem_binary<"rem"> {}
+def Poptorch_atan2: Poptorch_elem_binary<"atan2", [ImplicitCastToFloat]> {}
+def Poptorch_bitwiseAnd: Poptorch_elem_binary<"bitwiseAnd"> {
+    let arguments = (ins Poptorch_integral_tensor:$in1, Poptorch_integral_tensor:$in2);
+    let hasCanonicalizeMethod = 1;
+}
+def Poptorch_bitwiseOr: Poptorch_elem_binary<"bitwiseOr"> {
+    let arguments = (ins Poptorch_integral_tensor:$in1, Poptorch_integral_tensor:$in2);
+    let hasCanonicalizeMethod = 1;
+}
+def Poptorch_bitwiseXor: Poptorch_elem_binary<"bitwiseXor"> {
+    let arguments = (ins Poptorch_integral_tensor:$in1, Poptorch_integral_tensor:$in2);
+    let hasCanonicalizeMethod = 1;
+}
+def Poptorch_bitwiseXnor: Poptorch_elem_binary<"bitwiseXnor"> {
+    let arguments = (ins Poptorch_integral_tensor:$in1, Poptorch_integral_tensor:$in2);
+    let hasCanonicalizeMethod = 1;
+}
+def Poptorch_div: Poptorch_elem_binary<"div", [ImplicitCastToFloat]> {}
+def Poptorch_floor_divide : Poptorch_elem_binary<"floor_divide"> {
+    let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
+    let verifier = [{
+        emitWarning("floor_divide is deprecated. Use div with rounding_mode='trunc' for equivalent behaviour");
+        return mlir::success();
+    }];
+}
+def Poptorch_rem : Poptorch_elem_binary<"rem"> {
+    let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
+}
+def Poptorch_remainder: Poptorch_elem_binary<"remainder"> {
+    let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
+}
+def Poptorch_maximum: Poptorch_elem_binary<"maximum"> {
+    let hasCanonicalizeMethod = 1;
+}
+def Poptorch_minimum: Poptorch_elem_binary<"minimum"> {
+    let hasCanonicalizeMethod = 1;
+}
+def Poptorch_pow: Poptorch_elem_binary<"pow"> {
+    let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
+}
 def Poptorch_shiftLeft: Poptorch_elem_binary<"shiftleft"> {}
 def Poptorch_shiftRight: Poptorch_elem_binary<"shiftright"> {}
 def Poptorch_shiftRightSignExtend: Poptorch_elem_binary<"shiftrightsignextend"> {}
@@ -210,7 +254,6 @@ def Poptorch_div_mode: Poptorch_NotImplementedOp<"div_mode",
     }];
 }
 
-
 class Poptorch_elem_binary_with_alpha<string name> :  Poptorch_elem_binary<name> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2, DefaultValuedAttr<F32Attr, "1.0">:$alpha);
     let results = (outs Poptorch_tensor:$result);
@@ -227,13 +270,17 @@ class Poptorch_elem_binary_with_alpha<string name> :  Poptorch_elem_binary<name>
 }
 
 
-def Poptorch_add: Poptorch_elem_binary_with_alpha<"add"> {}
+def Poptorch_add: Poptorch_elem_binary_with_alpha<"add"> {
+    let hasCanonicalizeMethod = 1;
+}
 def Poptorch_sub: Poptorch_elem_binary_with_alpha<"sub"> {}
 
 
 // We add mul as a special case because multiply by one is common case in pytorch so we want to fold it.
 // TODO: add some attributes here.
-def Poptorch_mul: Poptorch_elem_binary<"mul"> {}
+def Poptorch_mul: Poptorch_elem_binary<"mul"> {
+    let hasCanonicalizeMethod = 1;
+}
 
 
 class Poptorch_elem_binary_in_place<string name> :  Poptorch_Op<name, []> {
@@ -259,7 +306,9 @@ def Poptorch_lt_: Poptorch_elem_binary_in_place<"lt_"> {}
 def Poptorch_maximum_: Poptorch_elem_binary_in_place<"maximum_"> {}
 def Poptorch_minimum_: Poptorch_elem_binary_in_place<"minimum_"> {}
 def Poptorch_neq_: Poptorch_elem_binary_in_place<"neq_"> {}
-def Poptorch_pow_: Poptorch_elem_binary_in_place<"pow_"> {}
+def Poptorch_pow_: Poptorch_elem_binary_in_place<"pow_"> {
+    let arguments = (ins Poptorch_non_boolean_tensor:$in1, Poptorch_non_boolean_tensor:$in2);
+}
 def Poptorch_rem_: Poptorch_elem_binary_in_place<"rem_"> {}
 def Poptorch_shiftLeft_: Poptorch_elem_binary_in_place<"shiftleft_"> {}
 def Poptorch_shiftRight_: Poptorch_elem_binary_in_place<"shiftright_"> {}
@@ -339,31 +388,6 @@ def Poptorch_addcmul_ : Poptorch_addcX<"addcmul_"> {}
 def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
 def Poptorch_addcdiv_ : Poptorch_addcX<"addcdiv_"> {}
 
-class Poptorch_NotImplemented_elem_binary<string name> :  Poptorch_NotImplementedOp<name, []> {
-    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
-    let results = (outs Poptorch_tensor:$result);
-
-    let builders = [OpBuilder<(ins "mlir::Value":$v1, "mlir::Value":$v2),[{
-        $_state.addOperands({v1, v2});
-        $_state.addTypes(inferType(v1, v2));
-     }]>
-    ];
-
-    // TODO: Will need to match the full shape inference rules.
-    let extraClassDeclaration = [{
-        static mlir::Type inferType(mlir::Value v1, mlir::Value v2) {
-            auto out_shape = broadcast(getShape(v1), getShape(v2));
-            return mlir::RankedTensorType::get(out_shape, getElementType(v1));
-        }
-    }];
-}
-
-def Poptorch_floor_divide : Poptorch_NotImplemented_elem_binary<"floor_divide"> {}
-def Poptorch_remainder_Tensor_out : Poptorch_NotImplemented_elem_binary<"remainder_Tensor_out"> {}
-def Poptorch_fmod : Poptorch_NotImplemented_elem_binary<"fmod"> {}
-def Poptorch_logicalXor: Poptorch_NotImplemented_elem_binary<"logicalXor"> {}
-
-
 class Poptorch_elem_binary_scalar_NotImplemented<string name> :  Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
     let results = (outs Poptorch_tensor:$result);
@@ -379,7 +403,8 @@ class Poptorch_elem_binary_scalar_NotImplemented<string name> :  Poptorch_NotImp
 
 def Poptorch_pow_Tensor_Scalar_out : Poptorch_elem_binary_scalar_NotImplemented<"pow_Tensor_Scalar_out"> {}
 
-class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
+class Poptorch_binary_conditional<string name, list<OpTrait> traits = []>
+        : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
     let results = (outs Poptorch_tensor:$result);
     let assemblyFormat = [{
@@ -394,10 +419,14 @@ class Poptorch_binary_conditional<string name> : Poptorch_Op<name, []> {
 }
 
 def Poptorch_eq: Poptorch_binary_conditional<"eq"> {}
+def Poptorch_neq: Poptorch_binary_conditional<"neq"> {}
 def Poptorch_gteq: Poptorch_binary_conditional<"gteq"> {}
 def Poptorch_gt: Poptorch_binary_conditional<"gt"> {}
 def Poptorch_lteq: Poptorch_binary_conditional<"lteq"> {}
 def Poptorch_lt: Poptorch_binary_conditional<"lt"> {}
+def Poptorch_logicalAnd: Poptorch_binary_conditional<"logicalAnd", [ImplicitCastToBool]> {}
+def Poptorch_logicalOr: Poptorch_binary_conditional<"logicalOr", [ImplicitCastToBool]> {}
+def Poptorch_logicalXor: Poptorch_binary_conditional<"logicalXor", [ImplicitCastToBool]> {}
 
 class Poptorch_NotImplemented_binary_conditional_scalar<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
@@ -428,18 +457,19 @@ def Poptorch_clamp: Poptorch_Op<"clamp", []> {
 
   // builders allow us to tell MIR the types
   let builders = [OpBuilder<(ins "mlir::Value":$self,
-                                    "std::optional<double>":$min,
-                                    "std::optional<double>":$max),
+                                 "std::optional<double>":$min,
+                                 "std::optional<double>":$max), [{
+    $_state.addOperands(self);
 
-  [{$_state.addOperands(self);
+    if (min.has_value()){
+        $_state.addAttribute("min", $_builder.getF64FloatAttr(min.value()));}
 
-  if (min.has_value()){
-      $_state.addAttribute("min", $_builder.getF64FloatAttr(min.value()));}
+    if (max.has_value()) {
+        $_state.addAttribute("max", $_builder.getF64FloatAttr(max.value()));}
 
-  if (max.has_value()) {
-      $_state.addAttribute("max", $_builder.getF64FloatAttr(max.value()));}
+    
 
-  $_state.addTypes(self.getType());
+    $_state.addTypes(self.getType());
   }]>
   ];
 }
@@ -449,27 +479,42 @@ def Poptorch_clampTensor: Poptorch_Op<"clampTensor", [AttrSizedOperandSegments]>
                          Optional<Poptorch_tensor>:$min,
                          Optional<Poptorch_tensor>:$max);
   // defining output arguments
-  let results = (outs Poptorch_tensor:$result);
+  let results = (outs Poptorch_non_boolean_tensor:$result);
+
+  let verifier = [{
+    if (!min() && !max()) {
+        ERROR("torch.clamp: At least one of 'min' or 'max' must not be None");
+    }
+    return mlir::success();
+  }];
 
   // builders allow us to tell MIR the types
   let builders = [OpBuilder<(ins "mlir::Value":$self,
-                                    "mlir::Value":$min,
-                                    "mlir::Value":$max),
+                                 "mlir::Value":$min,
+                                 "mlir::Value":$max),[{
+    std::vector<mlir::Value> operands = {self};
+    std::vector<std::int32_t> segments = {1, 0, 0};
 
-  [{std::vector<mlir::Value> operands = {self};
-  std::vector<std::int32_t> segments = {1, 0, 0};
-  if (min){
+    auto self_type = self.getType().cast<mlir::RankedTensorType>();
+    auto element_type = self_type.getElementType();
+    auto out_shape = getShape(self);
+
+    if (min){
       operands.push_back(min);
       segments[1]=1;
-  }
-  if (max){
+
+      out_shape = broadcast(out_shape, getShape(min));
+    }
+    if (max){
       operands.push_back(max);
       segments[2]=1;
-  }
+
+      out_shape = broadcast(out_shape, getShape(max));
+    }
     $_state.addOperands(operands);
     $_state.addAttribute("operand_segment_sizes", $_builder.getI32VectorAttr(segments));
 
-    $_state.addTypes(self.getType());
+    $_state.addTypes(mlir::RankedTensorType::get(out_shape, element_type));
     }]>
   ];
 }

@@ -255,14 +255,18 @@ def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
   }]>];
 }
 
-def Poptorch_zeros_like : Poptorch_NotImplementedOp<"zeros_like", [SameOperandsAndResultShape]> {
-  let arguments = (ins Poptorch_tensor:$self);
+def Poptorch_zeros_like : Poptorch_Op<"zeros_like", [SameOperandsAndResultShape]> {
+  let arguments = (ins Poptorch_tensor:$self, OptionalAttr<TypeAttr>:$dtype);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilder<(ins "mlir::Value":$self), [{
-          $_state.addOperands(self);
-          $_state.addTypes({self.getType()});
+  let builders = [OpBuilder<(ins "mlir::Value":$self, "std::optional<mlir::Type>":$dtype), [{
+    $_state.addOperands(self);
+    mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
 
+    auto out_type = dtype.value_or(tensor.getElementType());
+    $_state.addAttribute("dtype", mlir::TypeAttr::get(out_type));
+
+    $_state.addTypes(mlir::RankedTensorType::get(tensor.getShape(), out_type));
   }]>];
 }
 
@@ -271,10 +275,10 @@ def Poptorch_full_like : Poptorch_NotImplementedOp<"full_like", [SameOperandsAnd
 
   let results = (outs Poptorch_tensor:$result);
   let builders = [OpBuilder<(ins "mlir::Value":$self, "float":$fill_value), [{
-          $_state.addOperands(self);
-          $_state.addAttribute("fill_value", $_builder.getF32FloatAttr(fill_value));
+    $_state.addOperands(self);
+    $_state.addAttribute("fill_value", $_builder.getF32FloatAttr(fill_value));
 
-          $_state.addTypes({self.getType()});
+    $_state.addTypes({self.getType()});
   }]>];
 }
 

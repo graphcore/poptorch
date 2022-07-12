@@ -196,7 +196,8 @@ at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
 }
 
 c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
-                                        c10::Dispatcher &dispatcher) {
+                                        c10::Dispatcher &dispatcher,
+                                        c10::Stack &stack) {
   const auto &schema = op.schema();
   std::string name = schema.name();
   const std::string &overload = schema.overload_name();
@@ -206,6 +207,9 @@ c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
     // These are special cases because there is no zero / fill.
     if (name == "aten::zero_") {
       name = "aten::zeros_like";
+      // zero_ takes only 1 argument whereas our MLIR shape inference for
+      // zeros_like takes an optional dtype as well
+      stack.emplace_back();
     } else if (name == "aten::fill_") {
       name = "aten::full_like";
     } else {

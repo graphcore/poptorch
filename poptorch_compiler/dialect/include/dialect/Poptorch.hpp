@@ -12,6 +12,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
 
 #include "poptorch_logging/Error.hpp"
 
@@ -34,6 +35,17 @@ public:
 
 template <typename ConcreteType>
 class NotImplementedOp : public TraitBase<ConcreteType, NotImplementedOp> {};
+
+// Used for logical and/or/xor to force casting to a bool before running the
+// operation
+template <typename ConcreteType>
+class ImplicitCastToBool : public TraitBase<ConcreteType, ImplicitCastToBool> {
+};
+
+// Used for division to casting to a float before running the operation
+template <typename ConcreteType>
+class ImplicitCastToFloat
+    : public TraitBase<ConcreteType, ImplicitCastToFloat> {};
 
 const size_t max_implicit_casting_operands = 3;
 template <unsigned idx> class ImplicitCastOperand {
@@ -81,6 +93,14 @@ convertToPositiveDim(std::vector<std::int64_t> dim, std::size_t numDims) {
 
   return dim;
 }
+
+std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
+                               const std::vector<int64_t> &rhs,
+                               size_t end_skip = 0);
+
+std::vector<int64_t> getShape(mlir::Value value);
+
+mlir::Type getElementType(mlir::Value value);
 
 // Add our interfaces. These allow us to call poptorch specific functions on
 // generic ops.

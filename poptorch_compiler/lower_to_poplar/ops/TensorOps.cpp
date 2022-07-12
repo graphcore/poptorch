@@ -49,6 +49,20 @@ void zero_::lowerToPoplar(CompilerContext &context) {
   popops::zero(context.graph, input, context.seq);
 }
 
+// TODO(T65711): replace this with torch.zeros in a canonicalization pass so we
+// can remove the implicit dependence on the input
+void zeros_like::lowerToPoplar(CompilerContext &context) {
+  const auto out_tensor_type =
+      this->result().getType().cast<mlir::RankedTensorType>();
+  const auto out_shape = out_tensor_type.getShape();
+  const auto out_type =
+      CompilerContext::poplarTypeOf(out_tensor_type.getElementType());
+
+  const auto out = createConstant(context, out_type,
+                                  {out_shape.begin(), out_shape.end()}, false);
+  context.addTensor(this->result(), out);
+}
+
 void tensorconstant_float::lowerToPoplar(CompilerContext &context) {
   const std::vector<size_t> shape = convertIntArray<size_t>(this->shape());
   const std::vector<float> data = convertFloatArray<float>(this->data());
