@@ -68,8 +68,7 @@ void removeSurplusIdentityLosses(torch::jit::Graph *graph) {
 
         // If the operation was performing a reduction replace it with a manual
         // reduction operation.
-        const std::size_t reduction =
-            node->i(c10::Symbol::fromQualString("attr::reduction"));
+        const std::size_t reduction = node->i(c10::Symbol::attr("reduction"));
 
         if (reduction < 2) {
           // Flatten it into 1D.

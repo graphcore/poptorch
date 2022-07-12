@@ -19,8 +19,7 @@ namespace poptorch {
 
 namespace {
 
-const c10::Symbol delete_node_attr =
-    c10::Symbol::fromQualString("attr::delete_node");
+const c10::Symbol delete_node_attr = c10::Symbol::attr("delete_node");
 
 // This avoids the static initialisation order fiasco,
 std::unordered_map<c10::Symbol, SymbolHandler> &symbolHandlers() {

@@ -305,11 +305,11 @@ torch::jit::Node *createConstantPad(torch::jit::Graph *graph,
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::constant_pad, {A},
                           ImplicitCast::None, OutputType::AsFirstInput);
-  new_node->is_(c10::Symbol::fromQualString("attr::pads"),
+  new_node->is_(c10::Symbol::attr("pads"),
                 direct_pad_shape_input
                     ? pad_shape
                     : convertPytorchPads(shapeFromTensor(A), pad_shape));
-  new_node->f_(c10::Symbol::fromQualString("attr::value"), constant);
+  new_node->f_(c10::Symbol::attr("value"), constant);
   return new_node;
 }
 
@@ -325,7 +325,7 @@ torch::jit::Node *createEdgePad(torch::jit::Graph *graph, torch::jit::Value *A,
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::edge_pad, {A},
                           ImplicitCast::None, OutputType::AsFirstInput);
-  new_node->is_(c10::Symbol::fromQualString("attr::pads"),
+  new_node->is_(c10::Symbol::attr("pads"),
                 convertPytorchPads(shapeFromTensor(A), pad_shape));
   return new_node;
 }
@@ -336,7 +336,7 @@ torch::jit::Node *createReflectionPad(torch::jit::Graph *graph,
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::reflection_pad, {A},
                           ImplicitCast::None, OutputType::AsFirstInput);
-  new_node->is_(c10::Symbol::fromQualString("attr::pads"),
+  new_node->is_(c10::Symbol::attr("pads"),
                 convertPytorchPads(shapeFromTensor(A), pad_shape));
 
   return new_node;
@@ -364,12 +364,11 @@ createCustomOperation(torch::jit::Graph *graph,
       createAndInsertNode(graph, symbols::poptorch::custom_operation, inputs,
                           ImplicitCast::None, type, numOutputs);
 
-  new_node->s_(c10::Symbol::fromQualString("attr::name"), name);
-  new_node->s_(c10::Symbol::fromQualString("attr::domain"), domain);
-  new_node->i_(c10::Symbol::fromQualString("attr::version"), domainVersion);
-  new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"), numOutputs);
-  new_node->s_(c10::Symbol::fromQualString("attr::attributes_id"),
-               attributes_id_str);
+  new_node->s_(c10::Symbol::attr("name"), name);
+  new_node->s_(c10::Symbol::attr("domain"), domain);
+  new_node->i_(c10::Symbol::attr("version"), domainVersion);
+  new_node->i_(c10::Symbol::attr("num_outputs"), numOutputs);
+  new_node->s_(c10::Symbol::attr("attributes_id"), attributes_id_str);
 
   return new_node;
 }
@@ -404,9 +403,9 @@ torch::jit::Node *createEndForLoop(torch::jit::Graph *graph,
                                    std::int64_t trip_count) {
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::end_for_loop, {outputs, inputs});
-  new_node->i_(c10::Symbol::fromQualString("attr::trip_count"), trip_count);
+  new_node->i_(c10::Symbol::attr("trip_count"), trip_count);
   const std::size_t num_outputs = outputs->node()->inputs().size();
-  new_node->i_(c10::Symbol::fromQualString("attr::num_outputs"), num_outputs);
+  new_node->i_(c10::Symbol::attr("num_outputs"), num_outputs);
   return new_node;
 }
 
@@ -463,9 +462,9 @@ torch::jit::Node *createPrintIpuTensor(torch::jit::Graph *graph,
   torch::jit::Node *new_node =
       createAndInsertNode(graph, symbols::poptorch::ipu_print_tensor, {value});
 
-  new_node->i_(c10::Symbol::fromQualString("attr::print_gradient"), 1);
-  new_node->s_(c10::Symbol::fromQualString("attr::name"), "");
-  new_node->s_(c10::Symbol::fromQualString("attr::title"), title);
+  new_node->i_(c10::Symbol::attr("print_gradient"), 1);
+  new_node->s_(c10::Symbol::attr("name"), "");
+  new_node->s_(c10::Symbol::attr("title"), title);
 
   new_node->output()->setType(value->type());
 
@@ -481,7 +480,7 @@ torch::jit::Node *createCallCpuOp(torch::jit::Graph *graph,
       graph, symbols::poptorch::canonicalised_cpu_call, {value},
       ImplicitCast::None, OutputType::AsDtypeOrAsPromoted, num_outputs);
 
-  new_node->s_(c10::Symbol::fromQualString("attr::ID"), id);
+  new_node->s_(c10::Symbol::attr("ID"), id);
 
   for (std::uint32_t i = 0; i < num_outputs; ++i) {
     torch::jit::Value *old_out = original_node->output(i);
@@ -498,8 +497,7 @@ torch::jit::Node *createSetAvailableMemory(torch::jit::Graph *graph,
                                            float proportion) {
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::set_available_memory, value);
-  new_node->f_(c10::Symbol::fromQualString("attr::availableMemoryProportion"),
-               proportion);
+  new_node->f_(c10::Symbol::attr("availableMemoryProportion"), proportion);
 
   new_node->output()->setType(value->type());
 
@@ -514,10 +512,10 @@ torch::jit::Node *createSetMatMulSerialization(torch::jit::Graph *graph,
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::set_matmul_serialization, {matmul});
 
-  new_node->s_(c10::Symbol::fromQualString("attr::mode"), mode);
-  new_node->i_(c10::Symbol::fromQualString("attr::factor"), factor);
+  new_node->s_(c10::Symbol::attr("mode"), mode);
+  new_node->i_(c10::Symbol::attr("factor"), factor);
   new_node->i_(
-      c10::Symbol::fromQualString("attr::keep_precision"),
+      c10::Symbol::attr("keep_precision"),
       static_cast<torch::jit::IntAttr::ConstructorType>(keep_precision));
 
   new_node->output()->setType(matmul->type());
@@ -531,9 +529,9 @@ torch::jit::Node *createBeginIpuBlock(torch::jit::Graph *graph,
   torch::jit::Node *new_node = createAndInsertNode(
       graph, c10::Symbol::fromQualString("poptorch::begin_ipu_block"), {},
       ImplicitCast::None, OutputType::Unknown, 0);
-  new_node->i_(c10::Symbol::fromQualString("attr::stage"), stage_id);
-  new_node->i_(c10::Symbol::fromQualString("attr::phase"), phase);
-  new_node->i_(c10::Symbol::fromQualString("attr::ipu"), ipu_id);
+  new_node->i_(c10::Symbol::attr("stage"), stage_id);
+  new_node->i_(c10::Symbol::attr("phase"), phase);
+  new_node->i_(c10::Symbol::attr("ipu"), ipu_id);
 
   return new_node;
 }
@@ -544,7 +542,7 @@ createOptimizerGroup(torch::jit::Graph *graph, std::uint64_t group,
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::optimizer_group, list_of_params,
       ImplicitCast::None, OutputType::Unknown, 0);
-  new_node->i_(c10::Symbol::fromQualString("attr::group"), group);
+  new_node->i_(c10::Symbol::attr("group"), group);
 
   return new_node;
 }
@@ -584,7 +582,7 @@ torch::jit::Node *createRnn(torch::jit::Graph *graph,
   torch::jit::Node *new_node = createAndInsertNode(
       graph, symbols::poptorch::rnn, args, ImplicitCast::All,
       OutputType::AsImplicitCastPromoted, 2);
-  new_node->ss_(c10::Symbol::fromQualString("attr::activations"), activations);
+  new_node->ss_(c10::Symbol::attr("activations"), activations);
   return new_node;
 }
 

@@ -33,8 +33,7 @@ size_t numValuesInGraph(const torch::jit::Graph *g) {
   return num_values;
 }
 
-const c10::Symbol exclude_node_attr =
-    c10::Symbol::fromQualString("attr::exclude_node");
+const c10::Symbol exclude_node_attr = c10::Symbol::attr("exclude_node");
 
 void markForExclusion(torch::jit::Node *node) {
   node->i_(exclude_node_attr, 1);

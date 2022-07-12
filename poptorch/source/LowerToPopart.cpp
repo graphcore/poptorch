@@ -638,11 +638,10 @@ void LowerToPopartImpl::lowerBody() {
 
       // Popart needs to know the number of outputs even though it's in the
       // graph.
-      const std::size_t num_outputs =
-          node->i(c10::Symbol::fromQualString("attr::num_outputs"));
+      const std::size_t num_outputs = node->i(c10::Symbol::attr("num_outputs"));
 
-      const std::int32_t trip_count = static_cast<std::int32_t>(
-          node->i(c10::Symbol::fromQualString("attr::trip_count")));
+      const std::int32_t trip_count =
+          static_cast<std::int32_t>(node->i(c10::Symbol::attr("trip_count")));
 
       // Call the callback. This will pop the subgraphs from the stack.
       poptorch::TensorId first_output_tensor =
@@ -662,21 +661,19 @@ void LowerToPopartImpl::lowerBody() {
       poptorch::TensorId out = _compiler.addUntypedInputTensor();
       _value_map.setTensor(node->output(), out);
     } else if (kind == symbols::poptorch::begin_ipu_block) {
-      _compiler.setActiveIpu(
-          node->i(c10::Symbol::fromQualString("attr::stage")),
-          node->i(c10::Symbol::fromQualString("attr::phase")),
-          node->i(c10::Symbol::fromQualString("attr::ipu")));
+      _compiler.setActiveIpu(node->i(c10::Symbol::attr("stage")),
+                             node->i(c10::Symbol::attr("phase")),
+                             node->i(c10::Symbol::attr("ipu")));
     } else if (kind == symbols::poptorch::push_name_scope) {
-      _compiler.pushNameScope(
-          node->s(c10::Symbol::fromQualString("attr::name")).c_str());
+      _compiler.pushNameScope(node->s(c10::Symbol::attr("name")).c_str());
     } else if (kind == symbols::poptorch::pop_name_scope) {
       _compiler.popNameScope();
     } else if (kind == symbols::poptorch::set_matmul_serialization) {
       poptorch::TensorId input = _value_map.tensor(node->input());
       _compiler.setMatMulSerialization(
-          input, node->s(c10::Symbol::fromQualString("attr::mode")).c_str(),
-          node->i(c10::Symbol::fromQualString("attr::factor")),
-          node->i(c10::Symbol::fromQualString("attr::keep_precision")));
+          input, node->s(c10::Symbol::attr("mode")).c_str(),
+          node->i(c10::Symbol::attr("factor")),
+          node->i(c10::Symbol::attr("keep_precision")));
       _value_map.setTensor(node->output(), input);
     } else if (kind == symbols::poptorch::optimizer_group) {
       std::vector<poptorch::TensorId> inputs;
@@ -685,7 +682,7 @@ void LowerToPopartImpl::lowerBody() {
                        return _value_map.tensor(val);
                      });
 
-      std::uint64_t group = node->i(c10::Symbol::fromQualString("attr::group"));
+      std::uint64_t group = node->i(c10::Symbol::attr("group"));
       _compiler.optimizerGroup(inputs, group);
 
     } else if (kind == symbols::poptorch::set_available_memory) {
@@ -701,8 +698,7 @@ void LowerToPopartImpl::lowerBody() {
       }
 
       _compiler.setAvailableMemoryProportion(
-          inputs, node->f(c10::Symbol::fromQualString(
-                      "attr::availableMemoryProportion")));
+          inputs, node->f(c10::Symbol::attr("availableMemoryProportion")));
 
       for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
         _value_map.setTensor(node->output(i),
@@ -860,7 +856,7 @@ void LowerToPopartImpl::lowerBody() {
 
     } else if (kind == symbols::poptorch::canonicalised_cpu_call) {
       // CPU callbacks are referenced by an string identifier.
-      std::string id = node->s(c10::Symbol::fromQualString("attr::ID"));
+      std::string id = node->s(c10::Symbol::attr("ID"));
 
       std::vector<poptorch::PopartType> input_types;
       std::vector<std::vector<std::size_t>> input_shapes;
@@ -896,18 +892,13 @@ void LowerToPopartImpl::lowerBody() {
         _value_map.setTensor(output, output_tensor);
       }
     } else if (kind == symbols::poptorch::set_attribute) {
-      const std::string &attribute =
-          node->s(c10::Symbol::fromQualString("attr::attribute"));
-      const std::string &key =
-          node->s(c10::Symbol::fromQualString("attr::key"));
-      const std::string &value =
-          node->s(c10::Symbol::fromQualString("attr::value"));
+      const std::string &attribute = node->s(c10::Symbol::attr("attribute"));
+      const std::string &key = node->s(c10::Symbol::attr("key"));
+      const std::string &value = node->s(c10::Symbol::attr("value"));
       _compiler.setAttribute(attribute.c_str(), key.c_str(), value.c_str());
     } else if (kind == symbols::poptorch::clear_attribute) {
-      const std::string &attribute =
-          node->s(c10::Symbol::fromQualString("attr::attribute"));
-      const std::string &key =
-          node->s(c10::Symbol::fromQualString("attr::key"));
+      const std::string &attribute = node->s(c10::Symbol::attr("attribute"));
+      const std::string &key = node->s(c10::Symbol::attr("key"));
       _compiler.clearAttribute(attribute.c_str(), key.c_str());
     } else {
       ERROR("Couldn't find a registered operation for node " << *node);
@@ -1271,8 +1262,7 @@ convertCustomOpAttributes(const torch::jit::Node *node,
                           const py::function &attribute_accessor) {
   logging::LogContext ctx("convertCustomOpAttributes: processing " +
                           nodeToString(node));
-  std::string attributes_id_str(
-      node->s(c10::Symbol::fromQualString("attr::attributes_id")));
+  std::string attributes_id_str(node->s(c10::Symbol::attr("attributes_id")));
 
   auto dict_obj = attribute_accessor(attributes_id_str);
 
@@ -1341,8 +1331,7 @@ LowerToPopartImpl::LowerToPopartImpl(
 // The arguments are processed by extracting the given type using the above
 // accessors, the name is converted into "attr::NAME" which is what pytorch JIT
 // expects for attribute accessing.
-#define ARG(Type, Name)                                                        \
-  , convertType(node->Type(c10::Symbol::fromQualString("attr::" #Name)))
+#define ARG(Type, Name) , convertType(node->Type(c10::Symbol::attr(#Name)))
 
 #define POPART_CONST_ARG(unused) , convertTensorConstantNode(node)
 #define HOST_SIDE_CONST_ARG(unused)                                            \

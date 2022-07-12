@@ -706,8 +706,8 @@ for opset in classes:
 
             attr = attrTypeGetter(toType(arg["type"]))
 
-            cppFile += "new_node->" + attr + "_(c10::Symbol::fromQualString("\
-                "\"attr::" + arg["name"] + "\")," + arg["name"] + ");\n"
+            cppFile += "new_node->" + attr + "_(c10::Symbol::attr("\
+                "\"" + arg["name"] + "\")," + arg["name"] + ");\n"
 
         if name in ExtraArgumentOps:
             header += ", " + ", ".join(ExtraArgumentOps[name])

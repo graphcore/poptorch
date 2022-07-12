@@ -60,12 +60,9 @@ torch::jit::Node *handleSliceModification(torch::jit::Graph *graph,
     auto *slice_input = slice->input(0);
 
     // Record the indices that we sliced: We need these for DynamicUpdate
-    std::vector<int64_t> slice_starts =
-        slice->is(c10::Symbol::fromQualString("attr::starts"));
-    std::vector<int64_t> slice_ends =
-        slice->is(c10::Symbol::fromQualString("attr::ends"));
-    std::vector<int64_t> slice_dims =
-        slice->is(c10::Symbol::fromQualString("attr::axes"));
+    std::vector<int64_t> slice_starts = slice->is(c10::Symbol::attr("starts"));
+    std::vector<int64_t> slice_ends = slice->is(c10::Symbol::attr("ends"));
+    std::vector<int64_t> slice_dims = slice->is(c10::Symbol::attr("axes"));
 
     auto *slice_offset =
         createConstantInt(graph, slice_starts,

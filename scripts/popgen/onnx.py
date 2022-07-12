@@ -95,8 +95,8 @@ def init(popart_path=None, clang_path=None, debug=False):
 #   namespace - C++ namespace of declarations
 def find_functions(jsonOutput, node, namespace=""):
     # If this is not the file path provided on the comand line, skip.
-    if node.location.file is not None and str(
-            node.location.file) not in popart_files:
+    if node.location.file is not None and \
+            os.path.realpath(str(node.location.file)) not in popart_files:
         return
     if node.spelling in nodeBlacklist:
         return

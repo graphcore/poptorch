@@ -151,8 +151,7 @@ void ConvertHalfImpl::resolveHalfOrFloat() {
 
       // Some nodes need an attribute changing to match
       if (node->kind() == symbols::popart::cast) {
-        node->s_(c10::Symbol::fromQualString("attr::to"),
-                 scalarTypeToOnnxString(new_type));
+        node->s_(c10::Symbol::attr("to"), scalarTypeToOnnxString(new_type));
       }
 
       // Tensor constants may need retyping
