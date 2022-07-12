@@ -40,6 +40,10 @@ size_t numTensorsForType(const c10::TypePtr &type);
 void searchAndPossiblyDestroy(
     const std::unordered_set<torch::jit::Node *> &to_test);
 
+// Remove all the node's inputs and destroy them if they're not used
+// anywhere else.
+void removeAndPossiblyDestroyAllInputs(torch::jit::Node *node);
+
 // Use unused type BFLOAT16 to indicate ambiguity between FLOAT16 and FLOAT32
 // NOLINTNEXTLINE
 const auto HALF_OR_FLOAT = at::ScalarType::BFloat16;

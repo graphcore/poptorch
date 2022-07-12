@@ -566,9 +566,11 @@ def test_preserving_options_intact(trace_model):
     assert inference.options.output_mode == OutputMode.All
 
 
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("namescopes_enabled", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_name_scope_hook_disabled(namescopes_enabled, trace_model):
+def test_name_scope_hook_disabled(capfd, namescopes_enabled, trace_model):
     class Network(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -609,6 +611,14 @@ def test_name_scope_hook_disabled(namescopes_enabled, trace_model):
         namescope = expected_namescopes[i] if namescopes_enabled else ''
         expected_output = f'"name":"{namescope}{name}'
         assert ir.find(expected_output)
+
+    testlog = helpers.LogChecker(capfd)
+    it = testlog.createIterator()
+    it.findNext("lowered to Popart")
+    # Ensure none of the scope names are actually lowered to PopART
+    # They should have been handled by the compiler and not be part
+    # of the graph anymore.
+    it.assert_not_contains("Char")
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

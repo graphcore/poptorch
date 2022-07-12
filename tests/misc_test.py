@@ -265,6 +265,7 @@ def test_specific_error_handling():
 
 
 @helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
 @helpers.overridePopartLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_outline_attribute(capfd, trace_model):
@@ -303,6 +304,12 @@ def test_outline_attribute(capfd, trace_model):
     # Ensure the second group norm doesn't have the attribute,
     # as it is outside the attribute scope
     testlog.assert_no_matches(get_regex("gn2"), per_line=False)
+
+    it = testlog.createIterator()
+    it.findNext("lowered to Popart")
+    # Ensure none of the attributes key / values are actually lowered to PopART
+    # (They should have been converted to attributes)
+    it.assert_not_contains("Char")
 
 
 # Note: the ipu models are not supported by poptorch.ConnectionType.Never

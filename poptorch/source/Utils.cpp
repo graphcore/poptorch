@@ -280,6 +280,15 @@ void searchAndPossiblyDestroy(
   }
 }
 
+void removeAndPossiblyDestroyAllInputs(torch::jit::Node *node) {
+  std::unordered_set<torch::jit::Node *> inputs;
+  for (auto *i : node->inputs()) {
+    inputs.insert(i->node());
+  }
+  node->removeAllInputs();
+  searchAndPossiblyDestroy(inputs);
+}
+
 std::unique_ptr<char[]> stringToUniquePtr(const std::string &str) {
   auto ptr = std::unique_ptr<char[]>(new char[str.size() + 1]);
   str.copy(ptr.get(), std::string::npos);

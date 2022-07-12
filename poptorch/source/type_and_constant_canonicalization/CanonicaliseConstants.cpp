@@ -31,6 +31,7 @@ bool compilerStateChangingKind(const torch::jit::NodeKind &kind) {
   return (kind == symbols::poptorch::begin_ipu_block ||
           kind == symbols::poptorch::end_ipu_block ||
           kind == symbols::poptorch::set_available_memory ||
+          kind == symbols::poptorch::push_name_scope ||
           kind == symbols::poptorch::set_matmul_serialization);
 }
 

@@ -239,16 +239,29 @@ class LogIterator:
     def findNext(self, *exprs):
         """Find the next line in the log matching all the regular expressions provided"""
         self._all_checks.append(exprs)
-        while True:
-            assert self._current < self._num_lines, (
-                "\n".join(self._lines) +
-                "\n The log above doesn't contain lines matching all "
-                "these expressions:\n  " +
-                "\n  ".join(str(e) for e in self._all_checks))
+        line = self._findNext(exprs)
+        assert line is not None, (
+            "\n".join(self._lines) +
+            "\n The log above doesn't contain lines matching all "
+            "these expressions:\n  " +
+            "\n  ".join(str(e) for e in self._all_checks))
+        return line
+
+    def _findNext(self, exprs):
+        while self._current < self._num_lines:
             line = self._lines[self._current]
             self._current += 1
             if all([re.search(e, line) for e in exprs]):
                 return line
+        return None
+
+    def assert_not_contains(self, *exprs):
+        line = self._findNext(exprs)
+        if line is not None:
+            raise ValueError(
+                f"{line}"
+                "\n The line above matches all of the expressions "
+                f"{exprs}")
 
     def findAll(self, expr):
         """Return all lines in the log matching the provided regular expression"""
