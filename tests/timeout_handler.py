@@ -38,6 +38,12 @@ with subprocess.Popen(sys.argv[1:], start_new_session=True) as p:
         print("Timeout after %d seconds" % timeout, flush=True)
         # Timeout: send an segmentation fault signal to generate a core dump.
         process_group = os.getpgid(p.pid)
+        subprocess.run([  # pylint: disable=subprocess-run-check
+            "gdb", "--batch", "--quiet", "-ex", "thread apply all bt", "-ex",
+            "thread apply all py-bt", "-ex", "detach", "-ex", "quit", "-p",
+            str(process_group)
+        ])
+
         print("Sending signal to process group %d of process %d" %
               (process_group, p.pid),
               flush=True)
