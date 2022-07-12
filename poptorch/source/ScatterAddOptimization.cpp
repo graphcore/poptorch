@@ -41,16 +41,10 @@ void removeScatterAddIndexExpansion(torch::jit::Graph *graph) {
     auto *src = node->input(3);
     auto *original_index = index_producer->input(0);
     auto expanded_index_shape = shapeFromTensor(index);
-    std::vector<int64_t> expected_original_index_shape = {
-        expanded_index_shape.front(), 1};
-    auto dim = handleDimensionParam(node->input(1),
-                                    src->type()->expect<c10::TensorType>());
 
-    // Make sure removal is valid, i.e. all PopART requirements are satisfied.
+    // Make sure removal is valid
     if (index->uses().size() > 1 ||
-        shapeFromTensor(src) != expanded_index_shape ||
-        shapeFromTensor(original_index) != expected_original_index_shape ||
-        dim != 0) {
+        shapeFromTensor(src) != expanded_index_shape) {
       continue;
     }
 

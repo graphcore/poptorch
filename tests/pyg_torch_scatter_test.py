@@ -39,7 +39,7 @@ def torch_scatter_harness(trace_model, func, src, index):
     poptorch_model = poptorch.inferenceModel(model, options=options)
     native_out = func(src, index)
     ipu_out = poptorch_model(src, index)
-    helpers.assert_allequal(actual=ipu_out, expected=native_out)
+    helpers.assert_allclose(actual=ipu_out, expected=native_out)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -75,3 +75,16 @@ def test_scatter_add_zeros_optimized(capfd):
 
     it = helpers.LogChecker(capfd).createIterator()
     it.findNext("Removing zeros output to scatter_add")
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("TRACE")
+def test_scatter_add_nd_expand_removed(capfd):
+    torch.manual_seed(0)
+    src = torch.randn(10, 6, 16)
+    index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
+    func = partial(scatter_add, dim=1)
+    torch_scatter_harness(True, func, src, index)
+
+    it = helpers.LogChecker(capfd).createIterator()
+    it.findNext("Removing index expansion node:")
