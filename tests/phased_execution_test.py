@@ -239,7 +239,7 @@ class LogChecker(helpers.LogChecker):
         )
         # pylint: enable=line-too-long
 
-    def validate_serial_tensor_liveness(self, liveness):
+    def validate_serial_tensor_liveness(self, liveness, trace_model):
         # 'phases' does not include the bwd pass, so to calculate,
         # sum the number of phases in the fwd pass, plus any phase
         # gap between the end of the fwd and start of the bwd pass
@@ -283,12 +283,15 @@ class LogChecker(helpers.LogChecker):
             self.assert_contains(
                 'Transpose{} [float32({}, {}), mode(Phased), ipu(0), phase({})]'
                 .format(op_label, 8 - phase, 7 - phase, phase * stride))
-            self.assert_contains(
-                'MatMul{} [float32({}), mode(Phased), ipu(0), phase({})]'.
-                format(op_label, 7 - phase, phase * stride))
-            self.assert_contains(
-                'Add{} [float32({}), mode(Phased), ipu(0), phase({})]'.format(
-                    op_label, 7 - phase, phase * stride))
+            self.assert_matches(
+                (r'(MatMul|Gemm){} \[(float32\({}{}\)|undefined\(shape '
+                 r'inference failed\)), mode\(Phased\), ipu\(0\), phase\({}\)]'
+                 ).format(op_label, "" if trace_model else "1, ", 7 - phase,
+                          phase * stride))
+            if trace_model:
+                self.assert_contains(
+                    'Add{} [float32({}), mode(Phased), ipu(0), phase({})]'.
+                    format(op_label, 7 - phase, phase * stride))
 
 
 @helpers.printCapfdOnExit
@@ -491,9 +494,6 @@ def test_2x2_parallel_phased_execution_small_opts(capfd, trace_model):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_serial_tensor_liveness(capfd, liveness, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
@@ -526,7 +526,7 @@ def test_serial_tensor_liveness(capfd, liveness, trace_model):
     model.compile(input)
 
     testlog = LogChecker(capfd)
-    testlog.validate_serial_tensor_liveness(liveness)
+    testlog.validate_serial_tensor_liveness(liveness, trace_model)
 
 
 def test_phased_api():
