@@ -593,6 +593,29 @@ def Poptorch_index_tensor: Poptorch_NotImplementedOp<"index_tensor", []> {
     }]>];
 }
 
+// index_put(Tensor self, Tensor?[] indices, Tensor values,
+//           bool accumulate=False) -> Tensor
+def Poptorch_index_put: Poptorch_NotImplementedOp<"index_put", []> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         Poptorch_tensorlist:$indices,
+                         Poptorch_tensor:$values,
+                         BoolAttr:$accumulate);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "mlir::ValueRange":$indices,
+                                   "mlir::Value":$values,
+                                   "bool":$accumulate),[{
+      ERROR_ON_MSG(accumulate, "index_put is not supported with accumulate=true.");
+
+      $_state.addOperands(self);
+      $_state.addOperands(indices);
+      $_state.addOperands(values);
+      $_state.addTypes(self.getType());
+    }]>];
+}
+
 def Poptorch_index_select : Poptorch_NotImplementedOp<"index_select", []> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, Poptorch_tensor:$index);
     let results = (outs Poptorch_tensor:$result);
@@ -605,13 +628,13 @@ def Poptorch_index_select : Poptorch_NotImplementedOp<"index_select", []> {
 
         mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
         const auto input_shape = tensor.getShape();
+        
+        if (dim < 0) dim += input_shape.size();
 
-        ERROR_ON_MSG(dim >= input_shape.size() || -dim > input_shape.size(),
+        ERROR_ON_MSG(dim >= input_shape.size(),
                      "Cannot index outside the tensor (dims " +
                      std::to_string(input_shape.size()) + ") with dim (" +
                      std::to_string(dim) + ")");
-
-        if (dim < 0) dim += input_shape.size();
 
         mlir::RankedTensorType index_tensor = index.getType().cast<mlir::RankedTensorType>();
         const auto index_shape = index_tensor.getShape();

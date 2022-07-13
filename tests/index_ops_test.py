@@ -105,15 +105,43 @@ def index_harness(trace_model, op, idx, is_index_put, v=None, is_mask=False):
 
 
 index_ops = [
-    index_op0,
-    index_op1,
-    index_op2,
-    index_op3,
-    index_op4,
-    index_op5,
-    index_op6,
-    index_op7,
-    index_op8,
+    # op, none_indexing
+    {
+        "op": index_op0,
+        "none_indexing": False
+    },
+    {
+        "op": index_op1,
+        "none_indexing": False
+    },
+    {
+        "op": index_op2,
+        "none_indexing": True
+    },
+    {
+        "op": index_op3,
+        "none_indexing": True
+    },
+    {
+        "op": index_op4,
+        "none_indexing": True
+    },
+    {
+        "op": index_op5,
+        "none_indexing": True
+    },
+    {
+        "op": index_op6,
+        "none_indexing": False
+    },
+    {
+        "op": index_op7,
+        "none_indexing": True
+    },
+    {
+        "op": index_op8,
+        "none_indexing": True
+    },
 ]
 
 index_indices = ([0], [[1]], [0, 1], [[1, 0]], [[0, 1], [1, 0]])
@@ -123,7 +151,7 @@ index_indices = ([0], [[1]], [0, 1], [[1, 0]], [[0, 1], [1, 0]])
 @pytest.mark.parametrize("op", index_ops)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index(op, idxs, trace_model):
-    index_harness(trace_model, op, idxs, False)
+    index_harness(trace_model, op["op"], idxs, False)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -134,16 +162,11 @@ def test_index_bool_mask_failure(trace_model):
             r"because it would produce dynamic output shapes based on "
             r"the mask values\. The IPU cannot support dynamic output "
             r"shapes\."):
-        index_harness(trace_model, index_ops[0], [True, False], False)
+        index_harness(trace_model, index_ops[0]["op"], [True, False], False)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_on_max_indices(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Couldn't find a registered operation for node "
-            "aten::max")
-
     def op(x):
         _, argmax_tensor = torch.max(x, dim=1)
         b = x[:, argmax_tensor]
@@ -171,17 +194,18 @@ def test_index_on_max_indices(trace_model):
 @pytest.mark.parametrize("op", index_ops)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put(op, idxs, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Expected a list element that subtypes "
-                    "'Tensor' but got an element of type 'NoneType'")
-    index_harness(trace_model, op, idxs, True)
+    if not trace_model and op["none_indexing"]:
+        pytest.skip("TODO(T66024): Tensor aliasing is unsupported in "
+                    "JIT dispatch")
+    index_harness(trace_model, op["op"], idxs, True)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_scalar(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::_index_put_impl_")
+        pytest.skip("TODO(T51159): Shape of 'actual' (torch.Size([1])) "
+                    "should be the same as shape of 'expected' "
+                    "(torch.Size([2, 3, 4, 5]))")
 
     def op(t, idx, v):
         t[idx, idx] = v.item()
@@ -193,9 +217,6 @@ def test_index_put_scalar(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_broadcastable(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::_index_put_impl_")
     v = torch.zeros(5)
     # For each row r in t[0, 0], r = [0, 0, 0, 0, 0]
     index_harness(trace_model, index_op1, [[0]], True, v)
@@ -209,9 +230,6 @@ def test_index_put_broadcastable(trace_model):
 ])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_masked_fill(mask_size, dtype, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::_index_put_impl_")
     torch.manual_seed(42)
     mask_shape = [2, 3, 4, 5][:mask_size]
     mask = (torch.rand(mask_shape) > 0.5).type(dtype)
@@ -227,9 +245,6 @@ def test_index_put_masked_fill(mask_size, dtype, trace_model):
 ])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_masked_assign(mask_size, dtype, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): No shape inference handler for "
-                    "aten::_index_put_impl_")
     torch.manual_seed(42)
     mask_shape = [2, 3, 4, 5][:mask_size]
     mask = (torch.rand(mask_shape) > 0.5).type(dtype)
@@ -243,10 +258,6 @@ def test_index_put_masked_assign(mask_size, dtype, trace_model):
 @pytest.mark.parametrize("dim", range(-3, 3))
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_select(dim, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Cannot index outside the tensor (dims 3) with "
-            "dim (-1)")
     op = lambda src, index: src.index_select(dim, index)
 
     torch.manual_seed(0)

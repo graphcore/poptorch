@@ -52,6 +52,11 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
   m.impl("transpose_", PTC_BOXED(poptorch::fallback));
 
+  // If we don't intercept this op, it will be decomposed into
+  // _index_put_impl_, which exposes unnecessary implementation
+  // details
+  m.impl("index_put_", PTC_BOXED(poptorch::fallback));
+
   // If we don't catch these, PyTorch will try to call aten::resize_ on the
   // result which is not supported.
   m.impl("frobenius_norm.out", PTC_BOXED(poptorch::fallback));

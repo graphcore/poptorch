@@ -223,10 +223,8 @@ torch::jit::Node *minMaxWithIndicesHandler(torch::jit::Graph *graph,
     indices = createSqueeze(graph, {indices}, {dim})->output();
   }
 
-  if (node->hasUses()) {
-    replaceOutputUse(node->output(0), values);
-    replaceOutputUse(node->output(1), indices);
-  }
+  replaceOutputUse(node->output(0), values);
+  replaceOutputUse(node->output(1), indices);
 
   markNodeForDeletion(node);
   return nullptr;
