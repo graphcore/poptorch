@@ -255,6 +255,9 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
   for (c10::IValue value : stack) {
     // PopART doesn't always match these 1:1.
     if (output_index >= new_node->outputs().size()) {
+      logging::trace("The canonicalised JIT node has fewer outputs than the "
+                     "dispatch function. This is only an issue if these "
+                     "outputs are used.");
       break;
     }
 

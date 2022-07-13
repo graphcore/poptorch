@@ -349,8 +349,9 @@ torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
     // as well so we can use them too and we will only fail if BOTH JIT and MLIR
     // can't process the node.
     ERROR_ON_MSG(!is_allowed_to_fail,
-                 "Could not find canonicalisation handler for JIT symbol: "
-                     << symbol.toQualString());
+                 "Could not find canonicalisation handler for JIT symbol, "
+                     << symbol.toQualString() << ", for schema, "
+                     << schema.name() << ".");
     new_node = aten_target;
   }
   return new_node;
