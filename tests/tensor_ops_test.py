@@ -705,9 +705,6 @@ def test_expand(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_expand_preserve_dim(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Invalid tensor shape: dimension 1 is negative (-1)")
     torch.manual_seed(42)
     x = torch.randn(1, 1, 100)
     op = lambda x: x.expand(2, -1, -1)

@@ -181,13 +181,34 @@ def test_reshape_sparse():
 
 
 @pytest.mark.mlirSupportRequired
-def test_expand():
-    expand_reshape_view_harness((2, 1, 4), (2, 4, 4), "expand")
-    expand_reshape_view_harness((2, 1, 4), (2, 2, 2, 4, 4), "expand")
+@pytest.mark.parametrize(
+    "shape",
+    [
+        (2, 4, 4),  # standard
+        (2, 2, 2, 4, 4),  # more dimensions
+        (2, 4, -1),  # negative dimension
+        (2, 2, -1, 2, 4),  # negative & extra dimensions
+    ])
+def test_expand(shape):
+    expand_reshape_view_harness((2, 1, 4), shape, "expand")
 
-    # TODO T52507 Fully implement expand
-    with pytest.raises(poptorch.Error):
-        expand_reshape_view_harness((2, 1, 4), (2, 4, -1), "expand")
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("shape", [(5), (1, 2, 3)])
+def test_expand_scalar(shape):
+    expand_reshape_view_harness([], shape, "expand")
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize(
+    "case",
+    [((2, 4), r"should have at least as many dimensions"),
+     ((2, 2, 5), r"Can only expand dimensions of size 1"),
+     ((2, -1, 2, 4, 4), r"tried to set an added dimension's length to -1")])
+def test_expand_error(case):
+    shape, msg = case
+    with pytest.raises(poptorch.Error, match=msg):
+        expand_reshape_view_harness((2, 1, 4), shape, "expand")
 
 
 # Simple harness to test that the given `fn` returns a view of its input tensor,

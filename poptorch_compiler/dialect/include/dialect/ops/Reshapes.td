@@ -163,7 +163,6 @@ def Poptorch_view: Poptorch_Op<"view", [ViewOp]> {
 
 // Expand is like reshape but can broadcast unity dimensions and sets -1
 // dimensions to the same as the input. New dimensions are added at the front
-// TODO T52507 Fully inplement expand
 def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
       let arguments = (ins Poptorch_tensor:$input,
                            I64ArrayAttr:$shape,
@@ -171,16 +170,50 @@ def Poptorch_expand: Poptorch_Op<"expand", [ViewOp]> {
   let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$value,
-                                      "const std::vector<std::int64_t>&":$shape,
-                                      "bool":$implicit
-                                      ),[{
+                                   "const std::vector<std::int64_t>&":$shape,
+                                   "bool":$implicit),[{
         ERROR_ON_MSG(implicit,"expand: implicit=True not supported");
         $_state.addOperands({value});
-        $_state.addAttribute("shape", $_builder.getI64ArrayAttr(shape));
 
-        mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
-        mlir::Type e1 = t1.getElementType();
-        $_state.addTypes(mlir::RankedTensorType::get(shape, e1));
+        const auto tensor = asTensor(value);
+
+        // Resolve -1s in the desired shape into actual lengths.
+        const auto input_shape = tensor.getShape();
+        std::vector<std::int64_t> desired_shape = shape;
+
+        ERROR_ON_MSG(desired_shape.size() < input_shape.size(),
+                     "The desired shape passed to expand should have at least "
+                     "as many dimensions as the input tensor (wanted at least "
+                     << input_shape.size() << ", got " << desired_shape.size()
+                     << ")");
+
+        for (size_t i = 0; i < input_shape.size(); i++) {
+          // If you give more dimensions in the desired shape than there are in
+          // the input tensor, they'll get *pre*pended -- so to turn the -1s
+          // into lengths from the input, work backwards.
+          const auto input_idx = input_shape.size() - (i + 1);
+          const auto input_len = input_shape[input_idx];
+          const auto desired_idx = desired_shape.size() - (i + 1);
+          const auto desired_len = desired_shape[desired_idx];
+
+          if (desired_len == -1) {
+            desired_shape[desired_idx] = input_len;
+          } else if (desired_len != input_len && input_len != 1) {
+            ERROR("Can only expand dimensions of size 1; however, trying "
+                  "to expand dimension " << input_idx << " of size " <<
+                  input_len << " to " << desired_len);
+          }
+        }
+
+        const auto last = std::next(desired_shape.begin(),
+                                    desired_shape.size() - input_shape.size());
+        ERROR_ON_MSG(std::find(desired_shape.begin(), last, -1) != last,
+                     "torch.expand: tried to set an added dimension's length "
+                     "to -1");
+
+        $_state.addAttribute("shape", $_builder.getI64ArrayAttr(desired_shape));
+
+        $_state.addTypes(mlir::RankedTensorType::get(desired_shape, tensor.getElementType()));
      }]>
     ];
 }
@@ -196,7 +229,7 @@ class Poptorch_SqueezeOp<string name>: Poptorch_Op<name, [ViewOp]> {
       static mlir::Type inferType(mlir::Value v, const std::vector<int64_t> &dims) {
           auto shape = getShape(v);
           std::vector<int64_t> out_shape;
-          
+
           for (auto i = 0u; i < shape.size(); i++) {
             auto it = std::find(dims.begin(), dims.end(), i);
             if (it == dims.end() || shape[i] != 1) {
@@ -939,7 +972,7 @@ def Poptorch_im2col : Poptorch_upsample<"im2col"> {
             $_state.addAttribute("padding",
                                  $_builder.getI64ArrayAttr(padding));
             $_state.addAttribute("stride", $_builder.getI64ArrayAttr(stride));
-            
+
             auto input_shape = getShape(self);
             ERROR_ON_MSG(input_shape.size() != 3 && input_shape.size() != 4,
                          "Input must have 3 or 4 dimensions.");
@@ -972,7 +1005,7 @@ def Poptorch_im2col : Poptorch_upsample<"im2col"> {
 
             std::int64_t n_output_plane = n_input_plane * kernel_width *
                                             kernel_height;
-            
+
             int64_t output_height = (input_height + 2 * padding_height -
                            (dilation_height * (kernel_height - 1) + 1)) /
                             stride_height + 1;
@@ -1005,7 +1038,7 @@ def Poptorch_col2im : Poptorch_upsample<"col2im"> {
                    "const std::vector<std::int64_t>&":$padding,
                    "const std::vector<std::int64_t>&":$stride), [{
             $_state.addOperands(self);
-            
+
             $_state.addAttribute("output_size",
                                  $_builder.getI64ArrayAttr(output_size));
             $_state.addAttribute("kernel_size",
@@ -1036,7 +1069,7 @@ def Poptorch_col2im : Poptorch_upsample<"col2im"> {
 
             std::int64_t n_output_plane = n_input_plane / (kernel_width *
                                             kernel_height);
-            
+
             std::int64_t output_length = output_height * output_width;
 
             llvm::SmallVector<std::int64_t, 4> shape{batch_size, n_output_plane,
