@@ -19,6 +19,10 @@ def harness(op, **kwargs):
 @pytest.mark.parametrize("min_param,max_param", [(None, 0.5), (-0.5, None),
                                                  (-0.5, 0.5)])
 def test_clamp(min_param, max_param):
+    if min_param is None or max_param is None:
+        pytest.skip("TODO(T62028): There is currently a bug with the name "
+                    "mangling in poplar which causes this to break. Poplar "
+                    "task T62028")
     kwargs = {}
     if min_param is not None:
         kwargs["min"] = min_param

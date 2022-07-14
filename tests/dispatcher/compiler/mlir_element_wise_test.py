@@ -202,6 +202,8 @@ clamp_test_cases = [
     (torch.tensor([2]), torch.tensor([3]), torch.tensor([1])),
     (torch.tensor([0.0, 1.0, 3.0]), torch.tensor([-1.0, 1.0, 5.0])),
     (torch.tensor([0.0, 1.0, 3.0]), None, torch.tensor([-1.0, 1.0, 5.0])),
+    (torch.tensor([-2.0, -1.0, 1.0, 2.0]), torch.tensor([1.0, 1.0, 1.0, 1.0]),
+     torch.tensor([-1.0, -1.0, -1.0, -1.0])),
     (torch.tensor([[0.0, 1.0, 3.0],
                    [0.0, 1.0,
                     3.0]]), torch.tensor([[5.0, 1.0, -1.0], [-1.0, 1.0, 5.0]]),

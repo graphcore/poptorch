@@ -281,7 +281,10 @@ void clamp::lowerToPoplar(CompilerContext &context) {
                         ? this->max().getValue().convertToDouble()
                         : std::numeric_limits<float>::max();
 
-  auto expr = pe::Clamp(pe::_1, pe::Const(min), pe::Const(max));
+  // Note: pe::Clamp does not always behave in the correct manner when the min
+  // value is more than the max value (it seems to happen on the ipu when we are
+  // broadcasting)
+  auto expr = pe::Min(pe::Max(pe::_1, pe::Const(min)), pe::Const(max));
   poplar::Tensor out = popops::map(context.graph, expr, {self}, context.seq);
 
   context.addTensor(this->result(), out);
@@ -301,7 +304,10 @@ void clampTensor::lowerToPoplar(CompilerContext &context) {
                     : createConstant(context, poplar::FLOAT, param_shape,
                                      std::numeric_limits<float>::max());
 
-  auto expr = pe::Clamp(pe::_1, pe::_2, pe::_3);
+  // Note: pe::Clamp does not always behave in the correct manner when the min
+  // value is more than the max value (it seems to happen on the ipu when we are
+  // broadcasting)
+  auto expr = pe::Min(pe::Max(pe::_1, pe::_2), pe::_3);
 
   poplar::Tensor out =
       popops::map(context.graph, expr, {self, min, max}, context.seq);
