@@ -226,6 +226,59 @@ def distributedCacheLock(model, opts):
             os.remove(filename)
 
 
+# A helper class that compares using pointer semantics rather than value
+# semantics (i.e. comparing using `is` rather than eq). This is needed because
+# Tensor comparison in torch returns a Tensor rather than an boolean
+class WeakPtr(weakref.ref):
+    __hash__ = weakref.ref.__hash__
+
+    def __eq__(self, other):
+        s = self()
+        o = other()
+        return self is other if s is None else s is o
+
+
+# Our own dictionary with weak keys that compares keys using pointer semantics
+# rather than value semantics (i.e. comparing using `is` rather than `eq`). We
+# use this rather than a weakref.WeakKeyDictionary because that uses equality on
+# values to compare items.
+#
+# Note: that we do not provide functionality for iterating over the dictionary
+# since there will be issues if the cleanup function is called while iterating
+class WeakKeyPtrDict:
+    def __init__(self, dict=None):
+        self.data = {}
+
+        def cleanup(k, selfref=weakref.ref(self)):
+            self = selfref()
+            if self is not None:
+                del self.data[k]
+
+        self._cleanup = cleanup
+
+        self.update(dict)
+
+    def __setitem__(self, key, value):
+        self.data[WeakPtr(key, self._cleanup)] = value
+
+    def __delitem__(self, key):
+        del self.data[WeakPtr(key)]
+
+    def __getitem__(self, key):
+        return self.data[WeakPtr(key)]
+
+    def get(self, key, default=None):
+        return self.data.get(WeakPtr(key), default)
+
+    def __contains__(self, key):
+        return WeakPtr(key) in self.data
+
+    def update(self, dict=None):
+        if dict is not None:
+            for k, v in dict.items():
+                self.__setitem__(k, v)
+
+
 # The pickle handlers are called in two cases: when an object is copied
 # (i.e copy.copy(obj)) or when an object is pickled / serialised.
 # In both cases the object is first dumped using pickleUnwrapModel and then
@@ -242,14 +295,14 @@ def distributedCacheLock(model, opts):
 # When an object is loaded from file: the wrapper type doesn't exist any more
 # therefore we keep the object unwrapped. (It will be wrapped again when passed
 # to poptorch.trainingModel anyway)
-_wrapper_registry: weakref.WeakKeyDictionary = {}
+_wrapper_registry = WeakKeyPtrDict()
 # List of all the wrapper types used by PopTorch.
 _wrapper_types = []
 
 
 def _restoreWrapperIfNecessary(obj):
     wrapperType = _wrapper_registry.get(obj)
-    if wrapperType:
+    if not wrapperType is None:
         obj.__class__ = wrapperType
     return obj
 
