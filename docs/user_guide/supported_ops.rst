@@ -309,6 +309,11 @@ Currently only ``affine=True`` is supported as a parameter. That is to say, only
 Recurrent layers
 ----------------
 
+Bidirectional layers, non-zero dropout probabilities,
+and setting ``num_layers`` to a value greater than 1
+are not currently supported for any recurrent layer. In addition,
+setting ``bias=False`` is currently only supported for ``torch.nn.GRU``.
+
 * ``torch.nn.RNN``
 * ``torch.nn.GRU``
 * ``torch.nn.LSTM``
