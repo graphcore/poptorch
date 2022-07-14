@@ -94,13 +94,21 @@ convertToPositiveDim(std::vector<std::int64_t> dim, std::size_t numDims) {
   return dim;
 }
 
+inline mlir::RankedTensorType asTensor(const mlir::Value value) {
+  return value.getType().cast<mlir::RankedTensorType>();
+}
+
+inline std::vector<int64_t> getShape(mlir::Value value) {
+  return asTensor(value).getShape();
+}
+
+inline mlir::Type getElementType(mlir::Value value) {
+  return asTensor(value).getElementType();
+}
+
 std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
                                const std::vector<int64_t> &rhs,
                                size_t end_skip = 0);
-
-std::vector<int64_t> getShape(mlir::Value value);
-
-mlir::Type getElementType(mlir::Value value);
 
 // Add our interfaces. These allow us to call poptorch specific functions on
 // generic ops.

@@ -408,6 +408,23 @@ def Poptorch_poisson_nll_loss : Poptorch_not_implemented_simple_reduced_loss<"po
     ];
 }
 
+def Poptorch_soft_margin_loss_out : Poptorch_not_implemented_simple_reduced_loss<"soft_margin_loss_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         Poptorch_tensor:$target,
+                         I64Attr:$reduction);
+
+    let results = (outs Poptorch_tensor:$result);
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "mlir::Value":$target,
+                                   "std::int64_t":$reduction),[{
+        $_state.addOperands({self, target});
+        $_state.addAttribute("reduction", $_builder.getI64IntegerAttr(reduction));
+
+        $_state.addTypes({inferType(self, reduction)});
+    }]>
+    ];
+}
+
 def Poptorch_triplet_margin_loss : Poptorch_not_implemented_simple_reduced_loss<"triplet_margin_loss"> {
     let arguments = (ins Poptorch_tensor:$anchor,
                          Poptorch_tensor:$positive,

@@ -414,10 +414,6 @@ def test_SmoothL1Loss(reduction, trace_model):
 @pytest.mark.parametrize("reduction", {"mean", "sum"})
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_SoftMarginLoss(reduction, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Could not find canonicalisation handler for "
-            "JIT symbol: aten::resize_")
     torch.manual_seed(42)
 
     input = torch.empty(10).uniform_()

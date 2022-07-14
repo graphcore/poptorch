@@ -187,8 +187,44 @@ def Poptorch_addmm : Poptorch_Op<"addmm", []> {
     ];
 }
 
-// func: norm.out(Tensor self, Scalar? p, int[1] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
-def Poptorch_norm_out : Poptorch_NotImplementedOp<"norm_out", []> {
+class Poptorch_not_implemented_norm<string mnemonic, list<OpTrait> traits = []> :
+    Poptorch_NotImplementedOp<mnemonic, traits> {
+    let extraClassDeclaration = [{
+        static llvm::SmallVector<std::int64_t, 4> inferShape(const mlir::RankedTensorType &tensor,
+                                                             std::vector<std::int64_t> dims,
+                                                             bool keepdim) {
+          if (dims.empty()) {
+            return {};
+          }
+
+          const llvm::ArrayRef<std::int64_t> input_shape = tensor.getShape();
+          llvm::SmallVector<std::int64_t, 4> shape;
+
+          // Sort in descending order so when we erase a dimension it doesn't
+          // invalidate future erasings
+          std::sort(dims.begin(), dims.end(), std::greater<>{});
+          shape.insert(shape.begin(), input_shape.begin(), input_shape.end());
+          for (auto d : dims) {
+            if (keepdim) {
+              shape[d] = 1;
+            } else {
+              shape.erase(shape.begin() + d);
+            }
+          }
+
+          return shape;
+        }
+
+        static mlir::RankedTensorType inferType(const mlir::Value &input,
+                                                std::vector<std::int64_t> dims,
+                                                bool keepdim) {
+          return mlir::RankedTensorType::get(inferShape(asTensor(input), dims, keepdim),
+                                             getElementType(input));
+        }
+    }];
+}
+
+def Poptorch_norm_out : Poptorch_not_implemented_norm<"norm_out"> {
     let arguments = (ins Poptorch_tensor:$self,
                          OptionalAttr<F64Attr>:$p,
                          I64ArrayAttr:$dim,
@@ -196,36 +232,91 @@ def Poptorch_norm_out : Poptorch_NotImplementedOp<"norm_out", []> {
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$self,
-                                      "std::optional<double>":$p,
-                                      "const std::vector<std::int64_t>&":$dim,
-                                      "bool":$keepdim),[{
+                                   "std::optional<double>":$p,
+                                   "const std::vector<std::int64_t>&":$dim,
+                                   "bool":$keepdim),[{
         $_state.addOperands(self);
-        mlir::RankedTensorType tensor = self.getType().cast<mlir::RankedTensorType>();
-        const auto ref = tensor.getShape();
+        const auto tensor = asTensor(self);
 
         if (p.has_value()) {
-            $_state.addAttribute("p", $_builder.getF32FloatAttr(*p));
+          $_state.addAttribute("p", $_builder.getF32FloatAttr(*p));
         }
-        auto actual_dims = convertToPositiveDim(dim, ref.size());
+        const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
         $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
-        llvm::SmallVector<std::int64_t, 4> shape;
-        if (!actual_dims.empty()) {
-            // Sort in descending order so when we erase dimension it doesn't invalidate future erasings
-            std::sort(actual_dims.begin(), actual_dims.end(), std::greater<>{});
-            shape.insert(shape.begin(), ref.begin(), ref.end());
-            for (auto d : actual_dims) {
-                if (keepdim) {
-                    shape[d] = 1;
-                }
-                else {
-                    shape.erase(shape.begin() + d);
-                }
-            }
-        }
+        $_state.addTypes(inferType(self, actual_dims, keepdim));
+     }]>
+    ];
+}
 
-        $_state.addTypes(mlir::RankedTensorType::get(shape, tensor.getElementType()));
+def Poptorch_norm_dtype_out : Poptorch_not_implemented_norm<"norm_dtype_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         OptionalAttr<F64Attr>:$p,
+                         I64ArrayAttr:$dim,
+                         BoolAttr:$keepdim,
+                         TypeAttr:$dtype);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "std::optional<double>":$p,
+                                   "const std::vector<std::int64_t>&":$dim,
+                                   "bool":$keepdim,
+                                   "mlir::Type":$dtype),[{
+        $_state.addOperands(self);
+        const auto tensor = asTensor(self);
+
+        if (p.has_value()) {
+          $_state.addAttribute("p", $_builder.getF32FloatAttr(*p));
+        }
+        const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
+        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+        $_state.addAttribute("dtype", mlir::TypeAttr::get(dtype));
+
+        $_state.addTypes(inferType(self, actual_dims, keepdim));
+     }]>
+    ];
+}
+
+def Poptorch_frobenius_norm_out : Poptorch_not_implemented_norm<"frobenius_norm_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$dim,
+                         BoolAttr:$keepdim);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "const std::vector<std::int64_t>&":$dim,
+                                   "bool":$keepdim),[{
+        $_state.addOperands(self);
+        const auto tensor = asTensor(self);
+
+        const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
+        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+        $_state.addTypes(inferType(self, actual_dims, keepdim));
+     }]>
+    ];
+}
+
+def Poptorch_nuclear_norm_out : Poptorch_not_implemented_norm<"nuclear_norm_out"> {
+    let arguments = (ins Poptorch_tensor:$self,
+                         I64ArrayAttr:$dim,
+                         BoolAttr:$keepdim);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                   "const std::vector<std::int64_t>&":$dim,
+                                   "bool":$keepdim),[{
+        $_state.addOperands(self);
+        const auto tensor = asTensor(self);
+
+        const auto actual_dims = convertToPositiveDim(dim, tensor.getRank());
+        $_state.addAttribute("dim", $_builder.getI64ArrayAttr(actual_dims));
+        $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
+
+        $_state.addTypes(inferType(self, actual_dims, keepdim));
      }]>
     ];
 }

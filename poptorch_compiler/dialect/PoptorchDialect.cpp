@@ -83,14 +83,6 @@ std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
   return output_shape;
 }
 
-std::vector<int64_t> getShape(const mlir::Value value) {
-  return value.getType().cast<mlir::RankedTensorType>().getShape();
-}
-
-mlir::Type getElementType(const mlir::Value value) {
-  return value.getType().cast<mlir::RankedTensorType>().getElementType();
-}
-
 #include "dialect/PoptorchInterfaces.cpp.inc"
 
 void PoptorchDialect::initialize() {

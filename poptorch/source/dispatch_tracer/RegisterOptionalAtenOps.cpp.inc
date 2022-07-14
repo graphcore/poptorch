@@ -49,6 +49,11 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("select.int", PTC_BOXED(poptorch::fallback));
   m.impl("transpose_", PTC_BOXED(poptorch::fallback));
 
+  // If we don't catch these, PyTorch will try to call aten::resize_ on the
+  // result which is not supported.
+  m.impl("frobenius_norm.out", PTC_BOXED(poptorch::fallback));
+  m.impl("frobenius_norm.dim", PTC_BOXED(poptorch::fallback));
+
   // If we don't intercept this op, it will be call the native implementation
   // of alias, which will try to access our tensor storage.
   m.impl("repeat", PTC_BOXED(poptorch::fallback));
@@ -71,6 +76,7 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("l1_loss.out", PTC_BOXED(poptorch::fallback));
   m.impl("margin_ranking_loss", PTC_BOXED(poptorch::fallback));
   m.impl("poisson_nll_loss", PTC_BOXED(poptorch::fallback));
+  m.impl("soft_margin_loss.out", PTC_BOXED(poptorch::fallback));
   m.impl("triplet_margin_loss", PTC_BOXED(poptorch::fallback));
 
   // Scatter: By default, PyTorch's handler will fail if the index tensor isn't

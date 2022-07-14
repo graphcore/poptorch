@@ -904,6 +904,27 @@
   PopTorchDirect: norm_out
   UnusedOutputArguments: {out}
 
+# func: norm.dtype_out(Tensor self, Scalar? p, int[1] dim, bool keepdim, *, ScalarType dtype, Tensor(a!) out) -> Tensor(a!)
+- func: norm.dtype_out
+  PopTorchDirect: norm_dtype_out
+  UnusedOutputArguments: {out}
+
+# func: frobenius_norm.dim(Tensor self, int[1] dim, bool keepdim=False) -> Tensor
+- func: frobenius_norm.dim
+  PopTorchDirect: frobenius_norm_out
+
+# func: frobenius_norm.out(Tensor self, int[1] dim, bool keepdim=False, *, Tensor(a!) out) -> Tensor(a!)
+- func: frobenius_norm.out
+  PopTorchDirect: frobenius_norm_out
+  UnusedOutputArguments: {out}
+
+- func: nuclear_norm.dim
+  PopTorchDirect: nuclear_norm_out
+
+- func: nuclear_norm.dim_out
+  PopTorchDirect: nuclear_norm_out
+  UnusedOutputArguments: {out}
+
 # Both declarations are required.
 # func: cross(Tensor self, Tensor other, int? dim=None, *) -> Tensor(a!)
 - func: cross
@@ -1248,6 +1269,11 @@
 # func: poisson_nll_loss(Tensor input, Tensor target, bool log_input, bool full, float eps, int reduction) -> Tensor
 - func: poisson_nll_loss
   PopTorchDirect: poisson_nll_loss
+
+# func: soft_margin_loss.out(Tensor self, Tensor target, int reduction=Mean, *, Tensor(a!) out) -> Tensor(a!)
+- func: soft_margin_loss.out
+  PopTorchDirect: soft_margin_loss_out
+  UnusedOutputArguments: {out}
 
 # func: triplet_margin_loss(Tensor anchor, Tensor positive, Tensor negative, float margin=1.0, float p=2, float eps=1e-06, bool swap=False, int reduction=Mean) -> Tensor
 - func: triplet_margin_loss

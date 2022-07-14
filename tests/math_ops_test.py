@@ -533,10 +533,6 @@ reduction_ops_api2 = [
 @pytest.mark.parametrize("op", reduction_ops_api1)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_reduction_ops_float(op, trace_model):
-    if not trace_model and op in [torch.norm]:
-        pytest.skip(
-            "TODO(T51159): Could not find canonicalisation handler for JIT "
-            "symbol: aten::resize_")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -560,10 +556,6 @@ def test_reduction_ops_float(op, trace_model):
 @pytest.mark.parametrize("keepdim", [False, True])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
-    if not trace_model and op in [torch.norm]:
-        pytest.skip(
-            "TODO(T51159): Could not find canonicalisation handler for JIT "
-            "symbol: aten::resize_")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
@@ -635,15 +627,25 @@ norm_pvals = ['fro', float('inf'), float('-inf'), 1, 1.0, 2, 2.0, 3, 3.0]
 @pytest.mark.parametrize("p", norm_pvals)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_norm_p_values(p, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): Could not find canonicalisation handler for JIT "
-            "symbol: aten::resize_")
     torch.manual_seed(42)
     input = torch.randn([1, 2, 10, 10])
 
     def operation(x):
         return torch.norm(x, p=p)
+
+    def assert_(native_out, poptorch_out):
+        helpers.assert_allclose(actual=poptorch_out, expected=native_out)
+
+    op_harness(trace_model, operation, [input], assert_, test_training=True)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_norm_dtype(trace_model):
+    torch.manual_seed(42)
+    input = torch.randn([1, 2, 10, 10])
+
+    def operation(x):
+        return torch.norm(x, dtype=torch.float, p=2)
 
     def assert_(native_out, poptorch_out):
         helpers.assert_allclose(actual=poptorch_out, expected=native_out)
