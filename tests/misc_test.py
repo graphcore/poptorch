@@ -165,19 +165,14 @@ def test_print_orig_input_trace_tensors(capfd):
         orig_input_trace_tensors[2])
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_untracable_type_error(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Type 'Tuple[Tensor, float]' cannot be traced")
-
+def test_untracable_type_error():
     class Model(torch.nn.Module):
         def forward(self, t, f):
             return t + torch.tensor([f])
 
     x = torch.tensor([3.4])
     options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
+    options.Jit.traceModel(True)
     poptorch_model = poptorch.inferenceModel(Model(), options)
 
     with pytest.raises(
