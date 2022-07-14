@@ -346,7 +346,11 @@ SessionOptions parseSessionOptions(const py::dict &opts) {
     }
 
     if (name == "compilation_progress_bar_fn") {
-      options.setCompilationProgressLogger(value.cast<py::function>());
+      options.setCompilationProgressLogger(
+          [py_func = value.cast<py::function>()](int x, int y) {
+            py::gil_scoped_acquire acquire;
+            py_func(x, y);
+          });
     } else if (py::isinstance<py::bool_>(value)) {
       options.addBoolOption(name.c_str(), value.cast<bool>());
     } else if (py::isinstance<py::float_>(value)) {
@@ -1214,6 +1218,7 @@ compileWithTrace(py::handle h, const pybind11::dict &python_traced_params,
       h, python_traced_params, inputs, has_converted_any_half, options,
       training, optimizer_dict, attribute_accessor, added_dummy_output, anchors,
       model_parameters);
+  py::gil_scoped_release release;
   return lower.compile();
 }
 
@@ -1232,6 +1237,7 @@ std::shared_ptr<poptorch::PoplarExecutable> compileWithManualTracing(
   logging::debug("Compile with manual tracing");
   auto lower = lowerToPopartFromDispatch(options, attribute_accessor,
                                          is_training, opt_dict, anchors);
+  py::gil_scoped_release release;
   return lower.compile();
 }
 
