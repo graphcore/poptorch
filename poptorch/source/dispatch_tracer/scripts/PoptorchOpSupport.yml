@@ -24,7 +24,7 @@
    PopTorchDirect: custom_operation
 
  - func: ctc_beam_search_decoder
-   native_func: ctc_beam_search_decoder(Tensor probs, Tensor lengths, int blank, int beam_width, int top_paths) -> Tensor[]
+   native_func: ctc_beam_search_decoder(Tensor probs, Tensor lengths, int blank, int beam_width, int top_paths) -> (Tensor, Tensor, Tensor)
    PopTorchDirect: ctc_beam_search_decoder
 
  - func: identity_loss

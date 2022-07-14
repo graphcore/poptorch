@@ -693,8 +693,7 @@ void ctcBeamSearchDecoder(const c10::OperatorHandle &op, c10::Stack *stack) {
   at::Tensor path_lens = at::zeros({batch_size, top_paths});
   at::Tensor decoded_paths = at::zeros({batch_size, top_paths, input_len});
 
-  updateStack(op, stack,
-              {c10::List<at::Tensor>({path_probs, path_lens, decoded_paths})});
+  updateStack(op, stack, {path_probs, path_lens, decoded_paths});
 }
 
 // at::Tensor identityLoss(const at::Tensor &t, int64_t reduction)
@@ -782,7 +781,7 @@ static auto registry =
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::ctc_beam_search_decoder(Tensor probs, "
                         "Tensor lengths, int blank, int beam_width, int "
-                        "top_paths) -> Tensor[]")
+                        "top_paths) -> (Tensor, Tensor, Tensor)")
                 .catchAllKernel<PTC(ctcBeamSearchDecoder)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::identity_loss(Tensor x, int reduction) -> "

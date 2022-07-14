@@ -607,27 +607,18 @@ torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
   auto width = constantToInt(node->input(3)->node());
   auto top_paths = constantToInt(node->input(4)->node());
 
-  auto uses = node->output()->uses();
-  ERROR_ON_MSG(uses.size() != 1,
-               "[Internal Compiler Error] Malformed ctc beam search operator");
-
-  auto *unpack = uses[0].user;
-  ERROR_ON_MSG(unpack->kind() != c10::prim::ListUnpack,
-               "[Internal Compiler Error] Malformed ctc beam search operator");
-
   lengths = createCast(graph, {lengths}, "UINT32")->output();
   auto *decoder = createCtcbeamsearchdecoder(graph, {log_probs, lengths}, blank,
                                              width, top_paths);
   decoder->addOutput();
   decoder->addOutput();
 
-  replaceAllUsesWith(unpack->output(0), decoder->output(0));
-  replaceAllUsesWith(unpack->output(1), decoder->output(1));
-  replaceAllUsesWith(unpack->output(2), decoder->output(2));
+  replaceAllUsesWith(node->output(0), decoder->output(0));
+  replaceAllUsesWith(node->output(1), decoder->output(1));
+  replaceAllUsesWith(node->output(2), decoder->output(2));
 
   markNodeForDeletion(node);
-  markNodeForDeletion(unpack);
-  return nullptr;
+  return decoder;
 }
 
 } // namespace

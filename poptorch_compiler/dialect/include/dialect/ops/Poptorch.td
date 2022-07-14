@@ -102,7 +102,7 @@ def Poptorch_ctc_beam_search_decoder : Poptorch_NotImplementedOp<"ctc_beam_searc
                        I64Attr:$blank,
                        I64Attr:$beam_width,
                        I64Attr:$top_paths);
-  let results = (outs Poptorch_tensorlist:$result);
+  let results = (outs Poptorch_tensor:$outProbs, Poptorch_tensor:$outLengths, Poptorch_tensor:$outPaths);
   let builders = [OpBuilder<(ins "mlir::Value":$probs,
                                     "mlir::Value":$lengths,
                                     "int64_t":$blank,
@@ -112,7 +112,24 @@ def Poptorch_ctc_beam_search_decoder : Poptorch_NotImplementedOp<"ctc_beam_searc
           $_state.addAttribute("blank", $_builder.getI64IntegerAttr(blank));
           $_state.addAttribute("beam_width", $_builder.getI64IntegerAttr(beam_width));
           $_state.addAttribute("top_paths", $_builder.getI64IntegerAttr(top_paths));
-          $_state.addTypes({}); // TODO: Fill me in
+
+          const auto &probsShape = getShape(probs);
+          ERROR_ON_MSG(probsShape.size() != 3,
+                      "Input probablities tensor must be rank-3 for "
+                      "`ctc_beam_search_decoder`.");
+
+          const auto input_size = probsShape[0];
+          const auto batch_size = probsShape[1];
+
+          auto outProbs = mlir::RankedTensorType::get({batch_size, top_paths},
+                                                      getElementType(probs));
+          auto outLengths = mlir::RankedTensorType::get({batch_size, top_paths},
+                                                        getElementType(probs));
+          auto outPaths =
+            mlir::RankedTensorType::get({batch_size, top_paths, input_size},
+                                        getElementType(probs));
+
+          $_state.addTypes({outProbs, outLengths, outPaths});
      }]>
     ];
 }

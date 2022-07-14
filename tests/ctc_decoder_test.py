@@ -6,16 +6,13 @@ import torch
 import poptorch
 
 
-class Model(torch.nn.Module):
+class SimpleModel(torch.nn.Module):
     def forward(self, log_probs, lengths):
         return poptorch.ctc_beam_search_decoder(log_probs, lengths)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_ctc_decoder(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Malformed ctc beam search operator")
-
     input_size = 9
     batch_size = 3
     num_classes = 10
@@ -24,7 +21,7 @@ def test_ctc_decoder(trace_model):
     log_probs = torch.randn(input_size, batch_size, num_classes)
     lengths = torch.randint(5, input_size, (batch_size, ), dtype=torch.int)
 
-    model = Model()
+    model = SimpleModel()
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
