@@ -10,22 +10,10 @@ DOC_FOLDER = "../docs/user_guide"
 URL_PATTERN = re.compile(r"\bhttps?:[^\s>]+")
 
 # URLs which don't exist yet (e.g documentation for a future release) can be
-# added to the list of exceptions below.
-#
-# Make sure to add a TODO(TXXXX) comment to remove the exception once the link
-# is fixed.
-EXCEPTIONS = [
-    #TODO(T57889): remove exceptions after 2.5 release
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/pytorch",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/simple_applications/pytorch",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/popart/custom_operators",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/basics",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/efficient_data_loading",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/observing_tensors",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/tutorials/pytorch/mixed_precision",
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.5/feature_examples/pytorch/custom_op"
-]
+# added to the dictionary of exceptions:
+PRE_RELEASE_URLS = {
+    "https://github.com/graphcore/tutorials/tree/sdk-release-2.6": "https://phabricator.sourcevertex.net/diffusion/TUTORIALS/browse/sdk-release-2.6"
+}
 
 
 def get_all_links_from_file(rst_file_name):
@@ -36,9 +24,9 @@ def get_all_links_from_file(rst_file_name):
 
     all_links = []
 
-    # Force as extended ASCII to avoid decoding erors:
+    # Force as extended ASCII to avoid decoding errors:
     # assume all urls are made of 8-bit chars only
-    with open(rst_file_name, 'r', encoding="latin-1") as rst_file:
+    with open(rst_file_name, "r", encoding="latin-1") as rst_file:
         for line in rst_file:
             matches = URL_PATTERN.findall(line)
             for match in matches:
@@ -47,23 +35,32 @@ def get_all_links_from_file(rst_file_name):
     return all_links
 
 
+def convert_to_internal(url):
+    for forwarder in PRE_RELEASE_URLS:
+        if url.startswith(forwarder):
+            print("Will try pre-release URL:")
+            return True, url.replace(forwarder, PRE_RELEASE_URLS[forwarder], 1)
+
+    return False, url
+
+
 def check_url_works(url):
     print(f"Testing {url}")
 
     try:
         r = requests.head(url)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        # Allow the test to succeed with intermitent issues.
+        # Allow the test to succeed with intermittent issues.
         # (TooManyRedirects is not caught as could be a broken url.)
         return None
 
     code = r.status_code
     message = requests.status_codes._codes[code][0]  # pylint: disable=protected-access
 
-    print(message + f" ({code})")
+    print(f"{message} ({code})")
 
     if r.status_code == 302:
-        check_url_works(r.headers['Location'])
+        check_url_works(r.headers["Location"])
     else:
         # Allow any non 4xx status code, as other failures could be temporary
         # and break the CI tests.
@@ -76,19 +73,25 @@ def check_url_works(url):
 
 def test_all_links():
     user_guide_path = os.path.realpath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), DOC_FOLDER))
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), DOC_FOLDER)
+    )
     failed_urls = []
 
     for rst_file in glob.glob(f"{user_guide_path}/*.rst"):
         for url in get_all_links_from_file(rst_file):
             url_result = check_url_works(url)
+
+            # If URL didn't work, check internal repos for pending release
+            if url_result is not None:
+                is_pre_release, internal_url = convert_to_internal(url)
+                if is_pre_release:
+                    url_result = check_url_works(internal_url)
+
             if url_result is not None:
                 url, message, code = url_result
-                if url in EXCEPTIONS:
-                    print(f"{url} found in exceptions: ",
-                          f"ignoring {message} ({code})")
-                else:
-                    failed_urls.append(f"{url}: {message} ({code})")
+                failed_urls.append(f"{url}: {message} ({code})")
+
             print()
 
-    assert not failed_urls, failed_urls
+    no_failures = not failed_urls
+    assert no_failures, "\n".join(failed_urls)
