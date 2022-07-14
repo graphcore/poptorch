@@ -57,12 +57,34 @@ class _SetDefaultDeviceType:
         # All the ops with FACTORY_PARAMS in <torch>/tools/pyi/gen_pyi.py
         for name in [
                 "arange", "full", "full_like", "linspace", "logspace", "ones",
-                "rand", "randint", "range", "tensor", "zeros", "zeros_like"
+                "rand", "randint", "randn", "randperm", "range", "tensor",
+                "zeros", "zeros_like"
         ]:
             func = getattr(torch, name)
 
             self.overrides[name] = func
             setattr(torch, name, create_wrapper(func))
+
+        def create_non_tensor_wrapper(f):
+            @functools.wraps(f)
+            def _wrapper(*args, **kwargs):
+                if not any(
+                        isinstance(a, torch.Tensor) for a in itertools.chain(
+                            args, kwargs.values())) and "device" not in kwargs:
+                    logger.warning(
+                        "No device set in torch.%s(): forcing to IPU",
+                        f.__name__)
+                    kwargs["device"] = "xla"
+                return f(*args, **kwargs)
+
+            return _wrapper
+
+        # overloaded ops that take a device for some overloads
+        for name in ["normal"]:
+            func = getattr(torch, name)
+
+            self.overrides[name] = func
+            setattr(torch, name, create_non_tensor_wrapper(func))
 
         # Arguments validation forces the tensors to be compared onto the IPU
         # then the result is sent back to the CPU.

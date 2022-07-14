@@ -96,9 +96,6 @@ def test_uniform_(dt, trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_normal(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): !session")
-
     def rng_op(x):
         return torch.normal(mean=0.0, std=1.0, size=x.size())
 
@@ -118,6 +115,35 @@ def test_normal_(dt, trace_model):
     input = torch.empty(size=(3, 5, 1000), dtype=dt)
     stat_funs = [torch.mean, torch.var]
     rng_harness(trace_model, rng_op, input, stat_funs, expected_dtype=dt)
+
+
+# torch.normal with buffers and params
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_normal_buffers(trace_model):
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.register_buffer("mean", torch.Tensor([1.0, 2.0, 3.0]))
+            self.register_parameter(
+                "std", torch.nn.Parameter(torch.Tensor([0.5, 1.0, 1.5])))
+
+        def forward(self, x):
+            torch.manual_seed(42)
+            return torch.normal(self.mean, 0.5) + torch.normal(1.0,
+                                                               self.std) + x
+
+    model = Model()
+
+    # Run on IPU and check that the result has the correct type
+    opts = poptorch.Options().randomSeed(8)
+    opts.Jit.traceModel(trace_model)
+    pop_model = poptorch.inferenceModel(model, opts)
+    pop_out = pop_model(torch.tensor([0.0, 0.0, 0.0]))
+    assert pop_out.dtype == torch.float
+
+    native_out = model(torch.tensor([0.0, 0.0, 0.0]))
+    assert native_out.size() == pop_out.size()
 
 
 # torch.distributions.Normal
@@ -145,9 +171,6 @@ def test_distributions_normal(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_randn(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): !session")
-
     def rng_op(x):
         return torch.randn(x.size())
 
@@ -259,14 +282,10 @@ def test_distributions_exponential(trace_model):
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_randperm(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Trying to create tensor with negative dimension")
-
     def rng_op(x):
-        return torch.randperm(x.item()) + 0
+        return torch.randperm(x.size(dim=0)) + 0
 
-    input = torch.tensor([100], dtype=torch.int)
+    input = torch.arange(100)
     stat_funs = [torch.numel]
     rng_harness(trace_model, rng_op, input, stat_funs, torch.int32)
 
