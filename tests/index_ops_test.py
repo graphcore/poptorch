@@ -202,17 +202,24 @@ def test_index_put(op, idxs, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put_scalar(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): Shape of 'actual' (torch.Size([1])) "
-                    "should be the same as shape of 'expected' "
-                    "(torch.Size([2, 3, 4, 5]))")
-
     def op(t, idx, v):
-        t[idx, idx] = v.item()
+        # Tracing cannot take primitive-typed inputs to the graph,
+        # so we pass a tensor and unpack it using tensor.item()
+        # instead. This only works because tracing first runs the
+        # graph on CPU, and thus is able to capture the tensor constant.
+        #
+        # However, tensor.item() cannot be called mid-graph
+        # by JIT dispatch, as this is an eager operation. Instead,
+        # we pass the integer input to the graph directly, as
+        # this can be captured by the dispatcher
+        if trace_model:
+            v = v.item()
+        t[idx, idx] = v
         return t
 
+    v = torch.tensor([0]) if trace_model else 0
     # For each element e in t[0, 0], e = 0
-    index_harness(trace_model, op, [[0]], True, torch.tensor([0]))
+    index_harness(trace_model, op, [[0]], True, v)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

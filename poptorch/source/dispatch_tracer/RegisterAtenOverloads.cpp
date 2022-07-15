@@ -440,6 +440,18 @@ at::Scalar localScalarDense(const at::Tensor &self) {
                                       ATEN_OP(_local_scalar_dense)>::call(self);
 }
 
+at::Scalar item(const at::Tensor &self) {
+  bool is_eager_mode = false;
+#if POPTORCH_BUILD_MLIR_COMPILER
+  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
+  is_eager_mode = mlir->isEagerMode();
+#endif
+  ERROR_ON_MSG(!is_eager_mode, "aten::item is only supported in eager mode.");
+
+  return at::native::call_fallback_fn<&poptorch::cpuFallback,
+                                      ATEN_OP(item)>::call(self);
+}
+
 at::Tensor
 emptyBase(at::IntArrayRef size,
           c10::optional<at::ScalarType> dtype = c10::nullopt,

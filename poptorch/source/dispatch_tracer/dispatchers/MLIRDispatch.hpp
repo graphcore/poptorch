@@ -85,6 +85,8 @@ public:
       const std::vector<poptorch_ir::OptionalTensorId> &output_id,
       const std::vector<bool> &requires_grad);
 
+  bool isEagerMode() { return _eager_mode; }
+
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
 #include "AtenToMLIRInterface.hpp.inc"
