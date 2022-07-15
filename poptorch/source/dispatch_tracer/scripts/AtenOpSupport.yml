@@ -160,6 +160,10 @@
 # Views and reshapes
 ######################
 
+# aten::alias(Tensor(a) self) -> Tensor(a)
+- func: alias
+  PopTorchDirect: alias
+
 # aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
 - func: as_strided
   PopTorchDirect: as_strided

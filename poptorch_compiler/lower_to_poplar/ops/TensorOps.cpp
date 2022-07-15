@@ -13,6 +13,10 @@
 
 namespace poptorch_ir {
 
+void alias::lowerToPoplar(CompilerContext &context) {
+  context.addTensor(this->result(), context.fromSsa(this->input()));
+}
+
 void print_tensor::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor tensor = context.fromSsa(this->input());
   context.seq.add(poplar::program::PrintTensor(this->title().str(), tensor));

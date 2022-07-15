@@ -33,7 +33,10 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("all", PTC_BOXED(poptorch::fallback));
   m.impl("any", PTC_BOXED(poptorch::fallback));
 
-// Needed due to "CompositeImplicitAutograd"
+  // Intercept alias to circumvent issues accessing tensor storage directly
+  m.impl("alias", PTC_BOXED(poptorch::fallback));
+
+ // Needed due to "CompositeImplicitAutograd"
   m.impl("native_group_norm",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
@@ -54,8 +57,7 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("frobenius_norm.out", PTC_BOXED(poptorch::fallback));
   m.impl("frobenius_norm.dim", PTC_BOXED(poptorch::fallback));
 
-  // If we don't intercept this op, it will be call the native implementation
-  // of alias, which will try to access our tensor storage.
+  // Use our own repeat op
   m.impl("repeat", PTC_BOXED(poptorch::fallback));
 
   m.impl("constant_pad_nd", PTC_BOXED(poptorch::fallback));
