@@ -32,7 +32,7 @@ except ImportError as e:
     raise ImportError("Unable to import PopTorch, this can be caused by "
                       "attempting to import PopTorch without an active Poplar "
                       "SDK\n  The SDK can be enabled by running: "
-                      "`source /path/to/poplar-sdk/enable.sh`") from e
+                      "`source /path/to/poplar-sdk/enable`") from e
 
 # pylint: disable=wrong-import-position
 from poptorch.poptorch_core import importPoptorchMetadataFromFile, Error, RecoverableError, UnrecoverableError, enableEagerMode
