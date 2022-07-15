@@ -165,7 +165,9 @@ torch::jit::SourceRange getPythonInterpreterSourceRange() {
                     << "): " << entry.filename << "\n";
         if (!source_filename) {
           source_filename = context.filenameIfNotExcluded(*src->filename());
-          source_line = line;
+          if (source_filename) {
+            source_line = line;
+          }
         }
       }
     }

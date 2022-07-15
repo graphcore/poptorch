@@ -352,7 +352,7 @@ private:
       ERROR("Unsupported type for constant: " << i_value);
     }
 
-    _graph->insertNode(new_const);
+    insertNodeInGraph(_graph, new_const);
     _info_stack.top().container_nodes.push_back(new_const);
     _all_const_nodes.push_back(new_const);
     _info_stack.top().elements_left--;
@@ -376,7 +376,7 @@ private:
       construct_node->addInput(element->output());
     }
     construct_node->output()->setType(_info_stack.top().container_type);
-    _graph->insertNode(construct_node);
+    insertNodeInGraph(_graph, construct_node);
 
     _info_stack.pop();
 
@@ -461,12 +461,13 @@ void recursivelySelectHostAndIPUSideConstants(
         auto *host_side_node = graph->createClone(use.user, same_value);
         host_side_node->replaceInput(use.offset,
                                      host_side_replacement->output(output_idx));
-        graph->insertNode(host_side_node);
+
+        insertNodeInGraph(graph, host_side_node);
 
         auto *ipu_side_node = graph->createClone(use.user, same_value);
         ipu_side_node->replaceInput(use.offset,
                                     ipu_side_replacement->output(output_idx));
-        graph->insertNode(ipu_side_node);
+        insertNodeInGraph(graph, ipu_side_node);
 
         recursivelySelectHostAndIPUSideConstants(use.user, host_side_node,
                                                  ipu_side_node, to_delete);

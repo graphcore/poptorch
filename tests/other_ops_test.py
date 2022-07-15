@@ -357,6 +357,6 @@ def test_available_memory_scatter_add(capfd, trace_model):
     sa_line = it.findNext("popart::scatterreduce").strip()
     sa_var = sa_line.partition(" ")[0]
     sam_line = it.findNext("poptorch::set_available_memory").strip()
-    # Remove source code location if present.
-    sam_line = re.sub(r' # .*/other_ops_test\.py:\d+:\d+', '', sam_line)
-    assert sam_line.endswith("({})".format(sa_var))
+    # Check we have set_available_memory[...](%XX) where XX is the result of scatterreduce
+    assert re.search(r"set_available_memory\[.*\]\(\{}\)".format(sa_var),
+                     sam_line)

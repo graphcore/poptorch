@@ -8,6 +8,7 @@
 #include "poptorch/DispatchTracer.hpp"
 #include "poptorch/InplaceOps.hpp"
 #include "poptorch/InplaceOpsPyTorch.hpp_nolint"
+#include "poptorch/OpBuilder.hpp"
 
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -75,12 +76,7 @@ torch::jit::Node *outplaceOp(torch::jit::Graph &graph, torch::jit::Node *node) {
   torch::jit::NodeKind new_kind = outplaceKind(node->kind());
 
   torch::jit::WithInsertPoint insert_point(node);
-  auto *new_node = graph.create(new_kind);
-  graph.insertNode(new_node);
-
-  for (auto *input : node->inputs()) {
-    new_node->addInput(input);
-  }
+  auto *new_node = createAndInsertNode(&graph, new_kind, node->inputs());
 
   torch::jit::addAdditionalInputsIfRequired(&graph, node, new_node);
 

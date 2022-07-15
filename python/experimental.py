@@ -266,7 +266,7 @@ class _IPUContext:
         self.func = func
         self.ipu = None
         self.compiler = compiler
-        self.options = options
+        self.options = options or Options()
         self.training = training
         self.optimizer = optimizer
         self.dict_optimizer = dict_optimizer
@@ -280,6 +280,14 @@ class _IPUContext:
 
     @_impl.destroyDispatcherOnExit
     def _compileOrLoadExecutable(self, args, kwargs, filename=None):
+        module_namescope = None
+        # TODO(T66133) Add support for name scopes in MLIR backend.
+        # pylint: disable=protected-access
+        if self.model is not None and \
+                self.compiler == enums.Compiler.PopART and \
+                self.options._module_namescope_enabled:
+            module_namescope = _impl.NameScopeHook(self.model)
+
         tensor_args = flattenTensorStructure((args, kwargs))
         with IPUScope(tensor_args,
                       model=self.model,
@@ -302,6 +310,9 @@ class _IPUContext:
 
         if filename is not None:
             ipu.loadExecutable(filename)
+
+        if module_namescope:
+            module_namescope.remove()
 
         self.ipu = ipu
         return tensor_args

@@ -9,6 +9,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/OpBuilder.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -131,10 +132,11 @@ void maybeReplaceOutputType(torch::jit::Node *node, torch::jit::Value *output,
         ERROR("A constant should have no inputs");
         return value; // ensures correct output type
       };
-      auto *new_type_const = node->owningGraph()->createClone(input, no_inputs);
-      new_type_const->i_(c10::attr::value, replacement);
-      node->replaceInput(dtype_index, new_type_const->output());
-      new_type_const->insertBefore(node);
+      auto *new_node = node->owningGraph()->createClone(input, no_inputs);
+      new_node->i_(c10::attr::value, replacement);
+      node->replaceInput(dtype_index, new_node->output());
+
+      insertNodeBeforeNode(new_node, node);
     }
 
     logging::info("Replacing cast to {} with cast to {} for {}",

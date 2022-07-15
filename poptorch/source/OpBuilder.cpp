@@ -21,15 +21,58 @@ at::ScalarType scalarTypeFromInput(const torch::jit::Node *node, size_t num) {
   return *node->input(num)->type()->expect<c10::TensorType>()->scalarType();
 }
 
-torch::jit::SourceRange current_source_location = {};
+class SourceLocation {
+public:
+  void setLocation(const std::string &filename, std::uint64_t line) {
+    _dirty = true;
+    _filename = filename;
+    _line = line;
+  }
+
+  void setMetadata(const std::string &metadata) {
+    _dirty = true;
+    _metadata = metadata;
+  }
+
+  const torch::jit::SourceRange &sourceRange() {
+    if (_dirty) {
+      _dirty = false;
+      c10::optional<std::string> filename;
+      if (!_filename.empty()) {
+        filename = _filename;
+      }
+      auto source =
+          std::make_shared<torch::jit::Source>(_metadata, filename, _line);
+      _source_range = torch::jit::SourceRange(source, 0, 1);
+    }
+    return _source_range;
+  }
+
+private:
+  bool _dirty{true};
+  torch::jit::SourceRange _source_range;
+  std::string _metadata;
+  std::string _filename;
+  std::uint64_t _line;
+} current_source_location = {};
 
 } // namespace
 
 void setCurrentPythonCodeLocation(
     const torch::jit::SourceRange &source_location) {
-  current_source_location = source_location;
+  auto file_line_col = source_location.file_line_col();
+  std::uint64_t line = 0;
+  std::uint64_t col = 0;
+  std::string filename;
+  if (file_line_col) {
+    std::tie(filename, line, col) = *file_line_col;
+  }
+  current_source_location.setLocation(filename, line);
 }
 
+void setCurrentMetadata(const std::string &metadata) {
+  current_source_location.setMetadata(metadata);
+}
 torch::jit::Node *
 createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
                     torch::jit::ArrayRef<torch::jit::Value *> inputs,
@@ -57,13 +100,23 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
     }
   }
 
-  new_node->setSourceRange(current_source_location);
   setNodeOutputsTypes(new_node, implicit_cast, output_type);
-  graph->insertNode(new_node);
-
-  setAvailableMemoryAddPossibleInputOp(new_node);
+  insertNodeInGraph(graph, new_node);
 
   return new_node;
+}
+
+void insertNodeInGraph(torch::jit::Graph *graph, torch::jit::Node *new_node) {
+  new_node->setSourceRange(current_source_location.sourceRange());
+  graph->insertNode(new_node);
+  setAvailableMemoryAddPossibleInputOp(new_node);
+}
+
+void insertNodeBeforeNode(torch::jit::Node *new_node,
+                          torch::jit::Node *insert_point) {
+  new_node->setSourceRange(current_source_location.sourceRange());
+  new_node->insertBefore(insert_point);
+  setAvailableMemoryAddPossibleInputOp(new_node);
 }
 
 // Sets the scalar types of every output of a node

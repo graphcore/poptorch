@@ -247,6 +247,9 @@ public:
   // Returns the number of pipeline stages in the model execution
   std::uint64_t numPipelineStages();
 
+  popart::SourceLocation code_location;
+  std::string torch_node;
+
   // General helpers.
 
   // Inserts memory into the list of tensors being output by the model.

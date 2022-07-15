@@ -5,6 +5,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/OpBuilder.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -37,7 +38,7 @@ void processInputTensor(torch::jit::Graph *graph, torch::jit::Value *input) {
   // does not end up promoting to a Double/Long
   auto *new_node = graph->create(symbols::poptorch::host_side_cast);
 
-  new_node->insertBefore(earliest_user);
+  insertNodeBeforeNode(new_node, earliest_user);
   input->replaceAllUsesWith(new_node->output());
   new_node->addInput(input);
 

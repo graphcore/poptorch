@@ -1171,6 +1171,15 @@ Compiler::getTensorDTypeString(poptorch::TensorId id) const {
   return stringToUniquePtr(type_str);
 }
 
+void Compiler::setCurrentPythonCodeLocation(const char *torch_node,
+                                            const char *filename,
+                                            std::uint64_t line,
+                                            std::uint64_t col) {
+  UNUSED(col);
+  _impl->torch_node = torch_node;
+  _impl->code_location = popart::SourceLocation("", filename, line);
+}
+
 void Compiler::clearActiveIpu() { _impl->active_ipu = -1; }
 
 void Compiler::setActiveIpu(std::uint64_t stage_id, std::int64_t phase_id,

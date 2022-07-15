@@ -51,7 +51,8 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
     // Undefined tensors are optional tensors.
     if (!tensor.defined()) {
       // Create a null IR value.
-      torch::jit::Node *node = graph.insertNode(graph.createNone());
+      torch::jit::Node *node = graph.createNone();
+      insertNodeInGraph(&graph, node);
       return node->output();
     }
 
@@ -97,7 +98,6 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
         list_values.push_back(
             insertValueIntoGraphAndTrackIt(list_value, graph, mapper));
       }
-      logging::warn("Generic List of tensors! {}", value.tagKind());
     }
 
     // We assume all lists with the same jit values are the same list in python.
@@ -111,7 +111,7 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       }
 
       auto *list = graph.createList(type_ptr, list_values);
-      graph.insertNode(list);
+      insertNodeInGraph(&graph, list);
       val = list->output();
       mapper.addTensorList(list_values, val);
     }
@@ -142,8 +142,8 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
 
   // Create the aten target node for our canonicalisation to target.
   torch::jit::Node *aten_target =
-      graph.create(symbol, inputs, schema.returns().size());
-  graph.insertNode(aten_target);
+      createAndInsertNode(&graph, symbol, inputs, ImplicitCast::None,
+                          OutputType::Unknown, schema.returns().size());
 
   for (std::size_t i = 0; i < aten_target->inputs().size(); ++i) {
     torch::jit::Value *in = aten_target->input(i);

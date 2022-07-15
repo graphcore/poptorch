@@ -6,7 +6,7 @@ import unittest.mock
 import pytest
 import torch
 import torchvision.models as models
-from poptorch.experimental import IPUScope
+import poptorch
 import helpers
 
 # Torchvision models.
@@ -74,11 +74,10 @@ def inference_harness(imagenet_model, check=True):
     # Run on CPU.
     native_out = model(image_input)
 
-    # Run on IPU.
-    with IPUScope([image_input], model=model) as poptorch_model:
-        img = image_input.to("xla")
-        out = model(img)
-        poptorch_model.outputs(out)
+    opts = poptorch.Options()
+    opts.Jit.traceModel(False)
+
+    poptorch_model = poptorch.inferenceModel(model, opts)
 
     poptorch_out = poptorch_model(image_input)
 

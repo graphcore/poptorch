@@ -594,6 +594,24 @@ void LowerToPopartImpl::lowerBody() {
     logging::LogContext ctx("processing " + nodeToString(node));
     // Switch/lookup based on the actual int value.
     const c10::Symbol kind = node->kind();
+    // When using the dispatcher metadata should always be set.
+    std::string meta;
+    if (node->sourceRange().source()) {
+      meta = node->sourceRange().source()->text();
+    }
+    ERROR_ON_MSG(_built_in_params && meta.empty(),
+                 "Source code location missing for node " + nodeToString(node));
+    // Note: filename and line number might still not be available (For example
+    // if the filter set by the user excludes the entire stack).
+    auto file_line_col = node->sourceRange().file_line_col();
+    std::uint64_t line = 0;
+    std::uint64_t col = 0;
+    std::string filename;
+    if (file_line_col) {
+      std::tie(filename, line, col) = *file_line_col;
+    }
+    _compiler.setCurrentPythonCodeLocation(meta.c_str(), filename.c_str(), line,
+                                           col);
 
     auto itr = _functionToImplementation.find(kind);
     if (itr != _functionToImplementation.end()) {

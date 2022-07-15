@@ -14,6 +14,7 @@
 #include "poptorch_logging/Logging.hpp"
 
 #include "../PoptorchSymbols.hpp"
+#include "poptorch/OpBuilder.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
 
@@ -304,7 +305,7 @@ void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
       false);
   _nodes_map[node] = new_node;
 
-  _constexpr_graph->insertNode(new_node);
+  insertNodeInGraph(_constexpr_graph.get(), new_node);
 
   // Map the old outputs to the new
   const auto *old_it = node->outputs().begin();

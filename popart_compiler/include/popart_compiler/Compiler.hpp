@@ -245,6 +245,10 @@ public:
 
   poptorch::TensorId createTensorId(const char *name);
 
+  void setCurrentPythonCodeLocation(const char *torch_node,
+                                    const char *filename, std::uint64_t line,
+                                    std::uint64_t col);
+
 #define INT_VEC std::vector<std::int64_t>
 #define FLOAT_VEC std::vector<float>
 #define FLOAT float

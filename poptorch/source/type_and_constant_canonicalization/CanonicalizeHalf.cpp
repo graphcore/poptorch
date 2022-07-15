@@ -7,6 +7,7 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 
 #include "../PoptorchSymbols.hpp"
@@ -230,7 +231,7 @@ void ConvertHalfImpl::duplicateConstantsWithMixedHalfFloatUses() {
         new_node->t(c10::attr::value).to(invalid_type).contiguous();
     new_node->t_(c10::attr::value, new_tensor);
 
-    new_node->insertBefore(node);
+    insertNodeBeforeNode(new_node, node);
     for (auto *invalid_node : invalid_nodes) {
       invalid_node->replaceInputWith(node->output(), new_node->output());
     }

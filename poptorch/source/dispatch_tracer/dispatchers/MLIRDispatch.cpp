@@ -326,10 +326,7 @@ void MLIRDispatch::setCurrentCodeLocation(
     const torch::jit::SourceRange &source_location) {
   auto file_line_col = source_location.file_line_col();
   if (file_line_col) {
-    std::uint64_t line;
-    std::uint64_t col;
-    std::string filename;
-    std::tie(filename, line, col) = *file_line_col;
+    auto [filename, line, col] = *file_line_col; // NOLINT
     _compiler.setCurrentPythonCodeLocation(filename.c_str(), line, col);
   }
 }

@@ -125,6 +125,8 @@ void JITDispatch::createGraph() {
   // No need to create a MLIR graph, we're going to only use the dispatcher
   // for shape inference, so just initialise the compiler.
   _mlir_dispatch.initCompiler();
+
+  setCurrentMetadata("<input/parameter/buffer>");
 }
 
 void JITDispatch::addOutput(const at::Tensor &ipu_src,
@@ -283,7 +285,7 @@ void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
       auto tensor_list = value.toTensorVector();
       // Always insert list unpack if output value is a list.
       auto *unpack = graph->createListUnpack(val, tensor_list.size());
-      graph->insertNode(unpack);
+      insertNodeInGraph(graph.get(), unpack);
 
       for (size_t i = 0; i < tensor_list.size(); ++i) {
         at::Tensor tensor = tensor_list.at(i);
@@ -318,6 +320,11 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
 
   c10::OperatorHandle op = getOutplaceOpHandle(initial_op, dispatcher, *stack);
   const c10::FunctionSchema &schema = op.schema();
+
+  // Tag all the nodes created by the handler with the initial schema string
+  // representation so that they can be traced back to top level ops in the
+  // profiler.
+  setCurrentMetadata(c10::toString(initial_schema));
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, *graph, _mapper);

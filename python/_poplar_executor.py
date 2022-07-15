@@ -582,10 +582,6 @@ class PoplarExecutor:
             self._write_optim_state_dict_if_needed()
 
     def _compileWithDispatch(self, in_tensors, executable_filename=None):
-        module_namescope = _impl.NameScopeHook(
-            self._user_model
-        ) if self.options._module_namescope_enabled else None  # pylint: disable=protected-access
-
         with _SetDefaultDeviceType():
             # The IPUContext is going to move the model to the IPU so create a copy
             # to make sure we don't modify the user's model.
@@ -604,9 +600,6 @@ class PoplarExecutor:
             self._outputs_structure = ctx.ipu._outputs_structure  # pylint: disable=protected-access
         if self._training:
             self._install_state_hooks()
-
-        if module_namescope:
-            module_namescope.remove()
 
         return ctx.ipu._executable  # pylint: disable=protected-access
 

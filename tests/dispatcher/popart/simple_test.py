@@ -5,7 +5,7 @@ import copy
 import pytest
 import torch
 import torch.nn as nn
-from poptorch.experimental import IPUScope
+from poptorch.experimental import IPUContext, IPUScope
 import poptorch
 import helpers
 
@@ -89,11 +89,7 @@ def test_source_location(capfd, compiler, mode):
         opts.appendToLocationExcludes("/")
 
     input = torch.Tensor([[1.], [-1.]])
-    with IPUScope([input], model=layer, compile_using=compiler,
-                  options=opts) as ipu:
-        input = input.to("xla")
-        y = f(input)
-        ipu.outputs([y])
+    ipu = IPUContext(f, model=layer, options=opts, compiler=compiler)
 
     ipu(input)
     log = helpers.LogChecker(capfd)

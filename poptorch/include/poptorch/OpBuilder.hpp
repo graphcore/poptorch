@@ -40,12 +40,26 @@ namespace poptorch {
 void setCurrentPythonCodeLocation(
     const torch::jit::SourceRange &source_location);
 
+// Set the current metadata. (All the nodes created
+// will have this metadata attached to them).
+void setCurrentMetadata(const std::string &metadata);
+
 torch::jit::Node *createAndInsertNode(
     torch::jit::Graph *graph, torch::jit::NodeKind kind,
     torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
     ImplicitCast implicit_cast = ImplicitCast::None,
     OutputType output_type = OutputType::Unknown, size_t num_outputs = 1,
     c10::optional<at::ScalarType> dtype = c10::optional<at::ScalarType>());
+
+// All nodes should be added to the jit graph using this function or
+// insertNodeBeforeNode().
+// (or indirectly by using createAndInsertNode()).
+// These functions will ensure the new node contains all the required metadata
+// before it's added to the graph.
+void insertNodeInGraph(torch::jit::Graph *graph, torch::jit::Node *new_node);
+
+void insertNodeBeforeNode(torch::jit::Node *new_node,
+                          torch::jit::Node *insert_point);
 
 // Called by createAndInsertNode except in the cases of OutputType::AsDtype and
 // OutputType::AsDtypeOrFirstInput where it should be called manually once the

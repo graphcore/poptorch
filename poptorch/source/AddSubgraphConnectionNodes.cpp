@@ -98,8 +98,7 @@ void markOutputs(torch::jit::Graph *graph, torch::jit::Node *outputs,
     }
 
     torch::jit::Node *new_node = createAddOutputTensor(graph, output);
-
-    new_node->insertBefore(insertion_point);
+    insertNodeBeforeNode(new_node, insertion_point);
   }
 }
 
