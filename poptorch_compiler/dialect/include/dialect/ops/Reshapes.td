@@ -432,28 +432,31 @@ def Poptorch_unsqueeze : Poptorch_Op<"unsqueeze", []> {
 }
 
 // repeat(Tensor self, int[] repeats) -> Tensor
-def Poptorch_repeat : Poptorch_NotImplementedOp<"repeat", []> {
-    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$sizes);
+def Poptorch_repeat : Poptorch_Op<"repeat", [ViewOp]> {
+    let arguments = (ins Poptorch_tensor:$input, I64ArrayAttr:$repeats);
     let results = (outs Poptorch_tensor:$result);
     let builders = [OpBuilder<(ins "mlir::Value":$value,
-                                   "const std::vector<std::int64_t>&":$sizes),[{
+                                   "const std::vector<std::int64_t>&":$repeats),[{
         $_state.addOperands({value});
-        $_state.addAttribute("sizes", $_builder.getI64ArrayAttr(sizes));
+        $_state.addAttribute("repeats", $_builder.getI64ArrayAttr(repeats));
 
         mlir::RankedTensorType t1 = value.getType().cast<mlir::RankedTensorType>();
         mlir::Type e1 = t1.getElementType();
         std::vector<int64_t> shape = t1.getShape();
-        std::vector<int64_t> new_shape(std::max(shape.size(), sizes.size()));
-        for (int i=0; i < new_shape.size(); i++) {
+
+        ERROR_ON_MSG(repeats.size() < shape.size(),
+                     "Number of dimensions of repeat dims can not be smaller "
+                     "than number of dimensions of tensor");
+
+        std::vector<int64_t> new_shape(repeats.size());
+
+        int64_t num_new_dimensions = repeats.size()-shape.size();
+        for (int64_t i=0; i < new_shape.size(); i++) {
             int64_t ishape = 1;
-            int64_t isize = 1;
-            if (i < shape.size()) {
-                ishape = shape[shape.size() - i - 1];
+            if (i >= num_new_dimensions) {
+                ishape = shape[i-num_new_dimensions];
             }
-            if (i < sizes.size()) {
-                isize = sizes[sizes.size() - i - 1];
-            }
-            new_shape[new_shape.size() - i - 1] = ishape * isize;
+           new_shape[i] = ishape * repeats[i];
         }
         $_state.addTypes(mlir::RankedTensorType::get(new_shape, e1));
   }]>];

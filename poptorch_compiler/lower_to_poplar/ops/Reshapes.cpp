@@ -86,6 +86,25 @@ void unsqueeze::lowerToPoplar(CompilerContext &context) {
   context.addTensor(result(), in);
 }
 
+void repeat::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in = context.fromSsa(this->input());
+
+  // The new rank.
+  const std::size_t new_rank = this->repeats().size();
+
+  while (in.rank() < new_rank) {
+    in = in.expand({0});
+  }
+
+  for (std::size_t dim = 0; dim < new_rank; dim++) {
+    const std::uint64_t new_dim_int =
+        this->repeats()[dim].cast<mlir::IntegerAttr>().getUInt();
+    in = in.broadcast(new_dim_int, dim);
+  }
+
+  context.addTensor(result(), in);
+}
+
 void expand::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor in = context.fromSsa(this->input());
 
