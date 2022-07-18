@@ -1120,6 +1120,10 @@ std::string CompilerImpl::getPopartIR() const {
   return session->serializeIr(popart::IrSerializationFormat::JSON);
 }
 
+std::set<popart::TensorId> CompilerImpl::getTensorNames() const {
+  return session->getAllTensorIds();
+}
+
 PopartType CompilerImpl::getPopartType(poptorch::TensorId id) const {
   if (isHostSideConstant(id)) {
     return getHostSideConstant(id).popartType();

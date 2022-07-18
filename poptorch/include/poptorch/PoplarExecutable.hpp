@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -51,6 +52,9 @@ public:
 
   // Get the IR from popart.
   std::string getPopartIR() const;
+
+  // Get the tensor names that occur in the model graphs.
+  std::set<std::string> getTensorNames() const;
 
   void detachFromDevice();
   void attachToDevice();

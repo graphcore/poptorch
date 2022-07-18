@@ -871,6 +871,12 @@ getPopartIR(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   return executable->getPopartIR();
 }
 
+py::set
+getTensorNames(const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
+  ERROR_ON_MSG(!executable, "No built executable");
+  return py::cast(executable->getTensorNames());
+}
+
 void detachFromDevice(
     const std::shared_ptr<poptorch::PoplarExecutable> &executable) {
   poptorch::logging::Tracepoint tp{__FUNCTION__};
@@ -1277,6 +1283,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("setLogLevel", PTC(poptorch::setLogLevel), py::arg("level") = 2);
   m.def("setPopartLogLevel", PTC(poptorch::setPopartLogLevelUInt));
   m.def("_getPopartIR", PTC(poptorch::getPopartIR));
+  m.def("_getTensorNames", PTC(poptorch::getTensorNames));
   m.def("detachFromDevice", PTC(poptorch::detachFromDevice));
   m.def("attachToDevice", PTC(poptorch::attachToDevice));
   m.def("isAttachedToDevice", PTC(poptorch::isAttachedToDevice));

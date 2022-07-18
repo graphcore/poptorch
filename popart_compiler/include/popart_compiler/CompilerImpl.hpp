@@ -364,6 +364,8 @@ public:
                     const std::vector<Optimizer> &optimizers);
   std::string getPopartIR() const;
 
+  std::set<popart::TensorId> getTensorNames() const;
+
   // Returns the PopART type for specified id
   PopartType getPopartType(poptorch::TensorId id) const;
 

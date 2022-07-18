@@ -451,6 +451,10 @@ public:
   // protecting the ABI boundry.
   std::unique_ptr<char[]> getPopartIR() const;
 
+  // We return this as a unique char pointer to avoid leaking memory while
+  // protecting the ABI boundry.
+  std::set<std::unique_ptr<char[]>> getTensorNames() const;
+
   void optimizerGroup(const std::vector<poptorch::TensorId> &inputs,
                       int64_t group);
 

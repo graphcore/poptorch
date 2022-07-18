@@ -3,7 +3,6 @@ import collections
 import copy
 import functools
 import itertools
-import json
 import os
 import pickle
 import re
@@ -471,13 +470,9 @@ class PoplarExecutor:
         assert self._executable is not None, "Model must be compiled " \
             "before calling getTensorNames"
 
-        tensors = set()
-        ir = json.loads(self._debugGetPopartIR())
-        for op in ir.get('maingraph', {}):
-            for t in op['inputs'] + op['outputs']:
-                tensors.add(t['name'])
+        tensor_names = poptorch_core._getTensorNames(self._executable)  # pylint: disable=protected-access
 
-        return list(tensors)
+        return list(tensor_names)
 
     def getAnchoredTensor(self, short_name: str) -> torch.Tensor:
         assert short_name in self._anchor_memory, \

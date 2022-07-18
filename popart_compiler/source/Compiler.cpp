@@ -1021,6 +1021,18 @@ std::unique_ptr<char[]> Compiler::getPopartIR() const {
   return stringToUniquePtr(as_string);
 }
 
+std::set<std::unique_ptr<char[]>> Compiler::getTensorNames() const {
+  std::set<std::unique_ptr<char[]>> casted_ids;
+
+  const auto tensor_ids = _impl->getTensorNames();
+  for (const auto &tensor_id : tensor_ids) {
+    // Copy into a memory managed array to get around ABI.
+    casted_ids.insert(stringToUniquePtr(tensor_id));
+  }
+
+  return casted_ids;
+}
+
 // Write the weights into IPU memory from the pytorch tensor buffers in the
 // model.
 void Compiler::copyWeightsToDevice(const std::vector<void *> &host_buffers) {

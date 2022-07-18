@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+import os
+import re
+import tempfile
 import pytest
 import torch
 import poptorch
@@ -37,9 +40,48 @@ def test_tensor_names(trace_model):
     poptorch_model(input, label)
     tensors = poptorch_model.getTensorNames()
 
+    assert any([re.search(r"\bfc1\b", t) for t in tensors])
+    assert any([re.search(r"\bfc2\b", t) for t in tensors])
+    assert any([t.startswith('input') for t in tensors])
+    assert any([t.startswith('loss') for t in tensors])
     assert any([t.startswith('Gradient___') for t in tensors])
     assert any([t.startswith('UpdatedVar__') for t in tensors])
     assert any([t.startswith('scaledLearningRate') for t in tensors])
+    assert any([t.startswith('weightDecayScaleFactor') for t in tensors])
+
+
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_tensor_names_from_precompiled_model(trace_model):
+    with tempfile.TemporaryDirectory() as tmp:
+        filename = os.path.join(tmp, "model.poptorch")
+        model = Model()
+        options = poptorch.Options()
+        options.Jit.traceModel(trace_model)
+        poptorch_model = poptorch.trainingModel(model, options=options)
+        input = torch.rand(10, 10)
+        label = torch.rand(10, 10)
+
+        # Running the model will trigger the executable compilation
+        poptorch_model(input, label)
+        # Save the executable and destroy the model
+        poptorch_model.save(filename)
+        poptorch_model.destroy()
+
+        with pytest.raises(AssertionError):
+            poptorch_model.getTensorNames()
+
+        # Reload the model from file.
+        poptorch_model = poptorch.load(filename)
+
+        tensors = poptorch_model.getTensorNames()
+
+        assert any([re.search(r"\bfc1\b", t) for t in tensors])
+        assert any([re.search(r"\bfc2\b", t) for t in tensors])
+        assert any([t.startswith('input') for t in tensors])
+        assert any([t.startswith('loss') for t in tensors])
+        assert any([t.startswith('weightDecayScaleFactor') for t in tensors])
+        assert any([t.startswith('scaledLearningRate') for t in tensors])
 
 
 @pytest.mark.parametrize("trace_model", [True, False])

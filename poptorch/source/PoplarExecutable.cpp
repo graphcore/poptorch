@@ -216,6 +216,19 @@ std::string PoplarExecutable::getPopartIR() const {
   return raw_ptr;
 }
 
+std::set<std::string> PoplarExecutable::getTensorNames() const {
+  std::set<std::string> casted_ids;
+
+  const auto tensor_ids = _compiler.getTensorNames();
+  for (const auto &tensor_id : tensor_ids) {
+    const char *raw_ptr = static_cast<const char *>(tensor_id.get());
+    // Convert to std::string, copying again.
+    casted_ids.insert(raw_ptr);
+  }
+
+  return casted_ids;
+}
+
 void PoplarExecutable::detachFromDevice() { _compiler.detachFromDevice(); }
 
 void PoplarExecutable::attachToDevice() { _compiler.attachToDevice(); }
