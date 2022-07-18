@@ -120,6 +120,8 @@ def expand_reshape_view_harness(in_shape, new_shape, op):
     t = torch.randn(in_shape)
 
     def f(t):
+        if op == "broadcast_to":
+            return torch.broadcast_to(t, (new_shape)), t
         if op == "expand":
             return t.expand(new_shape), t
         if op == "reshape":
@@ -189,8 +191,9 @@ def test_reshape_sparse():
         (2, 4, -1),  # negative dimension
         (2, 2, -1, 2, 4),  # negative & extra dimensions
     ])
-def test_expand(shape):
-    expand_reshape_view_harness((2, 1, 4), shape, "expand")
+@pytest.mark.parametrize("op", ["broadcast_to", "expand"])
+def test_expand(shape, op):
+    expand_reshape_view_harness((2, 1, 4), shape, op)
 
 
 @pytest.mark.mlirSupportRequired

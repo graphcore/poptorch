@@ -695,6 +695,15 @@ def test_unsqueeze(trace_model):
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
+def test_broadcast_to(trace_model):
+    torch.manual_seed(42)
+    x = torch.randn(3, 1)
+    op = lambda x: torch.broadcast_to(x, (3, 4))
+
+    op_harness(op, x, trace_model=trace_model)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
 def test_expand(trace_model):
     torch.manual_seed(42)
     x = torch.randn(3, 1)

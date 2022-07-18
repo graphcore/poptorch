@@ -18,7 +18,11 @@ namespace {
 
 torch::jit::Node *expandHandler(torch::jit::Graph *graph,
                                 torch::jit::Node *node) {
+  // aten::broadcast_to(Tensor(a) self, int[] size) -> Tensor(a)
   // aten::expand(Tensor self, int[] size)  -> Tensor
+  // NB signature in source has an, apparently unused boolean:
+  // aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) ->
+  // Tensor(a)
   torch::jit::Node *new_node;
 
   // Extract the type from the pytorch IR.
@@ -932,6 +936,7 @@ torch::jit::Node *autocastHandler(torch::jit::Graph *graph,
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
+  registerHandler(c10::aten::broadcast_to, expandHandler);
   registerHandler(c10::aten::expand, expandHandler);
   registerHandler(c10::aten::expand_as, expandAsHandler);
   registerHandler(c10::aten::view, reshapeHandler);
