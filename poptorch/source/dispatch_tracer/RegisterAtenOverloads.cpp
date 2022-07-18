@@ -444,7 +444,9 @@ at::Scalar item(const at::Tensor &self) {
   bool is_eager_mode = false;
 #if POPTORCH_BUILD_MLIR_COMPILER
   auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
-  is_eager_mode = mlir->isEagerMode();
+  if (mlir != nullptr) {
+    is_eager_mode = mlir->isEagerMode();
+  }
 #endif
   ERROR_ON_MSG(!is_eager_mode, "aten::item is only supported in eager mode.");
 

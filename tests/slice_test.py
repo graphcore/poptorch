@@ -48,8 +48,13 @@ def test_slice_idx_size_of(step, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_slice_with_sum(step, trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): np broadcasting failed on 'Op 117 (ai.onnx.Add:7)'")
+        # Unsupported in JIT dispatch because PyTorch unwraps the tensor
+        # scalar outputs of start_fn/end_fn into Python scalars to use as
+        # slice args, which implicitly dispatches to aten::item, an
+        # eager-only operation (It works correctly if you explicitly set the
+        # tensor device to CPU). This only works with tracing because the
+        # tensor constants are picked up during CPU execution in JIT trace.
+        pytest.skip("Unsupported in JIT dispatch")
 
     def start_fn(tensor_in):
         del tensor_in
@@ -68,8 +73,13 @@ def test_slice_with_sum(step, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_slice_with_branch(step, trace_model):
     if not trace_model:
-        pytest.skip(
-            "TODO(T51159): np broadcasting failed on 'Op 131 (ai.onnx.Add:7)'")
+        # Unsupported in JIT dispatch because PyTorch unwraps the tensor
+        # scalar outputs of start_fn/end_fn into Python scalars to use as
+        # slice args, which implicitly dispatches to aten::item, an
+        # eager-only operation (It works correctly if you explicitly set the
+        # tensor device to CPU). This only works with tracing because the
+        # tensor constants are picked up during CPU execution in JIT trace.
+        pytest.skip("Unsupported in JIT dispatch")
 
     def start_fn(tensor_in):
         del tensor_in
