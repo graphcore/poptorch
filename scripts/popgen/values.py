@@ -1,7 +1,7 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved
 
 import sys
-from popgen import Value, NonTensorValue
+from popgen import PtrOrRef, Value, NonTensorValue
 from popgen.operatorfactory import op
 
 
@@ -25,7 +25,7 @@ class AlphaValue(Value):
         val_id = self.emit_arguments(values, val_id, tabs, f)
         self.emit_annotations(tabs, f)
         values[self] = "t" + str(val_id)
-        f.write(tabs + "auto " + values[self] + " = hasUnityValue(" +
+        f.write(tabs + "auto *" + values[self] + " = hasUnityValue(" +
                 values[self.args[1]] + ") ? " + values[self.args[0]] + " : " +
                 values[self.args[2]] + ";\n")
         return val_id + 1
@@ -52,7 +52,7 @@ class CastInPlace(Value):
         self.emit_annotations(tabs, f)
 
         node = "t" + str(val_id)
-        f.write(tabs + "auto " + node + " = " + values[self.args[0]] +
+        f.write(tabs + "auto *" + node + " = " + values[self.args[0]] +
                 "->node();\n")
         f.write(tabs + node + "->t_(c10::attr::value, ")
         f.write(node + "->t(c10::attr::value).to(" + self.to_type + "));\n")
@@ -61,7 +61,7 @@ class CastInPlace(Value):
 
         if not root:
             values[self] = "t" + str(val_id + 1)
-            f.write(tabs + "auto " + values[self] + " = " + node +
+            f.write(tabs + "auto *" + values[self] + " = " + node +
                     "->output();\n")
             return val_id + 2
         f.write(tabs + "return " + node + "->output();\n")
@@ -102,9 +102,15 @@ class TensorType(NonTensorValue):
 #   expects_node - True if arguments should be typed Node* instead of Value*
 #   needs_graph - method takes pointer to graph object
 class Helper(Value):
-    def __init__(self, op, args, method, expects_node=False,
-                 needs_graph=False):
-        Value.__init__(self, op, args)
+    def __init__(self,
+                 op,
+                 args,
+                 method,
+                 expects_node=False,
+                 needs_graph=False,
+                 const=False,
+                 ptr_or_ref=None):
+        super().__init__(op, args, const, ptr_or_ref)
         self.method = method
         self.expects_node = expects_node
         self.needs_graph = needs_graph
@@ -123,7 +129,8 @@ class Helper(Value):
         if self.needs_graph:
             args = ["graph"] + args
 
-        val_id = self.emit_assign_return(values, val_id, root, tabs, f)
+        val_id = self.emit_assign_return(values, val_id, root, tabs, f,
+                                         self.const, self.ptr_or_ref)
         self.emit_call(self.method, args, ";\n", f)
         return val_id
 
@@ -145,7 +152,12 @@ class InputValue(Value):
         if self in values:
             return val_id
 
-        self.emit_assign_return(values, self.name, root, tabs, f)
+        self.emit_assign_return(values,
+                                self.name,
+                                root,
+                                tabs,
+                                f,
+                                ptr_or_ref=PtrOrRef.PTR)
         f.write("node->input(" + str(self.num) + ");\n")
         return val_id
 
@@ -175,7 +187,12 @@ class OutputValue(Value):
         if self in values:
             return val_id
 
-        val_id = self.emit_assign_return(values, val_id, root, tabs, f)
+        val_id = self.emit_assign_return(values,
+                                         val_id,
+                                         root,
+                                         tabs,
+                                         f,
+                                         ptr_or_ref=PtrOrRef.PTR)
         f.write("node->output(" + str(self.index) + ");\n")
         return val_id + 1
 
@@ -283,7 +300,12 @@ class OriginalNode(Value):
         if self in values:
             return val_id
 
-        self.emit_assign_return(values, self.name, root, tabs, f)
+        self.emit_assign_return(values,
+                                self.name,
+                                root,
+                                tabs,
+                                f,
+                                ptr_or_ref=PtrOrRef.PTR)
         f.write("node;\n")
         return val_id
 

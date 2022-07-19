@@ -1,5 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved
-from popgen import values
+from popgen import PtrOrRef, values
 
 
 # alpha(m, a):
@@ -20,7 +20,8 @@ def alpha(m, a):
 def as_ir(v):
     return values.Helper('AsIr', [v],
                          'intVectorToIrConstant',
-                         needs_graph=True)
+                         needs_graph=True,
+                         ptr_or_ref=PtrOrRef.PTR)
 
 
 # cint(n)

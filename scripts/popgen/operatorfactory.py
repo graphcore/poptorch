@@ -55,7 +55,7 @@ def check_operator_signature(value, signatures):
         if isinstance(arg, Value):
             arg = arg.op
         assert arg in expected_args[i], 'Incorrect operand ' + str(i) + \
-            'for ' + value.op + '. Got ' + arg + ' , expecting ' + \
+            ' for ' + value.op + '. Got ' + arg + ', expecting ' + \
             'one of: ' + str(expected_args[i])
 
     return value

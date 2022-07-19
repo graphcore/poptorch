@@ -2,6 +2,8 @@
 import datetime
 import sys
 
+import re
+
 from popgen import registry, transform
 
 
@@ -15,7 +17,7 @@ from popgen import registry, transform
 #   f - output stream
 def emit_handlers(namespace, aten, handlers, f=sys.stdout):
     values = dict()
-    opname = get_op_name(aten)
+    opname = get_camel_case_op_name(aten)
     emit_arity_check = len(handlers) > 1
 
     decl = "torch::jit::Node *" + opname +  "Handler(" + \
@@ -116,7 +118,7 @@ def generate(script, namespace, filename, global_symbols):
     to_register = sorted(
         list(registry.handlers.keys()) + list(registry.forwardings.keys()))
     for aten in to_register:
-        opname = get_op_name(registry.forwardings.get(aten, aten))
+        opname = get_camel_case_op_name(registry.forwardings.get(aten, aten))
         reg_handler_line = ("  registerHandler(" + namespace + "::" + aten +
                             ", " + opname + "Handler);\n")
         if len(reg_handler_line) > 81:
@@ -139,3 +141,13 @@ def generate(script, namespace, filename, global_symbols):
 def get_op_name(aten):
     opname = aten.split(':')[-1]
     return opname
+
+
+def snake_to_camel_case(snake_case):
+    rx = re.compile(r"_[A-z]")
+    return re.sub(rx, lambda s: s.group(0).upper()[1], snake_case)
+
+
+def get_camel_case_op_name(aten):
+    rx = re.compile(r"_$")
+    return re.sub(rx, "InPlace", snake_to_camel_case(get_op_name(aten)))

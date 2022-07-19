@@ -4,7 +4,7 @@
 import math
 import os
 from popgen.api import convert, expand, forward, generate, simplify
-from popgen.helpers import as_ir, alpha, cfloat, cint, clong, clong_list, \
+from popgen.helpers import alpha, cfloat, cint, clong, clong_list, \
                            cstr, dimension, empty_initializer, output_shape, \
                            output_type, reduction, tensor_list, tensor_long, \
                            tensor_shape, tensor_type
@@ -42,6 +42,7 @@ expand("erfc", lambda x: 1. - op.erf(x))
 expand("log2", lambda x: op.log(x) / math.log(2))
 expand("log10", lambda x: op.log(x) / math.log(10))
 expand("log_sigmoid", lambda x: op.log(op.sigmoid(x)))
+forward("log_sigmoid_forward", "log_sigmoid")
 expand(
     "rand", lambda x: op.randomUniform(x, output_shape(), cfloat(1.), cfloat(
         0.), output_type()))
@@ -68,9 +69,6 @@ convert("logical_or", 2)
 expand("cat", lambda x, y: op.concat(tensor_list(x), clong(y)))
 forward("_cat", "cat")
 expand("elu", lambda x, y, z: op.selu(x, cfloat(y), cfloat(z)))
-expand(
-    "full_like", lambda x, y: op.expand(op.cast(y, output_type()),
-                                        as_ir(tensor_shape(x))))
 expand("ge", lambda x, y: x >= y)
 expand("le", lambda x, y: x <= y)
 expand("leaky_relu", lambda x, y: op.leakyrelu(x, cfloat(y)))
@@ -84,11 +82,6 @@ expand("rsub", lambda x, y: y - x)
 def celu_handler(x, a):
     val = a * (op.exp(x / a) - 1.)
     return op.max(x, 0.) + op.min(0., val)
-
-
-def full_handler(x, y):
-    r = op.expand(y, as_ir(clong_list(x)))
-    return op.cast(r, output_type())
 
 
 def hardshrink_handler(x, l):

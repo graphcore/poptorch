@@ -1,4 +1,5 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import enum
 import sys
 from popgen import onnx
 
@@ -6,10 +7,15 @@ onnx.init()
 onnx.parse_signatures()
 
 
+class PtrOrRef(enum.Enum):
+    PTR = 0
+    REF = 1
+
+
 # Root class for all expressions - the result of applying an operator
 # to a list of arguments
 class Value:
-    def __init__(self, op, args):
+    def __init__(self, op, args, const=False, ptr_or_ref=None):
         assert isinstance(args, list), \
                "args should be a list in Value::__init__"
 
@@ -18,6 +24,8 @@ class Value:
         self.cname = ""
         self.graph_arity = None
         self.annotation = []
+        self.const = const
+        self.ptr_or_ref = ptr_or_ref
 
         # perform dynamic casting for literals - makes for nice syntax
         for i, arg in enumerate(args):
@@ -89,7 +97,7 @@ class Value:
     #   tabs - indentation string
     #   f - output stream
     #   root - True: we should generate a return statement
-    # Returns: index of the next available temp  variable
+    # Returns: index of the next available temp variable
     def emit(self, values, val_id, tabs, f=sys.stdout, root=False):
         if self in values:
             return val_id
@@ -113,7 +121,12 @@ class Value:
         if not root:
             suffix = "->output();\n"
 
-        val_id = self.emit_assign_return(values, val_id, root, tabs, f)
+        val_id = self.emit_assign_return(values,
+                                         val_id,
+                                         root,
+                                         tabs,
+                                         f,
+                                         ptr_or_ref=PtrOrRef.PTR)
         left_brace = ["{"] if self.tensor_braces else []
         right_brace = ["}"] if self.tensor_braces else []
 
@@ -159,7 +172,14 @@ class Value:
     #   tabs - indentation string
     #   f - output stream
     # Returns: index of the next available temp  variable
-    def emit_assign_return(self, values, val_id, root, tabs, f):
+    def emit_assign_return(self,
+                           values,
+                           val_id,
+                           root,
+                           tabs,
+                           f,
+                           const=False,
+                           ptr_or_ref=None):
         if root:
             f.write(tabs + "return ")
             return val_id
@@ -170,7 +190,17 @@ class Value:
             values[self] = "t" + str(val_id)
             val_id += 1
 
-        f.write(tabs + "auto " + values[self] + " = ")
+        pr_qual = ""
+        if ptr_or_ref == PtrOrRef.PTR:
+            pr_qual = "*"
+        elif ptr_or_ref == PtrOrRef.REF:
+            pr_qual = "&"
+
+        const_qual = ""
+        if const:
+            const_qual = "const "
+
+        f.write(tabs + const_qual + "auto " + pr_qual + values[self] + " = ")
         return val_id
 
     # emit_call(fname, args, suffix, f)
@@ -237,13 +267,23 @@ class ConstantFloat(Value):
 
         if len(self.args) > 0:
             val_id = self.emit_arguments(values, val_id, tabs, f)
-            val_id = self.emit_assign_return(values, val_id, root, tabs, f)
+            val_id = self.emit_assign_return(values,
+                                             val_id,
+                                             root,
+                                             tabs,
+                                             f,
+                                             ptr_or_ref=PtrOrRef.PTR)
             self.emit_call(
                 "createConstantFloatLike",
                 ["graph", values[self.args[0]], "{",
                  str(self.val), "}", "{}"], suffix, f)
         else:
-            val_id = self.emit_assign_return(values, val_id, root, tabs, f)
+            val_id = self.emit_assign_return(values,
+                                             val_id,
+                                             root,
+                                             tabs,
+                                             f,
+                                             ptr_or_ref=PtrOrRef.PTR)
             self.emit_call(
                 "createConstantFloat32",
                 ["graph", "{", str(self.val), "}", "{}"], suffix, f)
