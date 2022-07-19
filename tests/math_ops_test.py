@@ -595,9 +595,6 @@ def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
 @pytest.mark.parametrize("keepdim", [False, True])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_minmax_tuple_out(op, dim, keepdim, trace_model):
-    if not trace_model and op in [torch.max, torch.min]:
-        pytest.skip(
-            "TODO(T51159): Couldn't find a registered operation for node")
     torch.manual_seed(42)
 
     input = torch.randn([1, 2, 10, 10])
