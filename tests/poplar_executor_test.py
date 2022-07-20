@@ -302,11 +302,6 @@ def _compile_model_offline(trace_model, cache, pid, num_processes):
 @helpers.printCapfdOnExit
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_distributed_compile(capfd, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError: Expected the first process "
-                    "model compilation to take more than 1 second but it took "
-                    "0:00:00.945000")
-
     num_processes = 6
     with tempfile.TemporaryDirectory() as tmp:
         cache = os.path.join(tmp, "poptorch_cache")
