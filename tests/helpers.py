@@ -236,6 +236,9 @@ class LogIterator:
         self._num_lines = len(lines)
         self._all_checks = []
 
+    def lineNumber(self):
+        return self._current
+
     def findNext(self, *exprs):
         """Find the next line in the log matching all the regular expressions provided"""
         self._all_checks.append(exprs)

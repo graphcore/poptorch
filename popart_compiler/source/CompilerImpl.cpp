@@ -502,7 +502,7 @@ std::vector<popart::TensorId> CompilerImpl::customOperation(
   popart::OperatorIdentifier id = {domain, op, 1, num_inputs};
 
   return active_builder->customOp(id, version, args, num_outputs,
-                                  attributes_map);
+                                  attributes_map, getDebugContext(op));
 }
 
 popart::TensorId CompilerImpl::recomputationCheckpoint(
@@ -762,7 +762,8 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
     ERROR_ON(!opt.accum_types_provided);
     auto optimizer = std::unique_ptr<popart::SGD>(new popart::SGD(
         opt.params, clipnorms, popart::SGDAccumulatorAndMomentum::Combined,
-        popart::DataType::UNDEFINED, popart::DataType::UNDEFINED));
+        popart::DataType::UNDEFINED, popart::DataType::UNDEFINED,
+        getDebugContext("SGD")));
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
   }
@@ -777,7 +778,8 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
 
     auto optimizer = std::unique_ptr<popart::SGD>(new popart::SGD(
         opt.params, clipnorms, popart::SGDAccumulatorAndMomentum::Separate,
-        opt.accum_type, opt.first_order_momentum_accum_type));
+        opt.accum_type, opt.first_order_momentum_accum_type,
+        getDebugContext("SGD")));
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
   }
@@ -804,7 +806,8 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
     auto optimizer = std::make_unique<popart::Adam>(
         opt.params, adam_mode, decay_mode, opt.accum_type,
         opt.first_order_momentum_accum_type,
-        opt.second_order_momentum_accum_type, clipnorms);
+        opt.second_order_momentum_accum_type, clipnorms, false,
+        getDebugContext("Adam"));
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
   }
@@ -818,7 +821,7 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
         opt.params, mode, popart::WeightDecayMode::L2Regularization,
         opt.accum_type, opt.first_order_momentum_accum_type,
         opt.second_order_momentum_accum_type, popart::DataType::FLOAT,
-        opt.use_tf_variant);
+        opt.use_tf_variant, getDebugContext("Adaptive"));
     updateGroups(optimizer.get(), optimizers);
     return optimizer;
   }
@@ -1072,6 +1075,16 @@ void CompilerImpl::clearAttribute(const std::string &attribute,
     }
     active_builder->setAttribute(attribute, attrs_vec);
   }
+}
+
+popart::DebugContext CompilerImpl::getDebugContext(const std::string &name) {
+  std::string op_name = op_builder->getNameScope() + name;
+  popart::DebugContext dc(name, code_location);
+  popart::DebugInfo di(dc, "poptorch");
+  di.setValue("torch_schema", torch_node);
+  di.setValue("op_type", name);
+  di.setValue("op_name", op_name);
+  return {di};
 }
 
 std::vector<popart::TensorId> CompilerImpl::endMultiConv() {

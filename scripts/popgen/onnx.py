@@ -131,10 +131,6 @@ def find_functions(jsonOutput, node, namespace=""):
         if argument['name'] == 'name':
             continue
 
-        # skip DebugContext argument
-        if re.search('DebugContext', argument['type']):
-            continue
-
         argument["num"] = argNum
         operation["args"].append(argument)
         argNum += 1
@@ -242,6 +238,8 @@ def parse_signatures():
         'ignore',
         'popart::TensorId':
         'ignore',
+        'popart::DebugContext':
+        'popart::DebugContext',
     }
 
     for classname in classes:

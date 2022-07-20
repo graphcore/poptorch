@@ -383,6 +383,8 @@ public:
                     const std::string &value);
   void clearAttribute(const std::string &attribute, const std::string &key);
 
+  popart::DebugContext getDebugContext(const std::string &name);
+
 private:
   // Raise an error if cycle logging is enabled
   void errorOnCycleLogging() const;

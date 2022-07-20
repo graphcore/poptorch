@@ -476,7 +476,10 @@ CXXTypeToTypeClass = {
 
     # String
     "std::string": "STRING",
-    "std::vector<std::string>": "STRING_VEC"
+    "std::vector<std::string>": "STRING_VEC",
+
+    # Debug context
+    "popart::DebugContext": "DEBUG_CONTEXT"
 }
 
 
@@ -513,7 +516,7 @@ CXX_TYPE_CONV_TABLE = {
 
 CXX_NON_CONV_TYPES = [
     "bool", "float", "int", "int64_t", "unsigned int", "std::string",
-    "std::vector<int64_t>", "std::vector<std::string>"
+    "std::vector<int64_t>", "std::vector<std::string>", "popart::DebugContext"
 ]
 
 
@@ -559,7 +562,8 @@ def attrTypeGetter(ty):
         "FLOAT": "f",
         "FLOAT_VEC": "fs",
         "STRING": "s",
-        "STRING_VEC": "ss"
+        "STRING_VEC": "ss",
+        "DEBUG_CONTEXT": "x",
     }
     assert ty in typemap, "Invalid type: " + ty
     return typemap[ty]
@@ -659,12 +663,15 @@ for opset in classes:
                 earlyExit = True
                 break
 
-            argVector += "ARG(" + macroType + "," + arg["name"] + ") "
+            if arg["name"] != "debugContext":
+                argVector += "ARG(" + macroType + "," + arg["name"] + ") "
 
             if any(arg["type"].endswith(s)
                    for s in ["ReductionType", "ScatterReduction"]):
                 bodyArgVector += f"BODY_ARG(static_cast<{clean(arg['type'])}>("\
                 + arg["name"] + ")) "
+            elif arg["name"] == "debugContext":
+                bodyArgVector += "BODY_ARG(DEBUG_CONTEXT(\"" + funcName + "\"))"
             else:
                 bodyArgVector += "BODY_ARG(" + arg["name"] + ") "
 
@@ -702,9 +709,12 @@ for opset in classes:
             if arg["name"] == "args":
                 continue
 
+            attr = attrTypeGetter(toType(arg["type"]))
+            if attr == "x":
+                continue
+
             header += "," + convertCxxConvert(arg["type"]) + " " + arg["name"]
 
-            attr = attrTypeGetter(toType(arg["type"]))
 
             cppFile += "new_node->" + attr + "_(c10::Symbol::attr("\
                 "\"" + arg["name"] + "\")," + arg["name"] + ");\n"

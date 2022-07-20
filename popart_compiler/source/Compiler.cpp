@@ -283,6 +283,7 @@ poptorch::TensorId Compiler::createTensorId(const char *name) {
 #define FLOAT float
 #define INT std::int64_t
 #define BOOL bool
+#define DEBUG_CONTEXT(Name) _impl->getDebugContext(Name)
 #define STRING const char *
 #define STRING_VEC std::vector<const char *>
 #define NONE
@@ -338,6 +339,7 @@ poptorch::TensorId Compiler::createTensorId(const char *name) {
 #undef FLOAT
 #undef FLOAT_VEC
 #undef INT_VEC
+#undef DEBUG_CONTEXT
 
 poptorch::TensorId
 Compiler::addInitializedInputTensor(const char *name, const char *type,
