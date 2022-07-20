@@ -880,7 +880,7 @@ Some operations may result in the model running in float32 where float16 would
 be expected, or vice versa (see :numref:`float_16_op_support` for full details).
 
 Graphcore's tutorials repository contains a walkthrough on using half and mixed precision
-in PopTorch: `Half and mixed precision tutorial <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/tutorials/pytorch/mixed_precision>`_.
+in PopTorch: :tutorials-repo:`Half and mixed precision tutorial <tutorials/pytorch/mixed_precision>`.
 
 Automatic mixed-precision casting
 =================================
@@ -1090,7 +1090,7 @@ You can also call this custom op inside a training model using
 :py:class:`~poptorch.custom_op` and the backward op will be called automatically.
 
 The Graphcore tutorials repository contains a feature example demonstrating
-how to load and in and use a custom op in a PopTorch model: `PopTorch example: Custom op <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/feature_examples/pytorch/custom_op>`_.
+how to load and in and use a custom op in a PopTorch model: :tutorials-repo:`PopTorch example: Custom op <feature_examples/pytorch/custom_op>`.
 
 Passing attributes to the custom op
 -----------------------------------

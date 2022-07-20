@@ -8,6 +8,8 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+import pathlib
+import json
 import sys
 sys.path.insert(0, os.path.abspath('.'))
 
@@ -28,7 +30,22 @@ version = 'v0.0.0'
 extensions = [
     'sphinx.ext.graphviz',
     'sphinx.ext.autodoc',
+    'sphinx.ext.extlinks',
 ]
+
+
+def get_current_release() -> str:
+    format_str = "{major}.{minor}"
+    version_file = pathlib.Path(__file__).parents[2].resolve() / "version.json"
+    return format_str.format(**json.load(open(version_file)))
+
+
+SDK_RELEASE = get_current_release()
+extlinks = {
+    'tutorials-repo':
+    (f'https://github.com/graphcore/tutorials/tree/sdk-release-{SDK_RELEASE}/%s',
+     None)
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = []

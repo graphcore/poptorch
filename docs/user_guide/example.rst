@@ -3,13 +3,13 @@ Examples
 
 You can find PyTorch examples and tutorials in the Graphcore GitHub repositories:
 
-* `Examples of popular machine learning models for training and inference <https://github.com/graphcore/examples>`__
+* `Examples of popular machine learning models for training and inference <https://github.com/graphcore/examples>`_
 
-* `Tutorials repo <https://github.com/graphcore/tutorials>`__ with:
+* `Tutorials repo <https://github.com/graphcore/tutorials>`_ with:
 
-  - `Tutorials <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/tutorials/pytorch>`__
-  - `Examples of PopTorch and IPU features <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/feature_examples/pytorch>`__
-  - `Examples of simple models <https://github.com/graphcore/tutorials/tree/sdk-release-2.6/simple_applications/pytorch>`__
+  - :tutorials-repo:`Tutorials <tutorials/pytorch>`
+  - :tutorials-repo:`Examples of PopTorch and IPU features <feature_examples/pytorch>`
+  - :tutorials-repo:`Examples of simple models <simple_applications/pytorch>`
   - Source code from videos, blogs and other documents
 
 MNIST example
@@ -17,9 +17,9 @@ _____________
 
 The example in :numref:`mnist-example-code` shows how a MNIST model can be run on the IPU. The highlighted lines show the PopTorch-specific code required to run the example on multiple IPUs.
 
-You can download the full source code from GitHub: `mnist.py <https://github.com/graphcore/poptorch/blob/sdk-release-2.4/examples/mnist.py>`__.
+You can download the full source code from GitHub: `mnist.py <https://github.com/graphcore/poptorch/blob/sdk-release-2.4/examples/mnist.py>`_.
 
-To run this example you will need to install the Poplar SDK (see the `Getting Started Guide <https://docs.graphcore.ai/en/latest/getting-started.html>`__ for your IPU system) and the appropriate version of ``torchvision``:
+To run this example you will need to install the Poplar SDK (see the `Getting Started Guide <https://docs.graphcore.ai/en/latest/getting-started.html>`_ for your IPU system) and the appropriate version of ``torchvision``:
 
 .. code-block:: console
 
@@ -35,4 +35,3 @@ To run this example you will need to install the Poplar SDK (see the `Getting St
   :dedent: 3
   :linenos:
   :lineno-match:
-
