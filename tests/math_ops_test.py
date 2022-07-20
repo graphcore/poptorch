@@ -496,6 +496,8 @@ def test_binary_bool_ops(op, trace_model):
 
 # These functions support API 1 - op(input)
 reduction_ops_api1 = [
+    torch.max,
+    torch.min,
     torch.amax,
     torch.amin,
     torch.argmax,
@@ -513,6 +515,8 @@ reduction_ops_api1 = [
 
 # These functions support API 2 - op(input,dim,keep_dim)
 reduction_ops_api2 = [
+    torch.max,
+    torch.min,
     torch.amax,
     torch.amin,
     torch.argmax,
@@ -563,9 +567,11 @@ def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
     def operation(x):
         return op(x, dim=dim, keepdim=keepdim)
 
+    # Whether op returns both values and indices with API 2.
+    returns_tuple = op in [torch.max, torch.min, torch.median]
+
     def assert_(native_out, poptorch_out):
-        if op is torch.median:
-            # Median returns values and indices with API 2.
+        if returns_tuple:
             helpers.assert_allclose(actual=poptorch_out[0],
                                     expected=native_out.values)
             helpers.assert_allequal(actual=poptorch_out[1].to(torch.int64),
@@ -582,7 +588,7 @@ def test_reduction_ops_float_api2(op, dim, keepdim, trace_model):
     # This check must be repeated here because we need to check the op before we
     # wrap the function otherwise it won't match in the test harness
     test_training = not op in non_differentiable_ops
-    out_fn = (lambda x: x.values) if op is torch.median else None
+    out_fn = (lambda x: x.values) if returns_tuple else None
     op_harness(trace_model,
                operation, [input],
                assert_,

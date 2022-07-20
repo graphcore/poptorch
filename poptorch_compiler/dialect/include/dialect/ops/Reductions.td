@@ -172,6 +172,22 @@ def Poptorch_prod_dim : Poptorch_reduce<"prod_dim"> {
 }
 
 
+class Poptorch_NotImplemented_unary_reduction<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+    let arguments = (ins Poptorch_tensor:$input);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$input),[{
+        $_state.addOperands({input});
+        $_state.addTypes(mlir::RankedTensorType::get({}, getElementType(input)));
+     }]>
+    ];
+}
+
+def Poptorch_max : Poptorch_NotImplemented_unary_reduction<"max"> {}
+def Poptorch_min : Poptorch_NotImplemented_unary_reduction<"min"> {}
+def Poptorch_median : Poptorch_NotImplemented_unary_reduction<"median"> {}
+
+
 // From the docs: https://pytorch.org/docs/stable/generated/torch.all.html
 // NOTE: This function matches the behaviour of NumPy in returning output of dtype bool
 // for all supported dtypes except uint8. For uint8 the dtype of output is uint8 itself.
@@ -403,7 +419,7 @@ class Poptorch_single_dim_reduction<string name> : Poptorch_NotImplementedOp<nam
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
     let builders = [
-        OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim, 
+        OpBuilder<(ins "mlir::Value":$self, "std::int64_t":$dim,
                     "bool":$keepdim), [{
             $_state.addOperands(self);
             $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
@@ -420,12 +436,12 @@ class Poptorch_single_dim_reduction<string name> : Poptorch_NotImplementedOp<nam
             } else {
                 out_shape.erase(out_shape.begin() + dim);
             }
-            
+
             const auto out_type = mlir::RankedTensorType::get(
                 out_shape, getElementType(self));
             const auto out_indices_type = mlir::RankedTensorType::get(
                 out_shape, $_builder.getIntegerType(32 /*width*/, true /*signed*/));
-            
+
             $_state.addTypes({out_type, out_indices_type});
         }]>
     ];
@@ -440,7 +456,7 @@ class Poptorch_multi_dim_reduction<string name> : Poptorch_NotImplementedOp<name
     let arguments = (ins Poptorch_tensor:$self, I64ArrayAttr:$dim, BoolAttr:$keepdim);
     let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
     let builders = [
-        OpBuilder<(ins "mlir::Value":$self, "const std::vector<std::int64_t>&":$dim, 
+        OpBuilder<(ins "mlir::Value":$self, "const std::vector<std::int64_t>&":$dim,
                     "bool":$keepdim), [{
             $_state.addOperands(self);
             $_state.addAttribute("dim", $_builder.getI64ArrayAttr(dim));
@@ -459,12 +475,12 @@ class Poptorch_multi_dim_reduction<string name> : Poptorch_NotImplementedOp<name
                     out_shape.erase(out_shape.begin() + d);
                 }
             }
-            
+
             const auto out_type = mlir::RankedTensorType::get(
                 out_shape, getElementType(self));
             const auto out_indices_type = mlir::RankedTensorType::get(
                 out_shape, $_builder.getIntegerType(32 /*width*/, true /*signed*/));
-            
+
             $_state.addTypes({out_type, out_indices_type});
         }]>
     ];

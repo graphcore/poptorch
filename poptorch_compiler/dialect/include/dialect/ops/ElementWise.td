@@ -3,7 +3,7 @@
  * Element wise ops.
  */
 
-class Poptorch_elem_unary<string name, list<OpTrait> traits = []> 
+class Poptorch_elem_unary<string name, list<OpTrait> traits = []>
     : Poptorch_Op<name, traits # [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1);
     let results = (outs Poptorch_tensor:$result);
@@ -108,9 +108,6 @@ class Poptorch_NotImplemented_elem_unary<string name> :  Poptorch_NotImplemented
     ];
 }
 
-def Poptorch_max : Poptorch_NotImplemented_elem_unary<"max"> {}
-def Poptorch_min : Poptorch_NotImplemented_elem_unary<"min"> {}
-def Poptorch_median : Poptorch_NotImplemented_elem_unary<"median"> {}
 def Poptorch_acos : Poptorch_NotImplemented_elem_unary<"acos"> {}
 def Poptorch_acosh : Poptorch_NotImplemented_elem_unary<"acosh"> {}
 def Poptorch_asinh : Poptorch_NotImplemented_elem_unary<"asinh"> {}
@@ -467,7 +464,7 @@ def Poptorch_clamp: Poptorch_Op<"clamp", []> {
     if (max.has_value()) {
         $_state.addAttribute("max", $_builder.getF64FloatAttr(max.value()));}
 
-    
+
 
     $_state.addTypes(self.getType());
   }]>
