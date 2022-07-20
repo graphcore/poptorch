@@ -316,6 +316,9 @@ SessionOptionsImpl::SessionOptionsImpl() {
                          ReductionType);
   ADD_POPART_ENUM_OPTION(meanAccumulationAndReplicationReductionStrategy,
                          MeanReductionStrategy);
+  ADD_POPART_ENUM_OPTION(
+      automaticLossScalingSettings.gradientTensorTrackingMethod,
+      GradientTensorTrackingMethod);
 
   ADD_POPART_STRING_OPTION(logDir);
   ADD_POPART_STRING_OPTION(cachePath);
@@ -399,9 +402,9 @@ SessionOptionsImpl::SessionOptionsImpl() {
   ADD_POPART_DOUBLE_OPTION(outlineSequenceBreakCost);
   ADD_POPART_DOUBLE_OPTION(outlineThreshold);
   ADD_POPART_DOUBLE_OPTION(timeLimitScheduler);
-  ADD_POPART_DOUBLE_OPTION(automaticLossScalingSettings.binEdgeLocation);
   ADD_POPART_DOUBLE_OPTION(
       automaticLossScalingSettings.thresholdUpperCountProportion);
+  ADD_POPART_DOUBLE_OPTION(automaticLossScalingSettings.binEdgeLocation);
 
 #undef ADD_POPART_STRING_OPTION
 #undef ADD_POPART_UINT64_OPTION

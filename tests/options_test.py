@@ -147,6 +147,8 @@ def test_set_popart_options(capfd):
     opts._Popart.set("accumulateOuterFragmentSettings.excludedVirtualGraphs",
                      ["0", "1"])
     opts._Popart.set("enableExplicitIR", True)
+    opts._Popart.set(
+        "automaticLossScalingSettings.gradientTensorTrackingMethod", 1)
 
     poptorch.poptorch_core._validateOptions(opts.toDict())
 
@@ -202,6 +204,9 @@ def test_set_popart_options(capfd):
         "poptorch.Options added 1 to "
         "accumulateOuterFragmentSettings.excludedVirtualGraphs")
     log.assert_contains("poptorch.Options set enableExplicitIR to value true")
+    log.assert_contains(
+        "poptorch.Options set "
+        "automaticLossScalingSettings.gradientTensorTrackingMethod to value 1")
 
 
 def test_popart_patterns():
