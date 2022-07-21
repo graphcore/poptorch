@@ -528,6 +528,12 @@ void Compiler::initSession(const std::vector<Optimizer> &optimizers,
   auto device = _impl->createDevice();
   popart::SessionOptions &options = _impl->popart_options;
 
+  if (options.engineOptions.count("debug.retainDebugInformation") == 0) {
+    options.engineOptions.emplace("debug.retainDebugInformation", "false");
+    // Message has to be consistent with format used by setOptionIfNotSet()
+    logging::debug(
+        "engineOptions[debug.retainDebugInformation] set to value false");
+  }
   // 'Auto' mode works if only one IPU is used per replica, and allows
   // overlapped IO to work. Excerpt from D51863 in PopART:
   // IO tiles can only be used when virtual graphs are enabled. Virtual graph
