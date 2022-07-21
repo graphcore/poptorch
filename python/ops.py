@@ -33,6 +33,14 @@ def ctc_beam_search_decoder(probs: "torch.Tensor",
               [batch_size, top_paths] and the decoded paths - of shape
               [batch_size, top_paths, input_length].
     """
+    if not isinstance(probs, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "ctc_beam_search_decoder: probs must be a torch.tensor argument. "
+            f"{type(probs)} is not supported.")
+    if not isinstance(lengths, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "ctc_beam_search_decoder: lengths must be a torch.tensor argument. "
+            f"{type(lengths)} is not supported.")
     return torch.ops.poptorch.ctc_beam_search_decoder(probs, lengths, blank,
                                                       beam_width, top_paths)
 
@@ -95,6 +103,10 @@ def ipu_print_tensor(tensor: "torch.Tensor",
     :param title: An optional title to print before the tensor value.
     :returns: The input tensor unchanged.
     """
+    if not isinstance(tensor, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "ipu print tensor must take a torch.tensor argument. "
+            f"{type(tensor)} is not supported.")
     return torch.ops.poptorch.ipu_print_tensor(tensor, title)
 
 
@@ -160,6 +172,10 @@ def nop(tensor: "torch.Tensor") -> "torch.Tensor":
     :param tensor: The tensor to pass to the no-op.
     :returns: The same tensor which was input.
     """
+    if not isinstance(tensor, torch.Tensor):
+        raise _impl.createPoptorchError(
+            f"nop must take a torch.tensor argument. {type(tensor)} is not "
+            "supported.")
     return torch.ops.poptorch.nop(tensor)
 
 
@@ -278,6 +294,10 @@ def set_available_memory(tensor: "torch.Tensor",
         of tile memory to be made available for temporary memory (default 0.6).
     :returns: The input tensor, as if calling an identity function.
      """
+    if not isinstance(tensor, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "You may only set available memory for torch.tensor values. "
+            f"{type(tensor)} is not supported.")
     return torch.ops.poptorch.set_available_memory(
         tensor, available_memory_proportion)
 
@@ -301,6 +321,10 @@ def set_overlap_for_input(input_tensor: "torch.Tensor",
 
     .. seealso:: :py:class:`poptorch.OverlapMode`.
     """
+    if not isinstance(input_tensor, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "You may only set overlap for torch.tensor inputs. "
+            f"{type(input_tensor)} is not supported.")
     return torch.ops.poptorch.set_overlap_for_input(input_tensor, mode.value)
 
 
@@ -324,6 +348,10 @@ def set_overlap_for_output(output_tensor: "torch.Tensor",
 
     .. seealso:: :py:class:`poptorch.OverlapMode`.
     """
+    if not isinstance(output_tensor, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "You may only set overlap for torch.tensor outputs. "
+            f"{type(output_tensor)} is not supported.")
     return torch.ops.poptorch.set_overlap_for_output(output_tensor, mode.value)
 
 

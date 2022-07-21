@@ -166,6 +166,24 @@ def test_input_error_messages(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options=opts)
     poptorch_model(torch.tensor([1.0]))
 
+    class TupleModel(torch.nn.Module):
+        def forward(self, x):
+            x2 = poptorch.set_overlap_for_input(
+                x, poptorch.OverlapMode.OverlapAccumulationLoop)
+            y = torch.add(*x2)
+            return y
+
+    model = TupleModel()
+
+    opts = opts.clone()
+    poptorch_model = poptorch.inferenceModel(model, options=opts)
+
+    input = (torch.tensor([1.0]), torch.tensor([0.0]))
+    err_msg = ("You may only set overlap for torch.tensor inputs. "
+               f"{type(input)} is not supported.")
+    with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
+        poptorch_model(input)
+
 
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
