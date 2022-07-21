@@ -166,6 +166,15 @@ class OptionsDict:
     def __call__(self, option):
         return getattr(self, option)
 
+    def __repr__(self):
+        # Call __repr__ on v so that strings display with quotes.
+        return (f"{type(self).__name__}(" +
+                ", ".join(f"{k}={v.__repr__()}"
+                          for k, v in self._values.items()) + ", " +
+                ", ".join(f"{k}={v.__repr__()}"
+                          for k, v in self.__dict__.items()
+                          if k != "_values") + ")")
+
 
 class IStageManager(abc.ABC):
     def __init__(self):

@@ -900,3 +900,13 @@ def test_wrap_options():
 
     opts = poptorch.Options()
     opts.Distributed.__class__ = _Distributed
+
+
+def test_options_printing(capsys):
+    """Check that the Options class displays meaningful information"""
+    opts = poptorch.Options()
+    print(opts)
+    captured = capsys.readouterr()
+    id_string = f"{id(opts):x}"  # Default printing is hexadecimal ID of object
+    error_str = "The Options class should be printing meaningful informations"
+    assert id_string not in captured.out, error_str

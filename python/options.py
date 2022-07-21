@@ -514,6 +514,11 @@ class _PopartOptions:
         self.set("patterns", patterns)
         return self
 
+    def __repr__(self):
+        repr_body = ", ".join(f"{k}={v.__repr__()}"
+                              for k, v in self.options.items())
+        return f"{type(self).__name__}({repr_body})"
+
 
 class _DistributedOptions(_options_impl.OptionsDict):
     """Options related to distributed execution.
@@ -1836,3 +1841,17 @@ class Options(_options_impl.OptionsDict):
         """Create an unfrozen deep copy of the current options.
         """
         return copy.deepcopy(self)
+
+    def __repr__(self):
+        """Repr which recurses through the "properties" of the class to
+        find the objects to print."""
+        # Call __repr__ on v so that strings display with quotes.
+        property_names = [
+            p for p in dir(type(self))
+            if isinstance(getattr(type(self), p), property)
+        ]
+        return (f"{type(self).__name__}(" +
+                ", ".join(f"{k}={v.__repr__()}"
+                          for k, v in self._values.items()) + ", " +
+                ", ".join(f"{prop}={getattr(self, prop)}"
+                          for prop in property_names) + ")")
