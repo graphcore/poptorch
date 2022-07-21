@@ -316,9 +316,6 @@ at::Tensor MLIRDispatch::detach(const at::Tensor &self) {
   at::Tensor out(self.unsafeGetTensorImpl()->shallow_copy_and_detach(
       /*version_counter=*/self.unsafeGetTensorImpl()->version_counter(),
       /*allow_tensor_metadata_change=*/true));
-
-  // The new tensor points at the same mlir tensor as the source.
-  _mapper.addTensor(out, findTensor(self));
   return out;
 }
 
@@ -468,15 +465,6 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
           static_cast<void *>(tensor.unsafeGetTensorImpl()),
           static_cast<void *>(tensor.storage().unsafeGetStorageImpl()));
 
-    } else if (_mapper.isDirectAlias(tensor)) {
-      // A value we haven't seen before, we should have captured all tensor
-      // creation paths so this should not be reachable normally. However,
-      // the autograd can sneakily shallow copy a tensor outwith the
-      // dispatch mechanism. So in these cases we do allow it to be an alias
-      // if it has the same, shape, storage, and storage offset. Only a
-      // direct alias (non-view) is allowed as otherwise we will end up
-      // tracking a huge map of tensors and their views.
-      val = _mapper.getMLIRForTensor(tensor);
     } else {
       ERROR("\tCould not find tensor " << str(tensor) << std::endl);
     }

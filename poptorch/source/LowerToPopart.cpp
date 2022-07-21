@@ -1061,8 +1061,8 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
     std::vector<int64_t> dims;
     get_type_info(value, scalar_type, dims);
     std::string popart_type = typeToPopartStr(scalar_type);
-    void *data_ptr = get_data_ptr(value);
     if (is_parameter_tensor(value)) {
+      void *data_ptr = get_data_ptr(value);
       ERROR_ON_MSG(value->uses().empty(),
                    "Parameter %"
                        << value->debugName()

@@ -105,8 +105,6 @@ def test_upsample_bicubic(shape, trace_model):
                                                ("trilinear", (1, 2, 3, 4, 5))])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_unsupported_upsample(mode, input_shape, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): refcount_.load() == 0")
     torch.manual_seed(42)
     scale_factor = 2
     model = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)

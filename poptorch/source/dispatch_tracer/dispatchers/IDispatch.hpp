@@ -19,7 +19,7 @@ class IDispatch {
 public:
   virtual ~IDispatch() {}
 
-  at::Tensor
+  virtual at::Tensor
   allocateTensor(c10::IntArrayRef sizes,
                  c10::optional<at::ScalarType> dtype = c10::nullopt,
                  c10::optional<at::Device> device = c10::nullopt,

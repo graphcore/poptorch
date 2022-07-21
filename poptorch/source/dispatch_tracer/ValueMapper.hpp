@@ -5,11 +5,13 @@
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
+#include "Tensor.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch {
@@ -54,18 +56,7 @@ public:
     // PyTorch side. However the autograd can create non-view aliases so
     // sometimes we have to check if we are an alias with the same stride,
     // shape, and storage offset.
-    at::TensorImpl *tensor_impl;
-
-    // Tensors can fall out of scope so we maintain a weak pointer to the
-    // tensors we are tracking. This prevents their storage from being
-    // deallocated. This wouldn't be an issue as the tensor will then not be
-    // rereferenced except PyTorch can allocate a new node's pointer and that
-    // can overlap with a tensor we previously saw but unbeknownst to us fell
-    // out of scope. This was intended to give us a way to remove invalid
-    // pointers, however, it turns out just by tracking them even with a weak
-    // reference we stop them from ever completely falling out of scope.
-    // TODO(T61602) not needed anymore? (We don't use storage as IDs anymore)
-    c10::weak_intrusive_ptr<at::TensorImpl> tracker;
+    std::shared_ptr<IpuTensorDetails> tensor_details;
 
     // The value in JIT IR
     torch::jit::Value *jit;
@@ -85,11 +76,7 @@ public:
 
   // We map each PyTorch tensor to a record of all the metadata we are tracking
   // about that tensor in the tensor map.
-  std::unordered_map<at::TensorImpl *, TrackedTensor> tensors;
-
-  // We also map the storage of the tensor to the same structure so we can check
-  // for aliases. We do not expect this to be large.
-  std::unordered_map<uint64_t, std::vector<TrackedTensor *>> ipu_ids_map;
+  std::unordered_map<IpuTensorDetails *, TrackedTensor> tensors;
 
   // Mapping between parameter / buffer names and tensor IDs
   std::unordered_map<std::string, uint64_t> name_ids_map;
@@ -123,13 +110,11 @@ public:
 
   void addTensorList(const TensorList &list, torch::jit::Value *val);
 
+  void addCopiedTensor(const at::TensorImpl *dest, const at::TensorImpl *src);
+
   torch::jit::Value *getValueForTensorList(const TensorList &list);
 
   void setParameterName(const at::Tensor &t, const std::string &name);
-
-  // Returns true if this is a direct alias and adds it to the approved alias
-  // map.
-  bool isDirectAlias(const at::Tensor &t);
 
   void replaceValue(torch::jit::Value *v_old, torch::jit::Value *v_new);
 };

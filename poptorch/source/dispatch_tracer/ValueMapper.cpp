@@ -1,6 +1,8 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include "ValueMapper.hpp"
 
+#include <utility>
+
 #include "Tensor.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
@@ -13,10 +15,9 @@ bool ValueMapper::TrackedTensor::isSame(const at::Tensor &other) const {
 
 ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor,
                                           bool _is_empty)
-    : tensor_impl(tensor.unsafeGetTensorImpl()),
-      tracker(tensor.getIntrusivePtr()), jit(nullptr),
-      mlir(poptorch_ir::tensor_error_id), ipu_tensor_id(ipuTensorId(tensor)),
-      is_empty(_is_empty) {}
+    : tensor_details(getTensorDetails(*tensor.unsafeGetTensorImpl())),
+      jit(nullptr), mlir(poptorch_ir::tensor_error_id),
+      ipu_tensor_id(ipuTensorId(tensor)), is_empty(_is_empty) {}
 
 void ValueMapper::setParameterName(const at::Tensor &t,
                                    const std::string &name) {
@@ -50,55 +51,6 @@ void ValueMapper::setParameterName(const at::Tensor &t,
   ids_name_map.insert({id, name});
 }
 
-bool ValueMapper::isDirectAlias(const at::Tensor &t) {
-  if (!isIpuTensor(t)) {
-    return false;
-  }
-  auto itr = ipu_ids_map.find(ipuTensorId(t));
-
-  if (itr == ipu_ids_map.end()) {
-    return false;
-  }
-
-  // We have a set of "approved" aliases. We do not want to get into the
-  // habit of checking the storage keys rather than the TensorIds. This can lead
-  // to a very messy situation of tracking which tensor is a view of what, etc.
-  // So we allow a narrow set of tensors to be tracked via their storage. We do
-  // this specifically for autograd tensors which can be a true alias of a
-  // tensor by being a direct storage copy and not a view change.
-  for (TrackedTensor *record : itr->second) {
-    std::int64_t dim = record->tensor_impl->dim();
-
-    // The same number of elements and dimensions.
-    if (record->tensor_impl->numel() != t.numel() ||
-        record->tensor_impl->dim() != t.dim()) {
-      continue;
-    }
-
-    // And that all dimensions and strides are exactly the same.
-    bool valid = true;
-    for (std::int64_t i = 0; i < dim; ++i) {
-      if (t.strides()[i] != record->tensor_impl->strides()[i] ||
-          t.sizes()[i] != record->tensor_impl->sizes()[i]) {
-        valid = false;
-        break;
-      }
-    }
-
-    if (!valid) {
-      continue;
-    }
-
-    addTensor(t, record->mlir, record->is_empty);
-    if (record->jit != nullptr) {
-      addTensor(t, record->jit, record->is_empty);
-    }
-    return true;
-  }
-
-  return false;
-}
-
 // Add a tensor to the IR.
 void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
                             bool is_empty) {
@@ -106,15 +58,13 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
                  static_cast<void *>(t.unsafeGetTensorImpl()), id);
   // If the tensor is already being tracked then we will update the MLIR
   // value being tracked. Otherwise we insert and add the MLIR value.
+  auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
+  new_details->mapper = this;
   auto itr =
-      tensors.insert({t.unsafeGetTensorImpl(), TrackedTensor{t, is_empty}})
-          .first;
+      tensors.insert({new_details.get(), TrackedTensor{t, is_empty}}).first;
   itr->second.mlir = id;
   itr->second.is_empty = is_empty;
-
-  // If this map insert fails then we add the storage to the existing list.
-  auto pair = ipu_ids_map.insert({ipuTensorId(t), {}});
-  pair.first->second.push_back(&itr->second);
+  ERROR_ON(itr->second.tensor_details != new_details);
 }
 
 void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
@@ -125,21 +75,32 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
                  val->debugName());
   // If the tensor is already being tracked then we will update the JIT
   // value being tracked. Otherwise we insert and add the jit value.
-  auto itr =
-      tensors.insert({t.unsafeGetTensorImpl(), TrackedTensor{t, is_empty}});
+  auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
+  new_details->mapper = this;
+  auto itr = tensors.insert({new_details.get(), TrackedTensor{t, is_empty}});
   itr.first->second.jit = val;
   itr.first->second.is_empty = is_empty;
+  ERROR_ON(itr.first->second.tensor_details != new_details);
 
   // Ensure we maintain a lookup of torch::jit to pytorch tensor.
   values_map.insert({val, &itr.first->second});
+}
 
-  // If this map insert fails then we add the storage to the existing list.
-  auto pair = ipu_ids_map.insert({ipuTensorId(t), {}});
-  pair.first->second.push_back(&itr.first->second);
+void ValueMapper::addCopiedTensor(const at::TensorImpl *dest,
+                                  const at::TensorImpl *src) {
+  auto src_details = getTensorDetails(*src);
+  auto dest_details = getTensorDetails(*dest);
+  dest_details->mapper = this;
+  auto itr = tensors.find(src_details.get());
+  ERROR_ON_MSG(itr == tensors.end(), "Could not find source tensor");
+  auto itr_new =
+      tensors.insert(std::make_pair(dest_details.get(), itr->second));
+  itr_new.first->second.tensor_details = dest_details;
+  itr_new.first->second.ipu_tensor_id = ipuTensorId(*dest);
 }
 
 ValueMapper::TrackedTensor *ValueMapper::rawTensorRecord(const at::Tensor &t) {
-  auto itr = tensors.find(t.unsafeGetTensorImpl());
+  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
 
   if (itr != tensors.end()) {
     return &itr->second;
@@ -160,7 +121,10 @@ ValueMapper::rawTensorRecord(torch::jit::Value *val) {
 
 // Get the user tensor from our SSA tensors.
 torch::jit::Value *ValueMapper::getValueForTensor(const at::Tensor &t) {
-  auto itr = tensors.find(t.unsafeGetTensorImpl());
+  if (!isIpuTensor(t)) {
+    return nullptr;
+  }
+  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
 
   if (itr != tensors.end()) {
     return itr->second.jit;
@@ -170,7 +134,10 @@ torch::jit::Value *ValueMapper::getValueForTensor(const at::Tensor &t) {
 }
 
 poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const at::Tensor &t) {
-  auto itr = tensors.find(t.unsafeGetTensorImpl());
+  if (!isIpuTensor(t)) {
+    return poptorch_ir::tensor_error_id;
+  }
+  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
 
   if (itr != tensors.end()) {
     return itr->second.mlir;
@@ -190,7 +157,7 @@ poptorch_ir::TensorId ValueMapper::getMLIRForJit(torch::jit::Value *val) {
 }
 
 c10::optional<bool> ValueMapper::tensorIsEmpty(const at::Tensor &t) {
-  auto itr = tensors.find(t.unsafeGetTensorImpl());
+  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
 
   if (itr == tensors.end()) {
     return c10::nullopt;

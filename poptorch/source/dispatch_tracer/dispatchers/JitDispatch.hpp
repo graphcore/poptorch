@@ -22,6 +22,13 @@ public:
   // The JIT graph we are building up.
   std::shared_ptr<torch::jit::Graph> graph;
 
+  at::Tensor allocateTensor(
+      c10::IntArrayRef sizes,
+      c10::optional<at::ScalarType> dtype = c10::nullopt,
+      c10::optional<at::Device> device = c10::nullopt,
+      c10::optional<at::Layout> layout = c10::nullopt,
+      c10::optional<bool> pin_memory = c10::nullopt,
+      c10::optional<at::MemoryFormat> memory_format = c10::nullopt) override;
   at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
   at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
@@ -31,7 +38,7 @@ public:
 
   void
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
-  void fallback(const c10::OperatorHandle &op, c10::Stack *stack);
+  void fallback(const c10::OperatorHandle &op, c10::Stack *stack) override;
 
   at::Tensor detach(const at::Tensor &self) final;
 

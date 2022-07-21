@@ -49,6 +49,17 @@ std::string truncateGraphString(torch::jit::Graph &graph) {
   return "[...truncated...]" + s.substr(start);
 }
 
+at::Tensor JITDispatch::allocateTensor(
+    c10::IntArrayRef sizes, c10::optional<at::ScalarType> dtype,
+    c10::optional<at::Device> device, c10::optional<at::Layout> layout,
+    c10::optional<bool> pin_memory,
+    c10::optional<at::MemoryFormat> memory_format) {
+  // We delegate tensor creation to the MLIR dispatcher so we don't end up with
+  // clashing IPU tensor IDs.
+  return _mlir_dispatch.allocateTensor(sizes, dtype, device, layout, pin_memory,
+                                       memory_format);
+}
+
 at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
 
@@ -229,9 +240,6 @@ at::Tensor JITDispatch::detach(const at::Tensor &self) {
   at::Tensor out(self.unsafeGetTensorImpl()->shallow_copy_and_detach(
       /*version_counter=*/self.unsafeGetTensorImpl()->version_counter(),
       /*allow_tensor_metadata_change=*/true));
-
-  // The new tensor points at the same mlir tensor as the source.
-  _mapper.addTensor(out, _mapper.getValueForTensor(self));
   return out;
 }
 

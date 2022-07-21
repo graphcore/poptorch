@@ -42,14 +42,14 @@ void *IDispatch::getDataSource(torch::jit::Value *value) {
     logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
     return nullptr;
   }
-  return getCpuData(*record->tensor_impl)->data();
+  return record->tensor_details->host_buffer->data();
 }
 
 bool IDispatch::isParameter(torch::jit::Value *value) {
   auto *record = _mapper.rawTensorRecord(value);
   ERROR_ON_MSG(record == nullptr,
                "JIT value not tracked " << reinterpret_cast<void *>(value));
-  return poptorch::isParameter(*record->tensor_impl);
+  return record->tensor_details->is_parameter;
 }
 
 void IDispatch::setParameterName(const at::Tensor &tensor,
@@ -63,7 +63,7 @@ std::string IDispatch::getParameterName(torch::jit::Value *value) {
     logging::trace("JIT value not tracked {}", reinterpret_cast<void *>(value));
     return "";
   }
-  ERROR_ON_MSG(!poptorch::isParameter(*record->tensor_impl),
+  ERROR_ON_MSG(!record->tensor_details->is_parameter,
                "%" << value->debugName() << " is not a Parameter");
   auto it = _mapper.ids_name_map.find(record->ipu_tensor_id);
   if (it == _mapper.ids_name_map.end()) {
@@ -76,4 +76,5 @@ void IDispatch::replaceValue(torch::jit::Value *v_old,
                              torch::jit::Value *v_new) {
   _mapper.replaceValue(v_old, v_new);
 }
+
 } // namespace poptorch

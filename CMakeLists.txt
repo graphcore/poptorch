@@ -60,9 +60,6 @@ if (NOT IS_REDHAT STREQUAL "")
   endif()
 endif()
 
-# Tell the source files if we have built MLIR or not so it can be exposed via python.
-add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=$<BOOL:${POPTORCH_BUILD_MLIR_COMPILER}>)
-
 set(CMAKE_CONFIGURATION_TYPES "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
 if(NOT CMAKE_BUILD_TYPE)
@@ -80,6 +77,23 @@ if(USE_PYTORCH_PACKAGE_HEADERS)
   if(NOT TORCH_PATH)
     message(FATAL_ERROR "python3 -c \"import torch\" failed: check that your virtual environment is active and torch is installed")
   endif()
+  execute_process(COMMAND python3 -c "import torch; import sys; sys.exit(3 if torch.version.debug else 4)"
+    RESULT_VARIABLE TORCH_DEBUG)
+  if(TORCH_DEBUG LESS 3 OR TORCH_DEBUG GREATER 4)
+    message(FATAL_ERROR "python3 -c \"import torch\" failed: check that your virtual environment is active and torch is installed")
+  endif()
+  if (TORCH_DEBUG EQUAL 4)
+    # We include torch header files which respond to this flag, so we have to
+    # set it correctly in order to get consistent torch behaviour.
+    add_compile_definitions(NDEBUG)
+  endif()
+endif()
+
+# Tell the source files if we have built MLIR or not so it can be exposed via python.
+if (POPTORCH_BUILD_MLIR_COMPILER)
+  add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=1)
+else()
+  add_compile_definitions(POPTORCH_BUILD_MLIR_COMPILER=0)
 endif()
 
 if(EXISTS ${SDK_DIR})

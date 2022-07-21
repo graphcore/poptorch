@@ -10,6 +10,10 @@
 #include <string>
 #include <vector>
 
+#include "ValueMapper.hpp"
+
+#include "poptorch/DispatchTracer.hpp"
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -31,6 +35,8 @@ uint64_t tensorImplDataSize(const at::TensorImpl &impl) {
   return nelems * elem_size;
 }
 
+} // namespace
+
 // This is our own TensorImpl: this is stored in every at::Tensor of type IPU.
 //
 // This implementation is inspired by VulkanOpaqueTensorImpl / OpaqueTensorImpl:
@@ -42,16 +48,20 @@ struct IpuTensorImpl : public at::TensorImpl {
   IpuTensorImpl(const IpuTensorImpl &src)
       : IpuTensorImpl(src.dtype(), src.device(), src.tensor_id,
                       src.sizes_and_strides_.sizes_arrayref(),
-                      src.sizes_and_strides_.strides_arrayref()) {
-    is_parameter = src.is_parameter;
-    host_buffer = src.host_buffer;
+                      src.sizes_and_strides_.strides_arrayref(),
+                      std::make_shared<IpuTensorDetails>(*src.details)) {}
+
+  ~IpuTensorImpl() {
+    details->parent = nullptr;
+    details->sizes = sizes_and_strides_.sizes_arrayref().vec();
+    details->strides = sizes_and_strides_.strides_arrayref().vec();
   }
 
-  ~IpuTensorImpl() = default;
-
   IpuTensorImpl(const caffe2::TypeMeta data_type, c10::Device device,
-                uint64_t id, c10::IntArrayRef sizes, c10::IntArrayRef strides)
-      : at::TensorImpl(dispatch_key_set, data_type, device) {
+                uint64_t id, c10::IntArrayRef sizes, c10::IntArrayRef strides,
+                const std::shared_ptr<IpuTensorDetails> &details_)
+      : at::TensorImpl(dispatch_key_set, data_type, device), details(details_) {
+    details->parent = this;
     // set_sizes must be called before stride_at because it resizes the
     // array that stores both sizes and strides.
     sizes_and_strides_.set_sizes(sizes);
@@ -77,6 +87,8 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*version_counter=*/version_counter,
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
+    ERROR_ON_MSG(details->mapper == nullptr, "Copying tensor with no mapper");
+    details->mapper->addCopiedTensor(impl.get(), this);
     return impl;
   }
 
@@ -90,6 +102,8 @@ struct IpuTensorImpl : public at::TensorImpl {
         /*version_counter=*/version_counter,
         /*allow_tensor_metadata_change=*/allow_tensor_metadata_change);
     impl->refresh_numel();
+    ERROR_ON_MSG(details->mapper == nullptr, "Copying tensor with no mapper");
+    details->mapper->addCopiedTensor(impl.get(), this);
     return impl;
   }
 
@@ -106,10 +120,10 @@ struct IpuTensorImpl : public at::TensorImpl {
                      << ") and destination tensor " << data_size);
     ERROR_ON_MSG(!cpu_src.is_contiguous(),
                  "Data source must be contiguous: " << str(cpu_src));
-    if (!host_buffer) {
-      host_buffer = std::make_shared<std::vector<char>>(data_size);
+    if (!details->host_buffer) {
+      details->host_buffer = std::make_shared<std::vector<char>>(data_size);
     }
-    memcpy(host_buffer->data(), cpu_src.data_ptr(), data_size);
+    memcpy(details->host_buffer->data(), cpu_src.data_ptr(), data_size);
   }
 
   void set_size(int64_t dim, int64_t new_size) override {
@@ -129,15 +143,14 @@ struct IpuTensorImpl : public at::TensorImpl {
     AT_ERROR("IPU tensors do not have set_storage_offset");
   }
 
-  bool is_parameter{false};
-  // Data source for this IPU tensor. Only allocated and populated for
-  // parameters and inputs.
-  Buffer host_buffer;
+  std::shared_ptr<IpuTensorDetails> details;
   uint64_t tensor_id;
 
 private:
   const char *tensorimpl_type_name() const override { return "IpuTensorImpl"; }
 };
+
+namespace {
 
 IpuTensorImpl *tryIpuTensorImpl(const at::Tensor &tensor) {
   return dynamic_cast<IpuTensorImpl *>(tensor.unsafeGetTensorImpl());
@@ -214,11 +227,40 @@ private:
 C10_REGISTER_GUARD_IMPL(XLA, GuardImpl)
 } // namespace
 
+int64_t IpuTensorDetails::dim() {
+  if (parent != nullptr) {
+    return parent->dim();
+  }
+  return sizes.size();
+}
+
+c10::IntArrayRef IpuTensorDetails::sizesArrayref() {
+  if (parent != nullptr) {
+    return parent->sizes();
+  }
+  return c10::IntArrayRef(sizes);
+}
+
+c10::IntArrayRef IpuTensorDetails::stridesArrayref() {
+  if (parent != nullptr) {
+    return parent->strides();
+  }
+  return c10::IntArrayRef(strides);
+}
+
+int64_t IpuTensorDetails::numel() {
+  if (parent != nullptr) {
+    return parent->numel();
+  }
+  return c10::multiply_integers(std::begin(sizes), std::end(sizes));
+}
+
 at::Tensor createIpuTensor(at::ScalarType dtype, const at::Device &device,
                            uint64_t ipu_tensor_id, c10::IntArrayRef sizes,
                            c10::IntArrayRef strides) {
   at::Tensor out = at::detail::make_tensor<IpuTensorImpl>(
-      c10::scalarTypeToTypeMeta(dtype), device, ipu_tensor_id, sizes, strides);
+      c10::scalarTypeToTypeMeta(dtype), device, ipu_tensor_id, sizes, strides,
+      std::make_shared<IpuTensorDetails>());
   for (size_t dim = 0; dim < sizes.size(); ++dim) {
     ERROR_ON_MSG(sizes.at(dim) < 0, "Invalid tensor shape: dimension "
                                         << dim << " is negative ("
@@ -235,20 +277,24 @@ uint64_t ipuTensorId(const at::Tensor &tensor) {
   return toIpuTensorImpl(tensor)->tensor_id;
 }
 
+uint64_t ipuTensorId(const at::TensorImpl &tensor) {
+  return toIpuTensorImpl(tensor)->tensor_id;
+}
+
 bool isIpuTensor(const at::Tensor &tensor) {
   return tryIpuTensorImpl(tensor) != nullptr;
 }
 
 void setIsParameter(at::Tensor &tensor, bool is_parameter) {
-  toIpuTensorImpl(tensor)->is_parameter = is_parameter;
+  toIpuTensorImpl(tensor)->details->is_parameter = is_parameter;
 }
 
 bool isParameter(const at::Tensor &tensor) {
-  return toIpuTensorImpl(tensor)->is_parameter;
+  return toIpuTensorImpl(tensor)->details->is_parameter;
 }
 
 bool isParameter(const at::TensorImpl &tensor) {
-  return toIpuTensorImpl(tensor)->is_parameter;
+  return toIpuTensorImpl(tensor)->details->is_parameter;
 }
 
 std::string str(const at::Tensor &tensor) {
@@ -262,7 +308,7 @@ std::string str(const at::Tensor &tensor) {
     if (device_type == at::DeviceType::XLA) {
       auto *ipu_tensor = toIpuTensorImpl(tensor);
       ss << " ID " << ipu_tensor->tensor_id;
-      if (ipu_tensor->is_parameter) {
+      if (ipu_tensor->details->is_parameter) {
         ss << " is_parameter";
       }
     }
@@ -281,11 +327,16 @@ void copyDataFromCpuSource(at::Tensor &ipu_tensor, const at::Tensor &cpu_src) {
 }
 
 Buffer getCpuData(const at::Tensor &ipu_tensor) {
-  return toIpuTensorImpl(ipu_tensor)->host_buffer;
+  return toIpuTensorImpl(ipu_tensor)->details->host_buffer;
 }
 
 Buffer getCpuData(const at::TensorImpl &ipu_tensor) {
-  return toIpuTensorImpl(ipu_tensor)->host_buffer;
+  auto details = toIpuTensorImpl(ipu_tensor)->details;
+  return details->host_buffer;
 }
 
+std::shared_ptr<IpuTensorDetails>
+getTensorDetails(const at::TensorImpl &ipu_tensor) {
+  return toIpuTensorImpl(ipu_tensor)->details;
+}
 } // namespace poptorch
