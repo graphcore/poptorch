@@ -1,4 +1,6 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+#include <c10/core/ScalarType.h>
+
 #include "../PoptorchStaticInit.hpp"
 #include "../PoptorchSymbols.hpp"
 #include "EinsumOp.hpp"
@@ -305,6 +307,34 @@ torch::jit::Node *setOverlapForOutputHandler(torch::jit::Graph *graph,
   setOverlap(graph->return_node(), "output", value_str);
   return nullptr;
 }
+
+torch::jit::Node *randintHandler(torch::jit::Graph *graph,
+                                 torch::jit::Node *node) {
+  auto *out = node->output(0);
+  auto shape = shapeFromTensor(out);
+  auto scalar_type = getNodeScalarType(out);
+  // Note: the popart range is closed whereas the pytorch range is expected to
+  // be half open
+  auto high = constantToFloat(node->input(1)->node()) - 1.0f;
+  auto low = constantToFloat(node->input(0)->node());
+  auto *ints =
+      createRandomUniform(graph, out, shape, high, low, c10::ScalarType::Int);
+  return createCast(graph, ints->output(0), scalar_type);
+}
+
+torch::jit::Node *randomHandler(torch::jit::Graph *graph,
+                                torch::jit::Node *node) {
+  auto *out = node->input(0);
+  auto shape = shapeFromTensor(out);
+  auto scalar_type = getNodeScalarType(out);
+  // Note: the popart range is closed whereas the pytorch range is expected to
+  // be half open
+  auto high = constantToFloat(node->input(2)->node()) - 1.0f;
+  auto low = constantToFloat(node->input(1)->node());
+  auto *ints =
+      createRandomUniform(graph, out, shape, high, low, c10::ScalarType::Int);
+  return createCast(graph, ints->output(0), scalar_type);
+}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -314,6 +344,8 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::tensordot, tensordotHandler);
   registerHandler(c10::aten::scatter_add, scatterAddHandler);
   registerHandler(c10::aten::_weight_norm, weightNormHandler);
+  registerHandler(c10::aten::randint, randintHandler);
+  registerHandler(c10::aten::random_, randomHandler);
   registerHandler(symbols::poptorch::set_available_memory,
                   setAvailableMemoryHandler);
   registerHandler(symbols::poptorch::set_overlap_for_input,

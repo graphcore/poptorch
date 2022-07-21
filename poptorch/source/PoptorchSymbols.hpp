@@ -14,6 +14,7 @@ extern c10::Symbol elu_;                        // NOLINT
 extern c10::Symbol selu_;                       // NOLINT
 extern c10::Symbol isinf;                       // NOLINT
 extern c10::Symbol uniform_;                    // NOLINT
+extern c10::Symbol random_;                     // NOLINT
 extern c10::Symbol normal_;                     // NOLINT
 extern c10::Symbol exponential_;                // NOLINT
 extern c10::Symbol where_;                      // NOLINT

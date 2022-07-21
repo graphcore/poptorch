@@ -35,14 +35,14 @@ bool isNondeterministic(const torch::jit::Node &node) {
 
   // Handle extra cases until this is fixed upstream
   // https://github.com/pytorch/pytorch/issues/52599
-  if (node.kind() == c10::aten::normal || node.kind() == c10::aten::normal_ ||
-      node.kind() == c10::aten::uniform_ ||
-      node.kind() == c10::aten::bernoulli_ ||
-      node.kind() == c10::aten::feature_dropout) {
-    return true;
-  }
+  static const auto non_deterministic_nodes = {
+      c10::aten::normal,  c10::aten::normal_,    c10::aten::uniform_,
+      c10::aten::randint, c10::aten::bernoulli_, c10::aten::feature_dropout,
+  };
 
-  return false;
+  return std::find(non_deterministic_nodes.begin(),
+                   non_deterministic_nodes.end(),
+                   node.kind()) != non_deterministic_nodes.end();
 }
 
 std::string nodeToString(const torch::jit::Node *node) {

@@ -6,6 +6,14 @@ import poptorch
 import helpers
 
 
+def int_mean(x):
+    return torch.mean(x.to(torch.float))
+
+
+def int_var(x):
+    return torch.var(x.to(torch.float))
+
+
 # Random Number Generation Harness
 # Checks that the IPU generated data with roughly the same summary
 # statistics as the CPU version.
@@ -47,7 +55,9 @@ def rng_harness(trace_model,
     # that the distribution statistics are consistent
     print("Checking summary statistics for generated random numbers:")
     for ss in stat_funs:
-        print("  {} = {}".format(ss.__name__, ss(pop_out)))
+        print("  {} = poptorch {}, native {}".format(ss.__name__, ss(pop_out),
+                                                     ss(native_out)),
+              flush=True)
         helpers.assert_allclose(expected=ss(native_out),
                                 actual=ss(pop_out),
                                 atol=1e-2,
@@ -177,6 +187,35 @@ def test_randn(trace_model):
     input = torch.empty(3, 5, 10000)
     stat_funs = [torch.mean, torch.var]
     rng_harness(trace_model, rng_op, input, stat_funs)
+
+
+# torch.random_
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.parametrize("input", [
+    torch.empty(3, 5, 10000, dtype=torch.float),
+    torch.empty(3, 5, 10000, dtype=torch.int),
+])
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_random(trace_model, input):
+    def rng_op(x):
+        return x.random_(5, 100)
+
+    stat_funs = [torch.min, torch.max, int_mean, int_var]
+    rng_harness(trace_model, rng_op, input, stat_funs, input.dtype)
+
+
+# torch.randint
+@pytest.mark.ipuHardwareRequired
+@pytest.mark.parametrize("trace_model", [True, False])
+@pytest.mark.parametrize("dtype", [None, torch.int32, torch.half, torch.float])
+def test_randint(trace_model, dtype):
+    def rng_op(x):
+        return torch.randint(5, 100, x.size(), dtype=dtype)
+
+    input = torch.empty(3, 5, 10000)
+    stat_funs = [torch.min, torch.max, int_mean, int_var]
+    rng_harness(trace_model, rng_op, input, stat_funs,
+                torch.int32 if dtype is None else dtype)
 
 
 # torch.normal(Tensor mean, float std)

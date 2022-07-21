@@ -27,7 +27,8 @@ namespace aten = c10::aten;
 const std::unordered_set<torch::jit::NodeKind> &onlyInplaceOps() {
   // static to make sure values are initialised
   static std::unordered_set<torch::jit::NodeKind> only_inplace = {
-      aten::copy_, aten::normal_, aten::uniform_, aten::exponential_};
+      aten::copy_, aten::normal_, aten::uniform_, aten::random_,
+      aten::exponential_};
   return only_inplace;
 }
 

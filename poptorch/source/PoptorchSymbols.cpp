@@ -15,6 +15,7 @@ c10::Symbol elu_;                        // NOLINT
 c10::Symbol selu_;                       // NOLINT
 c10::Symbol isinf;                       // NOLINT
 c10::Symbol uniform_;                    // NOLINT
+c10::Symbol random_;                     // NOLINT
 c10::Symbol normal_;                     // NOLINT
 c10::Symbol exponential_;                // NOLINT
 c10::Symbol where_;                      // NOLINT
@@ -54,6 +55,7 @@ static void initializeAtenSymbols() {
   SYMBOL_INIT(aten, selu_);
   SYMBOL_INIT(aten, isinf);
   SYMBOL_INIT(aten, uniform_);
+  SYMBOL_INIT(aten, random_);
   SYMBOL_INIT(aten, normal_);
   SYMBOL_INIT(aten, exponential_);
   SYMBOL_INIT(aten, where_);
