@@ -37,7 +37,8 @@ public:
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) final;
   std::string handleOp(const c10::OperatorHandle &op, c10::Stack *stack);
 
-  at::Tensor detach(const at::Tensor &self) final;
+  void detach(const c10::OperatorHandle &op, c10::Stack *stack,
+              bool moving_parameters) final;
 
   void registerEmptyTensor(const at::Tensor &tensor) final;
 

@@ -986,8 +986,6 @@ def test_flip(dims, trace_model):
 @pytest.mark.parametrize("with_detach", [True, False])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_detach_and_clone(with_clone, with_detach, trace_model):
-    if not trace_model and with_detach:
-        pytest.skip("TODO(T51159): assert tensor(False)")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):

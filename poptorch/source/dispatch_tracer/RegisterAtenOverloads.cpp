@@ -1,5 +1,6 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 #include <ATen/core/List.h>
+#include <ATen/core/function_schema.h>
 #include <ATen/native/CPUFallback.h>
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
@@ -515,13 +516,14 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
-at::Tensor detach(const at::Tensor &self) {
+void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
   logging::trace("[TRACING-2] Intercepting aten::detach");
 
   context.activeDispatch()->setCurrentCodeLocation(
       getPythonInterpreterSourceRange());
-  at::Tensor out = context.activeDispatch()->detach(self);
-  return out;
+
+  // Perform the shallow copy and detach.
+  context.activeDispatch()->detach(op, stack, context.moving_parameters);
 }
 
 void replaceValueDispatcher(torch::jit::Value *v_old,
@@ -577,7 +579,7 @@ TORCH_LIBRARY_IMPL(_, AutogradIPU, m) {
 // priority than the XLA key. Registration here is not required for
 // regular backward ops
 TORCH_LIBRARY_IMPL(aten, AutogradXLA, m) {
-  m.impl("detach", PTC(poptorch::detach));
+  m.impl("detach", PTC_BOXED(poptorch::detach));
 }
 
 void popArgumentsFromStack(const c10::OperatorHandle &op, c10::Stack *stack) {

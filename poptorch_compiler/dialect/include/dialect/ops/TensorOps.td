@@ -11,6 +11,17 @@ def Poptorch_alias: Poptorch_Op<"alias", [ViewOp]> {
     ];
 }
 
+def Poptorch_detach: Poptorch_NotImplementedOp<"detach", [ViewOp]> {
+    let arguments = (ins Poptorch_tensor:$input);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$input), [{
+        $_state.addOperands({input});
+        $_state.addTypes(input.getType());
+     }]>
+    ];
+}
+
 def Poptorch_empty_tensor: Poptorch_Op<"empty_tensor", []> {
     let arguments = (ins I64ArrayAttr:$size, TypeAttr:$type);
     let results = (outs Poptorch_tensor:$result);

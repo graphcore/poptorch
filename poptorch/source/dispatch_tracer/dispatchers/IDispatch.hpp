@@ -45,7 +45,8 @@ public:
   // The "catch-all" fallback kernel.
   virtual void fallback(const c10::OperatorHandle &op, c10::Stack *stack) = 0;
 
-  virtual at::Tensor detach(const at::Tensor &self) = 0;
+  virtual void detach(const c10::OperatorHandle &op, c10::Stack *stack,
+                      bool moving_parameters) = 0;
 
   // Rather than have each empty overload requring a specialised kernel we
   // simply ask the dispatchers to acknowledge the created empty tensor and we

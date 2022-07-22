@@ -240,11 +240,32 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
-at::Tensor JITDispatch::detach(const at::Tensor &self) {
-  at::Tensor out(self.unsafeGetTensorImpl()->shallow_copy_and_detach(
-      /*version_counter=*/self.unsafeGetTensorImpl()->version_counter(),
+void JITDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
+                         bool moving_parameters) {
+  // We only handle the special case when we're moving parameters here. If we're
+  // not moving parameters, we'll defer to the fallback and actually create a
+  // dispatch op on the PopART graph.
+  if (!moving_parameters) {
+    fallback(op, stack);
+    return;
+  }
+
+  const c10::FunctionSchema &schema = op.schema();
+  const auto num_arguments = schema.arguments().size();
+  const auto arguments = torch::jit::last(stack, num_arguments);
+
+  ERROR_ON(arguments.size() != 1);
+  at::Tensor in = arguments.front().toTensor();
+
+  at::Tensor out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
+      /*version_counter=*/in.unsafeGetTensorImpl()->version_counter(),
       /*allow_tensor_metadata_change=*/true));
-  return out;
+
+  // The new tensor points at the same mlir tensor as the source.
+  _mapper.addTensor(out, _mapper.getValueForTensor(in));
+
+  torch::jit::drop(stack, num_arguments);
+  torch::jit::push(stack, out);
 }
 
 void JITDispatch::setCurrentCodeLocation(

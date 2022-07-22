@@ -40,7 +40,8 @@ public:
   setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) override;
 
-  at::Tensor detach(const at::Tensor &self) final;
+  void detach(const c10::OperatorHandle &op, c10::Stack *stack,
+              bool moving_parameters) final;
 
   void registerEmptyTensor(const at::Tensor &tensor) final;
 

@@ -312,11 +312,24 @@ void MLIRDispatch::registerEmptyTensor(const at::Tensor &tensor) {
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
-at::Tensor MLIRDispatch::detach(const at::Tensor &self) {
-  at::Tensor out(self.unsafeGetTensorImpl()->shallow_copy_and_detach(
-      /*version_counter=*/self.unsafeGetTensorImpl()->version_counter(),
+void MLIRDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
+                          bool /*moving_parameters*/) {
+  const c10::FunctionSchema &schema = op.schema();
+  const auto num_arguments = schema.arguments().size();
+  const auto arguments = torch::jit::last(stack, num_arguments);
+
+  ERROR_ON(arguments.size() != 1);
+  at::Tensor in = arguments.front().toTensor();
+
+  at::Tensor out(in.unsafeGetTensorImpl()->shallow_copy_and_detach(
+      /*version_counter=*/in.unsafeGetTensorImpl()->version_counter(),
       /*allow_tensor_metadata_change=*/true));
-  return out;
+
+  // The new tensor points at the same mlir tensor as the source.
+  _mapper.addTensor(out, findTensor(in));
+
+  torch::jit::drop(stack, num_arguments);
+  torch::jit::push(stack, out);
 }
 
 void MLIRDispatch::setCurrentCodeLocation(

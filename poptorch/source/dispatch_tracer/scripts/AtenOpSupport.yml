@@ -164,6 +164,10 @@
 - func: alias
   PopTorchDirect: alias
 
+# aten::detach(Tensor(a) self) -> Tensor(a)
+- func: detach
+  PopTorchDirect: detach
+
 # aten::as_strided(Tensor(a) self, int[] size, int[] stride, int? storage_offset=None) -> (Tensor(a))
 - func: as_strided
   PopTorchDirect: as_strided
