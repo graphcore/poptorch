@@ -44,9 +44,26 @@ def leaky_relu_inplace(x):
 
 
 activation_functions = [
-    F.relu, torch.tanh, torch.sigmoid, F.gelu, F.hardsigmoid, F.silu,
-    F.hardswish, F.leaky_relu, relu_inplace, tanh_inplace, sigmoid_inplace,
-    silu_inplace, hardsigmoid_inplace, hardswish_inplace, leaky_relu_inplace
+    F.elu,
+    F.gelu,
+    F.hardshrink,
+    F.hardsigmoid,
+    F.hardswish,
+    F.leaky_relu,
+    F.logsigmoid,
+    F.relu,
+    F.silu,
+    F.softplus,
+    F.softshrink,
+    hardsigmoid_inplace,
+    hardswish_inplace,
+    leaky_relu_inplace,
+    relu_inplace,
+    sigmoid_inplace,
+    silu_inplace,
+    tanh_inplace,
+    torch.sigmoid,
+    torch.tanh,
 ]
 
 activation_backward_functions = [torch.tanh, torch.sigmoid, F.leaky_relu]
@@ -134,6 +151,21 @@ def test_logsoftmax_backward(dim):
     input1.grad.detach_()
 
     cpu_result = log_softmax_backward(input1)
+
+    helpers.assert_allclose(expected=cpu_result,
+                            actual=ipu_result,
+                            equal_nan=True)
+
+
+@pytest.mark.mlirSupportRequired
+def test_prelu():
+    torch.manual_seed(42)
+
+    inp = torch.randn((2, 2))
+    weight = torch.zeros(2)
+
+    cpu_result = F.prelu(inp, weight)
+    ipu_result = IPUContext(F.prelu)(inp, weight)
 
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,

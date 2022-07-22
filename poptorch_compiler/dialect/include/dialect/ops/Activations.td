@@ -13,7 +13,7 @@ def Poptorch_swish: Poptorch_elem_unary<"swish"> {}
 def Poptorch_relu: Poptorch_elem_unary<"relu"> {}
 def Poptorch_gelu: Poptorch_elem_unary<"gelu"> {}
 
-def Poptorch_elu : Poptorch_NotImplementedOp<"elu", [SameOperandsAndResultShape]> {
+def Poptorch_elu : Poptorch_Op<"elu", [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1, F32Attr:$alpha, F32Attr:$scale, F32Attr:$input_scale);
     let results = (outs Poptorch_tensor:$result);
 
@@ -28,7 +28,7 @@ def Poptorch_elu : Poptorch_NotImplementedOp<"elu", [SameOperandsAndResultShape]
     ];
 }
 
-def Poptorch_hardshrink : Poptorch_NotImplementedOp<"hardshrink", [SameOperandsAndResultShape]> {
+def Poptorch_hardshrink : Poptorch_Op<"hardshrink", [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1, F32Attr:$lambd);
     let results = (outs Poptorch_tensor:$result);
 
@@ -41,7 +41,7 @@ def Poptorch_hardshrink : Poptorch_NotImplementedOp<"hardshrink", [SameOperandsA
     ];
 }
 
-def Poptorch_softshrink_out : Poptorch_NotImplementedOp<"softshrink_out", [SameOperandsAndResultShape]> {
+def Poptorch_softshrink_out : Poptorch_Op<"softshrink_out", [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$in1, F32Attr:$lambd);
     let results = (outs Poptorch_tensor:$result);
 
@@ -54,7 +54,7 @@ def Poptorch_softshrink_out : Poptorch_NotImplementedOp<"softshrink_out", [SameO
     ];
 }
 
-def Poptorch_rrelu_with_noise : Poptorch_NotImplementedOp<"rrelu_with_noise", [SameOperandsAndResultShape]> {
+def Poptorch_rrelu_with_noise : Poptorch_Op<"rrelu_with_noise", [SameOperandsAndResultShape]> {
     let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$noise, F32Attr:$lower, F32Attr:$upper, BoolAttr:$training);
     let results = (outs Poptorch_tensor:$result);
 
@@ -102,8 +102,8 @@ def Poptorch_leaky_relu_backward : Poptorch_Op<"leaky_relu_backward", [SameOpera
     ];
 }
 
-def Poptorch_prelu : Poptorch_NotImplementedOp<"prelu", [SameOperandsAndResultShape]> {
-    let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$weight);
+def Poptorch_prelu : Poptorch_Op<"prelu", []> {
+    let arguments = (ins Poptorch_tensor:$self, Poptorch_tensor:$weight);
     let results = (outs Poptorch_tensor:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$self, "mlir::Value":$weight),[{
@@ -114,7 +114,7 @@ def Poptorch_prelu : Poptorch_NotImplementedOp<"prelu", [SameOperandsAndResultSh
     ];
 }
 
-def Poptorch_log_sigmoid_forward : Poptorch_NotImplementedOp<"log_sigmoid_forward", []> {
+def Poptorch_log_sigmoid_forward : Poptorch_Op<"log_sigmoid_forward", []> {
     let arguments = (ins Poptorch_tensor:$in1);
     let results = (outs Poptorch_tensor:$output,
                         Poptorch_tensor:$buffer);
@@ -174,7 +174,7 @@ def Poptorch_logsoftmax_backward : Poptorch_Op<"logsoftmax_backward", [SameOpera
   }]>];
 }
 
-def Poptorch_softplus : Poptorch_NotImplementedOp<"softplus", []> {
+def Poptorch_softplus : Poptorch_Op<"softplus", []> {
   let arguments = (ins Poptorch_tensor:$input,
                        F32Attr:$beta,
                        F32Attr:$threshold);

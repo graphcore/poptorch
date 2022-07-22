@@ -1,10 +1,14 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+#include "dialect/Poptorch.hpp"
 #include "dialect/PoptorchDialect.hpp"
 
+#include <poplar/Tensor.hpp>
 #include <popnn/LogSoftmax.hpp>
 #include <popnn/NonLinearity.hpp>
 #include <popops/ElementWise.hpp>
+#include <popops/Expr.hpp>
 #include <popops/Reduce.hpp>
+#include <poprand/RandomGen.hpp>
 
 #include "../CompilerHelpers.hpp"
 
@@ -22,6 +26,121 @@ void swish::lowerToPoplar(CompilerContext &context) {
   poplar::Tensor out = popnn::nonLinearity(
       context.graph, popnn::NonLinearityType::SWISH, input1, context.seq);
   context.addTensor(this->result(), out);
+}
+
+void elu::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  const auto alpha = this->alpha().convertToFloat();
+  std::vector<std::unique_ptr<popops::expr::Expr>> exprs;
+
+  exprs.push_back(std::make_unique<pe::Mul>(
+      pe::Const(alpha), pe::Sub(pe::Exp(pe::_1), pe::Const(1.0f))));
+  exprs.push_back(std::make_unique<pe::Min>(pe::Const(0.0f), *exprs.back()));
+  exprs.push_back(std::make_unique<pe::Add>(pe::Max(pe::Const(0.0f), pe::_1),
+                                            *exprs.back()));
+
+  const poplar::Tensor output =
+      popops::map(context.graph, *exprs.back(), {input1}, context.seq);
+  context.addTensor(this->result(), output);
+}
+
+void hardshrink::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  const float lambd = this->lambd().convertToFloat();
+  const poplar::Tensor output =
+      popops::map(context.graph,
+                  pe::Select(pe::Const(0.0f), pe::_1,
+                             pe::And(pe::Gte(pe::_1, pe::Const(-lambd)),
+                                     pe::Lte(pe::_1, pe::Const(lambd)))),
+                  {input1}, context.seq);
+  context.addTensor(this->result(), output);
+}
+
+void softshrink_out::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input1 = context.fromSsa(this->in1());
+  const float lambd = this->lambd().convertToFloat();
+  const poplar::Tensor output = popops::map(
+      context.graph,
+      pe::Select(pe::Add(pe::_1, pe::Const(lambd)),
+                 pe::Select(pe::Sub(pe::_1, pe::Const(lambd)), pe::Const(0.0f),
+                            pe::Gt(pe::_1, pe::Const(lambd))),
+                 pe::Lt(pe::_1, pe::Const(-lambd))),
+      {input1}, context.seq);
+  context.addTensor(this->result(), output);
+}
+
+void rrelu_with_noise::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+  const float lower = this->lower().convertToFloat();
+  const float upper = this->upper().convertToFloat();
+
+  emitWarning("`noise' argument to RReLU is currently ignored");
+
+  poplar::Tensor val =
+      this->training()
+          ? poprand::uniform(context.graph, nullptr, 0,
+                             context.graph.addConstant(poplar::FLOAT, {}, 0.0f),
+                             poplar::FLOAT, upper, lower, context.seq)
+          : context.graph.addConstant(poplar::FLOAT, {}, (lower + upper) / 2);
+
+  const poplar::Tensor output =
+      popops::map(context.graph,
+                  pe::Select(pe::Mul(pe::_1, pe::_2), pe::_1,
+                             pe::Lt(pe::_1, pe::Const(0.0f))),
+                  {self, val}, context.seq);
+  context.addTensor(this->result(), output);
+}
+
+void prelu::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+  poplar::Tensor weight = context.fromSsa(this->weight());
+  const poplar::Tensor output =
+      popops::map(context.graph,
+                  pe::Select(pe::Mul(pe::_1, pe::_2), pe::_1,
+                             pe::Lt(pe::_1, pe::Const(0.0f))),
+                  {self, weight}, context.seq);
+  context.addTensor(this->result(), output);
+}
+
+void log_sigmoid_forward::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor in1 = context.fromSsa(this->in1());
+  const poplar::Tensor output = popops::map(
+      context.graph, pe::Log(pe::Sigmoid(pe::_1)), {in1}, context.seq);
+  context.addTensor(this->output(), output);
+}
+
+void softplus::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor input = context.fromSsa(this->input());
+  const float beta = this->beta().convertToFloat();
+  const float threshold = this->threshold().convertToFloat();
+
+  std::vector<std::unique_ptr<pe::Expr>> exprs;
+  exprs.push_back(std::make_unique<pe::PlaceHolder>(pe::_1));
+
+  if (beta != 1.0f) {
+    exprs.push_back(std::make_unique<pe::Mul>(pe::Const(beta), *exprs.back()));
+  }
+
+  // log1p(-exp(|beta * x|))
+  exprs.push_back(std::make_unique<pe::Exp>(-pe::Abs(*exprs.back())));
+  exprs.push_back(std::make_unique<pe::Log1p>(*exprs.back()));
+
+  if (beta != 1.0f) {
+    exprs.push_back(
+        std::make_unique<pe::Divide>(*exprs.back(), pe::Const(beta)));
+  }
+
+  // 1/beta * log1p(-exp(|beta * x|)) + max(x, 0)
+  exprs.push_back(std::make_unique<pe::Add>(*exprs.back(),
+                                            pe::Max(pe::_1, pe::Const(0.0f))));
+
+  // beta * x <= threshold ? 1/beta * log1p(-exp(|beta * x|)) + max(x, 0) : x
+  exprs.push_back(std::make_unique<pe::Select>(
+      *exprs.back(), pe::_1, *exprs.back() <= pe::Const(threshold)));
+
+  const poplar::Tensor output =
+      popops::map(context.graph, *exprs.back(), {input}, context.seq);
+  context.addTensor(this->result(), output);
 }
 
 void relu::lowerToPoplar(CompilerContext &context) {
