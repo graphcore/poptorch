@@ -131,19 +131,19 @@ def add_outplace_op(function,
             assert not is_list
             outputs_code += scope + "\tstack.push_back(outputInplaceReshape"
             outputs_code += "(t_id, " + named_tensors[tensor_id]
-            outputs_code += "_pytorch));\n"
+            outputs_code += "_pytorch, requires_grad.at(0)));\n"
         elif is_inplace:
             # Inplace operations should be inplaced versions of a certain input.
             if is_list:
                 outputs_code += scope
                 outputs_code += "\tstack.push_back(outputIsInplaceOfList(t_ids"
                 outputs_code += ", " + named_tensors[
-                    tensor_id] + "_pytorch));\n"
+                    tensor_id] + "_pytorch, requires_grad));\n"
             else:
                 outputs_code += scope
                 outputs_code += "\tstack.push_back(outputIsInplaceOf(t_id"
                 outputs_code += ", " + named_tensors[
-                    tensor_id] + "_pytorch));\n"
+                    tensor_id] + "_pytorch, requires_grad.at(0)));\n"
         else:
             # Otherwise we are returning a new tensor or tensor list.
             if is_list:

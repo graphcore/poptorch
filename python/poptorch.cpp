@@ -803,6 +803,7 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   canonicalizeLate(graph.get());
 
   if (is_training) {
+    poptorch::addDetachOperations(graph.get());
     poptorch::removeSurplusIdentityLosses(graph.get());
   }
 

@@ -70,8 +70,4 @@ def fine_tuning_harness(imagenet_model, trace_model):
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_resnet18(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
     fine_tuning_harness(models.resnet18, trace_model)

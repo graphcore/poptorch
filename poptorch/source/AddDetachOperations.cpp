@@ -32,6 +32,7 @@ torch::jit::Value *possiblyDetachedValue(torch::jit::Graph *graph,
   auto it = detached_values.find(value);
   if (it == detached_values.end()) {
     auto *detach = graph->create(symbols::popart::detach);
+    detach->copyMetadata(producer);
     detach->addInput(value);
     detach->insertAfter(producer);
     it = detached_values.insert({value, detach->output(0)}).first;

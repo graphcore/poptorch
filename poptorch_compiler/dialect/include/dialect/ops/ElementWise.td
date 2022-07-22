@@ -403,7 +403,7 @@ def Poptorch_pow_Tensor_Scalar_out : Poptorch_elem_binary_scalar_NotImplemented<
 class Poptorch_binary_conditional<string name, list<OpTrait> traits = []>
         : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
     let arguments = (ins Poptorch_tensor:$in1, Poptorch_tensor:$in2);
-    let results = (outs Poptorch_tensor:$result);
+    let results = (outs Poptorch_tensor_no_grad:$result);
     let assemblyFormat = [{
         `(`$in1 `,` $in2 `)` `(`type($in1)`,`type($in2)`)` `->` type($result) attr-dict
     }];
@@ -427,7 +427,7 @@ def Poptorch_logicalXor: Poptorch_binary_conditional<"logicalXor", [ImplicitCast
 
 class Poptorch_NotImplemented_binary_conditional_scalar<string name> : Poptorch_NotImplementedOp<name, []> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
-    let results = (outs Poptorch_tensor:$result);
+    let results = (outs Poptorch_tensor_no_grad:$result);
     let builders = [OpBuilder<(ins "mlir::Value":$lhs, "float":$rhs),[{
         $_state.addOperands({lhs});
         $_state.addAttribute("rhs", $_builder.getF32FloatAttr(rhs));

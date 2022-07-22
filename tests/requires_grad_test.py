@@ -9,8 +9,6 @@ import helpers
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_requires_grad_false_simple(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): AssertionError: Tensor-likes are not close")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):

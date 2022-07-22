@@ -475,7 +475,8 @@ poptorch_ir::TensorId MLIRDispatch::findTensor(const at::Tensor &tensor) {
 
 at::Tensor
 MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
-                                const at::Tensor &original_input) {
+                                const at::Tensor &original_input,
+                                bool requires_grad) {
   ERROR_ON(output_id == poptorch_ir::none_id ||
            output_id == poptorch_ir::tensor_error_id);
 
@@ -483,23 +484,26 @@ MLIRDispatch::outputIsInplaceOf(poptorch_ir::OptionalTensorId output_id,
   _compiler.copy_(actual_output, output_id);
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
   original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
+  original_input.unsafeGetTensorImpl()->set_requires_grad(requires_grad);
   return original_input;
 }
 
 std::vector<at::Tensor> MLIRDispatch::outputIsInplaceOfList(
     const std::vector<poptorch_ir::OptionalTensorId> &output_id,
-    const std::vector<at::Tensor> &original_input) {
+    const std::vector<at::Tensor> &original_input,
+    const std::vector<bool> &requires_grad) {
   for (size_t i = 0; i < output_id.size(); i++) {
-    outputIsInplaceOf(output_id[i], original_input[i]);
+    outputIsInplaceOf(output_id[i], original_input[i], requires_grad[i]);
   }
   return original_input;
 }
 
-at::Tensor
-MLIRDispatch::outputInplaceReshape(poptorch_ir::TensorId output_id,
-                                   const at::Tensor &original_input) {
+at::Tensor MLIRDispatch::outputInplaceReshape(poptorch_ir::TensorId output_id,
+                                              const at::Tensor &original_input,
+                                              bool requires_grad) {
   const std::vector<std::int64_t> shape = _compiler.getSize(output_id);
   original_input.unsafeGetTensorImpl()->set_sizes_contiguous(shape);
+  original_input.unsafeGetTensorImpl()->set_requires_grad(requires_grad);
   _mapper.addTensor(original_input, output_id);
   return original_input;
 }

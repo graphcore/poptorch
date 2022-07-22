@@ -134,7 +134,7 @@ def Poptorch_topk : Poptorch_Op<"topk", []> {
                          BoolAttr:$sorted);
 
 
-    let results = (outs Poptorch_tensor:$values, Poptorch_tensor:$indices);
+    let results = (outs Poptorch_tensor:$values, Poptorch_tensor_no_grad:$indices);
 
     let builders = [OpBuilder<(ins "mlir::Value":$self, 
                                       "std::int64_t":$K,

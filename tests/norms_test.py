@@ -68,10 +68,6 @@ def test_batchNorm(batch_norm, affine, running_stats, training, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_batchNorm_eval_during_training(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T51159): NotImplementedError: Cannot access storage of "
-            "IpuTensorImpl")
     torch.manual_seed(42)
 
     class Model(torch.nn.Module):

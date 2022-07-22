@@ -103,7 +103,8 @@ at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
   tensor = copyAndCoerceType(tensor);
 
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
-  value->inferTypeFrom(tensor);
+  value->setType(c10::TensorType::create(tensor)->withRequiresGrad(
+      cpu_tensor.requires_grad()));
 
   logging::trace("[TRACING-2] Adding {}: Value {} with cpu ptr {}",
                  is_parameter ? "parameter" : "input",
@@ -211,9 +212,12 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
     copy = createCast(graph.get(), src_tracked->jit, *self_st)->output();
   }
 
+  copy->setType(copy->type()->expect<c10::TensorType>()->withRequiresGrad(
+      src.requires_grad()));
   self_tracked->jit = copy;
   self_tracked->is_empty = src_tracked->is_empty;
 
+  self.set_requires_grad(src.requires_grad());
   logging::trace("[TRACING-2][JIT] copyInplace: self tensor new jit ir %{}",
                  self_tracked->jit->debugName());
 
