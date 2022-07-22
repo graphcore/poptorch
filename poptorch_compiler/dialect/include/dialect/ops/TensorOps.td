@@ -262,6 +262,23 @@ def Poptorch_dropout : Poptorch_Op<"dropout", []> {
     ];
 }
 
+class Poptorch_dropout_NotImplementedOps<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+    let arguments = (ins Poptorch_tensor:$input, F32Attr:$p, BoolAttr:$training);
+
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$input, "float":$p, "bool":$training),[{
+        $_state.addOperands({input});
+        $_state.addAttribute("p", $_builder.getF32FloatAttr(p));
+        $_state.addAttribute("training", $_builder.getBoolAttr(training));
+        $_state.addTypes({input.getType()});
+      }]>
+    ];
+}
+
+def Poptorch_feature_dropout : Poptorch_dropout_NotImplementedOps<"feature_dropout", []> {}
+def Poptorch_feature_dropout_ : Poptorch_dropout_NotImplementedOps<"feature_dropout_", []> {}
+
 def Poptorch_where : Poptorch_Op<"where", [SameOperandsAndResultShape]> {
   let arguments = (ins Poptorch_tensor:$condition,
                        Poptorch_tensor:$self,

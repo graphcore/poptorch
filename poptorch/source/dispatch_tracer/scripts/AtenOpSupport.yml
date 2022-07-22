@@ -754,6 +754,15 @@
 - func: dropout
   PopTorchDirect: dropout
 
+# func: feature_dropout(Tensor input, float p, bool train) -> Tensor
+- func: feature_dropout
+  PopTorchDirect: feature_dropout
+
+# func: feature_dropout_(Tensor(a!) self, float p, bool train) -> Tensor(a!)
+- func: feature_dropout_
+  PopTorchDirect: feature_dropout_
+
+
 # func: acos.out(Tensor self, *, Tensor(a!) out) -> Tensor(a!)
 - func: acos.out
   PopTorchDirect: acos
