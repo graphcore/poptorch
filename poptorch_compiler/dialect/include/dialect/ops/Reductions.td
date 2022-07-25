@@ -315,6 +315,38 @@ class Poptorch_std_var_mean_correction<string name> : Poptorch_std_var_correctio
 def Poptorch_std_mean_correction : Poptorch_std_var_mean_correction<"std_mean_correction"> {}
 def Poptorch_var_mean_correction : Poptorch_std_var_mean_correction<"var_mean_correction"> {}
 
+
+// aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> Tensor
+def Poptorch_embedding : Poptorch_NotImplementedOp<"embedding", []> {
+    let arguments = (ins Poptorch_tensor:$weight,
+                         Poptorch_tensor:$indices,
+                         I64Attr:$padding_idx,
+                         BoolAttr:$scale_grad_by_freq,
+                         BoolAttr:$sparse);
+    let results = (outs Poptorch_tensor:$result);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$weight,
+                                   "mlir::Value":$indices,
+                                   "std::int64_t":$padding_idx,
+                                   "bool":$scale_grad_by_freq,
+                                   "bool":$sparse), [{
+      $_state.addOperands({weight, indices});
+      $_state.addAttribute("padding_idx", $_builder.getI64IntegerAttr(padding_idx));
+      $_state.addAttribute("scale_grad_by_freq", $_builder.getBoolAttr(scale_grad_by_freq));
+      $_state.addAttribute("sparse", $_builder.getBoolAttr(sparse));
+
+      ERROR_ON_MSG(scale_grad_by_freq, "scale_grad_by_freq is unsupported for aten::embedding");
+      ERROR_ON_MSG(sparse, "sparse is unsupported for aten::embedding");
+
+      auto embedding_dim = getShape(weight)[1];
+      auto out_shape = getShape(indices);
+      out_shape.push_back(embedding_dim);
+
+      $_state.addTypes(mlir::RankedTensorType::get(out_shape, getElementType(weight)));
+    }]>];
+}
+
+
 // func: _embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq=False, int mode=0, bool sparse=False, Tensor? per_sample_weights=None, bool include_last_offset=False, int padding_idx=-1) -> (Tensor, Tensor, Tensor, Tensor)
 // NOTE: shape inference for the cpu version of embedding_bag may by found in pytorch here:
 // pytorch/aten/src/ATen/native/EmbeddingBag.cpp:_embedding_bag_cpu_impl()

@@ -311,10 +311,6 @@ def test_embedding(trace_model):
 # pylint: disable=unsubscriptable-object
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_embedding_padding_idx(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T51159): ValueError: not enough values to unpack "
-                    "(expected 2, got 1)")
-
     class TestEmbedding(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -334,7 +330,9 @@ def test_embedding_padding_idx(trace_model):
     grad = model.embedding.weight.grad
 
     options = poptorch.Options()
-    options.anchorTensor("grad_embedding", "Gradient___model.embedding.weight")
+    prefix = "model." if trace_model else ""
+    options.anchorTensor("grad_embedding",
+                         f"Gradient___{prefix}embedding.weight")
     options.Jit.traceModel(trace_model)
     pop_model = poptorch.trainingModel(TestEmbedding(), options=options)
     pop_y, pop_loss = pop_model(x)

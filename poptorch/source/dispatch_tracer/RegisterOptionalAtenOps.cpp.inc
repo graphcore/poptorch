@@ -34,6 +34,7 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("any", PTC_BOXED(poptorch::fallback));
   m.impl("feature_dropout", PTC_BOXED(poptorch::fallback));
   m.impl("feature_dropout_", PTC_BOXED(poptorch::fallback));
+  m.impl("embedding", PTC_BOXED(poptorch::fallback));
 
   // Intercept alias to circumvent issues accessing tensor storage directly
   m.impl("alias", PTC_BOXED(poptorch::fallback));

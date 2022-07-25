@@ -1165,6 +1165,10 @@
 - func: masked_fill.Scalar
   PopTorchDirect: masked_fill_Scalar
 
+# func: embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> Tensor
+- func: embedding
+  PopTorchDirect: embedding
+
 # func: _embedding_bag(Tensor weight, Tensor indices, Tensor offsets, bool scale_grad_by_freq=False, int mode=0, bool sparse=False, Tensor? per_sample_weights=None, bool include_last_offset=False, int padding_idx=-1) -> (Tensor, Tensor, Tensor, Tensor)
 - func: _embedding_bag
   PopTorchDirect: embedding_bag
