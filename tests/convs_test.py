@@ -430,13 +430,16 @@ def test_cumsum(dim, training, trace_model):
 @pytest.mark.parametrize("src_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dest_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dim", range(-1, 1))
-def test_cumsum_changing_types(src_dtype, dest_dtype, dim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_cumsum_changing_types(src_dtype, dest_dtype, dim, trace_model):
     class Model(torch.nn.Module):
         def forward(self, inp):
             return inp.cumsum(dim=dim, dtype=dest_dtype)
 
     cpu_model = Model()
-    ipu_model = poptorch.inferenceModel(cpu_model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipu_model = poptorch.inferenceModel(cpu_model, options)
 
     torch.manual_seed(42)
     inp = torch.randn(1, 5, 6).to(src_dtype)
@@ -449,14 +452,17 @@ def test_cumsum_changing_types(src_dtype, dest_dtype, dim):
 @pytest.mark.parametrize("src_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dest_dtype", [torch.float, torch.int])
 @pytest.mark.parametrize("dim", range(-1, 1))
-def test_cumsum_changing_types_out(src_dtype, dest_dtype, dim):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_cumsum_changing_types_out(src_dtype, dest_dtype, dim, trace_model):
     class Model(torch.nn.Module):
         def forward(self, inp):
             res = torch.empty(inp.shape).to(dest_dtype)
             return torch.cumsum(inp, dim=dim, out=res)
 
     cpu_model = Model()
-    ipu_model = poptorch.inferenceModel(cpu_model)
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipu_model = poptorch.inferenceModel(cpu_model, options)
 
     torch.manual_seed(42)
     inp = torch.randn(1, 5, 6).to(src_dtype)

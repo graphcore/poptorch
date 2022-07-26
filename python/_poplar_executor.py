@@ -55,9 +55,9 @@ class _SetDefaultDeviceType:
 
         # All the ops with FACTORY_PARAMS in <torch>/tools/pyi/gen_pyi.py
         for name in [
-                "arange", "full", "full_like", "linspace", "logspace", "ones",
-                "rand", "randint", "randn", "randperm", "range", "tensor",
-                "zeros", "zeros_like"
+                "arange", "empty", "full", "full_like", "linspace", "logspace",
+                "ones", "rand", "randint", "randn", "randperm", "range",
+                "tensor", "zeros", "zeros_like"
         ]:
             func = getattr(torch, name)
 

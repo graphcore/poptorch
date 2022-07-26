@@ -304,6 +304,7 @@ void InplaceInputsTracker::addTensor(torch::jit::Value *input) {
 
 torch::jit::Value *
 InplaceInputsTracker::eraseCurrentAlias(torch::jit::Value *alias) {
+  ERROR_ON(alias == nullptr);
   // Walk through the view ops until we find an input tensor.
   while (viewOps().count(alias->node()->kind()) != 0) {
     alias = alias->node()->input(0);
