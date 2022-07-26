@@ -46,11 +46,16 @@ def module_repr(m: torch.nn.Module):
     return main_str
 
 
-def print(m: torch.nn.Module):
+_global_print = print
+
+
+def print(m):
     """
     Prints a torch.nn.Module along with the corresponding pre-hooks.
 
     This will print any BeginBlocks that have been added to the model which
     otherwise wouldn't be displayed.
     """
-    print(module_repr(m))
+    if isinstance(m, torch.nn.Module):
+        _global_print(module_repr(m))
+    _global_print(m)
