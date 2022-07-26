@@ -1142,22 +1142,30 @@ PopartType CompilerImpl::getPopartType(poptorch::TensorId id) const {
     return getHostSideConstant(id).popartType();
   }
 
-  ERROR_ON(!session);
-  if (!session->hasInfo(ids[id])) {
-    return PopartType::UNDEFINED;
+  popart::DataType dtype;
+  auto popart_id = ids[id];
+  if (!session) {
+    if (!active_builder->hasValueInfo(popart_id)) {
+      return PopartType::UNDEFINED;
+    }
+    dtype = active_builder->getTensorDataType(popart_id);
+  } else {
+    if (!session->hasInfo(popart_id)) {
+      return PopartType::UNDEFINED;
+    }
+    popart::TensorInfo info = session->getInfo(popart_id);
+    dtype = info.dataType();
   }
-
-  popart::TensorInfo info = session->getInfo(ids[id]);
 
 #define DEFINE_CASE(value)                                                     \
   case popart::DataType::value: {                                              \
     return PopartType::value;                                                  \
   }
 
-  switch (info.dataType()) { FOR_ALL_POPART_TYPES(DEFINE_CASE) }
+  switch (dtype) { FOR_ALL_POPART_TYPES(DEFINE_CASE) }
 #undef DEFINE_CASE
 
-  ERROR("Unsupported popart type in return: " << info.data_type());
+  ERROR("Unsupported popart type in return: " << dtype);
 }
 
 void CompilerImpl::cachePopartTypes() {

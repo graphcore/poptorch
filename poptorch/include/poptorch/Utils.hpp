@@ -91,6 +91,16 @@ private:
 };
 using ListTypeWithNumElementsPtr = std::shared_ptr<ListTypeWithNumElements>;
 
+struct JitTensorInfo {
+  explicit JitTensorInfo(const at::Tensor &tensor);
+  explicit JitTensorInfo(torch::jit::Value *value);
+  std::string toString() const;
+  at::ScalarType scalar_type;
+  std::vector<int64_t> dims;
+};
+
+void validateTensorShapeAndType(torch::jit::Value *value,
+                                const at::Tensor &tensor);
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_UTILS_HPP

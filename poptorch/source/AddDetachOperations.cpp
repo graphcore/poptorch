@@ -35,6 +35,7 @@ torch::jit::Value *possiblyDetachedValue(torch::jit::Graph *graph,
     detach->copyMetadata(producer);
     detach->addInput(value);
     detach->insertAfter(producer);
+    detach->output(0)->setType(value->type());
     it = detached_values.insert({value, detach->output(0)}).first;
   }
 

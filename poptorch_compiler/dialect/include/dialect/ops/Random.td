@@ -135,9 +135,7 @@ def Poptorch_bernoulli : Poptorch_NotImplementedOp<"bernoulli", [SameOperandsAnd
   let builders = [OpBuilder<(ins "mlir::Value":$input), [{
         $_state.addOperands({input});
 
-        auto input_shape = getShape(input);
-
-        $_state.addTypes(mlir::RankedTensorType::get(input_shape, $_builder.getF32Type()));
+        $_state.addTypes({input.getType()});
   }]>];
 }
 

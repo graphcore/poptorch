@@ -334,6 +334,10 @@ private:
   std::string tensorTypesAndShapes(std::int64_t first_tensor,
                                    std::int64_t num_tensors);
   std::string tensorTypesAndShapes(const ValueMap::TensorList &tensors);
+
+  void validateOutputShapeAndType(poptorch::TensorId output_tensor,
+                                  torch::jit::Node *node,
+                                  std::uint64_t node_output);
 };
 
 namespace {
@@ -587,6 +591,33 @@ LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
   return shapes;
 }
 
+void LowerToPopartImpl::validateOutputShapeAndType(
+    poptorch::TensorId output_tensor, torch::jit::Node *node,
+    std::uint64_t node_output) {
+  torch::jit::Value *output = node->output(node_output);
+  JitTensorInfo jit_output(output);
+
+  at::ScalarType popart_type =
+      fromPopartType(_compiler.getPopartType(output_tensor));
+  std::vector<std::int64_t> popart_size = _compiler.getSize(output_tensor);
+  bool match = (popart_type == jit_output.scalar_type);
+  // Only validate shape if PopART's shape inference worked.
+  if (match && !popart_size.empty()) {
+    if (popart_size.size() != jit_output.dims.size()) {
+      match = false;
+    } else {
+      for (std::uint64_t d = 0; d < popart_size.size(); ++d) {
+        if (popart_size.at(d) != jit_output.dims.at(d)) {
+          match = false;
+          break;
+        }
+      }
+    }
+  }
+  ERROR_ON_MSG(!match, "Output[" << node_output << "] mismatch: "
+                                 << nodeToString(node) << " -> PopART "
+                                 << tensorTypesAndShapes(output_tensor, 1));
+}
 // Lower the main body of the _graph.
 void LowerToPopartImpl::lowerBody() {
   logging::LogContext ctx_func("LowerToPopartImpl::lowerBody");
@@ -636,6 +667,9 @@ void LowerToPopartImpl::lowerBody() {
         poptorch::TensorId output_tensor = first_output_tensor + i;
         ERROR_ON_MSG(!_compiler.tensorIdIsValid(output_tensor),
                      "Output " << i << " doesn't exist of Node " << *node);
+        // TODO(T66614): JIT graph doesn't have any shape inference so we can't
+        // validate the shapes. Revisit once we've migrated to MLIR.
+        // validateOutputShapeAndType(output_tensor, node, i);
         _value_map.setTensor(output, output_tensor);
       }
 
@@ -937,9 +971,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   std::function<bool(torch::jit::Value * value)> is_parameter_tensor;
   std::function<void *(torch::jit::Value * value)> get_data_ptr;
   std::function<std::string(torch::jit::Value * value)> get_parameter_name;
-  std::function<void(torch::jit::Value * value, at::ScalarType & scalar_type,
-                     std::vector<int64_t> & dims)>
-      get_type_info;
+  std::function<JitTensorInfo(torch::jit::Value * value)> get_type_info;
 
   if (_built_in_params) {
     ERROR_ON_MSG(in_tensors != nullptr,
@@ -954,11 +986,8 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
                                      << value->debugName());
       return name;
     };
-    get_type_info = [](torch::jit::Value *value, at::ScalarType &scalar_type,
-                       std::vector<int64_t> &dims) {
-      auto tensor_type = value->type()->cast<at::TensorType>();
-      scalar_type = *tensor_type->scalarType();
-      dims = *tensor_type->sizes().concrete_sizes();
+    get_type_info = [](torch::jit::Value *value) {
+      return JitTensorInfo(value);
     };
 
     // Step 0, remove unused parameters
@@ -1039,14 +1068,12 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
       return tensor.data_ptr();
     };
 
-    get_type_info = [=](torch::jit::Value *value, at::ScalarType &scalar_type,
-                        std::vector<int64_t> &dims) {
+    get_type_info = [=](torch::jit::Value *value) {
       auto index = index_of_tensor(value);
       at::Tensor &tensor(is_parameter_tensor(value)
                              ? _parameters.at(index - num_t_inputs)
                              : (*in_tensors)[index]);
-      scalar_type = tensor.scalar_type();
-      dims = tensor.sizes().vec();
+      return JitTensorInfo(tensor);
     };
   }
 
@@ -1057,10 +1084,8 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
   size_t input_index = 0;
   size_t param_index = 0;
   for (auto *value : graph_t_inputs) {
-    at::ScalarType scalar_type;
-    std::vector<int64_t> dims;
-    get_type_info(value, scalar_type, dims);
-    std::string popart_type = typeToPopartStr(scalar_type);
+    JitTensorInfo info = get_type_info(value);
+    std::string popart_type = typeToPopartStr(info.scalar_type);
     if (is_parameter_tensor(value)) {
       void *data_ptr = get_data_ptr(value);
       ERROR_ON_MSG(value->uses().empty(),
@@ -1080,7 +1105,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
 
       std::string name = _parameter_names.at(param_index);
       auto id = _compiler.addInitializedInputTensor(
-          name.c_str(), popart_type.c_str(), dims, data_ptr);
+          name.c_str(), popart_type.c_str(), info.dims, data_ptr);
       parameter_values.push_back(value);
       parameter_popart_ids.push_back(id);
       param_index++;
@@ -1091,7 +1116,7 @@ void LowerToPopartImpl::lowerParameters(std::vector<at::Tensor> *in_tensors) {
         overlap_str = _graph.param_node()->s(overlap_symbol);
       }
 
-      auto id = _compiler.addInputTensor(popart_type.c_str(), dims,
+      auto id = _compiler.addInputTensor(popart_type.c_str(), info.dims,
                                          overlap_str.c_str());
       _input_tensor_hooks.push_back(id);
       input_index++;

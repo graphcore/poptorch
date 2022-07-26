@@ -473,6 +473,14 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     ERROR_ON_MSG(
         !record,
         "[TRACING-2][JIT] Inplace op is not tracking inplace argument");
+
+    // Ensure the value and torch tensor shapes match
+    JitTensorInfo value_info(value);
+    inplace_tensor->unsafeGetTensorImpl()->set_sizes_contiguous(
+        value_info.dims);
+
+    // Validate to make sure the data type also matches.
+    validateTensorShapeAndType(value, *inplace_tensor);
     record->jit = value;
     record->is_empty = false;
   }

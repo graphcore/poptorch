@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 #include "PoptorchSymbols.hpp"
 #include "poptorch/Utils.hpp"
@@ -312,4 +313,41 @@ std::vector<std::int64_t> shapeFromTensor(torch::jit::Value *value) {
   return shape;
 }
 
+JitTensorInfo::JitTensorInfo(const at::Tensor &tensor) {
+  scalar_type = tensor.scalar_type();
+  dims = tensor.sizes().vec();
+}
+
+JitTensorInfo::JitTensorInfo(torch::jit::Value *value) {
+  auto tensor_type = value->type()->cast<at::TensorType>();
+  ERROR_ON_MSG(!tensor_type->scalarType().has_value(), "Data type not set");
+  ERROR_ON_MSG(!tensor_type->sizes().concrete_sizes().has_value(),
+               "Size not set");
+  scalar_type = *tensor_type->scalarType();
+  dims = *tensor_type->sizes().concrete_sizes();
+}
+
+std::string JitTensorInfo::toString() const {
+  std::stringstream ss;
+  ss << scalar_type << "(";
+  std::string sep;
+
+  for (auto d : dims) {
+    ss << sep << d;
+    sep = ", ";
+  }
+  ss << ")";
+  return ss.str();
+}
+
+void validateTensorShapeAndType(torch::jit::Value *value,
+                                const at::Tensor &tensor) {
+  JitTensorInfo jit(value);
+  JitTensorInfo torch(tensor);
+  bool match = std::tie(torch.scalar_type, torch.dims) ==
+               std::tie(jit.scalar_type, jit.dims);
+  ERROR_ON_MSG(!match, "Shape/Type mismatch: JIT tensor %"
+                           << value->debugName() << " " << jit.toString()
+                           << " is incompatible with " << torch.toString());
+}
 } // namespace poptorch

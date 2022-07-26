@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "Tensor.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -73,6 +74,8 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
   logging::trace("Adding {} to value mapper, JIT ir: {}",
                  static_cast<void *>(t.unsafeGetTensorImpl()),
                  val->debugName());
+  validateTensorShapeAndType(val, t);
+
   // If the tensor is already being tracked then we will update the JIT
   // value being tracked. Otherwise we insert and add the jit value.
   auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
