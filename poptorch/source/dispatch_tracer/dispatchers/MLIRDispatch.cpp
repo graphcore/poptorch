@@ -338,6 +338,8 @@ void MLIRDispatch::setCurrentCodeLocation(
   if (file_line_col) {
     auto [filename, line, col] = *file_line_col; // NOLINT
     _compiler.setCurrentPythonCodeLocation(filename.c_str(), line, col);
+  } else {
+    _compiler.setCurrentPythonCodeLocation(nullptr, 0, 0);
   }
 }
 

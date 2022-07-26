@@ -289,8 +289,12 @@ public:
   // the location does not be sent as part of creating an op. This method allows
   // the location to be set.
   void setLoc(const char *filename, std::uint64_t line, std::uint64_t col) {
-    _builder.setLoc(mlir::FileLineColLoc::get(
-        _builder.getContext(), _builder.getIdentifier(filename), line, col));
+    if (filename != nullptr) {
+      _builder.setLoc(mlir::FileLineColLoc::get(
+          _builder.getContext(), _builder.getIdentifier(filename), line, col));
+    } else {
+      _builder.setLoc(mlir::UnknownLoc::get(_builder.getContext()));
+    }
   }
 
   template <typename OpTy, typename... Args> OpTy createOp(Args &&...args) {
