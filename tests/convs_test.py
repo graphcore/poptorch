@@ -280,7 +280,7 @@ def merge_dicts(x, y):
 def test_available_memory(capfd, trace_model):
     seen_length = 0
 
-    def get_mem_for_conv(op):
+    def get_mem_prop_for_conv(op):
         nonlocal seen_length
 
         torch.manual_seed(42)
@@ -298,25 +298,25 @@ def test_available_memory(capfd, trace_model):
 
         _, log = capfd.readouterr()
 
-        m = re.search(
-            r"Planning convolution with a per-tile memory limit of (\d+)", log)
+        m = re.search(r"availableMemoryProportion\ +([\d.]+)", log)
 
         assert m
 
-        return int(m.group(1))
+        return float(m.group(1))
 
     model = torch.nn.Conv2d(4, 16, 10, stride=1)
-    default_mem_for_conv = get_mem_for_conv(model)
+    default_prop_for_conv = get_mem_prop_for_conv(model)
 
     model.register_forward_hook(lambda _1, _2, conv: poptorch.
                                 set_available_memory(conv, 0.5))
 
-    adjusted_mem_for_conv = get_mem_for_conv(model)
+    adjusted_prop_for_conv = get_mem_prop_for_conv(model)
 
     # The default value for available_memory should be more than 0.5 meaning
     # the default memory available for the convolution should be more than
     # after we adjusted the available memory
-    assert default_mem_for_conv > adjusted_mem_for_conv
+    assert default_prop_for_conv > adjusted_prop_for_conv
+    assert adjusted_prop_for_conv == 0.5
 
 
 @pytest.mark.parametrize("mode", poptorch.MatMulSerializationMode)
