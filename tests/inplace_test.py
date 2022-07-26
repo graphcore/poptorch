@@ -383,6 +383,103 @@ def test_float_to_half_buffer_inplace_with_training(trace_model):
     helpers.assert_allclose(actual=native_loss, expected=poptorch_loss)
 
 
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_on_buffer_and_input(trace_model):
+    fill_value = 3
+    shape = (1, 2)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("buffer", torch.ones(shape))
+
+        def forward(self, x):
+            # Perform inplace ops on both the input and our buffer.
+            x.fill_(fill_value)
+
+            buffer_update = self.buffer + x
+            self.buffer.copy_(buffer_update)
+
+            return self.buffer, x
+
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+
+    model = poptorch.inferenceModel(Model(), opts)
+
+    buf, out = model(torch.ones(shape))
+
+    expected_out = torch.full(shape, fill_value)
+    expected_buf = expected_out + 1
+
+    helpers.assert_allequal(actual=out, expected=expected_out)
+    helpers.assert_allequal(actual=buf, expected=expected_buf)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_two_inplace_copies(trace_model):
+    fill_value = 3
+    shape = (1, 2)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            res = torch.full(shape, fill_value)
+            x.copy_(res)
+
+            # Do a second `copy_` to our input.
+            res += 3
+            x.copy_(res)
+
+            return x
+
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+
+    model = poptorch.inferenceModel(Model(), opts)
+
+    out = model(torch.ones(shape))
+
+    expected_out = torch.full(shape, fill_value) + 3
+
+    helpers.assert_allequal(actual=out, expected=expected_out)
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_two_inplace_copies_buffer(trace_model):
+    fill_value = 3
+    shape = (1, 2)
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("buffer", torch.ones(shape))
+
+        def forward(self, x):
+            x.fill_(fill_value)
+
+            buffer_update = self.buffer + x
+            self.buffer.copy_(buffer_update)
+
+            # Do a second `copy_` to our buffer.
+            buffer_update += 5
+            self.buffer.copy_(buffer_update)
+
+            return self.buffer, x
+
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+
+    model = poptorch.inferenceModel(Model(), opts)
+
+    buf, out = model(torch.ones(shape))
+
+    expected_out = torch.full(shape, fill_value)
+    expected_buf = expected_out + 6
+
+    helpers.assert_allequal(actual=out, expected=expected_out)
+    helpers.assert_allequal(actual=buf, expected=expected_buf)
+
+
 def direct_assign(x, step):
     x[0:2:step.item()] = x[0:2:step.item()] * 0
     return x

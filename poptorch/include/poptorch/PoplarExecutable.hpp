@@ -38,7 +38,7 @@ public:
    * Execute the compiled graph stored in field "compiler" with the given
    * |inTensors| and return to the user the resulting tensors if any.
    */
-  std::vector<at::IValue> run(std::vector<at::Tensor> *inTensors);
+  std::vector<at::IValue> run(std::vector<at::Tensor> &inTensors);
 
   void updateOptimizers(const std::vector<Optimizer> &optimizer);
 

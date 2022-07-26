@@ -307,9 +307,6 @@ def test_no_input_but_one_buffer(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_unsynchronised_replicated_buffers(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): assert tensor(9.) == (tensor([9]) * 50)")
-
     class ReplicaBufferModel(torch.nn.Module):
         def __init__(self):
             super().__init__()

@@ -214,6 +214,12 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
 
   copy->setType(copy->type()->expect<c10::TensorType>()->withRequiresGrad(
       src.requires_grad()));
+
+  // The copy_ node's output is now an alias of self, so mark it as such. By
+  // default, inputs will have a self -> self alias, so remove it first.
+  _inplace_tracker.eraseSelfAlias(self_tracked->jit);
+  _inplace_tracker.registerAlias(self_tracked->jit, copy);
+
   self_tracked->jit = copy;
   self_tracked->is_empty = src_tracked->is_empty;
 

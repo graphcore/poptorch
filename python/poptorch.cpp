@@ -943,7 +943,7 @@ execute(const std::shared_ptr<poptorch::PoplarExecutable> &executable,
     buildTensorList(value, &input_tensors);
   }
 
-  std::vector<at::IValue> output_tensors = executable->run(&input_tensors);
+  std::vector<at::IValue> output_tensors = executable->run(input_tensors);
 
   std::vector<pybind11::object> returnee;
 

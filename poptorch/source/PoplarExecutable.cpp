@@ -22,14 +22,14 @@ void PoplarExecutable::updateOptimizers(
 }
 
 std::vector<at::IValue>
-PoplarExecutable::run(std::vector<at::Tensor> *inTensors) {
+PoplarExecutable::run(std::vector<at::Tensor> &inTensors) {
   std::vector<at::Tensor> tensor_views;
 
   // Set up the input tensors in the poplar graph to point to the incoming
   // pytorch tensors.
   for (std::size_t i = 0; i < _popart_inputs.size(); ++i) {
     poptorch::TensorId popart_id = _popart_inputs[i];
-    at::Tensor &pytorch_tensor = inTensors->at(i);
+    at::Tensor &pytorch_tensor = inTensors.at(i);
 
     ERROR_ON(!pytorch_tensor.is_contiguous());
 
@@ -168,7 +168,7 @@ PoplarExecutable::run(std::vector<at::Tensor> *inTensors) {
       continue;
     }
     auto out_tensor = returnees.at(mapping[i]).toTensor();
-    (*inTensors)[i].copy_(out_tensor, false);
+    inTensors.at(i).copy_(out_tensor, false);
   }
 
   returnees.resize(_inplace_info.num_tensor_outputs);

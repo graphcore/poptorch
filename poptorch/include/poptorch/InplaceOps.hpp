@@ -86,12 +86,16 @@ public:
   // from the tracker and return the input it was aliasing. If the given value
   // doesn't alias an input return nullptr.
   torch::jit::Value *eraseCurrentAlias(torch::jit::Value *alias);
+  // Erase the given alias, only if it's an alias to the same node (as is made
+  // by addTensor). Returns true if an alias was erased.
+  bool eraseSelfAlias(torch::jit::Value *alias);
   void registerAlias(torch::jit::Value *aliased_input,
                      torch::jit::Value *alias);
   InplaceGraphInfo finalizeGraph(torch::jit::Graph &graph, size_t num_anchors,
                                  bool replicas_needing_broadcast);
 
 private:
+  // alias -> aliased
   std::unordered_map<torch::jit::Value *, torch::jit::Value *> _aliases;
 };
 } // namespace poptorch

@@ -942,8 +942,9 @@ def test_copy_(input_shapes, dtype, trace_model):
 
     def assert_fn(native_out, poptorch_out):
         for pop, native in zip(poptorch_out, native_out):
-            assert native.dtype == pop.dtype
-            helpers.assert_allclose(expected=native, actual=pop)
+            helpers.assert_allclose(expected=native,
+                                    actual=pop,
+                                    check_dtype=True)
 
     # Calculating with integers does not produce meaningful gradients
     test_training = dtype is torch.float

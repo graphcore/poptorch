@@ -321,6 +321,16 @@ InplaceInputsTracker::eraseCurrentAlias(torch::jit::Value *alias) {
   return nullptr;
 }
 
+bool InplaceInputsTracker::eraseSelfAlias(torch::jit::Value *alias) {
+  const auto it = _aliases.find(alias);
+  if (it != _aliases.end() && it->second == alias) {
+    eraseCurrentAlias(alias);
+    return true;
+  }
+
+  return false;
+}
+
 void InplaceInputsTracker::registerAlias(torch::jit::Value *aliased_input,
                                          torch::jit::Value *alias) {
   logging::trace("Registering alias {} for input %{}", alias->debugName(),
@@ -336,7 +346,8 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
   std::map<torch::jit::Value *, torch::jit::Value *> input_aliases;
   for (auto &p : _aliases) {
     ERROR_ON_MSG(!input_aliases.insert({p.second, p.first}).second,
-                 "More than one alias for graph input ");
+                 "More than one alias for graph input %"
+                     << p.second->debugName());
   }
   size_t num_normal_tensor_outputs = countNumTensorOutputs(graph);
   InplaceGraphInfo out;
@@ -384,7 +395,7 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
         // Clean up any dead nodes.
         searchAndPossiblyDestroy(to_delete);
       } else {
-        logging::trace("Alias for parameter %{} -> %{}", it->first->debugName(),
+        logging::trace("Alias for input %{} -> %{}", it->first->debugName(),
                        alias->debugName());
         // Check if the alias is already being returned.
         for (size_t output = 0; output < graph.outputs().size(); output++) {
@@ -405,7 +416,11 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
         }
       }
     }
-    out.input_output_mapping.push_back(output_mapping);
+    // The input/output mapping is only for 'true' inputs -- not parameters &
+    // buffers (see its usage in PoplarExecutable::run).
+    if (!isParameter(graph_input)) {
+      out.input_output_mapping.push_back(output_mapping);
+    }
   }
   return out;
 }
