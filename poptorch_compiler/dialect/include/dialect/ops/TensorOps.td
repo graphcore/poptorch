@@ -99,7 +99,7 @@ def Poptorch_tensorconstant_int : Poptorch_Op<"tensorconstant_int", []> {
      }]>];
 }
 
-def Poptorch_concat: Poptorch_Op<"concat", []> {
+def Poptorch_concat: Poptorch_Op<"concat", [ImplicitCastOperand<0>]> {
 
     let arguments = (ins Poptorch_tensorlist:$tensors,
                          I64Attr:$dim);

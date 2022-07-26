@@ -83,14 +83,32 @@ template <typename OpTy> constexpr bool isImplicitCastingOp() {
 //     }
 //   }
 // }
+template <typename T, typename F> struct CallWithElementTypeImpl {
+  static void call(const T &t, F &&f) {
+    f(t.getType().template cast<mlir::RankedTensorType>().getElementType());
+  }
+};
+
+template <typename F>
+struct CallWithElementTypeImpl<llvm::SmallVector<mlir::Value, 4>, F> {
+  static void call(const llvm::SmallVector<mlir::Value, 4> &t, F &&f) {
+    for (size_t i = 0; i < t.size(); i++) {
+      CallWithElementTypeImpl<mlir::Value, F>::call(t[i], std::forward<F>(f));
+    }
+  }
+};
+
+template <typename T, typename F>
+using CallWithElementType =
+    CallWithElementTypeImpl<std::remove_const_t<std::remove_reference_t<T>>, F>;
+
 template <typename OpTy, size_t start, size_t end, typename F, typename... Args>
 void callOnEachElementType(F &&f, const Args &...args) {
   if constexpr (start < end) {
     if constexpr (implicitCastsOn<OpTy, start>()) {
-      f(std::get<start>(std::forward_as_tuple(args...))
-            .getType()
-            .template cast<mlir::RankedTensorType>()
-            .getElementType());
+      auto tup = std::forward_as_tuple(args...);
+      CallWithElementType<std::tuple_element_t<start, decltype(tup)>, F>::call(
+          std::get<start>(tup), std::forward<F>(f));
     }
     callOnEachElementType<OpTy, start + 1, end>(f, args...);
   }
@@ -131,32 +149,49 @@ mlir::Type getCastToType(mlir::MLIRContext &context, const Args &...args) {
 // Implicit cast an mlir::Value to promote_to if necessary, otherwise simply
 // forward element.
 template <typename OpTy, std::size_t Ind, typename Elt>
-auto castAndForwardElt(mlir::ImplicitLocOpBuilder &builder,
-                       mlir::FuncOp &main_graph, const mlir::Type &promote_to,
-                       Elt &&element) {
-  if constexpr (implicitCastsOn<OpTy, Ind>()) {
-    static_assert(
-        std::is_same<typename std::remove_reference<decltype(element)>::type,
-                     mlir::Value>::value,
-        "Only an mlir::Value can be implicitly casted.");
+struct CastAndForwardElt {
+  static auto f(mlir::ImplicitLocOpBuilder &builder, mlir::FuncOp &main_graph,
+                const mlir::Type &promote_to, Elt &&element) {
+    if constexpr (implicitCastsOn<OpTy, Ind>()) {
+      static_assert(
+          std::is_same<typename std::remove_reference<decltype(element)>::type,
+                       mlir::Value>::value,
+          "Only an mlir::Value can be implicitly casted.");
+      mlir::Type element_type = element.getType()
+                                    .template cast<mlir::RankedTensorType>()
+                                    .getElementType();
 
-    mlir::Type element_type = element.getType()
-                                  .template cast<mlir::RankedTensorType>()
-                                  .getElementType();
-
-    if (element_type != promote_to) {
-      // Create a casting op for the implicit casting and add it to the graph
-      // updating the operand to the promoted output.
-      // (poptorch_ir::cast is an automatically generated mlir::Op subclass.)
-      auto casted = builder.create<poptorch_ir::cast>(element, promote_to);
-      main_graph.front().push_back(casted);
-      return casted.result();
+      if (element_type != promote_to) {
+        // Create a casting op for the implicit casting and add it to the graph
+        // updating the operand to the promoted output.
+        // (poptorch_ir::cast is an automatically generated mlir::Op subclass.)
+        auto casted = builder.create<poptorch_ir::cast>(element, promote_to);
+        main_graph.front().push_back(casted);
+        return casted.result();
+      }
     }
-  }
 
-  // Use perfect forwarding in other cases.
-  return std::forward<Elt>(element);
-}
+    // Use perfect forwarding in other cases.
+    return std::forward<Elt>(element);
+  }
+};
+
+template <typename OpTy, std::size_t Ind>
+struct CastAndForwardElt<OpTy, Ind, llvm::SmallVector<mlir::Value, 4> &> {
+  static auto f(mlir::ImplicitLocOpBuilder &builder, mlir::FuncOp &main_graph,
+                const mlir::Type &promote_to,
+                llvm::SmallVector<mlir::Value, 4> element) {
+    if constexpr (implicitCastsOn<OpTy, Ind>()) {
+      llvm::SmallVector<mlir::Value, 4> result;
+      for (size_t i = 0; i < element.size(); i++) {
+        result.emplace_back(CastAndForwardElt<OpTy, Ind, mlir::Value &>::f(
+            builder, main_graph, promote_to, element[i]));
+      }
+      return result;
+    }
+    return element;
+  }
+};
 
 // Perform the looping for implicit casting by unfolding over indices.
 // Equivalent code
@@ -182,8 +217,10 @@ auto castAndForwardImpl(mlir::ImplicitLocOpBuilder &builder,
                         std::index_sequence<Inds...> /*unused*/) {
   // Calls castAndForwardElt on every argument through unwidning, with "Inds"
   // becoming the given index, and returns a tuple of the lot.
-  return std::make_tuple(castAndForwardElt<OpTy, Inds>(
-      builder, main_graph, promote_to, std::get<Inds>(input_tuple))...);
+  return std::make_tuple(
+      CastAndForwardElt<OpTy, Inds,
+                        std::tuple_element_t<Inds, std::tuple<Args...>>>::
+          f(builder, main_graph, promote_to, std::get<Inds>(input_tuple))...);
 }
 
 // Loop through all operands, promote to promote_to if required for implicit

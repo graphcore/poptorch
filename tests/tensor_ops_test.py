@@ -382,9 +382,6 @@ def test_cat(dim, trace_model, dtypes):
 def test_cat_transpose(dim, trace_model):
     """This combination of ops without ImplicitCasting causes the code
     to crash out."""
-    if not trace_model:
-        pytest.skip("TODO(T51159): Only Tensors of floating point and complex "
-                    "dtype can require gradients")
     torch.manual_seed(42)
     floatTensor = torch.randn(2, 3).to(dtype=torch.float)
     intTensor = torch.randn(2, 3).to(dtype=torch.int)
