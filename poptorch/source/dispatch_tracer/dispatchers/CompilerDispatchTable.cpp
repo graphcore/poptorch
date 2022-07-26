@@ -48,6 +48,7 @@ void MLIRDispatch::generateDispatchTable() { // NOLINT
   _direct_dispatch_lookup = {
 #include "AtenToMLIRDispatch.inc"
 #include "PoptorchToMLIRDispatch.inc"
+#include "TorchScatterToMLIRDispatch.inc"
   };
 }
 

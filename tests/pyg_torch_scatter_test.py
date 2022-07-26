@@ -29,15 +29,21 @@ else:
 
 
 def torch_scatter_harness(trace_model, func, src, index):
+
+    # We do the shape inference from scatter here because we don't support
+    # dynamic shaped tensors on the ipu
+    dim_size = int(index.max()) + 1
+
     class Model(torch.nn.Module):
         def forward(self, src, index):
-            return func(src, index)
+            return func(src, index, dim_size=dim_size)
 
     model = Model()
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options=options)
-    native_out = func(src, index)
+
+    native_out = func(src, index, dim_size=dim_size)
     ipu_out = poptorch_model(src, index)
     helpers.assert_allclose(actual=ipu_out, expected=native_out)
 
@@ -45,9 +51,6 @@ def torch_scatter_harness(trace_model, func, src, index):
 @pytest.mark.parametrize("trace_model", [True, False])
 @pytest.mark.parametrize("reduce", ['sum', 'mean', 'max', 'min'])
 def test_scatter(trace_model, reduce):
-    if not trace_model:
-        pytest.skip("TODO(T65186): Various failures with the dispatcher.")
-
     func = partial(scatter, reduce=reduce)
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
@@ -58,9 +61,6 @@ def test_scatter(trace_model, reduce):
 @pytest.mark.parametrize("func",
                          [scatter_log_softmax, scatter_softmax, scatter_std])
 def test_composites(trace_model, func):
-    if not trace_model:
-        pytest.skip("TODO(T65186): Various failures with the dispatcher.")
-
     src = torch.tensor([1, 3, 2, 4, 5, 6]).float()
     index = torch.tensor([0, 1, 0, 1, 1, 3]).long()
     torch_scatter_harness(trace_model, func, src, index)

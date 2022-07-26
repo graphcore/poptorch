@@ -732,5 +732,6 @@ std::optional<double> toOptionalDouble(c10::IValue &value) {
 
 #include "AtenToMLIRInterface.cpp.inc"
 #include "PoptorchToMLIRInterface.cpp.inc"
+#include "TorchScatterToMLIRInterface.cpp.inc"
 
 } // namespace poptorch

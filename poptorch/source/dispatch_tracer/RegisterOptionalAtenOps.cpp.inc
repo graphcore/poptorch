@@ -114,3 +114,8 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("scatter_add.out", PTC_BOXED(poptorch::fallback));
   m.impl("scatter_add_", PTC_BOXED(poptorch::fallback));
 }
+
+TORCH_LIBRARY_IMPL(torch_scatter, XLA, m) {
+  m.impl("scatter_max", PTC_BOXED(poptorch::fallback));
+  m.impl("scatter_min", PTC_BOXED(poptorch::fallback));
+}

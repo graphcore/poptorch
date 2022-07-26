@@ -597,3 +597,54 @@ class Poptorch_elem_binary_scatter_reduce<string name, list<OpTrait> traits = []
 
 def Poptorch_scatter_reduce_out : Poptorch_elem_binary_scatter_reduce<"scatter_reduce_out"> {}
 def Poptorch_scatter_value_reduce_out : Poptorch_elem_binary_scatter_reduce<"scatter_value_reduce_out"> {}
+
+// Note: these are provided by the torch_scatter library
+class Poptorch_scatter_minmax<string name, list<OpTrait> traits = []> : Poptorch_NotImplementedOp<name, traits> {
+    let arguments = (ins Poptorch_tensor:$src,
+                         Poptorch_tensor:$index,
+                         I64Attr:$dim,
+                         Optional<Poptorch_tensor>:$out,
+                         OptionalAttr<I64Attr>:$dim_size);
+
+    let results = (outs Poptorch_tensor:$result, Poptorch_tensor_no_grad:$args);
+
+    let builders = [OpBuilder<(ins "mlir::Value":$src,
+                                   "mlir::Value":$index,
+                                   "std::int64_t":$dim,
+                                   "mlir::Value":$out,
+                                   "std::optional<int64_t>":$dim_size),[{
+        std::vector<mlir::Value> operands = {src, index};
+        std::vector<std::int32_t> segments = {1, 1, 0};
+
+        std::vector<std::int64_t> out_shape = getShape(src);
+
+        dim = convertToPositiveDim(dim, out_shape.size());
+
+        if (out) {
+            operands.push_back(out);
+            segments[2] = 1;
+
+            out_shape = getShape(out);
+        } else if (dim_size.has_value()) {
+            out_shape[dim] = *dim_size;
+        } else {
+            ERROR("You must provide either an output parameter or specify dim_size so the output shape may be inferred");
+        }
+
+        $_state.addOperands(operands);
+        $_state.addAttribute("operand_segment_sizes", $_builder.getI32VectorAttr(segments));
+
+        $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+        if (dim_size.has_value()) {
+            $_state.addAttribute("dim_size", $_builder.getI64IntegerAttr(*dim_size));
+            ERROR_ON_MSG(*dim_size != out_shape[dim], "dim_size expected to be the same as out.shape()[dim]");
+        }
+
+        $_state.addTypes({mlir::RankedTensorType::get(out_shape, getElementType(src)),
+                          mlir::RankedTensorType::get(out_shape, $_builder.getIntegerType(32, true))});
+      }]>
+    ];
+}
+
+def Poptorch_scatter_max : Poptorch_scatter_minmax<"scatter_max"> {}
+def Poptorch_scatter_min : Poptorch_scatter_minmax<"scatter_min"> {}

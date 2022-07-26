@@ -30,6 +30,32 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT
+    ${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRInterface.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRInterface.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRDispatch.inc
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
+     # The file containing the list of operations we are creating an interface for.
+     --ops-to-generate "${CMAKE_CURRENT_SOURCE_DIR}/TorchScatterOpSupport.yml"
+
+     # The file to generate into.
+     --gen-cpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRInterface.cpp.inc"
+
+      # We create a header file for the methods as well.
+     --gen-hpp-file-path "${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRInterface.hpp.inc"
+
+      # Finally a helper to create a lookup map which maps the poptorch symbol onto the function.
+     --gen-lookup "${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRDispatch.inc"
+
+      # Namespace for these symbols
+     --namespace torch_scatter
+   DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/TorchScatterOpSupport.yml
+     ${CMAKE_CURRENT_SOURCE_DIR}/generate_op_interface.py
+     ${CMAKE_CURRENT_SOURCE_DIR}/generate_direct_interface.py
+)
+
+add_custom_command(
+  OUTPUT
     ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.cpp.inc
     ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.hpp.inc
     ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRDispatch.inc
@@ -59,6 +85,9 @@ add_custom_target(generate_supported_ops_interface
     ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.cpp.inc
     ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRInterface.hpp.inc
     ${CMAKE_CURRENT_BINARY_DIR}/../AtenToMLIRDispatch.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRInterface.cpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRInterface.hpp.inc
+    ${CMAKE_CURRENT_BINARY_DIR}/../TorchScatterToMLIRDispatch.inc
     ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.cpp.inc
     ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRInterface.hpp.inc
     ${CMAKE_CURRENT_BINARY_DIR}/../PoptorchToMLIRDispatch.inc

@@ -95,6 +95,7 @@ public:
 // convert it into MLIR.
 #include "AtenToMLIRInterface.hpp.inc"
 #include "PoptorchToMLIRInterface.hpp.inc"
+#include "TorchScatterToMLIRInterface.hpp.inc"
 
 protected:
   // Returns the only tensor ID in the vector, if it exists, or
