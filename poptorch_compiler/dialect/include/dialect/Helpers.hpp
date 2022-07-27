@@ -2,6 +2,7 @@
 #ifndef POPTORCH_CODEGEN_POPTORCH_DIALECT_HELPERS_H_
 #define POPTORCH_CODEGEN_POPTORCH_DIALECT_HELPERS_H_
 
+#include <string>
 #include <vector>
 
 #include "mlir/IR/BuiltinTypes.h"
@@ -43,21 +44,58 @@ convertToPositiveDim(std::vector<std::int64_t> dim, std::size_t numDims) {
   return dim;
 }
 
-inline mlir::RankedTensorType asTensor(const mlir::Value value) {
+inline mlir::RankedTensorType asTensor(const mlir::Value &value) {
   return value.getType().cast<mlir::RankedTensorType>();
 }
 
-inline std::vector<int64_t> getShape(mlir::Value value) {
+inline std::vector<int64_t> getShape(const mlir::Value &value) {
   return asTensor(value).getShape();
 }
 
-inline mlir::Type getElementType(mlir::Value value) {
+inline mlir::Type getElementType(const mlir::Value &value) {
   return asTensor(value).getElementType();
 }
 
 std::vector<int64_t> broadcast(const std::vector<int64_t> &lhs,
                                const std::vector<int64_t> &rhs,
                                size_t end_skip = 0);
+
+inline std::string elementTypeToString(const mlir::Type &type) {
+  if (type.isF16()) {
+    return "float16";
+  }
+  if (type.isF32()) {
+    return "float32";
+  }
+  if (type.isUnsignedInteger(8)) {
+    return "uint8";
+  }
+  if (type.isUnsignedInteger(16)) {
+    return "uint16";
+  }
+  if (type.isUnsignedInteger(32)) {
+    return "uint32";
+  }
+  if (type.isUnsignedInteger(64)) {
+    return "uint64";
+  }
+  if (type.isInteger(1)) {
+    return "bool";
+  }
+  if (type.isInteger(8)) {
+    return "int8";
+  }
+  if (type.isInteger(16)) {
+    return "int16";
+  }
+  if (type.isInteger(32)) {
+    return "int32";
+  }
+  if (type.isInteger(64)) {
+    return "int64";
+  }
+  return "Unsupported MLIR type";
+}
 
 } // namespace poptorch_ir
 

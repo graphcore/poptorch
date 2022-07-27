@@ -54,6 +54,8 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
   m.impl("native_layer_norm",
          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
+  m.impl("lstm.input",
+          torch::CppFunction::makeFromBoxedFunction<&poptorch::fallback>());
 
 // If we don't intercept these ops, they will be decomposed into
 // as_strided which is harder to handle.

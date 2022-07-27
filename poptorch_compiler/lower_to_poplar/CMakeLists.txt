@@ -15,6 +15,7 @@ add_library(lower_to_poplar STATIC
         ops/Random.cpp
         ops/Reductions.cpp
         ops/Reshapes.cpp
+        ops/RNNOps.cpp
         ops/TensorOps.cpp
         passes/LowerToPopit.cpp
         passes/LowerToPoplar.cpp)

@@ -16,6 +16,7 @@ include "ops/Reductions.td"
 include "ops/NormOps.td"
 include "ops/PoolingOps.td"
 include "ops/Reshapes.td"
+include "ops/RNN.td"
 include "ops/TensorOps.td"
 
 include "ops/Poptorch.td"

@@ -1370,3 +1370,12 @@
 # _s_where(Tensor condition, Tensor self, Tensor other) -> Tensor
 - func: _s_where
   PopTorchDirect: where
+
+
+#######
+# RNN
+#######
+
+# lstm.input(Tensor input, Tensor[] hx, Tensor[] params, bool has_biases, int num_layers, float dropout, bool train, bool bidirectional, bool batch_first) -> (Tensor, Tensor, Tensor)
+- func: lstm.input
+  PopTorchDirect: lstm_input
