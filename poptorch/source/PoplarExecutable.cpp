@@ -111,7 +111,8 @@ PoplarExecutable::run(std::vector<at::Tensor> &inTensors) {
   // Set up the outputs.
   for (size_t i = 0; i < _popart_outputs.size(); i++) {
     poptorch::TensorId &popart_id(_popart_outputs[i]);
-    std::vector<std::int64_t> dims = _compiler.getSize(popart_id);
+    auto dims = _compiler.getSize(popart_id);
+    ERROR_ON_MSG(dims == Compiler::invalid_size, "Shape inference failed");
 
     std::uint64_t b_dim = _compiler.popartBatchDimForAnchor(popart_id);
     if (b_dim > 1) {

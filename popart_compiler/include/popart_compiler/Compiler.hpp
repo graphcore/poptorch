@@ -299,6 +299,8 @@ public:
   bool tensorIdIsValid(poptorch::TensorId id) const;
   const char *tensorName(poptorch::TensorId id) const;
 
+  static const std::vector<std::int64_t> invalid_size;
+
   std::vector<std::int64_t> getSize(poptorch::TensorId id) const;
 
   std::unique_ptr<char[]> getTensorDTypeString(poptorch::TensorId id) const;

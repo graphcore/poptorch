@@ -1156,6 +1156,7 @@ bool Compiler::tensorIdIsValid(poptorch::TensorId id) const {
   return id < _impl->ids.size();
 }
 
+const std::vector<std::int64_t> Compiler::invalid_size{-1};
 std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
   if (isHostSideConstant(id)) {
     return _impl->getHostSideConstant(id).shape();
@@ -1168,7 +1169,7 @@ std::vector<std::int64_t> Compiler::getSize(poptorch::TensorId id) const {
   auto popart_id = _impl->ids.at(id);
 
   if (!_impl->active_builder->hasValueInfo(popart_id)) {
-    return {};
+    return invalid_size;
   }
   return _impl->active_builder->getTensorShape(popart_id);
 }

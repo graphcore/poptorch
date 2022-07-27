@@ -569,7 +569,7 @@ LowerToPopartImpl::tensorTypesAndShapes(const ValueMap::TensorList &tensors) {
       auto dtype_chars = _compiler.getTensorDTypeString(tensor);
       shape_str << dtype_chars.get();
 
-      if (tensor_shape.empty()) {
+      if (tensor_shape == Compiler::invalid_size) {
         shape_str << shape_inf_failed;
       } else {
         shape_str << "(";
@@ -599,20 +599,11 @@ void LowerToPopartImpl::validateOutputShapeAndType(
 
   at::ScalarType popart_type =
       fromPopartType(_compiler.getPopartType(output_tensor));
-  std::vector<std::int64_t> popart_size = _compiler.getSize(output_tensor);
+  auto popart_size = _compiler.getSize(output_tensor);
   bool match = (popart_type == jit_output.scalar_type);
   // Only validate shape if PopART's shape inference worked.
-  if (match && !popart_size.empty()) {
-    if (popart_size.size() != jit_output.dims.size()) {
-      match = false;
-    } else {
-      for (std::uint64_t d = 0; d < popart_size.size(); ++d) {
-        if (popart_size.at(d) != jit_output.dims.at(d)) {
-          match = false;
-          break;
-        }
-      }
-    }
+  if (match && popart_size != Compiler::invalid_size) {
+    match = (popart_size == jit_output.dims);
   }
   ERROR_ON_MSG(!match, "Output[" << node_output << "] mismatch: "
                                  << nodeToString(node) << " -> PopART "

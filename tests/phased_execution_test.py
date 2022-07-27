@@ -172,11 +172,9 @@ class LogChecker(helpers.LogChecker):
         self.assert_contains(
             "Sub:0 [float32(10, 1), mode(Phased), ipu(3), phase(5)]")
         self.assert_contains(
-            "L1:0 [float32(shape inference failed), mode(Phased), ipu(3), phase(5)]"
-        )
+            "L1:0 [float32(), mode(Phased), ipu(3), phase(5)]")
         self.assert_contains(
-            "IdentityLoss:0 [float32(shape inference failed), mode(Phased), ipu(3), phase(5)]"
-        )
+            "IdentityLoss:0 [float32(), mode(Phased), ipu(3), phase(5)]")
         # pylint: enable=line-too-long
 
     def validate_2x2_parallel_phased_execution_small(self):
@@ -232,11 +230,9 @@ class LogChecker(helpers.LogChecker):
         self.assert_contains(
             "Sub:0 [float32(10, 1), mode(Phased), ipu(3), phase(1)]")
         self.assert_contains(
-            "L1:0 [float32(shape inference failed), mode(Phased), ipu(3), phase(1)]"
-        )
+            "L1:0 [float32(), mode(Phased), ipu(3), phase(1)]")
         self.assert_contains(
-            "IdentityLoss:0 [float32(shape inference failed), mode(Phased), ipu(3), phase(1)]"
-        )
+            "IdentityLoss:0 [float32(), mode(Phased), ipu(3), phase(1)]")
         # pylint: enable=line-too-long
 
     def validate_serial_tensor_liveness(self, liveness, trace_model):
