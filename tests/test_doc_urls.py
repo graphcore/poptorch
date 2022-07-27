@@ -12,7 +12,6 @@ URL_PATTERN = re.compile(r"\bhttps?:[^\s>]+")
 # URLs which don't exist yet (e.g documentation for a future release) can be
 # added to the dictionary of exceptions:
 PRE_RELEASE_URLS = {
-    "https://github.com/graphcore/tutorials/tree/sdk-release-2.6": "https://phabricator.sourcevertex.net/diffusion/TUTORIALS/browse/sdk-release-2.6"
 }
 
 
