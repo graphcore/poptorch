@@ -67,6 +67,7 @@ namespace symbols {
 
 namespace symbols::poptorch {
 extern c10::Symbol nop;
+extern c10::Symbol dynamic_slice;
 extern c10::Symbol begin_ipu_block;
 extern c10::Symbol internal_cast;
 extern c10::Symbol end_ipu_block;

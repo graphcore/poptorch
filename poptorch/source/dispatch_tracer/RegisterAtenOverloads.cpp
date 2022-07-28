@@ -5,6 +5,7 @@
 #include <torch/csrc/jit/frontend/tracer.h>
 #include <torch/csrc/jit/ir/ir.h>
 #include <torch/csrc/jit/runtime/interpreter.h>
+#include <torch/types.h>
 
 #include <set>
 #include <string>
@@ -709,6 +710,36 @@ void customOperation(const c10::OperatorHandle &op, c10::Stack *stack) {
   updateStack(op, stack, {out});
 }
 
+// dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) ->
+// Tensor
+void dynamicSlice(const c10::OperatorHandle &op, c10::Stack *stack) {
+  if (poptorch::isDispatcherOn()) {
+    poptorch::fallback(op, stack);
+  } else {
+    auto const self = getNthArgument(op, stack, 0).toTensor();
+    auto dim = getNthArgument(op, stack, 1).toInt();
+    auto t_start = getNthArgument(op, stack, 2).toTensor();
+    auto st = t_start.scalar_type();
+    std::int64_t start;
+    if (st == torch::kInt64) {
+      start = t_start.data_ptr<std::int64_t>()[0];
+    } else if (st == torch::kInt32) {
+      start = t_start.data_ptr<std::int32_t>()[0];
+    } else if (st == torch::kInt16) {
+      start = t_start.data_ptr<std::int16_t>()[0];
+    } else {
+      ERROR("Expected integer typed start tensor");
+    }
+
+    auto size = getNthArgument(op, stack, 3).toInt();
+    auto step = getNthArgument(op, stack, 4).toInt();
+
+    auto result = at::slice(self, dim, {start}, {start + size}, step);
+
+    updateStack(op, stack, {result});
+  }
+}
+
 // c10::List<at::Tensor> ctcBeamSearchDecoder(const at::Tensor &log_probs,
 //                                            const at::Tensor &lengths,
 //                                            int64_t blank, int64_t width,
@@ -810,6 +841,10 @@ static auto registry =
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::nop(Tensor self) -> Tensor")
                 .catchAllKernel<PTC(opReturningFirstArgument)>())
+        .op(torch::RegisterOperators::options()
+                .schema("poptorch::dynamic_slice(Tensor self, int dim, "
+                        "Tensor start, int size, int step) -> Tensor")
+                .catchAllKernel<PTC(dynamicSlice)>())
         .op(torch::RegisterOperators::options()
                 .schema("poptorch::custom_operation(Tensor[] inputs, str name, "
                         "str domain, int domain_version, int num_outputs, "

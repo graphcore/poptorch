@@ -179,6 +179,35 @@ def nop(tensor: "torch.Tensor") -> "torch.Tensor":
     return torch.ops.poptorch.nop(tensor)
 
 
+def dynamic_slice(tensor: "torch.Tensor", dim: int, start: "torch.Tensor",
+                  size: int, step: int) -> "torch.Tensor":
+    """Torch native dynamic slices can't be properly intercepted by backends,
+    so this op is provided to enable dynamic slicing in poptorch applications.
+
+    :param tensor: The tensor to slice.
+    :param dim: The dimension to slice along.
+    :param start: The start index.
+    :param size: The slice size. Must be a constant int.
+    :param step: The slice step. Must be a constant int.
+    :returns: The sliced tensor.
+    """
+    if not isinstance(tensor, torch.Tensor):
+        raise _impl.createPoptorchError(
+            f"dynamic_slice must take a torch.tensor input. {type(tensor)} is "
+            "not supported.")
+    if not isinstance(dim, int):
+        raise _impl.createPoptorchError("Dimension must be an integer.")
+    if not isinstance(start, torch.Tensor):
+        raise _impl.createPoptorchError(
+            "Slice start argument to dynamic_slice must be a torch.tensor. "
+            f"{type(tensor)} is not supported.")
+    if not isinstance(size, int):
+        raise _impl.createPoptorchError("Size must be an integer.")
+    if not isinstance(step, int):
+        raise _impl.createPoptorchError("Step must be an integer.")
+    return torch.ops.poptorch.dynamic_slice(tensor, dim, start, size, step)
+
+
 def recomputationCheckpoint(*tensors: List["torch.Tensor"]
                             ) -> List["torch.Tensor"]:
     """Operation for checkpointing values in a computational pipeline stage.

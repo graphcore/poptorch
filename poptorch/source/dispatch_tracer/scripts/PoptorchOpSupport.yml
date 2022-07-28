@@ -7,6 +7,10 @@
    native_func: nop(Tensor self) -> Tensor
    PopTorchDirect: nop
 
+ - func: dynamic_slice
+   native_func: dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) -> Tensor
+   PopTorchDirect: dynamic_slice
+
  - func: begin_ipu_block
    native_func: begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()
    PopTorchDirect: begin_ipu_block

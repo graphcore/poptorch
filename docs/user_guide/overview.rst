@@ -811,6 +811,15 @@ PopTorch includes a "no-op" function for debugging purposes.
 
 For more information see: :py:func:`~poptorch.nop`.
 
+poptorch.dynamic_slice
+----------------------
+
+When the dispatcher is enabled (see :numref:`dispatcher-support`), standard
+slicing syntax cannot currently be used to create dynamic slices. In order to
+support dynamic slicing with the dispatcher, this function is provided.
+
+For more information see: :py:func:`~poptorch.dynamic_slice`.
+
 poptorch.serializedMatMul
 -------------------------
 

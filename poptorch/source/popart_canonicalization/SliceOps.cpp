@@ -241,12 +241,9 @@ determineSizeConstant(const std::vector<torch::jit::Node *> &start_ancestory,
   return size;
 }
 
-// Handle a slice in which the start is an arbitary (i.e. non constant) input
-// but the slice is a fixed size
-torch::jit::Node *dynamicSliceHandler(torch::jit::Graph *graph,
-                                      torch::jit::Node *node,
-                                      torch::jit::Node *start_node,
-                                      torch::jit::Node *end_node) {
+std::int64_t inferDynamicSliceSize(torch::jit::Graph *graph,
+                                   torch::jit::Node *start_node,
+                                   torch::jit::Node *end_node) {
   std::vector<torch::jit::Node *> start_ancestory;
   std::vector<torch::jit::Node *> end_ancestory;
 
@@ -268,7 +265,16 @@ torch::jit::Node *dynamicSliceHandler(torch::jit::Graph *graph,
     ERROR("Taking a slice of a tensor with the end less than the start is "
           "not supported.");
   }
+  return size;
+}
 
+// Handle a slice in which the start is an arbitary (i.e. non constant) input
+// but the slice is a fixed size
+torch::jit::Node *dynamicSliceHandler(torch::jit::Graph *graph,
+                                      torch::jit::Node *node,
+                                      torch::jit::Node *start_node,
+                                      std::size_t start_offset,
+                                      std::int64_t size) {
   // The dim is as usual
   std::int64_t dim = constantToLong(node->input(1)->node());
 
@@ -280,12 +286,14 @@ torch::jit::Node *dynamicSliceHandler(torch::jit::Graph *graph,
                    << "dimension (" << length_of_dim << ").");
 
   // Make sure the start_node is a tensor not an int
-  if (start_node->output()->type()->kind() == c10::TypeKind::IntType) {
+  if (start_node->output(start_offset)->type()->kind() ==
+      c10::TypeKind::IntType) {
     start_node = start_node->input()->node();
+    start_offset = 0;
   }
 
   // Reshape the start node from a scalar to a one-dim and cast to UINT32
-  start_node = createReshape(graph, start_node->output(), {1});
+  start_node = createReshape(graph, start_node->output(start_offset), {1});
   start_node = createCast(graph, {start_node->output()}, "UINT32");
 
   auto *new_node = createDynamicslice(
@@ -311,6 +319,7 @@ namespace {
 torch::jit::Node *sliceCommon(torch::jit::Graph *graph, torch::jit::Node *node,
                               torch::jit::Value *input, int64_t dim,
                               torch::jit::Node *start_node,
+                              std::size_t start_offset,
                               torch::jit::Node *end_node, int64_t step) {
   auto dims = shapeFromTensor(input);
   if (dim < 0) {
@@ -319,7 +328,9 @@ torch::jit::Node *sliceCommon(torch::jit::Graph *graph, torch::jit::Node *node,
 
   // If any of the inputs are not constants, dynamicSlice is required
   if (!isTensorConstant(start_node) || !isTensorConstant(end_node)) {
-    auto *slice = dynamicSliceHandler(graph, node, start_node, end_node);
+    auto size = inferDynamicSliceSize(graph, start_node, end_node);
+    auto *slice =
+        dynamicSliceHandler(graph, node, start_node, start_offset, size);
     return subsampleSlice(graph, slice, dims.size(), dim, step);
   }
 
@@ -360,6 +371,7 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
   auto *input = node->input(0);
   auto dim = constantToLong(node->input(1)->node());
   auto *start_node = node->input(2)->node();
+  auto start_offset = node->input(2)->offset();
   auto *end_node = node->input(3)->node();
   auto *step_node = node->input(4)->node();
 
@@ -368,7 +380,38 @@ torch::jit::Node *sliceHandler(torch::jit::Graph *graph,
   auto step = constantToLong(step_node);
   ERROR_ON_MSG(step < 1, "Slicing step must be at least 1");
 
-  return sliceCommon(graph, node, input, dim, start_node, end_node, step);
+  return sliceCommon(graph, node, input, dim, start_node, start_offset,
+                     end_node, step);
+}
+
+torch::jit::Node *ptDynamicSliceHandler(torch::jit::Graph *graph,
+                                        torch::jit::Node *node) {
+  // poptorch::dynamic_slice(Tensor self, int dim, Tensor start, int size, int
+  // step) -> Tensor
+  auto *input = node->input(0);
+  auto dim = constantToLong(node->input(1)->node());
+  auto *start_node = node->input(2)->node();
+  auto start_offset = node->input(2)->offset();
+  auto *size_node = node->input(3)->node();
+  auto *step_node = node->input(4)->node();
+
+  ERROR_ON_MSG(!isTensorConstant(size_node), "Slicing size must be a constant");
+
+  auto size = constantToLong(size_node);
+  ERROR_ON_MSG(size == 0, "The start and end of a slice must be different.");
+  ERROR_ON_MSG(size < 0, "Taking a slice of a tensor with the end less than "
+                         "the start is not supported.");
+
+  ERROR_ON_MSG(!isTensorConstant(step_node), "Slicing step must be a constant");
+
+  auto step = constantToLong(step_node);
+  ERROR_ON_MSG(step < 1, "Slicing step must be at least 1");
+
+  auto dims = shapeFromTensor(input);
+
+  auto *slice =
+      dynamicSliceHandler(graph, node, start_node, start_offset, size);
+  return subsampleSlice(graph, slice, dims.size(), dim, step);
 }
 
 torch::jit::Node *unbindHandler(torch::jit::Graph *graph,
@@ -400,9 +443,11 @@ torch::jit::Node *narrowHandler(torch::jit::Graph *graph,
   auto *input = node->input(0);
   int dim = constantToInt(node->input(1)->node());
   auto *start_node = node->input(2)->node();
+  auto start_offset = node->input(2)->offset();
   auto *end_node = node->input(3)->node();
 
-  return sliceCommon(graph, node, input, dim, start_node, end_node, 1);
+  return sliceCommon(graph, node, input, dim, start_node, start_offset,
+                     end_node, 1);
 }
 
 torch::jit::Node *unfoldHandler(torch::jit::Graph *graph,
@@ -421,6 +466,7 @@ torch::jit::Node *unfoldHandler(torch::jit::Graph *graph,
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::slice, sliceHandler);
+  registerHandler(symbols::poptorch::dynamic_slice, ptDynamicSliceHandler);
   registerHandler(c10::aten::unbind, unbindHandler);
   registerHandler(c10::aten::narrow, narrowHandler);
   registerHandler(c10::aten::unfold, unfoldHandler);

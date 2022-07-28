@@ -27,6 +27,33 @@ def Poptorch_nop : Poptorch_NotImplementedOp<"nop", []> {
     ];
 }
 
+// dynamic_slice(Tensor self, int dim, Tensor start, int size, int step) -> Tensor
+def Poptorch_dynamic_slice : Poptorch_NotImplementedOp<"dynamic_slice", []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       I64Attr:$dim,
+                       Poptorch_tensor:$start,
+                       I64Attr:$size,
+                       I64Attr:$step);
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                 "int64_t":$dim,
+                                 "mlir::Value":$start,
+                                 "int64_t":$size,
+                                 "int64_t":$step), [{
+          $_state.addOperands({self, start});
+          $_state.addAttribute("dim", $_builder.getI64IntegerAttr(dim));
+          $_state.addAttribute("size", $_builder.getI64IntegerAttr(size));
+          $_state.addAttribute("step", $_builder.getI64IntegerAttr(step));
+
+          auto et = getElementType(self);
+          auto shape = getShape(self);
+          shape[dim] = (size + (step - 1)) / step;
+
+          $_state.addTypes(mlir::RankedTensorType::get(shape, et));
+     }]>
+    ];
+}
+
 // begin_ipu_block(int stage_id, int phase_id, int ipu_id) -> ()
 def Poptorch_begin_ipu_block : Poptorch_NotImplementedOp<"begin_ipu_block", []> {
   let arguments = (ins I64Attr:$stage_id,

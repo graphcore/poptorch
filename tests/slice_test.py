@@ -110,7 +110,12 @@ def dynamic_slice_harness(trace_model,
     if test_training:
         # TODO(T62094) PopART doesn't currently support dynamic slices in training.
         # Once it works, switch back test_training to True by default.
-        op = lambda t, e: t[start_fn(e):end_fn(e):step]
+        if trace_model:
+            op = lambda t, e: t[start_fn(e):end_fn(e):step]
+        else:
+            size = end_fn(1) - start_fn(1)
+            op = lambda t, e: poptorch.dynamic_slice(t, 0, start_fn(e), size,
+                                                     step)
         model = helpers.ModelWithWeights(op, tensor_in.shape)
 
         # Run on CPU.
@@ -124,7 +129,13 @@ def dynamic_slice_harness(trace_model,
         poptorch_model.assert_weights_changed()
     else:
         model = torch.nn.Module()
-        model.forward = lambda t, e: t[start_fn(e):end_fn(e):step]
+        if trace_model:
+            model.forward = lambda t, e: t[start_fn(e):end_fn(e):step]
+        else:
+            size = (end_fn(torch.tensor([1], dtype=torch.int)) -
+                    start_fn(torch.tensor([1], dtype=torch.int))).item()
+            model.forward = lambda t, e: poptorch.dynamic_slice(
+                t, 0, start_fn(e), size, step)
 
         # Run on CPU.
         native_out = model(tensor_in, extra_in)
@@ -146,10 +157,6 @@ def dynamic_slice_harness(trace_model,
 @pytest.mark.parametrize("step", [1, 2, 3])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dynamic_slice_one_dim_add(step, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
     def start_fn(extra_in):
         return extra_in
 
@@ -164,10 +171,6 @@ def test_dynamic_slice_one_dim_add(step, trace_model):
 @pytest.mark.parametrize("step", [1, 2, 3])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dynamic_slice_one_dim_subtract(step, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
     def start_fn(extra_in):
         return extra_in - 4
 
@@ -182,10 +185,6 @@ def test_dynamic_slice_one_dim_subtract(step, trace_model):
 @pytest.mark.parametrize("step", [1, 2, 3])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dynamic_slice_one_dim_mix_up(step, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
     def start_fn(extra_in):
         tmp = extra_in + 3
         tmp = tmp - 10
@@ -206,10 +205,6 @@ def test_dynamic_slice_one_dim_mix_up(step, trace_model):
 @pytest.mark.parametrize("step", [1, 2, 3])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dynamic_slice_two_dims(step, trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
     def start_fn(extra_in):
         return extra_in.to(torch.int32)
 
@@ -257,11 +252,6 @@ def test_dynamic_slice_two_dims_twice_sliced(step, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dynamic_slice_one_dim_equal(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T57195): Shape of 'actual' (torch.Size([1])) should be " +
-            "the same as shape of 'expected' (torch.Size([0]))")
-
     def start_fn(extra_in):
         return extra_in
 
@@ -284,10 +274,6 @@ def test_dynamic_slice_one_dim_equal(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dynamic_slice_one_dim_less_than(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
     def start_fn(extra_in):
         return extra_in
 
@@ -309,12 +295,7 @@ def test_dynamic_slice_one_dim_less_than(trace_model):
                               test_training=False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_dynamic_slice_one_dim_multiply(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
+def test_dynamic_slice_one_dim_multiply():
     def start_fn(extra_in):
         return extra_in
 
@@ -327,7 +308,7 @@ def test_dynamic_slice_one_dim_multiply(trace_model):
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
-        dynamic_slice_harness(trace_model,
+        dynamic_slice_harness(True,
                               torch.tensor(
                                   [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                               torch.tensor([5]),
@@ -339,10 +320,6 @@ def test_dynamic_slice_one_dim_multiply(trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_dynamic_slice_one_dim_add_non_factor(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
     def start_fn(extra_in):
         return extra_in
 
@@ -364,12 +341,7 @@ def test_dynamic_slice_one_dim_add_non_factor(trace_model):
                               test_training=False)
 
 
-@pytest.mark.parametrize("trace_model", [True, False])
-def test_dynamic_slice_one_dim_mix_up_float(trace_model):
-    if not trace_model:
-        pytest.skip(
-            "TODO(T61972) dynamic slices not supported with dispatcher")
-
+def test_dynamic_slice_one_dim_mix_up_float():
     def start_fn(extra_in):
         tmp = extra_in + 3
         tmp = tmp - 10.5
@@ -390,7 +362,7 @@ def test_dynamic_slice_one_dim_mix_up_float(trace_model):
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
-        dynamic_slice_harness(trace_model,
+        dynamic_slice_harness(True,
                               torch.tensor(
                                   [2.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
                               torch.tensor([5]),

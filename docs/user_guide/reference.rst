@@ -70,6 +70,8 @@ PopTorch Ops
 
 .. autofunction:: poptorch.nop
 
+.. autofunction:: poptorch.dynamic_slice
+
 .. autofunction:: poptorch.serializedMatMul
 
 .. autofunction:: poptorch.set_available_memory
