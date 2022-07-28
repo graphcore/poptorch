@@ -118,6 +118,12 @@ void endDispatch(bool error_occurred = false);
 void startParametersMove();
 void endParametersMove();
 
+// Called before starting to move outputs from the IPU to the CPU.
+// Allows us to error if an attempt is made to move outputs outside
+// of IPUScope.outputs().
+void startOutputsMove();
+void endOutputsMove();
+
 // Return true if we should be compiling with the dispatcher.
 bool isCompilingWithDispatcher();
 

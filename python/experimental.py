@@ -251,7 +251,9 @@ class IPUScope:
             out.float() if out.dtype == torch.double and isOnIpu(out) else out
             for out in self._outputs
         ]
+        poptorch_core.startOutputsMove()
         self._outputs = [out.cpu() for out in self._outputs]
+        poptorch_core.endOutputsMove()
 
         poptorch_core.finalizeGraph()
 

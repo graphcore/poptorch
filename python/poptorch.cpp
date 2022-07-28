@@ -1317,6 +1317,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
   m.def("endDispatch", PTC(poptorch::endDispatch));
   m.def("startParametersMove", PTC(poptorch::startParametersMove));
   m.def("endParametersMove", PTC(poptorch::endParametersMove));
+  m.def("startOutputsMove", PTC(poptorch::startOutputsMove));
+  m.def("endOutputsMove", PTC(poptorch::endOutputsMove));
   m.def("createGraph", PTC(poptorch::createGraph));
   m.def("mapParamsToNames", PTC(poptorch::mapParamsToNames));
   m.def("finalizeGraph", PTC(poptorch::finalizeGraph));

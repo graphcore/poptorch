@@ -102,6 +102,13 @@ struct GlobalTracerContext {
   // TODO(T61576) Find a better way to identify parameters and buffers.
   bool moving_parameters{false};
 
+  // A state used to determine whether we are currently registering output
+  // tensors for the graph (in IPUScope.outputs()). If we're not, moving
+  // output tensors may result in bad data, so we warn. An example of when
+  // this might happen is using torch dynamic slicing in the dispatcher
+  // (instead of poptorch.dynamic_slice()).
+  bool moving_outputs{false};
+
   // Return the passed filename if it doesn't match any of the registered
   // exclusions, else an empty c10::optional.
   c10::optional<std::string> filenameIfNotExcluded(const std::string &filename);
@@ -184,6 +191,17 @@ torch::jit::SourceRange getPythonInterpreterSourceRange() {
   return torch::jit::SourceRange(source, 0, stack_trace_text.size());
 }
 
+bool isEagerMode() {
+  bool result = false;
+#if POPTORCH_BUILD_MLIR_COMPILER
+  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
+  if (mlir != nullptr) {
+    result = mlir->isEagerMode();
+  }
+#endif
+  return result;
+}
+
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
                         bool non_blocking) {
@@ -223,6 +241,10 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
     ERROR_ON(!self.is_cpu());
     // TODO(T59880) rename is_xla() -> is_ipu()
     if (src.is_xla()) {
+      if (!context.moving_outputs && !isEagerMode()) {
+        logging::warn("Moved a tensor from IPU to CPU outside output "
+                      "registration. This may result in garbage data.");
+      }
       logging::trace("copy_ output IPU -> CPU");
       context.activeDispatch()->addOutput(src, self);
     } else {
@@ -241,6 +263,10 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
 void startParametersMove() { context.moving_parameters = true; }
 
 void endParametersMove() { context.moving_parameters = false; }
+
+void startOutputsMove() { context.moving_outputs = true; }
+
+void endOutputsMove() { context.moving_outputs = false; }
 
 // Turn on.
 void startDispatch() { context.dispatch_on = true; }
@@ -442,14 +468,7 @@ at::Scalar localScalarDense(const at::Tensor &self) {
 }
 
 at::Scalar item(const at::Tensor &self) {
-  bool is_eager_mode = false;
-#if POPTORCH_BUILD_MLIR_COMPILER
-  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
-  if (mlir != nullptr) {
-    is_eager_mode = mlir->isEagerMode();
-  }
-#endif
-  ERROR_ON_MSG(!is_eager_mode, "aten::item is only supported in eager mode.");
+  ERROR_ON_MSG(!isEagerMode(), "aten::item is only supported in eager mode.");
 
   return at::native::call_fallback_fn<&poptorch::cpuFallback,
                                       ATEN_OP(item)>::call(self);
