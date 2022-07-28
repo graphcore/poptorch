@@ -359,28 +359,24 @@ def test_embedding_bag(mode, trace_model):
 
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_embedding_bag_per_sample_weights(trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Could not find tensor")
-
     class Model(torch.nn.Module):
         def __init__(self):
             super(Model, self).__init__()
             # per_sample_weights are only supported for mode="sum"
             self.embedding_bag = torch.nn.EmbeddingBag(10, 3, mode="sum")
-            self.per_sample_weights = torch.randn(2, 4)
 
-        def forward(self, x):
-            return self.embedding_bag(
-                x, per_sample_weights=self.per_sample_weights)
+        def forward(self, x, p):
+            return self.embedding_bag(x, per_sample_weights=p)
 
     torch.manual_seed(0)
     model = Model()
     x = torch.LongTensor([[1, 2, 4, 5], [4, 3, 2, 9]])
-    cpu_out = model(x)
+    p = torch.randn(2, 4)
+    cpu_out = model(x, p)
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     pop_model = poptorch.inferenceModel(model, options)
-    pop_out = pop_model(x)
+    pop_out = pop_model(x, p)
     helpers.assert_allclose(actual=pop_out, expected=cpu_out)
 
 
