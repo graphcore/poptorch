@@ -1212,14 +1212,14 @@ PopartConstant convertTensorConstantNode(const torch::jit::Node *node) {
       "constant");
   auto output_type =
       *node->output()->type()->expect<c10::TensorType>()->scalarType();
-  auto tensor_type = node->t(c10::attr::value).scalar_type();
+  auto tensor_type = getNodeTensorAttrValue(node).scalar_type();
 
   ERROR_ON_MSG(output_type != tensor_type, "Output type is "
                                                << c10::toString(output_type)
                                                << " but tensor type is "
                                                << c10::toString(tensor_type));
 
-  auto tensor = node->t(c10::attr::value);
+  auto tensor = getNodeTensorAttrValue(node);
   ERROR_ON(!tensor.is_contiguous());
 
   return {toPopartType(tensor.scalar_type()), tensor.data_ptr(),
@@ -1234,7 +1234,7 @@ convertHostSideTensorConstantNode(const torch::jit::Node *node) {
                "Only a poptorch::host_side_tensor_constant can be converted "
                "into a host side constant constant");
 
-  auto tensor = node->t(c10::attr::value);
+  auto tensor = getNodeTensorAttrValue(node);
   ERROR_ON(!tensor.is_contiguous());
 
   return {toPopartType(tensor.scalar_type()), tensor.data_ptr(),

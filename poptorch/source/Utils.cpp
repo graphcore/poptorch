@@ -350,4 +350,21 @@ void validateTensorShapeAndType(torch::jit::Value *value,
                            << value->debugName() << " " << jit.toString()
                            << " is incompatible with " << torch.toString());
 }
+
+void setNodeTensorAttrValue(torch::jit::Node *node,
+                            torch::jit::TensorAttr::ConstructorType value) {
+  node->ts_(c10::attr::value,
+            {std::forward<torch::jit::TensorAttr::ConstructorType>(value)});
+}
+
+const torch::jit::TensorAttr::ValueType &
+getNodeTensorAttrValue(const torch::jit::Node *node) {
+  ERROR_ON_MSG(node->kindOf(c10::attr::value) != torch::jit::AttributeKind::ts,
+               "[Internal] expected type 'ts' but got "
+                   << torch::jit::toString(node->kindOf(c10::attr::value)));
+  const auto &ts = node->ts(c10::attr::value);
+  ERROR_ON(ts.size() != 1);
+  return ts.at(0);
+}
+
 } // namespace poptorch

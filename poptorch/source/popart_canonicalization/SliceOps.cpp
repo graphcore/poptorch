@@ -128,7 +128,7 @@ void resolveCastConstants(torch::jit::Graph *graph, torch::jit::Node *node) {
     }
 
     // Obtain the tensor and cast
-    auto tensor = constant_to_be_cast->t(c10::attr::value);
+    auto tensor = getNodeTensorAttrValue(constant_to_be_cast);
     auto popart_cast_to = cast_node->s(c10::Symbol::attr("to"));
     auto scalar_type = onnxStrToScalarType(popart_cast_to.c_str());
     tensor.to(scalar_type);

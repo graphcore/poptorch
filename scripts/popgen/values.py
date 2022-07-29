@@ -54,10 +54,10 @@ class CastInPlace(Value):
         node = "t" + str(val_id)
         f.write(tabs + "auto *" + node + " = " + values[self.args[0]] +
                 "->node();\n")
-        f.write(tabs + node + "->t_(c10::attr::value, ")
-        f.write(node + "->t(c10::attr::value).to(" + self.to_type + "));\n")
-        f.write(tabs + node + "->output()->inferTypeFrom(" + node +
-                "->t(c10::attr::value));\n")
+        f.write(f"{tabs}setNodeTensorAttrValue({node}, "
+                f"getNodeTensorAttrValue({node}).to({self.to_type}));\n")
+        f.write(f"{tabs}{node}->output()->inferTypeFrom("
+                f"getNodeTensorAttrValue({node}));\n")
 
         if not root:
             values[self] = "t" + str(val_id + 1)

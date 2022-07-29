@@ -123,7 +123,7 @@ at::ScalarType getNodeScalarType(const torch::jit::Value *tensor) {
 }
 
 bool hasUnityValue(torch::jit::Value *value) {
-  auto tensor = value->node()->t(c10::attr::value);
+  auto tensor = getNodeTensorAttrValue(value->node());
   if (tensor.numel() != 1) {
     return false;
   }
@@ -195,7 +195,7 @@ float constantToFloat(torch::jit::Node *node) {
                                             << node->kind().toQualString()
                                             << "' node to a float");
   if (node->output()->type()->cast<c10::TensorType>()) {
-    return node->t(c10::attr::value).to(at::ScalarType::Float).item<float>();
+    return getNodeTensorAttrValue(node).to(at::ScalarType::Float).item<float>();
   }
 
   ERROR_ON(!node->output()->type()->isSubtypeOf(c10::NumberType::get()));
@@ -209,9 +209,9 @@ torch::jit::Node *constantToLongConstant(torch::jit::Node *node) {
                                             << "' node to a long constant");
 
   ERROR_ON(!node->output()->type()->cast<c10::TensorType>());
-  node->t_(c10::attr::value,
-           node->t(c10::attr::value).to(at::ScalarType::Long));
-  node->output()->inferTypeFrom(node->t(c10::attr::value));
+  setNodeTensorAttrValue(node,
+                         getNodeTensorAttrValue(node).to(at::ScalarType::Long));
+  node->output()->inferTypeFrom(getNodeTensorAttrValue(node));
   return node;
 }
 
@@ -221,7 +221,7 @@ std::int32_t constantToInt(torch::jit::Node *node) {
                                             << "' node to an int");
 
   if (node->output()->type()->cast<c10::TensorType>()) {
-    return node->t(c10::attr::value)
+    return getNodeTensorAttrValue(node)
         .to(at::ScalarType::Int)
         .item<std::int32_t>();
   }
@@ -237,7 +237,7 @@ std::int64_t constantToLong(torch::jit::Node *node) {
                                             << "' node to a long");
 
   if (node->output()->type()->cast<c10::TensorType>()) {
-    return node->t(c10::attr::value)
+    return getNodeTensorAttrValue(node)
         .to(at::ScalarType::Long)
         .item<std::int64_t>();
   }
@@ -271,7 +271,7 @@ std::string constantToString(torch::jit::Node *node) {
   ERROR_ON_MSG(!isTensorConstant(node),
                "Cannot force a non-constant node to a string");
 
-  auto &&t = node->t(c10::attr::value);
+  auto &&t = getNodeTensorAttrValue(node);
   ERROR_ON(!t.is_contiguous());
 
   auto length = t.sizes().at(0);

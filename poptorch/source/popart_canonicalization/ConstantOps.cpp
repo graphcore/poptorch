@@ -111,8 +111,8 @@ torch::jit::Node *randpermHandler(torch::jit::Graph *graph,
                                   torch::jit::Node *node) {
   // aten::randperm(Scalar n, ScalarType dtype, Layout, Device, bool pin_memory)
   auto *n = node->input(0)->node();
-  n->t_(c10::attr::value, n->t(c10::attr::value).to(at::ScalarType::Long));
-  n->output()->inferTypeFrom(n->t(c10::attr::value));
+  setNodeTensorAttrValue(n, getNodeTensorAttrValue(n).to(at::ScalarType::Long));
+  n->output()->inferTypeFrom(getNodeTensorAttrValue(n));
   auto *size_of_permutation = n->output();
 
   auto shape = {constantToLong(n)};

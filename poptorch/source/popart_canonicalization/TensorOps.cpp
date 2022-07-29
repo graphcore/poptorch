@@ -334,7 +334,7 @@ torch::jit::Node *fullCommon(torch::jit::Graph *graph, torch::jit::Value *v,
   auto *vn = v->node();
   auto stype = coerceToSupportedType(type);
   if (isTensorConstant(vn) && vn->output()->type()->cast<c10::TensorType>()) {
-    auto v_scalar = vn->t(c10::attr::value).to(stype).item();
+    auto v_scalar = getNodeTensorAttrValue(vn).to(stype).item();
     return tensorToConstant(graph, at::full(shape, v_scalar, stype));
   }
   auto *v_cast = createCast(graph, v, stype)->output();

@@ -158,8 +158,9 @@ void ConvertHalfImpl::resolveHalfOrFloat() {
       // Tensor constants may need retyping
       if (node->kind() == symbols::poptorch::tensor_constant ||
           node->kind() == symbols::poptorch::host_side_tensor_constant) {
-        auto new_tensor = node->t(c10::attr::value).to(new_type).contiguous();
-        node->t_(c10::attr::value, new_tensor);
+        auto new_tensor =
+            getNodeTensorAttrValue(node).to(new_type).contiguous();
+        setNodeTensorAttrValue(node, new_tensor);
       }
 
       if (node->hasAttribute(c10::attr::dtype)) {
@@ -228,8 +229,8 @@ void ConvertHalfImpl::duplicateConstantsWithMixedHalfFloatUses() {
         new_node->output()->type()->expect<c10::TensorType>()->withScalarType(
             invalid_type));
     auto new_tensor =
-        new_node->t(c10::attr::value).to(invalid_type).contiguous();
-    new_node->t_(c10::attr::value, new_tensor);
+        getNodeTensorAttrValue(new_node).to(invalid_type).contiguous();
+    setNodeTensorAttrValue(new_node, new_tensor);
 
     insertNodeBeforeNode(new_node, node);
     for (auto *invalid_node : invalid_nodes) {

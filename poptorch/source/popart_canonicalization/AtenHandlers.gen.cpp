@@ -728,8 +728,9 @@ torch::jit::Node *topkHandler(torch::jit::Graph *graph,
   auto *x = node->input(0);
   auto *c = node->input(1);
   auto *t0 = c->node();
-  t0->t_(c10::attr::value, t0->t(c10::attr::value).to(at::ScalarType::Long));
-  t0->output()->inferTypeFrom(t0->t(c10::attr::value));
+  setNodeTensorAttrValue(t0,
+                         getNodeTensorAttrValue(t0).to(at::ScalarType::Long));
+  t0->output()->inferTypeFrom(getNodeTensorAttrValue(t0));
   auto *t1 = t0->output();
   auto *l = node->input(2);
   auto t2 = x->type()->expect<c10::TensorType>();

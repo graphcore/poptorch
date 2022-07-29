@@ -191,7 +191,15 @@ void handleTensorConstant(torch::jit::Graph *graph, torch::jit::Node *n) {
     ERROR("Tensor constant without type");
   }
 
-  auto tensor = n->t(c10::attr::value);
+  at::Tensor tensor;
+  if (n->kindOf(c10::attr::value) == torch::jit::AttributeKind::ts) {
+    tensor = getNodeTensorAttrValue(n);
+  } else {
+    ERROR_ON_MSG(n->kindOf(c10::attr::value) != torch::jit::AttributeKind::t,
+                 "[Internal] expected type 't' or 'ts' but got "
+                     << torch::jit::toString(n->kindOf(c10::attr::value)));
+    tensor = n->t(c10::attr::value);
+  }
   ERROR_ON(!tensor.defined());
   bool was_wrapped = tensor.unsafeGetTensorImpl()->is_wrapped_number();
   if (tensor.scalar_type() == at::ScalarType::Double) {
@@ -332,7 +340,7 @@ private:
 
     if (i_value.isTensor()) {
       new_const->output()->inferTypeFrom(i_value.toTensor());
-      new_const->t_(c10::attr::value, i_value.toTensor());
+      setNodeTensorAttrValue(new_const, i_value.toTensor());
     } else if (i_value.isInt()) {
       new_const->output()->setType(c10::IntType::get());
       new_const->i_(c10::attr::value, i_value.toInt());
@@ -498,18 +506,18 @@ void rectifyHostAndIPUSideConstants(
     }
 
     // Create two new nodes
-    auto t = node->t(c10::attr::value);
+    auto t = getNodeTensorAttrValue(node);
     torch::jit::WithInsertPoint insert_point(node);
 
     torch::jit::Node *host_side_node = createAndInsertNode(
         graph, symbols::poptorch::host_side_tensor_constant);
     host_side_node->output()->inferTypeFrom(t);
-    host_side_node->t_(c10::attr::value, t);
+    setNodeTensorAttrValue(host_side_node, t);
 
     torch::jit::Node *ipu_node =
         createAndInsertNode(graph, symbols::poptorch::tensor_constant);
     ipu_node->output()->inferTypeFrom(t);
-    ipu_node->t_(c10::attr::value, t);
+    setNodeTensorAttrValue(ipu_node, t);
 
     recursivelySelectHostAndIPUSideConstants(node, host_side_node, ipu_node,
                                              to_delete);

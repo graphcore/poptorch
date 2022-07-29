@@ -179,7 +179,7 @@ inferExpectedType(const torch::jit::ArrayRef<torch::jit::Value *> &inputs,
       std::vector<at::ScalarType> *place_in = &tensor_types;
 
       if (node->kind() == symbols::poptorch::tensor_constant) {
-        if (node->t(c10::attr::value)
+        if (getNodeTensorAttrValue(node)
                 .unsafeGetTensorImpl()
                 ->is_wrapped_number()) {
           place_in = &number_types;

@@ -101,6 +101,23 @@ struct JitTensorInfo {
 
 void validateTensorShapeAndType(torch::jit::Value *value,
                                 const at::Tensor &tensor);
+
+// setNodeTensorAttrValue and getNodeTensorAttrValue must be used instead of
+// node->t_(c10::attr::value, v) and node->t(c10::attr::value).
+//
+// When printing a torch::jit::Graph the graph will iterate over each node
+// and print all its attributes.
+// If an attribute is a tensor it will try to print the content of that
+// tensor which in our case would trigger a copy from IPU to CPU. This copy
+// not only will fail, it will also be interpreted as a request to add this
+// tensor as a graph output which will corrupt the graph.
+// However attributes which are arrays of tensors are not printed and therefore
+// will not trigger a copy, so behind the scenes these functions will wrap
+// and unwrap the tensor attribute in a size 1 vector.
+void setNodeTensorAttrValue(torch::jit::Node *node,
+                            torch::jit::TensorAttr::ConstructorType value);
+const torch::jit::TensorAttr::ValueType &
+getNodeTensorAttrValue(const torch::jit::Node *node);
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_UTILS_HPP

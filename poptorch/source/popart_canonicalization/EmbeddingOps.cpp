@@ -4,6 +4,7 @@
 #include "PopartCanonicalizationUtils.hpp"
 
 #include "poptorch/OpBuilder.hpp"
+#include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -89,7 +90,7 @@ torch::jit::Node *embeddingBagHandler(torch::jit::Graph *graph,
   ERROR_ON_MSG(!isTensorConstant(offsets->node()),
                "Unsupported aten::embedding_bag operation: offsets tensor must "
                "be a constant.");
-  auto offsets_tensor = offsets->node()->t(c10::attr::value);
+  auto offsets_tensor = getNodeTensorAttrValue(offsets->node());
 
   if (!include_last_offset) {
     // Append INT_MAX to use as the last offset slice

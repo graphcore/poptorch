@@ -229,7 +229,7 @@ torch::jit::Node *tensorToConstant(torch::jit::Graph *graph,
 
   torch::jit::Node *new_node = createAndInsertNode(graph, symbol);
   new_node->output()->inferTypeFrom(t);
-  new_node->t_(c10::attr::value, t);
+  setNodeTensorAttrValue(new_node, t);
 
   return new_node;
 }
@@ -293,8 +293,8 @@ createConstantFloatLike(torch::jit::Graph *graph, torch::jit::Value *t,
       *t->type()->expect<c10::TensorType>()->scalarType();
   torch::jit::Node *new_node = createConstantFloat32(graph, data, new_shape);
   if (scalar_type == at::ScalarType::Half) {
-    auto new_tensor = new_node->t(c10::attr::value).to(scalar_type);
-    new_node->t_(c10::attr::value, new_tensor);
+    auto new_tensor = getNodeTensorAttrValue(new_node).to(scalar_type);
+    setNodeTensorAttrValue(new_node, new_tensor);
     new_node->output()->inferTypeFrom(new_tensor);
   }
   return new_node;
