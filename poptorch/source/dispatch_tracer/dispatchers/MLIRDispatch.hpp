@@ -49,9 +49,6 @@ public:
 
   poptorch_ir::TensorId findTensor(const at::Tensor &tensor);
 
-  // Convert a stack of IValues into a vector of MLIR IR ids.
-  std::vector<poptorch_ir::TensorId> mlirFromStack(c10::Stack &stack);
-
   // Some times pytorch specifies the output of an operation as an argument
   // without that operation being inplace, i.e matmul. In these cases we copy
   // and let the compiler eliminate it.
@@ -117,12 +114,9 @@ private:
   uint64_t _next_output_idx{0};
   uint64_t _next_parameter_idx{0};
 
-  // We genenerate the lookup tables at object creation. This is the mechanism
-  // by which that we use to target the right MLIR operation for a given aten
-  // call.
+  // We generate the lookup tables at object creation. This is the mechanism
+  // by which we target the right MLIR operation for a given aten call.
   void generateDispatchTable();
-
-  using ReturnTy = poptorch_ir::TensorId;
 
   // We have a set of handlers which just map an ATEN node directly onto an MLIR
   // operation.

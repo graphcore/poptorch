@@ -10,15 +10,10 @@
 
 namespace poptorch {
 
-bool ValueMapper::TrackedTensor::isSame(const at::Tensor &other) const {
-  return ipuTensorId(other) == ipu_tensor_id;
-}
-
-ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor,
-                                          bool _is_empty)
+ValueMapper::TrackedTensor::TrackedTensor(const at::Tensor &tensor)
     : tensor_details(getTensorDetails(*tensor.unsafeGetTensorImpl())),
       jit(nullptr), mlir(poptorch_ir::tensor_error_id),
-      ipu_tensor_id(ipuTensorId(tensor)), is_empty(_is_empty) {}
+      ipu_tensor_id(ipuTensorId(tensor)) {}
 
 void ValueMapper::setParameterName(const at::Tensor &t,
                                    const std::string &name) {
@@ -53,23 +48,19 @@ void ValueMapper::setParameterName(const at::Tensor &t,
 }
 
 // Add a tensor to the IR.
-void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
-                            bool is_empty) {
+void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
   logging::trace("Adding {} to value mapper, MLIR id: {}",
                  static_cast<void *>(t.unsafeGetTensorImpl()), id);
   // If the tensor is already being tracked then we will update the MLIR
   // value being tracked. Otherwise we insert and add the MLIR value.
   auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
   new_details->mapper = this;
-  auto itr =
-      tensors.insert({new_details.get(), TrackedTensor{t, is_empty}}).first;
+  auto itr = tensors.insert({new_details.get(), TrackedTensor{t}}).first;
   itr->second.mlir = id;
-  itr->second.is_empty = is_empty;
   ERROR_ON(itr->second.tensor_details != new_details);
 }
 
-void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
-                            bool is_empty) {
+void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
   ERROR_ON_MSG(val == nullptr, "torch::jit::Value* cannot be null");
   logging::trace("Adding {} to value mapper, JIT ir: {}",
                  static_cast<void *>(t.unsafeGetTensorImpl()),
@@ -80,9 +71,8 @@ void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val,
   // value being tracked. Otherwise we insert and add the jit value.
   auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
   new_details->mapper = this;
-  auto itr = tensors.insert({new_details.get(), TrackedTensor{t, is_empty}});
+  auto itr = tensors.insert({new_details.get(), TrackedTensor{t}});
   itr.first->second.jit = val;
-  itr.first->second.is_empty = is_empty;
   ERROR_ON(itr.first->second.tensor_details != new_details);
 
   // Ensure we maintain a lookup of torch::jit to pytorch tensor.
@@ -147,26 +137,6 @@ poptorch_ir::TensorId ValueMapper::getMLIRForTensor(const at::Tensor &t) {
   }
 
   return poptorch_ir::tensor_error_id;
-}
-
-poptorch_ir::TensorId ValueMapper::getMLIRForJit(torch::jit::Value *val) {
-  auto itr = values_map.find(val);
-
-  if (itr != values_map.end()) {
-    return itr->second->mlir;
-  }
-
-  return poptorch_ir::tensor_error_id;
-}
-
-c10::optional<bool> ValueMapper::tensorIsEmpty(const at::Tensor &t) {
-  auto itr = tensors.find(getTensorDetails(*t.unsafeGetTensorImpl()).get());
-
-  if (itr == tensors.end()) {
-    return c10::nullopt;
-  }
-
-  return itr->second.is_empty;
 }
 
 void ValueMapper::addTensorList(const TensorList &list,

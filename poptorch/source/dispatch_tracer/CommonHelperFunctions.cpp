@@ -62,14 +62,6 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
       // it's a constant.
       val = makeConstant(graph, tensor);
       // Don't track constants in the ValueMapper as they are CPU tensors.
-    } else {
-      auto *record = mapper.rawTensorRecord(tensor);
-      // If this isn't an input or node-output tensor, add it to the graph now
-      // as a constant and fix the mapping.
-      if (record->is_empty) {
-        val = makeConstant(graph, tensor);
-        // Don't track constants in the ValueMapper as they are CPU tensors.
-      }
     }
 
     logging::trace(
@@ -267,19 +259,6 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
   for (std::size_t arg = 0;
        arg < schema.arguments().size() && arg < stack->size(); ++arg) {
     auto value = (*stack)[arg];
-    const auto &argument = schema.arguments()[arg];
-    bool is_write = argument.alias_info() && argument.alias_info()->isWrite();
-    // If we're writing to this tensor, it's no longer empty
-    if (is_write && value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
-      // Undefined tensors are optional tensors.
-      if (tensor.defined()) {
-        auto *record = mapper.rawTensorRecord(tensor);
-        if (record != nullptr) {
-          record->is_empty = false;
-        }
-      }
-    }
     inputs.push_back(insertValueIntoGraphAndTrackIt(value, graph, mapper));
   }
   return createAtenTarget(graph, schema, inputs, stack, mapper);

@@ -271,22 +271,6 @@ void MLIRDispatch::finalizeGraph() {
   _compiler.endTraceTiming();
 }
 
-std::vector<poptorch_ir::TensorId>
-MLIRDispatch::mlirFromStack(c10::Stack &stack) {
-  std::vector<poptorch_ir::TensorId> ids;
-
-  // For each IValue (which may or may not be a tensor).
-  for (c10::IValue value : stack) {
-    // Look up the MLIR value if it is a tensor.
-    if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
-      ids.push_back(findTensor(tensor));
-    }
-  }
-
-  return ids;
-}
-
 const at::Tensor &MLIRDispatch::copyInplace(const at::Tensor &self,
                                             const at::Tensor &src) {
   _compiler.copy_(findTensor(self), findTensor(src));

@@ -149,21 +149,15 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
   ERROR_ON_MSG(record == nullptr,
                "Internal: graph output tensor not present in the value mapper");
 
-  torch::jit::Value *val;
-  if (record->is_empty) {
-    val = makeConstant(*graph, ipu_src);
-    _mapper.addTensor(ipu_src, val);
-  } else {
-    val = record->jit;
+  torch::jit::Value *val = record->jit;
 
-    // If the output is an input: add an identity op to make sure the graph
-    // is not empty.
-    // TODO(T62169) handle empty graphs better.
-    for (auto *i : graph->inputs()) {
-      if (i == val) {
-        val = createIdentity(graph.get(), {val})->output();
-        break;
-      }
+  // If the output is an input: add an identity op to make sure the graph
+  // is not empty.
+  // TODO(T62169) handle empty graphs better.
+  for (auto *i : graph->inputs()) {
+    if (i == val) {
+      val = createIdentity(graph.get(), {val})->output();
+      break;
     }
   }
 
@@ -221,7 +215,6 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   _inplace_tracker.registerAlias(self_tracked->jit, copy);
 
   self_tracked->jit = copy;
-  self_tracked->is_empty = src_tracked->is_empty;
 
   self.set_requires_grad(src.requires_grad());
   logging::trace("[TRACING-2][JIT] copyInplace: self tensor new jit ir %{}",
@@ -242,7 +235,7 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
       "[Internal error] The empty tensor should have a valid compiler type");
   torch::jit::Node *n =
       graph->createUninitialized(c10::TensorType::create(tensor));
-  _mapper.addTensor(tensor, n->output(0), true);
+  _mapper.addTensor(tensor, n->output(0));
 }
 
 // aten::detach(Tensor(a) self) -> (Tensor(a))
@@ -488,7 +481,6 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     // Validate to make sure the data type also matches.
     validateTensorShapeAndType(value, *inplace_tensor);
     record->jit = value;
-    record->is_empty = false;
   }
 
   if (logging::shouldLog(logging::Level::Trace)) {

@@ -16,7 +16,6 @@
 
 namespace poptorch {
 
-// TODO(T61602) Clean up ValueMapper following dispatcher refactoring.
 /*
  * The value mapper is the core of the tracer functionality. It provides the
  * system by which we map an incoming at::Tensor onto the compiler IRs. We take
@@ -50,7 +49,7 @@ public:
   // Each tensor we are tracking has a short record containing a pointer to the
   // tensor and its corresponding values in the two IRs.
   struct TrackedTensor {
-    explicit TrackedTensor(const at::Tensor &tensor, bool _is_empty);
+    explicit TrackedTensor(const at::Tensor &tensor);
 
     // The PyTorch tensor impl. Most of the time it is "the tensor" on the
     // PyTorch side. However the autograd can create non-view aliases so
@@ -66,12 +65,6 @@ public:
 
     // Unique ID of the storage associated to this tensor.
     uint64_t ipu_tensor_id;
-
-    // Is this tensor empty?
-    bool is_empty;
-
-    // Autograd can create tensors which mirror the original tensor storage.
-    bool isSame(const at::Tensor &other) const;
   };
 
   // We map each PyTorch tensor to a record of all the metadata we are tracking
@@ -98,15 +91,9 @@ public:
 
   poptorch_ir::TensorId getMLIRForTensor(const at::Tensor &t);
 
-  poptorch_ir::TensorId getMLIRForJit(torch::jit::Value *val);
+  void addTensor(const at::Tensor &t, torch::jit::Value *val);
 
-  c10::optional<bool> tensorIsEmpty(const at::Tensor &t);
-
-  void addTensor(const at::Tensor &t, torch::jit::Value *val,
-                 bool is_empty = false);
-
-  void addTensor(const at::Tensor &t, poptorch_ir::TensorId id,
-                 bool is_empty = false);
+  void addTensor(const at::Tensor &t, poptorch_ir::TensorId id);
 
   void addTensorList(const TensorList &list, torch::jit::Value *val);
 
