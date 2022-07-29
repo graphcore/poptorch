@@ -32,21 +32,32 @@ class Poptorch_elem_unary_backward<string name> : Poptorch_Op<name#"_backward", 
     ];
 }
 
+// Trigonometric functions.
+def Poptorch_acos: Poptorch_elem_unary<"acos", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_acosh: Poptorch_elem_unary<"acosh", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_asin: Poptorch_elem_unary<"asin", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_asinh: Poptorch_elem_unary<"asinh", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_atan: Poptorch_elem_unary<"atan", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_atanh: Poptorch_elem_unary<"atanh", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_cos: Poptorch_elem_unary<"cos", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_cosh: Poptorch_elem_unary<"cosh", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_sin: Poptorch_elem_unary<"sin", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_sinh: Poptorch_elem_unary<"sinh", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_tan: Poptorch_elem_unary<"tan", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_tanh: Poptorch_elem_unary<"tanh", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+
 def Poptorch_abs: Poptorch_elem_unary<"abs"> {
     let arguments = (ins Poptorch_non_boolean_tensor:$in1);
 }
-def Poptorch_asin: Poptorch_elem_unary<"asin"> {}
 def Poptorch_bitwiseNot: Poptorch_elem_unary<"bitwiseNot"> {
     let arguments = (ins Poptorch_integral_tensor:$in1);
     let hasCanonicalizeMethod = 1;
 }
-def Poptorch_cbrt: Poptorch_elem_unary<"cbrt"> {}
 def Poptorch_ceil: Poptorch_elem_unary<"ceil"> {
     let arguments = (ins Poptorch_float_tensor:$in1);
 }
-def Poptorch_cos: Poptorch_elem_unary<"cos"> {}
 def Poptorch_countLeadingZeros: Poptorch_elem_unary<"countLeadingZeros"> {}
-def Poptorch_erf: Poptorch_elem_unary<"erf"> {}
+def Poptorch_erf: Poptorch_elem_unary<"erf", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_exp: Poptorch_elem_unary<"exp", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_expm1: Poptorch_elem_unary<"expm1"> {}
 def Poptorch_floor: Poptorch_elem_unary<"floor"> {
@@ -54,16 +65,13 @@ def Poptorch_floor: Poptorch_elem_unary<"floor"> {
 }
 def Poptorch_inv: Poptorch_elem_unary<"inv"> {}
 def Poptorch_log: Poptorch_elem_unary<"log", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_log1p: Poptorch_elem_unary<"log1p"> {}
+def Poptorch_log1p: Poptorch_elem_unary<"log1p", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_logicalNot: Poptorch_elem_unary<"logicalNot", [ImplicitCastOperand<0>, ImplicitCastToBool]> {}
 def Poptorch_neg: Poptorch_elem_unary<"neg"> {}
 def Poptorch_popcount: Poptorch_elem_unary<"popcount"> {}
 def Poptorch_signum: Poptorch_elem_unary<"signum"> {
     let hasCanonicalizeMethod = 1;
 }
-def Poptorch_sin: Poptorch_elem_unary<"sin"> {}
-def Poptorch_tan: Poptorch_elem_unary<"tan"> {}
-def Poptorch_tanh: Poptorch_elem_unary<"tanh"> {}
 def Poptorch_round: Poptorch_elem_unary<"round"> {
     let arguments = (ins Poptorch_float_tensor:$in1);
 }
@@ -72,8 +80,8 @@ def Poptorch_trunc: Poptorch_elem_unary<"trunc"> {
 }
 def Poptorch_sqrt: Poptorch_elem_unary<"sqrt", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_rsqrt: Poptorch_elem_unary<"rsqrt", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
-def Poptorch_square: Poptorch_elem_unary<"square"> {}
-def Poptorch_sigmoid: Poptorch_elem_unary<"sigmoid"> {}
+def Poptorch_square: Poptorch_elem_unary<"square", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_sigmoid: Poptorch_elem_unary<"sigmoid", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 
 def Poptorch_tanh_backward: Poptorch_elem_unary_backward<"tanh"> {}
 def Poptorch_sigmoid_backward: Poptorch_elem_unary_backward<"sigmoid"> {}
@@ -93,68 +101,67 @@ def Poptorch_isnan :  Poptorch_Op<"isnan"> {
     ];
 }
 
-class Poptorch_NotImplemented_elem_unary<string name> :  Poptorch_NotImplementedOp<name, [SameOperandsAndResultShape]> {
-    let arguments = (ins Poptorch_tensor:$in1);
-    let results = (outs Poptorch_tensor:$result);
-
-    let assemblyFormat = [{
-        `(`$in1`)` `(`type($in1)`)` `->` type($result) attr-dict
-    }];
-
-    let builders = [OpBuilder<(ins "mlir::Value":$v1),[{
-        $_state.addOperands({v1});
-        $_state.addTypes(v1.getType());
-     }]>
-    ];
+def Poptorch_erfc : Poptorch_elem_unary<"erfc", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_frac : Poptorch_elem_unary<"frac"> {
+    let arguments = (ins Poptorch_float_tensor:$in1);
 }
+def Poptorch_log10 : Poptorch_elem_unary<"log10", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_log2 : Poptorch_elem_unary<"log2", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_reciprocal : Poptorch_elem_unary<"reciprocal", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 
-def Poptorch_acos : Poptorch_NotImplemented_elem_unary<"acos"> {}
-def Poptorch_acosh : Poptorch_NotImplemented_elem_unary<"acosh"> {}
-def Poptorch_asinh : Poptorch_NotImplemented_elem_unary<"asinh"> {}
-def Poptorch_atan : Poptorch_NotImplemented_elem_unary<"atan"> {}
-def Poptorch_atanh : Poptorch_NotImplemented_elem_unary<"atanh"> {}
-def Poptorch_cosh : Poptorch_NotImplemented_elem_unary<"cosh"> {}
-def Poptorch_erfc : Poptorch_NotImplemented_elem_unary<"erfc"> {}
-def Poptorch_frac : Poptorch_NotImplemented_elem_unary<"frac"> {}
-def Poptorch_log10 : Poptorch_NotImplemented_elem_unary<"log10"> {}
-def Poptorch_log2 : Poptorch_NotImplemented_elem_unary<"log2"> {}
-def Poptorch_reciprocal : Poptorch_NotImplemented_elem_unary<"reciprocal"> {}
-def Poptorch_sinh : Poptorch_NotImplemented_elem_unary<"sinh"> {}
-
-class Poptorch_elem_unary_in_place<string name> :  Poptorch_Op<name, []> {
+class Poptorch_elem_unary_in_place<string name, list<OpTrait> traits = []> : Poptorch_Op<name, traits> {
     let arguments = (ins Poptorch_tensor:$in1);
     let assemblyFormat = [{
         `(` `(``->``)` $in1 `)` `(`type($in1)`)` attr-dict
     }];
 }
 
+// In-place trigonometric functions.
+def Poptorch_acos_: Poptorch_elem_unary_in_place<"acos_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_acosh_: Poptorch_elem_unary_in_place<"acosh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_asin_: Poptorch_elem_unary_in_place<"asin_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_asinh_: Poptorch_elem_unary_in_place<"asinh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_atan_: Poptorch_elem_unary_in_place<"atan_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_atanh_: Poptorch_elem_unary_in_place<"atanh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_cos_: Poptorch_elem_unary_in_place<"cos_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_cosh_: Poptorch_elem_unary_in_place<"cosh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_sin_: Poptorch_elem_unary_in_place<"sin_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_sinh_: Poptorch_elem_unary_in_place<"sinh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_tan_: Poptorch_elem_unary_in_place<"tan_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_tanh_: Poptorch_elem_unary_in_place<"tanh_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+
 def Poptorch_abs_: Poptorch_elem_unary_in_place<"abs_"> {}
-def Poptorch_asin_: Poptorch_elem_unary_in_place<"asin_"> {}
-def Poptorch_bitwiseNot_: Poptorch_elem_unary_in_place<"bitwiseNot_"> {}
-def Poptorch_cbrt_: Poptorch_elem_unary_in_place<"cbrt_"> {}
+def Poptorch_bitwiseNot_: Poptorch_elem_unary_in_place<"bitwiseNot_"> {
+    let arguments = (ins Poptorch_integral_tensor:$in1);
+    let hasCanonicalizeMethod = 1;
+}
 def Poptorch_ceil_: Poptorch_elem_unary_in_place<"ceil_"> {}
-def Poptorch_cos_: Poptorch_elem_unary_in_place<"cos_"> {}
 def Poptorch_countLeadingZeros_: Poptorch_elem_unary_in_place<"countLeadingZeros_"> {}
-def Poptorch_erf_: Poptorch_elem_unary_in_place<"erf_"> {}
+def Poptorch_erf_: Poptorch_elem_unary_in_place<"erf_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_erfc_: Poptorch_elem_unary_in_place<"erfc_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 def Poptorch_exp_: Poptorch_elem_unary_in_place<"exp_"> {}
 def Poptorch_expm1_: Poptorch_elem_unary_in_place<"expm1_"> {}
 def Poptorch_floor_: Poptorch_elem_unary_in_place<"floor_"> {}
 def Poptorch_inv_: Poptorch_elem_unary_in_place<"inv_"> {}
-def Poptorch_log_: Poptorch_elem_unary_in_place<"log_"> {}
-def Poptorch_log1p_: Poptorch_elem_unary_in_place<"log1p_"> {}
-def Poptorch_logicalNot_: Poptorch_elem_unary_in_place<"logicalNot_"> {}
+def Poptorch_log_: Poptorch_elem_unary_in_place<"log_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_log10_: Poptorch_elem_unary_in_place<"log10_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_log1p_: Poptorch_elem_unary_in_place<"log1p_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_frac_ : Poptorch_elem_unary_in_place<"frac_"> {
+    let arguments = (ins Poptorch_float_tensor:$in1);
+}
+def Poptorch_log2_: Poptorch_elem_unary_in_place<"log2_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_logicalNot_: Poptorch_elem_unary_in_place<"logicalNot_", [ImplicitCastOperand<0>, ImplicitCastToBool]> {}
 def Poptorch_neg_: Poptorch_elem_unary_in_place<"neg_"> {}
 def Poptorch_popcount_: Poptorch_elem_unary_in_place<"popcount_"> {}
+def Poptorch_reciprocal_ : Poptorch_elem_unary_in_place<"reciprocal_", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
+def Poptorch_round_: Poptorch_elem_unary_in_place<"round_"> {
+    let arguments = (ins Poptorch_float_tensor:$in1);
+}
+def Poptorch_rsqrt_: Poptorch_elem_unary_in_place<"rsqrt_"> {}
+def Poptorch_sigmoid_: Poptorch_elem_unary_in_place<"sigmoid_"> {}
 def Poptorch_signum_: Poptorch_elem_unary_in_place<"signum_"> {}
-def Poptorch_sin_: Poptorch_elem_unary_in_place<"sin_"> {}
-def Poptorch_tan_: Poptorch_elem_unary_in_place<"tan_"> {}
-def Poptorch_tanh_: Poptorch_elem_unary_in_place<"tanh_"> {}
-def Poptorch_round_: Poptorch_elem_unary_in_place<"round_"> {}
 def Poptorch_sqrt_: Poptorch_elem_unary_in_place<"sqrt_"> {}
 def Poptorch_square_: Poptorch_elem_unary_in_place<"square_"> {}
-def Poptorch_sigmoid_: Poptorch_elem_unary_in_place<"sigmoid_"> {}
-def Poptorch_rsqrt_: Poptorch_elem_unary_in_place<"rsqrt_"> {}
-
 
 /*
  * Binary ops.
@@ -385,7 +392,8 @@ def Poptorch_addcmul_ : Poptorch_addcX<"addcmul_"> {}
 def Poptorch_addcdiv : Poptorch_addcOutplaceX<"addcdiv"> {}
 def Poptorch_addcdiv_ : Poptorch_addcX<"addcdiv_"> {}
 
-class Poptorch_elem_binary_scalar_NotImplemented<string name> :  Poptorch_NotImplementedOp<name, []> {
+class Poptorch_elem_binary_scalar<string name, list<OpTrait> traits = []>
+        : Poptorch_Op<name, traits> {
     let arguments = (ins Poptorch_tensor:$lhs, F32Attr:$rhs);
     let results = (outs Poptorch_tensor:$result);
 
@@ -398,7 +406,7 @@ class Poptorch_elem_binary_scalar_NotImplemented<string name> :  Poptorch_NotImp
     ];
 }
 
-def Poptorch_pow_Tensor_Scalar_out : Poptorch_elem_binary_scalar_NotImplemented<"pow_Tensor_Scalar_out"> {}
+def Poptorch_pow_Tensor_Scalar_out: Poptorch_elem_binary_scalar<"pow_Tensor_Scalar_out", [ImplicitCastOperand<0>, ImplicitCastToFloat]> {}
 
 class Poptorch_binary_conditional<string name, list<OpTrait> traits = []>
         : Poptorch_Op<name, traits # [ImplicitCastOperand<0>, ImplicitCastOperand<1>]> {
@@ -535,8 +543,8 @@ class Poptorch_clamp_common<string name>: Poptorch_NotImplementedOp<name, []> {
 def Poptorch_clamp_min: Poptorch_clamp_common<"clamp_min"> {}
 def Poptorch_clamp_max: Poptorch_clamp_common<"clamp_max"> {}
 
-def Poptorch_threshold_out: Poptorch_NotImplementedOp<"threshold_out", []> {
-  let arguments = (ins Poptorch_tensor:$self,
+def Poptorch_threshold_out: Poptorch_Op<"threshold_out", []> {
+  let arguments = (ins Poptorch_non_boolean_tensor:$self,
                        F32Attr:$threshold,
                        F32Attr:$value);
   let results = (outs Poptorch_tensor:$result);

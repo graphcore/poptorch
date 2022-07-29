@@ -1,13 +1,16 @@
 // Copyright (c) 2021 Graphcore Ltd. All rights reserved.
-#include <popops/ElementWise.hpp>
+#include <limits>
 
+#include <popops/ElementWise.hpp>
 #include <popops/Expr.hpp>
 #include <popops/ExprOp.hpp>
 #include <popops/ScaledAdd.hpp>
 
 #include <popnn/NonLinearity.hpp>
+#include <poptorch_logging/Error.hpp>
 
 #include "../CompilerHelpers.hpp"
+#include "dialect/Poptorch.hpp"
 
 namespace pe = popops::expr;
 
@@ -334,4 +337,63 @@ void tanh_backward::lowerToPoplar(CompilerContext &context) {
       context.seq);
   context.addTensor(this->grad_input(), out);
 }
+
+void threshold_out::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor self = context.fromSsa(this->self());
+  const float threshold = this->threshold().convertToFloat();
+  const float value = this->value().convertToFloat();
+
+  // PyTorch treats NaN as greater than x, except when x = NaN or x = inf.
+  const poplar::Tensor out =
+      popops::map(context.graph,
+                  pe::Select(pe::Const(value), pe::_1,
+                             pe::Lte(pe::_1, pe::Const(threshold))),
+                  {self}, context.seq);
+  context.addTensor(this->result(), out);
+}
+
+void pow_Tensor_Scalar_out::lowerToPoplar(CompilerContext &context) {
+  poplar::Tensor lhs = context.fromSsa(this->lhs());
+  const float rhs = this->rhs().convertToFloat();
+  poplar::Tensor out = popops::map(
+      context.graph, pe::Pow(pe::_1, pe::Const(rhs)), {lhs}, context.seq);
+  context.addTensor(this->result(), out);
+}
+
+#define UNARY_OP_IMPL_EXPR(op, expr)                                           \
+  void op::lowerToPoplar(CompilerContext &context) {                           \
+    poplar::Tensor input1 = context.fromSsa(this->in1());                      \
+    poplar::Tensor out =                                                       \
+        popops::map(context.graph, expr, {input1}, context.seq);               \
+    context.addTensor(this->result(), out);                                    \
+  }                                                                            \
+                                                                               \
+  void op##_::lowerToPoplar(CompilerContext &context) {                        \
+    poplar::Tensor input1 = context.fromSsa(this->in1());                      \
+    popops::mapInPlace(context.graph, expr, {input1}, context.seq);            \
+  }
+
+UNARY_OP_IMPL_EXPR(acos,
+                   pe::Const(static_cast<float>(M_PI_2)) - pe::Asin(pe::_1))
+UNARY_OP_IMPL_EXPR(acosh, pe::Log(pe::_1 + pe::Sqrt(pe::Square(pe::_1) -
+                                                    pe::Const(1.0f))))
+UNARY_OP_IMPL_EXPR(atan, pe::Atan2(pe::_1, pe::Const(1.0f)))
+UNARY_OP_IMPL_EXPR(atanh, pe::Const(0.5f) * pe::Log((pe::Const(1.0f) + pe::_1) /
+                                                    (pe::Const(1.0f) - pe::_1)))
+UNARY_OP_IMPL_EXPR(asinh, pe::Log(pe::_1 + pe::Sqrt(pe::Square(pe::_1) +
+                                                    pe::Const(1.0f))))
+UNARY_OP_IMPL_EXPR(sinh,
+                   pe::Const(0.5f) *
+                       (pe::Exp(pe::_1) - (pe::Const(1.0f) / pe::Exp(pe::_1))))
+UNARY_OP_IMPL_EXPR(cosh,
+                   pe::Const(0.5f) *
+                       (pe::Exp(pe::_1) + (pe::Const(1.0f) / pe::Exp(pe::_1))))
+UNARY_OP_IMPL_EXPR(reciprocal, pe::Const(1.0f) / pe::_1)
+UNARY_OP_IMPL_EXPR(erfc, pe::Const(1.0f) - pe::Erf(pe::_1))
+UNARY_OP_IMPL_EXPR(log10, pe::Log(pe::_1) / pe::Log(pe::Const(10.0f)))
+UNARY_OP_IMPL_EXPR(log2, pe::Log(pe::_1) / pe::Log(pe::Const(2.0f)))
+UNARY_OP_IMPL_EXPR(frac, pe::_1 - pe::Trunc(pe::_1))
+
+#undef UNARY_OP_IMPL_EXPR
+
 } // namespace poptorch_ir

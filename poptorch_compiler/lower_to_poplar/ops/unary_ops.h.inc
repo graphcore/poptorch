@@ -3,7 +3,6 @@
 UNARY_OP(abs)
 UNARY_OP(asin)
 UNARY_OP(bitwiseNot)
-UNARY_OP(cbrt)
 UNARY_OP(ceil)
 UNARY_OP(cos)
 UNARY_OP(countLeadingZeros)

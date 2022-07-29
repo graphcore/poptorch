@@ -582,6 +582,10 @@
 # func: trunc(Tensor self) -> Tensor
 - func: trunc
   PopTorchDirect: trunc
+
+# func: trunc.out(Tensor self *, Tensor(a!) out) -> Tensor(a!)
+- func: trunc.out
+  PopTorchDirect: trunc
   UnusedOutputArguments: {out}
 
 # func: threshold.out(Tensor self, Scalar threshold, Scalar value, *, Tensor(a!) out) -> Tensor(a!)

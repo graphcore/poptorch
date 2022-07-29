@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 import ast
+from copy import deepcopy
 import os
 import re
 import pytest
@@ -12,13 +13,24 @@ from poptorch.experimental import IPUContext
 
 
 def op_harness(fn, *args, **kwargs):
+    cpu_args = deepcopy(args)
     # Get the result from the CPU
     try:
-        cpu_res = fn(*args, **kwargs)
+        cpu_res = fn(*cpu_args, **kwargs)
     except RuntimeError as err:
-        msg = f'({re.escape(str(err))}|Verification failed for)'
+        str_err = str(err)
+        msg = f'({re.escape(str_err)}|Verification failed for)'
+
+        cannot_cast = "can't be cast to the desired output type"
+        if cannot_cast in str_err:
+            msg = cannot_cast
+
+        if "not implemented for" in str_err:
+            msg = None  # as the error message is likely to be different anyway
+
         with pytest.raises((RuntimeError, poptorch.Error), match=msg):
             IPUContext(fn)(*args, **kwargs)
+
         return
 
     print(f"From CPU: {cpu_res}")
@@ -62,13 +74,6 @@ binary_ops = [
     torch.floor_divide,
     torch.pow,
 ]
-
-#other_ops = [
-#    torch.clamp,
-#    torch.threshold,
-#    torch.nn.Hardtanh,
-#    torch.dropout,
-#]
 
 torch.manual_seed(42)
 binary_test_cases = [
@@ -141,30 +146,52 @@ def test_binary_nan_support(monkeypatch, op):
 
 unary_ops = [
     lambda x: -x,
-    torch.neg,
-    torch.round,
-    torch.trunc,
-    torch.sign,
-    torch.exp,
-    torch.log,
-    torch.logical_not,
     torch.abs,
-    torch.ceil,
-    torch.floor,
-    torch.isnan,
-    torch.sqrt,
-    torch.rsqrt,
+    torch.acos,
+    torch.acosh,
+    torch.asin,
+    torch.asinh,
+    torch.atan,
+    torch.atanh,
     torch.bitwise_not,
+    torch.ceil,
+    torch.cos,
+    torch.cosh,
+    torch.erf,
+    torch.erfc,
+    torch.exp,
+    torch.floor,
+    torch.frac,
+    torch.isnan,
+    torch.log,
+    torch.log10,
+    torch.log1p,
+    torch.log2,
+    torch.logical_not,
+    torch.neg,
+    torch.reciprocal,
+    torch.round,
+    torch.rsqrt,
+    torch.sigmoid,
+    torch.sign,
+    torch.sin,
+    torch.sinh,
+    torch.sqrt,
+    torch.square,
+    torch.tan,
+    torch.tanh,
+    torch.trunc,
 ]
 
 unary_test_cases = [
     torch.tensor(2.0),
     torch.tensor([]),
     torch.tensor([70, 0]),
+    torch.tensor([70.25, 0.125]),
     torch.tensor([[13, 8]], dtype=torch.int32),
     torch.tensor([[True, False], [True, False]]),
     torch.randn(3, 3),
-    torch.tensor([torch.nan, torch.inf]),
+    torch.tensor([torch.nan, torch.inf, -torch.inf]),
 ]
 
 
@@ -173,7 +200,68 @@ unary_test_cases = [
 @pytest.mark.parametrize("op", unary_ops)
 @pytest.mark.parametrize("input", unary_test_cases)
 def test_unary(op, input):
+    if op in (torch.asinh, torch.log1p) and torch.any(torch.isinf(input)):
+        pytest.skip("TODO(T62888) `-inf` -> `nan`")
+
+    torch.manual_seed(42)
     op_harness(op, input)
+
+
+inplace_unary_ops = [
+    lambda x: x.bitwise_not_(),
+    # lambda x: x.logical_not_(),  # TODO(T66820): popops::logicalNotInPlace
+    torch.abs_,
+    torch.acos_,
+    torch.acosh_,
+    torch.asin_,
+    torch.asinh_,
+    torch.atan_,
+    torch.atanh_,
+    torch.ceil_,
+    torch.cos_,
+    torch.cosh_,
+    torch.erf_,
+    torch.erfc_,
+    torch.exp_,
+    torch.expm1_,
+    torch.floor_,
+    torch.frac_,
+    torch.log_,
+    torch.log10_,
+    torch.log1p_,
+    torch.log2_,
+    torch.neg_,
+    torch.reciprocal_,
+    torch.round_,
+    torch.rsqrt_,
+    torch.sigmoid_,
+    torch.sin_,
+    torch.sinh_,
+    torch.sqrt_,
+    torch.tan_,
+    torch.tanh_,
+    torch.trunc_,
+]
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("op", inplace_unary_ops)
+@pytest.mark.parametrize("input", unary_test_cases)
+def test_inplace_unary(op, input):
+    if op in (torch.asinh_, torch.log1p_) and torch.any(torch.isinf(input)):
+        pytest.skip("TODO(T62888) `-inf` -> `nan`")
+
+    torch.manual_seed(42)
+    op_harness(op, input)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("input", unary_test_cases)
+@pytest.mark.parametrize("threshold", [0., 1000., -50])
+@pytest.mark.parametrize("value", [0., 1000, -50])
+def test_threshold(input, threshold, value):
+    torch.manual_seed(42)
+    op_harness(torch.threshold, input, threshold, value)
 
 
 addc_test_cases = (
