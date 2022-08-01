@@ -41,12 +41,18 @@ def pytest_configure(config):
     config.addinivalue_line("markers",
                             ("ipuHardwareRequired: require IPU hardware to be "
                              "available on the platform"))
+    config.addinivalue_line("markers",
+                            ("extendedTestingOnly: to only include "
+                             "in extended testing runs because it takes a "
+                             "long time to run"))
     if config.getoption("collectonly"):
         helpers.is_running_tests = False
 
 
 def pytest_runtest_setup(item):
+    # Is it a test with parameters?
     if hasattr(item, 'callspec'):
+        # Does it have a trace_model parameter ?
         trace_model = item.callspec.params.get("trace_model")
         if trace_model is not None and not trace_model:
             if not mlir_available:
@@ -63,25 +69,35 @@ def pytest_runtest_setup(item):
 
 # Source: https://raphael.codes/blog/customizing-your-pytest-test-suite-part-2/
 def pytest_collection_modifyitems(session, config, items):  # pylint: disable=unused-argument
-    if not config.getoption("hw_tests_only") and not config.getoption(
-            "no_hw_tests"):
-        return
+    # if --extended-tests is set: include all the tests with a
+    # "extendedTestingOnly" marker (Even if --hw-tests-only is set).
     # if --hw-tests-only is set: only keep tests with a "ipuHardwareRequired"
     # marker.
     # if --no-hw-tests is set: keep only the other ones.
     hw_required = []
     hw_not_required = []
+    force_include = []
+    force_exclude = []
+    include_extended = config.getoption("extended_tests")
     for item in items:
-        if any(item.iter_markers("ipuHardwareRequired")):
+        if any(item.iter_markers("extendedTestingOnly")):
+            if include_extended:
+                force_include.append(item)
+            else:
+                force_exclude.append(item)
+        elif any(item.iter_markers("ipuHardwareRequired")):
             hw_required.append(item)
         else:
             hw_not_required.append(item)
     if config.getoption("hw_tests_only"):
-        config.hook.pytest_deselected(items=hw_not_required)
-        items[:] = hw_required
+        config.hook.pytest_deselected(items=hw_not_required + force_exclude)
+        items[:] = hw_required + force_include
+    elif config.getoption("no_hw_tests"):
+        config.hook.pytest_deselected(items=hw_required + force_exclude)
+        items[:] = hw_not_required + force_include
     else:
-        config.hook.pytest_deselected(items=hw_required)
-        items[:] = hw_not_required
+        config.hook.pytest_deselected(items=force_exclude)
+        items[:] = hw_required + hw_not_required + force_include
 
 
 def pytest_addoption(parser):
@@ -93,3 +109,9 @@ def pytest_addoption(parser):
                      action="store_true",
                      default=False,
                      help="Exclude all tests requiring HW")
+    parser.addoption("--extended-tests",
+                     action="store_true",
+                     default=False,
+                     help=("Include all tests marked with "
+                           "'extendedTestingOnly' (Takes precedence over"
+                           " --no-hw-tests)"))
