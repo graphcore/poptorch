@@ -219,7 +219,7 @@ torch::jit::Node *contiguousHandler(torch::jit::Graph *graph,
   //
   // Returns the tensor
   UNUSED(graph);
-  replaceAllUsesWith(node->output(), node->input(0));
+  node->output()->replaceAllUsesWith(node->input(0));
   markNodeForDeletion(node);
   return nullptr;
 }
@@ -744,7 +744,7 @@ torch::jit::Node *toHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
                      *tensor_type->scalarType());
     }
 
-    replaceAllUsesWith(node->output(), node->input(0));
+    node->output()->replaceAllUsesWith(node->input(0));
     markNodeForDeletion(node);
     return nullptr;
   }
@@ -925,7 +925,7 @@ torch::jit::Node *autocastHandler(torch::jit::Graph *graph,
   auto to_type = getNodeScalarType(node->output(0));
 
   if (from_type == to_type) {
-    replaceAllUsesWith(node->output(), node->input(0));
+    node->output()->replaceAllUsesWith(node->input(0));
     markNodeForDeletion(node);
     return nullptr;
   }

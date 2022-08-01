@@ -53,13 +53,6 @@ void checkAndChangeOutputTypes(torch::jit::Graph *graph);
 // constants (poptorch::tensor_constant) of the correct type.
 void canonicaliseConstants(torch::jit::Graph *graph);
 
-// Dispatcher-specific passes are below.
-
-// Categorise all poptorch::tensor_constant into either
-// poptorch::tensor_constant or poptorch::host_side_tensor_constant. This pass
-// is called after dispatch once the full graph is available.
-void categoriseConstantsDispatch(torch::jit::Graph *graph);
-
 } // namespace type_and_constant_canonicalization
 } // namespace poptorch
 

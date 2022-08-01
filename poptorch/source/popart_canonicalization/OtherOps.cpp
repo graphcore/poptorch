@@ -278,36 +278,6 @@ torch::jit::Node *setAvailableMemoryHandler(torch::jit::Graph *graph,
   return new_node;
 }
 
-void setOverlap(torch::jit::Node *node, const std::string &overlap_type,
-                const std::string &value_str) {
-  std::stringstream ss;
-  ss << "poptorch_next_" << overlap_type << "_idx";
-  c10::Symbol next_idx_symbol = c10::Symbol::attr(ss.str());
-  if (!node->hasAttribute(next_idx_symbol)) {
-    node->i_(next_idx_symbol, 0);
-  }
-  int64_t next_idx = node->i(next_idx_symbol);
-  node->i_(next_idx_symbol, next_idx + 1);
-  auto overlap_symbol = getOverlapSymbol(overlap_type.c_str(), next_idx);
-  node->s_(overlap_symbol, value_str);
-}
-
-torch::jit::Node *setOverlapForInputHandler(torch::jit::Graph *graph,
-                                            torch::jit::Node *node) {
-  // poptorch::set_overlap_for_input(Tensor, str) -> Tensor
-  auto value_str = constantToString(node->input(1)->node());
-  setOverlap(graph->param_node(), "input", value_str);
-  return nullptr;
-}
-
-torch::jit::Node *setOverlapForOutputHandler(torch::jit::Graph *graph,
-                                             torch::jit::Node *node) {
-  // poptorch::set_overlap_for_output(Tensor, str) -> Tensor
-  auto value_str = constantToString(node->input(1)->node());
-  setOverlap(graph->return_node(), "output", value_str);
-  return nullptr;
-}
-
 torch::jit::Node *randintHandler(torch::jit::Graph *graph,
                                  torch::jit::Node *node) {
   auto *out = node->output(0);
@@ -348,10 +318,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::random_, randomHandler);
   registerHandler(symbols::poptorch::set_available_memory,
                   setAvailableMemoryHandler);
-  registerHandler(symbols::poptorch::set_overlap_for_input,
-                  setOverlapForInputHandler);
-  registerHandler(symbols::poptorch::set_overlap_for_output,
-                  setOverlapForOutputHandler);
 }
 
 } // namespace poptorch

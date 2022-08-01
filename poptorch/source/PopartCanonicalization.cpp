@@ -81,7 +81,7 @@ torch::jit::Node *handleSliceModification(torch::jit::Graph *graph,
     // Replace uses of slice input after inplace op with result of
     // the dynamic update (i.e. the modified tensor)
     auto *modified_input = dynamic_update->output();
-    replaceAllUsesAfterNodeWith(node, slice_input, modified_input);
+    slice_input->replaceAllUsesAfterNodeWith(node, modified_input);
     new_node = dynamic_update;
 
     // Repeat this process for the entire chain of slices - the

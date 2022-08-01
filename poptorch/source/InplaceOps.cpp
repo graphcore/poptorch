@@ -68,8 +68,8 @@ torch::jit::Node *outplaceOp(torch::jit::Graph &graph, torch::jit::Node *node) {
   torch::jit::addAdditionalInputsIfRequired(&graph, node, new_node);
 
   new_node->output()->setType(node->output()->type());
-  replaceAllUsesWith(node->output(), new_node->output());
-  replaceAllUsesAfterNodeWith(node, node->input(0), node->output());
+  node->output()->replaceAllUsesWith(new_node->output());
+  node->input(0)->replaceAllUsesAfterNodeWith(node, node->output());
 
   return new_node;
 }

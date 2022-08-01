@@ -778,6 +778,8 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
 
   logging::trace("Traced graph:\n{}", *graph);
 
+  poptorch::attributiseOverlappedIO(graph.get());
+
   fixForLoopInputs(*graph);
 
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
@@ -790,14 +792,6 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   poptorch::canonicalize(graph.get());
 
   poptorch::annotateSubgraphs(graph.get(), graph->nodes().front());
-
-  poptorch::verifyOverlappedIOForDispatch(graph.get());
-
-  // Make sure all constants are correctly categorised as either
-  // poptorch::tensor_constant or poptorch::host_side_tensor_constant now
-  // that we have a full graph.
-  poptorch::type_and_constant_canonicalization::categoriseConstantsDispatch(
-      graph.get());
 
   // Collapse any `begin_cpu ... end_cpu` sequences into a single node, with the
   // correct inputs & outputs.

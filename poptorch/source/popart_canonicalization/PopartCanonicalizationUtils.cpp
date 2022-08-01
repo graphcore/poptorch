@@ -330,7 +330,7 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
         // This occurs because we have to trace with Float so we can switch
         // to Half here
         new_val->setType(old_type->withScalarType(at::ScalarType::Half));
-        replaceAllUsesWith(old_val, new_val);
+        old_val->replaceAllUsesWith(new_val);
         return;
       }
       if (old_type->scalarType() == at::ScalarType::Float &&
@@ -338,12 +338,12 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
         // At this stage, we do not know whether it is a float16 or float32
         new_val->setType(old_type->withScalarType(HALF_OR_FLOAT));
 
-        replaceAllUsesWith(old_val, new_val);
+        old_val->replaceAllUsesWith(new_val);
         return;
       }
 
       new_val->setType(new_type);
-      replaceAllUsesWith(old_val, new_val);
+      old_val->replaceAllUsesWith(new_val);
       return;
     }
   }
@@ -351,7 +351,7 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
   new_val->setType(old_val->type());
 
   // Replace the old value with the new one.
-  replaceAllUsesWith(old_val, new_val);
+  old_val->replaceAllUsesWith(new_val);
 }
 
 void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,

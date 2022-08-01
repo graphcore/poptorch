@@ -130,17 +130,6 @@ bool isCompilingWithDispatcher();
 // Destroy the active dispatcher object.
 void destroyDispatcher();
 
-// Replace all uses of target with replacement. Keeps track of the replacement
-// so it can be correctly handled if the dispatcher is active.
-void replaceAllUsesWith(torch::jit::Value *target,
-                        torch::jit::Value *replacement);
-
-// Replace all uses of target after node with replacement. Keeps track of the
-// replacement so it can be correctly handled if the dispatcher is active.
-void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
-                                 torch::jit::Value *target,
-                                 torch::jit::Value *replacement);
-
 void replaceValueDispatcher(torch::jit::Value *v_old, torch::jit::Value *v_new);
 
 std::uint64_t getIpuTensorId(const at::Tensor &tensor);

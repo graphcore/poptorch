@@ -645,51 +645,5 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
   searchAndPossiblyDestroy(to_delete);
 }
 
-void categoriseConstantsDispatch(torch::jit::Graph *graph) {
-  logging::LogContext ctx_func("CategoriseConstantsDispatch");
-
-  std::unordered_set<torch::jit::Node *> to_delete;
-  for (auto *node : graph->nodes()) {
-    if (node->kind() != symbols::poptorch::tensor_constant) {
-      continue;
-    }
-    torch::jit::Value *v_old = node->output();
-    torch::jit::Value *v_new = nullptr;
-
-    // Don't check the kind of the node itself as we are not calling on a
-    // prim::Constant.
-    switch (getUseOfNode(node, /*check_node_kind_itself=*/false)) {
-    case UseOfNode::PopARTOnly:
-      break;
-    case UseOfNode::HostSideOnly:
-      v_new = node->replaceWithNewSymbol(
-                      symbols::poptorch::host_side_tensor_constant)
-                  ->output();
-      to_delete.insert(node);
-      break;
-    case UseOfNode::HostSideAndPopART:
-      v_new = node->replaceWithNewSymbol(
-                      symbols::poptorch::host_and_ipu_side_tensor_constant)
-                  ->output();
-      to_delete.insert(node);
-      break;
-    }
-
-    if (v_new != nullptr) {
-      poptorch::replaceValueDispatcher(v_old, v_new);
-    }
-  }
-
-  searchAndPossiblyDestroy(to_delete);
-  to_delete.clear();
-
-  rectifyHostAndIPUSideConstants(graph, &to_delete);
-  searchAndPossiblyDestroy(to_delete);
-  to_delete.clear();
-
-  removeStateChangingNodesFromHostSideBranch(graph, &to_delete);
-  searchAndPossiblyDestroy(to_delete);
-}
-
 } // namespace type_and_constant_canonicalization
 } // namespace poptorch

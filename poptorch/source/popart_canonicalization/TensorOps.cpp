@@ -27,7 +27,7 @@ torch::jit::Node *numToTensorHandler(torch::jit::Graph *graph,
   ERROR_ON(node->input(0)->node()->kind() !=
            symbols::poptorch::tensor_constant);
   UNUSED(graph);
-  replaceAllUsesWith(node->output(), node->input(0));
+  node->output()->replaceAllUsesWith(node->input(0));
   markNodeForDeletion(node);
   return nullptr;
 }

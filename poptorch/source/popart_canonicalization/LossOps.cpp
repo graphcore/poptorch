@@ -613,9 +613,9 @@ torch::jit::Node *ctcbeamsearchdecoderHandler(torch::jit::Graph *graph,
   decoder->addOutput();
   decoder->addOutput();
 
-  replaceAllUsesWith(node->output(0), decoder->output(0));
-  replaceAllUsesWith(node->output(1), decoder->output(1));
-  replaceAllUsesWith(node->output(2), decoder->output(2));
+  node->output(0)->replaceAllUsesWith(decoder->output(0));
+  node->output(1)->replaceAllUsesWith(decoder->output(1));
+  node->output(2)->replaceAllUsesWith(decoder->output(2));
 
   markNodeForDeletion(node);
   return decoder;

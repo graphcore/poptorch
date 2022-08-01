@@ -284,17 +284,6 @@ std::string toString(const at::Tensor &t) {
   return ss.str();
 }
 
-void replaceAllUsesWith(torch::jit::Value *target,
-                        torch::jit::Value *replacement) {
-  target->replaceAllUsesWith(replacement);
-}
-
-void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
-                                 torch::jit::Value *target,
-                                 torch::jit::Value *replacement) {
-  target->replaceAllUsesAfterNodeWith(node, replacement);
-}
-
 bool isHalfTensor(const at::Tensor &t) {
   return t.scalar_type() == at::ScalarType::Half;
 }
