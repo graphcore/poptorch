@@ -205,6 +205,8 @@ class Command:
         # linter to undertake run-time inspection of the poptorch module.
         new_env = os.environ.copy()
         new_env["PYTHONPATH"] = ""
+        if "CPATH" in new_env:
+            del new_env["CPATH"]
 
         self.proc = _utils.Process([self.cmd],
                                    redirect_stderr=True,
