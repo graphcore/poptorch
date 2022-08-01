@@ -53,6 +53,7 @@ void removeSurplusIdentityLosses(torch::jit::Graph *graph) {
 
   // For all nodes in the IR.
   for (torch::jit::Node *node : graph->nodes()) {
+    WithNodeMetadata meta{node};
     const torch::jit::Symbol kind = node->kind();
 
     // For each loss see if it is used in a loss.

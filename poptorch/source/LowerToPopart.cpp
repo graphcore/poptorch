@@ -293,6 +293,8 @@ public:
   loadExecutableFromFile(const std::string &input_filename);
 
 private:
+  void printWasLoweredDebug(const torch::jit::Node *node,
+                            poptorch::TensorId first_output_tensor);
   torch::jit::Graph &_graph;
 
   bool _lowered;
@@ -419,6 +421,15 @@ void LowerToPopartImpl::lower(std::vector<at::Tensor> *in_tensors) {
 
   logging::debug("}");
   _lowered = true;
+}
+
+void LowerToPopartImpl::printWasLoweredDebug(
+    const torch::jit::Node *node, poptorch::TensorId first_output_tensor) {
+  logging::debug(
+      "{} was lowered to {} [{},{}]", nodeToString(node),
+      tensorNames(first_output_tensor, node->outputs().size()),
+      tensorTypesAndShapes(first_output_tensor, node->outputs().size()),
+      _compiler.getExecutionInfo().get());
 }
 
 void LowerToPopartImpl::lowerReturn() {
@@ -621,8 +632,10 @@ void LowerToPopartImpl::lowerBody() {
     if (node->sourceRange().source()) {
       meta = node->sourceRange().source()->text();
     }
+    /* TODO(anthonyb): follow up patch to fix these.
     ERROR_ON_MSG(_built_in_params && meta.empty(),
                  "Source code location missing for node " + nodeToString(node));
+     */
     // Note: filename and line number might still not be available (For example
     // if the filter set by the user excludes the entire stack).
     auto file_line_col = node->sourceRange().file_line_col();
@@ -665,16 +678,13 @@ void LowerToPopartImpl::lowerBody() {
       }
 
       if (!_compiler.isHostSideConstant(first_output_tensor)) {
-        logging::debug(
-            "  {} was lowered to {} [{},{}]", nodeToString(node),
-            tensorNames(first_output_tensor, node->outputs().size()),
-            tensorTypesAndShapes(first_output_tensor, node->outputs().size()),
-            _compiler.getExecutionInfo().get());
+        printWasLoweredDebug(node, first_output_tensor);
       }
     } else if (kind == symbols::poptorch::end_ipu_block) {
       _compiler.clearActiveIpu();
     } else if (kind == symbols::poptorch::start_for_loop) {
       _compiler.startSubgraph();
+      logging::debug("{} was lowered", nodeToString(node));
     } else if (kind == symbols::poptorch::end_for_loop) {
       std::vector<poptorch::TensorId> inputs =
           _value_map.tensors(node->input(0));
@@ -700,9 +710,11 @@ void LowerToPopartImpl::lowerBody() {
       }
 
       _value_map.setTuple(node->output(), outs);
+      printWasLoweredDebug(node, first_output_tensor);
     } else if (kind == symbols::poptorch::add_untyped_input_tensor) {
       poptorch::TensorId out = _compiler.addUntypedInputTensor();
       _value_map.setTensor(node->output(), out);
+      printWasLoweredDebug(node, out);
     } else if (kind == symbols::poptorch::begin_ipu_block) {
       _compiler.setActiveIpu(node->i(c10::Symbol::attr("stage")),
                              node->i(c10::Symbol::attr("phase")),
@@ -770,6 +782,7 @@ void LowerToPopartImpl::lowerBody() {
       } else {
         _value_map.setList(output, input_tensors);
       }
+      logging::debug("{} was lowered", nodeToString(node));
     } else if (kind == c10::prim::TupleUnpack ||
                kind == c10::prim::ListUnpack) {
       // Get the torch jit SSA for the input/output values.
@@ -820,6 +833,7 @@ void LowerToPopartImpl::lowerBody() {
         }
       }
       ERROR_ON_MSG(tensor_it != tensors.end(), "Didn't unpack all the tensors");
+      logging::debug("{} was lowered", nodeToString(node));
     } else if (kind == symbols::poptorch::host_side_cast) {
       // Map to the input value since the type will be cast host side
       ERROR_ON_MSG(!_value_map.hasTensor(node->input()),
@@ -892,11 +906,7 @@ void LowerToPopartImpl::lowerBody() {
         _value_map.setTensor(node_outputs[i], outputs[i]);
       }
 
-      logging::debug("{} was lowered to {} [{},{}]", nodeToString(node),
-                     tensorNames(outputs[0], outputs.size()),
-                     tensorTypesAndShapes(outputs[0], outputs.size()),
-                     _compiler.getExecutionInfo().get());
-
+      printWasLoweredDebug(node, outputs.front());
     } else if (kind == symbols::poptorch::canonicalised_cpu_call) {
       // CPU callbacks are referenced by an string identifier.
       std::string id = node->s(c10::Symbol::attr("ID"));
@@ -934,6 +944,7 @@ void LowerToPopartImpl::lowerBody() {
                      "Output " << i << " doesn't exist of Node " << *node);
         _value_map.setTensor(output, output_tensor);
       }
+      printWasLoweredDebug(node, first_output_tensor);
     } else if (kind == symbols::poptorch::set_attribute) {
       const std::string &attribute = node->s(c10::Symbol::attr("attribute"));
       const std::string &key = node->s(c10::Symbol::attr("key"));

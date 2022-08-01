@@ -73,6 +73,22 @@ void setCurrentPythonCodeLocation(
 void setCurrentMetadata(const std::string &metadata) {
   current_source_location.setMetadata(metadata);
 }
+
+WithNodeMetadata::WithNodeMetadata(torch::jit::Node *node) {
+  std::string meta;
+  auto sr = node->sourceRange();
+  if (sr.source()) {
+    meta = sr.source()->text();
+  }
+  setCurrentPythonCodeLocation(sr);
+  setCurrentMetadata(meta);
+}
+
+WithNodeMetadata::~WithNodeMetadata() {
+  setCurrentPythonCodeLocation({});
+  setCurrentMetadata("");
+}
+
 torch::jit::Node *
 createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
                     torch::jit::ArrayRef<torch::jit::Value *> inputs,

@@ -49,8 +49,7 @@ public:
                                 const at::Tensor &src) final;
 
   // Node will be updated to the new target post canonicalisation.
-  void canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
-                                c10::Stack &stack, torch::jit::Node **node);
+  void fixOutput(c10::Stack &stack, torch::jit::Node *node);
 
   InplaceGraphInfo finalizeInplaceGraphInfo(size_t num_anchors,
                                             bool replicas_needing_broadcast);

@@ -51,17 +51,7 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
                                   c10::Stack *stack, torch::jit::Graph &graph,
                                   ValueMapper &mapper);
 
-void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack);
-
-// Run our canonicaliser passes for the aten_target over the graph.
-torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
-                               torch::jit::Node *aten_target,
-                               torch::jit::Graph &graph,
-                               bool is_allowed_to_fail);
-
-// If this value was replaced with another by the most recently run handler,
-// return the replacement. If not, return nullptr.
-torch::jit::Value *wasReplaced(torch::jit::Value *target);
+void assertCanBeCanonicalised(const c10::FunctionSchema &schema);
 
 // Return a string containing the tensor sizes and type.
 std::string toString(const at::Tensor &t);

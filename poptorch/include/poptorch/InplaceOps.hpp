@@ -98,6 +98,8 @@ private:
   // alias -> aliased
   std::unordered_map<torch::jit::Value *, torch::jit::Value *> _aliases;
 };
+
+void fixForLoopInputs(torch::jit::Graph &graph);
 } // namespace poptorch
 
 #endif // INCLUDE_POPTORCH_INPLACE_OPS_H

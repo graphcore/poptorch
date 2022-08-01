@@ -21,6 +21,14 @@
 
 namespace poptorch {
 
+class WithMetadata {
+public:
+  explicit WithMetadata(const std::string &metadata) {
+    setCurrentMetadata(metadata);
+  }
+  ~WithMetadata() { setCurrentMetadata(""); }
+};
+
 std::string truncateGraphString(torch::jit::Graph &graph) {
   static const int num_lines_max = [=]() {
     if (const char *graph_len = std::getenv("POPTORCH_MAX_GRAPH_LEN")) {
@@ -62,6 +70,7 @@ at::Tensor JITDispatch::allocateTensor(
 
 at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
+  WithMetadata metadata("constant");
 
   auto src = copyAndCoerceType(cpu_tensor);
 
@@ -117,10 +126,12 @@ at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
 }
 
 at::Tensor JITDispatch::addInput(const at::Tensor &cpu_tensor) {
+  WithMetadata metadata("input");
   return addTensor(cpu_tensor, /* is_parameter= */ false);
 }
 
 at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
+  WithMetadata metadata("parameter");
   at::ScalarType type = tensor.scalar_type();
   // PopART doesn't allow non-floating point variables so add them as
   // constants instead. These will be deleted from parameters and buffers
@@ -137,17 +148,18 @@ void JITDispatch::createGraph() {
   // No need to create a MLIR graph, we're going to only use the dispatcher
   // for shape inference, so just initialise the compiler.
   _mlir_dispatch.initCompiler();
-
-  setCurrentMetadata("<input/parameter/buffer>");
 }
 
 void JITDispatch::addOutput(const at::Tensor &ipu_src,
                             const at::Tensor &cpu_dest) {
+  WithMetadata metadata("output");
   // The PopART backend will allocate its own buffers: ignore cpu_dest.
   UNUSED(cpu_dest);
   auto *record = _mapper.rawTensorRecord(ipu_src);
   ERROR_ON_MSG(record == nullptr,
-               "Internal: graph output tensor not present in the value mapper");
+               "Internal: graph output tensor not present in value mapper "
+                   << static_cast<void *>(&_mapper) << " for "
+                   << static_cast<void *>(ipu_src.unsafeGetTensorImpl()));
 
   torch::jit::Value *val = record->jit;
 
@@ -173,6 +185,8 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
 
 void JITDispatch::finalizeGraph() {
   logging::trace("[TRACING-2][JIT] Graph after marking outputs\n{}\n", *graph);
+  // Clear the code location
+  setCurrentPythonCodeLocation({});
 }
 
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
@@ -200,6 +214,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
 
   torch::jit::Value *copy;
   if (*self_st == *src_st) {
+    WithNodeMetadata meta{src_tracked->jit->node()};
     copy = createIdentity(graph.get(), {src_tracked->jit})->output();
     copy->setType(self_tracked->jit->type());
   } else {
@@ -273,33 +288,18 @@ void JITDispatch::setCurrentCodeLocation(
 }
 
 // Convert the operation into our normal IR style operation.
-void JITDispatch::canonicaliseAndFixOutput(const c10::FunctionSchema &schema,
-                                           c10::Stack &stack,
-                                           torch::jit::Node **node) {
-  torch::jit::Node *new_node =
-      canonicalise(schema, *node, *graph, /* is_allowed_to_fail=*/false);
-  *node = new_node;
-
-  logging::trace("[TRACING-2][JIT] Post canonicalisation {}", *new_node);
-
+void JITDispatch::fixOutput(c10::Stack &stack, torch::jit::Node *node) {
   // Fix up the outputs.
   std::uint32_t output_index = 0;
   for (c10::IValue value : stack) {
-    // PopART doesn't always match these 1:1.
-    if (output_index >= new_node->outputs().size()) {
-      logging::trace("The canonicalised JIT node has fewer outputs than the "
-                     "dispatch function. This is only an issue if these "
-                     "outputs are used.");
-      break;
+    // Add any missing outputs. They frequently return scalars which we just
+    // ignore here as our canonicalisation only returns tensors.
+    while (output_index >= node->outputs().size()) {
+      node->addOutput();
     }
 
     // Start tracking the output tensors, i.e. add them to the value mapper.
-    torch::jit::Value *val = new_node->output(output_index);
-    // Check whether the handler replaced this value.
-    auto *replacement = wasReplaced(val);
-    if (replacement != nullptr) {
-      val = replacement;
-    }
+    torch::jit::Value *val = node->output(output_index);
 
     if (value.isTensor()) {
       at::Tensor tensor = value.toTensor();
@@ -359,10 +359,11 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
   // Tag all the nodes created by the handler with the initial schema string
   // representation so that they can be traced back to top level ops in the
   // profiler.
-  setCurrentMetadata(c10::toString(initial_schema));
+  WithMetadata metadata(c10::toString(initial_schema));
 
   // Create a fake IR node for us to target using the schema.
   torch::jit::Node *node = lowerFromSchema(schema, stack, *graph, _mapper);
+  logging::trace("[TRACING-2][JIT] Node from schema {}", *node);
 
   if (inplace_tensor) {
     // For inplace ops, cast all input tensors to the same type as the output
@@ -384,6 +385,8 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
       }
       torch::jit::Value *jv = node->input(i);
       auto *cast = createCast(graph.get(), jv, output_type);
+      // The cast needs to be before the node.
+      cast->moveBefore(node);
       node->replaceInputWith(jv, cast->output());
     }
   }
@@ -425,20 +428,16 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
     process_value(value);
   }
   _mlir_dispatch.handleOp(op, stack);
+
   // Fix the fake tensor so it can still work with our canonicalisation
   // functions which check the output.
-  fixNodeOutput(node, *stack);
+  fixOutput(*stack, node);
+
   logging::trace("[TRACING-2][JIT] Pre canonicalisation {}", *node);
 
-  // Run our normal canonicalisation passes on it.
-  // The original node will be deleted but replaced with a new node.
-  canonicaliseAndFixOutput(schema, *stack, &node);
-
-  // Annotate for loops as subgraphs.
-  annotateSubgraphsDispatch(graph.get(), node);
-
-  logging::trace("[TRACING-2][JIT] Post canonicalisation and fix output {}",
-                 *node);
+  // Make sure we will be able to handle this op when we will later
+  // lower to PopART.
+  assertCanBeCanonicalised(schema);
 
   std::size_t i = 0;
   for (c10::IValue value : *stack) {

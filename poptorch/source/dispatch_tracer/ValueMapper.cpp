@@ -49,12 +49,17 @@ void ValueMapper::setParameterName(const at::Tensor &t,
 
 // Add a tensor to the IR.
 void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
-  logging::trace("Adding {} to value mapper, MLIR id: {}",
-                 static_cast<void *>(t.unsafeGetTensorImpl()), id);
+  logging::trace("Adding {} to value mapper {}, MLIR id: {}",
+                 static_cast<void *>(t.unsafeGetTensorImpl()),
+                 static_cast<void *>(this), id);
   // If the tensor is already being tracked then we will update the MLIR
   // value being tracked. Otherwise we insert and add the MLIR value.
   auto new_details = getTensorDetails(*t.unsafeGetTensorImpl());
-  new_details->mapper = this;
+  if (new_details->mapper == nullptr) {
+    // If this tensor was created by the JIT dispatcher we want the details
+    // to point at the JIT's mapper not the MLIR one, so don't overwrite.
+    new_details->mapper = this;
+  }
   auto itr = tensors.insert({new_details.get(), TrackedTensor{t}}).first;
   itr->second.mlir = id;
   ERROR_ON(itr->second.tensor_details != new_details);
@@ -62,9 +67,9 @@ void ValueMapper::addTensor(const at::Tensor &t, poptorch_ir::TensorId id) {
 
 void ValueMapper::addTensor(const at::Tensor &t, torch::jit::Value *val) {
   ERROR_ON_MSG(val == nullptr, "torch::jit::Value* cannot be null");
-  logging::trace("Adding {} to value mapper, JIT ir: {}",
+  logging::trace("Adding {} to value mapper {}, JIT ir: {}",
                  static_cast<void *>(t.unsafeGetTensorImpl()),
-                 val->debugName());
+                 static_cast<void *>(this), val->debugName());
   validateTensorShapeAndType(val, t);
 
   // If the tensor is already being tracked then we will update the JIT

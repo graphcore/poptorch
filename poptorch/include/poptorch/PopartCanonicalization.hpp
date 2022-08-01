@@ -41,9 +41,6 @@ void warnOnUnsupportedAten(torch::jit::Graph *graph);
 
 void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node);
 
-void annotateSubgraphsDispatch(torch::jit::Graph *graph,
-                               torch::jit::Node *node);
-
 void removeSurplusIdentityLosses(torch::jit::Graph *graph);
 
 void canonicaliseHalfInputs(torch::jit::Graph *graph,

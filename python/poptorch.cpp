@@ -653,7 +653,7 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
       parsed_options.replicationFactor() > 1 &&
           parsed_options.broadcastBuffers());
 
-  // Any types with ListTypeWithNumElements must be revereted (revert = true)
+  // Any types with ListTypeWithNumElements must be reverted (revert = true)
   // to allow constant evaluation to proceed
   poptorch::type_and_constant_canonicalization::addListNumElements(graph.get(),
                                                                    true);
@@ -777,6 +777,19 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
   std::shared_ptr<torch::jit::Graph> graph = getTracedGraph();
 
   logging::trace("Traced graph:\n{}", *graph);
+
+  fixForLoopInputs(*graph);
+
+  poptorch::type_and_constant_canonicalization::canonicaliseConstants(
+      graph.get());
+
+  poptorch::removeScatterAddIndexExpansion(graph.get());
+
+  poptorch::simplifyGatherWithExpandedIndices(graph.get());
+
+  poptorch::canonicalize(graph.get());
+
+  poptorch::annotateSubgraphs(graph.get(), graph->nodes().front());
 
   poptorch::verifyOverlappedIOForDispatch(graph.get());
 

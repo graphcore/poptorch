@@ -59,20 +59,6 @@ size_t countNumTensorOutputs(torch::jit::Graph &graph) {
   return num_tensors;
 }
 
-void fixForLoopInputs(torch::jit::Graph &graph) {
-  torch::jit::Value *correct_loop_input = nullptr;
-  for (auto *node : graph.nodes()) {
-    if (node->kind() == symbols::poptorch::start_for_loop) {
-      correct_loop_input = node->input();
-    } else if (node->kind() == symbols::poptorch::end_for_loop) {
-      ERROR_ON_MSG(!correct_loop_input,
-                   "[Internal] poptorch::end_for_loop "
-                   "encountered before poptorch::start_for_loop");
-      node->replaceInput(1, correct_loop_input);
-    }
-  }
-}
-
 torch::jit::Node *outplaceOp(torch::jit::Graph &graph, torch::jit::Node *node) {
   torch::jit::NodeKind new_kind = outplaceKind(node->kind());
 
@@ -424,6 +410,24 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
     }
   }
   return out;
+}
+
+void fixForLoopInputs(torch::jit::Graph &graph) {
+  torch::jit::Value *correct_loop_input = nullptr;
+  for (auto *node : graph.nodes()) {
+    if (node->kind() == symbols::poptorch::start_for_loop) {
+      ERROR_ON_MSG(correct_loop_input,
+                   "[Internal] new poptorch::start_for_loop "
+                   "encountered before previous poptorch::end_for_loop");
+      correct_loop_input = node->input();
+    } else if (node->kind() == symbols::poptorch::end_for_loop) {
+      ERROR_ON_MSG(!correct_loop_input,
+                   "[Internal] poptorch::end_for_loop "
+                   "encountered before poptorch::start_for_loop");
+      node->replaceInput(1, correct_loop_input);
+      correct_loop_input = nullptr;
+    }
+  }
 }
 
 } // namespace poptorch

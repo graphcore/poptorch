@@ -168,6 +168,7 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
   logging::LogContext ctx_func("PopartCanonicalization");
   for (torch::jit::Node *node : graph->nodes()) {
     logging::LogContext ctx("processing " + nodeToString(node));
+    WithNodeMetadata metadata(node);
     torch::jit::WithInsertPoint insert_point(node);
     torch::jit::Node *new_node = nullptr;
     torch::jit::Symbol kind = node->kind();
@@ -195,10 +196,18 @@ void CanonicalizeImpl::run(torch::jit::Graph *graph) {
     if (new_node != nullptr) {
       // Mark this node for deletion.
       markNodeForDeletion(node);
-      ERROR_ON(node->outputs().size() != new_node->outputs().size());
 
       if (node->hasUses()) {
         for (std::uint64_t i = 0; i < node->outputs().size(); ++i) {
+          if (i >= new_node->outputs().size()) {
+            ERROR_ON_MSG(
+                node->output(i)->hasUses(),
+                "The canonicalised JIT node has fewer outputs than the "
+                "dispatch function. This is only an issue because these "
+                "outputs are used.");
+            continue;
+          }
+
           // As well as replacing the use, this will copy across shape/type
           // if not explicitly set.
           replaceOutputUse(node, new_node, i);

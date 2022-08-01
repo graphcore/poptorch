@@ -35,6 +35,15 @@ template <class T> class optional;
 
 namespace poptorch {
 
+// RAII object to set / clear the current source code location
+// and metadata to those attached to the provided node.
+// (Useful when creating / replacing nodes in the graph).
+class WithNodeMetadata {
+public:
+  explicit WithNodeMetadata(torch::jit::Node *node);
+  ~WithNodeMetadata();
+};
+
 // Set the current source code location (i.e all the nodes created
 // will appear as having been instantiated from that location).
 void setCurrentPythonCodeLocation(

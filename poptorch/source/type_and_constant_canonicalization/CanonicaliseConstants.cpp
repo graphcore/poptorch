@@ -493,7 +493,7 @@ void recursivelySelectHostAndIPUSideConstants(
 }
 
 // Find any host_and_ipu_side_tensor_constant constants and perform the
-// neccessary splitting
+// necessary splitting
 void rectifyHostAndIPUSideConstants(
     torch::jit::Graph *graph,
     std::unordered_set<torch::jit::Node *> *to_delete) {
@@ -642,18 +642,6 @@ void canonicaliseConstants(torch::jit::Graph *graph) {
 
   to_delete.clear();
   removeStateChangingNodesFromHostSideBranch(graph, &to_delete);
-  searchAndPossiblyDestroy(to_delete);
-}
-
-void canonicaliseConstantsDispatch(torch::jit::Graph *graph,
-                                   torch::jit::Node *node) {
-  logging::LogContext ctx_func("CanonicaliseConstantsDispatch");
-  std::unordered_set<torch::jit::Node *> to_delete;
-  for (auto *input : node->inputs()) {
-    auto *input_producer = input->node();
-    canonicaliseIfConstant(graph, input_producer, &to_delete);
-  }
-
   searchAndPossiblyDestroy(to_delete);
 }
 

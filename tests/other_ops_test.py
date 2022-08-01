@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
-from contextlib import contextmanager
 import re
 
 import torch
@@ -197,11 +196,7 @@ def test_2d_scatter_add_with_index_expansion(capfd, expand_as):
     log = helpers.LogChecker(capfd)
     it = log.createIterator()
     it.findNext("Removing index expansion node:")
-    with pytest.raises(
-            AssertionError,
-            match=r".*The log above doesn't contain lines matching.*",
-    ):
-        it.findNext(look_for)
+    it.assert_not_contains(look_for)
 
 
 @helpers.printCapfdOnExit
@@ -293,29 +288,19 @@ def test_gather_with_index_expansion(capfd, expand_as, params):
     ipu_out = poptorch_model(data, indices)
     helpers.assert_allclose(actual=ipu_out, expected=cpu_out)
 
-    # Check gather is optimised by looking at logs.
-    @contextmanager
-    def does_not_raise():
-        yield
-
     log = helpers.LogChecker(capfd)
     it = log.createIterator()
 
     # Look for the log saying we did the optimisation, only if we should have.
     if params["should_optimise"]:
-        with does_not_raise():
-            it.findNext("Optimising gather:")
+        it.findNext("Optimising gather:")
 
     # Look for the (non-)presence of the expand op that should be removed.
     remove_if_optimised = "aten::expand_as" if expand_as else "aten::expand"
 
-    expectation = does_not_raise()
     if params["should_optimise"]:
-        expectation = pytest.raises(
-            AssertionError,
-            match=r".*The log above doesn't contain lines matching.*")
-
-    with expectation:
+        it.assert_not_contains(remove_if_optimised)
+    else:
         it.findNext(remove_if_optimised)
 
 

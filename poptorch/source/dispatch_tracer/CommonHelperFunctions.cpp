@@ -156,9 +156,6 @@ createAtenTarget(torch::jit::Graph &graph, const c10::FunctionSchema &schema,
     }
   }
 
-  poptorch::type_and_constant_canonicalization::canonicaliseConstantsDispatch(
-      &graph, aten_target);
-
   return aten_target;
 }
 
@@ -264,84 +261,21 @@ torch::jit::Node *lowerFromSchema(const c10::FunctionSchema &schema,
   return createAtenTarget(graph, schema, inputs, stack, mapper);
 }
 
-void fixNodeOutput(torch::jit::Node *node, const c10::Stack &stack) {
-  std::uint32_t index = 0;
-  for (c10::IValue value : stack) {
-    // Add any missing outputs. They frequently return scalars which we just
-    // ignore here as our canonicalisation only returns tensors.
-    while (index >= node->outputs().size()) {
-      node->addOutput();
-    }
-
-    if (value.isTensor()) {
-      at::Tensor tensor = value.toTensor();
-      // Sometimes "Tensors" are actually "Not tensors" but still stored as a
-      // tensor and will assert in the infer type.
-      if (tensor.sizes().size() == 1 && tensor.sizes()[0] == 0) {
-        continue;
-      }
-
-      torch::jit::Value *val = node->output(index);
-      val->inferTypeFrom(tensor);
-    } else if (value.isTensorList()) {
-      auto list_type = value.type()->expect<c10::ListType>();
-      torch::jit::Value *val = node->output(index);
-      val->setType(list_type);
-    }
-    index++;
-  }
-}
-
-static std::map<torch::jit::Value *, torch::jit::Value *> replacements;
-
-torch::jit::Node *canonicalise(const c10::FunctionSchema &schema,
-                               torch::jit::Node *aten_target,
-                               torch::jit::Graph &graph,
-                               bool is_allowed_to_fail) {
-  replacements.clear();
-  // Run the normal canonicalisation process on the aten target.
+void assertCanBeCanonicalised(const c10::FunctionSchema &schema) {
   torch::jit::Symbol symbol = torch::jit::Symbol::fromQualString(schema.name());
-
-  torch::jit::Node *new_node = nullptr;
-
-  if (SymbolHandler handler = getHandler(symbol)) {
-    new_node = handler(&graph, aten_target);
-    // No new node: keep the existing one.
-    if (new_node == nullptr) {
-      new_node = aten_target;
-    } else {
-      // If we have a new node add it and replace the old use.
-      std::unordered_set<torch::jit::Node *> to_delete;
-      to_delete.insert(aten_target);
-
-      // Clean up any dead nodes.
-      searchAndPossiblyDestroy(to_delete);
-    }
-  } else if (schema.getNamespace().has_value() &&
-             *schema.getNamespace() == "poptorch") {
-    // Ignore for now -- `poptorch::` nodes are handled during
-    // `canonicalizeLate`, and later at the lowering stage.
-    new_node = aten_target;
-  } else {
-    // In the JIT path we are not allowed to fail as we only have the
-    // canonicaliser to rely on. In the MLIR path we have our own 1:1 handlers
-    // as well so we can use them too and we will only fail if BOTH JIT and MLIR
-    // can't process the node.
-    ERROR_ON_MSG(!is_allowed_to_fail,
-                 "Could not find canonicalisation handler for JIT symbol, "
-                     << symbol.toQualString() << ", for schema, "
-                     << schema.name() << ".");
-    new_node = aten_target;
+  if (schema.getNamespace().has_value() &&
+      *schema.getNamespace() == "poptorch") {
+    // OK: it's a PopTorch op (It will be handled by the late canonicalisation).
+    return;
   }
-  return new_node;
-}
-
-torch::jit::Value *wasReplaced(torch::jit::Value *target) {
-  auto it = replacements.find(target);
-  if (it == std::end(replacements)) {
-    return nullptr;
-  }
-  return it->second;
+  // In the JIT path we are not allowed to fail as we only have the
+  // canonicaliser to rely on. In the MLIR path we have our own 1:1 handlers
+  // as well so we can use them too and we will only fail if BOTH JIT and MLIR
+  // can't process the node.
+  ERROR_ON_MSG(!getHandler(symbol),
+               "Could not find canonicalisation handler for JIT symbol, "
+                   << symbol.toQualString() << ", for schema, " << schema.name()
+                   << ".");
 }
 
 std::string toString(const at::Tensor &t) {
@@ -352,18 +286,12 @@ std::string toString(const at::Tensor &t) {
 
 void replaceAllUsesWith(torch::jit::Value *target,
                         torch::jit::Value *replacement) {
-  if (isCompilingWithDispatcher()) {
-    replacements[target] = replacement;
-  }
   target->replaceAllUsesWith(replacement);
 }
 
 void replaceAllUsesAfterNodeWith(torch::jit::Node *node,
                                  torch::jit::Value *target,
                                  torch::jit::Value *replacement) {
-  if (isCompilingWithDispatcher()) {
-    replacements[target] = replacement;
-  }
   target->replaceAllUsesAfterNodeWith(node, replacement);
 }
 
