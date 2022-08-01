@@ -296,7 +296,9 @@ def test_gather_with_index_expansion(capfd, expand_as, params):
         it.findNext("Optimising gather:")
 
     # Look for the (non-)presence of the expand op that should be removed.
-    remove_if_optimised = "aten::expand_as" if expand_as else "aten::expand"
+    # Note: aten::expand_as might be intercepted as aten::expand by the dispatcher
+    # so only check for "expand"
+    remove_if_optimised = "aten::expand"
 
     if params["should_optimise"]:
         it.assert_not_contains(remove_if_optimised)
