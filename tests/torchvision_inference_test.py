@@ -42,17 +42,19 @@ import helpers
 
 # Models here are hopefully representative of their cousins (i.e test Resnet18 without testing Resnet-34/50/101/152)
 # The others will be tested in hardware benchmark tests,
-tested_subset = [
+tested_models = [
     models.resnet18,
     models.resnext50_32x4d,
     models.mnasnet1_0,
     models.mobilenet_v2,
+    models.googlenet,
+    models.inception_v3,
     # SqueezeNet v1.0 simply has more parameters and a greater computational cost
     models.squeezenet1_1,
 ]
 
 # Deliberately un-tested models
-unsupported_models = [
+untested_models = [
     models.vgg11,  # Supported but takes a long time to compile.
     models.shufflenet_v2_x1_0,  # Supported but takes a long time to compile.
     models.densenet121,  # Supported but takes a long time to compile.
@@ -62,7 +64,7 @@ unsupported_models = [
 ]
 
 
-def inference_harness(imagenet_model, check=True):
+def inference_harness(imagenet_model, trace_model):
     torch.manual_seed(42)
 
     image_input = torch.randn([1, 3, 224, 224])
@@ -75,17 +77,16 @@ def inference_harness(imagenet_model, check=True):
     native_out = model(image_input)
 
     opts = poptorch.Options()
-    opts.Jit.traceModel(False)
+    opts.Jit.traceModel(trace_model)
 
     poptorch_model = poptorch.inferenceModel(model, opts)
 
     poptorch_out = poptorch_model(image_input)
 
-    if check:
-        helpers.assert_allclose(expected=native_out,
-                                actual=poptorch_out,
-                                atol=1e-05,
-                                rtol=0.1)
+    helpers.assert_allclose(expected=native_out,
+                            actual=poptorch_out,
+                            atol=1e-05,
+                            rtol=0.1)
 
     native_class = torch.topk(torch.softmax(native_out, 1), 5)
     pop_class = torch.topk(torch.softmax(poptorch_out, 1), 5)
@@ -97,44 +98,9 @@ def inference_harness(imagenet_model, check=True):
 
 
 @unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.mlirSupportRequired
-def test_resnet18():
-    inference_harness(models.resnet18)
-
-
-@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.mlirSupportRequired
-def test_resnext50_32x4d():
-    inference_harness(models.resnext50_32x4d)
-
-
-@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.mlirSupportRequired
-def test_mnasnet1_0():
-    inference_harness(models.mnasnet1_0)
-
-
-@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.mlirSupportRequired
-def test_mobilenet_v2():
-    inference_harness(models.mobilenet_v2)
-
-
-@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.mlirSupportRequired
-def test_googlenet():
-    inference_harness(models.googlenet)
-
-
-@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.mlirSupportRequired
-def test_inception_v3():
-    inference_harness(models.inception_v3, False)
-
-
-@unittest.mock.patch.dict("os.environ", helpers.disableSmallModel())
-@pytest.mark.mlirSupportRequired
-@pytest.mark.skip(
-    "TODO(T59568): Set is_leaf / grad_fn properly on MLIR tensors")
-def test_squeezenet1_1():
-    inference_harness(models.squeezenet1_1)
+@pytest.mark.parametrize("model", tested_models + untested_models)
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_model(model, trace_model):
+    if model in untested_models:
+        pytest.skip("Model not currently tested")
+    inference_harness(model, trace_model)
