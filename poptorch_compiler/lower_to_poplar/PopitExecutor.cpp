@@ -52,7 +52,7 @@ PopitMemPtr allocatePopitTensor(PopitContext &context,
                       std::multiplies<std::uint64_t>{});
 
   return PopitMemPtr(
-      popitMalloc(context.session.get(), tensor_spec.type, numel));
+      popit::malloc(context.session.get(), tensor_spec.type, numel));
 }
 
 bool containsPoplarOps(mlir::ModuleOp &module) {
@@ -66,8 +66,8 @@ bool containsPoplarOps(mlir::ModuleOp &module) {
 } // namespace
 
 PopitContext::PopitContext()
-    : session(nullptr, [](popitSession *) { /* nothing to do for nullptr */ }) {
-}
+    : session(nullptr,
+              [](popit::Session *) { /* nothing to do for nullptr */ }) {}
 
 PopitContext::~PopitContext() {
   tensors.clear();
@@ -80,10 +80,10 @@ PopitExecutor::PopitExecutor(PoplarDevice &device)
   _context->target = device.getTarget();
 
   _context->session =
-      std::unique_ptr<popitSession_t, decltype(&popitDestroySession)>(
-          popitCreateSession(&_context->target.target()),
-          [](popitSession *s) { popitDestroySession(s); });
-  popitConnect(_context->session.get(), &_context->device.device());
+      std::unique_ptr<popit::Session_t, decltype(&popit::destroySession)>(
+          popit::createSession(&_context->target.target()),
+          [](popit::Session *s) { popit::destroySession(s); });
+  popit::connect(_context->session.get(), &_context->device.device());
 }
 
 PopitExecutor::~PopitExecutor() {}
@@ -91,7 +91,7 @@ PopitExecutor::~PopitExecutor() {}
 void PopitExecutor::addInput(const Buffer &ptr,
                              const mlir::RankedTensorType &input, TensorId id) {
   PopitMemPtr tensor = allocatePopitTensor(*_context, input);
-  popitCopyFromHost(ptr->data(), tensor.get());
+  popit::copyFromHost(ptr->data(), tensor.get());
   ERROR_ON(!_context->tensors.try_emplace(id, tensor).second);
 }
 
@@ -99,7 +99,7 @@ void PopitExecutor::readOutput(TensorId id, void *ptr) {
   auto it = _context->tensors.find(id);
   ERROR_ON_MSG(it == _context->tensors.end(), "Unknown tensor ID " << id);
   poptorch::logging::trace("Copying tensor {} to host pointer {}", id, ptr);
-  popitCopyToHost(it->second.get(), reinterpret_cast<char *>(ptr));
+  popit::copyToHost(it->second.get(), reinterpret_cast<char *>(ptr));
 }
 
 void PopitExecutor::freeTensor(TensorId id) { _context->tensors.erase(id); }
@@ -122,7 +122,7 @@ void PopitExecutor::compileAndRun(
   auto run_popit = timer.nestAndScope("Executing popit");
 
   // Map graph input values to PopIT memory pointers.
-  std::vector<popitMem_t *> inputs;
+  std::vector<popit::Mem_t *> inputs;
   inputs.reserve(_context->inputs.size());
   for (auto &input : _context->inputs) {
     auto it = mappings.find(input);
@@ -135,9 +135,9 @@ void PopitExecutor::compileAndRun(
   }
 
   // Execute the function
-  std::vector<popitMem_t *> outputs =
-      popitCall(_context->session.get(), _context->popit_fn, /* ipuIndex=*/0,
-                /* ipuMemIndex=*/0, inputs);
+  std::vector<popit::Mem_t *> outputs =
+      popit::call(_context->session.get(), _context->popit_fn, /* ipuIndex=*/0,
+                  /* ipuMemIndex=*/0, inputs);
 
   // Map PopIT memory pointers to graph outputs.
   ERROR_ON(outputs.size() != _context->output_ids.size());

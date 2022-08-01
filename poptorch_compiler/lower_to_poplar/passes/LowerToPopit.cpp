@@ -117,9 +117,9 @@ void LowerToPopit::runOnOperation() {
     };
 
     // Add the function
-    _context->popit_fn = popitAddFunction(_context->session.get(), input_specs,
-                                          /*inouts=*/{}, output_specs, popit_fn,
-                                          function.getName().str());
+    _context->popit_fn = popit::addFunction(
+        _context->session.get(), input_specs,
+        /*inouts=*/{}, output_specs, popit_fn, function.getName().str());
   }
 }
 

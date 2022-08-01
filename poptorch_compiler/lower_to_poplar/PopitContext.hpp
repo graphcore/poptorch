@@ -23,10 +23,10 @@ class FuncOp;
 
 namespace poptorch_ir {
 
-class PopitMemPtr : public std::shared_ptr<popitMem_t> {
+class PopitMemPtr : public std::shared_ptr<popit::Mem_t> {
 public:
-  explicit PopitMemPtr(popitMem_t *ptr)
-      : std::shared_ptr<popitMem_t>(ptr, popitFree) {}
+  explicit PopitMemPtr(popit::Mem_t *ptr)
+      : std::shared_ptr<popit::Mem_t>(ptr, popit::free) {}
 };
 
 class PopitContext {
@@ -37,13 +37,13 @@ public:
   // Map of all the PopIT allocated tensors.
   std::unordered_map<TensorId, PopitMemPtr> tensors;
 
-  std::unique_ptr<popitSession_t, void (*)(popitSession *)> session;
+  std::unique_ptr<popit::Session_t, void (*)(popit::Session *)> session;
   // We need to keeep around the device used by the session or it will segfault.
   PoplarDevice device;
   PoplarTarget target;
 
   // These attributes get populated by LowerToPopit
-  popitFunctionId_t popit_fn;
+  popit::FunctionId_t popit_fn;
   std::vector<mlir::Value> inputs;
   std::deque<mlir::Value> outputs;
   std::vector<TensorId> output_ids;
