@@ -48,7 +48,7 @@ public:
   // Tell popart to copy weights from host into IPU memory.
   void copyWeightsToDevice(const std::map<std::string, void *> &buffers);
 
-  const std::vector<OutputType> &outputTypes() const;
+  const std::vector<OutputTypeShape> &outputTypes() const;
 
   // Get the IR from popart.
   std::string getPopartIR() const;

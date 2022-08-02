@@ -204,7 +204,7 @@ void PoplarExecutable::copyWeightsToDevice(
   _compiler.copyWeightsToDevice(pointers);
 }
 
-const std::vector<OutputType> &PoplarExecutable::outputTypes() const {
+const std::vector<OutputTypeShape> &PoplarExecutable::outputTypes() const {
   return _compiler.outputTypes();
 }
 

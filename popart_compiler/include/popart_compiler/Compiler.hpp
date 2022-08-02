@@ -79,7 +79,7 @@ void throwTestError(TestErrorType type);
 void rethrowPopartOrPoplarException(const std::exception_ptr &eptr,
                                     const char *filename, uint64_t line);
 
-struct OutputType {
+struct OutputTypeShape {
   OutputElemType type;
   int64_t num_elements{0};
 };
@@ -307,7 +307,7 @@ public:
 
   bool isHostSideConstant(poptorch::TensorId id) const;
 
-  void addOutputType(OutputType type);
+  void addOutputType(OutputTypeShape type);
 
   // This function marks |output| as being read back from the device by the
   // host. |output_mode| determines how frequently that should happen.
@@ -447,7 +447,7 @@ public:
   // Return a flat representation of the output types
   // For example: ( T0, T2, (T3, T4)) is represented as:
   // [ Tuple3, Tensor, Tensor, Tuple2, Tensor, Tensor ]
-  const std::vector<OutputType> &outputTypes() const;
+  const std::vector<OutputTypeShape> &outputTypes() const;
 
   // We return this as a unique char pointer to avoid leaking memory while
   // protecting the ABI boundry.

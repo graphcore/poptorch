@@ -179,7 +179,7 @@ public:
   std::vector<popart::TensorId> inputs;
   std::vector<popart::TensorId> outputs;
   // Flat representation of the output shapes
-  std::vector<OutputType> output_types;
+  std::vector<OutputTypeShape> output_types;
 
   // A list to allocate our buffers in so they get released.
   std::list<std::unique_ptr<popart::IArray>> memory_manager;

@@ -1396,11 +1396,11 @@ Compiler::Compiler(bool is_training, const SessionOptions &options)
 
 Compiler::~Compiler() = default;
 
-void Compiler::addOutputType(OutputType type) {
+void Compiler::addOutputType(OutputTypeShape type) {
   _impl->output_types.emplace_back(type);
 }
 
-const std::vector<OutputType> &Compiler::outputTypes() const {
+const std::vector<OutputTypeShape> &Compiler::outputTypes() const {
   return _impl->output_types;
 }
 
