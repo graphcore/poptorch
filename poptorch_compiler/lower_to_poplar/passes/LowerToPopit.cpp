@@ -68,7 +68,6 @@ void LowerToPopit::runOnOperation() {
     }
 
     // Create the PopIT specs.
-    std::vector<popit::TensorSpec> output_specs;
     std::vector<popit::TensorSpec> input_specs;
     input_specs.reserve(_context->inputs.size());
     for (auto &input : _context->inputs) {
@@ -77,7 +76,6 @@ void LowerToPopit::runOnOperation() {
 
     _context->output_ids.clear();
     function.walk([&](poptorch_ir::output_tensor output) {
-      output_specs.push_back(getTensorSpec(output.tensor().getType()));
       _context->output_ids.push_back(output.tensorIdAttr().getInt());
     });
 
@@ -117,9 +115,9 @@ void LowerToPopit::runOnOperation() {
     };
 
     // Add the function
-    _context->popit_fn = popit::addFunction(
-        _context->session.get(), input_specs,
-        /*inouts=*/{}, output_specs, popit_fn, function.getName().str());
+    _context->popit_fn =
+        popit::addFunction(_context->session.get(), input_specs, /*inouts=*/{},
+                           popit_fn, function.getName().str());
   }
 }
 
