@@ -27,10 +27,12 @@ if args.add_to_sys_path:
 # Collect the list of tests:
 list_tests = io.StringIO()
 pytest_args = ["-x", args.test_dir, "--collect-only", "-q"]
+extra_args = []
 if args.extra_pytest_args:
     arg = args.extra_pytest_args.replace("\"", "")
     if arg:
-        pytest_args += arg.split(",")
+        extra_args = arg.split(",")
+        pytest_args += extra_args
 
 with contextlib.redirect_stdout(list_tests):
     retval = pytest.main(pytest_args)
@@ -104,11 +106,13 @@ serial_tests = [
 #pylint: enable=line-too-long
 
 
-def add_test(output, test, root_folder, folder, test_id, test_properties):
+def add_test(output, test, root_folder, folder, test_id, test_properties,
+             extra_args):
+    extra = " ".join([f"\"{a}\"" for a in extra_args])
     output.write(
         f"add_test({test} \"{root_folder}/timeout_handler.py\" \"python3\""
         f" \"-m\" \"pytest\" \"-sv\" \"{folder}/{test}\" "
-        f"\"--junitxml=junit/junit-test{test_id}.xml\")\n")
+        f"\"--junitxml=junit/junit-test{test_id}.xml\" {extra})\n")
 
     props_string = " ".join(f"{k} {v}" for k, v in test_properties.items())
 
@@ -124,7 +128,7 @@ with open(args.output_file, "w") as output:
         add_test(output, test, args.test_dir, args.test_dir, test_id, {
             "LABELS": "short",
             "WORKING_DIRECTORY": work_dir
-        })
+        }, extra_args)
         test_id += 1
 
     # Process the list of tests returned by pytest
@@ -170,5 +174,5 @@ with open(args.output_file, "w") as output:
                 test_properties['LABELS'] = ";".join(labels)
 
             add_test(output, f"{test_file}::{m.group(2)}", args.test_dir,
-                     dir_path, test_id, test_properties)
+                     dir_path, test_id, test_properties, extra_args)
             test_id += 1

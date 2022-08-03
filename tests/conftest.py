@@ -100,6 +100,15 @@ def pytest_collection_modifyitems(session, config, items):  # pylint: disable=un
         items[:] = hw_required + hw_not_required + force_include
 
 
+def pytest_sessionfinish(session, exitstatus):
+    # Exit status 5 means no tests were collected -> this is not an error.
+    # In our case this is not an error because some files might only contain
+    # HW tests for example and therefore won't have any test to run if
+    # --hw-tests-only is used.
+    if exitstatus == 5:
+        session.exitstatus = 0
+
+
 def pytest_addoption(parser):
     parser.addoption("--hw-tests-only",
                      action="store_true",
