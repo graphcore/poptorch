@@ -678,3 +678,24 @@ def setLogLevel(level: Union[str, int]):
         * OFF:  Print nothing.
     """
     _logging.setLogLevel(level)
+
+
+# Hack so that print() works: Torch's print does a lot of slicing
+# and select on the tensor before moving it to the CPU.
+# This is annoying because it pollutes the graph, and generates some dynamic
+# slices, etc.
+# So, instead, we move the tensor to the CPU first, then we let torch do its
+# thing.
+# Upstream fix: https://github.com/pytorch/pytorch/pull/79287/files
+_real_tensor_str = torch._tensor_str._tensor_str  # pylint: disable=protected-access
+
+
+def _tensor_str(self, indent):
+    if self.device.type == "xla":
+        if poptorch_core.eagerModeEnabled():
+            return _real_tensor_str(self.to("cpu"), indent)
+        return "<unavailable>"
+    return _real_tensor_str(self, indent)
+
+
+torch._tensor_str._tensor_str = _tensor_str  # pylint: disable=protected-access

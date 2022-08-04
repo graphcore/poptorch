@@ -1318,6 +1318,7 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
       .export_values();
 
   m.def("enableEagerMode", PTC(poptorch::enableEagerMode));
+  m.def("eagerModeEnabled", PTC(poptorch::eagerModeEnabled));
   m.def("destroyDispatcher", PTC(poptorch::destroyDispatcher));
   m.def("startDispatch", PTC(poptorch::startDispatch));
   m.def("isCompilingWithDispatcher", PTC(poptorch::isCompilingWithDispatcher));

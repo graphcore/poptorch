@@ -97,6 +97,9 @@ void *getDataSourceForValue(torch::jit::Value *value);
 // Return true if the given IPU tensor is a parameter.
 bool isParameter(torch::jit::Value *value);
 
+// Return true if eager mode is enabled.
+bool eagerModeEnabled();
+
 // Switch to the eager mode dispatcher.
 void enableEagerMode();
 

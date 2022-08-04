@@ -192,17 +192,6 @@ torch::jit::SourceRange getPythonInterpreterSourceRange() {
   return torch::jit::SourceRange(source, 0, stack_trace_text.size());
 }
 
-bool isEagerMode() {
-  bool result = false;
-#if POPTORCH_BUILD_MLIR_COMPILER
-  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
-  if (mlir != nullptr) {
-    result = mlir->isEagerMode();
-  }
-#endif
-  return result;
-}
-
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
                         bool non_blocking) {
@@ -242,7 +231,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
     ERROR_ON(!self.is_cpu());
     // TODO(T59880) rename is_xla() -> is_ipu()
     if (src.is_xla()) {
-      if (!context.moving_outputs && !isEagerMode()) {
+      if (!context.moving_outputs && !eagerModeEnabled()) {
         logging::warn("Moved a tensor from IPU to CPU outside output "
                       "registration. This may result in garbage data.");
       }
@@ -271,6 +260,17 @@ void endOutputsMove() { context.moving_outputs = false; }
 
 // Turn on.
 void startDispatch() { context.dispatch_on = true; }
+
+bool eagerModeEnabled() {
+  bool result = false;
+#if POPTORCH_BUILD_MLIR_COMPILER
+  auto *mlir = dynamic_cast<MLIRDispatch *>(context.activeDispatch());
+  if (mlir != nullptr) {
+    result = mlir->isEagerMode();
+  }
+#endif
+  return result;
+}
 
 void enableEagerMode() {
 #if POPTORCH_BUILD_MLIR_COMPILER
@@ -469,7 +469,8 @@ at::Scalar localScalarDense(const at::Tensor &self) {
 }
 
 at::Scalar item(const at::Tensor &self) {
-  ERROR_ON_MSG(!isEagerMode(), "aten::item is only supported in eager mode.");
+  ERROR_ON_MSG(!eagerModeEnabled(),
+               "aten::item is only supported in eager mode.");
 
   return at::native::call_fallback_fn<&poptorch::cpuFallback,
                                       ATEN_OP(item)>::call(self);
