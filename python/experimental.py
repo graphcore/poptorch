@@ -1,4 +1,5 @@
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+import collections
 import functools
 import warnings
 from typing import List, Optional
@@ -52,6 +53,7 @@ class IPUScope:
         self._model = model
         self._cpu_params = {}
         self._cpu_buffers = {}
+        self._cpu_aliases = {}
 
         self._outputs = []
         self._outputs_structure = None
@@ -96,6 +98,29 @@ class IPUScope:
                     index,
                     [cpu_to_ipu[cpu.data_ptr()] for cpu in group["params"]])
 
+    def _get_module_and_name(self, n):
+        """
+        Given a nested attribute path, return `(module, name)` such that
+        `module` is the object which contains the attribute `name`, relative to
+        `self._model`.
+
+        This makes it easy to access nested attributes with
+        `getattr` and `setattr`, using the argument splat `*a` operator, i.e.:
+
+        ```
+        getattr(*self._get_module_and_name("some_module.layer_one.weight"))
+        ```
+
+        gets the attribute `self._model.some_module.layer_one.weight`.
+        """
+        m = self._model
+        name = n
+        sn = n.rpartition(".")
+        if sn[1] == ".":
+            m = m.get_submodule(sn[0])
+            name = sn[2]
+        return m, name
+
     # Start capturing calls.
     def __enter__(self):
         # Move the model parameters to the ipu and take a copy to load the
@@ -103,6 +128,7 @@ class IPUScope:
         if self._model:
             self._cpu_params = dict(self._model.named_parameters())
             self._cpu_buffers = dict(self._model.named_buffers())
+            cpu_state = self._model.state_dict(keep_vars=True)
 
             # We need to remove the PoptorchBuffer and PoptorchParam annotations
             # before compiling the model
@@ -115,6 +141,18 @@ class IPUScope:
             poptorch_core.startParametersMove()
             self._model.to(d)
             poptorch_core.endParametersMove()
+
+            # Restore aliased tensors.
+            state = self._model.state_dict(keep_vars=True)
+            tensors = collections.defaultdict(list)
+            for name, tensor in cpu_state.items():
+                tensors[id(tensor)].append(name)
+            aliases = [v for v in tensors.values() if len(v) > 1]
+            for a in aliases:
+                original = a[0]
+                for other in a[1:]:
+                    setattr(*self._get_module_and_name(other), state[original])
+                    self._cpu_aliases[other] = original
 
             params = dict(self._model.named_parameters())
 
@@ -152,20 +190,16 @@ class IPUScope:
             # but before resetting the model back to the cpu
             new_addresses = _impl.getBufferAndParameterAddresses(self._model)
 
-            def get_model_and_name(n):
-                m = self._model
-                name = n
-                sn = n.rpartition(".")
-                if sn[1] == ".":
-                    m = m.get_submodule(sn[0])
-                    name = sn[2]
-                return m, name
+            def _set_param(k, v):
+                setattr(*self._get_module_and_name(k), self._cpu_params[v])
 
             for k in self._cpu_params:
                 self._cpu_params[k].__class__ = torch.nn.Parameter
-                setattr(*get_model_and_name(k), self._cpu_params[k])
+                _set_param(k, k)
+            for k, v in self._cpu_aliases.items():
+                _set_param(k, v)
             for k in self._cpu_buffers:
-                setattr(*get_model_and_name(k), self._cpu_buffers[k])
+                setattr(*self._get_module_and_name(k), self._cpu_buffers[k])
 
             # Re-install the Poptorch annotations for buffers and parameters
             _impl.rewrapModelIfNecessary(self._model)
