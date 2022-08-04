@@ -16,6 +16,7 @@ class ExampleModel(torch.nn.Module):
                          dim=-1)
 
 
+# model_with_loss_start
 class ExampleModelWithLoss(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -26,6 +27,9 @@ class ExampleModelWithLoss(torch.nn.Module):
 
         return (torch.nn.functional.softmax(out),
                 torch.nn.CrossEntropyLoss(reduction="mean")(out, target))
+
+
+# model_with_loss_end
 
 
 class ExampleDataset(torch.utils.data.Dataset):

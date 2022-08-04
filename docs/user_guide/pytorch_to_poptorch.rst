@@ -38,8 +38,20 @@ Creating your model
 Training
 --------
 
-If you want to create a model for training on the IPU, all you need to do is instantiate a :py:func:`~poptorch.trainingModel`,
-by passing your PyTorch model, :py:class:`~poptorch.Options`, and optimizer.
+If you want to create a model for training on the IPU, you first need to wrap your model
+in a PyTorch model that returns a tuple containing two elements: the outputs of the model
+and the loss.
+
++-------------------------------------------------+
+| PopTorch                                        |
++-------------------------------------------------+
+| .. literalinclude:: poptorch_training_simple.py |
+|   :start-after: model_with_loss_start           |
+|   :end-before: model_with_loss_end              |
++-------------------------------------------------+
+
+Then all you need to do is instantiate a :py:func:`~poptorch.trainingModel`,
+by passing your new PyTorch model, :py:class:`~poptorch.Options`, and optimizer.
 
 +-------------------------------------------------+
 | PyTorch                                         |
