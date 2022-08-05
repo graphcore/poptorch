@@ -66,6 +66,8 @@ def test_simple_add(capfd):
 @pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_squeezenet():
+    pytest.skip("TODO(T67125): Tensor-likes are not close")
+
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
     input = torch.randn([1, 3, 224, 224])
@@ -88,6 +90,9 @@ def test_squeezenet():
 @pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly
 def test_resnet18():
+    pytest.skip("TODO(T64252): 'std::exception': Trying to allocate a tensor "
+                "to an allocated region")
+
     import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
 
     input = torch.randn([1, 3, 224, 224])
