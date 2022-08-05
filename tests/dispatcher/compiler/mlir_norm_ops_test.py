@@ -25,7 +25,7 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
         input_shape.append(6)
     if batch_norm is nn.BatchNorm3d:
         input_shape.append(7)
-    t = torch.randn(input_shape, requires_grad=True)
+    t = torch.randn(input_shape)
 
     ipu_norm = batch_norm(C,
                           affine=affine,
@@ -36,6 +36,7 @@ def test_batch_norm(batch_norm, affine, track_running_stats, training):
     t2 = torch.ones_like(t)
 
     def cpu_step(norm, x1, x2):
+        x1.requires_grad = True
         x1.retain_grad()
         out = norm(x1)
         loss = torch.nn.functional.mse_loss(out, x2)
@@ -80,13 +81,14 @@ def test_group_norm(num_dims, affine):
 
     cpu_norm = copy.deepcopy(ipu_norm)
 
-    t = torch.rand(input_shape, requires_grad=True)
+    t = torch.rand(input_shape)
     # Make the mean and stdev varied throughout
     t = t + torch.randint(0, 5, input_shape)
 
     t2 = torch.ones_like(t)
 
     def cpu_step(norm, x1, x2):
+        x1.requires_grad = True
         x1.retain_grad()
         out = norm(x1)
         loss = torch.nn.functional.mse_loss(out, x2)
@@ -182,7 +184,7 @@ def test_instance_norm(instance_norm, affine, track_running_stats, training):
     if instance_norm is nn.InstanceNorm3d:
         input_shape.append(7)
 
-    t = torch.rand(input_shape, requires_grad=True)
+    t = torch.rand(input_shape)
     # Make the mean and stdev varied throughout
     t = t + torch.randint(0, 5, input_shape)
 
@@ -201,15 +203,23 @@ def test_instance_norm(instance_norm, affine, track_running_stats, training):
     t2 = torch.ones_like(t)
 
     def cpu_step(norm, x1, x2):
+        x1.requires_grad = True
+        print("Before retain_grad")
         x1.retain_grad()
+        print("After retain_grad")
+
         out = norm(x1)
         loss = torch.nn.functional.mse_loss(out, x2)
+        print("Before backward")
         loss.backward()
+        print("after backward")
         ret = [out, x1.grad]
+        print("After set ret")
         if affine:
             ret.extend((norm.weight.grad, norm.bias.grad))
         if track_running_stats:
             ret.append(norm.running_mean)
+        print("Before return")
         return ret
 
     ipu_result = IPUContext(cpu_step, model=ipu_norm)(ipu_norm, t, t2)
@@ -247,13 +257,14 @@ def test_layer_norm(num_dims_normalize_start, affine):
 
     cpu_norm = copy.deepcopy(ipu_norm)
 
-    t = torch.rand(input_shape, requires_grad=True)
+    t = torch.rand(input_shape)
     # Make the mean and stdev varied throughout
     t = t + torch.randint(0, 5, input_shape)
 
     t2 = torch.ones_like(t)
 
     def cpu_step(norm, x1, x2):
+        x1.requires_grad = True
         x1.retain_grad()
         out = norm(x1)
         loss = torch.nn.functional.mse_loss(out, x2)

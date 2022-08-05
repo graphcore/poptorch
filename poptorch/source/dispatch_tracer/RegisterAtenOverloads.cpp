@@ -213,6 +213,11 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
         // Make sure the parameter flag is preserved.
         logging::trace("copy_ parameter CPU -> IPU, new self {}", str(self));
       } else {
+        ERROR_ON_MSG(
+            src.requires_grad(),
+            "An input tensor to an IPU model can not have requires_grad set "
+            "to true.");
+
         if (context.graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
           self = context.activeDispatch()->addInput(downCastIfNeeded(src));
         } else {

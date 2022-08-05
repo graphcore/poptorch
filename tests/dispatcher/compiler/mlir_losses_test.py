@@ -52,10 +52,12 @@ def test_mse_loss_backward(reduction, num_dims):
     if num_dims == 4:
         input_dims = [2, 4, 5, 3]
 
-    input1 = torch.nn.parameter.Parameter(torch.rand(input_dims))
+    input1 = torch.rand(input_dims)
     input2 = torch.rand(input_dims)
 
     def mse_loss_backward(t1, t2):
+        t1.requires_grad = True
+        t1.retain_grad()
         loss = F.mse_loss(
             t1,
             t2,
@@ -63,19 +65,16 @@ def test_mse_loss_backward(reduction, num_dims):
         )
         if reduction == "none":
             loss = loss.sum()
-        t1.retain_grad()
+        assert t1.requires_grad
         loss.backward()
         return t1.grad
 
     ipu_result = IPUContext(mse_loss_backward)(input1, input2)
-
-    input1.grad.zero_()
-    input1.grad.detach_()
     cpu_result = mse_loss_backward(input1, input2)
 
     helpers.assert_allclose(expected=cpu_result,
                             actual=ipu_result,
-                            equal_nan=True)
+                            equal_nan=False)
 
 
 @pytest.mark.mlirSupportRequired
@@ -122,11 +121,11 @@ def test_nll_loss_backward(reduction, num_dims):
 
     if num_dims == 1:
         # (C) and ()
-        input1 = torch.nn.parameter.Parameter(torch.randn([4]))
+        input1 = torch.randn([4])
         input2 = torch.tensor(2)
     if num_dims == 2:
         # (N, C) and (N)
-        input1 = torch.nn.parameter.Parameter(torch.randn([4, 10]))
+        input1 = torch.randn([4, 10])
         input2 = torch.tensor([1, 2, 3, 4])
     if num_dims == 4:
         # (N, C, d1, d2) and (N, d1, d2)
@@ -135,17 +134,17 @@ def test_nll_loss_backward(reduction, num_dims):
         # input2 = torch.tensor([1, 2, 3, 4]).unsqueeze(1).unsqueeze(1)
 
     def nll_loss_backward(t1, t2):
+        t1.requires_grad = True
+        t1.retain_grad()
+
         loss = F.nll_loss(t1, t2, reduction=reduction)
         if reduction == "none":
             loss = loss.sum()
-        t1.retain_grad()
         loss.backward()
         return t1.grad
 
     ipu_result = IPUContext(nll_loss_backward)(input1, input2)
 
-    input1.grad.zero_()
-    input1.grad.detach_()
     cpu_result = nll_loss_backward(input1, input2)
 
     helpers.assert_allclose(expected=cpu_result,
@@ -198,24 +197,23 @@ def test_nll_loss_forward_ignore_all(reduction):
 @pytest.mark.parametrize("ignore_index", [2, -100])
 def test_nll_loss_backward_ignore(reduction, ignore_index):
     torch.manual_seed(42)
-    input1 = torch.nn.parameter.Parameter(torch.randn([4, 10]))
+    input1 = torch.randn([4, 10])
     input2 = torch.tensor([1, 2, 3, 4])
 
     def nll_loss_backward(t1, t2):
+        t1.requires_grad = True
+        t1.retain_grad()
         loss = F.nll_loss(t1,
                           t2,
                           reduction=reduction,
                           ignore_index=ignore_index)
         if reduction == "none":
             loss = loss.sum()
-        t1.retain_grad()
         loss.backward()
         return t1.grad
 
     ipu_result = IPUContext(nll_loss_backward)(input1, input2)
 
-    input1.grad.zero_()
-    input1.grad.detach_()
     cpu_result = nll_loss_backward(input1, input2)
 
     helpers.assert_allclose(expected=cpu_result,
@@ -227,21 +225,20 @@ def test_nll_loss_backward_ignore(reduction, ignore_index):
 @pytest.mark.parametrize("reduction", ["none", "mean", "sum"])
 def test_nll_loss_backward_ignore_all(reduction):
     torch.manual_seed(42)
-    input1 = torch.nn.parameter.Parameter(torch.randn([4, 10]))
+    input1 = torch.randn([4, 10])
     input2 = torch.tensor([1, 1, 1, 1])
 
     def nll_loss_backward(t1, t2):
+        t1.requires_grad = True
+        t1.retain_grad()
         loss = F.nll_loss(t1, t2, reduction=reduction, ignore_index=1)
         if reduction == "none":
             loss = loss.sum()
-        t1.retain_grad()
         loss.backward()
         return t1.grad
 
     ipu_result = IPUContext(nll_loss_backward)(input1, input2)
 
-    input1.grad.zero_()
-    input1.grad.detach_()
     cpu_result = nll_loss_backward(input1, input2)
 
     helpers.assert_allclose(expected=cpu_result,
@@ -300,8 +297,7 @@ def test_binary_cross_entropy_backward(reduction, num_dims, weight):
         weight_tensor = None
 
     if num_dims == 1:
-        input1 = torch.nn.parameter.Parameter(
-            torch.clip(torch.randn([4]), min=0.001, max=0.999))
+        input1 = torch.clip(torch.randn([4]), min=0.001, max=0.999)
         input2 = torch.Tensor([1, 0, 0, 1])
         if weight == "batch":
             weight_tensor = torch.rand([1])
@@ -309,8 +305,7 @@ def test_binary_cross_entropy_backward(reduction, num_dims, weight):
             weight_tensor = torch.rand([4])
 
     if num_dims == 2:
-        input1 = torch.nn.parameter.Parameter(
-            torch.clip(torch.randn([3, 2]), min=0.001, max=0.999))
+        input1 = torch.clip(torch.randn([3, 2]), min=0.001, max=0.999)
         input2 = torch.Tensor([[1, 0], [0, 1], [1, 1]])
         if weight == "batch":
             weight_tensor = torch.rand([3, 1])
@@ -318,19 +313,19 @@ def test_binary_cross_entropy_backward(reduction, num_dims, weight):
             weight_tensor = torch.rand([3, 2])
 
     def bce_backward(t1, t2, weight_tensor):
+        t1.requires_grad = True
+        t1.retain_grad()
+
         loss = F.binary_cross_entropy(t1,
                                       t2,
                                       reduction=reduction,
                                       weight=weight_tensor)
         if reduction == "none":
             loss = loss.sum()
-        t1.retain_grad()
         loss.backward()
         return t1.grad
 
     ipu_result = IPUContext(bce_backward)(input1, input2, weight_tensor)
-    input1.grad.detach_()
-    input1.grad.zero_()
     cpu_result = bce_backward(input1, input2, weight_tensor)
 
     helpers.assert_allclose(expected=ipu_result,
@@ -369,24 +364,23 @@ def test_binary_cross_entropy_with_logits_forward(num_dims, reduction):
 def test_binary_cross_entropy_with_logits_backward(reduction, num_dims):
     torch.manual_seed(42)
     if num_dims == 1:
-        input1 = torch.nn.parameter.Parameter(torch.randn([4]))
+        input1 = torch.randn([4])
         input2 = torch.Tensor([1, 0, 0, 1])
 
     if num_dims == 2:
-        input1 = torch.nn.parameter.Parameter(torch.randn([3, 2]))
+        input1 = (torch.randn([3, 2]))
         input2 = torch.Tensor([[1, 0], [0, 1], [1, 1]])
 
     def bce_logit_backward(t1, t2):
+        t1.requires_grad = True
+        t1.retain_grad()
         loss = F.binary_cross_entropy_with_logits(t1, t2, reduction=reduction)
         if reduction == "none":
             loss = loss.sum()
-        t1.retain_grad()
         loss.backward()
         return t1.grad
 
     ipu_result = IPUContext(bce_logit_backward)(input1, input2)
-    input1.grad.detach_()
-    input1.grad.zero_()
     cpu_result = bce_logit_backward(input1, input2)
 
     helpers.assert_allclose(expected=ipu_result,

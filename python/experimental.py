@@ -333,6 +333,16 @@ class _IPUContext:
                       dict_optimizer=self.dict_optimizer,
                       compile_using=self.compiler,
                       skip_compilation=filename is not None) as ipu:
+
+            for idx, t in enumerate(tensor_args):
+                if t.requires_grad:
+                    raise _impl.createPoptorchError(
+                        "An input tensor to an IPU model can not have " +
+                        f"requires_grad set to True, however input {idx} " +
+                        f"does: {t}\nYou can set requires_grad=True from " +
+                        "within the model as an alternative, and return " +
+                        "gradients as oututs to your model, if required.")
+
             d = torch.device("xla:0")
             # Move all the inputs to the IPU
             tensor_args = [t.to(d) for t in tensor_args]

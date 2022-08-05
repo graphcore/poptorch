@@ -77,14 +77,16 @@ def test_activations(op):
     input = torch.randn([2, 10, 4, 2])
 
     def training_step(x):
+        if op in activation_backward_functions:
+            x.requires_grad = True
+            x.retain_grad()
+
         out = op(x)
         loss = torch.sum(out)
-        x.retain_grad()
         loss.backward()
         return out, x.grad
 
     if op in activation_backward_functions:
-        input = torch.nn.parameter.Parameter(input)
         cpu_step = training_step
     else:
         cpu_step = op
@@ -137,19 +139,17 @@ def test_logsoftmax_forward(dim):
 @pytest.mark.parametrize("dim", [0, 1, 2, 3])
 def test_logsoftmax_backward(dim):
     torch.manual_seed(42)
-    input1 = torch.nn.parameter.Parameter(torch.randn([2, 2, 4, 5]))
+    input1 = torch.randn([2, 2, 4, 5])
 
     def log_softmax_backward(t):
+        t.requires_grad = True
+        t.retain_grad()
         out = F.log_softmax(t, dim)
         loss = torch.sum(out)
-        t.retain_grad()
         loss.backward()
         return t.grad
 
     ipu_result = IPUContext(log_softmax_backward)(input1)
-    input1.grad.zero_()
-    input1.grad.detach_()
-
     cpu_result = log_softmax_backward(input1)
 
     helpers.assert_allclose(expected=cpu_result,
