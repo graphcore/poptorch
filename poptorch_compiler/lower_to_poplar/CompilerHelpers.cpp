@@ -92,10 +92,11 @@ std::shared_ptr<model_runtime::Device> getDevice() {
   }
   // Run on an actual device.
   if (!device) {
-    device =
-        manager.getDevice(1, {},
-                          waitIfIpuIsUnavailable() ? model_runtime::WAIT_FOREVER
-                                                   : model_runtime::NO_WAIT);
+    using WaitStrategy = model_runtime::DeviceWaitStrategy;
+    model_runtime::DeviceWaitConfig wait_config;
+    wait_config.strategy = waitIfIpuIsUnavailable() ? WaitStrategy::WAIT_FOREVER
+                                                    : WaitStrategy::NO_WAIT;
+    device = manager.getDevice(1, {}, wait_config);
   }
   ERROR_ON_MSG(!device, "Failed to acquire a device");
   return device;
