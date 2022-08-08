@@ -113,7 +113,6 @@ def test_as_strided():
         op_harness(torch.as_strided, [3, 3], [1, 3])
 
 
-@pytest.mark.mlirSupportRequired
 def expand_reshape_view_harness(in_shape, new_shape, op):
     torch.manual_seed(42)
 
@@ -200,6 +199,27 @@ def test_expand(shape, op):
 @pytest.mark.parametrize("shape", [(5), (1, 2, 3)])
 def test_expand_scalar(shape):
     expand_reshape_view_harness([], shape, "expand")
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("op", [torch.argmin, torch.argmax])
+@pytest.mark.parametrize(
+    "input",
+    [
+        torch.tensor(2.0),
+        torch.tensor([70, 0]),
+        torch.tensor([70.25, -0.125]),
+        torch.tensor([[13, 8]], dtype=torch.int32),
+        torch.randn(3, 3),
+        torch.randn(3, 4, 5),
+        # TODO(T67499): comparison of `nan` and `-inf`
+        # torch.tensor([torch.nan, torch.inf, -torch.inf]),
+    ])
+def test_argminmax(op, input):
+    torch.manual_seed(42)
+    cpu_result = op(input)
+    ipu_result = IPUContext(op)(input)
+    helpers.assert_allequal(actual=ipu_result, expected=cpu_result)
 
 
 @pytest.mark.mlirSupportRequired

@@ -182,10 +182,10 @@ def Poptorch_topk : Poptorch_Op<"topk", []> {
 }
 
 
-class Poptorch_NotImplemented_reduce_single_dim<string name> : Poptorch_NotImplementedOp<name, []> {
+class Poptorch_reduce_single_dim<string name> : Poptorch_Op<name, []> {
     let arguments = (ins Poptorch_tensor:$self, OptionalAttr<I64Attr>:$dim, BoolAttr:$keepdim);
 
-    let results = (outs Poptorch_tensor:$result);
+    let results = (outs Poptorch_tensor_no_grad:$result);
 
     let builders = [OpBuilder<(ins "mlir::Value":$self,
                                       "std::optional<std::int64_t>":$dim,
@@ -201,7 +201,7 @@ class Poptorch_NotImplemented_reduce_single_dim<string name> : Poptorch_NotImple
         $_state.addAttribute("keepdim", $_builder.getBoolAttr(keepdim));
 
         auto getShape = [&]() {
-            // We are flattenning the dimenion we're passed
+            // We are flattenning the dimension we're passed
             if (dim.has_value()) {
                 auto ref = tensor.getShape();
 
@@ -226,8 +226,8 @@ class Poptorch_NotImplemented_reduce_single_dim<string name> : Poptorch_NotImple
     ];
 }
 
-def Poptorch_argmax_out : Poptorch_NotImplemented_reduce_single_dim<"argmax_out"> {}
-def Poptorch_argmin_out : Poptorch_NotImplemented_reduce_single_dim<"argmin_out"> {}
+def Poptorch_argmax_out : Poptorch_reduce_single_dim<"argmax_out"> {}
+def Poptorch_argmin_out : Poptorch_reduce_single_dim<"argmin_out"> {}
 
 def Poptorch_argsort : Poptorch_NotImplementedOp<"argsort", []> {
     let arguments = (ins Poptorch_tensor:$self, I64Attr:$dim, BoolAttr:$descending);
