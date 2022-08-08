@@ -74,19 +74,12 @@ void LowerToPopit::runOnOperation() {
       input_specs.push_back(getTensorSpec(input.getType()));
     }
 
-    _context->output_ids.clear();
-    function.walk([&](poptorch_ir::output_tensor output) {
-      _context->output_ids.push_back(output.tensorIdAttr().getInt());
-    });
-
-    _context->function = function;
     // This lambda will actually be called by popitCall, so we need to make
     // sure it doesn't depend on "this" as this object will not exist anymore
     // and it will segfault.
     PopitContext *ctx = _context;
     auto popit_fn =
-        [ctx](
-            poplar::Graph &graph, std::vector<poplar::Tensor> &tensors,
+        [&](poplar::Graph &graph, std::vector<poplar::Tensor> &tensors,
             poplar::program::Sequence &program) -> std::vector<poplar::Tensor> {
       CompilerContext context(graph, program);
 
@@ -98,15 +91,13 @@ void LowerToPopit::runOnOperation() {
       }
 
       // Walk over all functions with a poplar impl.
-      ctx->function.walk(
+      function.walk(
           [&](PoplarImplInterface impl) { impl.lowerToPoplar(context); });
 
       // All the tensors that were written to are outputs.
       std::vector<poplar::Tensor> outputs;
-      outputs.reserve(ctx->output_ids.size());
       ctx->output_ids.clear();
-      ctx->output_ids.reserve(ctx->outputs.size());
-      ctx->function.walk([&](poptorch_ir::output_tensor output) {
+      function.walk([&](poptorch_ir::output_tensor output) {
         outputs.push_back(context.fromSsa(output.tensor()));
         ctx->output_ids.push_back(output.tensorIdAttr().getInt());
       });

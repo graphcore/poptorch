@@ -45,12 +45,7 @@ public:
   // These attributes get populated by LowerToPopit
   popit::FunctionId_t popit_fn;
   std::vector<mlir::Value> inputs;
-  std::deque<mlir::Value> outputs;
   std::vector<TensorId> output_ids;
-  // We need to store the mlir::FuncOp function because the
-  // lambda passed to popitAddFunction is actually called from
-  // popitCall()
-  mlir::FuncOp function;
 };
 
 } // namespace poptorch_ir
