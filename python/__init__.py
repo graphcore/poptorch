@@ -1,8 +1,9 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
+import abc
 import atexit
 import copy
 import os
-from typing import Any, Callable, Dict, Iterator, Optional, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Union, Type
 import pickle
 import pkg_resources
 
@@ -39,6 +40,7 @@ from poptorch.poptorch_core import importPoptorchMetadataFromFile, Error, Recove
 from . import _dataloader
 from . import _impl
 from . import _poptorch_data
+from . import _utils
 from .autocasting import autocast
 from .enums import *
 from .ops import *
@@ -699,3 +701,59 @@ def _tensor_str(self, indent):
 
 
 torch._tensor_str._tensor_str = _tensor_str  # pylint: disable=protected-access
+
+
+class ICustomArgParser(abc.ABC):
+    """Interface to create custom argument parsers to extract tensors and
+    rebuild custom object types."""
+
+    @abc.abstractmethod
+    def yieldTensors(self, struct) -> None:
+        """yield every single torch.Tensor contained in your
+        object in a deterministic order.
+
+        For example:
+        >>> self.a = { "t0": torch.Tensor(), "t1": torch.Tensor()}
+        ...
+        >>> def yieldTensors(self, struct):
+        >>>    for k in sorted(struct.a.keys()):
+        >>>        yield struct.a[k]
+        """
+
+    @abc.abstractmethod
+    def reconstruct(self, original_structure, tensor_iterator) -> Any:
+        """Create a new structure based on original_structure but
+        using tensors from the provided iterator in the same deterministic
+        order as in yieldTensors().
+
+        For example:
+        >>> self.a = { "t0": torch.Tensor(), "t1": torch.Tensor()}
+        ...
+        >>> def reconstruct(self, original_struct, tensor_iterator):
+        >>>    out = type(original_struct)()
+        >>>    for k in sorted(original_struct.a.keys()):
+        >>>        out.a[k] = next(tensor_iterator)
+        >>>    return out
+
+        .. important:: Only IPU tensors should be dequeued from the tensor
+                       iterator (not CPU tensors or other object types),
+        """
+
+
+def registerCustomArgParser(arg_data_type: Type,
+                            arg_parser: Optional[ICustomArgParser]):
+    """Register an argument parser for a custom argument type.
+
+    If a custom parser is already registered for this data type, it will be
+    replaced.
+    If arg_parser is None, then the current custom parser, if there is one,
+    will be deleted.
+    """
+    if arg_parser is None:
+        if arg_data_type in _utils.custom_arg_parsers:
+            del _utils.custom_arg_parsers[arg_data_type]
+    else:
+        if not isinstance(arg_parser, ICustomArgParser):
+            raise createPoptorchError(
+                "arg_parser must inherit from ICustomArgParser")
+        _utils.custom_arg_parsers[arg_data_type] = arg_parser

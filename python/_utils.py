@@ -67,6 +67,9 @@ def isOnIpu(x):
     return x.device.type == "xla"
 
 
+custom_arg_parsers = dict()
+
+
 # Returns the structure `tensors` as a list of its torch.Tensor contents.
 def flattenTensorStructure(tensors):
     def flatten(x):
@@ -78,6 +81,9 @@ def flattenTensorStructure(tensors):
                 yield from flatten(t)
         elif isinstance(x, torch.Tensor):
             yield x
+        for custom_type, parser in custom_arg_parsers.items():
+            if isinstance(x, custom_type):
+                yield from parser.yieldTensors(x)
         # If it's not a dict/list/tuple or tensor, just ignore it
 
     return list(flatten(tensors))
@@ -99,6 +105,9 @@ def reconstructTensorStructure(structure, values, filter_fn=lambda t: True):
             return type(x)(copy_structure(e, it) for e in x)
         if isinstance(x, torch.Tensor) and filter_fn(x):
             return next(it)
+        for custom_type, parser in custom_arg_parsers.items():
+            if isinstance(x, custom_type):
+                return parser.reconstruct(x, it)
         return x
 
     return copy_structure(structure, iter(values))

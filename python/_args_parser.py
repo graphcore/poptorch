@@ -131,10 +131,17 @@ class ArgsParser:
                             f"mismatch for {name}: expected {compiled.shape} "
                             f"but got {input.shape}.{end}")
                 else:
-                    # Other types are compiled in the graph (scalars, etc) and
-                    # therefore should be an exact match to the value used to
-                    # compile the model.
-                    if compiled != input:
+                    # If we've got a custom parser then we'll be able to extract
+                    # the tensors and validate them as a list.
+                    compiled_tensors = _utils.flattenTensorStructure(compiled)
+                    if compiled_tensors:
+                        input_tensors = _utils.flattenTensorStructure(input)
+                        validate(name, tuple(compiled_tensors),
+                                 tuple(input_tensors))
+                    elif compiled != input:
+                        # Other types are compiled in the graph (scalars, etc) and
+                        # therefore should be an exact match to the value used to
+                        # compile the model.
                         raise _impl.createPoptorchError(
                             f"Value mismatch for {name}: "
                             f"expected {compiled} but got {input}.{end}")

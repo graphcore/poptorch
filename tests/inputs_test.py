@@ -543,6 +543,53 @@ def test_none_input_dispatch_non_default_arg_dict(args, fwd_args):
 
 @pytest.mark.mlirSupportRequired
 @pytest.mark.parametrize("fwd_args", [True, False])
+def test_custom_arg_parser(fwd_args):
+    class MyArg:
+        def __init__(self, a, b):
+            self.a = a
+            self.b = b
+
+    class MyParser(poptorch.ICustomArgParser):
+        def yieldTensors(self, struct) -> None:
+            yield struct.a
+            yield struct.b
+
+        def reconstruct(self, _original_structure, tensor_iterator):
+            return MyArg(next(tensor_iterator), next(tensor_iterator))
+
+    poptorch.registerCustomArgParser(MyArg, MyParser())
+
+    class Model(torch.nn.Module):
+        def forward(self, args):
+            # Make sure to use a poptorch specific op
+            # to check the graph is not empty or running on the CPU
+            return args.a + poptorch.ipu_print_tensor(args.b)
+
+    class ModelWrapper(Model):
+        def forward(self, *args, **kwargs):
+            print(len(args))
+            return super().forward(*args, **kwargs)
+
+    if fwd_args:
+        model = ModelWrapper()
+    else:
+        model = Model()
+
+    options = poptorch.Options()
+    options.Jit.traceModel(False)
+    poptorch_model = poptorch.inferenceModel(model, options)
+
+    args = MyArg(torch.randn(2, 2), torch.randn(2, 2))
+    for i in range(2):
+        print(f"Run {i}")
+        args = MyArg(torch.randn(2, 2), torch.randn(2, 2))
+        native_out = model(args)
+        poptorch_out = poptorch_model(args)
+        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+
+
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("fwd_args", [True, False])
 def test_none_input_dispatch_args_kwargs(fwd_args):
     class Model(torch.nn.Module):
         def forward(self, a, b, *c, y=None, z=None, t=None, u=3, v="op", **w):
@@ -559,6 +606,7 @@ def test_none_input_dispatch_args_kwargs(fwd_args):
 
     class ModelWrapper(Model):
         def forward(self, *args, **kwargs):
+            print(len(args))
             return super().forward(*args, **kwargs)
 
     if fwd_args:
