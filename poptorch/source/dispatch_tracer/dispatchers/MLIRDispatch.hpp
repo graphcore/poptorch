@@ -30,6 +30,7 @@ public:
   at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
   void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
   void finalizeGraph() final;
+  void markStep() final;
 
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) final;
   std::string handleOp(const c10::OperatorHandle &op, c10::Stack *stack);

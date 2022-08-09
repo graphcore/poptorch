@@ -92,12 +92,19 @@ void MLIREagerCompiler::addOutput(void *ptr, TensorId id, const char *name) {
   _executor.readOutput(id, ptr);
 }
 
-void MLIREagerCompiler::onOpAdded() { compileRunAndReset(); }
+void MLIREagerCompiler::onOpAdded() {
+  if (shouldRunAllOpsSynchronously()) {
+    compileRunAndReset();
+  }
+}
 
 void MLIREagerCompiler::addReturn() {
   ERROR("Only static graphs have a return");
 }
 
+bool MLIREagerCompiler::shouldRunAllOpsSynchronously() const {
+  return !_compiler_options.eager.use_lazy_tensor;
+}
 } // namespace detail
 
 } // namespace poptorch_ir

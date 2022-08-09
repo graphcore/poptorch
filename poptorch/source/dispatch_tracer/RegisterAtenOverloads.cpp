@@ -241,6 +241,8 @@ CompilerOptions &enableEagerMode() {
 #endif
 }
 
+void markStep() { context.activeDispatch()->markStep(); }
+
 // Turn off.
 void endDispatch(bool error_occurred) {
   context.dispatch_on = false;

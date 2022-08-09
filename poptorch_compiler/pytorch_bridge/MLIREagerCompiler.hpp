@@ -30,6 +30,8 @@ public:
   mlir::Value findValue(TensorId tensor) override;
   void compileRunAndReset();
 
+  bool shouldRunAllOpsSynchronously() const;
+
 private:
   std::vector<mlir::RankedTensorType> _tensor_map;
   PopitExecutor _executor;

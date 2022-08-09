@@ -271,6 +271,8 @@ void MLIRDispatch::finalizeGraph() {
   _compiler.endTraceTiming();
 }
 
+void MLIRDispatch::markStep() { _compiler.compileRunAndReset(); }
+
 const at::Tensor &MLIRDispatch::copyInplace(const at::Tensor &self,
                                             const at::Tensor &src) {
   _compiler.copy_(findTensor(self), findTensor(src));

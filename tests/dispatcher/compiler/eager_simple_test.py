@@ -102,6 +102,33 @@ def test_source_location(capfd, mode):
             f"poptorch.transpose.*{expected_filename}:{expected_line}")
 
 
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+@pytest.mark.mlirSupportRequired
+@pytest.mark.extendedTestingOnly
+def test_lazy_tensor(capfd):
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+
+    poptorch.eager.eager_options.use_lazy_tensor = True
+
+    t = torch.tensor(1.0).to('xla')
+    s = t + t
+
+    log = helpers.LogChecker(capfd)
+    log.assert_no_matches("poptorch.add")
+
+    s.cpu()
+
+    log = helpers.LogChecker(capfd)
+    log.assert_matches("poptorch.add")
+
+    s = t + t
+    poptorch.eager.markStep()
+
+    log = helpers.LogChecker(capfd)
+    log.assert_matches("poptorch.add")
+
+
 @pytest.mark.mlirSupportRequired
 @helpers.printCapfdOnExit
 @helpers.overridePoptorchLogLevel("TRACE")

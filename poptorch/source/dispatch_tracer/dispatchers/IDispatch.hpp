@@ -38,6 +38,9 @@ public:
   virtual void addOutput(const at::Tensor &ipu_src,
                          const at::Tensor &cpu_dest) = 0;
   virtual void finalizeGraph() = 0;
+  // When running in eager mode with use lazy tensor on stop tracing and execute
+  // asynchronously
+  virtual void markStep() {}
 
   void setPythonStack(const std::vector<torch::jit::StackEntry> &stack);
 

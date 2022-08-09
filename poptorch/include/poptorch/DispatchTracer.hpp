@@ -104,6 +104,8 @@ bool eagerModeEnabled();
 // Switch to the eager mode dispatcher.
 CompilerOptions &enableEagerMode();
 
+void markStep();
+
 // Start capturing calls.
 // TODO(T61528): not needed anymore?
 void startDispatch();
