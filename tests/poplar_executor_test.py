@@ -421,7 +421,7 @@ def test_get_cycles_error_msgs(trace_model):
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(Model(), options)
 
-    error_msg = (r"Cycle count logging is disabled. Please set option " +
+    error_msg = (r"Cycle count logging is disabled. Please set option "
                  r"logCycleCount to True to enable.")
     with pytest.raises(poptorch.Error, match=error_msg):
         inference_model.cycleCount()
@@ -432,17 +432,15 @@ def test_get_cycles_error_msgs(trace_model):
 
     inference_model = poptorch.inferenceModel(Model(), options=opts)
 
-    error_msg = (
-        r"Please run the model at least once before obtaining cycle " +
-        r"count.")
+    error_msg = (r"Please run the model at least once before obtaining cycle "
+                 r"count.")
     with pytest.raises(poptorch.Error, match=error_msg):
         inference_model.cycleCount()
 
     inference_model.compile(torch.Tensor([1.0]), torch.Tensor([2.0]))
 
-    error_msg = (
-        r"Please run the model at least once before obtaining cycle " +
-        r"count.")
+    error_msg = (r"Please run the model at least once before obtaining cycle "
+                 r"count.")
     with pytest.raises(poptorch.Error, match=error_msg):
         inference_model.cycleCount()
 
@@ -520,8 +518,8 @@ def test_rewrap_model(rewrap_executor, trace_model):
 
     poptorch_model(torch.ones([5]))
 
-    err_msg = (r"Model has already been wrapped in 'poptorch.trainingModel'." +
-               r" Call model.destroy\(\) on the model to unwrap before " +
+    err_msg = (r"Model has already been wrapped in 'poptorch.trainingModel'."
+               r" Call model.destroy\(\) on the model to unwrap before "
                "wrapping again.")
     with pytest.raises(RuntimeError, match=err_msg):
         poptorch_model = poptorch.trainingModel(model, options=opts)

@@ -438,7 +438,7 @@ def test_running_statistics(capfd, dtype, setting, trace_model):
     device = "cpu" if trace_model else "xla:0"
 
     log.assert_contains(
-        f" : {dtype_str}(16, strides=[1], requires_grad=0, device={device}) " +
+        f" : {dtype_str}(16, strides=[1], requires_grad=0, device={device}) "
         "-> bn.running_var")
 
 
@@ -467,7 +467,7 @@ def test_running_statistics_dispatch(capfd):
         "poptorch.Options set runningStatisticsAlwaysFloat to false")
 
     log.assert_contains(
-        " : Float(16, strides=[1], requires_grad=0, device=xla:0) " +
+        " : Float(16, strides=[1], requires_grad=0, device=xla:0) "
         "-> bn.running_var")
 
 

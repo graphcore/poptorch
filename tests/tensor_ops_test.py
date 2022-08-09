@@ -122,7 +122,7 @@ def fuzzy_compare_exceptions(e_cpu, e_ipu):
             e_ipu_words.get(word, -1) >= i
             for i, word in enumerate(str(e_cpu).split())
     ]):
-        raise ValueError("CPU and IPU error messages did not match: " +
+        raise ValueError("CPU and IPU error messages did not match: "
                          f"'{e_cpu}' not in '{e_ipu}'") from e_ipu
     print(f"CPU and IPU error messages did match: '{e_cpu}' in '{e_ipu}'")
 
@@ -232,10 +232,9 @@ def op_harness(op,
     # Compare outputs
     if not ipu_raises and op_raises_exception:
         _, cpu_error = native_out
-        raise RuntimeError(
-            "The torch and poptorch API do not match, " +
-            "poptorch returned without error while torch failed" +
-            f" with {cpu_error}") from cpu_error
+        raise RuntimeError("The torch and poptorch API do not match, "
+                           "poptorch returned without error while torch failed"
+                           f" with {cpu_error}") from cpu_error
     if fuzzy_errors and op_raises_exception:
         fuzzy_compare_exceptions(native_out[1], poptorch_out[1])
     elif op_raises_exception:
@@ -1040,8 +1039,8 @@ def test_requires_grad_true(capfd, trace_model):
     poptorch_model(torch.tensor([0.0], requires_grad=True))
     log = helpers.LogChecker(capfd)
     log.assert_contains(
-        "Input tensor has requires_grad=True set. " +
-        "This tensor will be detached because backward pass via " +
+        "Input tensor has requires_grad=True set. "
+        "This tensor will be detached because backward pass via "
         "inputs is not supported.")
 
 

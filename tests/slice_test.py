@@ -280,7 +280,7 @@ def test_dynamic_slice_one_dim_less_than(trace_model):
     def end_fn(extra_in):
         return extra_in - 2
 
-    error_msg = (r"Taking a slice of a tensor with the end less than the " +
+    error_msg = (r"Taking a slice of a tensor with the end less than the "
                  r"start is not supported.")
 
     with pytest.raises(poptorch.Error, match=error_msg):
@@ -302,9 +302,8 @@ def test_dynamic_slice_one_dim_multiply():
     def end_fn(extra_in):
         return extra_in * 2
 
-    error_msg = (
-        r"The size of the sliced tensor must be a constant for each " +
-        r"execution of the model when running on the IPU\.")
+    error_msg = (r"The size of the sliced tensor must be a constant for each "
+                 r"execution of the model when running on the IPU\.")
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail
@@ -326,7 +325,7 @@ def test_dynamic_slice_one_dim_add_non_factor(trace_model):
     def end_fn(extra_in):
         return extra_in + 7
 
-    error_msg = (r"The size of the slice \(7\) must be a factor of the " +
+    error_msg = (r"The size of the slice \(7\) must be a factor of the "
                  r"slicing dimension \(8\)\.")
 
     with pytest.raises(poptorch.Error, match=error_msg):
@@ -355,9 +354,9 @@ def test_dynamic_slice_one_dim_mix_up_float():
         return tmp.to(torch.int32)
 
     error_msg = (
-        r"The size of the sliced tensor must be a constant for each " +
-        r"execution of the model when running on the IPU\. In this case, " +
-        r"there is a float added to the slice indices meaning it may change " +
+        r"The size of the sliced tensor must be a constant for each "
+        r"execution of the model when running on the IPU\. In this case, "
+        r"there is a float added to the slice indices meaning it may change "
         r"between runs\.")
 
     with pytest.raises(poptorch.Error, match=error_msg):
@@ -446,9 +445,8 @@ def test_dynamic_length_slice(trace_model):
     poptorch_model = poptorch.inferenceModel(model, options)
     inp, l = torch.rand(10, 10), torch.LongTensor([2])
 
-    error_msg = (
-        r"The size of the sliced tensor must be a constant for each " +
-        r"execution of the model when running on the IPU\.")
+    error_msg = (r"The size of the sliced tensor must be a constant for each "
+                 r"execution of the model when running on the IPU\.")
 
     with pytest.raises(poptorch.Error, match=error_msg):
         # Set test_training=False because we expect inference to fail

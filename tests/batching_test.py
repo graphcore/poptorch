@@ -355,12 +355,11 @@ def test_gradient_accumulation_pipelined_training(num_grad_accums,
     poptorch_model = poptorch.trainingModel(model, options=opts)
 
     if num_grad_accums in (4, 5):
-        err_msg = (
-            r"poptorch\.Options\(\)\.Training\.gradientAccumulation " +
-            r"must be greater than or equal to the number of pipeline" +
-            r" stages \(7\) when using poptorch\.PipelinedExecution\. " +
-            r"Please note that a model with 4 pipeline stages in " +
-            r"PopTorch will have an additional 3 stages when training.")
+        err_msg = (r"poptorch\.Options\(\)\.Training\.gradientAccumulation "
+                   r"must be greater than or equal to the number of pipeline"
+                   r" stages \(7\) when using poptorch\.PipelinedExecution\. "
+                   r"Please note that a model with 4 pipeline stages in "
+                   r"PopTorch will have an additional 3 stages when training.")
 
         with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):
             poptorch_model(torch.zeros(num_grad_accums * device_iterations))
@@ -383,14 +382,14 @@ def test_gradient_accumulation_inference(pipelined, Model):
 
     opts.Training.gradientAccumulation(2)
 
-    err_msg = (r"You must set " +
-               r"poptorch\.Options\(\)\.Training\.gradientAccumulation to 1 " +
-               r"or leave it as its default value \(1\) when running a " +
+    err_msg = (r"You must set "
+               r"poptorch\.Options\(\)\.Training\.gradientAccumulation to 1 "
+               r"or leave it as its default value \(1\) when running a "
                r"poptorch\.inferenceModel\(\)\.")
 
     if pipelined:
-        err_msg += (r" Use poptorch\.Options\(\)\.deviceIterations() to " +
-                    r"process a sufficient number of batches each run for " +
+        err_msg += (r" Use poptorch\.Options\(\)\.deviceIterations() to "
+                    r"process a sufficient number of batches each run for "
                     r"pipelined execution instead.")
 
     with pytest.raises(poptorch.poptorch_core.Error, match=err_msg):

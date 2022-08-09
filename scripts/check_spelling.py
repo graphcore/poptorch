@@ -218,7 +218,7 @@ def process_incorrect_word(hunspell, result, doc_str, line_offset):
 
     while True:
         print_context(doc_str, line_offset, unknown_spelling)
-        print(f"Unknown spelling, '{unknown_spelling}' on line {line_num}" +
+        print(f"Unknown spelling, '{unknown_spelling}' on line {line_num}"
               f" ({doc_str.source_file}).")
 
         if symbol == b"&":

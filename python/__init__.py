@@ -106,7 +106,7 @@ def load(filename: str,
     # It may look wrapped but not be in _impl._wrapper_types because it has been
     # loaded in a new session. Unwrap manually if so.
     wrapped_model_cls_str = (
-        "poptorch._poplar_executor." +
+        "poptorch._poplar_executor."
         "PoplarExecutor.__init__.<locals>.PoptorchModel'>")
     if wrapped_model_cls_str in str(data.model.__class__):
         data.model.__class__ = data.model.__class__.__bases__[0]
@@ -601,8 +601,8 @@ def trainingModel(model: Union['torch.nn.Module', 'poptorch.PoplarExecutor'],
 
     # Handle the model already being wrapped
     if _impl.isWrapped(model):
-        raise RuntimeError("Model has already been wrapped in " +
-                           "'poptorch.trainingModel'. Call model.destroy() " +
+        raise RuntimeError("Model has already been wrapped in "
+                           "'poptorch.trainingModel'. Call model.destroy() "
                            "on the model to unwrap before wrapping again.")
 
     # Create a copy of the original model in case it needs to be wrapped

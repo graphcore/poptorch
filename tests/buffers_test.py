@@ -126,7 +126,7 @@ def test_error_on_remove_buffer(trace_model):
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
 
-    error_msg = (r"Buffer y is removed from the model when calling the " +
+    error_msg = (r"Buffer y is removed from the model when calling the "
                  r"forward method\.")
     with pytest.raises(poptorch.Error, match=error_msg):
         poptorch_model(torch.tensor([5.0]))
@@ -149,10 +149,10 @@ def test_error_on_redefine_buffer(trace_model):
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     poptorch_model = poptorch.inferenceModel(model, options)
-    error_msg = (r"Buffer y is reassigned within the model when calling the " +
-                 r"forward method\. This is not supported\. Consider using " +
-                 r"self\.y\.copy_\(src\) to copy data " +
-                 r"from a source tensor, where src is the name of the " +
+    error_msg = (r"Buffer y is reassigned within the model when calling the "
+                 r"forward method\. This is not supported\. Consider using "
+                 r"self\.y\.copy_\(src\) to copy data "
+                 r"from a source tensor, where src is the name of the "
                  r"source tensor\.")
 
     with pytest.raises(poptorch.Error, match=error_msg):
@@ -259,10 +259,10 @@ def test_failing_on_replicas(trace_model):
     dummy_input = torch.ones([4, 2, 2, 2])
     dummy_target = torch.zeros_like(dummy_input)
 
-    error_msg = (r"PopTorch does not support broadcasting buffers. " +
-                 r"If your model is able to tolerate buffers becoming " +
-                 r"out of sync between replicas, you can disable " +
-                 r"buffer broadcasting using " +
+    error_msg = (r"PopTorch does not support broadcasting buffers. "
+                 r"If your model is able to tolerate buffers becoming "
+                 r"out of sync between replicas, you can disable "
+                 r"buffer broadcasting using "
                  r"poptorch.Options.broadcastBuffers\(False\).")
 
     with pytest.raises(poptorch.Error, match=error_msg):

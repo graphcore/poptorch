@@ -158,9 +158,9 @@ class PoplarExecutor:
 
             if options.Training.gradient_accumulation != 1:
                 err_msg = (
-                    "You must set " +
-                    "poptorch.Options().Training.gradientAccumulation to 1 " +
-                    "or leave it as its default value (1) when running a " +
+                    "You must set "
+                    "poptorch.Options().Training.gradientAccumulation to 1 "
+                    "or leave it as its default value (1) when running a "
                     "poptorch.inferenceModel().")
 
                 is_pipelined = (isinstance(options._execution_strategy,
@@ -168,8 +168,8 @@ class PoplarExecutor:
                                 and not isinstance(options._execution_strategy,
                                                    ShardedExecution))
                 if is_pipelined:
-                    err_msg += (" Use poptorch.Options().deviceIterations " +
-                                "to process a sufficient number of batches " +
+                    err_msg += (" Use poptorch.Options().deviceIterations "
+                                "to process a sufficient number of batches "
                                 "each run for pipelined execution instead.")
 
                 raise _impl.createPoptorchError(err_msg)
@@ -889,12 +889,12 @@ class PoplarExecutor:
         # pylint: disable=protected-access
         popart_options = self._options._Popart
         if not popart_options.options['instrumentWithHardwareCycleCounter']:
-            err_msg = ("Cycle count logging is disabled. Please set option " +
+            err_msg = ("Cycle count logging is disabled. Please set option "
                        "logCycleCount to True to enable.")
             raise _impl.createPoptorchError(err_msg)
 
         if not self.isCompiled():
-            err_msg = ("Please run the model at least once before obtaining " +
+            err_msg = ("Please run the model at least once before obtaining "
                        "cycle count.")
             raise _impl.createPoptorchError(err_msg)
 
@@ -1237,9 +1237,9 @@ class PoplarExecutor:
     def _getTraceNoOutput(self, in_tensors_trace_view_tuple):
         if not isinstance(self._model, torch.nn.Module):
             raise _impl.createPoptorchError(
-                "Tracing a model returning no outputs is only " +
-                "supported if the model is an instance of " +
-                "torch.nn.Module or an instance of a subclass " +
+                "Tracing a model returning no outputs is only "
+                "supported if the model is an instance of "
+                "torch.nn.Module or an instance of a subclass "
                 "of torch.nn.Module.")
 
         class AddFakeOutput(self._model.__class__):

@@ -16,24 +16,23 @@ def test_blocked_options():
         opts.useIpuId(1)
 
     with pytest.raises(RuntimeError,
-                       match=r"Cannot call `replicationFactor` with " +
+                       match=r"Cannot call `replicationFactor` with "
                        r"popdist\.poptorch\.Options"):
         opts.replicationFactor(1)
 
     with pytest.raises(RuntimeError,
-                       match=r"Cannot call `Distributed.disable` with " +
+                       match=r"Cannot call `Distributed.disable` with "
                        r"popdist\.poptorch\.Options"):
         opts.Distributed.disable()
 
-    with pytest.raises(
-            RuntimeError,
-            match=r"Cannot call `Distributed.setEnvVarNames` with " +
-            r"popdist\.poptorch\.Options"):
+    with pytest.raises(RuntimeError,
+                       match=r"Cannot call `Distributed.setEnvVarNames` with "
+                       r"popdist\.poptorch\.Options"):
         opts.Distributed.setEnvVarNames("A", "B")
 
     with pytest.raises(
             RuntimeError,
-            match=r"Cannot call `Distributed.configureProcessId` with " +
+            match=r"Cannot call `Distributed.configureProcessId` with "
             r"popdist\.poptorch\.Options"):
         opts.Distributed.configureProcessId(1)
 

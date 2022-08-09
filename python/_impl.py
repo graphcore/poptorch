@@ -428,19 +428,19 @@ def errorOnBufferOrParameterAddressChanges(old_addresses, new_addresses):
     for idx, dic in enumerate(old_addresses):
         for name, address in dic.items():
             if name not in new_addresses[idx]:
-                err_msg = (order[idx] + " " + name + " is removed from " +
-                           "the model when calling the forward method.")
+                err_msg = (
+                    f"{order[idx]} {name} is removed from the model when"
+                    " calling the forward method.")
 
                 raise createPoptorchError(err_msg)
 
             if address != new_addresses[idx][name]:
                 err_msg = (
-                    order[idx] + " " + name + " is reassigned " +
-                    "within the model when calling the forward " +
-                    "method. This is not supported. Consider using self." +
-                    name + ".copy_(src)" +
-                    " to copy data from a source tensor, where src is " +
-                    "the name of the source tensor.")
+                    f"{order[idx]} {name} is reassigned within the model"
+                    " when calling the forward method. This is not supported. "
+                    f"Consider using self.{name}.copy_(src) to copy data from "
+                    "a source tensor, where src is the name of the source "
+                    "tensor.")
                 raise createPoptorchError(err_msg)
 
 

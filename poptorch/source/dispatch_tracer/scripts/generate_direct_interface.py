@@ -346,7 +346,7 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
         else:
             if arg_type not in schemaToCpp:
                 print(f"There is no c++ schema for {arg_type} in {__file__}.")
-                print("You need to add one to schemaToCpp for compilation " +
+                print("You need to add one to schemaToCpp for compilation "
                       "to succeed.")
                 sys.exit(1)
 
@@ -394,8 +394,8 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
                                         parameters,
                                         inplace_ins[0] + "_pytorch")
     else:
-        raise KeyError("Couldn't find a valid PopTorch direct mapping " +
-                       "(eg. PopTorchDirect, or PopTorchDirectInplace)" +
+        raise KeyError("Couldn't find a valid PopTorch direct mapping "
+                       "(eg. PopTorchDirect, or PopTorchDirectInplace)"
                        f" for {op_target}")
 
     function_decl += "}\n"

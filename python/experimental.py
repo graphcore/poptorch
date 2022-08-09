@@ -23,17 +23,17 @@ class IPUScope:
                  skip_compilation=False):
 
         if not isinstance(inputs, (list, tuple)):
-            raise ValueError("You can only pass a list or tuple as the " +
+            raise ValueError("You can only pass a list or tuple as the "
                              "inputs argument to IPUScope.")
 
         # Check that the inputs are a valid type
         for tensor in inputs:
             if not isinstance(tensor, torch.Tensor):
-                raise ValueError("You can only pass torch.Tensors as inputs " +
+                raise ValueError("You can only pass torch.Tensors as inputs "
                                  "to IPUScope.")
 
             if tensor.is_sparse:
-                raise ValueError("You cannot pass sparse tensors as inputs " +
+                raise ValueError("You cannot pass sparse tensors as inputs "
                                  "to IPUScope.")
 
         if model and not isinstance(model, torch.nn.Module):
@@ -340,10 +340,10 @@ class _IPUContext:
             for idx, t in enumerate(tensor_args):
                 if t.requires_grad:
                     raise _impl.createPoptorchError(
-                        "An input tensor to an IPU model can not have " +
-                        f"requires_grad set to True, however input {idx} " +
-                        f"does: {t}\nYou can set requires_grad=True from " +
-                        "within the model as an alternative, and return " +
+                        "An input tensor to an IPU model can not have "
+                        f"requires_grad set to True, however input {idx} "
+                        f"does: {t}\nYou can set requires_grad=True from "
+                        "within the model as an alternative, and return "
                         "gradients as outputs to your model, if required.")
 
             d = torch.device("xla:0")

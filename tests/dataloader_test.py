@@ -1191,12 +1191,12 @@ fn({iterate_over_data})
     # Check that both the PID and the signal were caught
     if not kill_worker:
         parent.send_signal(signal.SIGINT)
-        raise RuntimeError("The termination signal for the worker process " +
+        raise RuntimeError("The termination signal for the worker process "
                            "was not received.")
     if worker_pid is None:
         parent.send_signal(signal.SIGINT)
         raise RuntimeError(
-            "Could not kill the AsynchronousDataAccessor, its " +
+            "Could not kill the AsynchronousDataAccessor, its "
             "PID could not be captured from the standard output.")
 
     print("Sending SIGINT to ", worker_pid)

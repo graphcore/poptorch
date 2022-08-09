@@ -665,14 +665,14 @@ def custom_op(inputs: Tuple["torch.Tensor"],
             if not isinstance(k, (str)):
                 raise ValueError("All attribute keys must be strings.")
             if not isinstance(v, (float, int, str, list, tuple)):
-                raise ValueError("Attribute values must be floats, ints, " +
-                                 "strings or a list/tuple of float, ints of " +
+                raise ValueError("Attribute values must be floats, ints, "
+                                 "strings or a list/tuple of float, ints of "
                                  "strings.")
 
             if isinstance(v, (list, tuple)):
                 for element in v:
                     if not isinstance(element, (type(v[0]))):
-                        raise ValueError("The types in a list/tuple " +
+                        raise ValueError("The types in a list/tuple "
                                          "attribute must all be the same.")
 
         # Non-ascii cannot be converted to std::string in C++

@@ -62,10 +62,9 @@ def test_float_attribute_too_low(trace_model):
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
 
-    with pytest.raises(
-            poptorch.Error,
-            match=r"-1\.79769e\+308 is too low for a Popart float " +
-            r"attribute\."):
+    with pytest.raises(poptorch.Error,
+                       match=r"-1\.79769e\+308 is too low for a Popart float "
+                       r"attribute\."):
         inference_model(x)
 
 
@@ -88,10 +87,9 @@ def test_float_attribute_too_high(trace_model):
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
 
-    with pytest.raises(
-            poptorch.Error,
-            match=r"1\.79769e\+308 is too high for a Popart float " +
-            r"attribute\."):
+    with pytest.raises(poptorch.Error,
+                       match=r"1\.79769e\+308 is too high for a Popart float "
+                       r"attribute\."):
         inference_model(x)
 
 
@@ -165,10 +163,9 @@ def test_float_list_attribute_too_low(trace_model):
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
-    with pytest.raises(
-            poptorch.Error,
-            match=r"-1\.79769e\+308 is too low for a Popart float " +
-            r"attribute\."):
+    with pytest.raises(poptorch.Error,
+                       match=r"-1\.79769e\+308 is too low for a Popart float "
+                       r"attribute\."):
         inference_model(x)
 
 
@@ -192,10 +189,9 @@ def test_float_list_attribute_too_high(trace_model):
     options = poptorch.Options()
     options.Jit.traceModel(trace_model)
     inference_model = poptorch.inferenceModel(model, options)
-    with pytest.raises(
-            poptorch.Error,
-            match=r"1\.79769e\+308 is too high for a Popart float " +
-            r"attribute\."):
+    with pytest.raises(poptorch.Error,
+                       match=r"1\.79769e\+308 is too high for a Popart float "
+                       r"attribute\."):
         inference_model(x)
 
 

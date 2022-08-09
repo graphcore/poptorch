@@ -172,7 +172,7 @@ def test_nested_tuples_and_lists(capfd, use_half, thing_to_test, trace_model):
     if trace_model and not use_half:
         testlog = helpers.LogChecker(capfd)
         testlog.assert_contains_after(
-            "Double(1, strides=[1], requires_grad=0, device=cpu) = " +
+            "Double(1, strides=[1], requires_grad=0, device=cpu) = "
             "prim::TupleUnpack", "Graph right before popart")
 
 

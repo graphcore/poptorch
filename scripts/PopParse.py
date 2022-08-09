@@ -184,8 +184,7 @@ def parse_session_options(root_node):  # pylint: disable=too-many-statements
         if opt not in handled:
             missing_mismatched.append(
                 f"Option {opt} not handled by PopTorch Type: {str(type)}. You"
-                +
-                " need to add the relevant macro in SessionOptions.cpp or to" +
+                " need to add the relevant macro in SessionOptions.cpp or to"
                 " options_not_handled in this script.")
         elif handled[opt] != type:
             missing_mismatched.append(
