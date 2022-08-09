@@ -81,12 +81,13 @@ std::vector<std::string> getAttributeNames(OptimizerType type,
   case OptimizerType::SGD1:
   case OptimizerType::SGD2: {
     if (is_default) {
-      return {"defaultLearningRate",    "defaultWeightDecay",
-              "defaultMomentum",        "defaultDampening",
-              "defaultVelocityScaling", "lossScaling"};
+      return {
+          "defaultLearningRate", "defaultWeightDecay",     "defaultMomentum",
+          "defaultDampening",    "defaultVelocityScaling", "nesterov",
+          "lossScaling"};
     }
-    return {"learningRate", "weightDecay", "momentum", "dampening",
-            "velocityScaling"};
+    return {"learningRate", "weightDecay",     "momentum",
+            "dampening",    "velocityScaling", "nesterov"};
   }
   case OptimizerType::LAMB:
   case OptimizerType::LAMB_NO_BIAS: {

@@ -113,8 +113,6 @@ class SGD(Optimizer, torch.optim.SGD):
     (`torch.optim.SGD <https://pytorch.org/docs/1.10.0/optim.html#torch.optim.SGD>`_)
     with optional loss and velocity scaling.
 
-    Nesterov momentum is not currently supported.
-
     PopTorch provides two possible variants. Both variants are mathematically
     identical to PyTorch but differ in their stability and efficiency.
 
@@ -214,7 +212,8 @@ class SGD(Optimizer, torch.optim.SGD):
         :param momentum: momentum factor.
         :param dampening: dampening term for momentum.
         :param weight_decay: Weight decay (L2 penalty) factor.
-        :param nesterov: Not supported (must be False).
+        :param nesterov: Whether to enable nesterov momentum. Default is
+            `False`.
         :param loss_scaling: Factor by which to scale the loss and hence
             gradients to assist numerical stability when using float16.
         :param velocity_scaling: Factor by which to scale the velocity values
@@ -265,6 +264,9 @@ class SGD(Optimizer, torch.optim.SGD):
             self.defaults["velocity_scaling"] = velocity_scaling
             for group in self.param_groups:
                 group.setdefault("velocity_scaling", velocity_scaling)
+
+        if nesterov is None:
+            nesterov = False
 
         supportedTypes = [torch.float16, torch.float32]
         errString = ("Accumulation types must be either torch.float32"

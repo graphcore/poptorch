@@ -64,11 +64,6 @@ def convertOptimizerToDict(optimizer, attr_tracker, options, is_compiled):
     num_groups = len(optimizer.param_groups)
     variable_attrs = getattr(optimizer, "variable_attrs", None)
 
-    def assertNesterovDisabled(params):
-        if params["nesterov"]:
-            raise ValueError("Nesterov momentum is currently not supported.")
-        return {}
-
     def assertAmsgradDisabled(params):
         if params["amsgrad"]:
             raise ValueError("Only non-amsgrad "
@@ -108,7 +103,6 @@ def convertOptimizerToDict(optimizer, attr_tracker, options, is_compiled):
 
     # Register all the attribute readers
     attr_readers = {
-        "nesterov": assertNesterovDisabled,
         "amsgrad": assertAmsgradDisabled,
         "bias_correction": ignore,
         "centered": ignore,
@@ -195,6 +189,8 @@ def convertOptimizerToDict(optimizer, attr_tracker, options, is_compiled):
     _AttrReader(attr_readers, "max_weight_norm", _GroupGetter(),
                 _ValueConstPairFormatter(variable_attrs, _IsEqualTo(65500.0)))
     _AttrReader(attr_readers, "alpha", _GroupGetter(),
+                _ValueConstPairFormatter(variable_attrs, isAlwaysConst))
+    _AttrReader(attr_readers, "nesterov", _GroupGetter(),
                 _ValueConstPairFormatter(variable_attrs, isAlwaysConst))
     _BetaReader(attr_readers, variable_attrs)
 

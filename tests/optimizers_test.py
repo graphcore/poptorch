@@ -433,14 +433,9 @@ def test_optimizer_SGD_nesterov(trace_model):
     options.Jit.traceModel(trace_model)
     model = OptimizerTestModel(options=options)
 
-    with pytest.raises(ValueError,
-                       match="Nesterov momentum is currently not supported"):
-        model.setOptimizer(
-            optim.SGD(model.parameters(),
-                      nesterov=True,
-                      momentum=0.1,
-                      lr=0.001))
-        model.run()
+    model.setOptimizer(
+        optim.SGD(model.parameters(), nesterov=True, momentum=0.1, lr=0.001))
+    model.run()
 
 
 @pytest.mark.parametrize("opt", poptorch_optimizers)
