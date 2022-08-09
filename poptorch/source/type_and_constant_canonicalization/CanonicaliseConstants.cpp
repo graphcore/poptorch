@@ -103,6 +103,7 @@ void replaceWithConstantTensor(torch::jit::Graph *graph, torch::jit::Node *n,
   ERROR_ON(n->kind() != c10::prim::Constant);
   bool is_dispatcher_active = isCompilingWithDispatcher();
   torch::jit::WithInsertPoint insert_point(n);
+  WithNodeMetadata meta(n);
 
   poptorch::UseOfNode use_of_node;
   if (is_dispatcher_active) {
@@ -409,6 +410,7 @@ private:
 void handleListOrTuple(torch::jit::Graph *graph, torch::jit::Node *n,
                        std::unordered_set<torch::jit::Node *> *to_delete) {
   torch::jit::WithInsertPoint insert_point(n);
+  WithNodeMetadata meta(n);
 
   // Use the visitor to turn the single list/tuple constant into many
   // constants and List/TupleConstructs.
@@ -428,6 +430,7 @@ void handleListOrTuple(torch::jit::Graph *graph, torch::jit::Node *n,
   // in the same way.
   for (auto *prim_const : visitor.getAllConstNodes()) {
     torch::jit::WithInsertPoint insert_point_prim_const(prim_const);
+    WithNodeMetadata prim_meta(prim_const);
 
     // If there are NoneTypes we can skip those
     if (prim_const->output()->type() != c10::NoneType::get()) {
@@ -463,6 +466,7 @@ void recursivelySelectHostAndIPUSideConstants(
       case UseOfNode::HostSideAndPopART:
         auto *graph = use.user->owningGraph();
         torch::jit::WithInsertPoint insert_point(use.user);
+        WithNodeMetadata meta(use.user);
 
         auto same_value = [](torch::jit::Value *value) { return value; };
 
@@ -508,6 +512,7 @@ void rectifyHostAndIPUSideConstants(
     // Create two new nodes
     auto t = getNodeTensorAttrValue(node);
     torch::jit::WithInsertPoint insert_point(node);
+    WithNodeMetadata meta(node);
 
     torch::jit::Node *host_side_node = createAndInsertNode(
         graph, symbols::poptorch::host_side_tensor_constant);

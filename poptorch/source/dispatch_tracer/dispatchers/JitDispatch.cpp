@@ -117,6 +117,7 @@ at::Tensor JITDispatch::addTensor(const at::Tensor &cpu_tensor,
   tensor = copyAndCoerceType(tensor);
 
   torch::jit::Value *value = graph->addInput(cpu_tensor.name());
+  setSourceRangeToCurrentLocation(value->node());
   value->setType(c10::TensorType::create(tensor)->withRequiresGrad(
       cpu_tensor.requires_grad()));
 
@@ -210,8 +211,8 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   ERROR_ON(!src_st.has_value());
 
   torch::jit::Value *copy;
+  WithNodeMetadata meta{src_tracked->jit->node()};
   if (*self_st == *src_st) {
-    WithNodeMetadata meta{src_tracked->jit->node()};
     copy = createIdentity(graph.get(), {src_tracked->jit})->output();
     copy->setType(self_tracked->jit->type());
   } else {
@@ -236,6 +237,7 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
 }
 
 void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
+  WithMetadata metadata("empty");
   // Do not call copyAndCoerceType from this method:
   // the source tensor hasn't been added to the mapper yet.
 
@@ -247,6 +249,7 @@ void JITDispatch::registerEmptyTensor(const at::Tensor &tensor) {
       "[Internal error] The empty tensor should have a valid compiler type");
   torch::jit::Node *n =
       graph->createUninitialized(c10::TensorType::create(tensor));
+  setSourceRangeToCurrentLocation(n);
   _mapper.addTensor(tensor, n->output(0));
 }
 

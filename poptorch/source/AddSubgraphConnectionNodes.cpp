@@ -54,6 +54,7 @@ bool markInputsAsComingFromParent(torch::jit::Graph *graph,
                                   torch::jit::Node *node, Subgraph *subgraph,
                                   const bool inputFromParent = true) {
   bool changed = false;
+  WithNodeMetadata meta(node);
 
   // If this node is NOT used in the terminator then we need to add it as an
   // input to the graph.

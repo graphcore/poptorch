@@ -363,6 +363,7 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
             "between replicas, you can disable buffer broadcasting using "
             "poptorch.Options.broadcastBuffers(False).");
 
+        WithNodeMetadata meta(alias->node());
         auto *aten_target =
             graph.create(symbols::poptorch::update_param_inplace, 1);
         aten_target->addInput(graph_input);

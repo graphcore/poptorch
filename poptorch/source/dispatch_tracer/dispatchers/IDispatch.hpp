@@ -18,7 +18,7 @@ namespace poptorch {
 
 class IDispatch {
 public:
-  virtual ~IDispatch() {}
+  virtual ~IDispatch();
 
   virtual at::Tensor
   allocateTensor(c10::IntArrayRef sizes,

@@ -178,7 +178,7 @@ torch::jit::Node *copyHandler(torch::jit::Graph *graph,
 torch::jit::Node *justReturnFalse(torch::jit::Graph *graph,
                                   torch::jit::Node * /*unused*/) {
   c10::IValue value{false};
-  torch::jit::Value *val = graph->insertConstant(value);
+  torch::jit::Value *val = insertConstant(graph, value);
   return val->node();
 }
 

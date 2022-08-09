@@ -112,7 +112,7 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
 
   // Assume value is a true constant and not a tensor so we don't have to
   // track it in the value mapper. It will get canonicalised later.
-  torch::jit::Value *val = graph.insertConstant(value);
+  torch::jit::Value *val = insertConstant(&graph, value);
   ERROR_ON_MSG(val == nullptr, "Internal: graph could not insert a constant");
 
   logging::trace("[TRACING-2] Constant input: jit ir %{}, ivalue tag kind: {}",

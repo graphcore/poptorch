@@ -38,6 +38,8 @@ namespace poptorch {
 // RAII object to set / clear the current source code location
 // and metadata to those attached to the provided node.
 // (Useful when creating / replacing nodes in the graph).
+// [Important] This is not a stack: the metadata is cleared on
+// destruction.
 class WithNodeMetadata {
 public:
   explicit WithNodeMetadata(torch::jit::Node *node);
@@ -53,6 +55,8 @@ void setCurrentPythonCodeLocation(
 // will have this metadata attached to them).
 void setCurrentMetadata(const std::string &metadata);
 
+void resetCurrentSourceLocation();
+
 torch::jit::Node *createAndInsertNode(
     torch::jit::Graph *graph, torch::jit::NodeKind kind,
     torch::jit::ArrayRef<torch::jit::Value *> inputs = {},
@@ -62,13 +66,15 @@ torch::jit::Node *createAndInsertNode(
 
 // All nodes should be added to the jit graph using this function or
 // insertNodeBeforeNode().
-// (or indirectly by using createAndInsertNode()).
+// (or indirectly by using createAndInsertNode(), insertConstant()).
 // These functions will ensure the new node contains all the required metadata
 // before it's added to the graph.
 void insertNodeInGraph(torch::jit::Graph *graph, torch::jit::Node *new_node);
 
 void insertNodeBeforeNode(torch::jit::Node *new_node,
                           torch::jit::Node *insert_point);
+
+void setSourceRangeToCurrentLocation(torch::jit::Node *node);
 
 // Called by createAndInsertNode except in the cases of OutputType::AsDtype and
 // OutputType::AsDtypeOrFirstInput where it should be called manually once the
@@ -77,6 +83,9 @@ void setNodeOutputsTypes(torch::jit::Node *node, ImplicitCast implicit_cast,
                          OutputType output_type);
 
 enum class UseOfNode { HostSideOnly, PopARTOnly, HostSideAndPopART };
+
+torch::jit::Value *insertConstant(torch::jit::Graph *graph,
+                                  const torch::jit::IValue &val);
 
 // Create a poptorch::tensor_constant, poptorch::host_side_tensor_constant
 // or poptorch::host_and_ipu_side_tensor_constant node from the given tensors,

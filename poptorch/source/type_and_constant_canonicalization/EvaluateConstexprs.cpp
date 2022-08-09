@@ -257,7 +257,7 @@ void ConstExprEvaluator::replaceWithConstants(const torch::jit::Stack &stack) {
 
     // Insert a constant to replace the original node and replace all uses
     torch::jit::WithInsertPoint insert_point(value->node());
-    torch::jit::Value *new_const = _graph->insertConstant(resolved_value);
+    torch::jit::Value *new_const = insertConstant(_graph, resolved_value);
     value->replaceAllUsesWith(new_const);
   }
 }

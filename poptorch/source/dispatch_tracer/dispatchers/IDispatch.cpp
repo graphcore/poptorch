@@ -8,6 +8,7 @@
 
 #include "../CommonHelperFunctions.hpp"
 #include "../Tensor.hpp"
+#include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 
 namespace poptorch {
@@ -135,5 +136,7 @@ torch::jit::SourceRange IDispatch::getPythonInterpreterSourceRange(
                  source_filename.value_or("<unknown>"), source_line);
   return torch::jit::SourceRange(source, 0, stack_trace.size());
 }
+
+IDispatch::~IDispatch() { resetCurrentSourceLocation(); }
 
 } // namespace poptorch

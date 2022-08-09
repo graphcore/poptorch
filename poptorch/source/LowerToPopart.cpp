@@ -632,10 +632,8 @@ void LowerToPopartImpl::lowerBody() {
     if (node->sourceRange().source()) {
       meta = node->sourceRange().source()->text();
     }
-    /* TODO(anthonyb): follow up patch to fix these.
     ERROR_ON_MSG(_built_in_params && meta.empty(),
                  "Source code location missing for node " + nodeToString(node));
-     */
     // Note: filename and line number might still not be available (For example
     // if the filter set by the user excludes the entire stack).
     auto file_line_col = node->sourceRange().file_line_col();

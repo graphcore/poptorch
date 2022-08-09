@@ -122,6 +122,7 @@ private:
 
     for (torch::jit::Node *node : _parts_queue.front()) {
       // Create the multi_conv_part node and insert it after the original conv
+      WithNodeMetadata meta(node);
       torch::jit::Node *conv_part = createMultiConvPart(_graph, node);
       conv_part->moveAfter(node);
       _to_delete.insert(node);

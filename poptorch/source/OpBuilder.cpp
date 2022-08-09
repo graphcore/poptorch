@@ -23,13 +23,19 @@ at::ScalarType scalarTypeFromInput(const torch::jit::Node *node, size_t num) {
 
 class SourceLocation {
 public:
+  // SourceLocation is considered enabled if a location or metadata
+  // has been explicitly set.
+  bool isEnabled() const { return _enabled; }
+
   void setLocation(const std::string &filename, std::uint64_t line) {
+    _enabled = true;
     _dirty = true;
     _filename = filename;
     _line = line;
   }
 
   void setMetadata(const std::string &metadata) {
+    _enabled = true;
     _dirty = true;
     _metadata = metadata;
   }
@@ -41,6 +47,9 @@ public:
       if (!_filename.empty()) {
         filename = _filename;
       }
+      ERROR_ON_MSG(
+          _metadata.empty(),
+          "[Internal] Metadata missing (setCurrentMetadata() missing)");
       auto source =
           std::make_shared<torch::jit::Source>(_metadata, filename, _line);
       _source_range = torch::jit::SourceRange(source, 0, 1);
@@ -49,7 +58,8 @@ public:
   }
 
 private:
-  bool _dirty{true};
+  bool _enabled{false};
+  bool _dirty{false};
   torch::jit::SourceRange _source_range;
   std::string _metadata;
   std::string _filename;
@@ -57,6 +67,10 @@ private:
 } current_source_location = {};
 
 } // namespace
+
+void resetCurrentSourceLocation() {
+  current_source_location = SourceLocation();
+}
 
 void setCurrentPythonCodeLocation(
     const torch::jit::SourceRange &source_location) {
@@ -75,18 +89,24 @@ void setCurrentMetadata(const std::string &metadata) {
 }
 
 WithNodeMetadata::WithNodeMetadata(torch::jit::Node *node) {
-  std::string meta;
-  auto sr = node->sourceRange();
-  if (sr.source()) {
-    meta = sr.source()->text();
+  // If no source location has been set yet
+  // then the node won't contain any location information.
+  if (current_source_location.isEnabled()) {
+    std::string meta;
+    auto sr = node->sourceRange();
+    if (sr.source()) {
+      meta = sr.source()->text();
+    }
+    setCurrentPythonCodeLocation(sr);
+    setCurrentMetadata(meta);
   }
-  setCurrentPythonCodeLocation(sr);
-  setCurrentMetadata(meta);
 }
 
 WithNodeMetadata::~WithNodeMetadata() {
-  setCurrentPythonCodeLocation({});
-  setCurrentMetadata("");
+  if (current_source_location.isEnabled()) {
+    setCurrentPythonCodeLocation({});
+    setCurrentMetadata("");
+  }
 }
 
 torch::jit::Node *
@@ -122,15 +142,24 @@ createAndInsertNode(torch::jit::Graph *graph, torch::jit::NodeKind kind,
   return new_node;
 }
 
+torch::jit::Value *insertConstant(torch::jit::Graph *graph,
+                                  const torch::jit::IValue &val) {
+  return graph->insertConstant(val, current_source_location.sourceRange());
+}
+
+void setSourceRangeToCurrentLocation(torch::jit::Node *node) {
+  node->setSourceRange(current_source_location.sourceRange());
+}
+
 void insertNodeInGraph(torch::jit::Graph *graph, torch::jit::Node *new_node) {
-  new_node->setSourceRange(current_source_location.sourceRange());
+  setSourceRangeToCurrentLocation(new_node);
   graph->insertNode(new_node);
   setAvailableMemoryAddPossibleInputOp(new_node);
 }
 
 void insertNodeBeforeNode(torch::jit::Node *new_node,
                           torch::jit::Node *insert_point) {
-  new_node->setSourceRange(current_source_location.sourceRange());
+  setSourceRangeToCurrentLocation(new_node);
   new_node->insertBefore(insert_point);
   setAvailableMemoryAddPossibleInputOp(new_node);
 }
