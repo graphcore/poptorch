@@ -15,6 +15,10 @@ class RankedTensorType;
 class Operation;
 } // namespace mlir
 
+namespace poptorch {
+struct CompilerOptions;
+}
+
 namespace poptorch_ir {
 
 namespace detail {
@@ -36,7 +40,11 @@ public:
 
   void dump();
 
-  void init(ExecutionType execution_type, CompilerBackend compiler_backend);
+  void init(ExecutionType execution_type, CompilerBackend compiler_backend,
+            const poptorch::CompilerOptions &options);
+
+  const poptorch::CompilerOptions &getOptions() const;
+  poptorch::CompilerOptions &getMutableOptions();
 
   void setCurrentPythonCodeLocation(const char *filename, std::uint64_t line,
                                     std::uint64_t col);

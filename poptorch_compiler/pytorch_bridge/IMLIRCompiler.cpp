@@ -64,9 +64,10 @@ bool higherThan(mlir::Type &lhs, mlir::Type &rhs) {
                                                     << mlirToStr(rhs));
 }
 
-IMLIRCompiler::IMLIRCompiler()
+IMLIRCompiler::IMLIRCompiler(const poptorch::CompilerOptions &options)
     : root_timer(timing_manager.getRootTimer()),
-      _builder(mlir::UnknownLoc::get(&context), &context) {
+      _builder(mlir::UnknownLoc::get(&context), &context),
+      _compiler_options(options) {
 
   context.getDiagEngine().registerHandler(printDiagnostic);
 

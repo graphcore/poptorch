@@ -15,7 +15,7 @@ namespace detail {
 
 class MLIRStaticGraphCompiler : public IMLIRCompiler {
 public:
-  MLIRStaticGraphCompiler();
+  explicit MLIRStaticGraphCompiler(const poptorch::CompilerOptions &options);
   virtual ~MLIRStaticGraphCompiler() = default;
   // Compile graph by running both PopTorch compiler passes and poplar
   // compilation.

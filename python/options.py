@@ -1242,9 +1242,8 @@ class Options(_options_impl.OptionsDict):
         self._execution_strategy = PipelinedExecution()
         # Don't pass it to super().__init__() -> we don't want it to be passed to the backend with the other
         # options. (It is passed to createGraph() instead).
-        self._source_location_excludes = [
-            "install/poptorch", "site-packages/torch", "site-packages/poptorch"
-        ]
+        self._source_location_excludes = copy.copy(
+            _options_impl.default_source_location_excludes)
 
         self.relaxOptimizerAttributesChecks(False)
         self.showCompilationProgressBar(True)

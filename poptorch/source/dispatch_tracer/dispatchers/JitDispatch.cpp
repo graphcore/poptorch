@@ -16,6 +16,8 @@
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "pytorch_bridge/CompilerOptions.hpp"
+
 #include "../CommonHelperFunctions.hpp"
 #include "../Tensor.hpp"
 
@@ -56,6 +58,9 @@ std::string truncateGraphString(torch::jit::Graph &graph) {
   // Start after the last line return.
   return "[...truncated...]" + s.substr(start);
 }
+
+JITDispatch::JITDispatch(const CompilerOptions &options)
+    : graph(std::make_shared<torch::jit::Graph>()), _mlir_dispatch(options) {}
 
 at::Tensor JITDispatch::allocateTensor(
     c10::IntArrayRef sizes, c10::optional<at::ScalarType> dtype,
@@ -140,14 +145,6 @@ at::Tensor JITDispatch::addParameter(const at::Tensor &tensor) {
     return addConstant(tensor);
   }
   return addTensor(tensor, /* is_parameter= */ true);
-}
-
-void JITDispatch::createGraph() {
-  graph = std::make_shared<torch::jit::Graph>();
-
-  // No need to create a MLIR graph, we're going to only use the dispatcher
-  // for shape inference, so just initialise the compiler.
-  _mlir_dispatch.initCompiler();
 }
 
 void JITDispatch::addOutput(const at::Tensor &ipu_src,
@@ -282,6 +279,10 @@ void JITDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
   torch::jit::push(stack, out);
 }
 
+const std::vector<std::vector<char>> &
+JITDispatch::getSourceLocationExcludes() const {
+  return _mlir_dispatch.getSourceLocationExcludes();
+}
 void JITDispatch::setCurrentCodeLocation(
     const torch::jit::SourceRange &source_location) {
   setCurrentPythonCodeLocation(source_location);

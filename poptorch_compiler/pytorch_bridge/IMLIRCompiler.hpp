@@ -16,6 +16,7 @@
 
 #include "dialect/PoptorchDialect.hpp"
 #include "lower_to_poplar/NonRestartingMLIRTimer.hpp"
+#include "pytorch_bridge/CompilerOptions.hpp"
 #include "pytorch_bridge/CompilerTypes.hpp"
 
 namespace poptorch_ir {
@@ -264,7 +265,7 @@ OpTy implicitCastAndCreate(mlir::ImplicitLocOpBuilder &builder,
 
 class IMLIRCompiler {
 public:
-  IMLIRCompiler();
+  explicit IMLIRCompiler(const poptorch::CompilerOptions &options);
   virtual ~IMLIRCompiler() = default;
 
   mlir::Type convertType(Type type);
@@ -314,6 +315,8 @@ public:
   virtual mlir::Value findValue(TensorId tensor);
 
   bool allOpsCanBeLoweredToPoplar() const;
+
+  poptorch::CompilerOptions &getMutableOptions() { return _compiler_options; }
 
 protected:
   struct Graph {
@@ -388,6 +391,9 @@ protected:
 
   // The main module which our functions are attached to.
   mlir::ModuleOp _the_module;
+
+  // Options to use in the compiler
+  poptorch::CompilerOptions _compiler_options;
 };
 
 } // namespace detail

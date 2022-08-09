@@ -25,6 +25,7 @@ class PoplarExecutorWrapper;
 
 namespace poptorch {
 
+struct CompilerOptions;
 struct InplaceGraphInfo;
 
 // Toggled by the user in python to choose which backend to target when tracing.
@@ -62,7 +63,7 @@ private:
 
 // Create a new graph.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
-                 const std::vector<std::string> &source_location_excludes);
+                 const CompilerOptions &options);
 
 // The current graph is complete: finalize it.
 //
@@ -101,7 +102,7 @@ bool isParameter(torch::jit::Value *value);
 bool eagerModeEnabled();
 
 // Switch to the eager mode dispatcher.
-void enableEagerMode();
+CompilerOptions &enableEagerMode();
 
 // Start capturing calls.
 // TODO(T61528): not needed anymore?

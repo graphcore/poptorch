@@ -176,6 +176,11 @@ class OptionsDict:
                           if k != "_values") + ")")
 
 
+default_source_location_excludes = [
+    "install/poptorch", "site-packages/torch", "site-packages/poptorch"
+]
+
+
 class IStageManager(abc.ABC):
     def __init__(self):
         self._next_auto_id = 0

@@ -1,6 +1,8 @@
 // Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 #include "IDispatch.hpp"
 
+#include <memory>
+
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -34,6 +36,11 @@ at::Tensor IDispatch::allocateTensor(
                    toString(output));
   }
   return output;
+}
+
+void IDispatch::setPythonStack(
+    const std::vector<torch::jit::StackEntry> &stack) {
+  setCurrentCodeLocation(getPythonInterpreterSourceRange(stack));
 }
 
 void *IDispatch::getDataSource(torch::jit::Value *value) {
@@ -75,6 +82,58 @@ std::string IDispatch::getParameterName(torch::jit::Value *value) {
 void IDispatch::replaceValue(torch::jit::Value *v_old,
                              torch::jit::Value *v_new) {
   _mapper.replaceValue(v_old, v_new);
+}
+
+// adapted from torch/csrc/jit/python/python_tracer.cpp because the header file
+// had too many dependencies
+torch::jit::SourceRange IDispatch::getPythonInterpreterSourceRange(
+    const std::vector<torch::jit::StackEntry> &cs) const {
+
+  auto excludes = getSourceLocationExcludes();
+  const auto is_filename_excluded = [&](std::string_view filename) {
+    const auto excludes_filename = [&filename](std::vector<char> exclude) {
+      return filename.find(std::string_view(exclude.data(), exclude.size())) !=
+             std::string_view::npos;
+    };
+    return std::any_of(excludes.begin(), excludes.end(), excludes_filename);
+  };
+
+  // transform_reduce
+  auto stack_trace = std::accumulate(
+      cs.begin(), cs.end(), std::string(),
+      [](std::string trace, const torch::jit::StackEntry &entry) {
+        auto file_line_col = entry.range.file_line_col();
+        if (file_line_col) {
+          const auto &[file, line, col] = *file_line_col;
+          UNUSED(col);
+          trace +=
+              file + "(" + std::to_string(line) + "): " + entry.filename + "\n";
+        }
+        return trace;
+      });
+
+  auto val = std::find_if(
+      cs.begin(), cs.end(),
+      [is_filename_excluded](const torch::jit::StackEntry &entry) {
+        auto file_line_col = entry.range.file_line_col();
+        if (file_line_col) {
+          return !is_filename_excluded(std::get<0>(*file_line_col));
+        }
+        return false;
+      });
+
+  c10::optional<std::string> source_filename;
+  std::size_t source_line = 0;
+  if (val != cs.end()) {
+    std::size_t col = 0;
+    std::tie(source_filename, source_line, col) = *val->range.file_line_col();
+  }
+
+  auto source = std::make_shared<torch::jit::Source>(
+      stack_trace, source_filename, source_line);
+  logging::trace("Setting op source to: {}:{}",
+                 source_filename.value_or("<unknown>"), source_line);
+  return torch::jit::SourceRange(source, 0, stack_trace.size());
 }
 
 } // namespace poptorch

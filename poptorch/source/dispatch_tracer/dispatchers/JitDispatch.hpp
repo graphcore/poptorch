@@ -16,9 +16,12 @@
 #include "poptorch/InplaceOps.hpp"
 
 namespace poptorch {
+struct CompilerOptions;
 
 class JITDispatch final : public IDispatch {
 public:
+  explicit JITDispatch(const CompilerOptions &options);
+
   // The JIT graph we are building up.
   std::shared_ptr<torch::jit::Graph> graph;
 
@@ -33,11 +36,8 @@ public:
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
   at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
   void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
-  void createGraph() final;
   void finalizeGraph() final;
 
-  void
-  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) override;
 
   void detach(const c10::OperatorHandle &op, c10::Stack *stack,
@@ -56,6 +56,10 @@ public:
 
 private:
   at::Tensor addTensor(const at::Tensor &cpu_tensor, bool is_parameter);
+
+  const std::vector<std::vector<char>> &getSourceLocationExcludes() const final;
+  void
+  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
 
   // We use the MLIR dispatch for shape inference.
   MLIRDispatch _mlir_dispatch;

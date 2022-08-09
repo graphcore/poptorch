@@ -19,21 +19,18 @@
 #include "IDispatch.hpp"
 
 namespace poptorch {
+struct CompilerOptions;
 
 class MLIRDispatch : public IDispatch {
 public:
-  MLIRDispatch();
+  explicit MLIRDispatch(CompilerOptions const &options);
 
-  void initCompiler(bool eager_mode = false);
   at::Tensor addConstant(const at::Tensor &cpu_tensor) final;
   at::Tensor addInput(const at::Tensor &cpu_tensor) final;
   at::Tensor addParameter(const at::Tensor &cpu_tensor) final;
   void addOutput(const at::Tensor &ipu_src, const at::Tensor &cpu_dest) final;
-  void createGraph() final;
   void finalizeGraph() final;
 
-  void
-  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
   void fallback(const c10::OperatorHandle &op, c10::Stack *stack) final;
   std::string handleOp(const c10::OperatorHandle &op, c10::Stack *stack);
 
@@ -86,7 +83,9 @@ public:
       const std::vector<poptorch_ir::OptionalTensorId> &output_id,
       const std::vector<bool> &requires_grad);
 
-  bool isEagerMode() { return _eager_mode; }
+  bool isEagerMode() const;
+  CompilerOptions &getMutableCompilerOptions();
+  const std::vector<std::vector<char>> &getSourceLocationExcludes() const final;
 
 // Add all the interface methods which match a single pytorch operation and
 // convert it into MLIR.
@@ -102,6 +101,10 @@ protected:
       const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec);
 
 private:
+  void
+  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) final;
+
+  void initCompiler(const CompilerOptions &compilerOptions);
 // We don't build this on Centos TODO(T49566)
 #if POPTORCH_BUILD_MLIR_COMPILER
   // The MLIR graph.
@@ -122,7 +125,6 @@ private:
   // operation.
   using StackFunctionType = std::function<void(c10::Stack &)>;
   std::unordered_map<std::string, StackFunctionType> _direct_dispatch_lookup;
-  bool _eager_mode{false};
 };
 
 } // namespace poptorch

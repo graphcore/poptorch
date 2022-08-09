@@ -5,6 +5,7 @@
 #include <ATen/Tensor.h>
 #include <ATen/core/boxing/KernelFunction.h>
 #include <c10/util/Optional.h>
+#include <torch/csrc/jit/frontend/source_range.h>
 #include <torch/csrc/jit/ir/ir.h>
 
 #include <string>
@@ -38,10 +39,8 @@ public:
                          const at::Tensor &cpu_dest) = 0;
   virtual void finalizeGraph() = 0;
 
-  virtual void createGraph() = 0;
+  void setPythonStack(const std::vector<torch::jit::StackEntry> &stack);
 
-  virtual void
-  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) = 0;
   // The "catch-all" fallback kernel.
   virtual void fallback(const c10::OperatorHandle &op, c10::Stack *stack) = 0;
 
@@ -71,7 +70,15 @@ protected:
   // types.
   ValueMapper _mapper;
 
+  virtual const std::vector<std::vector<char>> &
+  getSourceLocationExcludes() const = 0;
+  virtual void
+  setCurrentCodeLocation(const torch::jit::SourceRange &source_location) = 0;
+
 private:
+  torch::jit::SourceRange getPythonInterpreterSourceRange(
+      const std::vector<torch::jit::StackEntry> &cs) const;
+
   uint64_t _next_tensor_id{1};
 };
 

@@ -60,11 +60,14 @@ class IPUScope:
         self._upload_weights = True
         self._skip_compilation = skip_compilation
 
-        # Create the graph. Futured captured calls will be written into this
+        mlir_compiler_options = poptorch_core.CompilerOptions()
+        mlir_compiler_options.source_location_excludes = self._options._source_location_excludes  # pylint: disable=line-too-long
+
+        # Create the graph. Future captured calls will be written into this
         # graph behind the scenes.
         poptorch_core.createGraph(
             poptorch_core.TracingMode(self._compile_using), inputs,
-            self._options._source_location_excludes)
+            mlir_compiler_options)
 
         self._old_addresses = {}
 

@@ -13,9 +13,13 @@
 #include <torch/csrc/jit/python/pybind_utils.h>
 #include <torch/script.h>
 
+#include <algorithm>
+#include <iterator>
 #include <limits>
 #include <sstream>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "popart_compiler/CodeletsCompilation.hpp"
 #include "popart_compiler/Compiler.hpp"
@@ -39,6 +43,8 @@
 #include "poptorch/PopartCanonicalization.hpp"
 #include "poptorch/TypeAndConstantCanonicalization.hpp"
 #include "poptorch/Utils.hpp"
+
+#include "pytorch_bridge/CompilerOptions.hpp"
 
 namespace poptorch {
 namespace {
@@ -839,6 +845,13 @@ void mapParamsToNames(const pybind11::tuple &names,
     setParameterName(tensor, name);
   }
 }
+
+std::string convertToString(const std::vector<char> &str) {
+  return std::string(str.data(), str.size());
+}
+std::vector<char> convertToCharVec(const std::string &str) {
+  return std::vector<char>(str.begin(), str.end());
+}
 } // namespace
 
 void copyWeightsToHostImpl(
@@ -1262,6 +1275,47 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
              std::shared_ptr<poptorch::PoplarExecutable>>
       give_me_a_name(m, "InternalPoplarExecutable");
 
+  py::class_<poptorch::CompilerOptions>(m, "CompilerOptions")
+      .def(py::init<>())
+      .def_property_readonly(
+          "use_eager_mode",
+          [](const poptorch::CompilerOptions &options) {
+            return options.eager.eager_mode;
+          },
+          "Whether this options struct is for the eager mode compiler")
+      .def_property(
+          "use_lazy_tensor",
+          [](const poptorch::CompilerOptions &options) {
+            return options.eager.use_lazy_tensor;
+          },
+          [](poptorch::CompilerOptions &options, bool val) {
+            options.eager.use_lazy_tensor = val;
+          },
+          "Use Lazy Tensor: whether to run operations on the ipu immediately"
+          "or delay running them until after a synchronisation point")
+      .def_property(
+          "source_location_excludes",
+          [](const poptorch::CompilerOptions &options) {
+            std::vector<std::string> excludes;
+            std::transform(options.dispatcher.source_location_excludes.begin(),
+                           options.dispatcher.source_location_excludes.end(),
+                           std::back_inserter(excludes),
+                           &poptorch::convertToString);
+            return excludes;
+          },
+          [](poptorch::CompilerOptions &options,
+             const std::vector<std::string> &val) {
+            options.dispatcher.source_location_excludes.clear();
+            std::transform(
+                val.begin(), val.end(),
+                std::back_inserter(options.dispatcher.source_location_excludes),
+                &poptorch::convertToCharVec);
+          },
+          "When printing the IR all the frames containing one of the excluded"
+          "strings will be ignored.\n\n"
+          "This is helpful to get the IR to trace back to user code rather"
+          "than some function inside a framework.");
+
   m.def("processPrecisionOptions", PTC(poptorch::processPrecisionOptions));
   m.def("isGraphNondeterministic", PTC(poptorch::pyIsGraphNondeterministic));
   m.def("saveExecutableToFile", PTC(poptorch::saveExecutableToFile));
@@ -1317,7 +1371,8 @@ PYBIND11_MODULE(poptorch_core, m) { // NOLINT
       .value("Sentinel", poptorch::TracingMode::SENTINEL)
       .export_values();
 
-  m.def("enableEagerMode", PTC(poptorch::enableEagerMode));
+  m.def("enableEagerMode", PTC(poptorch::enableEagerMode),
+        py::return_value_policy::reference);
   m.def("eagerModeEnabled", PTC(poptorch::eagerModeEnabled));
   m.def("destroyDispatcher", PTC(poptorch::destroyDispatcher));
   m.def("startDispatch", PTC(poptorch::startDispatch));

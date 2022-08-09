@@ -3,10 +3,14 @@
 
 #include <string>
 
+#include "IMLIRCompiler.hpp"
+
 namespace poptorch_ir {
 namespace detail {
 
-MLIRStaticGraphCompiler::MLIRStaticGraphCompiler() {
+MLIRStaticGraphCompiler::MLIRStaticGraphCompiler(
+    const poptorch::CompilerOptions &options)
+    : IMLIRCompiler(options) {
   _write_weights_graph = createSubGraph("WeightsToDevice");
   _read_weights_graph = createSubGraph("WeightsToHost");
 }

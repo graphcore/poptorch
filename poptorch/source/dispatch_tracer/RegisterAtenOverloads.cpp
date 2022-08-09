@@ -30,6 +30,8 @@
 #include "dispatchers/MLIRDispatch.hpp"
 #endif
 
+#include "pytorch_bridge/CompilerOptions.hpp"
+
 namespace poptorch {
 
 namespace {
@@ -90,10 +92,6 @@ struct GlobalTracerContext {
     _active_dispatch = std::move(new_dispatch);
   }
 
-  // When setting the location source ignore all the frames containing one of
-  // these strings.
-  std::vector<std::string> source_location_excludes;
-
   // A simple guard to stop us from redispatching when we are already in a
   // dispatch context.
   bool dispatch_on{false};
@@ -109,10 +107,6 @@ struct GlobalTracerContext {
   // this might happen is using torch dynamic slicing in the dispatcher
   // (instead of poptorch.dynamic_slice()).
   bool moving_outputs{false};
-
-  // Return the passed filename if it doesn't match any of the registered
-  // exclusions, else an empty c10::optional.
-  c10::optional<std::string> filenameIfNotExcluded(const std::string &filename);
 
   // Each tensor allocated must have a unique id.
   uint64_t next_tensor_id{1};
@@ -131,16 +125,6 @@ private:
   std::unique_ptr<IDispatch> _active_dispatch;
 };
 
-c10::optional<std::string>
-GlobalTracerContext::filenameIfNotExcluded(const std::string &filename) {
-  for (auto &exception : source_location_excludes) {
-    if (filename.find(exception) != std::string::npos) {
-      return {};
-    }
-  }
-  return filename;
-}
-
 GlobalTracerContext context;
 
 // Poplar doesn't support long, so cast to int if needed.
@@ -156,47 +140,11 @@ at::Tensor downCastIfNeeded(const at::Tensor &t) {
   return t;
 }
 
-// adapted from torch/csrc/jit/python/python_tracer.cpp because the header file
-// had too many dependepencies
-torch::jit::SourceRange getPythonInterpreterSourceRange() {
-  auto cs = torch::jit::tracer::pythonCallstack();
-  c10::optional<std::string> source_filename;
-  size_t source_line = 0;
-  std::stringstream stack_trace;
-  for (const auto &entry : cs) {
-    const auto &range = entry.range;
-    if (range.source()) {
-      const auto &src = range.source();
-      if (src && src->filename()) {
-        auto line =
-            src->starting_line_no() + src->lineno_for_offset(range.start());
-        stack_trace << *(src->filename()) << "(" << line
-                    << "): " << entry.filename << "\n";
-        if (!source_filename) {
-          source_filename = context.filenameIfNotExcluded(*src->filename());
-          if (source_filename) {
-            source_line = line;
-          }
-        }
-      }
-    }
-  }
-
-  auto stack_trace_text = stack_trace.str();
-  auto source = std::make_shared<torch::jit::Source>(
-      stack_trace_text, source_filename, source_line);
-  if (!source_filename) {
-    source_filename = "<unknown>";
-  }
-  logging::trace("Setting op source to: {}:{}", *source_filename, source_line);
-  return torch::jit::SourceRange(source, 0, stack_trace_text.size());
-}
-
 // copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> Tensor(a!)
 at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
                         bool non_blocking) {
-  context.activeDispatch()->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
+  context.activeDispatch()->setPythonStack(
+      torch::jit::tracer::pythonCallstack());
   UNUSED(non_blocking);
   logging::trace("[TRACING-2] Intercepting aten::copy_");
   logging::trace("[Input copy_] self {}", str(self));
@@ -277,12 +225,16 @@ bool eagerModeEnabled() {
   return result;
 }
 
-void enableEagerMode() {
+CompilerOptions &enableEagerMode() {
 #if POPTORCH_BUILD_MLIR_COMPILER
-  auto dispatcher = std::make_unique<MLIRDispatch>();
-  dispatcher->initCompiler(/*eager_mode =*/true);
+  auto dispatcher =
+      std::make_unique<MLIRDispatch>(CompilerOptions::eagerOptions());
+
+  auto &options = dispatcher->getMutableCompilerOptions();
 
   context.resetActiveDispatch(std::move(dispatcher));
+
+  return options;
 #else
   ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
         "use eager mode.");
@@ -339,24 +291,37 @@ bool isDispatcherOn() {
 #endif
 }
 
+CompilerOptions
+createMLIROptions(const std::vector<std::string> &source_location_excludes) {
+  CompilerOptions options;
+  std::transform(
+      source_location_excludes.begin(), source_location_excludes.end(),
+      std::back_inserter(options.dispatcher.source_location_excludes),
+      [](std::string const &exclude) {
+        return std::vector<char>(exclude.begin(), exclude.end());
+      });
+  return options;
+}
+
 // Take the inputs to the graph and turn them into our IR graph
 // inputs/parameters.
 void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
-                 const std::vector<std::string> &source_location_excludes) {
-  context.source_location_excludes = source_location_excludes;
+                 const CompilerOptions &options) {
   if (mode == TracingMode::POPART) {
 // TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
-    context.resetActiveDispatch(std::make_unique<JITDispatch>());
+    context.resetActiveDispatch(std::make_unique<JITDispatch>(options));
 #else
+    UNUSED(options);
     ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
           "use the dispatcher");
 #endif
   } else if (mode == TracingMode::MLIR) {
 // TODO(T49566) We don't build this on Centos
 #if POPTORCH_BUILD_MLIR_COMPILER
-    context.resetActiveDispatch(std::make_unique<MLIRDispatch>());
+    context.resetActiveDispatch(std::make_unique<MLIRDispatch>(options));
 #else
+    UNUSED(options);
     ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON to "
           "use the dispatcher");
 #endif
@@ -364,9 +329,8 @@ void createGraph(TracingMode mode, const std::vector<at::Tensor> &inputs,
     ERROR("Unsupported target");
   }
 
-  context.activeDispatch()->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
-  context.activeDispatch()->createGraph();
+  context.activeDispatch()->setPythonStack(
+      torch::jit::tracer::pythonCallstack());
   context.graph_inputs.clear();
   for (const auto &input : inputs) {
     context.graph_inputs.emplace(
@@ -387,8 +351,8 @@ void fallback(const c10::OperatorHandle &op, c10::Stack *stack) {
   const c10::FunctionSchema &schema = op.schema();
   logging::trace("[TRACING-2] Intercepting {} ", schema);
 
-  context.activeDispatch()->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
+  context.activeDispatch()->setPythonStack(
+      torch::jit::tracer::pythonCallstack());
   for (const auto &t : *stack) {
     logging::trace("[Input {}] {}", schema.name(), valueToString(t));
   }
@@ -490,8 +454,8 @@ emptyBase(at::IntArrayRef size,
           c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
   ERROR_ON(!device); // Internal error: shouldn't happen
   if (isIpuDevice(*device)) {
-    context.activeDispatch()->setCurrentCodeLocation(
-        getPythonInterpreterSourceRange());
+    context.activeDispatch()->setPythonStack(
+        torch::jit::tracer::pythonCallstack());
 
     // We use the device ID to determine if a tensor is a parameter
     // (device 1) or not (device 0) but in reality all the tensors
@@ -545,8 +509,8 @@ at::Tensor emptyStrided(at::IntArrayRef size, at::IntArrayRef stride,
 void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
   logging::trace("[TRACING-2] Intercepting aten::detach");
 
-  context.activeDispatch()->setCurrentCodeLocation(
-      getPythonInterpreterSourceRange());
+  context.activeDispatch()->setPythonStack(
+      torch::jit::tracer::pythonCallstack());
 
   // Perform the shallow copy and detach.
   context.activeDispatch()->detach(op, stack, context.moving_parameters);

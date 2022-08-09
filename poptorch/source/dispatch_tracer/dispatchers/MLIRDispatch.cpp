@@ -21,6 +21,8 @@
 #include "poptorch_err/ExceptionHandling.hpp"
 #include "poptorch_logging/Logging.hpp"
 
+#include "pytorch_bridge/CompilerOptions.hpp"
+
 #include "../CommonHelperFunctions.hpp"
 #include "../Tensor.hpp"
 
@@ -126,23 +128,28 @@ void MLIRExecutor::weightsToHost() {
   CATCH_AND_RETHROW_AS_POPTORCH_EXCEPTION
 }
 
-MLIRDispatch::MLIRDispatch() { this->generateDispatchTable(); }
+MLIRDispatch::MLIRDispatch(CompilerOptions const &options) {
+  this->generateDispatchTable();
+  initCompiler(options);
 
-void MLIRDispatch::initCompiler(bool eager_mode) {
-  _eager_mode = eager_mode;
+  // Start timing how long it takes us to build the graph.
+  _compiler.startTraceTiming();
+}
+
+void MLIRDispatch::initCompiler(const CompilerOptions &options) {
   // Init our MLIR compiler.
-  if (eager_mode) {
+  if (options.eager.eager_mode) {
     _compiler.init(poptorch_ir::ExecutionType::EagerMode,
-                   poptorch_ir::CompilerBackend::Poplar);
+                   poptorch_ir::CompilerBackend::Poplar, options);
   } else {
     _compiler.init(poptorch_ir::ExecutionType::StaticGraph,
-                   poptorch_ir::CompilerBackend::Poplar);
+                   poptorch_ir::CompilerBackend::Poplar, options);
   }
 }
 
 at::Tensor MLIRDispatch::addConstant(const at::Tensor &cpu_tensor) {
   ERROR_ON(!cpu_tensor.unsafeGetTensorImpl()->is_cpu());
-  if (_eager_mode) {
+  if (isEagerMode()) {
     // Everything is considered an input in eager mode.
     return addInput(cpu_tensor);
   }
@@ -244,13 +251,6 @@ at::Tensor MLIRDispatch::addParameter(const at::Tensor &cpu_tensor) {
   return tensor;
 }
 
-void MLIRDispatch::createGraph() {
-  initCompiler();
-
-  // Start timing how long it takes us to build the graph.
-  _compiler.startTraceTiming();
-}
-
 void MLIRDispatch::addOutput(const at::Tensor &ipu_src,
                              const at::Tensor &cpu_dest) {
   void *storage = cpu_dest.data_ptr();
@@ -314,6 +314,15 @@ void MLIRDispatch::detach(const c10::OperatorHandle &op, c10::Stack *stack,
 
   torch::jit::drop(stack, num_arguments);
   torch::jit::push(stack, out);
+}
+
+const std::vector<std::vector<char>> &
+MLIRDispatch::getSourceLocationExcludes() const {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  return _compiler.getOptions().dispatcher.source_location_excludes;
+#else
+  return {};
+#endif
 }
 
 void MLIRDispatch::setCurrentCodeLocation(
@@ -555,6 +564,14 @@ std::vector<at::Tensor> MLIRDispatch::makeEmptyOutputTensorList(
   return output;
 }
 
+CompilerOptions &MLIRDispatch::getMutableCompilerOptions() {
+#if POPTORCH_BUILD_MLIR_COMPILER
+  return _compiler.getMutableOptions();
+#else
+  ERROR("PopTorch must be compiled with POPTORCH_BUILD_MLIR_COMPILER=ON");
+#endif
+}
+
 poptorch_ir::OptionalTensorId MLIRDispatch::getSingleOptionalTensorId(
     const std::vector<poptorch_ir::OptionalTensorId> &tensor_vec) {
   ERROR_ON(tensor_vec.size() > 1);
@@ -720,4 +737,7 @@ std::optional<double> toOptionalDouble(c10::IValue &value) {
 #include "PoptorchToMLIRInterface.cpp.inc"
 #include "TorchScatterToMLIRInterface.cpp.inc"
 
+bool MLIRDispatch::isEagerMode() const {
+  return _compiler.getOptions().eager.eager_mode;
+}
 } // namespace poptorch

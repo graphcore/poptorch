@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "lower_to_poplar/PoplarDeviceAndTarget.hpp"
+#include "pytorch_bridge/CompilerOptions.hpp"
 #include "pytorch_bridge/PytorchBridgeUtils.hpp"
 
 #include "IMLIRCompiler.hpp"
@@ -27,19 +28,28 @@ PoptorchCompiler::~PoptorchCompiler() {
 }
 
 void PoptorchCompiler::init(ExecutionType execution_type,
-                            CompilerBackend compiler_backend) {
+                            CompilerBackend compiler_backend,
+                            const poptorch::CompilerOptions &options) {
   ERROR_ON_MSG(compiler_backend != CompilerBackend::Poplar,
                "Only CompilerBackend::Poplar supported for now");
 
   if (compiler_backend == CompilerBackend::Poplar) {
     if (execution_type == ExecutionType::StaticGraph) {
-      _impl = std::make_unique<detail::MLIRStaticGraphCompiler>();
+      _impl = std::make_unique<detail::MLIRStaticGraphCompiler>(options);
     } else if (execution_type == ExecutionType::EagerMode) {
       PoplarDevice device = PoplarDevice::defaultDevice();
-      _impl = std::make_unique<detail::MLIREagerCompiler>(device);
+      _impl = std::make_unique<detail::MLIREagerCompiler>(device, options);
     }
   }
   ERROR_ON(_impl == nullptr);
+}
+
+const poptorch::CompilerOptions &PoptorchCompiler::getOptions() const {
+  return const_cast<PoptorchCompiler *>(this)->getMutableOptions();
+}
+
+poptorch::CompilerOptions &PoptorchCompiler::getMutableOptions() {
+  return _impl->getMutableOptions();
 }
 
 void PoptorchCompiler::onOpAdded() { _impl->onOpAdded(); }

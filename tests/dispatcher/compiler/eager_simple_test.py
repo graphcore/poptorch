@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2022 Graphcore Ltd. All rights reserved.
+import inspect
 import torch
 import torchvision.models as models
 import pytest
@@ -52,6 +53,53 @@ def simple_add(capfd):
 @helpers.overridePoptorchLogLevel("TRACE")
 def test_simple_add_hw(capfd):
     simple_add(capfd)
+
+
+@helpers.printCapfdOnExit
+@helpers.overridePoptorchLogLevel("DEBUG")
+@pytest.mark.parametrize("mode", ["default", "show_all", "hide_all"])
+@pytest.mark.mlirSupportRequired
+@pytest.mark.extendedTestingOnly
+def test_source_location(capfd, mode):
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+
+    layer = torch.nn.Linear(1, 2).to('xla')
+    expected_filename = inspect.stack()[0].filename
+    # +3 -> We expect to see f()'s return line in the log
+    expected_line = inspect.stack()[0].lineno + 3
+
+    def f(x):
+        return layer(x)
+
+    if mode == "show_all":
+        # Clear the list: show everything
+        poptorch.eager.eager_options.source_location_excludes = []
+    elif mode == "hide_all":
+        # All paths have a '/' in them so we essentially exclude everything.
+        poptorch.eager.eager_options.source_location_excludes += ['/']
+
+    input = torch.Tensor([[1.], [-1.]]).to('xla')
+    f(input)
+
+    log = helpers.LogChecker(capfd)
+    if mode == "show_all":
+        # If we clear the list of exclusions we will point at Torch's internals
+        log.assert_matches(
+            "poptorch.transpose.*site-packages/torch/nn/functional.py")
+        log.assert_no_matches(
+            f"poptorch.transpose.*{expected_filename}:{expected_line}")
+    elif mode == "hide_all":
+        log.assert_matches(r"poptorch.transpose.*\[unknown\]")  # no filename
+        log.assert_no_matches(
+            "poptorch.transpose.*site-packages/torch/nn/functional.py")
+        log.assert_no_matches(
+            f"poptorch.transpose.*{expected_filename}:{expected_line}")
+    else:
+        # By default: we point at the user code
+        log.assert_no_matches(
+            "poptorch.transpose.*site-packages/torch/nn/functional.py")
+        log.assert_matches(
+            f"poptorch.transpose.*{expected_filename}:{expected_line}")
 
 
 @pytest.mark.mlirSupportRequired
