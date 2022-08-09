@@ -200,7 +200,7 @@ class AutoStage(enum.IntEnum):
 
     By default, the following execution strategy is used:
 
-    >>> stategy = poptorch.PipelinedExecution(poptorch.AutoStage.SameAsIpu)
+    >>> strategy = poptorch.PipelinedExecution(poptorch.AutoStage.SameAsIpu)
     >>> opts.setExecutionStrategy(strategy)
 
     which would translate to ``stage_id = ipu_id``:
@@ -211,7 +211,7 @@ class AutoStage(enum.IntEnum):
 
     Now if instead you use:
 
-    >>> stategy = poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement)
+    >>> strategy = poptorch.PipelinedExecution(poptorch.AutoStage.AutoIncrement)
     >>> opts.setExecutionStrategy(strategy)
 
     The last block would be in its own stage rather than sharing one with
