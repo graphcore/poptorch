@@ -45,7 +45,7 @@ template <typename ConcreteType>
 class ImplicitCastToFloat
     : public TraitBase<ConcreteType, ImplicitCastToFloat> {};
 
-const size_t max_implicit_casting_operands = 3;
+const size_t max_implicit_casting_operands = 8;
 template <unsigned idx> class ImplicitCastOperand {
 public:
   static_assert(idx < max_implicit_casting_operands);

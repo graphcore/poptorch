@@ -85,6 +85,9 @@ template <typename OpTy> constexpr bool isImplicitCastingOp() {
 // }
 template <typename T, typename F> struct CallWithElementTypeImpl {
   static void call(const T &t, F &&f) {
+    if (t.getImpl() == nullptr) {
+      return;
+    }
     f(t.getType().template cast<mlir::RankedTensorType>().getElementType());
   }
 };
@@ -157,6 +160,9 @@ struct CastAndForwardElt {
           std::is_same<typename std::remove_reference<decltype(element)>::type,
                        mlir::Value>::value,
           "Only an mlir::Value can be implicitly casted.");
+      if (element.getImpl() == nullptr) {
+        return std::forward<Elt>(element);
+      }
       mlir::Type element_type = element.getType()
                                     .template cast<mlir::RankedTensorType>()
                                     .getElementType();
