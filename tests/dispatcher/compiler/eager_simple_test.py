@@ -137,6 +137,21 @@ def test_simple_add(capfd):
     simple_add(capfd)
 
 
+@pytest.mark.mlirSupportRequired
+@pytest.mark.parametrize("lazy", [True, False])
+@pytest.mark.extendedTestingOnly
+def test_backward(lazy):
+    import poptorch.eager  # pylint: disable=unused-import, import-outside-toplevel
+    poptorch.eager.eager_options.use_lazy_tensor = lazy
+
+    t = torch.tensor([1.0], requires_grad=True)
+    t_x = t.to('xla')
+    s = 2.0 * t_x
+
+    s.backward()
+    assert t.grad == 2.0
+
+
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.mlirSupportRequired
 @pytest.mark.extendedTestingOnly

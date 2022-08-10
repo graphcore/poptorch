@@ -162,7 +162,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
         logging::trace("copy_ parameter CPU -> IPU, new self {}", str(self));
       } else {
         ERROR_ON_MSG(
-            src.requires_grad(),
+            src.requires_grad() && !eagerModeEnabled(),
             "An input tensor to an IPU model can not have requires_grad set "
             "to true.");
 
