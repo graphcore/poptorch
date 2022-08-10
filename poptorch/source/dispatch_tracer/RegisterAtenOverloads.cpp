@@ -164,7 +164,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
         ERROR_ON_MSG(
             src.requires_grad() && !eagerModeEnabled(),
             "An input tensor to an IPU model can not have requires_grad set "
-            "to true.");
+            "to True.");
 
         if (context.graph_inputs.count(src.unsafeGetTensorImpl()) > 0) {
           self = context.activeDispatch()->addInput(downCastIfNeeded(src));

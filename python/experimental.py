@@ -344,7 +344,7 @@ class _IPUContext:
                         f"requires_grad set to True, however input {idx} " +
                         f"does: {t}\nYou can set requires_grad=True from " +
                         "within the model as an alternative, and return " +
-                        "gradients as oututs to your model, if required.")
+                        "gradients as outputs to your model, if required.")
 
             d = torch.device("xla:0")
             # Move all the inputs to the IPU
