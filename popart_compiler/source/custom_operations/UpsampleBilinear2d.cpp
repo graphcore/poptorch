@@ -56,12 +56,17 @@ BilinearParams computeSourceIndexAndLambda(const float scale,
     // scale_factor = 1, simply copy
     return {output_index, output_index, 1.0, 0.0};
   }
-  const float real_input_index =
-      areaPixelComputeSourceIndex(static_cast<float>(1.0 / scale), output_index,
-                                  align_corners, /*cubic=*/false);
+
+  float ratio = align_corners ? static_cast<float>(input_size - 1) /
+                                    (scale * input_size - 1.0)
+                              : 1.0f / scale;
+
+  const float real_input_index = areaPixelComputeSourceIndex(
+      ratio, output_index, align_corners, /*cubic=*/false);
   size_t index0 = static_cast<int64_t>(real_input_index);
   size_t offset = (index0 < input_size - 1) ? 1 : 0;
   float lambda1 = real_input_index - index0;
+
   return {index0, index0 + offset, 1.0f - lambda1, lambda1};
 }
 
@@ -97,6 +102,7 @@ using MultipleTileMap = std::map<size_t, TileInputs>;
 poplar::Tensor bilinearMap(poplar::Graph &graph,            // NOLINT
                            poplar::program::Sequence &prog, // NOLINT
                            const poplar::Tensor &input, float scale_factor,
+                           const bool align_corners = false,
                            const poplar::DebugContext &dc = {}) {
   poputil::PoplibsOpDebugInfo di(dc, DI_ARGS(input, scale_factor));
 
@@ -125,11 +131,11 @@ poplar::Tensor bilinearMap(poplar::Graph &graph,            // NOLINT
 
   std::vector<float> w11s;
   for (size_t h = 0; h < output_dims[2]; ++h) {
-    BilinearParams params_h =
-        computeSourceIndexAndLambda(scale_factor, h, input_dims[2], false);
+    BilinearParams params_h = computeSourceIndexAndLambda(
+        scale_factor, h, input_dims[2], align_corners);
     for (size_t w = 0; w < output_dims[3]; ++w) {
-      BilinearParams params_w =
-          computeSourceIndexAndLambda(scale_factor, w, input_dims[3], false);
+      BilinearParams params_w = computeSourceIndexAndLambda(
+          scale_factor, w, input_dims[3], align_corners);
       w00s.push_back(params_h.lambda0 * params_w.lambda0);
       w01s.push_back(params_h.lambda0 * params_w.lambda1);
       w10s.push_back(params_h.lambda1 * params_w.lambda0);
@@ -190,14 +196,14 @@ using GradMultipleMap = std::map<GradMultipleKey, std::vector<GradMultipleVal>>;
 
 GradMultipleMap computeGradMap(size_t in_height, size_t in_width,
                                size_t out_height, size_t out_width,
-                               float scale_factor) {
+                               float scale_factor, bool align_corners) {
   GradMultipleMap m;
   for (size_t h = 0; h < in_height; ++h) {
     BilinearParams params_h =
-        computeSourceIndexAndLambda(scale_factor, h, out_height, false);
+        computeSourceIndexAndLambda(scale_factor, h, out_height, align_corners);
     for (size_t w = 0; w < in_width; ++w) {
-      BilinearParams params_w =
-          computeSourceIndexAndLambda(scale_factor, w, out_width, false);
+      BilinearParams params_w = computeSourceIndexAndLambda(
+          scale_factor, w, out_width, align_corners);
       m[{params_h.input0, params_w.input0}].push_back(
           GradMultipleVal{params_h.lambda0, params_w.lambda0, h, w});
       m[{params_h.input0, params_w.input1}].push_back(
@@ -432,7 +438,8 @@ std::vector<Mapping> splitMapping(const Mapping &m, uint32_t partitions,
 poplar::Tensor bilinearMapGrads(poplar::Graph &graph,            // NOLINT
                                 poplar::program::Sequence &prog, // NOLINT
                                 const poplar::Tensor &grad_output,
-                                float scale_factor, uint32_t nb_splits = 0,
+                                float scale_factor, bool align_corners,
+                                uint32_t nb_splits = 0,
                                 const poplar::DebugContext &dc = {}) {
   poputil::PoplibsOpDebugInfo di(dc, DI_ARGS(grad_output, scale_factor));
   const auto grad_output_dims = grad_output.shape();
@@ -461,9 +468,9 @@ poplar::Tensor bilinearMapGrads(poplar::Graph &graph,            // NOLINT
       grad_output.dimShuffle({2, 3, 0, 1})
           .reshape({grad_output_dims[2], grad_output_dims[3],
                     grad_output_dims[0] * grad_output_dims[1]});
-  GradMultipleMap m =
-      computeGradMap(grad_output_dims[2], grad_output_dims[3],
-                     grad_input_dims[2], grad_input_dims[3], scale_factor);
+  GradMultipleMap m = computeGradMap(grad_output_dims[2], grad_output_dims[3],
+                                     grad_input_dims[2], grad_input_dims[3],
+                                     scale_factor, align_corners);
   const auto &full_mapping = graph.getTileMapping(grad_input_shuffled);
   if (nb_splits == 0) { // try to guess a good split
     nb_splits = 1;
@@ -596,6 +603,7 @@ public:
   float getSubgraphValue() const final { return getLowSubgraphValue(); }
 
   float getScalingFactor() const { return _scalingFactor; }
+  bool getAlignCorners() const { return _alignCorners; }
   // Implementation defined below
   void appendAttributes(popart::OpSerialiserBase &os) const override;
 
@@ -604,14 +612,16 @@ public:
 
 private:
   float _scalingFactor;
+  bool _alignCorners;
 };
 
 // The forward Op
 class UpsampleOp : public popart::Op {
 public:
   UpsampleOp(const popart::OperatorIdentifier &_opid, float scalingFactor,
-             const popart::Op::Settings &settings_)
-      : popart::Op(_opid, settings_), _scalingFactor{scalingFactor} {}
+             bool alignCorners, const popart::Op::Settings &settings_)
+      : popart::Op(_opid, settings_), _scalingFactor{scalingFactor},
+        _alignCorners(alignCorners) {}
 
   // same comment as for UpsampleGradOp, for running shape/type inference
   // "statically"
@@ -647,20 +657,24 @@ public:
   void appendAttributes(popart::OpSerialiserBase &os) const override {
     Op::appendAttributes(os);
     os.appendAttribute("scaling_factor", getScalingFactor());
+    os.appendAttribute("align_corners", getAlignCorners());
   }
 
   void appendOutlineAttributes(popart::OpSerialiserBase &os) const override {
     Op::appendOutlineAttributes(os);
     os.appendAttribute("scaling_factor", getScalingFactor());
+    os.appendAttribute("align_corners", getAlignCorners());
   }
 
   // an estimate of how valuable sub-graph matching will be
   float getSubgraphValue() const final { return getLowSubgraphValue(); }
 
   float getScalingFactor() const { return _scalingFactor; }
+  bool getAlignCorners() const { return _alignCorners; }
 
 private:
   float _scalingFactor;
+  bool _alignCorners;
 };
 
 // describe the inputs and outputs that are supported by the operation
@@ -670,7 +684,8 @@ popart::OpDefinition::DataTypes t = {popart::DataType::FLOAT16,
 popart::OpDefinition upsample_op_def(
     {popart::OpDefinition::Inputs({{"input", t}}),
      popart::OpDefinition::Outputs({{"output", t}}),
-     popart::OpDefinition::Attributes({{"scaling_factor", {"*"}}})});
+     popart::OpDefinition::Attributes({{"scaling_factor", {"*"}},
+                                       {"align_corners", {"*"}}})});
 
 popart::OpCreator<UpsampleOp> upsample_op_creator(
     popart::OpDefinitions({{poptorch_custom_ops::upsample_bilinear2d,
@@ -680,8 +695,10 @@ popart::OpCreator<UpsampleOp> upsample_op_creator(
       float scaling_factor =
           info.attributes.getAttribute<popart::Attributes::Float>(
               "scaling_factor", 2.0f);
+      int align_corners = info.attributes.getAttribute<popart::Attributes::Int>(
+          "align_corners", 0);
       return std::make_unique<UpsampleOp>(info.opid, scaling_factor,
-                                          info.settings);
+                                          align_corners, info.settings);
     },
     true);
 
@@ -706,8 +723,11 @@ public:
     std::cerr << "Debug UpsampleOpx::grow\n";
     auto op = getOp<UpsampleOp>();
     float scaling_factor = op.getScalingFactor();
+    bool align_corners = op.getAlignCorners();
     auto input = getInTensor(0);
-    setOutTensor(0, bilinearMap(graph(), prog, input, scaling_factor));
+
+    setOutTensor(
+        0, bilinearMap(graph(), prog, input, scaling_factor, align_corners));
   }
 };
 
@@ -728,23 +748,28 @@ public:
 
     auto op = getOp<UpsampleGradOp>();
     float scaling_factor = op.getScalingFactor();
-    setOutTensor(0, bilinearMapGrads(graph(), prog, grad_out, scaling_factor));
+    bool align_corners = op.getAlignCorners();
+    setOutTensor(0, bilinearMapGrads(graph(), prog, grad_out, scaling_factor,
+                                     align_corners));
   }
 };
 
 UpsampleGradOp::UpsampleGradOp(const UpsampleOp &fwdOp)
     : popart::Op(poptorch_custom_ops::upsample_bilinear2d_grad, fwdOp.settings),
-      _scalingFactor{fwdOp.getScalingFactor()} {}
+      _scalingFactor{fwdOp.getScalingFactor()}, _alignCorners{
+                                                    fwdOp.getAlignCorners()} {}
 
 void UpsampleGradOp::appendAttributes(popart::OpSerialiserBase &os) const {
   Op::appendAttributes(os);
   os.appendAttribute("scaling_factor", getScalingFactor());
+  os.appendAttribute("align_corners", getAlignCorners());
 }
 
 void UpsampleGradOp::appendOutlineAttributes(
     popart::OpSerialiserBase &os) const {
   Op::appendOutlineAttributes(os);
   os.appendAttribute("scaling_factor", getScalingFactor());
+  os.appendAttribute("align_corners", getAlignCorners());
 }
 
 popart::popx::OpxCreator<UpsampleOpx>

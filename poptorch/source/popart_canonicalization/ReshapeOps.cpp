@@ -845,6 +845,7 @@ torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
   auto *output_size = node->input(1);
   auto *output_scale = node->input(3);
 
+  const bool align_corners = constantToBool(node->input(2)->node());
   auto scalar_type = getNodeScalarType(input);
   auto output_rank = shapeFromTensor(node->output()).size();
   auto input_shape = shapeFromTensor(input);
@@ -879,7 +880,8 @@ torch::jit::Node *upsampleBilinear2dHandler(torch::jit::Graph *graph,
   std::string name = "UpsampleBilinear2d";
   std::string domain = "poptorch.custom_ops";
   std::string attributes("{\"scaling_factor\":" + std::to_string(scales[2]) +
-                         "}");
+                         ", " + "\"align_corners\":" +
+                         std::to_string(static_cast<int>(align_corners)) + "}");
 
   auto *new_node =
       createCustomOperation(graph, inputs, name, domain, 1, 1, attributes);

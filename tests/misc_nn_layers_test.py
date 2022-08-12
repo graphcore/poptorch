@@ -65,9 +65,13 @@ def test_downsample_nearest(trace_model):
 @pytest.mark.parametrize("scale_factor", [2, 5])
 @pytest.mark.parametrize("input_shape", [(1, 2, 3, 4), (2, 2, 2, 8)])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_upsample_bilinear_factor(scale_factor, input_shape, trace_model):
+@pytest.mark.parametrize("align_corners", [True, False])
+def test_upsample_bilinear_factor(scale_factor, input_shape, trace_model,
+                                  align_corners):
     torch.manual_seed(42)
-    op = torch.nn.Upsample(scale_factor=scale_factor, mode="bilinear")
+    op = torch.nn.Upsample(scale_factor=scale_factor,
+                           mode="bilinear",
+                           align_corners=align_corners)
     x = torch.randn(*input_shape)
     op_harness(trace_model, op, [x])
 
@@ -75,9 +79,12 @@ def test_upsample_bilinear_factor(scale_factor, input_shape, trace_model):
 @pytest.mark.parametrize("shapes", [[(1, 2, 3, 4),
                                      (6, 8)], [(2, 2, 2, 8), (7, 28)]])
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_upsample_bilinear_factor_shapes(shapes, trace_model):
+@pytest.mark.parametrize("align_corners", [True, False])
+def test_upsample_bilinear_factor_shapes(shapes, trace_model, align_corners):
     torch.manual_seed(42)
-    op = torch.nn.Upsample(size=shapes[1], mode="bilinear")
+    op = torch.nn.Upsample(size=shapes[1],
+                           mode="bilinear",
+                           align_corners=align_corners)
     x = torch.randn(*shapes[0])
     op_harness(trace_model, op, [x])
 
