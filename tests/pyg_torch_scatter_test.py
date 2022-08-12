@@ -9,7 +9,7 @@ import helpers
 import poptorch
 
 if helpers.is_running_tests:
-    from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add
+    from torch_scatter import scatter, scatter_log_softmax, scatter_softmax, scatter_std, scatter_add, scatter_max
 else:
 
     def scatter():
@@ -25,6 +25,9 @@ else:
         pass
 
     def scatter_add():
+        pass
+
+    def scatter_max():
         pass
 
 
@@ -88,3 +91,12 @@ def test_scatter_add_nd_expand_removed(capfd):
 
     it = helpers.LogChecker(capfd).createIterator()
     it.findNext("Removing index expansion node:")
+
+
+@pytest.mark.parametrize("shape", [(5, ), (2, 5), (2, 5, 5)])
+def test_scatter_max(shape):
+    torch.manual_seed(0)
+    x = torch.rand(shape)
+    ind = torch.randint(3, shape)
+
+    torch_scatter_harness(True, scatter_max, x, ind)

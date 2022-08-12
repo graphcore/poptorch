@@ -6,6 +6,7 @@
 #include "poptorch/OpBuilder.hpp"
 #include "poptorch/Utils.hpp"
 #include "poptorch_logging/Error.hpp"
+#include "poptorch_logging/Logging.hpp"
 
 namespace poptorch {
 namespace {
@@ -33,20 +34,65 @@ torch::jit::Node *scatterMaxMinHandler(torch::jit::Graph *graph,
   ERROR_ON_MSG(!isNone(opt_out),
                "Providing the optional output is not currently supported.");
 
-  // Both scatter_max and scatter_min return two outputs but we only support the
-  // first output so we delete the second one to match the popart output
-  node->eraseOutput(1);
-
-  auto shape = shapeFromTensor(node->output());
+  auto shape = shapeFromTensor(node->output(0));
   auto axissize = shape.at(axis);
 
   auto *opt_axissize = node->input(4);
   if (!isNone(opt_axissize)) {
     axissize = constantToInt(opt_axissize->node());
+    shape[axis] = axissize;
   }
 
-  return createScatterreduce(graph, {src, index}, axissize, axis,
-                             getReductionMethod(node));
+  auto *result = createScatterreduce(graph, {src, index}, axissize, axis,
+                                     getReductionMethod(node));
+
+  // Both scatter_max and scatter_min return two outputs where the second one
+  // is the index but most often this second output is simply ignored.
+  if (!node->output(1)->hasUses()) {
+    // the indices output is unused so is safe to delete
+    node->eraseOutput(1);
+    return result;
+  }
+
+  // Calculate the indices of the max/min
+  auto ishape = shapeFromTensor(src);
+  std::vector<int64_t> index_range_shape(ishape.size(), 1);
+  index_range_shape[axis] = ishape[axis];
+
+  auto gather_handler = getHandler(c10::aten::gather);
+  result->output()->setType(t->withSizes(shape));
+  auto *gather =
+      createHandlerOperation(graph, gather_handler,
+                             {result->output(), node->input(2), index})
+          ->output();
+
+  // true if the scatter chose this location in src, false if we didn't
+  auto *mask = createEqual(graph, {gather, src})->output();
+  std::vector<std::int64_t> vals(ishape[axis]);
+  std::iota(std::begin(vals), std::end(vals), 1);
+  auto *index_range =
+      createConstantInt(graph, vals, index_range_shape)->output();
+  auto *not_chosen =
+      createConstantInt(graph, {ishape[axis] + 1}, {1})->output();
+  // The 1-based index in src if this location was chosen, ishape[axis] + 1 if
+  // it wasn't
+  auto *index_of_result =
+      createWhere(graph, {mask, index_range, not_chosen})->output();
+  // Apply the same scattering to our index tensor as we did to the input tensor
+  auto *arg_scatter =
+      createScatterreduce(graph, {index_of_result, index}, axissize, axis, 2)
+          ->output();
+  // Now we've got a tensor of 1-based indices, with zeroes where no index
+  // was scattered. We need to transform this to zero-based indices, with
+  // ishape[axis] where no index was scattered.
+  auto *one = createConstantInt(graph, {1}, {1})->output();
+  arg_scatter = createSub(graph, {arg_scatter, one})->output();
+  arg_scatter = createRemainder(graph, {arg_scatter, not_chosen})->output();
+
+  replaceOutputUse(node->output(0), result->output());
+  replaceOutputUse(node->output(1), arg_scatter);
+  markNodeForDeletion(node);
+  return nullptr;
 }
 
 } // namespace
