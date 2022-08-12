@@ -196,7 +196,14 @@ torch::jit::Node *klDivHandler(torch::jit::Graph *graph,
   torch::jit::Node *log_y_minus_x = createSub(graph, {log_y, x});
 
   // y(log(y) - x)
-  torch::jit::Node *final_node = createMul(graph, {y, log_y_minus_x->output()});
+  torch::jit::Node *y_log_y_minus_x =
+      createMul(graph, {y, log_y_minus_x->output()});
+
+  // Handle any log(y) where y<=0 from earlier
+  torch::jit::Node *zeros = createConstantFloatLike(graph, y, {0}, {});
+  torch::jit::Node *mask = createGreater(graph, {y, zeros->output()});
+  torch::jit::Node *final_node = createWhere(
+      graph, {mask->output(), y_log_y_minus_x->output(), zeros->output()});
 
   return createIdentityloss(graph, {final_node->output()}, reduction);
 }

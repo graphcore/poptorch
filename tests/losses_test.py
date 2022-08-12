@@ -326,7 +326,7 @@ def test_KLDiv(reduction, log_target, trace_model):
     torch.manual_seed(42)
 
     # 2D Tensors to test batchmean
-    target = torch.empty(3, 10).uniform_()
+    target = torch.empty(3, 10).uniform_(-1, 1)
     input = torch.randn(3, 10)
 
     loss_harness(trace_model,
