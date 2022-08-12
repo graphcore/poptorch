@@ -210,22 +210,23 @@ const at::Tensor &JITDispatch::copyInplace(const at::Tensor &self,
   ERROR_ON(!self_st.has_value());
   ERROR_ON(!src_st.has_value());
 
-  torch::jit::Value *copy;
-  WithNodeMetadata meta{src_tracked->jit->node()};
-  if (*self_st == *src_st) {
-    copy = createIdentity(graph.get(), {src_tracked->jit})->output();
-    copy->setType(self_tracked->jit->type());
-  } else {
-    copy = createCast(graph.get(), src_tracked->jit, *self_st)->output();
+  WithMetadata meta("copy_");
+  torch::jit::Value *copy =
+      createAndInsertNode(graph.get(), c10::aten::copy_,
+                          {self_tracked->jit, src_tracked->jit},
+                          ImplicitCast::None, OutputType::AsFirstInput, 1)
+          ->output();
+
+  copy->setType(
+      self_tracked->jit->type()->expect<c10::TensorType>()->withRequiresGrad(
+          src_tracked->jit->type()->expect<c10::TensorType>()->requiresGrad()));
+
+  // The copy_ node's output is now an alias of self, so mark it as such; this
+  // essentially mirrors what JITDispatch::fallback would do.
+  auto *aliased_input = _inplace_tracker.eraseCurrentAlias(self_tracked->jit);
+  if (aliased_input != nullptr) {
+    _inplace_tracker.registerAlias(aliased_input, copy);
   }
-
-  copy->setType(copy->type()->expect<c10::TensorType>()->withRequiresGrad(
-      src.requires_grad()));
-
-  // The copy_ node's output is now an alias of self, so mark it as such. By
-  // default, inputs will have a self -> self alias, so remove it first.
-  _inplace_tracker.eraseSelfAlias(self_tracked->jit);
-  _inplace_tracker.registerAlias(self_tracked->jit, copy);
 
   self_tracked->jit = copy;
 

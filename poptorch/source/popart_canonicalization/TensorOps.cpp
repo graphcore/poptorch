@@ -169,10 +169,20 @@ torch::jit::Node *copyHandler(torch::jit::Graph *graph,
   at::ScalarType dest_type = getNodeScalarType(dest);
   at::ScalarType src_type = getNodeScalarType(src);
 
+  torch::jit::Node *copy = nullptr;
+
   if (src_type == dest_type) {
-    return createIdentity(graph, {src});
+    copy = createIdentity(graph, {src});
+  } else {
+    copy = createCast(graph, src, dest_type);
   }
-  return createCast(graph, src, dest_type);
+  ERROR_ON(copy == nullptr);
+
+  copy->output()->setType(
+      copy->output()->type()->expect<c10::TensorType>()->withRequiresGrad(
+          src->type()->expect<c10::TensorType>()->requiresGrad()));
+
+  return copy;
 }
 
 torch::jit::Node *justReturnFalse(torch::jit::Graph *graph,

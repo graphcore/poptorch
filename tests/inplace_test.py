@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+import re
+
 import torch
 import torch.nn as nn
 
@@ -36,7 +38,7 @@ def test_inplace_add(trace_model):
         # can't be modified in-place.
         return
 
-    # We're changing the  input type: must recompile
+    # We're changing the input type: must recompile
     poptorch_model.destroy()
     list_in = [torch.Tensor([1.0])]
     cpu_in = [torch.Tensor([1.0])]
@@ -513,7 +515,8 @@ def modify_before_assign(x, step):
     direct_assign, direct_assign_inplace, direct_fill, chained_slice,
     modify_before_assign
 ])
-def test_inplace_modify_slice(op, step_size, capfd):
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_inplace_modify_slice(op, step_size, capfd, trace_model):
     t = torch.rand(4, 4)
     step = torch.tensor(step_size)
 
@@ -522,8 +525,11 @@ def test_inplace_modify_slice(op, step_size, capfd):
 
     Model.forward = lambda _, x: op(x, step)
 
+    opts = poptorch.Options()
+    opts.Jit.traceModel(trace_model)
+
     cpu_model = Model()
-    ipu_model = poptorch.inferenceModel(cpu_model)
+    ipu_model = poptorch.inferenceModel(cpu_model, opts)
 
     if step_size == 1:
         ipu_input = t.clone()
@@ -535,14 +541,14 @@ def test_inplace_modify_slice(op, step_size, capfd):
         # correctly reflected
         helpers.assert_allclose(actual=ipu_input, expected=cpu_input)
     else:
-        if op is direct_fill:
-            with pytest.raises(
-                    poptorch.poptorch_core.Error,
-                    match="All operations in the main graph were pruned, "
-                    "nothing to compute"):
-                ipu_model.compile(t)
-        else:
+        try:
             ipu_model.compile(t)
+        except poptorch.Error as e:
+            # Allow for the whole graph to be potentially pruned, in failing
+            # cases (only known to happen for trace_model=True).
+            assert re.match(
+                "All operations in the main graph were pruned, nothing to "
+                "compute", e.message)
 
         testlog = helpers.LogChecker(capfd)
         testlog.assert_matches(

@@ -356,7 +356,8 @@ void replaceOutputUse(torch::jit::Value *old_val, torch::jit::Value *new_val) {
 
 void replaceOutputUse(torch::jit::Node *oldNode, torch::jit::Node *new_node,
                       std::uint64_t outputIdx) {
-  logging::trace("Replacing outputs with those of {}", *new_node);
+  logging::trace("Replacing node output %{} with that of {}",
+                 oldNode->output(outputIdx)->debugName(), *new_node);
 
   torch::jit::Value *new_val = new_node->output(outputIdx);
   torch::jit::Value *old_val = oldNode->output(outputIdx);

@@ -299,7 +299,7 @@ InplaceInputsTracker::eraseCurrentAlias(torch::jit::Value *alias) {
   auto it = _aliases.find(alias);
   if (it != _aliases.end()) {
     auto *real_input = it->second;
-    logging::trace("Deleted alias {} for input %{}", it->first->debugName(),
+    logging::trace("Deleted alias %{} for input %{}", it->first->debugName(),
                    it->second->debugName());
     // Remove current alias.
     _aliases.erase(it);
@@ -308,19 +308,9 @@ InplaceInputsTracker::eraseCurrentAlias(torch::jit::Value *alias) {
   return nullptr;
 }
 
-bool InplaceInputsTracker::eraseSelfAlias(torch::jit::Value *alias) {
-  const auto it = _aliases.find(alias);
-  if (it != _aliases.end() && it->second == alias) {
-    eraseCurrentAlias(alias);
-    return true;
-  }
-
-  return false;
-}
-
 void InplaceInputsTracker::registerAlias(torch::jit::Value *aliased_input,
                                          torch::jit::Value *alias) {
-  logging::trace("Registering alias {} for input %{}", alias->debugName(),
+  logging::trace("Registering alias %{} for input %{}", alias->debugName(),
                  aliased_input->debugName());
   ERROR_ON(!_aliases.insert({alias, aliased_input}).second);
 }
@@ -329,6 +319,28 @@ InplaceGraphInfo
 InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
                                     size_t num_anchors,
                                     bool replicas_needing_broadcast) {
+  // For every alias (ie. target of an inplace op), look back and see if it's
+  // applied through a bunch of views back to an input. if it is, mark it to
+  // be handled later, at canonicalisation.
+  for (auto &kv : _aliases) {
+    auto *inplace_op = kv.first->node();
+    const auto *aliased_input = kv.second;
+
+    if (inplace_op->inputs().empty()) {
+      continue;
+    }
+
+    // Aliases are already traced back through views to graph inputs when
+    // they're updated via `eraseCurrentAlias`, so can just check that the
+    // ultimate input (`aliased_input`) is different to the inplace op's
+    // immediate input.
+    if (aliased_input == inplace_op->input(0)) {
+      continue;
+    }
+
+    inplace_op->i_(c10::Symbol::attr("was_inplace_on_view"), 1);
+  }
+
   // _aliases[alias] = graph_input -> we want the other way around.
   std::map<torch::jit::Value *, torch::jit::Value *> input_aliases;
   for (auto &p : _aliases) {
