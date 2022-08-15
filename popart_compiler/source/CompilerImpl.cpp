@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 #include <chrono>
 #include <memory>
+#include <numeric>
 #include <vector>
 
 #include <popart/adam.hpp>
@@ -1022,6 +1023,28 @@ CompilerImpl::unfold(const std::vector<popart::TensorId> &tensors,
   return poprithms::ndarray::Unfolder<T, H>::unfold(
              {this, active_builder, first}, dimension, size, step)
       .tensor;
+}
+
+popart::TensorId CompilerImpl::prelu(std::vector<popart::TensorId> &tensors) {
+  const popart::TensorId &self = tensors[0];
+  popart::TensorId &weight = tensors[1];
+
+  const auto self_shape = active_builder->getTensorShape(self);
+  const auto weight_shape = active_builder->getTensorShape(weight);
+
+  if (self_shape.size() > weight_shape.size() + 1) {
+    // PyTorch's implementation adds some extra singleton dimensions to the
+    // weight to ensure it is 'unidirectionally broadcastable' with the input.
+    std::vector<std::int64_t> unsqueeze_axes(self_shape.size() -
+                                             weight_shape.size() - 1);
+    std::iota(unsqueeze_axes.begin(), unsqueeze_axes.end(),
+              weight_shape.size());
+    weight =
+        active_builder->aiOnnxOpset10().unsqueeze({weight}, unsqueeze_axes);
+    setExecutionStrategyAttributes({weight});
+  }
+
+  return active_builder->aiOnnxOpset10().prelu(tensors);
 }
 
 const HostSideConstant &

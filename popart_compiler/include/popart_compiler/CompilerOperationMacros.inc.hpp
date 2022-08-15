@@ -1,6 +1,6 @@
-// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+// Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
-// Run `python3 PopParse.py to regenerate
+// Run `python3 scripts/PopParse.py` to regenerate
 // clang-format off
 
 // Ops from AiGraphcoreOpset1
@@ -81,7 +81,6 @@ OP_DECL(popart, maxunpool, maxunpool, AiOnnxOpset10.maxunpool, ARG(INT_VEC,kerne
 OP_DECL(popart, meanvariancenormalization, meanvariancenormalization, AiOnnxOpset10.meanvariancenormalization, ARG(INT_VEC,axes) , BODY_ARG(axes) BODY_ARG(DEBUG_CONTEXT("Meanvariancenormalization")))
 OP_DECL(popart, nonzero, nonzero, AiOnnxOpset10.nonzero, NONE, BODY_ARG(DEBUG_CONTEXT("Nonzero")))
 OP_DECL(popart, onehot, onehot, AiOnnxOpset10.onehot, ARG(INT,axis) , BODY_ARG(axis) BODY_ARG(DEBUG_CONTEXT("Onehot")))
-OP_DECL(popart, prelu, prelu, AiOnnxOpset10.prelu, NONE, BODY_ARG(DEBUG_CONTEXT("Prelu")))
 OP_DECL(popart, scatter, scatter, AiOnnxOpset10.scatter, ARG(INT,axis) , BODY_ARG(axis) BODY_ARG(DEBUG_CONTEXT("Scatter")))
 OP_DECL(popart, shrink, shrink, AiOnnxOpset10.shrink, ARG(FLOAT,bias) ARG(FLOAT,lambd) , BODY_ARG(bias) BODY_ARG(lambd) BODY_ARG(DEBUG_CONTEXT("Shrink")))
 OP_DECL(popart, sign, sign, AiOnnxOpset10.sign, NONE, BODY_ARG(DEBUG_CONTEXT("Sign")))

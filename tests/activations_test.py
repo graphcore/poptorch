@@ -8,13 +8,13 @@ import poptorch
 import helpers
 
 # Non-linear activations (Weighted activations)
-#'torch.nn.ELU', 'torch.nn.Hardshrink', 'torch.nn.Hardtanh', 'torch.nn.LeakyReLU', 'torch.nn.LogSigmoid', 'torch.nn.MultiheadAttention', 'torch.nn.MultiheadAttention.forward',
-#'torch.nn.PReLU', 'torch.nn.ReLU', 'torch.nn.ReLU6', 'torch.nn.RReLU', 'torch.nn.SELU', 'torch.nn.SiLU', 'torch.nn.CELU', 'torch.nn.GELU', 'torch.nn.Sigmoid', 'torch.nn.Softplus',
-#'torch.nn.Softshrink', 'torch.nn.Softsign', 'torch.nn.Tanh', 'torch.nn.Tanhshrink', 'torch.nn.Threshold',
+# 'torch.nn.ELU', 'torch.nn.Hardshrink', 'torch.nn.Hardtanh', 'torch.nn.LeakyReLU', 'torch.nn.LogSigmoid', 'torch.nn.MultiheadAttention', 'torch.nn.MultiheadAttention.forward',
+# 'torch.nn.PReLU', 'torch.nn.ReLU', 'torch.nn.ReLU6', 'torch.nn.RReLU', 'torch.nn.SELU', 'torch.nn.SiLU', 'torch.nn.CELU', 'torch.nn.GELU', 'torch.nn.Sigmoid', 'torch.nn.Softplus',
+# 'torch.nn.Softshrink', 'torch.nn.Softsign', 'torch.nn.Tanh', 'torch.nn.Tanhshrink', 'torch.nn.Threshold',
 
 # Non-linear activations (other)
-#'torch.nn.Softmin', 'torch.nn.Softmax', 'torch.nn.Softmax2d', 'torch.nn.LogSoftmax', 'torch.nn.AdaptiveLogSoftmaxWithLoss', 'torch.nn.AdaptiveLogSoftmaxWithLoss.log_prob',
-#'torch.nn.AdaptiveLogSoftmaxWithLoss.predict',
+# 'torch.nn.Softmin', 'torch.nn.Softmax', 'torch.nn.Softmax2d', 'torch.nn.LogSoftmax', 'torch.nn.AdaptiveLogSoftmaxWithLoss', 'torch.nn.AdaptiveLogSoftmaxWithLoss.log_prob',
+# 'torch.nn.AdaptiveLogSoftmaxWithLoss.predict',
 
 
 # A version of Softplus with non default arguments
@@ -24,7 +24,7 @@ class SoftplusWithParams(nn.Softplus):
 
 
 activation_functions = [
-    nn.ReLU, nn.Tanh, nn.Sigmoid, nn.PReLU, nn.SELU, nn.SiLU, nn.ELU, nn.GELU,
+    nn.ReLU, nn.Tanh, nn.Sigmoid, nn.SELU, nn.SiLU, nn.ELU, nn.GELU,
     nn.Softmax, nn.LogSoftmax, nn.Softsign, nn.LeakyReLU, nn.Hardtanh,
     nn.Softplus, nn.Softshrink, nn.Hardshrink, nn.CELU, nn.Hardsigmoid,
     nn.Hardswish, SoftplusWithParams
@@ -61,10 +61,34 @@ def test_activations(op, trace_model):
                             atol=tol[1],
                             equal_nan=True)
 
-    # PReLU grad op is not supported in PopART (T22591; WontFix)
-    if not op is nn.PReLU:
-        # Training test - check weights have changed
-        poptorch_model.assert_weights_changed()
+    poptorch_model.assert_weights_changed()
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+@pytest.mark.parametrize("input", [
+    torch.randn((4, )),
+    torch.randn((2, 2)),
+    torch.randn((2, 8, 16)),
+    torch.randn((2, 8, 32, 32))
+])
+def test_prelu(trace_model, input):
+    num_channels = input.shape[1] if input.dim() >= 2 else 1
+    model = nn.PReLU(num_channels)
+
+    # Run on CPU.
+    native_out = model(input)
+
+    # Run on IPU.
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    poptorch_model = poptorch.inferenceModel(model, options=options)
+    poptorch_out = poptorch_model(input)
+
+    helpers.assert_allclose(actual=poptorch_out,
+                            expected=native_out,
+                            rtol=1e-4,
+                            atol=1e-7,
+                            equal_nan=True)
 
 
 @pytest.mark.parametrize("dim", range(5))

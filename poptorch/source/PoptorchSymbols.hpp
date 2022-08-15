@@ -108,6 +108,7 @@ extern c10::Symbol set_attribute;
 extern c10::Symbol clear_attribute;
 
 extern c10::Symbol unfold;
+extern c10::Symbol prelu;
 } // namespace symbols::poptorch
 
 // Return the attribute symbol refering to having overlap for a given input

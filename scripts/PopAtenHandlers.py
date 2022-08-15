@@ -54,7 +54,7 @@ expand("selu", lambda x: op.selu(x, cfloat(selu_alpha), cfloat(selu_lambda)))
 expand("square", lambda x: x * x)
 
 # binary operators
-opers = ["atan2", "div", "fmod", "pow", "prelu", "remainder"]
+opers = ["atan2", "div", "fmod", "pow", "remainder"]
 
 for oper in opers:
     convert(oper, 2)

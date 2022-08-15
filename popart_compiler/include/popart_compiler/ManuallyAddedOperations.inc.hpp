@@ -53,6 +53,8 @@ OP_DECL(poptorch, unfold, unfold, _impl->unfold,
         ARG(INT, dimension) ARG(INT, size) ARG(INT, step),
         BODY_ARG(dimension) BODY_ARG(size) BODY_ARG(step))
 
+OP_DECL(poptorch, prelu, prelu, _impl->prelu, NONE, NONE)
+
 // Operations which need extra types
 
 #define EMPTY_FLOAT_VEC std::vector<float>()

@@ -483,14 +483,6 @@ torch::jit::Node *powHandler(torch::jit::Graph *graph, torch::jit::Node *node) {
   return createPow(graph, {i0, i1});
 }
 
-torch::jit::Node *preluHandler(torch::jit::Graph *graph,
-                               torch::jit::Node *node) {
-  auto *i0 = node->input(0);
-  auto *i1 = node->input(1);
-  // prelu(i0, i1)
-  return createPrelu(graph, {i0, i1});
-}
-
 torch::jit::Node *randHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
   auto *x = node->input(0);
@@ -819,7 +811,6 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::normal_, normalInPlaceHandler);
   registerHandler(c10::aten::pixel_shuffle, pixelShuffleHandler);
   registerHandler(c10::aten::pow, powHandler);
-  registerHandler(c10::aten::prelu, preluHandler);
   registerHandler(c10::aten::rand, randHandler);
   registerHandler(c10::aten::randn, randnHandler);
   registerHandler(c10::aten::reciprocal, reciprocalHandler);

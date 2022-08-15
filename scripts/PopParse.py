@@ -204,7 +204,9 @@ tu = index.parse(session_file,
 
 parse_session_options(tu.cursor)
 
-UnsupportedOps = ["abort", "ctcloss", "gru", "rnn", "tensorremap"]
+# `prelu' is supported, PyTorch's definition requires a reshape before passing
+# to the ONNX op.
+UnsupportedOps = ["abort", "ctcloss", "gru", "rnn", "tensorremap", "prelu"]
 
 ## Implicit cast support
 # Casting on all args
@@ -242,7 +244,6 @@ CastingOps = [
     "mod",
     "mul",
     "pow",
-    "prelu",
     "range",
     "remainder",
     "rnn",
@@ -738,9 +739,9 @@ for opset in classes:
 
         cxxFile += cppFile + "\n"
 
-autoComment = """// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+autoComment = """// Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
-// Run `python3 PopParse.py to regenerate
+// Run `python3 scripts/PopParse.py` to regenerate
 // clang-format off
 """
 

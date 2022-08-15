@@ -697,6 +697,15 @@ torch::jit::Node *createRnn(torch::jit::Graph *graph,
   return new_node;
 }
 
+torch::jit::Node *createPrelu(torch::jit::Graph *graph, torch::jit::Value *self,
+                              torch::jit::Value *weight) {
+  torch::jit::Node *new_node =
+      createAndInsertNode(graph, symbols::poptorch::prelu, {self, weight},
+                          ImplicitCast::None, OutputType::AsFirstInput);
+
+  return new_node;
+}
+
 /*
  * Auto generated operation.
  */

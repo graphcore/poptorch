@@ -1,6 +1,6 @@
-// Copyright (c) 2021 Graphcore Ltd. All rights reserved.
+// Copyright (c) 2022 Graphcore Ltd. All rights reserved.
 // Auto generated file, do not modify
-// Run `python3 PopParse.py to regenerate
+// Run `python3 scripts/PopParse.py` to regenerate
 // clang-format off
 
 torch::jit::Node* createCopyvarupdate(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
@@ -405,10 +405,6 @@ return new_node;
 torch::jit::Node* createOnehot(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::onehot, args, ImplicitCast::None, OutputType::AsFirstInput);
 new_node->i_(c10::Symbol::attr("axis"),axis);
-return new_node;
-}
-torch::jit::Node* createPrelu(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::prelu, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
 return new_node;
 }
 torch::jit::Node* createScatter(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t axis) {

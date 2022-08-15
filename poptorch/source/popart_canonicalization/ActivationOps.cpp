@@ -140,6 +140,14 @@ torch::jit::Node *hardswishHandler(torch::jit::Graph *graph,
   return createWhere(graph, {t4, t1, t8});
 }
 
+torch::jit::Node *preluHandler(torch::jit::Graph *graph,
+                               torch::jit::Node *node) {
+  auto *self = node->input(0);
+  auto *weight = node->input(1);
+
+  return createPrelu(graph, self, weight);
+}
+
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -149,6 +157,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::softplus, softplusHandler);
   registerHandler(c10::aten::hardsigmoid, hardsigmoidHandler);
   registerHandler(c10::aten::hardswish, hardswishHandler);
+  registerHandler(c10::aten::prelu, preluHandler);
 }
 
 } // namespace poptorch
