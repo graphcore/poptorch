@@ -343,6 +343,8 @@ def isWrapped(obj):
 
 
 def unwrapIfWrapped(obj):
+    """Unwrap the model if it is wrapped, without unwrapping parameters and
+       buffers."""
     if isWrapped(obj):
         obj.__class__ = obj.__class__.__bases__[0]
     return obj
@@ -374,10 +376,13 @@ def forEachParameterAndBuffer(model, fn):
 
 
 def unwrapModelIfNecessary(model: torch.nn.Module):
-    # Removes the PoptorchParameter and PoptorchBuffer annotations in the model
+    """Unwrap the model, including parameter and buffer annoations and the
+       model as a whole."""
 
     for buff in itertools.chain(model.buffers(), model.parameters()):
         _unwrapIfWrappedAndRegister(buff)
+
+    _unwrapIfWrappedAndRegister(model)
 
 
 def rewrapModelIfNecessary(model: torch.nn.Module):
@@ -385,6 +390,8 @@ def rewrapModelIfNecessary(model: torch.nn.Module):
 
     for buff in itertools.chain(model.buffers(), model.parameters()):
         _restoreWrapperIfNecessary(buff)
+
+    _restoreWrapperIfNecessary(model)
 
 
 def getBufferAndParameterTensors(model):

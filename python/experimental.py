@@ -53,6 +53,9 @@ class IPUScope:
         self._model = model
         self._cpu_params = {}
         self._cpu_buffers = {}
+
+        # A map of parameters and buffers (tensors) on the CPU which share
+        # the same python id, to the earliest tensor.
         self._cpu_aliases = {}
 
         self._outputs = []
@@ -134,7 +137,8 @@ class IPUScope:
             cpu_state = self._model.state_dict(keep_vars=True)
 
             # We need to remove the PoptorchBuffer and PoptorchParam annotations
-            # before compiling the model
+            # before compiling the model. In addition, we must unwrap the whole
+            # model to prevent IPU to CPU copies when accessing the state_dict.
             _impl.unwrapModelIfNecessary(self._model)
 
             # TODO(T61576) We currently use a state machine to determine if
@@ -145,18 +149,36 @@ class IPUScope:
             self._model.to(d)
             poptorch_core.endParametersMove()
 
-            # Restore aliased tensors.
+            # If there were any parameters and buffers (tensors), which were
+            # aliases on the CPU (shared the same Python ID), these will have
+            # become separate IPU tensors during the copy to IPU
+            #
+            # Find all such tensors, and then
+            # 1. Keep a map from them to the earliest cpu tensor in the
+            #    cpu_state dict.
+            # 2. Replace IPU tensors which are not but should be aliases with
+            #    that matching the earliest.
+            # NB the "original" name is based on order of addition of the
+            # tensors/modules and may not be a name of the parmeter which
+            # replaced another, e.g. the case of "weight tying", but the
+            # name of the "replaced". However, no names will be lost but the
+            # aliases simply harmonised to be matching tensors on CPU and IPU.
             state = self._model.state_dict(keep_vars=True)
             tensors = collections.defaultdict(list)
             for name, tensor in cpu_state.items():
                 tensors[id(tensor)].append(name)
             aliases = [v for v in tensors.values() if len(v) > 1]
             for a in aliases:
+                # NB original matches that in model.named_x() as both this as
+                # model.state_dict() loop he same  OrderedDicts in same order
+                # and the named versions return only the first instances
                 original = a[0]
+
                 for other in a[1:]:
                     setattr(*self._get_module_and_name(other), state[original])
                     self._cpu_aliases[other] = original
 
+            # Map named unique parameters and buffers on the IPU.
             params = dict(self._model.named_parameters())
 
             poptorch_core.mapParamsToNames(tuple(params.keys()),
@@ -199,8 +221,12 @@ class IPUScope:
             for k in self._cpu_params:
                 self._cpu_params[k].__class__ = torch.nn.Parameter
                 _set_param(k, k)
+
+            # Restore aliased parametesr/buffers which will not be represented
+            # in self._cpu_params or self._cpu_buffers
             for k, v in self._cpu_aliases.items():
                 _set_param(k, v)
+
             for k in self._cpu_buffers:
                 setattr(*self._get_module_and_name(k), self._cpu_buffers[k])
 

@@ -185,8 +185,7 @@ at::Tensor &copyInplace(at::Tensor &self, const at::Tensor &src,
     // TODO(T59880) rename is_xla() -> is_ipu()
     if (src.is_xla()) {
       if (!context.moving_outputs && !eagerModeEnabled()) {
-        logging::warn("Moved a tensor from IPU to CPU outside output "
-                      "registration. This may result in garbage data.");
+        ERROR("Moved a tensor from IPU to CPU outside output");
       }
       logging::trace("copy_ output IPU -> CPU");
       context.activeDispatch()->addOutput(src, self);
