@@ -136,8 +136,8 @@ void PopitExecutor::compileAndRun(
 
   // Execute the function
   std::vector<popit::Mem_t *> outputs =
-      popit::call(_context->session.get(), _context->popit_fn, /* ipuIndex=*/0,
-                  /* ipuMemIndex=*/0, inputs);
+      popit::call(_context->session.get(), _context->popit_fn,
+                  /* ipuIndex=*/0, inputs);
 
   // Map PopIT memory pointers to graph outputs.
   ERROR_ON(outputs.size() != _context->output_ids.size());
