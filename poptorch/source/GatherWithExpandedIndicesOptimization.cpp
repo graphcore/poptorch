@@ -35,6 +35,7 @@ void simplifyGatherWithExpandedIndices(torch::jit::Graph *graph) {
       continue;
     }
 
+    WithNodeMetadata meta(node);
     // aten::expand(Tensor self, int[] size, *, bool implicit) -> Tensor
     // aten::expand_as(Tensor self, Tensor other) -> Tensor
     auto *original_indices = expand_node->input(0);
