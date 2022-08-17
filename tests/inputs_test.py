@@ -813,3 +813,17 @@ def test_return_and_use_nested_input(trace_model):
     assert poptorch_model(torch.tensor([1.])) == (torch.tensor([1.]),
                                                   (torch.tensor([1.]),
                                                    torch.tensor([2.])))
+
+
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_scalar_tensor_input(trace_model):
+    class Square(torch.nn.Module):
+        def forward(self, x):
+            return x * x
+
+    model = Square()
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    s = poptorch.inferenceModel(model, options)
+    x = torch.tensor(3.)  # shape = torch.Size([])
+    helpers.assert_allclose(actual=s(x), expected=model(x))

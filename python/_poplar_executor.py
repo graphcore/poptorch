@@ -1429,7 +1429,8 @@ class PoplarExecutor:
                                  self._options.replication_factor,
                                  self._options.Training.gradient_accumulation,
                                  extra_poplar_batch_dims)
-        return tensor.narrow(0, 0, b_size // extra_poplar_batch_dims)
+        return tensor if tensor.shape == torch.Size([]) else tensor.narrow(
+            0, 0, b_size // extra_poplar_batch_dims)
 
     def isAttachedToDevice(self) -> bool:
         """Returns true, if the target device has been attached. False,
