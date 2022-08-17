@@ -8,6 +8,8 @@ v3.0 (Poplar SDK 3.0)
 New features
 ------------
 
+- Support for tensor.new_full
+
 API changes
 -----------
 

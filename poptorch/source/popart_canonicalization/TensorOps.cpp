@@ -354,11 +354,29 @@ torch::jit::Node *fullCommon(torch::jit::Graph *graph, torch::jit::Value *v,
 
 torch::jit::Node *fullHandler(torch::jit::Graph *graph,
                               torch::jit::Node *node) {
-  // aten::full(int[] size, Scalar fill_value) -> Tensor
-  auto *v = node->input(1);
-  auto *shape = node->input(0);
+  // aten::full(int[] size, Scalar fill_value,
+  //            ScalarType? dtype=None, Layout? layout=None,
+  //            Device? device=None, bool? pin_memory=None) -> Tensor
+  // aten::new_full(Tensor self, int[] size, Scalar fill_value,
+  //                ScalarType? dtype=None, Layout? layout=None,
+  //                Device? device=None, bool? pin_memory=None) -> Tensor
+  size_t shape_index = 0;
+  if (node->kind() == c10::aten::new_full) {
+    shape_index = 1;
+  }
+  auto *shape = node->input(shape_index + 0);
+  auto *v = node->input(shape_index + 1);
+  auto *dtype = node->input(shape_index + 2);
   auto lv_shape = constantToLongVec(shape->node());
-  auto type = getNodeScalarType(shape);
+  auto type = c10::ScalarType::Float;
+  if (node->kind() == c10::aten::new_full) {
+    type = getNodeScalarType(node->input(0));
+  }
+  // The specified dtype takes precedence
+  if (!isNone(dtype)) {
+    type = constantToScalarType(dtype->node());
+  }
+
   return fullCommon(graph, v, type, lv_shape);
 }
 
@@ -387,6 +405,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::gather, gatherHandler);
   registerHandler(c10::aten::scatter, scatterHandler);
   registerHandler(c10::aten::full, fullHandler);
+  registerHandler(c10::aten::new_full, fullHandler);
   registerHandler(c10::aten::full_like, fullLikeHandler);
 }
 

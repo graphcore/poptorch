@@ -771,7 +771,8 @@ def test_fill(capfd, input_shapes, t, trace_model):
         x = x + 0  # Ensure x is not modified in place
         # Add zero to all results to avoid pruning the whole graph
         return x.fill_(value) + 0, torch.full_like(x, value) + 0, torch.full(
-            input_shapes, value, dtype=x.dtype) + 0, torch.ones_like(x) + 0
+            input_shapes, value, dtype=x.dtype) + 0, x.new_full(
+                input_shapes, value, dtype=x.dtype) + 0, torch.ones_like(x) + 0
 
     x = torch.ones(*input_shapes, dtype=t)
 
