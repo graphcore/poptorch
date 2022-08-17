@@ -105,43 +105,15 @@ def index_harness(trace_model, op, idx, is_index_put, v=None, is_mask=False):
 
 
 index_ops = [
-    # op, none_indexing
-    {
-        "op": index_op0,
-        "none_indexing": False
-    },
-    {
-        "op": index_op1,
-        "none_indexing": False
-    },
-    {
-        "op": index_op2,
-        "none_indexing": True
-    },
-    {
-        "op": index_op3,
-        "none_indexing": True
-    },
-    {
-        "op": index_op4,
-        "none_indexing": True
-    },
-    {
-        "op": index_op5,
-        "none_indexing": True
-    },
-    {
-        "op": index_op6,
-        "none_indexing": False
-    },
-    {
-        "op": index_op7,
-        "none_indexing": True
-    },
-    {
-        "op": index_op8,
-        "none_indexing": True
-    },
+    index_op0,
+    index_op1,
+    index_op2,
+    index_op3,
+    index_op4,
+    index_op5,
+    index_op6,
+    index_op7,
+    index_op8,
 ]
 
 index_indices = ([0], [[1]], [0, 1], [[1, 0]], [[0, 1], [1, 0]])
@@ -151,7 +123,7 @@ index_indices = ([0], [[1]], [0, 1], [[1, 0]], [[0, 1], [1, 0]])
 @pytest.mark.parametrize("op", index_ops)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index(op, idxs, trace_model):
-    index_harness(trace_model, op["op"], idxs, False)
+    index_harness(trace_model, op, idxs, False)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -162,7 +134,7 @@ def test_index_bool_mask_failure(trace_model):
             r"because it would produce dynamic output shapes based on "
             r"the mask values\. The IPU cannot support dynamic output "
             r"shapes\."):
-        index_harness(trace_model, index_ops[0]["op"], [True, False], False)
+        index_harness(trace_model, index_ops[0], [True, False], False)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
@@ -194,10 +166,7 @@ def test_index_on_max_indices(trace_model):
 @pytest.mark.parametrize("op", index_ops)
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_index_put(op, idxs, trace_model):
-    if not trace_model and op["none_indexing"]:
-        pytest.skip("TODO(T66024): Tensor aliasing is unsupported in "
-                    "JIT dispatch")
-    index_harness(trace_model, op["op"], idxs, True)
+    index_harness(trace_model, op, idxs, True)
 
 
 @pytest.mark.parametrize("trace_model", [True, False])
