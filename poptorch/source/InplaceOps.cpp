@@ -189,10 +189,11 @@ size_t processInput(torch::jit::Graph &graph, torch::jit::Value *graph_input,
                  "between replicas, you can disable buffer broadcasting using "
                  "poptorch.Options.broadcastBuffers(False).");
 
+    WithNodeMetadata meta(current_alias->node());
     auto *new_node = graph.create(symbols::poptorch::update_param_inplace, 1);
     new_node->addInput(graph_input);
     new_node->addInput(current_alias);
-    new_node->insertAfter(current_alias->node());
+    insertNodeAfterNode(new_node, current_alias->node());
     new_node->output()->setType(current_alias->type());
 
   } else {
@@ -380,7 +381,7 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
             graph.create(symbols::poptorch::update_param_inplace, 1);
         aten_target->addInput(graph_input);
         aten_target->addInput(alias);
-        aten_target->insertAfter(alias->node());
+        insertNodeAfterNode(aten_target, alias->node());
         aten_target->output()->setType(alias->type());
 
         // Canonicalise immediately

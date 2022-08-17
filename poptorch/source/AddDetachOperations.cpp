@@ -31,10 +31,10 @@ torch::jit::Value *possiblyDetachedValue(torch::jit::Graph *graph,
 
   auto it = detached_values.find(value);
   if (it == detached_values.end()) {
+    WithNodeMetadata meta(producer);
     auto *detach = graph->create(symbols::popart::detach);
-    detach->copyMetadata(producer);
     detach->addInput(value);
-    detach->insertAfter(producer);
+    insertNodeAfterNode(detach, producer);
     detach->output(0)->setType(value->type());
     it = detached_values.insert({value, detach->output(0)}).first;
   }

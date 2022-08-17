@@ -164,6 +164,13 @@ void insertNodeBeforeNode(torch::jit::Node *new_node,
   setAvailableMemoryAddPossibleInputOp(new_node);
 }
 
+void insertNodeAfterNode(torch::jit::Node *new_node,
+                         torch::jit::Node *insert_point) {
+  setSourceRangeToCurrentLocation(new_node);
+  new_node->insertAfter(insert_point);
+  setAvailableMemoryAddPossibleInputOp(new_node);
+}
+
 // Sets the scalar types of every output of a node
 void setNodeOutputsTypes(torch::jit::Node *node,
                          const ImplicitCast implicit_cast,

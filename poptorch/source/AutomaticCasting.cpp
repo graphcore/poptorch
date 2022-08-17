@@ -10,6 +10,7 @@
 #include "PoptorchSymbols.hpp"
 #include "popart_canonicalization/PopartCanonicalizationUtils.hpp"
 #include "poptorch/ImplicitCasting.hpp"
+#include "poptorch/OpBuilder.hpp"
 #include "poptorch_logging/Error.hpp"
 #include "poptorch_logging/Logging.hpp"
 
@@ -202,10 +203,11 @@ torch::jit::Value *castValue(torch::jit::Graph *graph, torch::jit::Value *value,
   }
 
   // create a poptorch::autocast node
+  WithNodeMetadata meta(value->node());
   auto current_type = value->type()->cast<c10::TensorType>();
   auto *new_node = graph->create(symbols::poptorch::autocast);
   new_node->addInput(value);
-  new_node->insertAfter(value->node());
+  insertNodeAfterNode(new_node, value->node());
   new_node->output(0)->setType(current_type->withScalarType(type));
   cast_value.insert(std::make_pair(value, new_node->output(0)));
 

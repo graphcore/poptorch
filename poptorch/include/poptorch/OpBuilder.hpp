@@ -64,15 +64,20 @@ torch::jit::Node *createAndInsertNode(
     OutputType output_type = OutputType::Unknown, size_t num_outputs = 1,
     c10::optional<at::ScalarType> dtype = c10::optional<at::ScalarType>());
 
-// All nodes should be added to the jit graph using this function or
-// insertNodeBeforeNode().
-// (or indirectly by using createAndInsertNode(), insertConstant()).
+// All nodes should be added to the jit graph using one of the below `insert`
+// functions (or indirectly by using createAndInsertNode()).
 // These functions will ensure the new node contains all the required metadata
 // before it's added to the graph.
 void insertNodeInGraph(torch::jit::Graph *graph, torch::jit::Node *new_node);
 
 void insertNodeBeforeNode(torch::jit::Node *new_node,
                           torch::jit::Node *insert_point);
+
+void insertNodeAfterNode(torch::jit::Node *new_node,
+                         torch::jit::Node *insert_point);
+
+torch::jit::Value *insertConstant(torch::jit::Graph *graph,
+                                  const torch::jit::IValue &val);
 
 void setSourceRangeToCurrentLocation(torch::jit::Node *node);
 
@@ -83,9 +88,6 @@ void setNodeOutputsTypes(torch::jit::Node *node, ImplicitCast implicit_cast,
                          OutputType output_type);
 
 enum class UseOfNode { HostSideOnly, PopARTOnly, HostSideAndPopART };
-
-torch::jit::Value *insertConstant(torch::jit::Graph *graph,
-                                  const torch::jit::IValue &val);
 
 // Create a poptorch::tensor_constant, poptorch::host_side_tensor_constant
 // or poptorch::host_and_ipu_side_tensor_constant node from the given tensors,
