@@ -118,7 +118,7 @@ def run_recomputation_checkpoint_test(size, model_cls, exp_num_stash_ckpted,
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError: Popart IR should contain a "
+        pytest.skip("TODO(T65559): AssertionError: Popart IR should contain a "
                     "checkpoint")
     size = 3
 
@@ -148,7 +148,7 @@ def test_recomputation_checkpoint_tensor(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor_two_inputs(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError: Popart IR should contain a "
+        pytest.skip("TODO(T65559): AssertionError: Popart IR should contain a "
                     "checkpoint")
     size = 3
 
@@ -184,7 +184,7 @@ def test_recomputation_checkpoint_tensor_two_inputs(trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_recomputation_checkpoint_tensor_tuple_inputs(trace_model):
     if not trace_model:
-        pytest.skip("TODO(T57195): AssertionError: Popart IR should contain a "
+        pytest.skip("TODO(T65559): AssertionError: Popart IR should contain a "
                     "checkpoint")
     size = 3
 

@@ -448,8 +448,7 @@ def test_MultiLabelSoftMarginLoss(reduction, specify_weight, trace_model):
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_CosineEmbeddingLoss(reduction, trace_model):
     if not trace_model:
-        # TODO(T66165): Popart bug
-        pytest.skip("TODO Fails due to detach op pass")
+        pytest.skip("TODO(T66165): Fails due to detach op pass")
     torch.manual_seed(42)
 
     # Margin should be between -1 and 1
