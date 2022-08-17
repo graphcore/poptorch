@@ -3,6 +3,7 @@
 
 import os  # pylint: disable=unused-import
 import unittest.mock
+from copy import deepcopy
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -47,14 +48,16 @@ def test_batchNorm(batch_norm, affine, running_stats, training, trace_model):
 
     model = helpers.ModelWithWeights(norm, input.shape)
 
+    options = poptorch.Options()
+    options.Jit.traceModel(trace_model)
+    ipumodel = deepcopy(model)
+    poptorch_model = poptorch.trainingModel(
+        ipumodel, options) if training else poptorch.inferenceModel(
+            ipumodel, options)
+
     # Run pytorch native on CPU.
     native_out, _ = model((input, ))
 
-    options = poptorch.Options()
-    options.Jit.traceModel(trace_model)
-    poptorch_model = poptorch.trainingModel(
-        model, options) if training else poptorch.inferenceModel(
-            model, options)
     # Run on IPU.
     poptorch_out, _ = poptorch_model((input, ))
 
@@ -369,6 +372,4 @@ def test_batchnorm_statistics(trace_model):
 
     # Running var is not so close.
     helpers.assert_allclose(actual=model2.bn.running_var,
-                            expected=model1.bn.running_var,
-                            atol=1e-1,
-                            rtol=0.1)
+                            expected=model1.bn.running_var)

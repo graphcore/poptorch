@@ -14,6 +14,8 @@ API changes
 Bug Fixes
 ---------
 
+- Fixed BatchNorm running statistics, now using the unbiased estimator to update ``running_var`` at training time.
+
 v2.6 (Poplar SDK 2.6)
 =====================
 

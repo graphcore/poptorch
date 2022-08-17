@@ -5,6 +5,7 @@
 
 // Ops from AiGraphcoreOpset1
 OP_DECL(popart, copyvarupdate, copyvarupdate, AiGraphcoreOpset1.copyvarupdate, NONE, BODY_ARG(DEBUG_CONTEXT("Copyvarupdate")))
+OP_DECL(popart, batchnormalization, batchnormalization, AiGraphcoreOpset1.batchnormalization, ARG(INT,num_outputs) ARG(FLOAT,epsilon) ARG(FLOAT,momentum) , BODY_ARG(num_outputs) BODY_ARG(epsilon) BODY_ARG(momentum) BODY_ARG(DEBUG_CONTEXT("Batchnormalization")))
 OP_DECL(popart, groupnormalization, groupnormalization, AiGraphcoreOpset1.groupnormalization, ARG(INT,num_groups) ARG(FLOAT,epsilon) , BODY_ARG(num_groups) BODY_ARG(epsilon) BODY_ARG(DEBUG_CONTEXT("Groupnormalization")))
 OP_DECL(popart, subsample, subsample, AiGraphcoreOpset1.subsample, ARG(INT_VEC,strides) , BODY_ARG(strides) BODY_ARG(DEBUG_CONTEXT("Subsample")))
 OP_DECL(popart, printtensor, printtensor, AiGraphcoreOpset1.printtensor, ARG(INT,print_gradient) ARG(STRING,title) , BODY_ARG(print_gradient) BODY_ARG(DEBUG_CONTEXT("Printtensor"))BODY_ARG(title) )
@@ -65,7 +66,6 @@ OP_DECL(popart, upsample, upsample, AiOnnxOpset10.upsample, ARG(STRING,mode) , B
 OP_DECL(popart, acosh, acosh, AiOnnxOpset10.acosh, NONE, BODY_ARG(DEBUG_CONTEXT("Acosh")))
 OP_DECL(popart, asinh, asinh, AiOnnxOpset10.asinh, NONE, BODY_ARG(DEBUG_CONTEXT("Asinh")))
 OP_DECL(popart, atanh, atanh, AiOnnxOpset10.atanh, NONE, BODY_ARG(DEBUG_CONTEXT("Atanh")))
-OP_DECL(popart, batchnormalization, batchnormalization, AiOnnxOpset10.batchnormalization, ARG(INT,num_outputs) ARG(FLOAT,epsilon) ARG(FLOAT,momentum) , BODY_ARG(num_outputs) BODY_ARG(epsilon) BODY_ARG(momentum) BODY_ARG(DEBUG_CONTEXT("Batchnormalization")))
 OP_DECL(popart, cast, cast, AiOnnxOpset10.cast, ARG(STRING,to) , BODY_ARG(to) BODY_ARG(DEBUG_CONTEXT("Cast")))
 OP_DECL(popart, compress, compress, AiOnnxOpset10.compress, ARG(INT,axis) , BODY_ARG(axis) BODY_ARG(DEBUG_CONTEXT("Compress")))
 OP_DECL(popart, cosh, cosh, AiOnnxOpset10.cosh, NONE, BODY_ARG(DEBUG_CONTEXT("Cosh")))

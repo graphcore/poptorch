@@ -7,6 +7,13 @@ torch::jit::Node* createCopyvarupdate(torch::jit::Graph *graph,  const std::vect
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::copyvarupdate, args, ImplicitCast::None, OutputType::Unknown);
 return new_node;
 }
+torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum, unsigned int num_node_outputs) {
+ torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFourthFifth, OutputType::AsFirstInput, num_node_outputs);
+new_node->i_(c10::Symbol::attr("num_outputs"),num_outputs);
+new_node->f_(c10::Symbol::attr("epsilon"),epsilon);
+new_node->f_(c10::Symbol::attr("momentum"),momentum);
+return new_node;
+}
 torch::jit::Node* createGroupnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,int64_t num_groups,float epsilon) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::groupnormalization, args, ImplicitCast::All, OutputType::AsImplicitCastPromoted);
 new_node->i_(c10::Symbol::attr("num_groups"),num_groups);
@@ -322,13 +329,6 @@ return new_node;
 }
 torch::jit::Node* createAtanh(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args) {
  torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::atanh, args, ImplicitCast::None, OutputType::AsFirstInput);
-return new_node;
-}
-torch::jit::Node* createBatchnormalization(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,unsigned int num_outputs,float epsilon,float momentum, unsigned int num_node_outputs) {
- torch::jit::Node *new_node = createAndInsertNode(graph, symbols::popart::batchnormalization, args, ImplicitCast::ExceptFourthFifth, OutputType::AsFirstInput, num_node_outputs);
-new_node->i_(c10::Symbol::attr("num_outputs"),num_outputs);
-new_node->f_(c10::Symbol::attr("epsilon"),epsilon);
-new_node->f_(c10::Symbol::attr("momentum"),momentum);
 return new_node;
 }
 torch::jit::Node* createCast(torch::jit::Graph *graph,  const std::vector<torch::jit::Value *>& args,const std::string & to) {
