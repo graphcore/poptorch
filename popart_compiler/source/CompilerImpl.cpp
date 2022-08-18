@@ -469,7 +469,8 @@ CompilerImpl::reshape(const std::vector<popart::TensorId> &tensors,
   popart::Shape s = {static_cast<int64_t>(shape.size())};
   popart::TensorInfo tensor_info("INT64", s);
   auto new_shape = ai_onnx.constant({shape.data(), tensor_info});
-  return ai_onnx.reshape({tensors.at(0), new_shape});
+  return ai_onnx.reshape({tensors.at(0), new_shape},
+                         getDebugContext("Reshape"));
 }
 
 std::vector<popart::TensorId> CompilerImpl::customOperation(
@@ -521,7 +522,8 @@ CompilerImpl::tensorConstant(const std::vector<popart::TensorId> &tensors,
   UNUSED(tensors);
   auto ai_onnx = active_builder->aiOnnxOpset10();
 
-  return ai_onnx.constant(constant.getPopartData());
+  return ai_onnx.constant(constant.getPopartData(),
+                          getDebugContext("Constant"));
 }
 
 poptorch::TensorId CompilerImpl::hostSideTensorConstant(
@@ -835,7 +837,7 @@ CompilerImpl::getPopartOptimizer(std::vector<Optimizer> optimizers) {
 popart::TensorId
 CompilerImpl::addNotInPlace(const std::vector<popart::TensorId> &in) {
   auto ai_onnx = active_builder->aiOnnxOpset10();
-  popart::TensorId output = ai_onnx.add(in);
+  popart::TensorId output = ai_onnx.add(in, getDebugContext("AddNotInPlace"));
   active_builder->setInplacePreferences(
       output, {{"AddLhsInplace", -1}, {"AddRhsInplace", -1}});
   return output;
@@ -849,7 +851,8 @@ CompilerImpl::randomNormal(const std::vector<popart::TensorId> &tensors,
   auto ai_onnx = active_builder->aiOnnxOpset10();
   auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomnormal(shape, popart::getONNXDataTypeAsInt(pdt), mean,
-                              scale);
+                              scale, nonstd::optional<float>(),
+                              getDebugContext("Randomnormal"));
 }
 
 popart::TensorId
@@ -860,7 +863,8 @@ CompilerImpl::randomUniform(const std::vector<popart::TensorId> &tensors,
   auto ai_onnx = active_builder->aiOnnxOpset10();
   auto pdt = popart::dataTypeFromString(dtype);
   return ai_onnx.randomuniform(shape, popart::getONNXDataTypeAsInt(pdt), high,
-                               low);
+                               low, nonstd::optional<float>(),
+                               getDebugContext("Randomuniform"));
 }
 
 popart::TensorId
@@ -1039,12 +1043,13 @@ popart::TensorId CompilerImpl::prelu(std::vector<popart::TensorId> &tensors) {
                                              weight_shape.size() - 1);
     std::iota(unsqueeze_axes.begin(), unsqueeze_axes.end(),
               weight_shape.size());
-    weight =
-        active_builder->aiOnnxOpset10().unsqueeze({weight}, unsqueeze_axes);
+    weight = active_builder->aiOnnxOpset10().unsqueeze(
+        {weight}, unsqueeze_axes, getDebugContext("Unsqueeze"));
     setExecutionStrategyAttributes({weight});
   }
 
-  return active_builder->aiOnnxOpset10().prelu(tensors);
+  return active_builder->aiOnnxOpset10().prelu(tensors,
+                                               getDebugContext("Prelu"));
 }
 
 const HostSideConstant &

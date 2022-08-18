@@ -14,11 +14,13 @@ OP_DECL(poptorch, host_side_tensor_constant, host_side_tensor_constant,
 
 OP_DECL(poptorch, constant_pad, constant_pad, AiOnnxOpset10.pad,
         ARG(INT_VEC, pads) ARG(FLOAT, value),
-        BODY_ARG(pads) BODY_ARG("constant") BODY_ARG(value))
+        BODY_ARG(pads) BODY_ARG("constant") BODY_ARG(value)
+        BODY_ARG(DEBUG_CONTEXT("Constantpad")))
 OP_DECL(poptorch, reflection_pad, reflection_pad, AiOnnxOpset10.pad,
         ARG(INT_VEC, pads), BODY_ARG(pads) BODY_ARG("reflect"))
 OP_DECL(poptorch, edge_pad, edge_pad, AiOnnxOpset10.pad, ARG(INT_VEC, pads),
-        BODY_ARG(pads) BODY_ARG("edge"))
+        BODY_ARG(pads) BODY_ARG("edge") BODY_ARG(0.0f)
+        BODY_ARG(DEBUG_CONTEXT("Reflectionpad")))
 
 OP_DECL(poptorch, add_not_in_place, add_not_in_place, _impl->addNotInPlace,
         NONE, NONE)
@@ -64,13 +66,16 @@ OP_DECL(poptorch, prelu, prelu, _impl->prelu, NONE, NONE)
 
 OP_DECL(poptorch, gru, gru, AiOnnxOpset10.gru, NONE,
         BODY_ARG(2) BODY_ARG(EMPTY_FLOAT_VEC) BODY_ARG(EMPTY_FLOAT_VEC)
-            BODY_ARG(EMPTY_STRING_VEC) BODY_ARG(OPTIONAL_FLOAT)
-                BODY_ARG("forward") BODY_ARG(OPTIONAL_INT) BODY_ARG(1))
+        BODY_ARG(EMPTY_STRING_VEC) BODY_ARG(OPTIONAL_FLOAT)
+        BODY_ARG("forward") BODY_ARG(OPTIONAL_INT) BODY_ARG(1)
+        BODY_ARG(DEBUG_CONTEXT("Gru")))
 
 OP_DECL(poptorch, rnn, rnn, AiOnnxOpset10.rnn, ARG(STRING_VEC, activations),
         BODY_ARG(2) BODY_ARG(EMPTY_FLOAT_VEC) BODY_ARG(EMPTY_FLOAT_VEC)
-            BODY_ARG(activations) BODY_ARG(OPTIONAL_FLOAT) BODY_ARG("forward")
-                BODY_ARG(OPTIONAL_INT))
+        BODY_ARG(activations) BODY_ARG(OPTIONAL_FLOAT) BODY_ARG("forward")
+        BODY_ARG(OPTIONAL_INT)
+        BODY_ARG(DEBUG_CONTEXT("Rnn")))
+
 
 #undef EMPTY_STRING_VEC
 #undef OPTIONAL_INT
