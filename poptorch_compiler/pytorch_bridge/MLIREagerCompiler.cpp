@@ -2,6 +2,7 @@
 #include "MLIREagerCompiler.hpp"
 
 #include <deque>
+#include <utility>
 
 #include "poptorch_logging/Logging.hpp"
 
@@ -57,7 +58,7 @@ void MLIREagerCompiler::compileRunAndReset() {
     }
   }
 
-  _executor.compileAndRun(_the_module, root_timer, mappings);
+  _executor.compileAndRun(_the_module, root_timer, std::move(mappings));
   resetMainGraph();
 
   root_timer.stop();

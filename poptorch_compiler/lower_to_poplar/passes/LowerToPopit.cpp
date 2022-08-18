@@ -70,8 +70,19 @@ void LowerToPopit::runOnOperation() {
     // Create the PopIT specs.
     std::vector<popit::TensorSpec> input_specs;
     input_specs.reserve(_context->inputs.size());
+    std::vector<popit::TensorSpec> inout_specs;
     for (auto &input : _context->inputs) {
-      input_specs.push_back(getTensorSpec(input.getType()));
+      auto input_pair_it = _context->mappings.find(input);
+      ERROR_ON(input_pair_it == _context->mappings.end());
+
+      const auto &oids = _context->output_ids;
+      const auto tensor_spec = getTensorSpec(input.getType());
+      if (std::find(oids.cbegin(), oids.cend(), input_pair_it->second) ==
+          oids.cend()) {
+        input_specs.push_back(tensor_spec);
+      } else {
+        inout_specs.push_back(tensor_spec);
+      }
     }
 
     // This lambda will actually be called by popitCall, so we need to make
@@ -107,7 +118,7 @@ void LowerToPopit::runOnOperation() {
 
     // Add the function
     _context->popit_fn =
-        popit::addFunction(_context->session.get(), input_specs, /*inouts=*/{},
+        popit::addFunction(_context->session.get(), input_specs, inout_specs,
                            popit_fn, function.getName().str());
   }
 }

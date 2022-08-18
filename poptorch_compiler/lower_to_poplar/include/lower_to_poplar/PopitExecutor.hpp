@@ -26,7 +26,7 @@ public:
   explicit PopitExecutor(PoplarDevice &device);
 
   void compileAndRun(mlir::ModuleOp module, NonRestartingMLIRTimer &timer,
-                     const llvm::DenseMap<mlir::Value, TensorId> &mappings);
+                     llvm::DenseMap<mlir::Value, TensorId> &&mappings);
   void addInput(const Buffer &ptr, const mlir::RankedTensorType &input,
                 TensorId id);
   void readOutput(TensorId id, void *ptr);

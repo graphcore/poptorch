@@ -38,9 +38,13 @@ public:
   std::unordered_map<TensorId, PopitMemPtr> tensors;
 
   std::unique_ptr<popit::Session_t, void (*)(popit::Session *)> session;
-  // We need to keeep around the device used by the session or it will segfault.
+  // We need to keep around the device used by the session or it will segfault.
   PoplarDevice device;
   PoplarTarget target;
+
+  // Mapping from MLIR to PopTorch tensors. Needed to work out which tensors
+  // will be passed in as inout parameters.
+  llvm::DenseMap<mlir::Value, TensorId> mappings;
 
   // These attributes get populated by LowerToPopit
   popit::FunctionId_t popit_fn;
