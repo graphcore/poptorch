@@ -106,14 +106,12 @@ void PopitExecutor::freeTensor(TensorId id) { _context->tensors.erase(id); }
 
 void PopitExecutor::compileAndRun(
     mlir::ModuleOp module, NonRestartingMLIRTimer &timer,
-    llvm::DenseMap<mlir::Value, TensorId> &&mappings) {
+    const llvm::DenseMap<mlir::Value, TensorId> &mappings) {
 
   if (!containsPoplarOps(module)) {
     poptorch::logging::trace("MLIR graph empty: skipping compileAndRun()");
     return;
   }
-
-  _context->mappings = std::move(mappings);
 
   auto compile_popit = timer.nestAndScope("Compiling popit");
 
@@ -127,11 +125,11 @@ void PopitExecutor::compileAndRun(
   std::vector<popit::Mem_t *> inputs;
   inputs.reserve(_context->inputs.size());
   for (auto &input : _context->inputs) {
-    auto it = _context->mappings.find(input);
+    auto it = mappings.find(input);
     // This can only happen if a pass in MLIRToPopitConverter replaces one of
     // the graph inputs. We can't support this because we've got no way to map
     // the new graph input to a Torch tensor.
-    ERROR_ON_MSG(it == _context->mappings.end(),
+    ERROR_ON_MSG(it == mappings.end(),
                  "[Internal] Input Value not found in tensor map");
     inputs.push_back(_context->tensors.at(it->second).get());
   }
