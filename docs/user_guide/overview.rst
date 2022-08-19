@@ -461,7 +461,7 @@ used:
   :linenos:
   :start-after: annotations_start
   :end-before: annotations_end
-  :emphasize-lines: 25, 32, 47-48, 51-52
+  :emphasize-lines: 23, 30, 45-46, 49-50
   :name: parallel_phased_example
 
 With the above functions as building blocks, you can set execution strategies
@@ -985,7 +985,7 @@ that is to allow tensors to keep their values from the previous run on each new 
 without making them model parameters.
 However, you must make sure that you only make in-place modifications to the
 buffer using PyTorch in-place operations (such as `+=` or those ending in  `_`).
-For example, you can  ``torch.Tensor.copy_`` to copy the contents of a another
+For example, you can  ``torch.Tensor.copy_`` to copy the contents of another
 tensor to the buffer.
 
 Unlike when running on the CPU, the following PyTorch code does not increment
@@ -998,10 +998,8 @@ Unlike when running on the CPU, the following PyTorch code does not increment
     :start-after: counter_model_wrong_start
     :end-before: counter_model_wrong_end
 
-This is because the PyTorch tracer will capture the value for ``model.i`` when
-tracing happens and then freeze the value as a constant.
-In fact, the value captured is `6.0` as PyTorch has traced or called the
-forward method five times before it captures the constant.
+This is because the PyTorch dispatcher will capture the value for ``model.i`` when
+building the graph and freeze the value as a constant.
 
 You can keep the value of a tensor between runs by registering it as a buffer
 in PyTorch, as the following examples shows:

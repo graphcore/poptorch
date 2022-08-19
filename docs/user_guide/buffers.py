@@ -1,7 +1,11 @@
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+import sys
 import torch
 import poptorch
+
+if not poptorch.hasMLIRSupportOnPlatform():
+    sys.exit(0)
 
 
 # counter_model_wrong_start
@@ -17,11 +21,11 @@ class CounterModel(torch.nn.Module):
 
 model = CounterModel()
 poptorch_model = poptorch.inferenceModel(model)
-print(poptorch_model())  # tensor([6.])
-print(poptorch_model())  # tensor([6.])
+print(poptorch_model())  # tensor([1.])
+print(poptorch_model())  # tensor([1.])
 # counter_model_wrong_end
 
-torch.testing.assert_close(model.i, torch.tensor([5.], dtype=torch.float))
+torch.testing.assert_close(model.i, torch.tensor([1.], dtype=torch.float))
 
 
 # pragma pylint: disable=function-redefined,no-member

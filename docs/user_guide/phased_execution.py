@@ -14,12 +14,10 @@ size = 10
 class Model(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.weights = []
-        for n in range(N * 6):
-            weight = torch.nn.Parameter(torch.rand(size, size),
-                                        requires_grad=True)
-            self.register_parameter(f"w{n}", weight)
-            self.weights.append(weight)
+        self.weights = torch.nn.ParameterList([
+            torch.nn.Parameter(torch.rand(size, size), requires_grad=True)
+            for n in range(N * 6)
+        ])
 
     def forward(self, in0, target=None):
         phase = 0

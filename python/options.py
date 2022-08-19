@@ -9,6 +9,7 @@ from ._logging import logger
 from . import _options_config
 from . import _options_impl
 from . import ops
+from . import poptorch_core
 
 
 class Attribute():
@@ -55,20 +56,23 @@ class _JitOptions(_options_impl.OptionsDict):
     """
 
     def __init__(self) -> None:
-        super().__init__(trace_model=True)
+        # The dispatcher requires MLIR support, so only change the default
+        # value if MLIR is available.
+        trace_model_default = not poptorch_core.mlirIsSupportedOnPlatform()
+        super().__init__(trace_model=trace_model_default)
 
     def traceModel(self, trace_model: bool) -> "poptorch.options._JitOptions":
         """
         Controls whether to use PyTorch's JIT tracing or the dispatcher
         to build the PopTorch graph.
 
-        The support for the dispatcher is still experimental, therefore
-        by default PopTorch will use torch.jit.trace().
-
         :param bool trace_model:
-            * True: use `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_
+            * True (deprecated): use `torch.jit.trace <https://pytorch.org/docs/1.10.0/generated/torch.jit.trace.html#torch.jit.trace>`_
             * False: use Torch's dispatcher to trace the graph.
        """
+        if trace_model:
+            logger.warning("trace_model=True is deprecated since version 3.0 "
+                           "and will be removed in a future release")
         self.set(trace_model=trace_model)
         return self
 

@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2021 Graphcore Ltd. All rights reserved.
 
+import sys
 import torch
 import poptorch
+
+if not poptorch.hasMLIRSupportOnPlatform():
+    sys.exit(0)
 
 
 class Model(torch.nn.Module):
@@ -33,8 +37,8 @@ tensor_names = poptorch_model.getTensorNames()
 
 # tensor_anchor_start
 opts = poptorch.Options()
-opts.anchorTensor('grad_bias', 'Gradient___model.fc2.bias')
-opts.anchorTensor('update_weight', 'UpdatedVar___model.fc2.weight')
+opts.anchorTensor('grad_bias', 'Gradient___fc2.bias')
+opts.anchorTensor('update_weight', 'UpdatedVar___fc2.weight')
 # tensor_anchor_end
 
 poptorch_model.destroy()

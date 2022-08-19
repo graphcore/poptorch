@@ -13,6 +13,9 @@ New features
 API changes
 -----------
 
+- Use the dispatcher instead of ``torch.jit.trace()`` by default to capture the graph on supported platforms (see :numref:`dispatcher-support`).
+  Use ``poptorch.Options.Jit.traceModel(True)`` to revert to previous behaviour.
+
 Bug Fixes
 ---------
 

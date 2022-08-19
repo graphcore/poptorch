@@ -1,7 +1,11 @@
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import sys
 import torch
 import poptorch
+
+if not poptorch.hasMLIRSupportOnPlatform():
+    sys.exit(0)
 
 # pragma pylint: disable=function-redefined
 
@@ -24,6 +28,8 @@ assert native_model(float16_tensor).dtype == torch.float32
 assert native_model(float32_tensor).dtype == torch.float32
 
 opts = poptorch.Options()
+# Important: this is only needed for traceModel(True)
+opts.Jit.traceModel(True)
 opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
@@ -33,6 +39,15 @@ assert poptorch_model(float16_tensor).dtype == torch.float16
 
 poptorch_model = poptorch.inferenceModel(native_model, opts)
 assert poptorch_model(float32_tensor).dtype == torch.float32
+
+# UPDATE: with the new default of traceModel(False) PopTorch now matches the native behaviour
+poptorch_model = poptorch.inferenceModel(native_model)
+assert poptorch_model(float16_tensor).dtype == native_model(
+    float16_tensor).dtype
+
+poptorch_model = poptorch.inferenceModel(native_model)
+assert poptorch_model(float32_tensor).dtype == native_model(
+    float32_tensor).dtype
 
 # zero_res_end
 
@@ -51,6 +66,8 @@ float16_tensor = torch.tensor([1.0], dtype=torch.float16)
 float32_tensor = torch.tensor([1.0], dtype=torch.float32)
 
 opts = poptorch.Options()
+# Important: this is only needed for traceModel(True)
+opts.Jit.traceModel(True)
 opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
@@ -64,6 +81,15 @@ assert poptorch_model(float16_tensor).dtype == torch.float16
 
 poptorch_model = poptorch.inferenceModel(native_model, opts)
 assert poptorch_model(float32_tensor).dtype == torch.float32
+
+# UPDATE: with the new default of traceModel(False) PopTorch now matches the native behaviour
+poptorch_model = poptorch.inferenceModel(native_model)
+assert poptorch_model(float16_tensor).dtype == native_model(
+    float16_tensor).dtype
+
+poptorch_model = poptorch.inferenceModel(native_model)
+assert poptorch_model(float32_tensor).dtype == native_model(
+    float32_tensor).dtype
 
 # rand_res_end
 
@@ -89,6 +115,8 @@ assert native_model(float16_tensor).dtype == torch.float32
 assert native_model(float32_tensor).dtype == torch.float32
 
 opts = poptorch.Options()
+# Important: this is only needed for traceModel(True)
+opts.Jit.traceModel(True)
 opts.Precision.halfFloatCasting(
     poptorch.HalfFloatCastingBehavior.HalfUpcastToFloat)
 
@@ -98,4 +126,14 @@ assert poptorch_model(float16_tensor).dtype == torch.float16
 
 poptorch_model = poptorch.inferenceModel(native_model, opts)
 assert poptorch_model(float32_tensor).dtype == torch.float32
+
+# UPDATE: with the new default of traceModel(False) PopTorch now matches the native behaviour
+poptorch_model = poptorch.inferenceModel(native_model)
+assert poptorch_model(float16_tensor).dtype == native_model(
+    float16_tensor).dtype
+
+poptorch_model = poptorch.inferenceModel(native_model)
+assert poptorch_model(float32_tensor).dtype == native_model(
+    float32_tensor).dtype
+
 # uniform_res_end

@@ -1504,4 +1504,9 @@ class PoplarExecutor:
 
 
 def hasMLIRSupportOnPlatform():
+    """Return True if the current platform supports MLIR, else False.
+
+    The dispatcher and eager mode cannot be used on platforms that don't
+    support MLIR.
+    """
     return poptorch_core.mlirIsSupportedOnPlatform()

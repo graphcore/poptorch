@@ -381,6 +381,10 @@ Support nearest and bicubic mode.
 Float 16 operations
 ===================
 
+.. warning::
+   Deprecated since version 3.0.
+   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
+
 Due to the limitation of PyTorch's float 16 support on the CPU (used for tracing the model), certain operations may result in the use of float 32 where float 16 would be expected, or float 16 where float 32 would be expected.
 This is because the model must always be traced with float 16 inputs converted to float 32.
 
@@ -389,6 +393,11 @@ In such situations, any dtype which incorrectly resolves to a float 16 would hav
 
 Casting
 -------
+
+.. warning::
+   Deprecated since version 3.0.
+   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
+
 The ``tensor.to(dtype)`` argument will be ignored if it is ``torch.float32`` because it may refer to one or more float 16 tensors which were converted to float 32 to allow tracing to happen, for example ``a.to(b.dtype)`` where ``b`` may be a float 16 tensor converted to a float 32 tensor.
 Once the output of the op or one of its descendants encounters a known float 16 or float 32 input, the type will be resolved to this type.
 
@@ -411,6 +420,10 @@ The following examples show cases where the casting functionality is resolved ba
 
 Creation functions
 ------------------
+
+.. warning::
+   Deprecated since version 3.0.
+   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
 
 The following functions are affected:
 
@@ -449,6 +462,10 @@ The following examples show cases where the type output differs from PyTorch:
 
 Normalization
 -------------
+
+.. warning::
+   Deprecated since version 3.0.
+   The use of `torch.jit.trace()` has been deprecated, therefore this section only applies if you explicitly use ``opts.Jit.traceModel(True)``.
 
 Some normalization layers require the computation of running statistics - mean and variance. These tensors will be computed as float32 even though the inputs to the operator can be float16. This behaviour has been chosen to strike a balance between performance and numerical accuracy.
 
