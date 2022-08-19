@@ -1070,10 +1070,10 @@
   PopTorchDirect: cast
   IgnoreArgs: non_blocking, copy, memory_format
 
-# func: arange.start_out(Scalar start, Scalar end, Scalar step=1, *, Tensor(a!) out) -> Tensor(a!)
-- func: arange.start_out
-  PopTorchDirect: arange_start_out
-  UnusedOutputArguments: {out}
+# arange.start_step(Scalar start, Scalar end, Scalar step, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- func: arange.start_step
+  PopTorchDirect: arange
+  IgnoreArgs: layout, device, pin_memory
 
 - func: topk.values
   PopTorchDirect: topk

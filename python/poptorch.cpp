@@ -788,6 +788,8 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
 
   fixForLoopInputs(*graph);
 
+  poptorch::type_and_constant_canonicalization::evaluateConstexprs(graph.get());
+
   poptorch::type_and_constant_canonicalization::canonicaliseConstants(
       graph.get());
 

@@ -517,6 +517,12 @@ void detach(const c10::OperatorHandle &op, c10::Stack *stack) {
   context.activeDispatch()->detach(op, stack, context.moving_parameters);
 }
 
+at::Tensor &arangeOut(const at::Scalar &start, const at::Scalar &end,
+                      const at::Scalar &step, at::Tensor &out) {
+  out = at::arange(start, end, step, {at::kXLA});
+  return out;
+}
+
 void replaceValueDispatcher(torch::jit::Value *v_old,
                             torch::jit::Value *v_new) {
   if (!context.hasActiveDispatch()) {

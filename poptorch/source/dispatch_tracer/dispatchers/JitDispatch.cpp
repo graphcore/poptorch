@@ -79,10 +79,9 @@ at::Tensor JITDispatch::addConstant(const at::Tensor &cpu_tensor) {
 
   auto src = copyAndCoerceType(cpu_tensor);
 
-  at::Tensor tensor =
-      allocateTensor(src.sizes(), c10::typeMetaToScalarType(src.dtype()));
+  at::Tensor tensor = allocateTensor(src.sizes(), src.scalar_type());
 
-  torch::jit::Value *value = makeConstant(*graph, src);
+  auto *value = insertConstant(graph.get(), src);
 
   logging::trace("[TRACING-2] Adding constant: Value {} with cpu ptr {}",
                  static_cast<void *>(value), cpu_tensor.data_ptr());
@@ -166,7 +165,12 @@ void JITDispatch::addOutput(const at::Tensor &ipu_src,
   // TODO(T62169) handle empty graphs better.
   for (auto *i : graph->inputs()) {
     if (i == val) {
-      val = createIdentity(graph.get(), {val})->output();
+      auto *none = graph->createNone();
+      insertNodeInGraph(graph.get(), none);
+      val = createAndInsertNode(graph.get(), c10::aten::clone,
+                                {val, none->output()}, ImplicitCast::None,
+                                OutputType::AsFirstInput)
+                ->output();
       break;
     }
   }
@@ -389,9 +393,24 @@ void JITDispatch::fallback(const c10::OperatorHandle &initial_op,
         continue;
       }
       torch::jit::Value *jv = node->input(i);
-      auto *cast = createCast(graph.get(), jv, output_type);
+      auto *g = graph.get();
+      auto *dtype = insertConstant(g, output_type);
+      auto *non_blocking = insertConstant(g, false);
+      auto *copy = insertConstant(g, false);
+      auto *none = g->createNone();
+      insertNodeInGraph(g, none);
+      auto *cast =
+          createAndInsertNode(graph.get(), c10::aten::to,
+                              {jv, dtype, non_blocking, copy, none->output()});
+      cast->output()->setType(
+          jv->type()->expect<c10::TensorType>()->withScalarType(output_type));
       // The cast needs to be before the node.
       cast->moveBefore(node);
+      dtype->node()->moveBefore(cast);
+      non_blocking->node()->moveBefore(cast);
+      copy->node()->moveBefore(cast);
+      none->moveBefore(cast);
+
       node->replaceInputWith(jv, cast->output());
     }
   }

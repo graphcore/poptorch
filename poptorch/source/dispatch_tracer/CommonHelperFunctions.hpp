@@ -22,11 +22,6 @@ namespace poptorch {
 
 class ValueMapper;
 
-// Insert a poptorch::tensor_constant into the graph which doesn't require
-// further canonicalization.
-torch::jit::Value *makeConstant(torch::jit::Graph &graph,
-                                const at::Tensor &tensor);
-
 at::Tensor copyAndCoerceType(const at::Tensor &tensor);
 
 // If initial_op is already an outplace op return it. Otherwise get the

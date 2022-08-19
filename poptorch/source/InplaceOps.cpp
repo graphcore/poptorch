@@ -377,24 +377,11 @@ InplaceInputsTracker::finalizeGraph(torch::jit::Graph &graph,
             "poptorch.Options.broadcastBuffers(False).");
 
         WithNodeMetadata meta(alias->node());
-        auto *aten_target =
-            graph.create(symbols::poptorch::update_param_inplace, 1);
-        aten_target->addInput(graph_input);
-        aten_target->addInput(alias);
-        insertNodeAfterNode(aten_target, alias->node());
-        aten_target->output()->setType(alias->type());
-
-        // Canonicalise immediately
-        SymbolHandler handler =
-            getHandler(symbols::poptorch::update_param_inplace);
-        ERROR_ON(!handler);
-        auto *new_node = handler(&graph, aten_target);
-        ERROR_ON(new_node == nullptr);
-        // Replace the old node by the canonicalised one.
-        std::unordered_set<torch::jit::Node *> to_delete;
-        to_delete.insert(aten_target);
-        // Clean up any dead nodes.
-        searchAndPossiblyDestroy(to_delete);
+        auto *new_node =
+            createAndInsertNode(&graph, symbols::poptorch::update_param_inplace,
+                                {graph_input, alias});
+        new_node->moveAfter(alias->node());
+        new_node->output()->setType(alias->type());
       } else {
         logging::trace("Alias for input %{} -> %{}", it->first->debugName(),
                        alias->debugName());

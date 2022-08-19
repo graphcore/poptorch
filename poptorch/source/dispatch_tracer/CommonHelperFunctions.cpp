@@ -60,7 +60,8 @@ torch::jit::Value *insertValueIntoGraphAndTrackIt(c10::IValue &value,
     if (val == nullptr) {
       // This is probably an external tensor that we didn't catch. Assume
       // it's a constant.
-      val = makeConstant(graph, tensor);
+      val = insertConstant(graph, copyAndCoerceType(tensor));
+      setSourceRangeToCurrentLocation(val->node());
       // Don't track constants in the ValueMapper as they are CPU tensors.
     }
 
@@ -165,12 +166,6 @@ at::ScalarType scalarTypeOrDefault(c10::optional<at::ScalarType> dtype) {
   return dtype ? *dtype : at::ScalarType::Float;
 }
 
-torch::jit::Value *makeConstant(torch::jit::Graph &graph,
-                                const at::Tensor &tensor) {
-  auto *constant = tensorToConstant(&graph, copyAndCoerceType(tensor));
-  return constant->output();
-}
-
 at::Tensor copyAndCoerceType(const at::Tensor &tensor) {
   at::Tensor copy;
   auto scalar_type = tensor.scalar_type();
@@ -195,12 +190,28 @@ c10::OperatorHandle getOutplaceOpHandle(const c10::OperatorHandle &op,
   if (name[name.size() - 1] == '_') {
     // These are special cases because there is no zero / fill.
     if (name == "aten::zero_") {
+      // aten::zero_(Tensor(a!) self)
+      // aten::zeros_like(Tensor self, *, ScalarType? dtype=None,
+      //                  Layout? layout=None, Device? device=None,
+      //                  bool? pin_memory=None,
+      //                  MemoryFormat? memory_format=None)
       name = "aten::zeros_like";
-      // zero_ takes only 1 argument whereas our MLIR shape inference for
-      // zeros_like takes an optional dtype as well
-      stack.emplace_back();
+      // Add the remaining 5 arguments
+      for (auto i = 0u; i < 5; i++) {
+        stack.emplace_back();
+      }
     } else if (name == "aten::fill_") {
+      // aten::fill_.Tensor(Tensor(a!) self, Tensor value)
+      // aten::fill_.Scalar(Tensor(a!) self, Scalar value)
+      // aten::full_like(Tensor self, Scalar fill_value, *,
+      //                 ScalarType? dtype=None, Layout? layout=None,
+      //                 Device? device=None, bool? pin_memory=None,
+      //                 MemoryFormat? memory_format=None
       name = "aten::full_like";
+      // Add the remaining 5 arguments
+      for (auto i = 0u; i < 5; i++) {
+        stack.emplace_back();
+      }
     } else {
       name.erase(name.end() - 1, name.end());
     }

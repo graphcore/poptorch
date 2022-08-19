@@ -390,13 +390,9 @@ def test_embedding_bag_per_sample_weights(trace_model):
 @pytest.mark.parametrize("mode", ["max", "mean", "sum"])
 @pytest.mark.parametrize("trace_model", [True, False])
 def test_embedding_bag_include_last_offset(mode, trace_model):
-    if not trace_model:
-        pytest.skip("TODO(T57195): Unsupported aten::embedding_bag operation: "
-                    "offsets tensor must be a constant")
-
     class Model(torch.nn.Module):
         def __init__(self):
-            super(Model, self).__init__()
+            super().__init__()
             self.weight = torch.nn.Parameter(torch.Tensor(10, 3))
             torch.nn.init.normal_(self.weight)
 

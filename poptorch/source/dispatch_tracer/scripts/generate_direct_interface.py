@@ -81,7 +81,8 @@ def add_outplace_op(function,
                     outputs,
                     named_tensors,
                     scope="",
-                    inplace_reshape=False):
+                    inplace_reshape=False,
+                    has_tensor_params=True):
     return_type = "poptorch_ir::ODSTensorResults mlir_output =\n" + scope
     return_type += "\t  "
 
@@ -117,8 +118,9 @@ def add_outplace_op(function,
         outputs_code += "\tt_ids = mlir_output.at(" + str(
             index) + ").tensor_ids;\n"
         outputs_code += scope
+        requires_grad = "requires_grad_or" if has_tensor_params else "false"
         outputs_code += "\trequires_grad = requiresGrad(mlir_output.at(" + str(
-            index) + ").requires_grad_types, requires_grad_or);\n"
+            index) + f").requires_grad_types, {requires_grad});\n"
         if not is_list:
             outputs_code += scope
             outputs_code += "\tt_id = getSingleOptionalTensorId(t_ids);\n"
@@ -224,9 +226,13 @@ def add_maybe_inplace_op(op_target, parameters, tensor_params,
         function_decl += "and manually mark the function.\n"
 
         # Add the out place version of the operation.
-        function_decl += add_outplace_op(op_target["PopTorchDirect"],
-                                         parameters, outputs, named_tensors,
-                                         "\t")
+        function_decl += add_outplace_op(
+            op_target["PopTorchDirect"],
+            parameters,
+            outputs,
+            named_tensors,
+            "\t",
+            has_tensor_params=len(tensor_params) > 0)
         function_decl += "}\n"
     return function_decl
 
@@ -366,7 +372,8 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
     # Remove the comma
     parameters = parameters[:-1]
 
-    if len(tensor_params) > 0:
+    has_tensor_params = len(tensor_params) > 0
+    if has_tensor_params:
         tensor_params = tensor_params[1:]
 
     # Check if the inplace operation is directly on one of the input tensors.
@@ -379,7 +386,10 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
     elif "PopTorchDirect" in op_target:
         # Otherwise we are dealing with a vanilla function.
         function_decl += add_outplace_op(op_target["PopTorchDirect"],
-                                         parameters, outputs, named_tensors)
+                                         parameters,
+                                         outputs,
+                                         named_tensors,
+                                         has_tensor_params=has_tensor_params)
     elif "PopTorchDirectInplaceReshape" in op_target:
         # These functions are inplace from PyTorch's point of view, but reshape
         # the target tensor, so need to be handled outplace in MLIR.
@@ -388,7 +398,8 @@ def generate_cpp(op_target, canonicalised_args, outputs, named_tensors):
             parameters,
             outputs,
             named_tensors,
-            inplace_reshape=True)
+            inplace_reshape=True,
+            has_tensor_params=has_tensor_params)
     elif "PopTorchDirectInplace" in op_target:
         function_decl += add_inplace_op(op_target["PopTorchDirectInplace"],
                                         parameters,

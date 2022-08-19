@@ -255,8 +255,13 @@ void ConstExprEvaluator::replaceWithConstants(const torch::jit::Stack &stack) {
     // Obtain the resolved value from the stack
     auto resolved_value = stack.at(constexpr_value_to_out_idx[constexpr_value]);
 
+    if (resolved_value.isTensor()) {
+      resolved_value = resolved_value.toTensor().contiguous();
+    }
+
     // Insert a constant to replace the original node and replace all uses
     torch::jit::WithInsertPoint insert_point(value->node());
+    WithNodeMetadata meta(value->node());
     torch::jit::Value *new_const = insertConstant(_graph, resolved_value);
     value->replaceAllUsesWith(new_const);
   }
@@ -303,6 +308,16 @@ void ConstExprEvaluator::copyNodeToConstexprGraph(torch::jit::Node *node) {
   auto *new_node = _constexpr_graph->createClone(
       node, [this](torch::jit::Value *v) { return this->_values_map[v]; },
       false);
+
+  for (auto *input : new_node->inputs()) {
+    auto maybe_device = input->type()->cast<c10::DeviceObjType>();
+    if (maybe_device != nullptr) {
+      // All code should be running on CPU here
+      input->node()->s_(c10::attr::value, "cpu");
+    }
+  }
+
+  WithNodeMetadata meta(new_node);
   _nodes_map[node] = new_node;
 
   insertNodeInGraph(_constexpr_graph.get(), new_node);

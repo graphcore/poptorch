@@ -343,18 +343,27 @@ def Poptorch_one_hot : Poptorch_NotImplementedOp<"one_hot", []> {
   }]>];
 }
 
-def Poptorch_arange_start_out : Poptorch_NotImplementedOp<"arange_start_out", []> {
-  let arguments = (ins F32Attr:$start, F32Attr:$end, F32Attr:$step);
+def Poptorch_arange : Poptorch_NotImplementedOp<"arange", []> {
+  let arguments = (ins F32Attr:$start,
+                       F32Attr:$end,
+                       F32Attr:$step,
+                       OptionalAttr<TypeAttr>:$dtype);
 
   let results = (outs Poptorch_tensor:$result);
-  let builders = [OpBuilder<(ins "float":$start, "float":$end, "float":$step), [{
-          $_state.addAttribute("start", $_builder.getF32FloatAttr(start));
-          $_state.addAttribute("end", $_builder.getF32FloatAttr(end));
-          $_state.addAttribute("step", $_builder.getF32FloatAttr(step));
+  let builders = [OpBuilder<(ins "float":$start,
+                                 "float":$end,
+                                 "float":$step,
+                                 "std::optional<mlir::Type>":$dtype), [{
+    $_state.addAttribute("start", $_builder.getF32FloatAttr(start));
+    $_state.addAttribute("end", $_builder.getF32FloatAttr(end));
+    $_state.addAttribute("step", $_builder.getF32FloatAttr(step));
 
-          const auto count = static_cast<int64_t>((end - start) / step);
+    auto out_type = dtype.value_or($_builder.getF32Type());
+    $_state.addAttribute("dtype", mlir::TypeAttr::get(out_type));
 
-          $_state.addTypes(mlir::RankedTensorType::get({count}, $_builder.getF32Type()));
+    const auto count = static_cast<int64_t>((end - start) / step);
+
+    $_state.addTypes(mlir::RankedTensorType::get({count}, out_type));
   }]>];
 }
 
