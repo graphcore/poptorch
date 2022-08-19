@@ -280,9 +280,13 @@ class LogChecker:
     def __init__(self, capfd_or_str):
         if isinstance(capfd_or_str, str):
             self._log = capfd_or_str
-        else:
+        elif hasattr(capfd_or_str, "text"):
+            self._log = capfd_or_str.text
+        elif hasattr(capfd_or_str, "readouterr"):
             out, err = capfd_or_str.readouterr()
             self._log = out + err
+        else:
+            raise TypeError("LogChecker passed unsupported capture fixture")
         self._lines = self._log.split('\n')
 
     def createIterator(self):

@@ -303,7 +303,7 @@ def test_seed_precompilation(capfd, trace_model):
 @helpers.overridePoptorchLogLevel("DEBUG")
 @pytest.mark.ipuHardwareRequired
 @pytest.mark.parametrize("trace_model", [True, False])
-def test_save_everything(capfd, trace_model):
+def test_save_everything(capfd, caplog, trace_model):
     # create a dummy model
     model = ModelWithLoss(torch.nn.CrossEntropyLoss(), use_dropout=True)
 
@@ -337,9 +337,10 @@ def test_save_everything(capfd, trace_model):
         log = helpers.LogChecker(capfd)
         log.assert_matches("Reading random seed")
         log.assert_matches("Reading RNG state")
-        # TODO(T67436): following message is not output to log
-        # log.assert_matches("Implicit copyWeightsToHost()")
         log.assert_matches("Writing optimiser state tensors from IPU to host.")
+
+        log = helpers.LogChecker(caplog)
+        log.assert_matches("Implicit copyWeightsToHost()")
 
         origin_out.append(training_model(input, label))
 
