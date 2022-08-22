@@ -439,8 +439,12 @@ at::Scalar localScalarDense(const at::Tensor &self) {
 }
 
 at::Scalar item(const at::Tensor &self) {
-  ERROR_ON_MSG(!eagerModeEnabled(),
-               "aten::item is only supported in eager mode.");
+  ERROR_ON_MSG(
+      !eagerModeEnabled(),
+      "aten::item is only supported in eager mode, but was intercepted in "
+      "a static graph. This means an IPU to CPU copy was triggered before "
+      "the end of the graph, for example by calling tensor.item(). "
+      "Please ensure that any such copies are removed.");
 
   return at::native::call_fallback_fn<&poptorch::cpuFallback,
                                       ATEN_OP(item)>::call(self);
