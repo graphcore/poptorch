@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Graphcore Ltd. All rights reserved.
 
+import collections
 import re
 import torch
 import torch.nn as nn
@@ -557,13 +558,20 @@ def test_custom_arg_parser(fwd_args):
         def reconstruct(self, _original_structure, tensor_iterator):
             return MyArg(next(tensor_iterator), next(tensor_iterator))
 
+    class OutputContainer(collections.OrderedDict):
+        def print(self):
+            return str(self)
+
     poptorch.registerCustomArgParser(MyArg, MyParser())
 
     class Model(torch.nn.Module):
         def forward(self, args):
             # Make sure to use a poptorch specific op
             # to check the graph is not empty or running on the CPU
-            return args.a + poptorch.ipu_print_tensor(args.b)
+            out = OutputContainer()
+            out["sum"] = args.a + poptorch.ipu_print_tensor(args.b)
+            out["a"] = args.a
+            return out
 
     class ModelWrapper(Model):
         def forward(self, *args, **kwargs):
@@ -585,7 +593,15 @@ def test_custom_arg_parser(fwd_args):
         args = MyArg(torch.randn(2, 2), torch.randn(2, 2))
         native_out = model(args)
         poptorch_out = poptorch_model(args)
-        helpers.assert_allclose(expected=native_out, actual=poptorch_out)
+        # Make sure we get an OutputContainer and the elements are in the same order
+        assert isinstance(native_out, OutputContainer)
+        assert isinstance(poptorch_out, OutputContainer)
+        print(native_out.print())
+        print(poptorch_out.print())
+        for native_key, poptorch_key in zip(native_out, poptorch_out):
+            assert native_key == poptorch_key
+            helpers.assert_allclose(expected=native_out[native_key],
+                                    actual=poptorch_out[poptorch_key])
 
 
 @pytest.mark.mlirSupportRequired

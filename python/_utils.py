@@ -74,7 +74,7 @@ custom_arg_parsers = dict()
 def flattenTensorStructure(tensors):
     def flatten(x):
         if isinstance(x, dict):
-            for k in sorted(x.keys()):
+            for k in x.keys():
                 yield from flatten(x[k])
         elif isinstance(x, (list, tuple)):
             for t in x:
@@ -100,7 +100,7 @@ def reconstructTensorStructure(structure, values, filter_fn=lambda t: True):
     # passed iterator.
     def copy_structure(x, it):
         if isinstance(x, dict):
-            return {k: copy_structure(x[k], it) for k in sorted(x.keys())}
+            return type(x)({k: copy_structure(x[k], it) for k in x.keys()})
         if isinstance(x, (tuple, list)):
             return type(x)(copy_structure(e, it) for e in x)
         if isinstance(x, torch.Tensor) and filter_fn(x):
