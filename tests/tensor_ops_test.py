@@ -799,6 +799,22 @@ def test_fill(capfd, input_shapes, t, trace_model):
     testlog.assert_no_matches("expand")
 
 
+@pytest.mark.parametrize("trace_model", [True, False])
+def test_triu_in_constexpr(trace_model):
+    def op(x):
+        # triu is unsupported but the RHS should be reduced
+        # to a constant before the op reaches PopART
+        # canonicalisation
+        return x + torch.ones(3, 3).triu_()
+
+    x = torch.ones(3, 3)
+    op_harness(op,
+               x,
+               test_training=False,
+               native_out=op(x),
+               trace_model=trace_model)
+
+
 @pytest.mark.parametrize("input_shapes", input_shapes)
 @pytest.mark.parametrize("value", [0.666, -4.32, float("Inf"), float("-Inf")])
 @pytest.mark.parametrize("trace_model", [True, False])

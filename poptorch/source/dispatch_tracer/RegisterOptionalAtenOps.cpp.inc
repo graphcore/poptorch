@@ -46,6 +46,10 @@ TORCH_LIBRARY_IMPL(aten, XLA, m) {
   m.impl("arange.start_out", PTC(poptorch::arangeOut));
   m.impl("arange.start_step", PTC_BOXED(poptorch::fallback));
 
+  // If we don't intercept this op, it will be decomposed into fill_.Scalar
+  // which acts on empty tensors and thus wouldn't be recognised as a constexpr
+  m.impl("ones", PTC_BOXED(poptorch::fallback));
+
   // Intercept alias to circumvent issues accessing tensor storage directly
   m.impl("alias", PTC_BOXED(poptorch::fallback));
 

@@ -34,10 +34,10 @@ void canonicalizeLate(torch::jit::Graph *graph);
 void canonicalizeLists(torch::jit::Graph *graph);
 
 /*
- * Warn if any Aten ops remain in the graph after we have run canonicalisation
+ * Error if any Aten ops remain in the graph after we have run canonicalisation
  * so the user can report exactly what operation we are missing.
  */
-void warnOnUnsupportedAten(torch::jit::Graph *graph);
+void errorOnUnsupportedAten(torch::jit::Graph *graph);
 
 void annotateSubgraphs(torch::jit::Graph *graph, torch::jit::Node *start_node);
 

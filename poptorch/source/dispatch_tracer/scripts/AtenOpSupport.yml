@@ -1075,6 +1075,11 @@
   PopTorchDirect: arange
   IgnoreArgs: layout, device, pin_memory
 
+# ones(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+- func: ones
+  PopTorchDirect: ones
+  IgnoreArgs: layout, device, pin_memory
+
 - func: topk.values
   PopTorchDirect: topk
   UnusedOutputArguments: {values, indices}
@@ -1189,6 +1194,10 @@
 - func: resize_
   PopTorchDirect: resize_
   IgnoreArgs: {memory_format}
+
+# triu(Tensor self, int diagonal=0) -> Tensor
+- func: triu
+  PopTorchDirect: triu
 
 #########
 # Norms

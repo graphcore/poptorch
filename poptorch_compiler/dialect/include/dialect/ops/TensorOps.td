@@ -48,6 +48,18 @@ def Poptorch_zero_: Poptorch_Op<"zero_", []> {
     let arguments = (ins Poptorch_tensor:$input);
 }
 
+def Poptorch_triu: Poptorch_NotImplementedOp<"triu", []> {
+  let arguments = (ins Poptorch_tensor:$self,
+                       I64Attr:$diagonal);
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilder<(ins "mlir::Value":$self,
+                                 "std::int64_t":$diagonal),[{
+    $_state.addOperands({self});
+    $_state.addAttribute("diagonal", $_builder.getI64IntegerAttr(diagonal));
+    $_state.addTypes(self.getType());
+  }]>];
+}
+
 // to.dtype(Tensor(a) self, ScalarType dtype, ...) -> Tensor(a)
 def Poptorch_cast : Poptorch_Op<"cast", []> {
   let arguments = (ins Poptorch_tensor:$self, TypeAttr:$dtype);
@@ -364,6 +376,22 @@ def Poptorch_arange : Poptorch_NotImplementedOp<"arange", []> {
     const auto count = static_cast<int64_t>((end - start) / step);
 
     $_state.addTypes(mlir::RankedTensorType::get({count}, out_type));
+  }]>];
+}
+
+// ones(int[] size, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
+def Poptorch_ones: Poptorch_NotImplementedOp<"ones", []> {
+  let arguments = (ins I64ArrayAttr:$size,
+                       OptionalAttr<TypeAttr>:$dtype);
+
+  let results = (outs Poptorch_tensor:$result);
+  let builders = [OpBuilder<(ins "const std::vector<std::int64_t>&":$size,
+                                 "std::optional<mlir::Type>":$dtype), [{
+    $_state.addAttribute("size", $_builder.getI64ArrayAttr(size));
+    auto out_type = dtype.value_or($_builder.getF32Type());
+    $_state.addAttribute("dtype", mlir::TypeAttr::get(out_type));
+
+    $_state.addTypes(mlir::RankedTensorType::get(size, out_type));
   }]>];
 }
 

@@ -738,8 +738,8 @@ poptorch::LowerToPopart lowerToPopartFromTrace(
     logging::trace("Graph right after add detach operations:\n{}", *graph);
   }
 
-  // Warn the user if any operations couldn't be canonicalised.
-  poptorch::warnOnUnsupportedAten(graph.get());
+  // Error if any operations couldn't be canonicalised.
+  poptorch::errorOnUnsupportedAten(graph.get());
 
   logging::trace("Graph right before popart:\n{}", *graph);
 
@@ -821,6 +821,9 @@ poptorch::LowerToPopart lowerToPopartFromDispatch(
     poptorch::addDetachOperations(graph.get());
     poptorch::removeSurplusIdentityLosses(graph.get());
   }
+
+  // Error if any operations couldn't be canonicalised.
+  poptorch::errorOnUnsupportedAten(graph.get());
 
   // Prepare CPU op callbacks, by allocating the CPU tensors where the
   // inputs/outputs will be stored. We have to do this at the last possible

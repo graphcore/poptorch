@@ -390,6 +390,15 @@ torch::jit::Node *fullLikeHandler(torch::jit::Graph *graph,
   return fullCommon(graph, v, like_type, like_shape);
 }
 
+torch::jit::Node *triuHandler(torch::jit::Graph *graph,
+                              torch::jit::Node *node) {
+  // aten::triu(Tensor self, int diagonal=0) -> Tensor
+  ERROR("torch.triu is only supported within constant expressions, "
+        "for example torch.ones(3, 3).triu_().");
+  UNUSED(graph);
+  UNUSED(node);
+  return nullptr;
+}
 } // namespace
 
 __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
@@ -407,6 +416,7 @@ __attribute__((constructor(HANDLER_INIT_PRIORITY))) static void registration() {
   registerHandler(c10::aten::full, fullHandler);
   registerHandler(c10::aten::new_full, fullHandler);
   registerHandler(c10::aten::full_like, fullLikeHandler);
+  registerHandler(c10::aten::triu, triuHandler);
 }
 
 } // namespace poptorch

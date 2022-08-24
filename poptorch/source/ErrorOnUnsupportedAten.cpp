@@ -8,7 +8,7 @@
 
 namespace poptorch {
 
-void warnOnUnsupportedAten(torch::jit::Graph *graph) {
+void errorOnUnsupportedAten(torch::jit::Graph *graph) {
   // Check that all of the "aten::" ops have been eliminated.
   std::unordered_set<torch::jit::Symbol> unsupported_ops;
 
